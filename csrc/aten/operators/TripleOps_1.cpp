@@ -4,7 +4,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
-#include <utils/Pointwise.h>
+#include "comm/Pointwise.h"
 
 #include "Loops.h"
 

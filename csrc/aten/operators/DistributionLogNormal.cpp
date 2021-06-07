@@ -5,8 +5,8 @@
 #include <core/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
-#include <utils/ATDispatch.h>
-#include <utils/AccumulateType.h>
+#include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 
 #include "Random.h"
 #include "Distributions.h"

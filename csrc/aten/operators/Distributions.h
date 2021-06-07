@@ -2,7 +2,7 @@
 
 #include "Random.h"
 #include "Loops.h"
-#include <utils/Numerics.h>
+#include "comm/Numerics.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {

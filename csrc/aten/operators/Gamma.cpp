@@ -1,13 +1,13 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
-#include <utils/AccumulateType.h>
+#include "comm/AccumulateType.h"
 
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 #include "Random.h"
 #include "Loops.h"

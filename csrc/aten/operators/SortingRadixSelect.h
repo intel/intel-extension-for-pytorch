@@ -1,6 +1,6 @@
 #pragma once
 
-#include <utils/Numerics.h>
+#include "comm/Numerics.h"
 
 
 namespace xpu {

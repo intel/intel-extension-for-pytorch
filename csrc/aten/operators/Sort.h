@@ -6,7 +6,7 @@
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/Numerics.h>
+#include "comm/Numerics.h"
 
 using namespace at;
 using namespace xpu::dpcpp::detail;

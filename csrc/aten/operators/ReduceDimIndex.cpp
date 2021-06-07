@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 
-#include <utils/MathReduce.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/MathReduce.h"
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {

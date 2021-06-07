@@ -7,9 +7,9 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <c10/core/ScalarType.h>
-#include <utils/Numerics.h>
-#include <utils/AccumulateType.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/AccumulateType.h"
+#include "comm/ATDispatch.h"
 #include <iostream>
 
 #include "Loops.h"

@@ -2,8 +2,8 @@
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/ATDispatch.h>
-#include <utils/Numerics.h>
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>

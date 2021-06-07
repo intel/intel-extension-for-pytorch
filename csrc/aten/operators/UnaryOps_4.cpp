@@ -2,9 +2,9 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/DPCPP.h>
-#include <utils/Numerics.h>
-#include <utils/Pairwise.h>
-#include <utils/Pointwise.h>
+#include "comm/Numerics.h"
+#include "comm/Pairwise.h"
+#include "comm/Pointwise.h"
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include "Loops.h"

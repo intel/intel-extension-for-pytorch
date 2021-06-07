@@ -6,8 +6,8 @@
 
 #include <core/ApplyUtils.h>
 #include <core/TensorImplUtils.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 #include <ATen/native/TensorIterator.h>
 #include "Loops.h"
 

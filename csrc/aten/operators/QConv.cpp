@@ -1,13 +1,13 @@
 #include <ATen/ATen.h>
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
-#include <utils/ParamUtils.h>
+#include "comm/ParamUtils.h"
 
 #include <core/DPCPPUtils.h>
 #include <core/Quantizer.h>
 #include <oneDNN/oneDNN.h>
 
-#include "QUtil.h"
+#include "comm/QUtil.h"
 
 
 using namespace dnnl;

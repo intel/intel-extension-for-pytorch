@@ -10,7 +10,7 @@
 
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
-#include <utils/Numerics.h>
+#include "comm/Numerics.h"
 #include <oneDNN/oneDNN.h>
 
 #include "Loops.h"

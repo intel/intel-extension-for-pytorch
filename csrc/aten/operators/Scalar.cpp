@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>

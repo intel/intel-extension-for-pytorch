@@ -3,7 +3,7 @@
 
 #include <core/DPCPP.h>
 #include <oneDNN/oneDNN.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 #include "Loops.h"
 

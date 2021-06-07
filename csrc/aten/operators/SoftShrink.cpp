@@ -2,8 +2,8 @@
 
 #include <core/Context.h>
 #include <core/DPCPP.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 #include "Loops.h"
 

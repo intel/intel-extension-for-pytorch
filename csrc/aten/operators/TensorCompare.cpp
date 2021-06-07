@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
-#include <utils/AccumulateType.h>
+#include "comm/AccumulateType.h"
 
 #include <core/ApplyUtils.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 
 using namespace xpu::dpcpp;

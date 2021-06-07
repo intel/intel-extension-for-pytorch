@@ -7,7 +7,7 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <core/DPCPP.h>

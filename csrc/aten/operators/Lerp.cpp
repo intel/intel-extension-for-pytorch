@@ -1,8 +1,8 @@
 #include <ATen/ExpandUtils.h>
 #include <ATen/NativeFunctions.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
-#include <utils/ScalarOps.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
+#include "comm/ScalarOps.h"
 
 #include "Loops.h"
 

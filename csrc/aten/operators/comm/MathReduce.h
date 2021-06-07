@@ -7,8 +7,8 @@
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 
-#include <utils/Algorithm.h>
-#include <utils/Numerics.h>
+#include "Algorithm.h"
+#include "Numerics.h"
 
 
 using namespace at::native;

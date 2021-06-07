@@ -1,12 +1,12 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorIterator.h>
-#include <utils/AccumulateType.h>
+#include "comm/AccumulateType.h"
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <utils/Algorithm.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Algorithm.h"
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 #include <cmath>
 #include <limits>

@@ -3,12 +3,12 @@
 #include <ATen/record_function.h>
 #include <ATen/CPUApplyUtils.h>
 #include <core/TensorImplUtils.h>
-#include <utils/ATDispatch.h>
 
 #include <oneDNN/oneDNN.h>
 #include <vector>
 
-#include "QUtil.h"
+#include "comm/ATDispatch.h"
+#include "comm/QUtil.h"
 
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>

@@ -8,8 +8,8 @@
 #include <core/DPCPPUtils.h>
 #include <core/ApplyUtils.h>
 
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp::detail;
 

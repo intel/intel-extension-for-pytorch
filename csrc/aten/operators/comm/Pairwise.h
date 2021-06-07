@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <core/DPCPP.h>
-#include <utils/Pointwise.h>
+#include "Pointwise.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {

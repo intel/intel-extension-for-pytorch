@@ -5,7 +5,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 #include <core/Memory.h>
 #include <oneDNN/oneDNN.h>

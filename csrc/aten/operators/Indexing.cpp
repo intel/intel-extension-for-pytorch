@@ -9,10 +9,10 @@
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/Atomics.h>
-#include <utils/MathReduce.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Atomics.h"
+#include "comm/MathReduce.h"
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 #include "IndexingUtils.h"
 #include "Loops.h"

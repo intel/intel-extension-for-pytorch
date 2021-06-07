@@ -5,7 +5,7 @@
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <core/Context.h>
 #include <core/Quantizer.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
 

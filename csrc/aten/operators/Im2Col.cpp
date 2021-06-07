@@ -9,7 +9,7 @@
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"

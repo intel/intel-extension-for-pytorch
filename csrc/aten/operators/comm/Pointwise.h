@@ -5,8 +5,8 @@
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
 #include <core/TensorImplUtils.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "Numerics.h"
+#include "ATDispatch.h"
 
 
 namespace at {

@@ -13,8 +13,8 @@
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
 
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 #include "Loops.h"
 

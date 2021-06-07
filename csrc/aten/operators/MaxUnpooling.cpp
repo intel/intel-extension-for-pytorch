@@ -4,9 +4,9 @@
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/NumericLimits.h>
-#include <utils/Atomics.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Atomics.h"
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp;
 

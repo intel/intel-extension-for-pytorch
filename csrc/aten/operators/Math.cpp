@@ -1,7 +1,7 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 
-#include "Math.h"
+#include "comm/Math.h"
 
 
 DPCPP_DEF_K1(memory_scale);

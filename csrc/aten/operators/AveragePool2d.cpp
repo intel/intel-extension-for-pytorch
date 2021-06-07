@@ -3,7 +3,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
 
 #include <vector>

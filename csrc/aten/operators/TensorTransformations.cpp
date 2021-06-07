@@ -2,9 +2,9 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorTransformations.h>
 #include <ATen/WrapDimUtilsMulti.h>
-#include <utils/AccumulateType.h>
-#include <utils/ATDispatch.h>
-#include <utils/Numerics.h>
+#include "comm/AccumulateType.h"
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>

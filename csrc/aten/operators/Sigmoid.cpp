@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
-#include <utils/AccumulateType.h>
-#include <utils/ATDispatch.h>
+#include "comm/AccumulateType.h"
+#include "comm/ATDispatch.h"
 #include <core/Context.h>
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <utils/Numerics.h>
-#include <utils/Pointwise.h>
+#include "comm/Numerics.h"
+#include "comm/Pointwise.h"
 
 #include "Loops.h"
 

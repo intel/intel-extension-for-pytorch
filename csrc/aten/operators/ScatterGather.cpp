@@ -5,7 +5,7 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include "ScatterGather.h"
 
 

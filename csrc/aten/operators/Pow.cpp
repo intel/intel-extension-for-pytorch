@@ -1,8 +1,8 @@
 #include <core/ApplyUtils.h>
 #include <core/TensorImplUtils.h>
-#include <utils/Numerics.h>
-#include <utils/Pointwise.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/Pointwise.h"
+#include "comm/ATDispatch.h"
 
 
 using namespace xpu::dpcpp;

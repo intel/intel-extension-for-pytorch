@@ -10,7 +10,7 @@
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
-#include <utils/Numerics.h>
+#include "comm/Numerics.h"
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {

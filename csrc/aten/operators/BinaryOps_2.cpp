@@ -3,8 +3,8 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/DPCPP.h>
-#include <utils/Pointwise.h>
-#include <utils/ScalarOps.h>
+#include "comm/Pointwise.h"
+#include "comm/ScalarOps.h"
 #include <oneDNN/oneDNN.h>
 
 #include "Loops.h"

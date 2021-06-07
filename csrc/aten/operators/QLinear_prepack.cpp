@@ -2,10 +2,10 @@
 #include <ATen/native/quantized/cpu/packed_params.h>
 
 #include <core/DPCPPUtils.h>
-#include <utils/ParamUtils.h>
+#include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
 
-#include "QUtil.h"
+#include "comm/QUtil.h"
 
 
 using namespace dnnl;

@@ -2,8 +2,8 @@
 #include <ATen/native/TensorIterator.h>
 #include <core/DPCPP.h>
 #include <core/detail/IndexUtils.h>
-#include <utils/Atomics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Atomics.h"
+#include "comm/ATDispatch.h"
 #include "Loops.h"
 
 

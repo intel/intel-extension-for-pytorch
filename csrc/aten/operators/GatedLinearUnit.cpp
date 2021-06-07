@@ -5,8 +5,8 @@
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 
 using namespace xpu::dpcpp;

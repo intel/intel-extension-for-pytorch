@@ -3,7 +3,7 @@
 #include <ATen/NativeFunctions.h>
 
 #include <oneDNN/oneDNN.h>
-#include <utils/Math.h>
+#include "comm/Math.h"
 
 using namespace xpu::dpcpp;
 

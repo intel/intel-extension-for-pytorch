@@ -7,7 +7,7 @@
 #include <oneDNN/LRUCache.h>
 #include <core/Quantizer.h>
 #include <tensor/Context.h>
-#include <utils/Math.h>
+#include <operators/comm/Math.h>
 #include "Utils.h"
 #include "Reorder.h"
 

@@ -8,7 +8,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
 
 #include "Im2Col.h"

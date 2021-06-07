@@ -2,7 +2,7 @@
 
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
-#include <utils/Numerics.h>
+#include "Numerics.h"
 
 
 using namespace xpu::dpcpp;

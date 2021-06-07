@@ -3,9 +3,9 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
-#include <utils/Numerics.h>
-#include <utils/Pairwise.h>
-#include <utils/Pointwise.h>
+#include "comm/Numerics.h"
+#include "comm/Pairwise.h"
+#include "comm/Pointwise.h"
 
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"

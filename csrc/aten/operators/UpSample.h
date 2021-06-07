@@ -10,8 +10,8 @@
 #include <core/DPCPPUtils.h>
 #include <oneDNN/oneDNN.h>
 
-#include <utils/Atomics.h>
-#include <utils/ParamUtils.h>
+#include "comm/Atomics.h"
+#include "comm/ParamUtils.h"
 
 
 namespace xpu {

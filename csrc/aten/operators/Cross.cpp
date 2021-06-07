@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <utils/Pointwise.h>
+#include "comm/Pointwise.h"
 
 
 using namespace xpu::dpcpp;

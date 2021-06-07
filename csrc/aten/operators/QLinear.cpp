@@ -7,9 +7,9 @@
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <core/DPCPPUtils.h>
 #include <oneDNN/oneDNN.h>
-#include <utils/ParamUtils.h>
+#include "comm/ParamUtils.h"
 #include "InnerProduct.h"
-#include "QUtil.h"
+#include "comm/QUtil.h"
 
 
 using namespace dnnl;

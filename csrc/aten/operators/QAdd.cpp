@@ -5,7 +5,7 @@
 #include <torch/custom_class.h>
 
 #include <core/DPCPPUtils.h>
-#include <utils/ParamUtils.h>
+#include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
 
 

@@ -2,8 +2,8 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include <utils/Math.h>
-#include <utils/ATDispatch.h>
+#include "comm/Math.h"
+#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
 
 #include <tuple>

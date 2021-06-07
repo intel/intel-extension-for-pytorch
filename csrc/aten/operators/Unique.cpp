@@ -6,7 +6,7 @@
 #include <tuple>
 #include <iterator>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <ATen/AtenIpexTypeXPU.h>
 
 #ifdef USE_ONEDPL

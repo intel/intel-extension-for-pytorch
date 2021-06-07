@@ -3,7 +3,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <tensor/Context.h>
-#include <utils/ParamUtils.h>
+#include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
 
 #include "ConvTranspose.h"

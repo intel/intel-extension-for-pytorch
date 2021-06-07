@@ -4,7 +4,7 @@
 #include <ATen/native/Pool.h>
 
 #include <oneDNN/oneDNN.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
 
 #include <vector>

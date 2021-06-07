@@ -1,7 +1,7 @@
 #pragma once
 
 #include <core/DPCPP.h>
-#include <utils/Numerics.h>
+#include "Numerics.h"
 
 // alternative for thrust::tabulate
 template <typename ForwardIterator, typename UnaryOp>

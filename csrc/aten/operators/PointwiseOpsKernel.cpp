@@ -4,7 +4,7 @@
 
 #include <core/DPCPP.h>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 #include "Loops.h"
 

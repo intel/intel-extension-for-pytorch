@@ -6,8 +6,8 @@
 #include <core/DPCPP.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 #include "SortingCommon.h"
 #include "SortingRadixSelect.h"
 

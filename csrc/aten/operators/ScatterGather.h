@@ -4,8 +4,8 @@
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
 
-#include <utils/Atomics.h>
-#include <utils/Numerics.h>
+#include "comm/Atomics.h"
+#include "comm/Numerics.h"
 
 
 using namespace xpu::dpcpp::detail;

@@ -13,7 +13,7 @@
 #include <c10/core/ScalarType.h>
 #include <ATen/native/Resize.h>
 
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 #include "Loops.h"
 #include <oneDNN/oneDNN.h>

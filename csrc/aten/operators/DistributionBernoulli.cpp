@@ -3,7 +3,7 @@
 
 #include <core/DPCPP.h>
 #include <core/Generator.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 #include <ATen/AtenIpexTypeXPU.h>
 #include "Random.h"

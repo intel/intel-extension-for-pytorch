@@ -7,8 +7,8 @@
 #include <core/Generator.h>
 #include <core/DPCPP.h>
 
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"

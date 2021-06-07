@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
-#include <utils/AccumulateType.h>
-#include <utils/ATDispatch.h>
+#include "comm/AccumulateType.h"
+#include "comm/ATDispatch.h"
 #include <core/Context.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/Numerics.h>
-#include <utils/SimpelReduce.h>
+#include "comm/Numerics.h"
+#include "comm/SimpelReduce.h"
 #include <oneDNN/oneDNN.h>
 
 

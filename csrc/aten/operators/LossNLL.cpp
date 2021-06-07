@@ -1,7 +1,5 @@
 #include <utils/Utils.h>
-#include <utils/Numerics.h>
-#include <utils/AccumulateType.h>
-#include <utils/Atomics.h>
+
 #include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
 #include <ATen/Functions.h>
@@ -13,9 +11,12 @@
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/ATDispatch.h>
-#include <utils/SimpelReduce.h>
-#include <operators/Reduce.h>
+#include "comm/ATDispatch.h"
+#include "comm/SimpelReduce.h"
+#include "comm/Numerics.h"
+#include "comm/AccumulateType.h"
+#include "comm/Atomics.h"
+#include "Reduce.h"
 
 
 DPCPP_DEF_K2(updateOutputName, typename scalar_t);

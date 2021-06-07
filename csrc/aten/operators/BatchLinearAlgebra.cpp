@@ -4,8 +4,8 @@
 
 #include <core/ApplyUtils.h>
 #include <core/Context.h>
-#include <utils/ATDispatch.h>
-#include <utils/Numerics.h>
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>

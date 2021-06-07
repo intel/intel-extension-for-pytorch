@@ -5,7 +5,7 @@
 #include <core/DPCPPUtils.h>
 #include <oneDNN/oneDNN.h>
 
-#include <utils/ParamUtils.h>
+#include "comm/ParamUtils.h"
 
 
 using namespace dnnl;

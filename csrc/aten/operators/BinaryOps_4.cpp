@@ -4,8 +4,8 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
-#include <utils/Numerics.h>
-#include <utils/Pointwise.h>
+#include "comm/Numerics.h"
+#include "comm/Pointwise.h"
 
 #include "Loops.h"
 

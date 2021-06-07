@@ -19,7 +19,6 @@ endif()
 set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
         ${TORCH_INCLUDE_DIRS}
         ${SYCL_INCLUDE_DIR}
-        ${IPEX_C_SOURCE_DIR}
         ${IPEX_GPU_ROOT}
         ${IPEX_GPU_ATEN_SRC_DIR}
         ${IPEX_GPU_ATEN_GENERATED})

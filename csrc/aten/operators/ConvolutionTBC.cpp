@@ -6,7 +6,7 @@
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <utils/ATDispatch.h>
+#include "comm/ATDispatch.h"
 
 
 using namespace xpu::dpcpp;

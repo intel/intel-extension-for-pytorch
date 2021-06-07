@@ -4,8 +4,8 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
-#include <utils/Pointwise.h>
-#include <utils/ScalarOps.h>
+#include "comm/Pointwise.h"
+#include "comm/ScalarOps.h"
 
 #include "Loops.h"
 

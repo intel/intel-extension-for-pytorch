@@ -2,9 +2,9 @@
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <utils/MathReduce.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/MathReduce.h"
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 
 using namespace at::detail;

@@ -4,8 +4,8 @@
 #include <core/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
-#include <utils/Numerics.h>
-#include <utils/ATDispatch.h>
+#include "comm/Numerics.h"
+#include "comm/ATDispatch.h"
 
 
 using namespace xpu::dpcpp;
