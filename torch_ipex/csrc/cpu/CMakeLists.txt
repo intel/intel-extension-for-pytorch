@@ -1,4 +1,4 @@
-FILE(GLOB _CPU_SRCS *.cpp dbl/*.cpp int8/*.cpp bf16/*.cpp aten/operators/*.cpp toolkit/*.cpp)
+FILE(GLOB _CPU_SRCS *.cpp dbl/*.cpp int8/*.cpp bf16/*.cpp aten/operators/*.cpp toolkit/*.cpp mlperf/*.cpp)
 LIST(APPEND DPCPP_CPU_SRCS ${_CPU_SRCS})
 
 # Pass to parent

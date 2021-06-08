@@ -10,7 +10,6 @@ class AtenIpexTypeExt {
   static void packed_add_(at::Tensor & top_half, at::Tensor & bot_half, const at::Tensor & grad, float alpha);
   static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
   static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, const std::vector<at::Tensor> & input);
-  static at::Tensor fuseinteractemb_forward(at::Tensor &lS_o, at::Tensor &lS_i, std::vector<at::Tensor> &emb, at::Tensor &densex);
   static std::vector<at::Tensor> embedding_bag(const at::Tensor & weight, const at::Tensor & indices, const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights, bool include_last_offset);
   static at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias);
   static at::Tensor adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size);
