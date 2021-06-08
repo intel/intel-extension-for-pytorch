@@ -372,6 +372,39 @@ class TestFusionPattern(JitLlgaTestCase):
         # ]
         # self.checkPatterns(graph, patterns)
 
+    @llga_test_env
+    def test_defer_size(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.eltwise = nn.ReLU()
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.eltwise(x)
+                y = self.conv2(x)
+                y = y.reshape(x.size(0), -1)
+                return y
+        
+        m = M()
+        x = torch.rand(1, 32, 28, 28)
+        
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="defer_size")
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 6)
+        self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
+
+        patterns = [
+            ["aten::quantize_per_tensor"],
+            ["aten::quantize_per_channel"],
+            ["aten::dequantize", "aten::_convolution", 'aten::relu', "aten::quantize_per_tensor"],
+            ["aten::quantize_per_channel"],
+            ["aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
+            ["aten::dequantize"]
+        ]
+        self.checkPatterns(graph, patterns)
+
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
     @llga_test_env

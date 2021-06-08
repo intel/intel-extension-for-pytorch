@@ -36,7 +36,10 @@ class SizeCheckMover {
             return u.user == node ||
               // TODO: register more shape preserved op
               u.user->kind() == Symbol::aten("relu") ||
-              u.user->kind() == Symbol::aten("sigmoid");
+              u.user->kind() == Symbol::aten("sigmoid") ||
+              u.user->kind() == Symbol::aten("quantize_per_tensor") ||
+              u.user->kind() == Symbol::aten("quantize_per_channel");
+
         });
 
     if (!onlyUsedByShapePreserveOp)

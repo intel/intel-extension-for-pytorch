@@ -358,8 +358,8 @@ bool isSupported(Node* node) {
   // As a result, for the below pattern, LLGA is not aware of the
   // WildCard OP: TupleConstruct and will wrongly select the 
   // dequant-conv-quant into a partition.
-  // Workaround here to send the upsample_nearest2d, ListConstruct,
-  // TupleConstruct and size to LLGA.
+  // Workaround here to send the upsample_nearest2d, ListConstruct and
+  // TupleConstruct to LLGA.
   // In the future, need define the usage of WildCard OPs and send 
   // all of them to LLGA to correctly select the partitions.
   //
@@ -375,7 +375,6 @@ bool isSupported(Node* node) {
   return node->kind() == aten::upsample_nearest2d || 
     node->kind() == prim::ListConstruct || 
     node->kind() == prim::TupleConstruct || 
-    node->kind() == aten::size || 
     createOperator(node).kind() != opkind::Wildcard;
 };
 

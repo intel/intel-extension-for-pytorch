@@ -38,6 +38,11 @@ class LlgaKernel {
 
   int64_t getOutputDtype(size_t offset) const;
 
+  // Get the scale, zp and dtype from the node on the graph
+  // and save them in the spec to re-use during runtime to
+  // create qtensor for output of public format
+  ArgSpec getQuantizedSpec(ArgSpec spec, size_t offset) const;
+
   ArgSpecs specializeInputSpecs(const TensorArgs& inputs) const;
 
   ArgSpecs specializeOutputSpecs(

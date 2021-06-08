@@ -1,10 +1,12 @@
 #include "jit/codegen/onednn/graph_helper.h"
 #include "jit/codegen/onednn/kernel.h"
+#include "jit/codegen/onednn/operator.h"
 #include "jit/codegen/onednn/runtime.h"
 #include "jit/codegen/onednn/subgraph_dtype_setter.h"
 
 #include <ATen/core/functional.h>
 #include <torch/csrc/jit/jit_log.h>
+#include <ATen/quantized/Quantizer.h>
 
 namespace torch {
 namespace jit {
@@ -76,6 +78,27 @@ int64_t LlgaKernel::getOutputDtype(size_t offset) const {
   return LlgaNodeWrapper(fusionNode_).getOutputDtypes(offset);
 }
 
+ArgSpec LlgaKernel::getQuantizedSpec(ArgSpec spec, size_t offset) const {
+  auto node = graph_->outputs()[offset]->node();
+  TORCH_CHECK(node->kind() == Symbol::aten("quantize_per_tensor") || node->kind() == Symbol::aten("quantize_per_channel"), "Int8 tensor must be the output from a quantize operator");
+
+  if (node->kind() == Symbol::aten("quantize_per_tensor")) {
+    spec = spec.set_quantizer(
+      at::make_per_tensor_affine_quantizer(
+        Operator::Float(node, /* offset */1), 
+        Operator::Int(node, /* offset */2), 
+        static_cast<at::ScalarType>(Operator::Int(node, /* offset */3))));
+  } else {
+    spec = spec.set_quantizer(
+      at::make_per_channel_affine_quantizer(
+        Operator::Tensor(node, /* offset */1), 
+        Operator::Tensor(node, /* offset */2), 
+        Operator::Int(node, /* offset */3), 
+        static_cast<at::ScalarType>(Operator::Int(node, /* offset */4))));       
+  }
+  return spec;
+}
+
 ArgSpecs LlgaKernel::specializeInputSpecs(const TensorArgs& inputs) const {
   ArgSpecs inputSpecs;
   inputSpecs.reserve(nInputs_);
@@ -103,6 +126,10 @@ ArgSpecs LlgaKernel::specializeOutputSpecs(
     logical_tensor::data_type propagate_dtype = getPropagateDataType(output_dtype);
     if (propagate_dtype != logical_tensor::data_type::undef) {
       spec = spec.dtype(propagate_dtype);
+
+      if (propagate_dtype == data_type::u8 || propagate_dtype == data_type::s8) {
+        spec = getQuantizedSpec(spec, i);
+      }
     } else {
       spec = spec.dtype(inputSpecs[0].dtype());
     }
@@ -138,14 +165,21 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
       auto inputTensor = inputs[inputOffset];
       outputs.push_back(inputTensor);
       runOutputs.push_back({spec.logical_tensor(), inputTensor.data_ptr()});
-    } else if (spec.is_opaque() || spec.is_quantized()) {
+    } else if (spec.is_opaque()) {
       auto tensor = at::empty_llga(spec, opt);
       outputs.push_back(tensor);
       runOutputs.push_back(at::llga_from_aten_tensor(tensor));
     } else {
-      auto tensor = at::empty(spec.sizes(), opt);
-      outputs.push_back(tensor);
-      runOutputs.push_back({spec.logical_tensor(), tensor.data_ptr()});
+      if (spec.is_quantized()) {
+        at::QuantizerPtr quantizer = spec.get_quantizer();
+        auto qtensor = at::new_qtensor(spec.sizes(), opt, quantizer);
+        outputs.push_back(qtensor);
+        runOutputs.push_back({spec.logical_tensor(), qtensor.data_ptr()});
+      } else {
+        auto tensor = at::empty(spec.sizes(), opt);
+        outputs.push_back(tensor);
+        runOutputs.push_back({spec.logical_tensor(), tensor.data_ptr()});
+      }
     }
   }
 

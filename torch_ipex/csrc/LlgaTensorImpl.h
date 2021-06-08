@@ -95,6 +95,16 @@ struct LlgaTensorDesc {
     ret.layout_type_ = new_layout_type;
     return ret;
   }
+  
+  LlgaTensorDesc set_quantizer(QuantizerPtr new_quantizer) {
+    auto ret = *this;
+    ret.quantizer_ = new_quantizer;
+    return ret;
+  }
+
+  QuantizerPtr get_quantizer() {
+    return quantizer_;
+  }
 
   LlgaTensorDesc any() {
     return layout_type(desc::layout_type::any);
@@ -163,6 +173,7 @@ struct LlgaTensorDesc {
   desc::data_type dtype_;
   desc::layout_type layout_type_;
   size_t layout_id_;
+  QuantizerPtr quantizer_;
 };
 
 struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
