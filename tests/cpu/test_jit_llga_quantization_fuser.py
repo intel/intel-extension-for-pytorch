@@ -357,9 +357,23 @@ class TestFusionPattern(JitLlgaTestCase):
         y = torch.randn(2, 20)
         m = M()
         graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, config_name="linear_dropout_sum")
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 11) # TODO: nb FUSION_GROUP=6 when oneDNN support sum post_ops with zps
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 10) # TODO: nb FUSION_GROUP=6 when oneDNN support sum post_ops with zps
         self.assertFused(graph, ['aten::linear', 'aten::add',
                                  'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
+
+        patterns = [
+            ["aten::quantize_per_tensor"],
+            ["aten::quantize_per_channel"],
+            ["aten::dequantize", "aten::linear"],
+            ["aten::quantize_per_tensor"],
+            ["aten::dequantize"],
+            ["aten::add"],
+            ["aten::quantize_per_tensor"],
+            ["aten::quantize_per_channel"],
+            ["aten::dequantize", "aten::linear", "aten::quantize_per_tensor"],
+            ["aten::dequantize"]
+        ]
+        self.checkPatterns(graph, patterns)
 
         # TODO: check patterns when oneDNN support sum post_ops with zps
         # patterns = [
