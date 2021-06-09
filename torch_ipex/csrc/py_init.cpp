@@ -170,6 +170,10 @@ void InitIpexModuleBindings(py::module m) {
         std::tie(i_scale, o_scale) = indicator.get_indicator_scales();
         d["inputs_scale"] = i_scale;
         d["outputs_scale"] = o_scale;
+        std::vector<int32_t> i_zero_point, o_zero_point;
+        std::tie(i_zero_point, o_zero_point) = indicator.get_indicator_zero_point();
+        d["inputs_zero_point"] = i_zero_point;
+        d["outputs_zero_point"] = o_zero_point;
         std::vector<bool> i_uint8_used, o_uint8_used;
         std::tie(i_uint8_used, o_uint8_used)= indicator.get_indicator_uint8_status();
         d["inputs_uint8_used"] = i_uint8_used;
@@ -193,13 +197,24 @@ void InitIpexModuleBindings(py::module m) {
           py::cast<std::vector<float>>(i["inputs_scale"]);
       std::vector<float> o_scale =
           py::cast<std::vector<float>>(i["outputs_scale"]);
+        
+        // TODO: what should be the default value here? different for u8 and s8
+        std::vector<int32_t> i_zero_point = {0};
+        std::vector<int32_t> o_zero_point = {0};
+        if (i.contains("inputs_zero_point")) {
+          i_zero_point = py::cast<std::vector<int32_t>>(i["inputs_zero_point"]);
+        }
+        if (i.contains("outputs_zero_point")) {
+          o_zero_point = py::cast<std::vector<int32_t>>(i["outputs_zero_point"]);
+        }
+
       std::vector<bool> i_uint8_used =
           py::cast<std::vector<bool>>(i["inputs_uint8_used"]);
       std::vector<bool> o_uint8_used =
           py::cast<std::vector<bool>>(i["outputs_uint8_used"]);
       bool quantized = py::cast<bool>(i["quantized"]);
       Indicator temp(id, op_name, algorithm, weight_granularity, i_scale,
-                     o_scale, i_uint8_used, o_uint8_used, quantized);
+                     o_scale, i_uint8_used, o_uint8_used, quantized, i_zero_point, o_zero_point);
       indicators.push_back(temp);
     }
     Int8OptConfig::get_config().set_indicators(indicators);
