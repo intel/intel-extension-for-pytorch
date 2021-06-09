@@ -28,7 +28,6 @@ static void clearDPCPPContextAndDevices() {
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
   auto plaform_list = DPCPP::platform::get_platforms();
-  DeviceIndex devIndex = 0;
   std::vector<DPCPP::device> root_devices;
   // Enumerated root devices(GPU cards) from GPU Platform firstly.
   for (const auto& platform : plaform_list) {
