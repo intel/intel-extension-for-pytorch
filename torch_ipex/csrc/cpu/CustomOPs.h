@@ -31,7 +31,7 @@ namespace ipex {
   static auto conv3d_sum_relu = Symbol::fromQualString("ipex::conv3d_sum_relu");
 
   static auto max_pool2d = Symbol::fromQualString("ipex::max_pool2d");
-
+  static auto softmax = Symbol::fromQualString("ipex::softmax");
 }
 
 }} // namespace torch::jit
@@ -63,6 +63,8 @@ class AtenIpexJITDev {
   static at::Tensor dil_linear(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias);
 
   static at::Tensor dil_linear_fuse_eltwise(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias, const ideep::attr_t& attr);
+  
+  static at::Tensor dil_softmax(const at::Tensor& input, const int64_t dim, const at::IValue& dtype);
 
   static at::Tensor dil_linear_add(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias, at::Tensor& accumu, at::Scalar alpha);
   

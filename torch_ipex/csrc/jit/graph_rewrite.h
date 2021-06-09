@@ -25,7 +25,7 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph);
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
 void replaceAtenLinearWithIpexLinear(std::shared_ptr<Graph>& graph);
-
+void replaceAtenLinearWithIpexSoftmax(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite_helper
 } // namespace jit
 } // namespace torch

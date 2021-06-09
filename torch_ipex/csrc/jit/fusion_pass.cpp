@@ -330,6 +330,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
 
   // replace aten::linear with ipex linear
   graph_rewrite::replaceAtenLinearWithIpexLinear(graph);
+  
+  // replace aten::softmax with ipex::softmax
+  graph_rewrite::replaceAtenLinearWithIpexSoftmax(graph);
 
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);

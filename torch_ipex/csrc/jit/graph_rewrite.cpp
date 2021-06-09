@@ -410,6 +410,22 @@ void replaceAtenLinearWithIpexLinear(std::shared_ptr<Graph>& graph) {
   rewriter_linear.runOnGraph(graph);
 }
 
+//replace aten::softmax to ipex::softmax during jit pass 
+//there is better performanc for ipex::softmax with oneDNN than aten::softmax
+void replaceAtenLinearWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
+  std::string aten_softmax = R"(
+      graph(%a, %dim:int, %half_to_float:bool):
+        %r = aten::softmax(%a, %dim, %half_to_float)
+        return (%r) )";
+  std::string ipex_softmax = R"(
+      graph(%a, %dim:int, %half_to_float:bool):
+        %r = ipex::softmax(%a, %dim, %half_to_float)
+        return (%r) )";
+  SubgraphRewriter rewriter_aten;
+  rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
+  rewriter_aten.runOnGraph(graph);
+
+}
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

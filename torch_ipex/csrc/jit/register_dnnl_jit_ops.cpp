@@ -261,6 +261,23 @@ RegisterOperators op({
             };
         },
         aliasAnalysisFromSchema()),
-    });
+    
+    Operator(
+         "ipex::softmax(Tensor self, int dim, ScalarType ? dtype) -> Tensor",
+         [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = AtenIpexJITDev::dil_softmax(
+                  (std::move(peek(stack, 0, 3))).toTensor(),
+                  (std::move(peek(stack, 1, 3))).toInt(),
+                  (std::move(peek(stack, 2, 3))));
+              drop(stack, 3);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema())
+
+      });
+  
 } // namespace jit
 } // namespace torch

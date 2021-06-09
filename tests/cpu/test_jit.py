@@ -428,6 +428,14 @@ class MatmulDiv(nn.Module):
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
           
+class AtenSoftmaxRepalce(nn.Module):
+    def __init__(self, dim=-1):
+        super(AtenSoftmaxRepalce, self).__init__()
+        self.softmax = torch.nn.Softmax(dim)
+        
+    def forward(self, x):
+        return self.softmax(x)
+
 
 class Tester(TestCase):
 
@@ -870,6 +878,17 @@ class Tester(TestCase):
             kind_not_in_graph=None,
             prec=5e-3)
  
+    def test_ipex_softmax(self):
+        self._test_output(
+            AtenSoftmaxRepalce(),
+            torch.rand(3, 4, 4),
+            kind_in_graph="ipex::softmax")
+        self._test_output_bf16(
+            AtenSoftmaxRepalce(),
+            torch.rand(3, 4, 4, dtype=torch.bfloat16),
+            kind_in_graph="ipex::softmax",
+            prec=5e-3)
+
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()

@@ -4,6 +4,7 @@
 #include "Linear.h"
 #include "Pooling.h"
 #include "Matmul.h"
+#include "Softmax.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
@@ -307,6 +308,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
   return linear_impl(self, weight, bias, attr);
 }
 
+
 /**
  *Dispatch Linear + Add fusion pattern to ipex oneDNN kernel for inference mode.
  *This feature might improve performance for cases like residual learning blocks
@@ -331,6 +333,28 @@ at::Tensor AtenIpexJITDev::dil_linear_add(
 #endif
   auto scale = alpha.to<float>();
   return linear_inplace_impl(self, weight, bias, accumu, ideep::attr_t::fuse_sum(scale));
+}
+
+//Dispatch softmax to oneDNN path for jit inference
+at::Tensor AtenIpexJITDev::dil_softmax(
+    const at::Tensor& input,
+    const int64_t dim,
+    const at::IValue& dtype) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_softmax", std::vector<c10::IValue>({}));
+#endif
+  auto half_to_float = false;
+  if (!dtype.isNone()) {
+    auto outtype = dtype.toScalarType();
+    auto intype = input.scalar_type();
+    AT_ASSERTM(
+      intype != at::ScalarType::Half,
+      "softmax with half to float conversion is not supported on Mkldnn");
+    at::Tensor converted = input.toType(outtype);
+    return softmax_impl(converted, dim);
+  }
+
+  return softmax_impl(input, dim);
 }
 
 }  // namespace cpu
