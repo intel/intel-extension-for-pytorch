@@ -44,7 +44,7 @@ at::Tensor conv2d(const at::Tensor &input, const at::Tensor &weight, const c10::
     op_outputs.push_back(op_output);
     tensors_flow.emplace(output.unsafeGetTensorImpl(),
                          val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, weight,
+    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
                                           "conv2d", op_id, op_inputs, op_outputs);
     return output;
     }
@@ -63,12 +63,12 @@ at::Tensor conv2d(const at::Tensor &input, const at::Tensor &weight, const c10::
       conv_x = input_q.dequantize();
       if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
         auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-        auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
-        auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, at::kQInt8);
+        auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
+        auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
         conv_w = weight_q.dequantize();
       } else {
-        float w_scale = torch_ipex::get_int8_weight_scale(op_id);
-        auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+        std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
+        auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
         conv_w = weight_q.dequantize();
       }
     }
@@ -100,7 +100,7 @@ at::Tensor conv3d(const at::Tensor &input, const at::Tensor &weight, const c10::
     op_outputs.push_back(op_output);
     tensors_flow.emplace(output.unsafeGetTensorImpl(),
                          val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, weight,
+    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
                                           "conv3d", op_id, op_inputs, op_outputs);
     return output;
   }
@@ -119,12 +119,12 @@ at::Tensor conv3d(const at::Tensor &input, const at::Tensor &weight, const c10::
     conv_x = input_q.dequantize();
     if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
       auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
-      auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, at::kQInt8);
+      auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
+      auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
       conv_w = weight_q.dequantize();
     } else {
-      float w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
       conv_w = weight_q.dequantize();
     }
   }
@@ -156,7 +156,7 @@ at::Tensor conv_transpose3d(const at::Tensor &input, const at::Tensor &weight, c
     op_outputs.push_back(op_output);
     tensors_flow.emplace(output.unsafeGetTensorImpl(),
                          val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, weight,
+    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
                                           "conv_transpose3d", op_id, op_inputs, op_outputs);
     return output;
   }
@@ -175,12 +175,12 @@ at::Tensor conv_transpose3d(const at::Tensor &input, const at::Tensor &weight, c
     conv_x = input_q.dequantize();
     if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
       auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
-      auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, at::kQInt8);
+      auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
+      auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
       conv_w = weight_q.dequantize();
     } else {
-      float w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
       conv_w = weight_q.dequantize();
     }
   }
@@ -476,7 +476,7 @@ at::Tensor linear(const at::Tensor &input, const at::Tensor &weight, const c10::
     op_outputs.push_back(op_output);
     tensors_flow.emplace(output.unsafeGetTensorImpl(),
                          val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, weight,
+    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
                                           "linear", op_id, op_inputs, op_outputs);
     return output;
   }
@@ -495,12 +495,12 @@ at::Tensor linear(const at::Tensor &input, const at::Tensor &weight, const c10::
     linear_x = input_q.dequantize();
     if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
       auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
-      auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, at::kQInt8);
+      auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
+      auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
       linear_w = weight_q.dequantize();
     } else {
-      float w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
       linear_w = weight_q.dequantize();
     }
   }
@@ -659,7 +659,104 @@ at::Tensor gelu(const at::Tensor &input) {
     return output;
   }
 }
-  
+
+std::tuple<Tensor, Tensor, Tensor> lstm(
+    const Tensor& input, TensorList hx, TensorList _params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (torch_ipex::check_int8_calibration()) {
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "lstm." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+    at::Tensor output, hy, cy;
+    std::tie(output, hy, cy) = at::lstm(input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+    std::string op_output = "lstm." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    std::vector<at::Tensor> weights;
+    if (has_biases) {
+      // hx: [w10, w11, b10, b11, w20, w21, b20, b21 ...]
+      for (int i = 0; i < _params.size(); i+=4) {
+        auto w = at::cat({_params[i], _params[i + 1]}, 1);
+        weights.push_back(w);
+      }
+    } else {
+      // hx: [w10, w11, w20, w21 ...]
+      for (int i = 0; i < _params.size(); i+=2) {
+        auto w = at::cat({_params[i], _params[i + 1]}, 1);
+        weights.push_back(w);
+      }
+    }
+    torch_ipex::insert_or_updata_observer({input}, {output}, weights,
+                                          "lstm", op_id, op_inputs, op_outputs);
+    return std::make_tuple(output, hy, cy);
+  }
+
+  auto qparams = torch_ipex::get_int8_scales(op_id);
+  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
+  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
+  std::vector<bool> inputs_quantized, outputs_quantized;
+  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
+  at::Tensor output, hy, cy;
+  auto lstm_x = input;
+  if (inputs_quantized[0]) {
+    // add quantize and dequantize for input and weight.
+    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
+        qparams[0][0].zero_point, input_quantized_dtypes[0]);
+    lstm_x = input_q.dequantize();
+    std::vector<at::Tensor> lstm_params;
+    int idx = 0, step = 2;
+    if (has_biases) {
+      step = 4;
+    }
+    if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
+      auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
+      for (int i = 0; i < _params.size(); i += step) {
+        auto zero_points = at::zeros(weight_scale[idx].numel(), at::dtype(at::kLong));
+        auto weight_q = at::quantize_per_channel(_params[i], weight_scale[idx], zero_points, 0, at::kQInt8);
+        lstm_params.emplace_back(weight_q.dequantize());
+        auto zero_points_2 = at::zeros(weight_scale[idx].numel(), at::dtype(at::kLong));
+        auto weight_q_2 = at::quantize_per_channel(_params[i + 1], weight_scale[idx], zero_points_2, 0, at::kQInt8);
+        lstm_params.emplace_back(weight_q_2.dequantize());
+        if (has_biases) {
+           lstm_params.emplace_back(_params[i + 2]);
+           lstm_params.emplace_back(_params[i + 3]);
+        }
+        idx += 1;
+      }
+    } else {
+      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
+      for (int i = 0; i < _params.size(); i += step) {
+        auto weight_q = at::quantize_per_tensor(_params[i], w_scale[idx], 0, at::kQInt8);
+        lstm_params.emplace_back(weight_q.dequantize());
+        auto weight_q_2 = at::quantize_per_tensor(_params[i+1], w_scale[idx], 0, at::kQInt8);
+        lstm_params.emplace_back(weight_q_2.dequantize());
+        if (has_biases) {
+           lstm_params.emplace_back(_params[i + 2]);
+           lstm_params.emplace_back(_params[i + 3]);
+        }
+        idx += 1;
+      }
+    }
+    std::tie(output, hy, cy) = at::lstm(lstm_x, hx, lstm_params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  } else {
+    std::tie(output, hy, cy) = at::lstm(lstm_x, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  }
+  // add quantize and dequantize output.
+  if (outputs_quantized[0]) {
+    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
+        qparams[1][0].zero_point, output_quantized_dtypes[0]);
+    return std::make_tuple(output_q.dequantize(), hy, cy);
+  }
+  return std::make_tuple(output, hy, cy);
+}
+
 } // namespace autocast
 } // namespace cpu
 } // namespace torch_ipex

@@ -49,5 +49,9 @@ at::Tensor dropout(const at::Tensor& input, double p, bool train);
 
 at::Tensor gelu(const at::Tensor& input);
 
+std::tuple<Tensor, Tensor, Tensor> lstm_aten(
+    const Tensor& _input, TensorList hx, TensorList _params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
+
 } // autocast
 } // torch_ipex

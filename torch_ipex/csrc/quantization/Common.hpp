@@ -15,7 +15,7 @@ void insert_or_updata_observer(const at::TensorList &inputs,
 
 void insert_or_updata_observer(const at::TensorList &inputs,
                                const at::TensorList &ouputs,
-                               const at::Tensor& weight,
+                               const at::TensorList& weight,
                                std::string op_name, int64_t ops_id,
                                std::vector<std::string> inputs_flow,
                                std::vector<std::string> outputs_flow);
@@ -24,9 +24,9 @@ std::vector<std::vector<quant_utils::TensorQuantizationParams>> get_int8_scales(
 
 std::string get_int8_weight_granularity(const int64_t ops_id);
 
-float get_int8_weight_scale(const int64_t ops_id);
+std::vector<float> get_int8_weight_scale(const int64_t ops_id);
 
-at::Tensor& get_int8_weight_tensor_scale(const int64_t ops_id);
+std::vector<at::Tensor>& get_int8_weight_tensor_scale(const int64_t ops_id);
 
 bool get_int8_quantized_status(const int64_t ops_id);
 

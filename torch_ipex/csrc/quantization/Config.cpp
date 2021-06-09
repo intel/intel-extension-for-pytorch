@@ -11,7 +11,7 @@ using namespace int8;
 
 void Int8OptConfig::insert_or_updata_observer(
     std::string op_name, std::vector<std::vector<float>> i_min_max_values,
-    std::vector<std::vector<float>> w_min_max_values,
+    std::vector<std::vector<std::vector<float>>> w_min_max_values,
     std::vector<std::vector<float>> o_min_max_values, int64_t ops_id,
     std::vector<std::string> inputs_flow, std::vector<std::string> outputs_flow) {
   if (observers_.size() <= ops_id) {
@@ -99,11 +99,11 @@ void Int8OptConfig::add_indicators() {
   const int precision = 8;
   for (auto i = 0; i < observers_.size(); i++) {
     std::vector<quant_utils::TensorQuantizationParams> input_params, output_params;
-    std::vector<float> weight_scales;
+    std::vector<std::vector<float>> weights_scales;
 
     std::vector<std::vector<float>> input_values = observers_[i].inputs_min_max_values;
     std::vector<std::vector<float>> output_values = observers_[i].outputs_min_max_values;
-    std::vector<std::vector<float>> weight_values = observers_[i].weight_min_max_values;
+    std::vector<std::vector<std::vector<float>>> weights_values = observers_[i].weights_min_max_values;
     std::vector<std::string> x_quantized_types = observers_[i].input_quantized_dtypes;
     std::vector<std::string> y_quantized_types = observers_[i].output_quantized_dtypes;
     // for symmetric: s = 2max(|x_min|, x_max) / (Q_max - Q_min),
@@ -131,18 +131,23 @@ void Int8OptConfig::add_indicators() {
     }
     // for weight, always using symetric quantization, quantized to int8 dtype.
     // is_signed = true;
-    for (auto m = 0; m < weight_values.size(); m++) {
-      auto max_value = std::max(std::abs(weight_values[m][0]), weight_values[m][1]);
-      auto qparams = quant_utils::ChooseQuantizationParams(
-          /*min*/ -max_value,
-          /*max*/ max_value,
-          /*q_min*/ -(1 << (precision - 1)),
-          /*q_max*/ ((1 << (precision - 1)) - 1));
-      weight_scales.push_back(qparams.scale);
+    for (auto m = 0; m < weights_values.size(); m++) {
+      auto w = weights_values[m];
+      std::vector<float> w_scales;
+      for (auto n = 0; n < w.size(); n++) {
+        auto max_value = std::max(std::abs(weights_values[m][n][0]), weights_values[m][n][1]);
+        auto qparams = quant_utils::ChooseQuantizationParams(
+            /*min*/ -max_value,
+            /*max*/ max_value,
+            /*q_min*/ -(1 << (precision - 1)),
+            /*q_max*/ ((1 << (precision - 1)) - 1));
+        w_scales.push_back(qparams.scale);
+      }
+      weights_scales.push_back(w_scales);
     }
     Indicator new_indicator(
         observers_[i].id, observers_[i].name, observers_[i].algorithm,
-        observers_[i].weight_granularity, input_params, weight_scales, output_params,
+        observers_[i].weight_granularity, input_params, weights_scales, output_params,
         observers_[i].input_quantized_dtypes, observers_[i].output_quantized_dtypes,
         observers_[i].inputs_quantized, observers_[i].outputs_quantized,
         observers_[i].inputs_flow, observers_[i].outputs_flow);
@@ -168,11 +173,22 @@ std::string Int8OptConfig::get_indicator_weight_granularity(const int64_t ops_id
   return weight_granularity;
 }
 
-float Int8OptConfig::get_indicator_weight_scale(const int64_t ops_id) {
-  return indicators_[ops_id].get_indicator_weight_scales()[0];
+// per tensor quantization for weight
+std::vector<float> Int8OptConfig::get_indicator_weight_scale(const int64_t ops_id) {
+  std::vector<float> w_scales;
+  auto weights_scales = indicators_[ops_id].get_indicator_weight_scales();
+  TORCH_CHECK(weights_scales.size() > 0,
+      "weights_scales should be greater than zero when get weight scale");
+  for (auto i = 0; i < weights_scales.size(); i++) {
+    w_scales.push_back(weights_scales[i][0]);
+  }
+  return w_scales;
 }
 
-at::Tensor& Int8OptConfig::get_indicator_weight_tensor_scale(const int64_t ops_id) {
+// per channel quantization for weight
+std::vector<at::Tensor>& Int8OptConfig::get_indicator_weight_tensor_scale(const int64_t ops_id) {
+  TORCH_CHECK(weights_scales_[ops_id].size() > 0,
+      "weights_scales_ should be greater than zero when get the weight scale tensors");
   return weights_scales_[ops_id];
 }
 
@@ -195,8 +211,11 @@ void Int8OptConfig::set_indicators(std::vector<Indicator> indicators) {
     if (i.get_indicator_weight_granularity() == "per_channel") {
       auto id = i.get_indicator_id();
       auto w_scales = i.get_indicator_weight_scales();
-      auto casted_scale = at::tensor(w_scales, at::device(at::kCPU).dtype(at::kDouble));
-      weights_scales_.emplace(id, casted_scale);
+      std::vector<at::Tensor> casted_scales;
+      for (auto i = 0; i < w_scales.size(); i++) {
+        casted_scales.emplace_back(at::tensor(w_scales[i], at::device(at::kCPU).dtype(at::kDouble)));
+      }
+      weights_scales_.emplace(id, casted_scales);
     }
     indicators_.emplace_back(i);
   }

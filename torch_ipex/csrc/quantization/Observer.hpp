@@ -11,7 +11,7 @@ struct Observer {
   int64_t id;
   std::string name;
   std::vector<std::vector<float>> inputs_min_max_values;
-  std::vector<std::vector<float>> weight_min_max_values; // per_channel or per_tensor
+  std::vector<std::vector<std::vector<float>>> weights_min_max_values; // per_channel or per_tensor
   std::vector<std::vector<float>> outputs_min_max_values;
   // default uising min/max to compute the quantization parameters,
   // only support min_max, MovingAverageMinMax and other none per_channel
@@ -36,7 +36,7 @@ public:
             std::string alg,
             std::string granu,
             std::vector<TensorQuantizationParams> i_params,
-            std::vector<float> w_scales,
+            std::vector<std::vector<float>> w_scales,
             std::vector<TensorQuantizationParams> o_params,
             std::vector<std::string> i_quantized_dtypes,
             std::vector<std::string> o_quantized_dtypes,
@@ -45,7 +45,7 @@ public:
             std::vector<std::string> i_flow,
             std::vector<std::string> o_flow )
       : id(i), name(n), algorithm(alg), weight_granularity(granu),
-        input_params(i_params), weight_scales(std::move(w_scales)), output_params(o_params),
+        input_params(i_params), weights_scales(std::move(w_scales)), output_params(o_params),
         input_quantized_dtypes(i_quantized_dtypes), output_quantized_dtypes(o_quantized_dtypes),
         inputs_quantized(inputs_quant), outputs_quantized(outputs_quant),
         inputs_flow(i_flow), outputs_flow(o_flow) {}
@@ -57,7 +57,7 @@ public:
       algorithm = other.algorithm;
       weight_granularity = other.weight_granularity;
       input_params = other.input_params;
-      weight_scales = other.weight_scales;
+      weights_scales = other.weights_scales;
       output_params = other.output_params;
       input_quantized_dtypes = other.input_quantized_dtypes;
       output_quantized_dtypes = other.output_quantized_dtypes;
@@ -80,8 +80,8 @@ public:
     return std::make_tuple(input_params, output_params);
   }
 
-  std::vector<float> get_indicator_weight_scales() {
-    return weight_scales;
+  std::vector<std::vector<float>> get_indicator_weight_scales() {
+    return weights_scales;
   }
 
   std::tuple<std::vector<std::string>, std::vector<std::string>> get_indicator_quantized_dtypes() {
@@ -118,7 +118,7 @@ private:
   std::string weight_granularity;
   std::vector<TensorQuantizationParams> input_params;
   std::vector<TensorQuantizationParams> output_params; 
-  std::vector<float> weight_scales;
+  std::vector<std::vector<float>> weights_scales;
   std::vector<std::string> input_quantized_dtypes;
   std::vector<std::string> output_quantized_dtypes;
   std::vector<bool> inputs_quantized;

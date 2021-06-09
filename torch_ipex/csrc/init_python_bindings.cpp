@@ -112,7 +112,7 @@ void InitIpexModuleBindings(py::module m) {
           y_scales.push_back(p.scale);
           y_zero_points.push_back(p.zero_point);
         }
-        std::vector<float> w_scales = indicator.get_indicator_weight_scales();
+        std::vector<std::vector<float>> w_scales = indicator.get_indicator_weight_scales();
         d["input_scales"] = x_scales;
         d["input_zero_points"] = x_zero_points;
         d["output_scales"] = y_scales;
@@ -157,7 +157,7 @@ void InitIpexModuleBindings(py::module m) {
         param.zero_point = y_zero_points[i];
         y_params.push_back(param);
       }
-      std::vector<float> w_scales = py::cast<std::vector<float>>(i["weight_scales"]);
+      std::vector<std::vector<float>> w_scales = py::cast<std::vector<std::vector<float>>>(i["weight_scales"]);
       std::vector<std::string> i_quantized_dtypes =
           py::cast<std::vector<std::string>>(i["input_quantized_dtypes"]);
       std::vector<std::string> o_quantized_dtypes =

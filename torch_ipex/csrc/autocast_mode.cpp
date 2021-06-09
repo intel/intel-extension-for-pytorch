@@ -244,6 +244,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   m.impl(TORCH_SELECTIVE_NAME("aten::add.Tensor"), TORCH_FN((&torch_ipex::autocast::add_tensor)));
   m.impl(TORCH_SELECTIVE_NAME("aten::dropout"), TORCH_FN((&torch_ipex::autocast::dropout)));
   m.impl(TORCH_SELECTIVE_NAME("aten::gelu"), TORCH_FN((&torch_ipex::autocast::gelu)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::lstm.input"), TORCH_FN((&torch_ipex::autocast::lstm_aten)));
+
 }
 
 }  // namespace autocast

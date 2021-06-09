@@ -225,5 +225,20 @@ at::Tensor gelu(const at::Tensor& input) {
   return at::gelu(input);
 }
 
+std::tuple<Tensor, Tensor, Tensor> lstm_aten(
+    const Tensor& _input, TensorList hx, TensorList _params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  // not support projection case, for projection case, make fall through.
+  if (at::ScalarType::Char == target_type && !(hx[0].size(2) != hx[1].size(2))) {
+    return int8::lstm(_input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  }
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("lstm");
+#endif
+  return at::lstm(_input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+}
+
 } // autocast
 } // torch_ipex

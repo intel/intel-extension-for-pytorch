@@ -22,7 +22,7 @@ public:
 public:
   void insert_or_updata_observer(std::string op_name,
                                  std::vector<std::vector<float>> i_min_max_values,
-                                 std::vector<std::vector<float>> w_min_max_values,
+                                 std::vector<std::vector<std::vector<float>>> w_min_max_values,
                                  std::vector<std::vector<float>> o_min_max_values,
                                  int64_t ops_id,
                                  std::vector<std::string> inputs_flow,
@@ -36,9 +36,9 @@ public:
 
   std::string get_indicator_weight_granularity(const int64_t ops_id);
 
-  float get_indicator_weight_scale(const int64_t ops_id);
+  std::vector<float> get_indicator_weight_scale(const int64_t ops_id);
 
-  at::Tensor& get_indicator_weight_tensor_scale(const int64_t ops_id);
+  std::vector<at::Tensor>& get_indicator_weight_tensor_scale(const int64_t ops_id);
 
 
   std::tuple<std::vector<bool>, std::vector<bool>> get_indicator_insert_quantized_status(const int64_t ops_id);
@@ -64,7 +64,7 @@ private:
 private:
   std::vector<Observer> observers_;
   std::vector<Indicator> indicators_;
-  std::unordered_map<int64_t, at::Tensor> weights_scales_;
+  std::unordered_map<int64_t, std::vector<at::Tensor>> weights_scales_;
   thread_local static int64_t current_ops_id;
 };
 
