@@ -6,7 +6,7 @@
 namespace toolkit {
 
 template <typename T>
-std::vector<double> roc_auc_score_(at::Tensor self, at::Tensor other, int size) {
+std::vector<double> roc_auc_score_(at::Tensor self, at::Tensor other, int size, bool only_score=true) {
   T *actual = self.data_ptr<T>();
   T *prediction = other.data_ptr<T>();
   std::vector<T> predictedRank(size, 0.0);
@@ -16,17 +16,6 @@ std::vector<double> roc_auc_score_(at::Tensor self, at::Tensor other, int size) 
     nPos += (int)actual[i];
 
   nNeg = size - nPos;
-  double acc = 0.0;
-  double loss = 0.0;
-#pragma omp parallel for reduction(+:acc,loss)
-  for(int i = 0; i < size; i++) {
-    auto rpred = std::roundf(prediction[i]);
-    if(actual[i] == rpred) acc += 1;
-    loss += (actual[i] * std::log(prediction[i])) + ((1 - actual[i]) * std::log(1 - prediction[i]));
-  }
-
-  double accuracy = acc / size;
-  double log_loss = -loss / size;
 
   std::vector<std::pair<T, int> > v_sort(size);
 #pragma omp parallel for
@@ -63,24 +52,43 @@ std::vector<double> roc_auc_score_(at::Tensor self, at::Tensor other, int size) 
     }
   }
   double score = (filteredRankSum - ((double)nPos * ((nPos + 1.0) / 2.0))) / ((double)nPos * nNeg);
+  double log_loss = 0.0;
+  double accuracy = 0.0;
+  if (not only_score) {
+    double acc = 0.0;
+    double loss = 0.0;
+    #pragma omp parallel for reduction(+:acc,loss)
+    for(int i = 0; i < size; i++) {
+      auto rpred = std::roundf(prediction[i]);
+      if(actual[i] == rpred) acc += 1;
+      loss += (actual[i] * std::log(prediction[i])) + ((1 - actual[i]) * std::log(1 - prediction[i]));
+    }
+    accuracy = acc / size;
+    log_loss = -loss / size;
+  }
+
   return {score, log_loss, accuracy};
 }
 
 std::vector<double> roc_auc_score(at::Tensor self, at::Tensor other) {
-  if (self.dim() != 1 || other.dim() != 1) {
-    throw std::runtime_error("Dims of all inputs must be 1");
-  }
-
-  if (self.dtype() != other.dtype()) {
-    throw std::runtime_error("DataType of all inputs must be consistent");
-  }
-
-  if (self.numel() != other.numel()) {
-    throw std::runtime_error("Shapes of all inputs must be consistent");
-  }
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.dim() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(other.dim() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.dtype() == other.dtype());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.numel() == other.numel());
 
   return AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "roc_auc_score", [&]() {
     return roc_auc_score_<scalar_t>(self, other, self.numel());
+  });
+}
+
+std::vector<double> roc_auc_score_all(at::Tensor self, at::Tensor other) {
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.dim() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(other.dim() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.dtype() == other.dtype());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.numel() == other.numel());
+
+  return AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "roc_auc_score_all", [&]() {
+    return roc_auc_score_<scalar_t>(self, other, self.numel(), false);
   });
 }
 
