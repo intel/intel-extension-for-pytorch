@@ -31,8 +31,6 @@ std::vector<int64_t> TensorImpl_sizesLegacyNoScalars(
 const int64_t* TensorImpl_getStridePtr(at::TensorImpl* tensor);
 int64_t TensorImpl_stride(const at::TensorImpl* self, int dim);
 int64_t TensorImpl_strideLegacyNoScalars(const at::TensorImpl* self, int dim);
-// THDPCPP_API THDPCPPTensor *THDPCPPTensor_new(THDPCPPState *state,
-// caffe2::TypeMeta type_meta);
 TensorImpl* TensorImpl_resizeImpl(
     at::TensorImpl* self,
     at::IntArrayRef size,

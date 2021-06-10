@@ -1,12 +1,9 @@
-#include <c10/core/Device.h>
-#include <c10/macros/Macros.h>
-
-#include <utils/DPCPPUtils.h>
-#include <utils/Context.h>
-#include <utils/Exception.h>
-#include <utils/Env.h>
+#include <utils/Device.h>
 #include <core/Device.h>
 #include <core/Stream.h>
+#include <utils/Exception.h>
+#include <utils/Env.h>
+#include <utils/Context.h>
 
 #include <cmath>
 
@@ -17,7 +14,7 @@ namespace dpcpp {
 // Global device pool state
 static std::once_flag init_device_flag;
 static DPCPPDevicePool gDevPool;
-static thread_local DeviceIndex cur_dev_index = 0;
+static thread_local at::DeviceIndex cur_dev_index = 0;
 
 static void clearDPCPPContextAndDevices() {
   xpu::dpcpp::clearDeviceContext();
@@ -36,7 +33,7 @@ static void initGlobalDevicePoolState() {
       continue;
 #else
     auto plat_name = platform.get_info<DPCPP::info::platform::name>();
-    if (plat_name.compare(dpcppPreferredPlatform()) != 0)
+    if (plat_name.compare(getPreferredPlatform()) != 0)
       continue;
 #endif
     auto device_list = platform.get_devices();
@@ -94,7 +91,7 @@ int dpcppGetDeviceCount(int* deviceCount) {
   return DPCPP_SUCCESS;
 }
 
-int dpcppGetDevice(DeviceIndex* pDI) {
+int dpcppGetDevice(at::DeviceIndex* pDI) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   TORCH_CHECK(pDI != NULL);
@@ -102,10 +99,10 @@ int dpcppGetDevice(DeviceIndex* pDI) {
   return DPCPP_SUCCESS;
 }
 
-int dpcppSetDevice(DeviceIndex device_index) {
+int dpcppSetDevice(at::DeviceIndex device_index) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  if (device_index >= (DeviceIndex)gDevPool.devices.size()) {
+  if (device_index >= (at::DeviceIndex)gDevPool.devices.size()) {
     TORCH_WARN("dpcppSetDevice: device_index is out of range");
   } else {
     cur_dev_index = device_index;
@@ -113,25 +110,25 @@ int dpcppSetDevice(DeviceIndex device_index) {
   return DPCPP_SUCCESS;
 }
 
-DPCPP::device dpcppGetRawDevice(DeviceIndex device_index) {
+DPCPP::device dpcppGetRawDevice(at::DeviceIndex device_index) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  if (device_index >= (DeviceIndex)gDevPool.devices.size()) {
+  if (device_index >= (at::DeviceIndex)gDevPool.devices.size()) {
     TORCH_CHECK(0, "dpcppSetDevice: device_index is out of range");
   }
   return gDevPool.devices[device_index];
 }
 
-DeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index) {
+DeviceSelector dpcppGetDeviceSelector(at::DeviceIndex device_index) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  if (device_index >= (DeviceIndex)gDevPool.devices.size()) {
+  if (device_index >= (at::DeviceIndex)gDevPool.devices.size()) {
     TORCH_CHECK(0, "dpcppSetDevice: device_index is out of range");
   }
   return gDevPool.dev_sels[device_index];
 }
 
-DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
+at::DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   auto it = std::find(gDevPool.devices.begin(), gDevPool.devices.end(), device);
@@ -141,58 +138,13 @@ DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
   return -1;
 }
 
-int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
+int dpcppGetDeviceIdFromPtr(at::DeviceIndex* device_id, void* ptr) {
   auto raw_device = DPCPP::get_pointer_device(ptr, xpu::dpcpp::getDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
   return DPCPP_SUCCESS;
 }
 
-DPCPP::queue& dpcppGetCurrentQueue() {
-  return getCurrentDPCPPStream().dpcpp_queue();
-}
-
-int64_t dpcppMaxWorkGroupSize(DPCPP::queue& queue) {
-  return queue.get_device().get_info<dpcpp_dev_max_wgroup_size>();
-}
-
-int64_t dpcppMaxWorkGroupSize() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppMaxWorkGroupSize(queue);
-}
-
-int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue) {
-  return queue.get_device()
-      .template get_info<dpcpp_dev_max_units>();
-}
-
-int64_t dpcppMaxComputeUnitSize() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppMaxComputeUnitSize(queue);
-}
-
-int64_t dpcppMaxDSSNum(DPCPP::queue& queue) {
-  // TODO: We need to got this info from DPC++ Runtime
-  // Hardcode to 32 for ATS
-  int64_t dss_num = 32;
-  return dss_num;
-}
-
-int64_t dpcppMaxDSSNum() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppMaxDSSNum(queue);
-}
-
-int64_t dpcppLocalMemSize(DPCPP::queue& queue) {
-  return queue.get_device()
-      .template get_info<dpcpp_dev_local_mem_size>();
-}
-
-int64_t dpcppLocalMemSize() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppLocalMemSize(queue);
-}
-
-std::string dpcppPreferredPlatform() {
+static inline std::string getPreferredPlatform() {
   // TODO: To use more stable api from dpc++ runtime to preferred select
   // platform Following code logic based upon the assumption: gpu_selector will
   // select gpu device with priority considering platform: 1) level_zero 2)

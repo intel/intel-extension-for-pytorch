@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utils/Macros.h>
 #include <ATen/core/Generator.h>
 
 
@@ -8,7 +9,7 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
-struct CAFFE2_API DPCPPGeneratorImpl : public GeneratorImpl {
+struct IPEX_API DPCPPGeneratorImpl : public GeneratorImpl {
   // Constructors
   DPCPPGeneratorImpl(DeviceIndex device_index = -1);
   ~DPCPPGeneratorImpl() = default;
@@ -31,8 +32,8 @@ struct CAFFE2_API DPCPPGeneratorImpl : public GeneratorImpl {
 
 namespace detail {
 
-CAFFE2_API const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
-CAFFE2_API Generator createDPCPPGenerator(DeviceIndex device_index = -1);
+IPEX_API const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
+IPEX_API Generator createDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
 } // namespace dpcpp

@@ -2,6 +2,8 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
+#include <utils/DPCPPUtils.h>
+
 #include "comm/ApplyUtils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"

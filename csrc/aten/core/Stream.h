@@ -6,7 +6,8 @@
 #include <c10/core/Stream.h>
 #include <c10/util/Exception.h>
 
-#include <utils/DPCPPUtils.h>
+#include <utils/DPCPP.h>
+#include <utils/Device.h>
 #include <utils/Macros.h>
 
 
@@ -72,20 +73,20 @@ class IPEX_API DPCPPStream {
   Stream stream_;
 };
 
-CAFFE2_API DPCPPStream getDPCPPStreamFromPool(
+IPEX_API DPCPPStream getDPCPPStreamFromPool(
     const bool isDefault = false,
     DeviceIndex device_index = -1);
 
-CAFFE2_API DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index = -1);
+IPEX_API DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index = -1);
 
-CAFFE2_API DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
+IPEX_API DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
 
-CAFFE2_API void setCurrentDPCPPStream(DPCPPStream stream);
+IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
 
-CAFFE2_API DPCPPStream
+IPEX_API DPCPPStream
 getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index);
 
-C10_API std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s);
+IPEX_API std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s);
 
 } // namespace dpcpp
 } // namespace xpu

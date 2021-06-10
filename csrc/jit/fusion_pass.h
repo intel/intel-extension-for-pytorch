@@ -6,7 +6,7 @@
 
 namespace torch { namespace jit {
 // LEGACY CALL
-struct TORCH_API RegisterPreFusionPass {
+struct RegisterPreFusionPass {
   RegisterPreFusionPass(GraphPass p);
 };
 }} // namespace torch::jit

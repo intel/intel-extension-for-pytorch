@@ -6,11 +6,12 @@
 #include <ATen/cpp_custom_type_hack.h>
 
 #include <torch/custom_class.h>
+#include <utils/Macros.h>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-struct CAFFE2_API PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
+struct IPEX_API PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
   PackedConvWeightQDPCPP(
       Tensor weight,
       c10::optional<at::Tensor> bias,
@@ -87,7 +88,7 @@ struct CAFFE2_API PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
     int64_t groups);
 };
 
-struct CAFFE2_API PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
+struct IPEX_API PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
   PackedLinearWeightQDPCPP (
       Tensor weight,
       c10::optional<at::Tensor> bias)
