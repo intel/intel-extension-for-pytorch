@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 TORCH_VERSION = '1.8.0'
-TORCH_IPEX_VERSION = '1.3.0'
+TORCH_IPEX_VERSION = '1.8.0'
 
 # import torch
 import platform
