@@ -4,7 +4,7 @@
 
 #include "comm/ParamUtils.h"
 
-#include "comm/QUtil.h"
+#include <quantized/QUtil.h>
 
 
 using namespace dnnl;

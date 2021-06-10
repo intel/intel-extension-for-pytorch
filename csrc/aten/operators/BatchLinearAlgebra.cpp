@@ -3,14 +3,13 @@
 #include <ATen/native/LinearAlgebraUtils.h>
 
 #include "comm/ApplyUtils.h"
-#include <core/Context.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
-#include <core/oneMKLUtils.h>
+#include <utils/oneMKLUtils.h>
 #endif
 
 

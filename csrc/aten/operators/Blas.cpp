@@ -8,12 +8,12 @@
 #include <vector>
 
 #include "comm/ATDispatch.h"
-#include "comm/QUtil.h"
+#include <quantized/QUtil.h>
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
-#include <core/oneMKLUtils.h>
+#include <utils/oneMKLUtils.h>
 #endif
 
 #include <c10/util/typeid.h>

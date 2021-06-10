@@ -5,7 +5,7 @@
 #include <utils/DPCPPUtils.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
-#include <core/Quantizer.h>
+#include <quantized/Quantizer.h>
 #include <tensor/Context.h>
 #include <operators/comm/Math.h>
 #include "Utils.h"

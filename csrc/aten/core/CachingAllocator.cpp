@@ -1,5 +1,5 @@
 #include <core/CachingAllocator.h>
-#include <core/Context.h>
+#include <utils/Context.h>
 #include <utils/DPCPPUtils.h>
 #include <c10/core/Allocator.h>
 #include <tensor/Context.h>

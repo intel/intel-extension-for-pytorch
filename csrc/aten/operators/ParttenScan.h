@@ -1,4 +1,3 @@
-#include <core/Context.h>
 #include <utils/DPCPP.h>
 #include <utils/DPCPPUtils.h>
 #include <core/Memory.h>

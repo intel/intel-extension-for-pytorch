@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/quantized/QTensorImpl.h>
+#include <core/Allocator.h>
 #include <tensor/Context.h>
 
 
@@ -10,7 +11,7 @@ Tensor empty_opaque_tensor(
     DPCPPTensorContext::Meta meta,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  auto* allocator = xpu::dpcpp::getDPCPPDeviceAllocator();
+  auto* allocator = xpu::dpcpp::getDeviceAllocator();
   int64_t nelements = DPCPPTensorContext(nullptr, meta).padded_size();
   auto dtype = options.dtype();
   int64_t size_bytes = nelements * dtype.itemsize();
@@ -45,7 +46,7 @@ Tensor empty_opaque_qtensor(
   DPCPPTensorContext::Meta meta,
   c10::optional<MemoryFormat> optional_memory_format,
   QuantizerPtr quantizer) {
-  auto* allocator = xpu::dpcpp::getDPCPPDeviceAllocator();
+  auto* allocator = xpu::dpcpp::getDeviceAllocator();
   int64_t nelements = DPCPPTensorContext(nullptr, meta).padded_size();
   auto dtype = scalarTypeToTypeMeta(quantizer->scalar_type());
   int64_t size_bytes = nelements * dtype.itemsize();

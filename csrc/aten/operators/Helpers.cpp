@@ -1,4 +1,3 @@
-#include <core/Context.h>
 #include <core/Device.h>
 #include <utils/Exception.h>
 #include <core/Stream.h>

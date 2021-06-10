@@ -1,8 +1,5 @@
-#include <ATen/ATen.h>
-#include <core/Context.h>
-#include <core/CachingAllocator.h>
+#include <utils/Context.h>
 #include <utils/Exception.h>
-
 
 namespace xpu {
 namespace dpcpp {
@@ -64,10 +61,6 @@ DPCPP::context getDeviceContext(int device_index) {
   return *gCtxPool[device_index];
 }
 #endif
-
-at::Allocator* getDPCPPDeviceAllocator() {
-  return dpcpp_getCachingAllocator();
-}
 
 } // namespace dpcpp
 } // namespace xpu

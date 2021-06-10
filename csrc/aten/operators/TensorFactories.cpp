@@ -8,7 +8,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 
-#include <core/Context.h>
+#include <core/Allocator.h>
 #include <core/TensorImplUtils.h>
 #include <core/Generator.h>
 #include "comm/ATDispatch.h"
@@ -41,7 +41,7 @@ Tensor empty_dpcpp(
   // been
   // "unpacked"
 
-  auto* allocator = xpu::dpcpp::getDPCPPDeviceAllocator();
+  auto* allocator = xpu::dpcpp::getDeviceAllocator();
   int64_t nelements = prod_intlist(size);
   auto dtype = options.dtype();
   int64_t size_bytes = nelements * dtype.itemsize();

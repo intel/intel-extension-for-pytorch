@@ -2,7 +2,7 @@
 #include <intrinsic/ipex_intrinsic.h>
 #include <ATen/quantized/Quantizer.h>
 #include <utils/DPCPPUtils.h>
-#include <core/Quantizer.h>
+#include <quantized/Quantizer.h>
 #include <core/TensorImplUtils.h>
 #include <tensor/Context.h>
 

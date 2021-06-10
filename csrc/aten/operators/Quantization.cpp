@@ -3,8 +3,7 @@
 
 
 #include <intrinsic/ipex_intrinsic.h>
-#include <core/Context.h>
-#include <core/Quantizer.h>
+#include <quantized/Quantizer.h>
 #include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"

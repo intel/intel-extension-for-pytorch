@@ -3,11 +3,11 @@
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 
 #include <utils/DPCPPUtils.h>
-#include <core/Quantizer.h>
+#include <quantized/Quantizer.h>
 #include <oneDNN/oneDNN.h>
 
 #include "Cat.h"
-#include "comm/QUtil.h"
+#include <quantized/QUtil.h>
 #include "comm/ParamUtils.h"
 #include "ReQuantization.h"
 

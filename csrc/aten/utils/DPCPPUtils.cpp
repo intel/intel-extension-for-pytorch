@@ -1,12 +1,12 @@
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
 
-#include <core/Context.h>
 #include <utils/DPCPPUtils.h>
-#include <core/Device.h>
+#include <utils/Context.h>
 #include <utils/Exception.h>
-#include <core/Stream.h>
 #include <utils/Env.h>
+#include <core/Device.h>
+#include <core/Stream.h>
 
 #include <cmath>
 
@@ -36,7 +36,7 @@ static void initGlobalDevicePoolState() {
       continue;
 #else
     auto plat_name = platform.get_info<DPCPP::info::platform::name>();
-    if (plat_name.compare(getPreferredPlatform()) != 0)
+    if (plat_name.compare(dpcppPreferredPlatform()) != 0)
       continue;
 #endif
     auto device_list = platform.get_devices();
@@ -192,7 +192,7 @@ int64_t dpcppLocalMemSize() {
   return dpcppLocalMemSize(queue);
 }
 
-std::string getPreferredPlatform() {
+std::string dpcppPreferredPlatform() {
   // TODO: To use more stable api from dpc++ runtime to preferred select
   // platform Following code logic based upon the assumption: gpu_selector will
   // select gpu device with priority considering platform: 1) level_zero 2)

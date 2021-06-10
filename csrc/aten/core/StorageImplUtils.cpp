@@ -1,6 +1,6 @@
 #include <c10/util/intrusive_ptr.h>
 
-#include <core/Context.h>
+#include <core/Allocator.h>
 #include <utils/DPCPPUtils.h>
 #include <utils/Exception.h>
 #include <core/Memory.h>
@@ -47,7 +47,7 @@ at::StorageImpl* StorageImpl_new() {
       c10::make_intrusive<at::StorageImpl>(
         c10::StorageImpl::use_byte_size_t(),
         0,
-        xpu::dpcpp::getDPCPPDeviceAllocator(),
+        xpu::dpcpp::getDeviceAllocator(),
         true)
           .release();
   return storage;

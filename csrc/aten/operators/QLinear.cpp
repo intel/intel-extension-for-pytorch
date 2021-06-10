@@ -9,7 +9,7 @@
 #include <oneDNN/oneDNN.h>
 #include "comm/ParamUtils.h"
 #include "InnerProduct.h"
-#include "comm/QUtil.h"
+#include <quantized/QUtil.h>
 
 
 using namespace dnnl;

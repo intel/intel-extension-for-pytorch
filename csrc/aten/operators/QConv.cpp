@@ -4,10 +4,10 @@
 #include "comm/ParamUtils.h"
 
 #include <utils/DPCPPUtils.h>
-#include <core/Quantizer.h>
+#include <quantized/Quantizer.h>
 #include <oneDNN/oneDNN.h>
 
-#include "comm/QUtil.h"
+#include <quantized/QUtil.h>
 
 
 using namespace dnnl;

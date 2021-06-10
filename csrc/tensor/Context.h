@@ -4,7 +4,7 @@
 
 #include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/Context.h>
+#include <core/Allocator.h>
 #include <oneapi/dnnl/dnnl.hpp>
 
 
@@ -191,7 +191,7 @@ struct DPCPPTensorContext {
     at::DataPtr tag_dptr(
         tag_ctx->data(),
         tag_ctx,
-        getDPCPPDeviceAllocator()->raw_deleter(),
+        getDeviceAllocator()->raw_deleter(),
         t.device().type());
 
     // release raw data to avoid auto-free after data_ptr dtor
@@ -209,7 +209,7 @@ struct DPCPPTensorContext {
     // t->data != ctx->data. old raw data is released and should be deleted by
     // us
     if (cur_raw_data != tag_raw_data)
-      getDPCPPDeviceAllocator()->raw_deleter()(cur_ctx);
+      getDeviceAllocator()->raw_deleter()(cur_ctx);
   }
 };
 

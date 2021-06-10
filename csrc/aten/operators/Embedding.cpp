@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include "comm/AccumulateType.h"
 
-#include <core/Context.h>
 #include <utils/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/Memory.h>

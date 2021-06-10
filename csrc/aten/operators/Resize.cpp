@@ -1,6 +1,5 @@
 #include <ATen/ATen.h>
 
-#include <core/Context.h>
 #include <core/TensorImplUtils.h>
 
 using namespace xpu::dpcpp;

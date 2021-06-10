@@ -2,7 +2,6 @@
 #include <intrinsic/ipex_intrinsic.h>
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
-#include <core/Context.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
 #include "comm/Numerics.h"

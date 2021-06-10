@@ -1,6 +1,6 @@
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
-#include <aten/operators/comm/QUtil.h>
+#include <quantized/QUtil.h>
 #include "dpcpp_ops.h"
 #include "accelerated_ops.h"
 //#include "graph_ext.h"

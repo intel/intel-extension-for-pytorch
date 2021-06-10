@@ -9,7 +9,7 @@
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
 #include <oneapi/mkl/dfti.hpp>
-#include <core/oneMKLUtils.h>
+#include <utils/oneMKLUtils.h>
 #endif
 
 

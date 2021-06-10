@@ -7,7 +7,7 @@
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>
 #include <mkl.h>
-#include <core/oneMKLUtils.h>
+#include <utils/oneMKLUtils.h>
 #endif
 
 namespace xpu {

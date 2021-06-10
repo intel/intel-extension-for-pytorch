@@ -7,7 +7,6 @@
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 
-#include <core/Context.h>
 #include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "MemoryAccess.h"

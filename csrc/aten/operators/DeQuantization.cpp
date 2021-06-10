@@ -8,7 +8,6 @@
 #include <c10/util/Exception.h>
 #include <intrinsic/ipex_intrinsic.h>
 
-#include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include "comm/Numerics.h"
 #include <oneDNN/oneDNN.h>

@@ -2,9 +2,9 @@
 
 #include <ATen/TensorUtils.h>
 
+#include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <core/Context.h>
 
 #include <math.h>
 #include "Helpers.h"

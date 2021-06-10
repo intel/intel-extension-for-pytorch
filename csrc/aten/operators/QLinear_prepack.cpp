@@ -5,7 +5,7 @@
 #include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
 
-#include "comm/QUtil.h"
+#include <quantized/QUtil.h>
 
 
 using namespace dnnl;

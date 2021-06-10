@@ -13,6 +13,7 @@
 
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>
+#include <utils/oneMKLUtils.h>
 #endif
 
 namespace at {

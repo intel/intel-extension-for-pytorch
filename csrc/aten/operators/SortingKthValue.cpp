@@ -2,10 +2,11 @@
 #include <ATen/native/SortingUtils.h>
 #include <c10/macros/Macros.h>
 
-#include "comm/ApplyUtils.h"
 #include <utils/DPCPP.h>
+#include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
 #include "SortingCommon.h"

@@ -8,7 +8,7 @@
 #include <assert.h>
 
 #include "comm/Array.h"
-#include <core/Context.h>
+#include <core/Allocator.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/OffsetCalculator.h>
@@ -700,7 +700,7 @@ inline void dpcpp_reduce_kernel(
   at::DataPtr buffer;
   at::DataPtr semaphores;
   if (config.should_global_reduce()) {
-    auto& allocator = *dpcpp::getDPCPPDeviceAllocator();
+    auto& allocator = *dpcpp::getDeviceAllocator();
     buffer = allocator.allocate(config.global_memory_size());
     semaphores = allocator.allocate(config.semaphore_size());
     dpcppMemset(semaphores.get(), 0, config.semaphore_size());

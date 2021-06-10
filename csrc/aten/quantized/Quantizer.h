@@ -1,9 +1,7 @@
 #pragma once
 
 #include <ATen/quantized/Quantizer.h>
-
 #include <intrinsic/ipex_intrinsic.h>
-#include "Quantizer.h"
 
 
 namespace xpu {

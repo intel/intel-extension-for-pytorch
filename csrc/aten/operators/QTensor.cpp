@@ -8,7 +8,7 @@
 #include <intrinsic/ipex_intrinsic.h>
 
 #include "comm/ATDispatch.h"
-#include <core/Context.h>
+#include <core/Allocator.h>
 #include <core/TensorImplUtils.h>
 #include <utils/DPCPP.h>
 
@@ -80,7 +80,7 @@ Tensor new_qtensor(
   auto memory_format =
     options.memory_format_opt().value_or(MemoryFormat::Contiguous);
 
-  at::Allocator *allocator = xpu::dpcpp::getDPCPPDeviceAllocator();
+  at::Allocator *allocator = xpu::dpcpp::getDeviceAllocator();
 
   at::DispatchKey tensorDispatchKey = options.computeDispatchKey();
   native::check_size_nonnegative(sizes);

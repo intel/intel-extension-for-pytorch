@@ -2,8 +2,9 @@
 
 #include <ATen/Config.h>
 
-#include <core/Context.h>
+#include <utils/Context.h>
 #include <utils/DPCPPUtils.h>
+#include <core/Device.h>
 #include <core/Memory.h>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>

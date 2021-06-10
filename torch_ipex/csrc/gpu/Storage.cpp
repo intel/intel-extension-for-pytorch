@@ -9,6 +9,7 @@
 #include <torch/csrc/autograd/utils/wrap_outputs.h>
 #include <torch/csrc/copy_utils.h>
 #include <ATen/AtenIpexTypeXPU.h>
+#include <core/Allocator.h>
 #include <core/Memory.h>
 
 #if defined(USE_ONEDPL)
@@ -365,7 +366,7 @@ public:
     at::StorageImpl* storage = c10::make_intrusive<at::StorageImpl>(
             c10::StorageImpl::use_byte_size_t(),
             0,
-            xpu::dpcpp::getDPCPPDeviceAllocator(),
+            xpu::dpcpp::getDeviceAllocator(),
             true)
             .release();
     return storage;
@@ -471,7 +472,7 @@ public:
     THStorage* storage = c10::make_intrusive<at::StorageImpl>(
             c10::StorageImpl::use_byte_size_t(),
             size * sizeof(typename c10::impl::ScalarTypeToCPPType<scalarType>::type),
-            xpu::dpcpp::getDPCPPDeviceAllocator(),
+            xpu::dpcpp::getDeviceAllocator(),
             true)
             .release();
     return storage;

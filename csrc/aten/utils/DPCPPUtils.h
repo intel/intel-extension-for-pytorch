@@ -60,5 +60,11 @@ int64_t dpcppLocalMemSize();
 
 int64_t dpcppLocalMemSize(DPCPP::queue& queue);
 
+static inline bool dpcppIsAvailable() {
+  int count;
+  dpcppGetDeviceCount(&count);
+  return count > 0;
+}
+
 } // namespace dpcpp
 } // namespace xpu
