@@ -38,5 +38,22 @@ ideep::tensor get_linear_prepacked_weight(
     const ideep::tensor& input,
     const at::Tensor& weight);
 
+std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
+    const at::Tensor& weight_ih,
+    const at::Tensor& weight_hh,
+    int64_t input_size,
+    int64_t num_gates,
+    int64_t hidden_size,
+    const ideep::dims& output_sizes,
+    const ideep::tensor& src_layer,
+    const ideep::tensor& src_iter,
+    const ideep::tensor& src_iter_c,
+    const ideep::tensor& bias,
+    const bool reverse);
+
+inline ideep::tensor get_mkldnn_tensor_view(const at::Tensor& tensor, const ideep::tensor::desc& desc);
+
+bool is_prepacked(const at::Tensor& weight);
+
 } // namespace cpu
 }  // namespace torch_ipex

@@ -1,4 +1,5 @@
 #include "ExtendOPs.h"
+#include "WeightPrepack.h"
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/InitialTensorOptions.h>
@@ -144,6 +145,9 @@ std::vector<int64_t> _output_size(const RNNParams& rnn) {
 //                           +---------+
 //
 at::Tensor _shuffle_weight(const at::Tensor& weight, int64_t fn_mode) {
+  if (torch_ipex::cpu::is_prepacked(weight))
+    return weight;
+
   auto weight_t = weight.contiguous();
   if (static_cast<ideep::rnn_kind>(fn_mode) == ideep::rnn_kind::GRU) {
     std::vector<at::Tensor> gates = weight_t.chunk(3, /*gates*/0);
@@ -160,25 +164,6 @@ at::Tensor _shuffle_bias(const at::Tensor& bias_ih, const at::Tensor& bias_hh, i
   }
   return bias_ih + bias_hh;
 };
-
-// Create mkldnn memory view from ATen tensor
-static inline ideep::tensor get_mkldnn_tensor(
-    const at::Tensor& tensor, const ideep::tensor::desc& desc) {
-  TORCH_CHECK(
-      tensor.device().is_cpu(),
-      "itensor_view_from_dense expects CPU tensor input");
-  TORCH_CHECK(
-      tensor.layout() == at::Layout::Strided,
-      "itensor_view_from_dense expects dense tensor input");
-  TORCH_CHECK(tensor.scalar_type() == at::ScalarType::Float || tensor.scalar_type() == at::ScalarType::BFloat16,
-             "itensor_view_from_dense expects float or bfloat16 tensor input");
-  //TORCH_INTERNAL_ASSERT(at::impl::variable_excluded_from_dispatch());
-  if (tensor.scalar_type() == at::ScalarType::Float){
-    return {desc, tensor.template data_ptr<float>()};
-  } else {
-    return {desc, tensor.template data_ptr<c10::BFloat16>()};
-  }
-}
 
 at::Tensor mkldnn_rnn_layer(at::Tensor& hy_, at::Tensor& cy_,
     const at::Tensor& input, at::TensorList weights,
@@ -202,15 +187,27 @@ at::Tensor mkldnn_rnn_layer(at::Tensor& hy_, at::Tensor& cy_,
   bias.copy_(bias_);
   // per layer input size
   int64_t input_size = input.size(2);
-  auto x = get_mkldnn_tensor(input, rnn.src_layer_desc(input_size, get_mkldnn_dtype(input.scalar_type())));
-  auto hx = get_mkldnn_tensor(hx_, rnn.src_iter_desc(get_mkldnn_dtype(hx_.scalar_type())));
-  auto cx = get_mkldnn_tensor(cx_, rnn.src_iter_c_desc());
-  auto w1 = get_mkldnn_tensor(weight_ih, rnn.weights_layer_desc(input_size, get_mkldnn_dtype(weight_ih.scalar_type())));
-  auto w2 = get_mkldnn_tensor(weight_hh, rnn.weights_iter_desc(get_mkldnn_dtype(weight_hh.scalar_type())));
-  auto b = get_mkldnn_tensor(bias, rnn.bias_desc());
-  auto y = get_mkldnn_tensor(output, rnn.dst_layer_desc(get_mkldnn_dtype(output.scalar_type())));
-  auto hy = get_mkldnn_tensor(hy_, rnn.dst_iter_desc(get_mkldnn_dtype(hy_.scalar_type())));
-  auto cy = get_mkldnn_tensor(cy_, rnn.dst_iter_c_desc());
+  auto x = torch_ipex::cpu::get_mkldnn_tensor_view(input, rnn.src_layer_desc(input_size, get_mkldnn_dtype(input.scalar_type())));
+  auto hx = torch_ipex::cpu::get_mkldnn_tensor_view(hx_, rnn.src_iter_desc(get_mkldnn_dtype(hx_.scalar_type())));
+  auto cx = torch_ipex::cpu::get_mkldnn_tensor_view(cx_, rnn.src_iter_c_desc());
+  auto b = torch_ipex::cpu::get_mkldnn_tensor_view(bias, rnn.bias_desc());
+  auto y = torch_ipex::cpu::get_mkldnn_tensor_view(output, rnn.dst_layer_desc(get_mkldnn_dtype(output.scalar_type())));
+  auto hy = torch_ipex::cpu::get_mkldnn_tensor_view(hy_, rnn.dst_iter_desc(get_mkldnn_dtype(hy_.scalar_type())));
+  auto cy = torch_ipex::cpu::get_mkldnn_tensor_view(cy_, rnn.dst_iter_c_desc());
+
+  ideep::tensor w1, w2;
+  std::tie(w1, w2) = torch_ipex::cpu::get_lstm_prepacked_weight(
+    weight_ih, 
+    weight_hh,
+    input_size,
+    rnn.num_gates,
+    rnn.hidden_size,
+    {output_size.cbegin(), output_size.cend()},
+    x,
+    hx,
+    cx,
+    b,
+    reverse);
 
   ideep::lstm_forward::compute(x, hx, cx, w1, w2, b, y, hy, cy, reverse);
 

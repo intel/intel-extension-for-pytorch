@@ -136,6 +136,10 @@ class tensor : public memory {
       return is_blocking_desc() && blocking_desc().inner_nblks == 0;
     };
 
+    inline bool is_rnn_packed() const {
+      return is_rnn_packed_desc();
+    }
+
     inline bool is_default() const {
       if (!is_plain()) return false;
 
