@@ -268,6 +268,12 @@ static void bindGetDeviceProperties(PyObject* module) {
   m.def("_get_device_properties", [](int device) -> XPUDeviceProp * {
       return xpu::dpcpp::getDeviceProperties(device);
   }, py::return_value_policy::reference);
+
+  m.def("_synchronize",
+    [](const int & device_index) {
+      auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
+      dpcpp_queue.wait_and_throw();
+    });
 }
 
 void init_module(pybind11::module& m) {

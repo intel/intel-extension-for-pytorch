@@ -348,7 +348,9 @@ def synchronize(device: _device_t = None) -> None:
             It uses the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
     """
-    pass
+    _lazy_init()
+    idx = _get_device_index(device, optional=True)
+    return _C._synchronize(idx) 
 
 
 def current_stream(device: Optional[_device_t] = None) -> Stream:
