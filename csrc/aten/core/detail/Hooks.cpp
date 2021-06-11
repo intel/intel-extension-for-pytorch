@@ -3,6 +3,7 @@
 #include <c10/util/Exception.h>
 
 #include <utils/DPCPPUtils.h>
+#include <utils/Exception.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>
@@ -43,18 +44,20 @@ std::string XPUHooks::showConfig() const {
 
 int64_t XPUHooks::getCurrentDevice() const {
   c10::DeviceIndex device_index;
-  dpcppGetDevice(&device_index);
+  AT_DPCPP_CHECK(dpcppGetDevice(&device_index));
   return device_index;
 }
 
 int XPUHooks::getDeviceCount() const {
   int count;
-  dpcppGetDeviceCount(&count);
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
   return count;
 }
 
 at::Device XPUHooks::getDeviceFromPtr(void* data) const {
-  return xpu::dpcpp::getDeviceFromPtr(data);
+  c10::DeviceIndex device;
+  AT_DPCPP_CHECK(dpcppGetDeviceIdFromPtr(&device, data));
+  return {DeviceType::XPU, static_cast<int16_t>(device)};
 }
 
 bool XPUHooks::isPinnedPtr(void* data) const {

@@ -16,6 +16,7 @@
 #include <vector>
 #include <cstdlib>
 
+using namespace xpu::dpcpp;
 
 namespace xpu {
 namespace dpcpp {
@@ -33,18 +34,13 @@ class DPCPPStreamImpl {
   DPCPPStreamImpl(
       DeviceIndex di,
       DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
-      : /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
-        queue_([&]() -> DPCPP::queue {
+      : queue_([&]() -> DPCPP::queue {
               return dpcpp_profiling() ?
-                  DPCPP::queue(xpu::dpcpp::getDeviceContext((int)di),
-                   dpcppGetDeviceSelector(di),
-                   asyncHandler,
+                  DPCPP::queue(dpcppGetRawDevice(di), asyncHandler,
                    {DPCPP::property::queue::in_order(),
-                    DPCPP::property::queue::enable_profiling()}) :
-                  DPCPP::queue(xpu::dpcpp::getDeviceContext((int)di),
-                   dpcppGetDeviceSelector(di),
-                   asyncHandler,
-                   {DPCPP::property::queue::in_order()});
+                    DPCPP::property::queue::enable_profiling()})
+                  : DPCPP::queue(dpcppGetRawDevice(di), asyncHandler,
+                      {DPCPP::property::queue::in_order()});
             } ()
         ), device_index_(di) {}
 
