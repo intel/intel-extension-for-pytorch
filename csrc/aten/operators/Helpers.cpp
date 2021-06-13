@@ -1,7 +1,8 @@
 #include <core/Device.h>
-#include <utils/Exception.h>
 #include <core/Stream.h>
-#include <utils/Env.h>
+#include <runtime/DPCPPUtils.h>
+#include <runtime/Exception.h>
+#include <runtime/Env.h>
 
 #include <cmath>
 #include "comm/Helpers.h"

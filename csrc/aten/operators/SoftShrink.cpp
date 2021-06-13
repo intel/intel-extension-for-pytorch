@@ -1,6 +1,6 @@
 #include <ATen/native/TensorIterator.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
 

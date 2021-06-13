@@ -1,13 +1,13 @@
 #pragma once
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 
 #include <c10/util/Exception.h>
-#include <utils/Macros.h>
+#include <runtime/Macros.h>
 
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>
 #include <mkl.h>
-#include <utils/oneMKLUtils.h>
+#include <runtime/oneMKLUtils.h>
 #endif
 
 namespace xpu {

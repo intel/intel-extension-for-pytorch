@@ -1,9 +1,9 @@
-#include <utils/Device.h>
+#include <runtime/Device.h>
 #include <core/Device.h>
 #include <core/Stream.h>
-#include <utils/Exception.h>
-#include <utils/Env.h>
-#include <utils/Context.h>
+#include <runtime/Exception.h>
+#include <runtime/Env.h>
+#include <runtime/Context.h>
 
 #include <cmath>
 #include <mutex>

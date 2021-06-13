@@ -4,8 +4,8 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include "comm/ApplyUtils.h"
-#include <utils/DPCPP.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPP.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>

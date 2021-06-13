@@ -6,7 +6,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/Helpers.h"
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 
 #include <cstddef>

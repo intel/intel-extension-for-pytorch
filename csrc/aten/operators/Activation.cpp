@@ -5,7 +5,7 @@
 #include <core/TensorImplUtils.h>
 #include "comm/ApplyUtils.h"
 #include <core/Generator.h>
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

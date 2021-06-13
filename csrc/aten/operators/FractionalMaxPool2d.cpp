@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "comm/NumericLimits.h"
 #include "comm/AccumulateType.h"

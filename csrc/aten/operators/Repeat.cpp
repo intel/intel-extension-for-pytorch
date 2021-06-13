@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
 
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "comm/Helpers.h"
 

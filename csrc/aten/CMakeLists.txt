@@ -22,17 +22,8 @@ foreach (sfile ${aten_functions_src})
     list(APPEND _FAST_SRCS ${sfile})
   endif()
 endforeach()
-list(APPEND aten_reorg_src ${_SLOW_SRCS} ${_FAST_SRCS})
+list(APPEND aten_ops_src ${_SLOW_SRCS} ${_FAST_SRCS})
+set(IPEX_ATEN_OPS_SRCS ${aten_ops_src} PARENT_SCOPE)
 
-FILE(GLOB aten_core_src "utils/*.cpp" "core/*.cpp" "core/detail/*.cpp")
-
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/core" "${CMAKE_CURRENT_SOURCE_DIR}/utils"
-        DESTINATION include
-        FILES_MATCHING PATTERN "*.h")
-
-set(aten_src)
-list(APPEND aten_src ${aten_reorg_src})
-list(APPEND aten_src ${aten_core_src})
-list(APPEND aten_src ${gpu_generated_src})
-
-set(IPEX_ATEN_SRCS ${aten_src} PARENT_SCOPE)
+FILE(GLOB aten_core_src "core/*.cpp" "core/detail/*.cpp")
+set(IPEX_ATEN_CORE_SRCS ${aten_core_src} PARENT_SCOPE)

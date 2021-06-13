@@ -1,5 +1,5 @@
 #include "comm/ApplyUtils.h"
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>

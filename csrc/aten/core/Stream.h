@@ -5,21 +5,16 @@
 
 #include <c10/core/Stream.h>
 #include <c10/util/Exception.h>
+#include <c10/core/DeviceGuard.h>
 
-#include <utils/DPCPP.h>
-#include <utils/Device.h>
-#include <utils/Macros.h>
+#include <runtime/DPCPP.h>
+#include <runtime/Macros.h>
 
 
 using namespace at;
 
 namespace xpu {
 namespace dpcpp {
-
-#define DPCPP_STREAM_COMPUTATION_INDEX 0
-#define DPCPP_STREAM_IO_INDEX 1
-#define DPCPP_STREAM_NETWORK_INDEX 2
-#define DPCPP_STREAM_MAX_INDEX 32
 
 class IPEX_API DPCPPStream {
  public:
@@ -29,6 +24,7 @@ class IPEX_API DPCPPStream {
     TORCH_CHECK(stream_.device_type() == DeviceType::XPU);
   }
 
+  /// Construct a DPCPPStream from a Stream with no error checking.
   explicit DPCPPStream(Unchecked, Stream stream) : stream_(stream) {}
 
   bool operator==(const DPCPPStream& other) const noexcept {
@@ -55,6 +51,11 @@ class IPEX_API DPCPPStream {
     return stream_.id();
   }
 
+  void synchronize() const {
+    DeviceGuard guard{stream_.device()};
+    dpcpp_queue().wait();
+  }
+
   Stream unwrap() const {
     return stream_;
   }
@@ -73,20 +74,13 @@ class IPEX_API DPCPPStream {
   Stream stream_;
 };
 
-IPEX_API DPCPPStream getDPCPPStreamFromPool(
-    const bool isDefault = false,
-    DeviceIndex device_index = -1);
+DPCPPStream getDPCPPStreamFromPool(bool is_default, DeviceIndex device_index);
 
-IPEX_API DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index = -1);
+DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index = -1);
 
 IPEX_API DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
 
 IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
-
-IPEX_API DPCPPStream
-getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index);
-
-IPEX_API std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s);
 
 } // namespace dpcpp
 } // namespace xpu

@@ -4,7 +4,7 @@
 
 #include <oneDNN/oneDNN.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {

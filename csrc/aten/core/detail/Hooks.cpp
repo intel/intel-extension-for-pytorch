@@ -2,8 +2,8 @@
 #include <ATen/Context.h>
 #include <c10/util/Exception.h>
 
-#include <utils/DPCPPUtils.h>
-#include <utils/Exception.h>
+#include <runtime/DPCPPUtils.h>
+#include <runtime/Exception.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>

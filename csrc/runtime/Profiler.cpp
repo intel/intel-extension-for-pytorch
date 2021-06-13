@@ -1,5 +1,5 @@
 #include <torch/csrc/autograd/profiler.h>
-#include <utils/Profiler.h>
+#include <runtime/Profiler.h>
 #include <sstream>
 
 float DPCPPEventStubImpl::elapsed() {

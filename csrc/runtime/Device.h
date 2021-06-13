@@ -2,8 +2,8 @@
 
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
-#include <utils/DPCPP.h>
-#include <utils/Macros.h>
+#include <runtime/DPCPP.h>
+#include <runtime/Macros.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -39,8 +39,8 @@ struct XPUDeviceProp {
 //          DPCPP::info::device::global_mem_size;
 };
 
-IPEX_API XPUDeviceProp* getCurrentDeviceProperties();
-IPEX_API XPUDeviceProp* getDeviceProperties(int64_t device);
+XPUDeviceProp* getCurrentDeviceProperties();
+XPUDeviceProp* getDeviceProperties(int64_t device);
 
 } // namespace dpcpp
 } // namespace at

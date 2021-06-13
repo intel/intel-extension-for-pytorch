@@ -3,7 +3,7 @@
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
 
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Device.h>
 #include <core/Memory.h>
 #include <core/Stream.h>

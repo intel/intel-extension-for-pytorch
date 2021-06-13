@@ -1,7 +1,7 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/native/quantized/cpu/packed_params.h>
 
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 #include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
 

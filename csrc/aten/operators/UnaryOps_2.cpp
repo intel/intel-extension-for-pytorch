@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"

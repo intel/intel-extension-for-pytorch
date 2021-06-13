@@ -1,9 +1,9 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <utils/Profiler.h>
-#include <utils/Timer.h>
-#include <utils/Env.h>
+#include <runtime/Profiler.h>
+#include <runtime/Timer.h>
+#include <runtime/Env.h>
 
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;

@@ -1,6 +1,6 @@
 #include <c10/util/Exception.h>
-#include <utils/Macros.h>
-#include <utils/Context.h>
+#include <runtime/Macros.h>
+#include <runtime/Context.h>
 #include <core/CachingHostAllocator.h>
 
 #include <deque>

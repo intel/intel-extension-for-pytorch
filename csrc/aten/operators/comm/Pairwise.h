@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include "Pointwise.h"
 
 namespace at {

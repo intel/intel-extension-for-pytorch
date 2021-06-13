@@ -2,7 +2,7 @@
 #include <ATen/Functions.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "Loops.h"
 

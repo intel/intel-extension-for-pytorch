@@ -3,8 +3,8 @@
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
 
-#include <utils/DPCPPUtils.h>
-#include <utils/Exception.h>
+#include <runtime/DPCPPUtils.h>
+#include <runtime/Exception.h>
 #include <core/Device.h>
 #include <core/Stream.h>
 

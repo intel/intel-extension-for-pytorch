@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #include "comm/ApplyUtils.h"
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include <core/detail/TensorInfo.h>
 
 

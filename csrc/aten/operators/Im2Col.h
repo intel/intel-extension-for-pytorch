@@ -3,7 +3,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include "UpSample.h"
 
 

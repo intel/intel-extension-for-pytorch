@@ -1,5 +1,5 @@
 #pragma once
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 
 #ifdef BUILD_INTERNAL_DEBUG
 #define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \

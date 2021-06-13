@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include <core/Memory.h>
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"

@@ -1,6 +1,7 @@
 #include <core/CachingAllocator.h>
-#include <utils/Context.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/Context.h>
+#include <runtime/Exception.h>
+#include <runtime/DPCPPUtils.h>
 #include <c10/core/Allocator.h>
 #include <tensor/Context.h>
 

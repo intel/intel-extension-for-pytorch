@@ -3,7 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <intrinsic/ipex_intrinsic.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include "comm/Pointwise.h"
 #include "comm/ScalarOps.h"
 #include <oneDNN/oneDNN.h>

@@ -1,5 +1,5 @@
-#include <utils/Context.h>
-#include <utils/Exception.h>
+#include <runtime/Context.h>
+#include <runtime/Exception.h>
 
 namespace xpu {
 namespace dpcpp {

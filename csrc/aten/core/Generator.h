@@ -1,6 +1,7 @@
 #pragma once
 
-#include <utils/Macros.h>
+#include <runtime/Macros.h>
+#include <ATen/Utils.h>
 #include <ATen/core/Generator.h>
 
 
@@ -32,8 +33,9 @@ struct IPEX_API DPCPPGeneratorImpl : public GeneratorImpl {
 
 namespace detail {
 
+Generator createDPCPPGenerator(DeviceIndex device_index = -1);
+
 IPEX_API const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
-IPEX_API Generator createDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
 } // namespace dpcpp

@@ -2,12 +2,12 @@
 
 #include <ATen/Config.h>
 
-#include <utils/Context.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/Context.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Device.h>
 #include <core/Memory.h>
-#include <utils/Profiler.h>
-#include <utils/Timer.h>
+#include <runtime/Profiler.h>
+#include <runtime/Timer.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>

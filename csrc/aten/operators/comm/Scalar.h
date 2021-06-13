@@ -1,6 +1,6 @@
 #pragma onece
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 
 namespace xpu {
 namespace dpcpp {

@@ -1,6 +1,3 @@
-
-set(IPEX_GPU_ATEN_GENERATED "${PROJECT_SOURCE_DIR}/csrc/aten/generated")
-
 add_custom_command(OUTPUT
         ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
         ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp
@@ -24,7 +21,5 @@ add_custom_command(OUTPUT
 list(APPEND gpu_generated_src ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
         ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp)
 
-add_custom_target(IPEX_GPU_GEN_TARGET DEPENDS ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.h
-                                              ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.h)
-add_library(IPEX_GPU_FILES_GEN_LIB INTERFACE)
-add_dependencies(IPEX_GPU_FILES_GEN_LIB IPEX_GPU_GEN_TARGET)
+add_custom_target(IPEX_GPU_GEN_TARGET DEPENDS ${gpu_generated_src})
+set(IPEX_GPU_GEN_FILES ${gpu_generated_src})

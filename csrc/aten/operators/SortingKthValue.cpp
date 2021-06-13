@@ -2,7 +2,7 @@
 #include <ATen/native/SortingUtils.h>
 #include <c10/macros/Macros.h>
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>

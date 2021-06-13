@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include "comm/Numerics.h"
@@ -14,7 +14,7 @@
 #ifdef USE_ONEMKL
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
+#include <runtime/oneMKLUtils.h>
 #endif
 
 

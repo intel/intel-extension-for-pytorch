@@ -1,5 +1,5 @@
 #include <core/Memory.h>
-#include <utils/Profiler.h>
+#include <runtime/Profiler.h>
 #include <core/CachingHostAllocator.h>
 #include <core/Stream.h>
 

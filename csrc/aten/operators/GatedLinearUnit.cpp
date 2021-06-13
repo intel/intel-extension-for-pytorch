@@ -2,8 +2,8 @@
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 
-#include <utils/DPCPP.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPP.h>
+#include <runtime/DPCPPUtils.h>
 
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

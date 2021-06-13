@@ -5,7 +5,7 @@
 #include <c10/core/impl/InlineStreamGuard.h>
 
 #include <core/GuardImpl.h>
-#include <utils/Macros.h>
+#include <runtime/Macros.h>
 #include <cstddef>
 
 

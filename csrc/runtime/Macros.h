@@ -1,9 +1,5 @@
 #pragma once
 
-// See c10/macros/Export.h for a detailed explanation of what the function
-// of these macros are.  We need one set of macros for every separate library
-// we build.
-
 #ifdef _WIN32
 #if defined(AT_DPCPP_BUILD_SHARED_LIBS)
 #define IPEX_EXPORT __declspec(dllexport)
@@ -26,6 +22,10 @@
 #else
 #define IPEX_API IPEX_IMPORT
 #endif
+
+#define IPEX_DISABLE_COPY_AND_ASSIGN(classname)   \
+  classname(const classname&) = delete;           \
+  classname& operator=(const classname&) = delete
 
 enum DPCPP_STATUS {
   DPCPP_SUCCESS = 0,

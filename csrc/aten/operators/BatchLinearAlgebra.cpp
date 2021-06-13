@@ -2,7 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPPUtils.h>
 
 #include "comm/ApplyUtils.h"
 #include "comm/ATDispatch.h"
@@ -11,7 +11,7 @@
 #ifdef USE_ONEMKL
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
+#include <runtime/oneMKLUtils.h>
 #endif
 
 

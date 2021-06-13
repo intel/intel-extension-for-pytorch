@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <utils/DPCPP.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPP.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"
@@ -13,7 +13,7 @@
 
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
+#include <runtime/oneMKLUtils.h>
 #endif
 
 namespace at {

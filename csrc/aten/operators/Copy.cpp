@@ -5,7 +5,7 @@
 #include <ATen/quantized/Quantizer.h>
 #include <ATen/quantized/QTensorImpl.h>
 
-#include <utils/Exception.h>
+#include <runtime/Exception.h>
 #include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>

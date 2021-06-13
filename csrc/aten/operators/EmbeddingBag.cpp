@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <torch/torch.h>
 
-#include <utils/DPCPP.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPP.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/Memory.h>
 

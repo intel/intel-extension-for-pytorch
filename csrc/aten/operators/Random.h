@@ -1,7 +1,7 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include <ATen/core/DistributionsHelper.h>
 #include <ATen/core/PhiloxRNGEngine.h>
 #include <ATen/core/MT19937RNGEngine.h>

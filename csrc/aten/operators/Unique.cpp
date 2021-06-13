@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
 
-#include <utils/DPCPP.h>
+#include <runtime/DPCPP.h>
 #include <core/Memory.h>
 #include <tuple>
 #include <iterator>

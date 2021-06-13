@@ -1,16 +1,25 @@
-include(${PROJECT_SOURCE_DIR}/cmake/Codegen.cmake)
-set(IPEX_GPU_ATEN_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/aten")
 set(IPEX_GPU_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT}/aten")
+set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
+set(IPEX_GPU_ATEN_GENERATED "${IPEX_GPU_ATEN_SRC_DIR}/generated")
 
 # sources
-set(IPEX_ATEN_SRCS)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/aten)
+set(IPEX_GPU_GEN_FILES)
+set(IPEX_GPU_GEN_TARGET)
+include(${PROJECT_SOURCE_DIR}/cmake/Codegen.cmake)
+
+set(IPEX_ATEN_OPS_SRCS)
+set(IPEX_ATEN_CORE_SRCS)
+add_subdirectory(${IPEX_GPU_ATEN_SRC_DIR})
+
+set(IPEX_RUNTIME_SRCS)
+add_subdirectory(${IPEX_GPU_RUNTIME_SRC_DIR})
 
 set(IPEX_JIT_SRCS)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/jit)
+add_subdirectory(${IPEX_GPU_ROOT}/jit)
 
 set(IPEX_TENSOR_SRCS)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tensor)
+add_subdirectory(${IPEX_GPU_ROOT}/tensor)
 
 if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
@@ -21,23 +30,25 @@ set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
         ${SYCL_INCLUDE_DIR}
         ${IPEX_GPU_ROOT}
         ${IPEX_GPU_ATEN_SRC_DIR}
+        ${IPEX_GPU_RUNTIME_SRC_DIR}
         ${IPEX_GPU_ATEN_GENERATED})
 
-FILE(GLOB GPU_UTIL_SRC "*.cpp")
+set(IPEX_KER_SRC ${IPEX_ATEN_OPS_SRCS}
+        ${IPEX_ATEN_CORE_SRCS}
+        ${IPEX_RUNTIME_SRCS}
+        ${IPEX_GPU_GEN_FILES}
+        ${IPEX_TENSOR_SRCS})
+set_sycl_flag("${IPEX_ATEN_OPS_SRCS}")
+add_library(torch_ipex_kernel SHARED ${IPEX_KER_SRC})
 
-set(SYCL_SOURCES ${GPU_UTIL_SRC} ${IPEX_JIT_SRCS} ${IPEX_ATEN_SRCS})
-set_sycl_flag("${SYCL_SOURCES}")
-
-set(IPEX_GPU_SRC ${GPU_UTIL_SRC} ${IPEX_JIT_SRCS})
-
-add_library(torch_ipex_kernel SHARED ${IPEX_ATEN_SRCS} ${IPEX_TENSOR_SRCS})
+set(IPEX_GPU_SRC ${IPEX_JIT_SRCS})
 add_library(torch_ipex_gpu SHARED ${IPEX_GPU_SRC})
 
-target_include_directories(torch_ipex_gpu PUBLIC ${IPEX_INCLUDE_DIRS})
 target_include_directories(torch_ipex_kernel PUBLIC ${IPEX_INCLUDE_DIRS})
+target_include_directories(torch_ipex_gpu PUBLIC ${IPEX_INCLUDE_DIRS})
 
-target_link_libraries(torch_ipex_gpu PUBLIC IPEX_GPU_FILES_GEN_LIB)
-
+add_dependencies(torch_ipex_kernel IPEX_GPU_GEN_TARGET)
+target_link_libraries(torch_ipex_kernel PUBLIC ${TORCH_LIBRARIES})
 target_link_libraries(torch_ipex_gpu PUBLIC ${TORCH_LIBRARIES})
 
 set(IPEX_COMPILE_DEFINITIONS)

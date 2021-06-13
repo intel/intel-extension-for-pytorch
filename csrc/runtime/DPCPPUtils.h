@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utils/DPCPP.h>
-#include <utils/Device.h>
+#include <runtime/DPCPP.h>
+#include <runtime/Device.h>
 #include <core/Stream.h>
 
 

@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
-#include <utils/DPCPP.h>
-#include <utils/DPCPPUtils.h>
+#include <runtime/DPCPP.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 
