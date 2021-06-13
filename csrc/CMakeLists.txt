@@ -33,23 +33,23 @@ set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
         ${IPEX_GPU_RUNTIME_SRC_DIR}
         ${IPEX_GPU_ATEN_GENERATED})
 
-set(IPEX_KER_SRC ${IPEX_ATEN_OPS_SRCS}
+set(IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
         ${IPEX_TENSOR_SRCS})
 set_sycl_flag("${IPEX_ATEN_OPS_SRCS}")
-add_library(torch_ipex_kernel SHARED ${IPEX_KER_SRC})
+add_library(ipex_gpu_core SHARED ${IPEX_GPU_CORE_SRC})
 
 set(IPEX_GPU_SRC ${IPEX_JIT_SRCS})
-add_library(torch_ipex_gpu SHARED ${IPEX_GPU_SRC})
+add_library(ipex_gpu SHARED ${IPEX_GPU_SRC})
 
-target_include_directories(torch_ipex_kernel PUBLIC ${IPEX_INCLUDE_DIRS})
-target_include_directories(torch_ipex_gpu PUBLIC ${IPEX_INCLUDE_DIRS})
+target_include_directories(ipex_gpu_core PUBLIC ${IPEX_INCLUDE_DIRS})
+target_include_directories(ipex_gpu PUBLIC ${IPEX_INCLUDE_DIRS})
 
-add_dependencies(torch_ipex_kernel IPEX_GPU_GEN_TARGET)
-target_link_libraries(torch_ipex_kernel PUBLIC ${TORCH_LIBRARIES})
-target_link_libraries(torch_ipex_gpu PUBLIC ${TORCH_LIBRARIES})
+add_dependencies(ipex_gpu_core IPEX_GPU_GEN_TARGET)
+target_link_libraries(ipex_gpu_core PUBLIC ${TORCH_LIBRARIES})
+target_link_libraries(ipex_gpu PUBLIC ${TORCH_LIBRARIES})
 
 set(IPEX_COMPILE_DEFINITIONS)
 
@@ -78,8 +78,8 @@ endif()
 set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};CL_TARGET_OPENCL_VERSION=220")
 if(USE_ONEDPL)
     find_package(oneDPL)
-    target_link_libraries(torch_ipex_gpu PUBLIC oneDPL)
-    target_link_libraries(torch_ipex_kernel PUBLIC oneDPL)
+    target_link_libraries(ipex_gpu PUBLIC oneDPL)
+    target_link_libraries(ipex_gpu_core PUBLIC oneDPL)
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_ONEDPL")
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};ONEDPL_USE_TBB_BACKEND=0")
     # FIXME:
@@ -101,8 +101,8 @@ if (USE_ONEMKL)
     find_package(MKLDPCPP QUIET)
     if (MKLDPCPP_FOUND)
         set(ONEMKL_INCLUDE_DIR ${ONEMKL_INCLUDE_DIR} PARENT_SCOPE)
-        target_link_libraries(torch_ipex_kernel PUBLIC ${ONEMKL_SHARED_LIBS})
-        target_include_directories(torch_ipex_kernel PUBLIC ${ONEMKL_INCLUDE_DIR})
+        target_link_libraries(ipex_gpu_core PUBLIC ${ONEMKL_SHARED_LIBS})
+        target_include_directories(ipex_gpu_core PUBLIC ${ONEMKL_INCLUDE_DIR})
         set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_ONEMKL")
     else()
         set(USE_ONEMKL OFF PARENT_SCOPE)
@@ -112,18 +112,18 @@ endif()
 
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
-    target_link_libraries(torch_ipex_kernel PRIVATE ${ONEDNN_LIBRARIES})
-    target_include_directories(torch_ipex_kernel BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
-    add_dependencies(torch_ipex_kernel dnnl)
+    target_link_libraries(ipex_gpu_core PRIVATE ${ONEDNN_LIBRARIES})
+    target_include_directories(ipex_gpu_core BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
+    add_dependencies(ipex_gpu_core dnnl)
 else()
     message(FATAL_ERROR "Cannot find oneDNN")
 endif()
 
-target_compile_definitions(torch_ipex_gpu PUBLIC ${IPEX_COMPILE_DEFINITIONS})
-target_compile_definitions(torch_ipex_kernel PUBLIC ${IPEX_COMPILE_DEFINITIONS})
+target_compile_definitions(ipex_gpu PUBLIC ${IPEX_COMPILE_DEFINITIONS})
+target_compile_definitions(ipex_gpu_core PUBLIC ${IPEX_COMPILE_DEFINITIONS})
 
-target_link_libraries(torch_ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} torch_ipex_kernel)
+target_link_libraries(ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} ipex_gpu_core)
 
-install(TARGETS torch_ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS torch_ipex_kernel LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS ipex_gpu_core LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY "./" DESTINATION include/ipex FILES_MATCHING PATTERN "*.h")
