@@ -1,4 +1,5 @@
-import unittest, copy
+import unittest
+import copy
 import torch
 import torch.nn as nn
 import intel_pytorch_extension as ipex
@@ -6,6 +7,8 @@ from common_utils import TestCase
 import time, sys
 from torch.testing._core import _get_default_tolerance
 import itertools
+import collections
+from autocast_test_lists import AutocastCPUTestLists
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -36,60 +39,22 @@ class TestFunction(TestCase):
                 out_autocast = _conv(_in_cpu)
             self.assertEqual(out_autocast.dtype, torch.float)
 
-class TestConv(TestCase):
-    # In autocast, Conv should be forced into the bf16
-    def test_conv2d_forward(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        _in_cpu = torch.rand((1, 1, 7, 7))
-        _conv = torch.nn.Conv2d(1, 1, (3, 3))
-        
-        out = _conv(_in_cpu)
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
-            out_autocast = _conv(_in_cpu)
-        self.assertEqual(out_autocast.dtype, torch.bfloat16)
-        self.assertEqual(out, out_autocast.to(torch.float), 1e-2)
-
-    def test_conv2d_backward(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-
-        input = torch.rand((1, 1, 7, 7))
-        _in_cpu = input.clone().requires_grad_()
-        in_autocast = input.clone().requires_grad_()
-        
-        _conv = torch.nn.Conv2d(1, 1, (3, 3))
-        conv_cpu = copy.deepcopy(_conv)
-        conv_auto_cast = copy.deepcopy(_conv)
-        
-        out = conv_cpu(_in_cpu).sum()
-        out.backward()
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
-            out_autocast = conv_auto_cast(in_autocast).sum()
-        out_autocast.backward()
-            #loss = criterion(y_autocast, target)
-        self.assertEqual(out_autocast.dtype, torch.bfloat16)
-        self.assertEqual(in_autocast.grad.dtype, torch.float)
-        self.assertEqual(_in_cpu.grad, in_autocast.grad, 1e-2)
-
 class TestAutocastWithJit(TestCase):
     def setUp(self):
         super(TestAutocastWithJit, self).setUp()
         from test_jit import Conv_Bn_Relu, BatchNorm_Conv_BatchNorm, ConvBatchNorm_Fixed, ConvReshapeBatchNorm,\
                             CascadedConvBnSumRelu, LinearBn, Linear_Reshape_Bn
-        self.models = [Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1), BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),\
-                    ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1), ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),\
-                    ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),\
-                    CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),\
-                    LinearBn(2 ,32, 32, bias=True),\
-                    Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True)]
-        self.inputs = [torch.randn(32, 3, 64, 64), torch.randn(32, 3, 64, 64),\
-                    torch.randn(32, 3, 64, 64), torch.randn(32, 3, 32, 32, 32),\
-                    torch.randn(32, 3, 64, 64),\
-                    torch.rand(32, 3, 64, 64),\
-                    torch.rand(1, 1, 32, 32),\
+        self.models = [Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1), BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),
+                    ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1), ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
+                    ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
+                    CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
+                    LinearBn(2, 32, 32, bias=True),
+                    Linear_Reshape_Bn(2, 32, 32, (1, 1, 64, 16), bias=True)]
+        self.inputs = [torch.randn(32, 3, 64, 64), torch.randn(32, 3, 64, 64),
+                    torch.randn(32, 3, 64, 64), torch.randn(32, 3, 32, 32, 32),
+                    torch.randn(32, 3, 64, 64),
+                    torch.rand(32, 3, 64, 64),
+                    torch.rand(1, 1, 32, 32),
                     torch.rand(1, 1, 32, 32)]
 
     def test_generate_autocast_jit_trace_model(self):
@@ -141,7 +106,7 @@ class TestCustomerOps(TestCase):
             A = [x] + ly
             R = ipex.interaction(*A)
             return R
-        
+
         def interact_fusion_autocast(x, ly):
             A = [x] + ly
             with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
@@ -161,8 +126,8 @@ class TestCustomerOps(TestCase):
 
             A = interact_fusion(x1, ly1) # all fp32
             B = interact_fusion_autocast(x2, ly2) # all bf16
-            C = interact_fusion_autocast(x1, ly2) #  fp32 dense bf16 emb 
-            D = interact_fusion_autocast(x2, ly1) #  bf16 dense fp32 emb
+            C = interact_fusion_autocast(x1, ly2) # fp32 dense bf16 emb
+            D = interact_fusion_autocast(x2, ly1) # bf16 dense fp32 emb
 
             self.assertEqual(A.dtype, torch.float)
             self.assertEqual(B.dtype, torch.bfloat16)
@@ -180,20 +145,20 @@ class TestCustomerOps(TestCase):
             self.assertEqual(x1.grad.dtype, torch.float)
             self.assertEqual(x2.grad.dtype, torch.bfloat16)
 
-            self.assertEqual(x1.grad, x2.grad, 1e-03)
+            self.assertEqual(x1.grad, x2.grad.float(), 1e-03)
             for i in range(0, 26):
                 self.assertEqual(ly1[i].grad.dtype, torch.float)
                 self.assertEqual(ly2[i].grad.dtype, torch.bfloat16)
-                self.assertEqual(ly1[i].grad, ly2[i].grad, 1e-03)
+                torch.testing.assert_allclose(ly1[i].grad, ly2[i].grad.float(), rtol=1e-02, atol=1e-04)
 
     def test_embeddingbag_op(self):
         cpu_emb = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
         autocast_emb = copy.deepcopy(cpu_emb)
 
-        input = torch.LongTensor([1,2,4,5,4,3,2,9])
+        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
         # bf16_input = input.clone().detach()
 
-        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
         # bf16_offsets = offsets.clone().detach()
 
         cpu_out = cpu_emb(input, offsets)
@@ -202,7 +167,7 @@ class TestCustomerOps(TestCase):
 
         self.assertEqual(cpu_out.dtype, torch.float)
         self.assertEqual(inference_out.dtype, torch.bfloat16)
-        self.assertEqual(cpu_out, inference_out.float(), 1e-2)
+        torch.testing.assert_allclose(cpu_out, inference_out.float(), rtol=1e-02, atol=1e-4)
 
         # re-init autocast_emb
         autocast_emb = copy.deepcopy(cpu_emb)
@@ -218,9 +183,10 @@ class M(nn.Module):
         super(M, self).__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
 
-    def forward(self, x, h = None):
+    def forward(self, x, h=None):
         x, h = self.lstm(x, h)
         return x, h
+
 class TestLSTM(TestCase):
     def _lstm_params_list(self):
         params_dict = {
@@ -258,7 +224,7 @@ class TestLSTM(TestCase):
                     continue
 
                 num_directions = 2 if bidirectional else 1
-                
+
                 if batch_first:
                     input = torch.randn(batch_size, seq_len, input_size)
                 else:
@@ -350,6 +316,176 @@ class TestLSTM(TestCase):
     
     def test_lstm_pack_padded_sequence(self):
         self._test_lstm_pack_padded_sequence()
+
+class TestAutocastOperations(TestCase):
+    def setUp(self):
+        super(TestAutocastOperations, self).setUp()
+        self.autocast_lists = AutocastCPUTestLists(torch.device('cpu'))
+
+    def tearDown(self):
+        del self.autocast_lists
+        super(TestAutocastOperations, self).tearDown()
+
+    def _run_autocast_outofplace(self, op, args, run_as_type, out_type=None, module=torch, add_kwargs=None):
+        # helper to cast args
+        def cast(val, to_type):
+            if isinstance(val, torch.Tensor):
+                return val.to(to_type) if val.is_floating_point() else val
+            elif isinstance(val, collections.abc.Iterable):
+                return type(val)(cast(v, to_type) for v in val)
+            else:
+                return val
+
+        if add_kwargs is None:
+            add_kwargs = {}
+
+        self.assertFalse(ipex.core.is_autocast_enabled())
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+            self.assertTrue(ipex.core.is_autocast_enabled())
+            out_type = out_type if out_type is not None else run_as_type
+            output = output_method = None
+
+            # Try module.* variant, if requested:
+            if module is not None and hasattr(module, op):
+                output = getattr(module, op)(*args, **add_kwargs)
+                if isinstance(output, torch.Tensor):
+                    self.assertTrue(out_type == output.dtype,
+                                    "autocast for torch.{} produced {}, should produce {}"
+                                    .format(op, output.dtype, out_type))
+            # Try Tensor.* variant:
+            if hasattr(torch.Tensor, op):
+                output_method = getattr(args[0], op)(*args[1:], **add_kwargs)
+                if isinstance(output_method, torch.Tensor):
+                    self.assertTrue(out_type == output_method.dtype,
+                                    "autocast for torch.{} produced {}, should produce torch.{}"
+                                    .format(op, output_method.dtype, out_type))
+
+            self.assertTrue((output is not None) or (output_method is not None),
+                            "{} not found as an attribute on either Tensor or the requested module {}".format(
+                            op, module))
+
+            # Accounts for ops that return Tensors, iterables, and other non-Tensors.
+            # For example, lstm_cell returns a tuple and equal returns bool.
+            def compare(first, second):
+                if isinstance(first, torch.Tensor):
+                    return torch.equal(first, second)
+                elif isinstance(first, collections.abc.Iterable):
+                    return all(compare(f, s) for f, s in zip(first, second))
+                else:
+                    return first == second
+
+            # If both torch.* and Tensor.* variants were found, check outputs are identical
+            if (output is not None) and (output_method is not None):
+                self.assertTrue(type(output) == type(output_method))
+                comparison = compare(output, output_method)
+                self.assertTrue(comparison, "torch.{0} result did not match Tensor.{0} result".format(op))
+
+            # Compare numerics to Python-side "autocasting" that (we expect) does the same thing
+            # as the C++-side autocasting, and should be bitwise accurate.
+            output_to_compare = output if output is not None else output_method
+            with ipex.amp.autocast(enabled=False, configure=ipex.conf.AmpConf(torch.bfloat16)):
+                self.assertFalse(ipex.core.is_autocast_enabled())
+
+                if module is not None and hasattr(module, op):
+                    control = getattr(module, op)(*cast(args, run_as_type), **add_kwargs)
+                else:
+                    control = getattr(args[0].to(run_as_type), op)(*cast(args[1:], run_as_type), **add_kwargs)
+                self.assertTrue(type(output_to_compare) == type(control))
+                comparison = compare(output_to_compare, control)
+                self.assertTrue(comparison, "torch.{} result did not match control".format(op))
+            self.assertTrue(ipex.core.is_autocast_enabled())
+        self.assertFalse(ipex.core.is_autocast_enabled())
+
+    def _run_autocast_pass_test(self, op, args, run_as_type, out_type=None, module=torch, add_kwargs=None):
+        # helper to cast args
+        def cast(val, to_type):
+            if isinstance(val, torch.Tensor):
+                return val.to(to_type) if val.is_floating_point() else val
+            elif isinstance(val, collections.abc.Iterable):
+                return type(val)(cast(v, to_type) for v in val)
+            else:
+                return val
+
+        if add_kwargs is None:
+            add_kwargs = {}
+
+        self.assertFalse(ipex.core.is_autocast_enabled())
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+            self.assertTrue(ipex.core.is_autocast_enabled())
+            out_type = out_type if out_type is not None else run_as_type
+
+            # Try module.* variant, if requested:
+            if module is not None and hasattr(module, op):
+                getattr(module, op)(*args, **add_kwargs)
+            # Try Tensor.* variant:
+            if hasattr(torch.Tensor, op):
+                getattr(args[0], op)(*args[1:], **add_kwargs)
+
+    def args_maybe_kwargs(self, op_with_args):
+        if len(op_with_args) == 2:
+            return op_with_args[0], op_with_args[1], {}
+        else:
+            return op_with_args[0], op_with_args[1], op_with_args[2]
+
+    def test_autocast_torch_expect_builtin_promote(self):
+        for op, args, out_type in self.autocast_lists.torch_expect_builtin_promote:
+            self._run_autocast_outofplace(op, args, torch.float32, out_type=out_type)
+
+    def test_autocast_methods_expect_builtin_promote(self):
+        for op, args, out_type in self.autocast_lists.methods_expect_builtin_promote:
+            self._run_autocast_outofplace(op, args, torch.float32, module=None, out_type=out_type)
+
+    def test_autocast_torch_bf16(self):
+        for op_with_args in self.autocast_lists.torch_bf16:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.bfloat16, add_kwargs=maybe_kwargs)
+
+    def test_autocast_nn_bf16(self):
+        for op, args in self.autocast_lists.nn_bf16:
+            self._run_autocast_outofplace(op, args, torch.bfloat16, module=torch._C._nn)
+
+    def test_autocast_torch_fp32(self):
+        for op_with_args in self.autocast_lists.torch_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.float32, add_kwargs=maybe_kwargs)
+
+    def test_autocast_nn_fp32(self):
+        for op_with_args in self.autocast_lists.nn_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
+
+    def test_autocast_fft_fp32(self):
+        for op_with_args in self.autocast_lists.fft_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_pass_test(op, args, torch.float32, module=torch._C._fft, add_kwargs=maybe_kwargs)
+
+    def test_autocast_special_fp32(self):
+        for op_with_args in self.autocast_lists.special_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_pass_test(op, args, torch.float32, module=torch._C._special, add_kwargs=maybe_kwargs)
+
+    def test_autocast_linalg_fp32(self):
+        for op_with_args in self.autocast_lists.linalg_fp32:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_pass_test(op, args, torch.float32, module=torch._C._linalg, add_kwargs=maybe_kwargs)
+
+    def test_autocast_torch_need_autocast_promote(self):
+        for op, args in self.autocast_lists.torch_need_autocast_promote:
+            self._run_autocast_outofplace(op, args, torch.float32)
+
+    def test_autocast_blacklist_non_float_output(self):
+        for op, args in self.autocast_lists.blacklist_non_float_output_pass_test:
+            self._run_autocast_pass_test(op, args, torch.float32)
+
+    def test_autocast_torch_fp32_multi_output(self):
+        for op_with_args in self.autocast_lists.torch_fp32_multi_output:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_pass_test(op, args, torch.float32, add_kwargs=maybe_kwargs)
+
+    def test_autocast_nn_fp32_multi_output(self):
+        for op_with_args in self.autocast_lists.nn_fp32_multi_output:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(op, args, torch.float32, module=torch._C._nn, add_kwargs=maybe_kwargs)
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -208,7 +208,7 @@ at::Tensor dropout(const at::Tensor& input, double p, bool train) {
   if (at::ScalarType::Char == target_type) {
     return int8::dropout(input, p, train);
   }
-  //convert to fp32 path.
+  // Fall Through.
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("dropout");
 #endif
@@ -221,7 +221,7 @@ at::Tensor gelu(const at::Tensor& input) {
   if (at::ScalarType::Char == target_type) {
     return int8::gelu(input);
   }
-  // convert to fp32 path.
+  // Fall Through.
   return at::gelu(input);
 }
 
