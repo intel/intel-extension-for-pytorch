@@ -25,7 +25,7 @@ class TestEMB(TestCase):
         bf16_out = bf16_emb(dpcpp_input, dpcpp_offsets)
 
         self.assertEqual(cpu_out, dpcpp_out.to('cpu'))
-        self.assertEqual(cpu_out, bf16_out.to('cpu').float(), 0.01)
+        self.assertEqual(cpu_out, bf16_out.to('cpu').float(), atol=1e-1, rtol=1e-5)
 
         cpu_out.mean().backward()
         dpcpp_out.mean().backward()
@@ -38,7 +38,7 @@ class TestEMB(TestCase):
         self.assertEqual(cpu_emb.weight.grad.data._indices(), dpcpp_emb.weight.grad.data._indices().to('cpu'))
         self.assertEqual(cpu_emb.weight.grad.data._values(), dpcpp_emb.weight.grad.data._values().to('cpu'))
 
-        self.assertEqual(cpu_emb.weight.grad.data._values(), dpcpp_emb.weight.grad.data._values().to('cpu'), 0.01)
+        self.assertEqual(cpu_emb.weight.grad.data._values(), dpcpp_emb.weight.grad.data._values().to('cpu'), atol=1e-1, rtol=1e-5)
         self.assertEqual(bf16_emb.weight.grad.data._values().dtype, torch.bfloat16)
 
 if __name__ == '__main__':

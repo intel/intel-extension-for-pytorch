@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 
 #include <torch/csrc/jit/runtime/custom_operator.h>
 

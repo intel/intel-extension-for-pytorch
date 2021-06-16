@@ -71,11 +71,15 @@ from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 from torch._six import inf, nan
 
-from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
-    TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
-    IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
-    IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf, int8_calibration
+from common_utils import (
+    TestCase, TEST_WITH_ROCM, run_tests,
+    IS_WINDOWS, IS_FILESYSTEM_UTF8_ENCODING, NO_MULTIPROCESSING_SPAWN,
+    do_test_dtypes, IS_SANDCASTLE, IS_FBCODE, IS_REMOTE_GPU, load_tests, slowTest,
+    skipCUDAMemoryLeakCheckIf, BytesIOContext,
+    skipIfRocm, skipIfNoSciPy, TemporaryFileName, TemporaryDirectoryName,
+    wrapDeterministicFlagAPITest, DeterministicGuard, make_tensor)
+
+from utils.utils import int8_calibration
 
 device = ipex.DEVICE
 #device = 'cpu:0'
@@ -129,7 +133,7 @@ class ConvReshapeBatchNorm(nn.Module):
 
     def forward(self, x):
         conv_output = self.conv(x)
-        return self.bn(torch.reshape(conv_output, self.dest_shape)) 
+        return self.bn(torch.reshape(conv_output, self.dest_shape))
 
 class Conv_Conv_Concat(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -494,8 +498,8 @@ class Tester(TestCase):
         # to avoid affecting other scripts
         core.disable_mix_bf16_fp32()
 
-        self.assertEqual(fused_sresult, result, prec=prec)
-        self.assertEqual(fused_tresult, result, prec=prec)
+        self.assertEqual(fused_sresult, result, atol=1e-1, rtol=1e-5)
+        self.assertEqual(fused_tresult, result, atol=1e-1, rtol=1e-5)
 
         # check if the fused node exists in the graph
         if kind_in_graph is not None:
@@ -540,8 +544,8 @@ class Tester(TestCase):
             with ipex.AutoMixPrecision(int8_conf):
                fused_tresult = trace_fused_model(x3)
         os.remove('configure.json')
-        self.assertEqual(fused_sresult, result, prec)
-        self.assertEqual(fused_tresult, result, prec)
+        self.assertEqual(fused_sresult, result, atol=1e-1, rtol=1e-5)
+        self.assertEqual(fused_tresult, result, atol=1e-1, rtol=1e-5)
 
         # check if the fused node exists in the graph
         if kind_in_graph is not None:
@@ -830,7 +834,7 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu")
- 
+
     def test_output_linear_add(self):
         self._test_output(
             LinearAdd(3, 32, bias=True),

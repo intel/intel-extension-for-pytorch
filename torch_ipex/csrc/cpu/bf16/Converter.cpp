@@ -1,6 +1,6 @@
 #include "Converter.h"
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 
 #if defined(AVX512)
 #include "vec/vec_type_cvt.h"

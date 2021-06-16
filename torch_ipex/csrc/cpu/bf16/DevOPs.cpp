@@ -18,9 +18,9 @@ at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor &
   return bf16::gen_mix_prec_tensor(_ipex_result);
 }
 
-at::Tensor index(const at::Tensor & self, at::TensorList indices) {
+at::Tensor index(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices) {
   auto&& _tensor = bf16::gen_consistent_tensor(self);
-  auto&& _ipex_indices = bridge::shallowFallbackToCPUTensorList(indices);
+  auto&& _ipex_indices = torch_ipex::bridge::shallowFallbackToCPUTensorList(indices);
   auto&& _ipex_result = at::index(_tensor, _ipex_indices);
   return bf16::gen_mix_prec_tensor(_ipex_result);
 }

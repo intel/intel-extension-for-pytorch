@@ -1,13 +1,97 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+TORCH_VERSION = '1.8.0'
+TORCH_IPEX_VERSION = '1.8.0'
+
+# import torch
+import platform
+import pkg_resources
+import re
+from socket import timeout
+import subprocess
+import sys
+import os
+import urllib.request
+
+try:
+    from packaging import version
+except Exception:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'packaging'])
+    from packaging import version
+
+installed_raw = {pkg for pkg in pkg_resources.working_set}
+installed = {}
+for i in installed_raw:
+    installed[i.key] = i.version
+
+requires = {}
+requires_raw = {}
+try:
+    with open('requirements.txt', 'r') as reader:
+        for line in reader.readlines():
+            line_raw = line.replace('\n', '')
+            line = line_raw.replace('=', '')
+            tmp = re.split('[=<>]', line)
+            if len(tmp) == 2:
+                requires[tmp[0]] = tmp[1]
+            else:
+                requires[tmp[0]] = ''
+            requires_raw[tmp[0]] = line_raw
+except Exception:
+    pass
+
+restart = False
+for k in requires.keys():
+    if k in installed.keys():
+        if requires[k] != '' and version.parse(installed[k]) < version.parse(requires[k]):
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', requires_raw[k]])
+            if k == 'wheel':
+                restart = True
+    else:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', k])
+        if k == 'wheel':
+            restart = True
+if restart:
+    os.execv(sys.executable, ['python'] + sys.argv)
+    exit(1)
+
+TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
+
 try:
     import torch
 except ImportError as e:
-    print('Unable to import torch. Error:')
-    print('\t', e)
-    print('You need to install pytorch first.')
-    sys.exit(1)
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch=='+TORCH_VERSION+'+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
+    import torch
+
+PYTHON_VERSION = sys.version_info
+IS_WINDOWS = (platform.system() == 'Windows')
+IS_DARWIN = (platform.system() == 'Darwin')
+IS_LINUX = (platform.system() == 'Linux')
+
+TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-linux_x86_64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
+if IS_DARWIN:
+    TORCH_URL = 'torch=={}'.format(TORCH_VERSION)
+else:
+    OS_VER = 'linux_x86_64'
+    if IS_WINDOWS:
+        TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-win_amd64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
+        OS_VER = 'win_amd64'
+
+    try:
+        fp = urllib.request.urlopen('https://download.pytorch.org/whl/torch_stable.html', timeout=30)
+        cont_bytes = fp.read()
+        cont = cont_bytes.decode('utf8').replace('\n', '')
+        fp.close()
+        lines = re.split(r'<br>', cont)
+
+        for line in lines:
+            matches = re.match('<a href="(cpu\/torch-{0}.*cp{1}{2}.*{3}.*)">(.*)<\/a>'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor, OS_VER), line)
+            if matches and len(matches.groups()) == 2:
+                TORCH_URL = 'torch @ https://download.pytorch.org/whl/{}'.format(matches.group(2))
+                break
+    except Exception:
+        pass
 
 from subprocess import check_call, check_output
 from setuptools import setup, Extension, find_packages, distutils
@@ -22,12 +106,7 @@ import glob
 import inspect
 import multiprocessing
 import multiprocessing.pool
-import os
-import platform
-import re
 import shutil
-import subprocess
-import sys
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -86,20 +165,23 @@ def _get_env_backend():
 
 
 def get_git_head_sha(base_dir):
-  ipex_git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                        cwd=base_dir).decode('ascii').strip()
-  if os.path.isdir(os.path.join(base_dir, '..', '.git')):
-    torch_git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                            cwd=os.path.join(
-                                                base_dir,
-                                                '..')).decode('ascii').strip()
-  else:
-    torch_git_sha = ''
+  ipex_git_sha = ''
+  torch_git_sha = ''
+  try:
+    ipex_git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                          cwd=base_dir).decode('ascii').strip()
+    if os.path.isdir(os.path.join(base_dir, '..', '.git')):
+      torch_git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                              cwd=os.path.join(
+                                                  base_dir,
+                                                  '..')).decode('ascii').strip()
+  except Exception:
+    pass
   return ipex_git_sha, torch_git_sha
 
 
 def get_build_version(ipex_git_sha):
-  version = os.getenv('TORCH_IPEX_VERSION', '1.2.0')
+  version = os.getenv('TORCH_IPEX_VERSION', TORCH_IPEX_VERSION)
   if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
     try:
       version += '+' + ipex_git_sha[:7]
@@ -271,11 +353,6 @@ create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
 # Constant known variables used throughout this file
 
-# PyTorch installed library
-IS_WINDOWS = (platform.system() == 'Windows')
-IS_DARWIN = (platform.system() == 'Darwin')
-IS_LINUX = (platform.system() == 'Linux')
-
 
 def make_relative_rpath(path):
   if IS_DARWIN:
@@ -285,12 +362,17 @@ def make_relative_rpath(path):
   else:
     return '-Wl,-rpath,$ORIGIN/' + path
 
+install_requires=[
+        TORCH_URL,
+]
+
 setup(
     name='torch_ipex',
     version=version,
     description='Intel PyTorch Extension',
     url='https://github.com/intel/intel-extension-for-pytorch',
     author='Intel/PyTorch Dev Team',
+    install_requires=install_requires,
     # Exclude the build files.
     #packages=find_packages(exclude=['build']),
     packages=[

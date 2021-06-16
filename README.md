@@ -3,65 +3,73 @@
 Intel Extension for PyTorch is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
 
  - [Installation](#installation)
-     - [Install PyTorch from Source](#install-pytorch-from-source)
+     - [Install PyTorch](#install-pytorch)
      - [Install Intel Extension for PyTorch from Source](#install-intel-extension-for-pytorch-from-source)
  - [Getting Started](#getting-started)
      - [Automatically Mix Precison](#automatically-mix-precision)
         - [BFloat16](#BFloat16)
         - [INT8](#int8-quantization)
- - [Contribution](#contribution)
+     - [Supported Customized Operators](#supported-customized-operators)
+     - [Supported Fusion Patterns](#supported-fusion-patterns)
+ - [Tutorials](#tutorials)
+ - [Joint blogs](#joint-blogs)
  - [License](#license)
 
 ## Installation
 
-### Install PyTorch from Source
+### Install PyTorch
  |IPEX Version|PyTorch Version|
  |--|--|
+ |[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|
  |[v1.2.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.2.0)|[v1.7.0](https://github.com/pytorch/pytorch/tree/v1.7.0 "v1.7.0")|
  |[v1.1.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.1.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.2](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.2)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
 
- Take Intel-Extension-for-Pytorch v1.2.0 as the example.
+ Take Intel-Extension-for-Pytorch v1.8.0 as the example.
 
- 1. Get PyTorch v1.7.0 source(Refer to [PyTorch guide](https://github.com/pytorch/pytorch#get-the-pytorch-source) for more details)
+ 1. Install PyTorch from binary
+    ```bash
+    conda install pytorch torchvision torchaudio cpuonly -c pytorch
+    ```
+
+ 2. Install PyTorch from source
+    
+    Get PyTorch v1.8.0 source(Refer to [PyTorch guide](https://github.com/pytorch/pytorch#get-the-pytorch-source) for more details)
     ```bash
     git clone --recursive https://github.com/pytorch/pytorch
+    ```
+    
+    Checkout PyTorch to the specified version
+    ```bash
     cd pytorch
+    git checkout v1.8.0
+    ```
 
-    # checkout source code to the specified version
-    git checkout v1.7.0
-
-    # update submodules for the specified PyTorch version
+    Update submodules
+    ```bash
     git submodule sync
     git submodule update --init --recursive
     ```
 
- 2. Get the source code of Intel Extension for PyTorch
+    Build and install PyTorch (Refer to [PyTorch guide](https://github.com/pytorch/pytorch#install-pytorch) for more details)
     ```bash
-    git clone --recursive https://github.com/intel/intel-extension-for-pytorch
-    cd intel-extension-for-pytorch
-
-    # if you are updating an existing checkout
-    git submodule sync
-    git submodule update --init --recursive
-    ```
-
- 3. Add an new backend for Intel Extension for PyTorch
-    ```bash
-    # Apply git patch to pytorch code
-    cd ${pytorch_directory}
-    git apply ${intel_extension_for_pytorch_directory}/torch_patches/xpu-1.7.patch
-    ```
-
- 4. Build and install PyTorch (Refer to [PyTorch guide](https://github.com/pytorch/pytorch#install-pytorch) for more details)
-    ```bash
-    cd ${pytorch_directory}
     python setup.py install
     ```
 
 ### Install Intel Extension for PyTorch from Source
+
+Get the source code of Intel Extension for PyTorch
+```bash
+git clone --recursive https://github.com/intel/intel-extension-for-pytorch
+cd intel-extension-for-pytorch
+
+# if you are updating an existing checkout
+git submodule sync
+git submodule update --init --recursive
+```
+
 Install dependencies
 ```bash
 pip install lark-parser hypothesis
@@ -247,6 +255,39 @@ Supported Quantization Operators:
 - ```convolution + sum```
 - ```convolution + sum + relu```
 - ```convolution + BatchNorm```
+
+
+
+### Supported Customized Operators
+* ROIAlign
+* NMS
+* BatchScoreNMS
+* MLP
+* Interaction
+* FrozenBatchNorm2d
+
+### Supported Fusion Patterns
+* Conv2D + ReLU
+* Conv2D + SUM
+* Conv2D + SUM + ReLU
+* Conv2D + Sigmoid
+* Conv2D + Sigmoid + MUL
+* Conv2D + HardTanh
+* Conv2D + ELU
+* Conv3D + ReLU
+* Conv3D + SUM
+* Conv3D + SUM + ReLU
+* Linear + ReLU
+* Linear + GELU
+* View + Transpose + Contiguous + View
+
+## Tutorials
+*  [Performance Tuning](tutorials/Performance_Tuning.md)
+
+## Joint-blogs
+* [Intel and Facebook Accelerate PyTorch Performance with 3rd Gen Intel® Xeon® Processors and Intel® Deep Learning Boost’s new BFloat16 capability](https://www.intel.com/content/www/us/en/artificial-intelligence/posts/intel-facebook-boost-bfloat16.html)
+* [Accelerate PyTorch with IPEX and oneDNN using Intel BF16 Technology](https://medium.com/pytorch/accelerate-pytorch-with-ipex-and-onednn-using-intel-bf16-technology-dca5b8e6b58f)
+* [Scaling up BERT-like model Inference on modern CPU - Part 1 by IPEX launcher](https://huggingface.co/blog/bert-cpu-scaling-part-1)
 
 
 ## Contribution

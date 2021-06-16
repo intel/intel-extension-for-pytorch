@@ -86,7 +86,7 @@ class TestQuantization(TestCase):
             y = model(x)
 
         self.assertTrue(ipex.core.is_int8_dil_tensor(y))
-        self.assertEqual(ref, y, prec=0.1)
+        self.assertEqual(ref, y, atol=1e-1, rtol=1e-5)
         os.remove('configure.json')
 
     def _lstm_compare_fp32_int8(self, model, *args):
@@ -103,9 +103,10 @@ class TestQuantization(TestCase):
 
         self.assertTrue(ipex.core.is_int8_dil_tensor(y))
 
-        self.assertEqual(ref, y, prec=0.1)
-        self.assertEqual(hy_ref[0], hy[0], prec=0.01)
-        self.assertEqual(hy_ref[1], hy[1], prec=0.01)
+        # self.assertEqual(ref, y, prec=0.1)
+        self.assertEqual(ref, y, atol=0.1, rtol=1e-5)
+        self.assertEqual(hy_ref[0], hy[0], atol=0.01, rtol=1e-5)
+        self.assertEqual(hy_ref[1], hy[1], atol=0.01, rtol=1e-5)
         os.remove('configure.json')
 
     def test_conv2d(self):
