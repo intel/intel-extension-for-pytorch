@@ -271,6 +271,7 @@ Tensor host_softmax_backward(
     const Tensor& output_,
     int64_t dim_,
     bool half_to_float) {
+  RECORD_FUNCTION("host_softmax_backward", {});
   AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");

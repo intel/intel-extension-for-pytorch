@@ -80,6 +80,7 @@ Tensor& fused_adamW(
     double weight_decay,
     const bool correct_bias
     ){
+    RECORD_FUNCTION("fused_adamW", std::vector<c10::IValue>({grad_input, avg, avg_sq}));
     auto gI_ = grad_input.contiguous();
     Tensor output = at::empty_like(gI_);
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
