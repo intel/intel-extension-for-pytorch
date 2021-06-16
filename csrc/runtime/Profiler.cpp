@@ -2,6 +2,7 @@
 #include <runtime/Profiler.h>
 #include <sstream>
 
+
 float DPCPPEventStubImpl::elapsed() {
   float us;
   event_.wait();

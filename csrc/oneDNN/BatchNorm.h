@@ -98,8 +98,16 @@ batch_normalization(
 
   auto bn_fwd_desc =
       batch_normalization_forward::desc(prop, src_md, epsilon, flag);
+
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto bn_fwd_pd =
+      batch_normalization_forward::primitive_desc(bn_fwd_desc, attr, engine);
+#else
   auto bn_fwd_pd =
       batch_normalization_forward::primitive_desc(bn_fwd_desc, engine);
+#endif
 
   at::Tensor dst;
   auto dst_md = bn_fwd_pd.dst_desc();
@@ -189,6 +197,13 @@ batch_normalization(
 
   args.insert({DNNL_ARG_MEAN, mean_m});
   args.insert({DNNL_ARG_VARIANCE, var_m});
+
+ #ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = bn_fwd_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(bn_fwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
+#endif
 
   DPCPP_ONEDNN_EXEC(bn_fwd, strm, args);
 
@@ -284,6 +299,7 @@ batch_normalization_backward(
 
   auto bwd_desc = batch_normalization_backward::desc(
       p_kind, diff_dst_md, src_md, epsilon, flags);
+
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
       bwd_desc, engine, bn_fwd_pd);
 

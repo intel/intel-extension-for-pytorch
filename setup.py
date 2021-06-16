@@ -8,6 +8,7 @@
 # USE_LEVEL_ZERO_ONLY   - to enumerate devices only with Level Zero
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
+# USE_SCRATCHPAD_MODE   - to trun on oneDNN scratchpad user mode
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_ITT               - to Use Intel(R) VTune Profiler ITT functionality
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
@@ -294,6 +295,8 @@ setup(
             '*.py',
             'lib/*.so',
             'include/*.h',
+            'include/gpu/*',
+            'include/gpu/aten/utils/*.h',
             'include/core/*.h',
             'include/utils/*.h']
         },

@@ -136,6 +136,7 @@ static at::Tensor pooling(
 #else
   auto pooling_fwd = pooling_forward(pooling_fwd_pd);
 #endif
+
   DPCPP_ONEDNN_EXEC(
       pooling_fwd,
       strm,
@@ -281,6 +282,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
 #else
     auto pooling_fwd = pooling_forward(pooling_fwd_pd);
 #endif
+    
     DPCPP_ONEDNN_EXEC(
         pooling_fwd,
         strm,

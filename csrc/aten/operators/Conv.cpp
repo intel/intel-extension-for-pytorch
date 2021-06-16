@@ -83,8 +83,15 @@ Tensor dpcpp_convolution_backward_input(
       input_md, weight_md, output_md,
       _stride, _dilation, _padding, _padding);
 
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
+      conv_backward_data_desc, attr, engine, conv_forward_pd);
+#else
   auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
       conv_backward_data_desc, engine, conv_forward_pd);
+#endif
 
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
   if (!lazy_reorder_enabled()) {
@@ -149,13 +156,23 @@ Tensor dpcpp_convolution_backward_input(
     grad_input_memory = dpcpp_onednn_memory(expected_grad_input_md, engine, grad_input_.data_ptr());
   }
 
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size() / grad_output.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, grad_output.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(conv_backward_data_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+#endif
+
   auto conv_backward_data = convolution_backward_data(conv_backward_data_pd);
   DPCPP_ONEDNN_EXEC(
       conv_backward_data,
       strm,
       {{DNNL_ARG_DIFF_DST, grad_output_memory},
       {DNNL_ARG_WEIGHTS, weight_memory},
-      {DNNL_ARG_DIFF_SRC, grad_input_memory}});
+      {DNNL_ARG_DIFF_SRC, grad_input_memory},
+#ifdef USE_SCRATCHPAD_MODE
+      {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+#endif
+      });
 
   if (!lazy_reorder_enabled() && grad_input_memory != grad_input_usr_memory) {
     DPCPP_ONEDNN_EXEC(
@@ -240,8 +257,15 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
           input_md, weight_md, bias_md, output_md,
           _stride, _dilation, _padding, _padding);
 
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto conv_backward_weight_pd = convolution_backward_weights::primitive_desc(
+          conv_backward_weight_desc, attr, engine, conv_forward_pd);
+#else
   auto conv_backward_weight_pd = convolution_backward_weights::primitive_desc(
           conv_backward_weight_desc, engine, conv_forward_pd);
+#endif
 
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
   if (!lazy_reorder_enabled()) {
@@ -320,6 +344,12 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
     }
   }
 
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = conv_backward_weight_pd.scratchpad_desc().get_size() / grad_output.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, input.options(), c10::nullopt);
+  auto scratchpad_memory = dnnl::memory(conv_backward_weight_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+#endif
+
   auto conv_backward_weight = convolution_backward_weights(conv_backward_weight_pd);
   DPCPP_ONEDNN_EXEC(
       conv_backward_weight,
@@ -327,7 +357,11 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
       {{DNNL_ARG_DIFF_DST, grad_output_memory},
       {DNNL_ARG_SRC, input_memory},
       {DNNL_ARG_DIFF_WEIGHTS, grad_weight_memory},
-      {DNNL_ARG_DIFF_BIAS, grad_bias_memory}});
+      {DNNL_ARG_DIFF_BIAS, grad_bias_memory},
+#ifdef USE_SCRATCHPAD_MODE
+      {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+#endif
+      });
 
   if (grad_weight_memory.get_desc() != grad_weight_usr_memory.get_desc()) {
     // grad_weight_ contains the result of gw backward, while it is blk format.
@@ -339,6 +373,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
         {{DNNL_ARG_FROM, grad_weight_memory},
         {DNNL_ARG_TO, grad_weight_usr_memory}});
   }
+
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
 }
 

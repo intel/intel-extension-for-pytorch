@@ -55,6 +55,7 @@ void dpcppMemoryScale1(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data= get_buffer<read_mode>(cgh, (float*)src);
     auto out_data= get_buffer<write_mode>(cgh, (float*)dst);
+
     cgh.parallel_for<DPCPP_K(memory_scale1)>(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_ptr = get_pointer(in_data);
@@ -85,6 +86,7 @@ void dpcppMemoryScale2(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = get_buffer<read_mode>(cgh, (float*)src);
     auto out_data = get_buffer<write_mode>(cgh, (float*)dst);
+
     cgh.parallel_for<DPCPP_K(memory_scale2)>(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_ptr = get_pointer(in_data);

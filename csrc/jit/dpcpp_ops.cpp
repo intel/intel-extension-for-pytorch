@@ -210,6 +210,11 @@ at::Tensor trans_addmm_sigmoid(const at::Tensor& weight, const at::Tensor& bias,
   return at::AtenIpexTypeXPU::linear_sigmoid(input, weight, bias, beta, alpha);
 }
 
+at::Tensor fusion_amdd(at::Tensor & p, at::Tensor & d_p, at::Tensor & buf, float weight_decay, float momentum, float dampening, float lr) {
+  return at::AtenIpexTypeXPU::fusion_amdd(p, d_p, buf, weight_decay, momentum, dampening, lr);
+}
+
+
 } // dpcpp
 } // jit
 } // torch

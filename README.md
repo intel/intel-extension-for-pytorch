@@ -226,6 +226,7 @@ The following build options are supported in Intel GPU Extension for PyTorch.
 | USE_ONEMKL | ON | Use oneMKL BLAS library if set to ON. |
 | USE_PERSIST_STREAM | ON | Use persistent oneDNN stream if set to ON.|
 | USE_PRIMITIVE_CACHE | OFF | Use IPEX solution to cache oneDNN primtives if set to ON. <br> Otherwise use oneDNN cache solution.|
+| USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
 | USE_MULTI_CONTEXT | ON | Create DPC++ runtime context per device.
 | USE_ITT | OFF | (Experimental) Use Intel(R) VTune Profiler ITT functionality if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |

@@ -10,6 +10,10 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
+
 
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
@@ -109,6 +113,11 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
   // STEP2: creat attribute
   primitive_attr pattr;
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   post_ops po;
   int64_t post_flags = 0;
   if (attr.alpha_ != 1.f)
@@ -218,6 +227,12 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
   auto matmul_pd = matmul::primitive_desc(matmul_desc, pattr, engine);
 
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = matmul_pd.scratchpad_desc().get_size() / sizeof(matmul_pd.scratchpad_desc().data_type());
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, dst.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(matmul_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+#endif
+
 #ifdef USE_PRIMITIVE_CACHE
   auto matmul_p = fetch_or_create_m<dnnl::matmul>(key, matmul_pd);
 #else
@@ -281,16 +296,25 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   if (attr.beta_ == 1.f && attr.alpha_ == 1.f &&
       (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_m = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
+
     DPCPP_ONEDNN_EXEC(matmul_p, strm,
                       {{DNNL_ARG_SRC, m1_m},
                        {DNNL_ARG_WEIGHTS, m2_m},
                        {DNNL_ARG_BIAS, b_m},
-                       {DNNL_ARG_DST, dst_m}});
+                       {DNNL_ARG_DST, dst_m},
+#ifdef USE_SCRATCHPAD_MODE
+                       {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+#endif
+    });
   } else {
     DPCPP_ONEDNN_EXEC(matmul_p, strm,
                       {{DNNL_ARG_SRC, m1_m},
                        {DNNL_ARG_WEIGHTS, m2_m},
-                       {DNNL_ARG_DST, dst_m}});
+                       {DNNL_ARG_DST, dst_m},
+#ifdef USE_SCRATCHPAD_MODE
+                       {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+#endif
+    });
   }
 
   if (lazy_reorder_enabled() && dst_m != dst_usr_m && dims == 2) {

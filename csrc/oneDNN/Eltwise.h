@@ -52,7 +52,14 @@ static inline void eltwise(
 #endif
 
   eltwise_forward::desc eltwise_eltwiseFwd_desc(prop_kind::forward, alg_kind, src_md, alpha, beta);
+
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto eltwise_forward_pd = eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, attr, engine);
+#else
   auto eltwise_forward_pd = eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
+#endif
 
   memory dst_memory;
   if (!lazy_reorder_enabled()) {
@@ -91,11 +98,23 @@ static inline void eltwise(
   auto eltwise_fwd = dnnl::eltwise_forward(eltwise_forward_pd);
 #endif
 
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = eltwise_forward_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(eltwise_forward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   DPCPP_ONEDNN_EXEC(
       eltwise_fwd,
       strm,
       {{DNNL_ARG_SRC, src_memory},
+       {DNNL_ARG_DST, dst_memory},
+       {DNNL_ARG_SCRATCHPAD, scratchpad_memory}});
+#else
+   DPCPP_ONEDNN_EXEC(
+      eltwise_fwd,
+      strm,
+      {{DNNL_ARG_SRC, src_memory},
        {DNNL_ARG_DST, dst_memory}});
+#endif
 }
 
 template <algorithm alg_kind>
@@ -157,9 +176,18 @@ static inline void eltwise_backward(
           strm, {{DNNL_ARG_FROM, diff_dst_usr_memory}, {DNNL_ARG_TO, diff_dst_memory}});
     } 
   }
+
   eltwise_backward::desc eltwise_eltwiseBwd_desc(alg_kind, diff_dst_md, src_dst_md, alpha, beta);
+
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto eltwise_backward_pd = eltwise_backward::primitive_desc(
+      eltwise_eltwiseBwd_desc, attr, engine, eltwise_forward_pd);
+#else
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_eltwiseBwd_desc, engine, eltwise_forward_pd);
+#endif
 
   memory diff_src_memory;
   if (!lazy_reorder_enabled()) {
@@ -188,17 +216,31 @@ static inline void eltwise_backward(
   auto eltwise_bwd = dnnl::eltwise_backward(eltwise_backward_pd);
 #endif
 
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = eltwise_backward_pd.scratchpad_desc().get_size() / src_dst.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src_dst.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(eltwise_backward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+#endif
+
 
   if (alg_kind == algorithm::eltwise_logistic_use_dst_for_bwd) {
     DPCPP_ONEDNN_EXEC(eltwise_bwd, strm,
         {{DNNL_ARG_DST, src_dst_memory},
         {DNNL_ARG_DIFF_DST, diff_dst_memory},
-        {DNNL_ARG_DIFF_SRC, diff_src_memory}});
+        {DNNL_ARG_DIFF_SRC, diff_src_memory},
+#ifdef USE_SCRATCHPAD_MODE
+        {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+#endif
+        });
   } else {
     DPCPP_ONEDNN_EXEC(eltwise_bwd, strm,
         {{DNNL_ARG_SRC, src_dst_memory},
         {DNNL_ARG_DIFF_DST, diff_dst_memory},
-        {DNNL_ARG_DIFF_SRC, diff_src_memory}});
+        {DNNL_ARG_DIFF_SRC, diff_src_memory},
+#ifdef USE_SCRATCHPAD_MODE
+        {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+#endif
+        });
   }
 }
 

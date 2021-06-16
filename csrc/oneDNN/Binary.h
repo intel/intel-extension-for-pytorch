@@ -51,6 +51,7 @@ static inline Tensor bin(
   auto m2_usr = dpcpp_onednn_memory(md2, engine, t2.data_ptr());
 
   primitive_attr attr;
+
   post_ops post;
   memory::desc md3;
   memory m3_usr;
@@ -113,6 +114,7 @@ static inline Tensor bin(
 #else
   auto prim = binary(pd);
 #endif
+
 
   if (t3.defined()) {
     prim.execute(strm,

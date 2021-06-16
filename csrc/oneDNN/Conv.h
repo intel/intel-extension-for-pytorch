@@ -289,6 +289,10 @@ static at::Tensor convolution(
   }
   pattr.set_post_ops(po);
 
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
   auto conv_forward_pd =
       convolution_forward::primitive_desc(conv_forward_desc, pattr, engine);
 
@@ -438,6 +442,20 @@ static at::Tensor convolution(
   auto conv_forward = convolution_forward(conv_forward_pd);
 #endif
 
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = conv_forward_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(conv_forward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  DPCPP_ONEDNN_EXEC(
+      conv_forward,
+      strm,
+      {{DNNL_ARG_SRC,       src_m},
+       {DNNL_ARG_WEIGHTS,   wgh_m},
+       {DNNL_ARG_BIAS,      bia_m},
+       {DNNL_ARG_DST,       dst_m},
+       {DNNL_ARG_SCRATCHPAD, scratchpad_memory}}
+  );
+#else
   DPCPP_ONEDNN_EXEC(
       conv_forward,
       strm,
@@ -446,6 +464,7 @@ static at::Tensor convolution(
        {DNNL_ARG_BIAS,      bia_m},
        {DNNL_ARG_DST,       dst_m}}
   );
+#endif
 
   if (lazy_reorder_enabled() && dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);

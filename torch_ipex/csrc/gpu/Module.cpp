@@ -296,6 +296,12 @@ void init_module(pybind11::module& m) {
         },
         "fused linear with sigmoid opt. on Intel device");
 
+  m.def("_synchronize",
+        [](const int & device_index) {
+          auto& dpcpp_queue = getCurrentDPCPPStream(device_index).dpcpp_queue();
+          dpcpp_queue.wait();
+        });
+
   m.def("mul_add",
         [](const at::Tensor & self,
            const at::Tensor & other,
@@ -314,6 +320,17 @@ void init_module(pybind11::module& m) {
       },
       "enable split SGD for BF16 weight update. on Intel device");
 
+  m.def("fusion_amdd",
+    [](at::Tensor & p,
+      at::Tensor & d_p,
+      at::Tensor & buf,
+      float weight_decay,
+      float momentum,
+      float dampening,
+      float lr) {
+      return at::AtenIpexTypeXPU::fusion_amdd(p, d_p, buf, weight_decay, momentum, dampening, lr);
+    },
+    "enable Fusion SGD for weight update. on Intel device");
   m.def("fused_adamW",
       [](at::Tensor& grad_input,
         const at::Tensor& avg,

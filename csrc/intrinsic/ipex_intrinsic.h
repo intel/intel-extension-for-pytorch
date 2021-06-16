@@ -39,6 +39,8 @@ at::Tensor mul_add(const Tensor& self, const Tensor& other, const Tensor& accumu
 
 at::Tensor packed_add(at::Tensor & top_half, at::Tensor & bot_half, const at::Tensor & grad, float alpha);
 
+at::Tensor fusion_amdd(at::Tensor & p, at::Tensor & d_p, at::Tensor & buf, float weight_decay, float momentum, float dampening, float lr);
+
 at::Tensor empty_opaque_tensor(DPCPPTensorContext::Meta meta, const TensorOptions& options, c10::optional<MemoryFormat> optional_memory_format);
 
 at::Tensor empty_opaque_qtensor(DPCPPTensorContext::Meta meta, c10::optional<MemoryFormat> optional_memory_format, QuantizerPtr quantizer);

@@ -185,5 +185,69 @@ Tensor packed_add(
   return top_half;
 }
 
+template <typename T>
+class FusionAmdd_ker {};
+
+template <typename scalar_t>
+static inline void fusion_amdd_kernel(
+  scalar_t* __restrict__ p,
+  scalar_t* __restrict__ d_p,
+  scalar_t* __restrict__ buf,
+  size_t num_element,
+  float weight_decay,
+  float momentum,
+  float dampening,
+  float lr) {
+
+  static const auto read_mode = DPCPP::access::mode::read;
+  static const auto read_write_mode = DPCPP::access::mode::read_write;
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto w = get_buffer<read_write_mode>(cgh, p);
+    auto m_buf = get_buffer<read_write_mode>(cgh, buf);
+    auto gw = get_buffer<read_write_mode>(cgh, d_p);
+
+    cgh.parallel_for<FusionAmdd_ker<scalar_t>>(
+      DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {
+
+        auto id = item.get_linear_id();
+        gw[id] += w[id] * weight_decay;
+        m_buf[id] = m_buf[id] * momentum + gw[id];
+        w[id] += m_buf[id] * lr;
+
+    });
+  };
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
+Tensor fusion_amdd(
+    at::Tensor & p,
+    at::Tensor & d_p,
+    at::Tensor & buf,
+    float weight_decay,
+    float momentum,
+    float dampening,
+    float lr) {
+  // RECORD_FUNCTION("fusion_amdd", std::vector<c10::IValue>({top_half, bot_half, grad}));
+  // There is only for FP32 update
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      d_p.scalar_type(),
+      "fusion_amdd_kernel",
+      [&]() {
+        fusion_amdd_kernel<scalar_t>(
+            p.data_ptr<scalar_t>(),
+            d_p.data_ptr<scalar_t>(),
+            buf.data_ptr<scalar_t>(),
+            p.numel(),
+            static_cast<float>(weight_decay),
+            static_cast<float>(momentum),
+            static_cast<float>(dampening),
+            static_cast<float>(lr));
+      });
+  return p;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
