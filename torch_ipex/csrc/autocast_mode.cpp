@@ -154,10 +154,6 @@ struct CPU_WrapFunction_<DtypeCastPolicy::promote, Redispatch, F, Ret,
          &CPU_WrapFunction<DtypeCastPolicy::PRE_DEFINED_POLICY, SIGNATURE,     \
                            SIGNATURE, &FUNC>::type::call);
 
-TORCH_LIBRARY_IMPL(_, AutocastCPU, m) {
-  m.fallback(torch::CppFunction::makeFallthrough());
-}
-
 #define TUPLE_TWO_TENSORS std::tuple<Tensor, Tensor>
 
 #define TUPLE_THREE_TENSORS std::tuple<Tensor, Tensor, Tensor>
@@ -315,11 +311,11 @@ MAKE_REGISTER_FUNC(ADD_NS(quantile), "quantile.scalar",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(quantile), "quantile.new",
                    Tensor(const Tensor &, const Tensor &,
-                          c10::optional<int64_t>, bool, std::string),
+                          c10::optional<int64_t>, bool, c10::string_view),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(quantile), "quantile.new_scalar",
                    Tensor(const Tensor &, double, c10::optional<int64_t>, bool,
-                          std::string),
+                          c10::string_view),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(nanquantile), "nanquantile",
                    Tensor(const Tensor &, const Tensor &,
@@ -330,11 +326,11 @@ MAKE_REGISTER_FUNC(ADD_NS(nanquantile), "nanquantile.scalar",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(nanquantile), "nanquantile.new",
                    Tensor(const Tensor &, const Tensor &,
-                          c10::optional<int64_t>, bool, std::string),
+                          c10::optional<int64_t>, bool, c10::string_view),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(nanquantile), "nanquantile.new_scalar",
                    Tensor(const Tensor &, double, c10::optional<int64_t>, bool,
-                          std::string),
+                          c10::string_view),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(argsort), "argsort",
                    Tensor(const Tensor &, int64_t, bool), fp32)
@@ -516,63 +512,63 @@ MAKE_REGISTER_FUNC(ADD_NS(pixel_unshuffle), "pixel_unshuffle",
                    Tensor(const Tensor &, int64_t), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_fft), "fft_fft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_ifft), "fft_ifft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_fft2), "fft_fft2",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
-                          at::IntArrayRef, c10::optional<std::string>),
+                          at::IntArrayRef, c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_ifft2), "fft_ifft2",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
-                          at::IntArrayRef, c10::optional<std::string>),
+                          at::IntArrayRef, c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_fftn), "fft_fftn",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
                           c10::optional<at::IntArrayRef>,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_ifftn), "fft_ifftn",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
                           c10::optional<at::IntArrayRef>,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_rfft), "fft_rfft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_irfft), "fft_irfft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_rfft2), "fft_rfft2",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
-                          at::IntArrayRef, c10::optional<std::string>),
+                          at::IntArrayRef, c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_irfft2), "fft_irfft2",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
-                          at::IntArrayRef, c10::optional<std::string>),
+                          at::IntArrayRef, c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_rfftn), "fft_rfftn",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
                           c10::optional<at::IntArrayRef>,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_irfftn), "fft_irfftn",
                    Tensor(const Tensor &, c10::optional<at::IntArrayRef>,
                           c10::optional<at::IntArrayRef>,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_hfft), "fft_hfft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_ihfft), "fft_ihfft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
-                          c10::optional<std::string>),
+                          c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(special_exp2), "special_exp2", Tensor(const Tensor &),
                    fp32)
@@ -587,14 +583,14 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_matrix_norm), "linalg_matrix_norm",
                           bool, c10::optional<at::ScalarType>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_matrix_norm), "linalg_matrix_norm.str_ord",
-                   Tensor(const Tensor &, std::string, at::IntArrayRef, bool,
+                   Tensor(const Tensor &, c10::string_view, at::IntArrayRef, bool,
                           c10::optional<at::ScalarType>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_cond), "linalg_cond",
                    Tensor(const Tensor &, const c10::optional<at::Scalar> &),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_cond), "linalg_cond.p_str",
-                   Tensor(const Tensor &, std::string), fp32)
+                   Tensor(const Tensor &, c10::string_view), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_matrix_rank), "linalg_matrix_rank",
                    Tensor(const Tensor &, const c10::optional<double>, bool),
                    fp32)
@@ -609,7 +605,7 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_svdvals), "linalg_svdvals",
 MAKE_REGISTER_FUNC(ADD_NS(linalg_eigvals), "linalg_eigvals",
                    Tensor(const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_eigvalsh), "linalg_eigvalsh",
-                   Tensor(const Tensor &, std::string), fp32)
+                   Tensor(const Tensor &, c10::string_view), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_inv), "linalg_inv", Tensor(const Tensor &),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_householder_product),
@@ -706,7 +702,7 @@ MAKE_REGISTER_FUNC(ADD_NS(multilabel_margin_loss_forward),
                    TUPLE_TWO_TENSORS(const Tensor &, const Tensor &, int64_t),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_qr), "linalg_qr",
-                   TUPLE_TWO_TENSORS(const Tensor &, std::string), fp32)
+                   TUPLE_TWO_TENSORS(const Tensor &, c10::string_view), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_cholesky_ex), "linalg_cholesky_ex",
                    TUPLE_TWO_TENSORS(const Tensor &, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_svd), "linalg_svd",
@@ -714,11 +710,11 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_svd), "linalg_svd",
 MAKE_REGISTER_FUNC(ADD_NS(linalg_eig), "linalg_eig",
                    TUPLE_TWO_TENSORS(const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_eigh), "linalg_eigh",
-                   TUPLE_TWO_TENSORS(const Tensor &, std::string), fp32)
+                   TUPLE_TWO_TENSORS(const Tensor &, c10::string_view), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_lstsq), "linalg_lstsq",
                    TUPLE_FOUR_TENSORS(const Tensor &, const Tensor &,
                                       c10::optional<double>,
-                                      c10::optional<std::string>),
+                                      c10::optional<c10::string_view>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_inv_ex), "linalg_inv_ex",
                    TUPLE_TWO_TENSORS(const Tensor &, bool), fp32)
