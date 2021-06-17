@@ -21,14 +21,14 @@ class lru_cache {
 public:
   class node_t;
 
-  typedef typename std::pair<key_t, value_t> value_type;
+  using value_type = typename std::pair<key_t, value_t>;
 
   // Only need opaque node_t pointer, it'll compile
-  typedef typename std::list<node_t>::iterator iterator;
-  typedef typename std::list<node_t>::const_iterator const_iterator;
+  using iterator = typename std::list<node_t>::iterator;
+  using const_iterator = typename std::list<node_t>::const_iterator;
 
-  typedef typename map<key_t, iterator>::iterator map_it;
-  typedef typename map<key_t, iterator>::const_iterator const_map_it;
+  using map_it = typename map<key_t, iterator>::iterator;
+  using const_map_it = typename map<key_t, iterator>::const_iterator;
 
   // Only class possible, we can't use typedef or using. Or can we?
   class node_t : public std::pair<map_it, value_t> {
@@ -39,7 +39,7 @@ public:
       std::pair<map_it, value_t>(std::move(l)) {}
   };
 
-  typedef typename std::list<node_t>::size_type size_type;
+  using size_type = typename std::list<node_t>::size_type;
 
   lru_cache(size_type capacity) : capacity_(capacity) {}
 

@@ -45,7 +45,7 @@ DPCPP::queue& DPCPPStream::dpcpp_queue() const {
 static DPCPPStream QueueToDPCPPStream(const Queue* ptr) {
   return DPCPPStream(
       DPCPPStream::UNCHECKED,
-      Stream(Stream::UNSAFE, c10::Device(DeviceType::XPU, ptr->getDeviceIndex()), getQueueId(ptr)));
+      Stream(Stream::UNSAFE, c10::Device(DeviceType::XPU, ptr->getDeviceId()), getQueueId(ptr)));
 }
 
 DPCPPStream getDPCPPStreamFromPool(bool is_default, DeviceIndex device_index) {

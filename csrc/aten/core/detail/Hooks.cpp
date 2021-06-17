@@ -2,12 +2,11 @@
 #include <ATen/Context.h>
 #include <c10/util/Exception.h>
 
-#include <runtime/DPCPPUtils.h>
 #include <runtime/Exception.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>
-#include <core/CachingHostAllocator.h>
+#include <core/Allocator.h>
 
 #include <cstddef>
 #include <functional>
@@ -43,29 +42,24 @@ std::string XPUHooks::showConfig() const {
 }
 
 int64_t XPUHooks::getCurrentDevice() const {
-  c10::DeviceIndex device_index;
-  AT_DPCPP_CHECK(dpcppGetDevice(&device_index));
-  return device_index;
+  return current_device();
 }
 
 int XPUHooks::getDeviceCount() const {
-  int count;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
-  return count;
+  return device_count();
 }
 
 at::Device XPUHooks::getDeviceFromPtr(void* data) const {
-  c10::DeviceIndex device;
-  AT_DPCPP_CHECK(dpcppGetDeviceIdFromPtr(&device, data));
+  auto device = get_devie_index_from_ptr(data);
   return {DeviceType::XPU, static_cast<int16_t>(device)};
 }
 
 bool XPUHooks::isPinnedPtr(void* data) const {
-  return dpcpp_isAllocatedByCachingHostAllocator(data);
+  return isAllocatedByHostAlloc(data);
 }
 
 at::Allocator* XPUHooks::getPinnedMemoryAllocator() const {
-  return dpcpp_getCachingHostAllocator();
+  return getHostAllocator();
 }
 
 const Generator&

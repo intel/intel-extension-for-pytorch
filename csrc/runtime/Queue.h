@@ -3,21 +3,15 @@
 #include <cstdint>
 #include <utility>
 
-#include <c10/core/Stream.h>
-#include <c10/util/Exception.h>
-#include <c10/core/DeviceGuard.h>
-
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <runtime/Device.h>
-#include <runtime/Macros.h>
+#include <utils/Macros.h>
 #include <runtime/Exception.h>
-
-
-using namespace at;
-using QueueId = c10::StreamId;
 
 namespace xpu {
 namespace dpcpp {
+
+using QueueId = int32_t;
 
 enum class QueueType : uint8_t {
   DEFAULT = 0x0,
@@ -27,7 +21,7 @@ enum class QueueType : uint8_t {
 class Queue {
  public:
   Queue(
-      DeviceIndex di,
+      DeviceId di,
       DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
       : queue_([&]() -> DPCPP::queue {
               return dpcpp_profiling() ?
@@ -37,10 +31,10 @@ class Queue {
                   : DPCPP::queue(dpcppGetRawDevice(di), asyncHandler,
                       {DPCPP::property::queue::in_order()});
             } ()
-        ), device_index_(di) {}
+        ), device_id_(di) {}
 
-  DeviceIndex getDeviceIndex() const {
-    return device_index_;
+  DeviceId getDeviceId() const {
+    return device_id_;
   }
 
   DPCPP::queue& getDpcppQueue() {
@@ -53,24 +47,24 @@ class Queue {
 
  private:
   DPCPP::queue queue_;
-  DeviceIndex device_index_;
+  DeviceId device_id_;
 };
 
 QueueType queueType(QueueId s);
 
 size_t queueIdIndex(QueueId s);
 
-Queue* getDefaultQueue(DeviceIndex device_index);
+Queue* getDefaultQueue(DeviceId device_id = -1);
 
-Queue* getReservedQueue(DeviceIndex device_index, QueueId queue_id);
+Queue* getReservedQueue(DeviceId device_id, QueueId queue_id);
 
-Queue* getCurrentQueue(DeviceIndex device_index);
+Queue* getCurrentQueue(DeviceId device_id = -1);
 
 void setCurrentQueue(Queue* queue);
 
-Queue* getQueueFromPool(const bool isDefault, DeviceIndex device_index);
+Queue* getQueueFromPool(const bool isDefault, DeviceId device_id);
 
-Queue* getQueueOnDevice(DeviceIndex device_index, QueueId queue_id);
+Queue* getQueueOnDevice(DeviceId device_id, QueueId queue_id);
 
 QueueId getQueueId(const Queue* ptr);
 

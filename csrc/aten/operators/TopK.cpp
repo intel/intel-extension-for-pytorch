@@ -24,7 +24,7 @@ struct TopKTypeConfig {};
 
 template <>
 struct TopKTypeConfig<float> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
   // Converts a float to an integer representation with the same
   // sorting; i.e., for floats f1, f2:
   // if f1 < f2 then convert(f1) < convert(f2)
@@ -46,7 +46,7 @@ struct TopKTypeConfig<float> {
 
 template <>
 struct TopKTypeConfig<uint8_t> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
 
   static inline RadixType convert(uint8_t v) {
     return v;
@@ -59,7 +59,7 @@ struct TopKTypeConfig<uint8_t> {
 
 template <>
 struct TopKTypeConfig<int8_t> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
 
   static inline RadixType convert(int8_t v) {
     return 128u + v;
@@ -72,7 +72,7 @@ struct TopKTypeConfig<int8_t> {
 
 template <>
 struct TopKTypeConfig<int16_t> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
 
   static inline RadixType convert(int16_t v) {
     return 32768u + v;
@@ -85,7 +85,7 @@ struct TopKTypeConfig<int16_t> {
 
 template <>
 struct TopKTypeConfig<int32_t> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
 
   static inline RadixType convert(int32_t v) {
     return 2147483648u + v;
@@ -98,7 +98,7 @@ struct TopKTypeConfig<int32_t> {
 
 template <>
 struct TopKTypeConfig<int64_t> {
-  typedef uint64_t RadixType;
+  using RadixType = uint64_t;
 
   static inline RadixType convert(int64_t v) {
     // assert(sizeof(int64_t) == 8);
@@ -112,10 +112,10 @@ struct TopKTypeConfig<int64_t> {
 
 template <>
 struct TopKTypeConfig<double> {
-  typedef uint64_t RadixType;
+  using RadixType = uint64_t;
 
   static inline RadixType convert(double v) {
-    RadixType x = *((uint64_t*)&v);
+    RadixType x = *((RadixType*)&v);
     RadixType mask = -((x >> 63)) | 0x8000000000000000;
     return (x ^ mask);
   }
@@ -129,7 +129,7 @@ struct TopKTypeConfig<double> {
 
 template <>
 struct TopKTypeConfig<at::Half> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
 
   static inline RadixType convert(at::Half v) {
     RadixType x = *((uint16_t*)&v);
@@ -146,7 +146,7 @@ struct TopKTypeConfig<at::Half> {
 
 template <>
 struct TopKTypeConfig<at::BFloat16> {
-  typedef uint32_t RadixType;
+  using RadixType = uint32_t;
 
   static inline RadixType convert(at::BFloat16 v) {
     RadixType x = *((uint16_t*)&v);

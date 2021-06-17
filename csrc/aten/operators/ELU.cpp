@@ -2,7 +2,7 @@
 #include <ATen/Context.h>
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include "Loops.h"
 
 

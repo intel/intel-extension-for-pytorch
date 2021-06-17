@@ -7,9 +7,8 @@
 #include <c10/util/Exception.h>
 #include <c10/core/DeviceGuard.h>
 
-#include <runtime/DPCPP.h>
-#include <runtime/Macros.h>
-
+#include <utils/DPCPP.h>
+#include <utils/Macros.h>
 
 using namespace at;
 
@@ -24,7 +23,7 @@ class IPEX_API DPCPPStream {
     TORCH_CHECK(stream_.device_type() == DeviceType::XPU);
   }
 
-  /// Construct a DPCPPStream from a Stream with no error checking.
+  // Construct a DPCPPStream from a Stream with no error checking.
   explicit DPCPPStream(Unchecked, Stream stream) : stream_(stream) {}
 
   bool operator==(const DPCPPStream& other) const noexcept {

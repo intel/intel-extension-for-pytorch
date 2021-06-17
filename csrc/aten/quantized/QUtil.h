@@ -6,7 +6,7 @@
 #include <ATen/cpp_custom_type_hack.h>
 
 #include <torch/custom_class.h>
-#include <runtime/Macros.h>
+#include <utils/Macros.h>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {

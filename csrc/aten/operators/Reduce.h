@@ -9,7 +9,7 @@
 
 #include "comm/Array.h"
 #include <core/Allocator.h>
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/OffsetCalculator.h>
 

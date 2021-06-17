@@ -1,8 +1,8 @@
+#include <utils/DPCPP.h>
 #include <runtime/Device.h>
-#include <core/Device.h>
-#include <core/Stream.h>
+#include <utils/Macros.h>
 #include <runtime/Exception.h>
-#include <runtime/Env.h>
+#include <utils/Env.h>
 #include <runtime/Context.h>
 
 #include <cmath>
@@ -17,7 +17,7 @@ static std::once_flag init_device_flag;
 static std::once_flag init_prop_flag;
 static std::deque<std::once_flag> device_prop_flags;
 static std::vector<XPUDeviceProp> device_properties;
-static thread_local at::DeviceIndex cur_dev_index = 0;
+static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
   std::vector<DPCPP::device> devices;
@@ -27,6 +27,15 @@ struct DPCPPDevicePool {
 static void clearDPCPPContextAndDevices() {
   xpu::dpcpp::clearDeviceContext();
   gDevPool.devices.clear();
+}
+
+static inline std::string getPreferredPlatform() {
+  // TODO: To use more stable api from dpc++ runtime to preferred select
+  // platform Following code logic based upon the assumption: gpu_selector will
+  // select gpu device with priority considering platform: 1) level_zero 2)
+  // opencl JIRA CMPLRLLVM-19937 is tracking this.
+  DPCPP::device dev{DPCPP::gpu_selector{}};
+  return dev.get_platform().get_info<DPCPP::info::platform::name>();
 }
 
 // It should be call only once. (std::call_once)
@@ -94,7 +103,7 @@ int dpcppGetDeviceCount(int* deviceCount) {
   return DPCPP_SUCCESS;
 }
 
-int dpcppGetDevice(at::DeviceIndex* pDI) {
+int dpcppGetDevice(DeviceId* pDI) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   TORCH_CHECK(pDI != NULL);
@@ -102,27 +111,27 @@ int dpcppGetDevice(at::DeviceIndex* pDI) {
   return DPCPP_SUCCESS;
 }
 
-int dpcppSetDevice(at::DeviceIndex device_index) {
+int dpcppSetDevice(DeviceId device_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  if (device_index >= (at::DeviceIndex)gDevPool.devices.size()) {
-    TORCH_WARN("dpcppSetDevice: device_index is out of range");
+  if (device_id >= (DeviceId)gDevPool.devices.size()) {
+    TORCH_WARN("dpcppSetDevice: device_id is out of range");
   } else {
-    cur_dev_index = device_index;
+    cur_dev_index = device_id;
   }
   return DPCPP_SUCCESS;
 }
 
-DPCPP::device dpcppGetRawDevice(at::DeviceIndex device_index) {
+DPCPP::device dpcppGetRawDevice(DeviceId device_id) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  if (device_index >= (at::DeviceIndex)gDevPool.devices.size()) {
-    TORCH_CHECK(0, "dpcppSetDevice: device_index is out of range");
+  if (device_id >= (DeviceId)gDevPool.devices.size()) {
+    TORCH_CHECK(0, "dpcppSetDevice: device_id is out of range");
   }
-  return gDevPool.devices[device_index];
+  return gDevPool.devices[device_id];
 }
 
-at::DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
+DeviceId dpcppGetDeviceIndex(DPCPP::device device) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   auto it = std::find(gDevPool.devices.begin(), gDevPool.devices.end(), device);
@@ -132,51 +141,48 @@ at::DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
   return -1;
 }
 
-int dpcppGetDeviceIdFromPtr(at::DeviceIndex* device_id, void* ptr) {
-  auto raw_device = DPCPP::get_pointer_device(ptr, xpu::dpcpp::getDeviceContext());
+int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr) {
+  auto raw_device = DPCPP::get_pointer_device(ptr, getDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
   return DPCPP_SUCCESS;
 }
 
-static inline std::string getPreferredPlatform() {
-  // TODO: To use more stable api from dpc++ runtime to preferred select
-  // platform Following code logic based upon the assumption: gpu_selector will
-  // select gpu device with priority considering platform: 1) level_zero 2)
-  // opencl JIRA CMPLRLLVM-19937 is tracking this.
-  DPCPP::device dev{DPCPP::gpu_selector{}};
-  return dev.get_platform().get_info<DPCPP::info::platform::name>();
-}
-
 XPUDeviceProp* getCurrentDeviceProperties() {
-  auto device = current_device();
+  DeviceId device = 0;
+  AT_DPCPP_CHECK(dpcppGetDevice(&device));
   return getDeviceProperties(device);
 }
 
 void initXPUContextVectors() {
-  auto num_gpus = device_count();
+  auto num_gpus = 0;
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_gpus));
   device_prop_flags.resize(num_gpus);
   device_properties.resize(num_gpus);
 }
 
-void initDeviceProperty(DeviceIndex device_index) {
+void initDeviceProperty(DeviceIndex device_id) {
   XPUDeviceProp device_prop;
-  auto device = dpcppGetRawDevice(device_index);
+  auto device = dpcppGetRawDevice(device_id);
   device_prop.name = device.get_info<dpcpp_dev_name>();
   device_prop.dev_type = device.get_info<dpcpp_dev_type>();
   device_prop.total_global_mem = device.get_info<dpcpp_dev_global_mem_size>();
   device_prop.max_compute_units = device.get_info<dpcpp_dev_max_units>();
   device_prop.platform_name = device.get_info<DPCPP::info::device::platform>().get_info<DPCPP::info::platform::name>();
   device_prop.sub_devices_number = device.get_info<DPCPP::info::device::partition_max_sub_devices>();
-  device_properties[device_index] = device_prop;
+  device_properties[device_id] = device_prop;
 }
 
-XPUDeviceProp* getDeviceProperties(int64_t device) {
+XPUDeviceProp* getDeviceProperties(DeviceId device) {
   std::call_once(init_prop_flag, initXPUContextVectors);
-  if (device == -1) device = current_device();
-  auto num_gpus = device_count();
-  AT_ASSERT(device >= 0 && device < num_gpus);
-  std::call_once(device_prop_flags[device], initDeviceProperty, device);
-  return &device_properties[device];
+  DeviceId device_id = device;
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
+  }
+  auto num_gpus = 0;
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_gpus));
+  AT_ASSERT(device_id >= 0 && device_id < num_gpus);
+  std::call_once(device_prop_flags[device_id], initDeviceProperty, device_id);
+  return &device_properties[device_id];
 }
 
 } // namespace dpcpp

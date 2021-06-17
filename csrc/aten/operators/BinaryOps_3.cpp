@@ -3,7 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
 #include "comm/ScalarOps.h"
 

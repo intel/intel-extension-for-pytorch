@@ -11,7 +11,7 @@
 #ifdef USE_ONEMKL
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
-#include <runtime/oneMKLUtils.h>
+#include <utils/oneMKLUtils.h>
 #endif
 
 

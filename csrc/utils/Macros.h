@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef _WIN32
-#if defined(AT_DPCPP_BUILD_SHARED_LIBS)
+#if defined(IPEX_BUILD_SHARED_LIBS)
 #define IPEX_EXPORT __declspec(dllexport)
 #define IPEX_IMPORT __declspec(dllimport)
 #else
@@ -17,7 +17,7 @@
 #define IPEX_IMPORT IPEX_EXPORT
 #endif // _WIN32
 
-#ifdef BUILD_IPEX_MAIN_LIB
+#ifndef BUILD_IPEX_MAIN_LIB
 #define IPEX_API IPEX_EXPORT
 #else
 #define IPEX_API IPEX_IMPORT

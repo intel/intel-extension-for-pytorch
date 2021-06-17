@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include "General.h"
 #include "NumericLimits.h"
 

@@ -3,7 +3,7 @@
 #include <ATen/TensorUtils.h>
 #include <tuple>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"

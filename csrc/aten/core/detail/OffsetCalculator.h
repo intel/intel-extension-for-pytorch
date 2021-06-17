@@ -5,7 +5,7 @@
 #include <c10/macros/Macros.h>
 
 #include <operators/comm/Array.h>
-#include <runtime/IntegerDivider.h>
+#include <utils/IntegerDivider.h>
 
 
 /// OffsetCalculator calculates the offset in bytes of a linear index for NARGS

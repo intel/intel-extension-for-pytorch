@@ -3,7 +3,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include "comm/ApplyUtils.h"
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/TensorImplUtils.h>
@@ -172,14 +172,13 @@ struct NonZeroOp {
 
 #ifdef USE_ONEDPL
 template <typename Iterator>
-class strided_range
-{
+class strided_range {
 public:
-  typedef typename std::iterator_traits<Iterator>::difference_type difference_type;
+  using difference_type = typename std::iterator_traits<Iterator>::difference_type;
 
   struct stride_functor
   {
-    typedef typename std::iterator_traits<Iterator>::reference reference;
+    using reference = typename std::iterator_traits<Iterator>::reference;
     difference_type stride;
     Iterator base;
 
@@ -192,23 +191,21 @@ public:
     }
   };
 
-  typedef typename oneapi::dpl::counting_iterator<difference_type>                   CountingIterator;
-  typedef typename oneapi::dpl::transform_iterator<CountingIterator, stride_functor> TransformIterator;
-
+  using CountingIterator = typename oneapi::dpl::counting_iterator<difference_type>;
   // type of the strided_range iterator
-  typedef TransformIterator iterator;
+  using TransformIterator = typename oneapi::dpl::transform_iterator<CountingIterator, stride_functor>;
 
   // construct strided_range for the range [first,last)
   strided_range(Iterator first, Iterator last, difference_type stride)
     : first(first), last(last), stride(stride) {}
 
-  iterator begin(void) const
+  TransformIterator begin(void) const
   {
     return TransformIterator(CountingIterator(0),
                              stride_functor(stride, first));
   }
 
-  iterator end(void) const
+  TransformIterator end(void) const
   {
     return begin() + ((last - first) + (stride - 1)) / stride;
   }

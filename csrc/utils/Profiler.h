@@ -1,8 +1,9 @@
 #pragma once
 
 #include <torch/csrc/autograd/profiler.h>
+#include <c10/core/Allocator.h>
 
-#include <runtime/Env.h>
+#include <utils/Env.h>
 #include <CL/sycl.hpp>
 #include <sstream>
 #include <iostream>
@@ -84,4 +85,8 @@ static inline void dpcpp_log(std::string name, cl::sycl::event& start_event, cl:
   if (is_profiler_enabled()) {
     dpcpp_mark(name, start_event, end_event);
   }
+}
+
+static inline void reportMemoryUsage(void* ptr, int64_t alloc_size, at::DeviceIndex device_id) {
+  c10::reportMemoryUsageToProfiler(ptr, alloc_size, c10::Device(c10::DeviceType::XPU, device_id));
 }

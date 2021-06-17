@@ -1,8 +1,8 @@
 #pragma once
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <runtime/Device.h>
-#include <core/Stream.h>
+#include <runtime/Queue.h>
 
 
 using namespace at;
@@ -18,7 +18,7 @@ static inline bool dpcppIsAvailable() {
 }
 
 static inline DPCPP::queue& dpcppGetCurrentQueue() {
-  return getCurrentDPCPPStream().dpcpp_queue();
+  return getCurrentQueue()->getDpcppQueue();
 }
 
 static inline int64_t dpcppMaxWorkGroupSize(DPCPP::queue& queue) {

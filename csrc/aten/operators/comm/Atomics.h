@@ -1,6 +1,6 @@
 #pragma once
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <runtime/DPCPPUtils.h>
 #include "Numerics.h"
 #include "Scalar.h"

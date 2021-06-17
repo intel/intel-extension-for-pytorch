@@ -21,6 +21,9 @@ add_subdirectory(${IPEX_GPU_ROOT}/jit)
 set(IPEX_TENSOR_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT}/tensor)
 
+set(IPEX_UTILS_SRCS)
+add_subdirectory(${IPEX_GPU_ROOT}/utils)
+
 if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
@@ -37,7 +40,8 @@ set(IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
-        ${IPEX_TENSOR_SRCS})
+        ${IPEX_TENSOR_SRCS}
+        ${IPEX_UTILS_SRCS})
 set_sycl_flag("${IPEX_ATEN_OPS_SRCS}")
 add_library(ipex_gpu_core SHARED ${IPEX_GPU_CORE_SRC})
 

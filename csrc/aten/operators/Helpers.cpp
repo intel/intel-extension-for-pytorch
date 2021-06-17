@@ -2,7 +2,7 @@
 #include <core/Stream.h>
 #include <runtime/DPCPPUtils.h>
 #include <runtime/Exception.h>
-#include <runtime/Env.h>
+#include <utils/Env.h>
 
 #include <cmath>
 #include "comm/Helpers.h"

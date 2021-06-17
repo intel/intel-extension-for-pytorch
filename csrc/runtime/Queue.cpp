@@ -1,7 +1,7 @@
-#include <runtime/DPCPP.h>
-#include <runtime/Macros.h>
+#include <utils/DPCPP.h>
+#include <utils/Macros.h>
 #include <runtime/Queue.h>
-#include <runtime/Env.h>
+#include <utils/Env.h>
 
 #include <array>
 #include <atomic>
@@ -38,7 +38,7 @@ QueueId makeQueueId(QueueType st, size_t queue_id) {
 }
 
 QueueId getQueueId(const Queue* ptr) {
-  DeviceIndex di = ptr->getDeviceIndex();
+  auto di = ptr->getDeviceId();
   if (ptr == default_queues[di].get()) {
     return makeQueueId(QueueType::DEFAULT, 0);
   }
@@ -114,8 +114,8 @@ static void initQueuePoolOnce() {
   }
 }
 
-static inline void check_num_devices(DeviceIndex device_index) {
-  TORCH_INTERNAL_ASSERT(device_index >= 0 && device_index < dpcpp_num_devices);
+static inline void check_num_devices(DeviceId device_id) {
+  TORCH_INTERNAL_ASSERT(device_id >= 0 && device_id < dpcpp_num_devices);
 }
 
 static uint32_t get_queue_index(std::atomic<uint32_t>& counter) {
@@ -123,62 +123,62 @@ static uint32_t get_queue_index(std::atomic<uint32_t>& counter) {
   return raw_idx % QueuePerPool;
 }
 
-Queue* getCurrentQueue(DeviceIndex device_index) {
+Queue* getCurrentQueue(DeviceId device_id) {
   initQueuePoolOnce();
-  if (device_index == -1) {
-    AT_DPCPP_CHECK(dpcppGetDevice(&device_index));
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   }
-  check_num_devices(device_index);
-  return current_queues[device_index];
+  check_num_devices(device_id);
+  return current_queues[device_id];
 }
 
 void setCurrentQueue(Queue* queue) {
   initQueuePoolOnce();
   TORCH_INTERNAL_ASSERT(queue);
-  current_queues[queue->getDeviceIndex()] = queue;
+  current_queues[queue->getDeviceId()] = queue;
 }
 
-Queue* getDefaultQueue(DeviceIndex device_index) {
+Queue* getDefaultQueue(DeviceId device_id) {
   initQueuePoolOnce();
-  if (device_index == -1) {
-    AT_DPCPP_CHECK(dpcppGetDevice(&device_index));
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   }
-  check_num_devices(device_index);
-  return default_queues[device_index].get();
+  check_num_devices(device_id);
+  return default_queues[device_id].get();
 }
 
-Queue* getReservedQueue(DeviceIndex device_index, QueueId queue_id) {
+Queue* getReservedQueue(DeviceId device_id, QueueId queue_id) {
   initQueuePoolOnce();
-  return reserved_queues[device_index][queue_id].get();
+  return reserved_queues[device_id][queue_id].get();
 }
 
-Queue* getQueueFromPool(const bool isDefault, DeviceIndex device_index) {
+Queue* getQueueFromPool(const bool isDefault, DeviceId device_id) {
   initQueuePoolOnce();
-  if (device_index == -1) {
-    AT_DPCPP_CHECK(dpcppGetDevice(&device_index));
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   }
-  check_num_devices(device_index);
+  check_num_devices(device_id);
 
   if (isDefault) {
-    return getDefaultQueue(device_index);
+    return getDefaultQueue(device_id);
   }
 
-  const auto queue_id = get_queue_index(reserve_counters[device_index]);
-  return getReservedQueue(device_index, queue_id);
+  const auto queue_id = get_queue_index(reserve_counters[device_id]);
+  return getReservedQueue(device_id, queue_id);
 }
 
-Queue* getQueueOnDevice(DeviceIndex device_index, QueueId queue_id) {
+Queue* getQueueOnDevice(DeviceId device_id, QueueId queue_id) {
   initQueuePoolOnce();
-  if (device_index == -1) {
-    AT_DPCPP_CHECK(dpcppGetDevice(&device_index));
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   }
-  check_num_devices(device_index);
+  check_num_devices(device_id);
 
   if (queue_id == 0) {
-    return getDefaultQueue(device_index);
+    return getDefaultQueue(device_id);
   }
   TORCH_INTERNAL_ASSERT(queue_id <= QueuePerPool);
-  return reserved_queues[device_index][queue_id - 1].get();
+  return reserved_queues[device_id][queue_id - 1].get();
 }
 
 

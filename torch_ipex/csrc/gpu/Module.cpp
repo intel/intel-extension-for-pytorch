@@ -11,7 +11,7 @@
 #include "Storage.h"
 #include <core/Device.h>
 #include <core/Generator.h>
-#include <core/CachingAllocator.h>
+#include <core/Allocator.h>
 
 #define ASSERT_TRUE(cmd) if (!(cmd)) return
 
@@ -90,7 +90,7 @@ PyObject * THPModule_resetPeakMemoryStats(PyObject *_unused, PyObject *arg)
   HANDLE_TH_ERRORS
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to reset_peak_memory_stats");
   const int device = (int) THPUtils_unpackLong(arg);
-  xpu::dpcpp::resetPeakStats(device);
+  xpu::dpcpp::resetPeakStatsInDevAlloc(device);
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
@@ -100,7 +100,7 @@ PyObject * THPModule_resetAccumulatedMemoryStats(PyObject *_unused, PyObject *ar
   HANDLE_TH_ERRORS
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to reset_accumulated_memory_stats");
   const int device = (int) THPUtils_unpackLong(arg);
-  xpu::dpcpp::resetAccumulatedStats(device);
+  xpu::dpcpp::resetAccumulatedStatsInDevAlloc(device);
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
@@ -108,7 +108,7 @@ PyObject * THPModule_resetAccumulatedMemoryStats(PyObject *_unused, PyObject *ar
 PyObject * THPModule_emptyCache(PyObject *_unused, PyObject *noargs)
 {
   HANDLE_TH_ERRORS
-  xpu::dpcpp::emptyCache();
+  xpu::dpcpp::emptyCacheInDevAlloc();
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
@@ -119,12 +119,12 @@ PyObject * THPModule_memoryStats(PyObject *_unused, PyObject *arg)
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to memory_allocated");
   const int device = (int) THPUtils_unpackLong(arg);
 
-  using xpu::dpcpp::CAStatType;
-  using xpu::dpcpp::CAStat;
-  using xpu::dpcpp::CAStatArray;
-  using xpu::dpcpp::CADeviceStats;
+  using xpu::dpcpp::StatType;
+  using xpu::dpcpp::Stat;
+  using xpu::dpcpp::StatArray;
+  using xpu::dpcpp::DeviceStats;
 
-  const auto statToDict = [](const CAStat& stat) {
+  const auto statToDict = [](const Stat& stat) {
       py::dict dict;
 
       dict["current"] = stat.current;
@@ -134,8 +134,8 @@ PyObject * THPModule_memoryStats(PyObject *_unused, PyObject *arg)
       return dict;
   };
 
-  const auto statArrayToDict = [=](const CAStatArray& statArray) {
-      const std::array<const char*, static_cast<size_t>(CAStatType::NUM_TYPES)> statTypeNames = {
+  const auto statArrayToDict = [=](const StatArray& statArray) {
+      const std::array<const char*, static_cast<size_t>(StatType::NUM_TYPES)> statTypeNames = {
               "all", "small_pool", "large_pool"
       };
       py::dict dict;
@@ -145,7 +145,7 @@ PyObject * THPModule_memoryStats(PyObject *_unused, PyObject *arg)
       return dict;
   };
 
-  const CADeviceStats stats = xpu::dpcpp::getDeviceStats(device);
+  const auto stats = xpu::dpcpp::getDeviceStatsFromDevAlloc(device);
 
   py::dict result;
   result["num_alloc_retries"] = stats.num_alloc_retries;
@@ -167,10 +167,10 @@ PyObject * THPModule_memorySnapshot(PyObject *_unused, PyObject *noargs)
 {
   HANDLE_TH_ERRORS
 
-      using xpu::dpcpp::CASegmentInfo;
-      using xpu::dpcpp::CABlockInfo;
+      using xpu::dpcpp::SegmentInfo;
+      using xpu::dpcpp::BlockInfo;
 
-      const auto segmentInfoToDict = [](const CASegmentInfo& segmentInfo) {
+      const auto segmentInfoToDict = [](const SegmentInfo& segmentInfo) {
           py::dict segmentDict;
           segmentDict["device"] = segmentInfo.device;
           segmentDict["address"] = segmentInfo.address;
@@ -191,7 +191,7 @@ PyObject * THPModule_memorySnapshot(PyObject *_unused, PyObject *noargs)
           return segmentDict;
       };
 
-      const std::vector<CASegmentInfo>& snapshot = xpu::dpcpp::snapshot();
+      const std::vector<SegmentInfo>& snapshot = xpu::dpcpp::snapshotOfDevAlloc();
       py::list result;
 
       for (const auto& segmentInfo : snapshot) {
@@ -343,16 +343,16 @@ void init_module(pybind11::module& m) {
         double weight_decay,
         const bool correct_bias) {
         return at::AtenIpexTypeXPU::fused_adamW(
-			grad_input,
-			avg,
-			avg_sq,
-			step,
-			lr,
-			eps,
-			beta1,
-			beta2,
-			weight_decay,
-			correct_bias);
+      grad_input,
+      avg,
+      avg_sq,
+      step,
+      lr,
+      eps,
+      beta1,
+      beta2,
+      weight_decay,
+      correct_bias);
       },
       "optimized adamW optimizer kernel implemtation on Intel device");
 

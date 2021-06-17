@@ -1,6 +1,6 @@
 #include <core/Memory.h>
-#include <runtime/Profiler.h>
-#include <core/CachingHostAllocator.h>
+#include <utils/Profiler.h>
+#include <core/Allocator.h>
 #include <core/Stream.h>
 
 
@@ -21,7 +21,7 @@ static void memcpyHostToDevice(
   if (!async) {
     e.wait();
   } else {
-    dpcpp_recordEventInCachingHostAllocator(const_cast<void*>(src), e);
+    recordEventInHostAlloc(const_cast<void*>(src), e);
   }
 
   dpcpp_log("dpcpp_kernel", e);
@@ -42,7 +42,7 @@ static void memcpyDeviceToHost(
   if (!async) {
     e.wait();
   } else {
-    dpcpp_recordEventInCachingHostAllocator(const_cast<void*>(dst), e);
+    recordEventInHostAlloc(const_cast<void*>(dst), e);
   }
 
   dpcpp_log("dpcpp_kernel", e);

@@ -2,7 +2,7 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"
 #include "comm/Helpers.h"

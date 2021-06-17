@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Generator.h>
 #include "comm/ATDispatch.h"
 

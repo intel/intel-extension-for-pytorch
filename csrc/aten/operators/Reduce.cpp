@@ -10,7 +10,6 @@
 #include "comm/Numerics.h"
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
-#include <iostream>
 
 #include "Loops.h"
 #include "Reduce.h"

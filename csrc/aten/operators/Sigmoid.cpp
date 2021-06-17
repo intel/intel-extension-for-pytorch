@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "comm/Numerics.h"

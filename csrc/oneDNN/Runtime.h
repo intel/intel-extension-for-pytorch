@@ -6,8 +6,8 @@
 #include <runtime/DPCPPUtils.h>
 #include <core/Device.h>
 #include <core/Memory.h>
-#include <runtime/Profiler.h>
-#include <runtime/Timer.h>
+#include <utils/Profiler.h>
+#include <utils/Timer.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>
@@ -76,7 +76,7 @@ struct GpuEngineManager {
     TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
       engine_pool.push_back(std::make_shared<dnnl::engine>(
-          dnnl::sycl_interop::make_engine(dpcppGetRawDevice(i), xpu::dpcpp::getDeviceContext(i))));
+          dnnl::sycl_interop::make_engine(dpcppGetRawDevice(i), getDeviceContext(i))));
     }
   }
   ~GpuEngineManager() {}

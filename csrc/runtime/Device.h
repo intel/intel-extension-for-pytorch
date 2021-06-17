@@ -1,22 +1,22 @@
 #pragma once
 
-#include <c10/core/Device.h>
-#include <c10/macros/Macros.h>
-#include <runtime/DPCPP.h>
-#include <runtime/Macros.h>
+#include <utils/DPCPP.h>
+#include <utils/Macros.h>
 
 namespace xpu {
 namespace dpcpp {
 
+using DeviceId = int16_t;
+
 int dpcppGetDeviceCount(int* deviceCount);
 
-int dpcppGetDevice(at::DeviceIndex* pDI);
+int dpcppGetDevice(DeviceId* pDI);
 
-int dpcppSetDevice(at::DeviceIndex device_index);
+int dpcppSetDevice(DeviceId device_id);
 
-int dpcppGetDeviceIdFromPtr(at::DeviceIndex* device_id, void* ptr);
+int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr);
 
-DPCPP::device dpcppGetRawDevice(at::DeviceIndex device_index);
+DPCPP::device dpcppGetRawDevice(DeviceId device_id);
 
 struct XPUDeviceProp {
   typename DPCPP::info::param_traits<DPCPP::info::device, dpcpp_dev_name>::return_type
@@ -40,7 +40,7 @@ struct XPUDeviceProp {
 };
 
 XPUDeviceProp* getCurrentDeviceProperties();
-XPUDeviceProp* getDeviceProperties(int64_t device);
+XPUDeviceProp* getDeviceProperties(DeviceId device_id);
 
 } // namespace dpcpp
 } // namespace at

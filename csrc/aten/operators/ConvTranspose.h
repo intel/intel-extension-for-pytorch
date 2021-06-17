@@ -2,7 +2,7 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <oneDNN/oneDNN.h>
 
 namespace at {

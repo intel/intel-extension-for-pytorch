@@ -3,7 +3,7 @@
 #include <ATen/ATen.h>
 
 #include "ApplyUtils.h"
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/TensorImplUtils.h>
 #include "Numerics.h"
 #include "ATDispatch.h"

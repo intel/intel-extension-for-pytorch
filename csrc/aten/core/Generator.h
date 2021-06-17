@@ -1,6 +1,6 @@
 #pragma once
 
-#include <runtime/Macros.h>
+#include <utils/Macros.h>
 #include <ATen/Utils.h>
 #include <ATen/core/Generator.h>
 

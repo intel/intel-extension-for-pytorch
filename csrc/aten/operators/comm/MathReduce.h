@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
