@@ -6,8 +6,6 @@
 #include <tensor/Context.h>
 
 
-DPCPP_DEF_K1(CA_dummy_kernel);
-
 namespace xpu {
 namespace dpcpp {
 
@@ -380,10 +378,7 @@ void CachingDeviceAllocator::insert_events(Block* block) {
   std::unordered_set<Queue*> queues(std::move(block->m_queue_uses));
   AT_ASSERT(block->m_queue_uses.empty());
   for (auto it = queues.begin(); it != queues.end(); ++it) {
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      cgh.single_task<DPCPP_K(CA_dummy_kernel)>([=]() {});
-    };
-    auto event = (*it)->getDpcppQueue().submit(cgf);
+    auto event = (*it)->getDpcppQueue().submit_barrier();
     block->m_event_cnt++;
     dpcpp_events.emplace_back(event, block);
   }
