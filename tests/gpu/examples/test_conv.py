@@ -280,3 +280,48 @@ class TestNNMethod(TestCase):
     print(ref)
 
     self.assertEqual(real.contiguous().cpu(), ref)
+
+  def test_channels_last_bwd(self, dtype=torch.float):
+    x_cpu = torch.randn([1, 7, 1, 15000], dtype=dtype, device=cpu_device, requires_grad=True)
+    x_cpu = x_cpu.to(memory_format=torch.channels_last)
+    grad_cpu = torch.full([1, 64, 1, 15000], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(7, 64, kernel_size=1, stride=1, bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    y_cpu_gw = conv_cpu.weight.grad.detach().clone()
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
+    x_dpcpp = x_dpcpp.to(memory_format=torch.channels_last)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
+    conv_cpu.zero_grad()
+
+
+    self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5*1e-5, rtol=0)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
+
+  def test_plain_format_bwd(self, dtype=torch.float):
+    x_cpu = torch.randn([1, 7, 1, 15000], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.full([1, 64, 1, 15000], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(7, 64, kernel_size=1, stride=1, bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    y_cpu_gw = conv_cpu.weight.grad.detach().clone()
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
+    conv_cpu.zero_grad()
+
+
+    self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5*1e-5, rtol=0)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
+

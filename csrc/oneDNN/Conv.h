@@ -221,10 +221,8 @@ static at::Tensor convolution(
 
   // block combination
   if (lazy_reorder_enabled()) {
-    src_md = memory::desc(src_tz, src_data_t,
-        src.is_contiguous(at::MemoryFormat::ChannelsLast) ? fmt_src : fmt_any);
-    dst_md = memory::desc(dst_tz, dst_data_t,
-        src.is_contiguous(at::MemoryFormat::ChannelsLast) ? fmt_src : fmt_any);
+    src_md = memory::desc(src_tz, src_data_t, fmt_any);
+    dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
   }
 
