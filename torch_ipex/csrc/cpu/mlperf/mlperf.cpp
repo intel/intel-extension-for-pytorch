@@ -5,6 +5,8 @@
 #include "cpu/int8/Config.h"
 #include "cpu/ExtendOPs.h"
 #include "utils.h"
+#include "cpu/interaction.h"
+
 namespace torch_ipex {
     namespace mlperf {
         namespace dlrm {
@@ -397,24 +399,38 @@ namespace torch_ipex {
                 return output;
             }
 
-            // template<typename T>
-            // at::Tensor _fuseembint_forward(
-            //     at::Tensor &lS_o,
-            //     at::Tensor &lS_i,
-            //     std::vector<at::Tensor> &emb,
-            //     at::Tensor &densex,
-            //     int64_t ops_id = -1) {
-            //     std::vector<at::Tensor> input;
-            //     input.push_back(densex);
-            //     for (int i = 0; i < emb.size(); ++i) {
-            //         input.push_back(
-            //             cpu::aten::embedding_bag::embedding_bag_impl(emb[i], lS_i[i], lS_o[i], false, 0, false, emb[i], true));
-            //     }
-            //     at::Tensor out = _interaction_forward<T>(input);
-            //     return out;
-            // }
+            template<typename T>
+            at::Tensor _fuseembint_forward(
+                at::Tensor &lS_o,
+                at::Tensor &lS_i,
+                std::vector<at::Tensor> &emb,
+                at::Tensor &densex,
+                int64_t ops_id = -1) {
+                std::vector<at::Tensor> input;
+                assert(false & "Only support float and int8");
+                at::Tensor out;
+                return out;
+            }
 
-            at::Tensor _fuseembint_forward_int8(
+            template<>
+            at::Tensor _fuseembint_forward<float>(
+                at::Tensor &lS_o,
+                at::Tensor &lS_i,
+                std::vector<at::Tensor> &emb,
+                at::Tensor &densex,
+                int64_t ops_id) {
+                std::vector<at::Tensor> input;
+                input.push_back(densex);
+                for (int i = 0; i < emb.size(); ++i) {
+                    auto embo = cpu::aten::embedding_bag::_embedding_bag_index_add_select_fast<float>(lS_i[i], emb[i], lS_o[i], false);
+                    input.push_back(embo);
+                }
+                at::Tensor out = _interaction_forward<float>(input);
+                return out;
+            }
+
+            template<>
+            at::Tensor _fuseembint_forward<int8_t>(
                 at::Tensor &lS_o,
                 at::Tensor &lS_i,
                 std::vector<at::Tensor> &emb,
@@ -430,8 +446,6 @@ namespace torch_ipex {
                 assert(false & "Only support 26 embeddings and emb size=128");
                 at::Tensor out;
                 return out;
-                // cpu::aten::embedding_bag::embedding_bag_impl(emb[i], lS_i[i], lS_o[i], false, 0, false, emb[i], true);
-                // return _interaction_forward<int8_t>(input);
             }
 
             at::Tensor fuseembint_forward(
@@ -446,16 +460,14 @@ namespace torch_ipex {
                         for (auto &w : emb) {
                             cpu::dbl::comm::reorder_to_int8_for_mix_prec(w, {}, false, {}, true);
                         }
-                        return _fuseembint_forward_int8(lS_o, lS_i, emb, densex, num_ops_id);
+                        return _fuseembint_forward<int8_t>(lS_o, lS_i, emb, densex, num_ops_id);
                     }
                 }
-                // cpu::dbl::comm::reorder_to_dtype(densex, at::kFloat);
-                // at::Tensor out = _fuseembint_forward<float>(lS_o, lS_i, emb, densex);
-                // if (check_int8_calibration() && check_auto_mix_int8_fp32()) {
-                //     insert_or_updata_observer({densex}, {out}, "fuseinteractionembedding", Int8OptConfig::fetch_and_add_ops_id());
-                // }
-                assert(false & "Only support int8");
-                at::Tensor out;
+                cpu::dbl::comm::reorder_to_dtype(densex, at::kFloat);
+                at::Tensor out = _fuseembint_forward<float>(lS_o, lS_i, emb, densex);
+                if (check_int8_calibration() && check_auto_mix_int8_fp32()) {
+                    insert_or_updata_observer({densex}, {out}, "fuseinteractionembedding", Int8OptConfig::fetch_and_add_ops_id());
+                }
                 return out;
             }
         }

@@ -1,3 +1,4 @@
+#pragma once
 #include <libxsmm.h>
 #include <libxsmm_intrinsics_x86.h>
 #include <libxsmm_rng.h>
@@ -18,10 +19,10 @@ template<typename T>
 using xsmm_dtype = typename xsmmType<T>::dtype;
 
 template<typename T>
-xsmm_type<T> get_mm_kernel(int32_t M, int32_t N, int32_t K) { }
+inline xsmm_type<T> get_mm_kernel(int32_t M, int32_t N, int32_t K) { }
 
 template<>
-libxsmm_smmfunction get_mm_kernel<float>(int32_t M, int32_t N, int32_t K) {
+inline libxsmm_smmfunction get_mm_kernel<float>(int32_t M, int32_t N, int32_t K) {
   float alpha = 1.0;
   float beta = 0.0;
   auto flags = LIBXSMM_GEMM_FLAGS('N', 'N');
@@ -30,7 +31,7 @@ libxsmm_smmfunction get_mm_kernel<float>(int32_t M, int32_t N, int32_t K) {
 }
 
 template<>
-libxsmm_bmmfunction get_mm_kernel<at::BFloat16>(int32_t M, int32_t N, int32_t K) {
+inline libxsmm_bmmfunction get_mm_kernel<at::BFloat16>(int32_t M, int32_t N, int32_t K) {
   float alpha = 1.0;
   float beta = 0.0;
   auto flags = LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_VNNI_A;
@@ -38,7 +39,7 @@ libxsmm_bmmfunction get_mm_kernel<at::BFloat16>(int32_t M, int32_t N, int32_t K)
   return mm_kernel;
 }
 
-libxsmm_xtransfunction get_tr_kernel(int M, int N, int LDO) {
+inline libxsmm_xtransfunction get_tr_kernel(int M, int N, int LDO) {
   libxsmm_xtransfunction tr_kernel;
   libxsmm_descriptor_blob blob;
   libxsmm_trans_descriptor *tr_desc;
@@ -46,4 +47,3 @@ libxsmm_xtransfunction get_tr_kernel(int M, int N, int LDO) {
   tr_kernel = libxsmm_dispatch_trans(tr_desc);
   return tr_kernel;
 }
-
