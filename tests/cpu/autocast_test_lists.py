@@ -232,7 +232,6 @@ class AutocastCPUTestLists(object):
             ("unique_dim_consecutive", (torch.arange(9.).to(torch.bfloat16), False)),
             ("kthvalue", (torch.arange(9.).to(torch.bfloat16), 1)),
             ("sort", (torch.arange(9.).to(torch.bfloat16), -1)),
-            ("topk", (torch.arange(9.).to(torch.bfloat16), 2)),
             ("cummax", (torch.randn(10).to(torch.bfloat16), 0)),
             ("cummin", (torch.randn(10).to(torch.bfloat16), 0)),
             ("eig", (torch.randn(10, 10).to(torch.bfloat16), True)),
