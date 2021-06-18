@@ -310,6 +310,7 @@ class IPEXBuild(build_ext, object):
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
             '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib",
+            '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
         ]
 
     if _check_env_flag("IPEX_DISP_OP"):
