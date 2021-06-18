@@ -1,6 +1,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/WrapDimUtils.h>
 
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -286,7 +287,7 @@ DPCPP_DEVICE DataType findPattern(
     BitDataType desiredMask,
     const DPCPP::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
-  auto smem_ptr = SyclConvertToActualTypePtr(DataType, smem_acc);
+  auto smem_ptr = static_cast<DataType*>(static_cast<void*>(smem_acc.get_pointer().get()));
   if (local_id < RADIX_SIZE) {
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, DataType>::to(0);
   }

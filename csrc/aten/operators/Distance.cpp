@@ -2,6 +2,7 @@
 #include <ATen/native/Distance.h>
 
 #include <utils/DPCPP.h>
+#include <runtime/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include "comm/Numerics.h"
