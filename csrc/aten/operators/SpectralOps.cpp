@@ -177,6 +177,11 @@ void _mkl_dft(
     _fft_fill_with_conjugate_symmetry_(
         output, signal_ndim, size_last_signal_dim, start_slice);
   }
+
+  // wait for the queue.  For MKL this is a must, as it can have allocated some USM internally, and
+  // that will be freed when the destructor is called.  So, before that is legal, anything submitted to
+  // the queue that is using this USM must have finished.
+  dpcpp_queue.wait();
 }
 #endif
 
