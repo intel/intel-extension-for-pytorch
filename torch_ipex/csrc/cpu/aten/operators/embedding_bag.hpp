@@ -3,8 +3,13 @@
 #include <ATen/Tensor.h>
 #include <ATen/Parallel.h>
 #include <c10/core/ScalarType.h>
-
 #include <vector>
+
+#include "utils.h"
+#include "aten_ipex_bridge.h"
+
+#include "cpu/bf16/vec/bf16_vec_kernel.h"
+#include "cpu/int8/vec/int8_vec_kernel.h"
 
 
 namespace torch_ipex {
@@ -74,14 +79,66 @@ namespace torch_ipex {
                     return output;
                 }
 
-                at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
-                                              const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
-                                              const at::Tensor & per_sample_weights, bool include_last_offset);
+                template<>
+                inline at::Tensor _embedding_bag_index_add_select_fast<int8_t>(
+                    const at::Tensor select_indices,
+                    const at::Tensor src_at,
+                    const at::Tensor offsets,
+                    bool include_last_offset) {
+                    dil::tensor src = dbl::comm::try_gen_dil_tensor(src_at);
+                    int64_t ddim = src.get_dim(1);
+                    int8_t* src_data = static_cast<int8_t *>(src.get_data_handle());
+                    int64_t output_size = offsets.numel() - 1;
+                    int64_t* offsets_data = offsets.data_ptr<int64_t>();
+                    std::vector<int64_t> offsets_include_last;
+                    if (!include_last_offset) {
+                        output_size = offsets.numel();
+                        offsets_include_last.resize(output_size + 1);
+                        int64_t* offsets_include_last_data = offsets_include_last.data();
+                        int64_t iter_time = (output_size >> 5);
+                        int64_t align32_size = (iter_time << 5);
+                        int64_t left_size = output_size - align32_size;
+                        //std::memcpy(offsets_include_last.data(), offsets_data, sizeof(int64_t) * output_size);
+                        at::parallel_for(0, iter_time, 16, [&](int64_t start, int64_t end) {
+                            for (int64_t i = start; i < end; i += 1) {
+                                auto start_offset = i << 5;
+                                move_ker(&offsets_include_last_data[start_offset], &offsets_data[start_offset], 32);
+                            }
+                        });
+                        if (left_size > 0) {
+                            move_ker(&offsets_include_last_data[align32_size], &offsets_data[align32_size], left_size);
+                        }
+                        offsets_include_last[output_size] = select_indices.numel();
+                        offsets_data = offsets_include_last.data();
+                    }
+                    // init output tensor
+                    dil::dims dst_dims{output_size, src.get_dim(1)};
+                    dil::tensor::desc dst_desc(dst_dims, dil::data_type::s8);
+                    dil::tensor output{dst_desc};
+                    auto scale = src.get_scale();
+                    output.set_scale(scale);
+                    int8_t* output_data = static_cast<int8_t *>(output.get_data_handle());
+                    auto indices_accessor = select_indices.accessor<int64_t, 1>();
+                    at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
+                        for (int64_t i = start; i < end; i++) {
+                            int8_t* out_data_ptr = &output_data[i * ddim];
+                            auto inputs_start = offsets_data[i];
+                            auto inputs_end = offsets_data[i + 1];
+                            if (inputs_start >= inputs_end) {
+                                zero_ker(out_data_ptr, ddim);
+                            } else {
+                                int8_t* select_data_ptr = &src_data[indices_accessor[inputs_start] * ddim];
+                                move_ker(out_data_ptr, select_data_ptr, ddim);
+                            }
+                            for (int64_t s = (inputs_start + 1); s < inputs_end; s++) {
+                                int8_t* select_data_ptr = &src_data[indices_accessor[s] * ddim];
+                                add_ker(out_data_ptr, select_data_ptr, ddim);
+                            }
+                        }
+                    });
 
-                at::Tensor embedding_bag_int8_impl(const at::Tensor & weight,
-                                                   const at::Tensor & indices,
-                                                   const at::Tensor & offsets,
-                                                   bool include_last_offset);
+                    return dbl::comm::gen_aten_tensor_by(std::move(output));
+                }
 
                 at::Tensor embedding_bag_backward_impl(const at::Tensor & grad, const at::Tensor & indices,
                                                        const at::Tensor & offsets, const at::Tensor & offset2bag, const at::Tensor & bag_size, const at::Tensor & maximum_indices,

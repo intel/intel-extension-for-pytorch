@@ -1,3 +1,4 @@
+#pragma once
 #include <immintrin.h>
 #include "vec_type_cvt.h"
 
