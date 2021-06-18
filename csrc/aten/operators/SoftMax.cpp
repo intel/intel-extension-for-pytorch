@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/record_function.h>
 #include <intrinsic/ipex_intrinsic.h>
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"

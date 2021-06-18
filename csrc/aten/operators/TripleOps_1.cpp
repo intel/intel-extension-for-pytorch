@@ -1,4 +1,5 @@
 #include <ATen/Context.h>
+#include <ATen/record_function.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>

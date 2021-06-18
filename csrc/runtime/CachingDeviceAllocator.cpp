@@ -298,7 +298,7 @@ void CachingDeviceAllocator::recordQueue(void* buffer, Queue* queue) {
 
 void CachingDeviceAllocator::emptyCache() {
   std::lock_guard<std::recursive_mutex> lock(mutex);
-  synchronize_and_free_events(nullopt);
+  synchronize_and_free_events(std::nullopt);
   free_blocks(large_blocks, large_blocks.begin(), large_blocks.end());
   free_blocks(small_blocks, small_blocks.begin(), small_blocks.end());
 }
@@ -492,7 +492,7 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
       small_blocks.lower_bound(&upper_bound));
 }
 
-void CachingDeviceAllocator::synchronize_and_free_events(optional<DeviceId> di) {
+void CachingDeviceAllocator::synchronize_and_free_events(std::optional<DeviceId> di) {
   auto remaining_events = decltype(dpcpp_events)();
 
   for (auto& e : dpcpp_events) {

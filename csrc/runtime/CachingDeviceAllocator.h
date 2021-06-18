@@ -102,7 +102,7 @@ class CachingDeviceAllocator final {
 
   void process_events();
 
-  void synchronize_and_free_events(optional<DeviceId> di);
+  void synchronize_and_free_events(std::optional<DeviceId> di);
 
   void cache_info_aux(BlockPool& blocks, DeviceId di, size_t* total, size_t* largest);
 

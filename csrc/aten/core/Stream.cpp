@@ -2,6 +2,12 @@
 #include <runtime/Queue.h>
 #include <runtime/Device.h>
 
+#include <c10/core/DeviceGuard.h>
+#include <c10/util/Exception.h>
+
+#include <cstdint>
+#include <utility>
+
 namespace xpu {
 namespace dpcpp {
 
@@ -35,6 +41,50 @@ static Queue* DPCPPStreamToQueue(DPCPPStream stream) {
           std::to_string(static_cast<int>(st)),
           ")");
   }
+}
+
+DPCPPStream::DPCPPStream(Stream stream) : stream_(stream) {
+  TORCH_CHECK(stream_.device_type() == DeviceType::XPU);
+}
+
+DPCPPStream::DPCPPStream(Unchecked, Stream stream) : stream_(stream) {}
+
+bool DPCPPStream::operator==(const DPCPPStream& other) const noexcept {
+  return unwrap() == other.unwrap();
+}
+
+bool DPCPPStream::operator!=(const DPCPPStream& other) const noexcept {
+  return unwrap() != other.unwrap();
+}
+
+DPCPPStream::operator Stream() const {
+  return unwrap();
+}
+
+DeviceIndex DPCPPStream::device_index() const {
+  return stream_.device_index();
+}
+
+Device DPCPPStream::device() const {
+  return Device(DeviceType::XPU, device_index());
+}
+
+
+StreamId DPCPPStream::id() const {
+  return stream_.id();
+  }
+
+void DPCPPStream::synchronize() const {
+  DeviceGuard guard{stream_.device()};
+  dpcpp_queue().wait();
+}
+
+Stream DPCPPStream::unwrap() const {
+  return stream_;
+}
+
+uint64_t DPCPPStream::pack() const noexcept {
+  return stream_.pack();
 }
 
 DPCPP::queue& DPCPPStream::dpcpp_queue() const {

@@ -27,3 +27,15 @@ set(IPEX_ATEN_OPS_SRCS ${aten_ops_src} PARENT_SCOPE)
 
 FILE(GLOB aten_core_src "core/*.cpp" "core/detail/*.cpp")
 set(IPEX_ATEN_CORE_SRCS ${aten_core_src} PARENT_SCOPE)
+
+list(APPEND aten_core_headers
+  ${IPEX_GPU_ATEN_CORE_DIR}/Allocator.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/AllocationInfo.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/Device.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/Event.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/Generator.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/Guard.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/GuardImpl.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/Memory.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/Stream.h)
+set(IPEX_ATEN_HEADERS ${aten_core_headers} PARENT_SCOPE)

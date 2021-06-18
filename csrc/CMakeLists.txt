@@ -1,7 +1,9 @@
 set(IPEX_GPU_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT}/aten")
-set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
+set(IPEX_GPU_ATEN_CORE_DIR "${IPEX_GPU_ATEN_SRC_DIR}/core")
 set(IPEX_GPU_ATEN_GENERATED "${IPEX_GPU_ATEN_SRC_DIR}/generated")
+set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
+set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT}/utils")
 
 # sources
 set(IPEX_GPU_GEN_FILES)
@@ -10,6 +12,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/Codegen.cmake)
 
 set(IPEX_ATEN_OPS_SRCS)
 set(IPEX_ATEN_CORE_SRCS)
+set(IPEX_ATEN_HEADERS)
 add_subdirectory(${IPEX_GPU_ATEN_SRC_DIR})
 
 set(IPEX_RUNTIME_SRCS)
@@ -22,6 +25,7 @@ set(IPEX_TENSOR_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT}/tensor)
 
 set(IPEX_UTILS_SRCS)
+set(IPEX_UTILS_HEADERS)
 add_subdirectory(${IPEX_GPU_ROOT}/utils)
 
 if(NOT DEFINED SYCL_INCLUDE_DIR)
@@ -135,4 +139,5 @@ target_link_libraries(ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} ipex_gpu_core)
 
 install(TARGETS ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(TARGETS ipex_gpu_core LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY "./" DESTINATION include/ipex FILES_MATCHING PATTERN "*.h")
+install(FILES ${IPEX_ATEN_HEADERS} DESTINATION include/aten/core)
+install(FILES ${IPEX_UTILS_HEADERS} DESTINATION include/utils)

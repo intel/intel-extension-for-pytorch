@@ -8,6 +8,7 @@
 #include <cmath>
 #include <mutex>
 #include <vector>
+#include <deque>
 
 namespace xpu {
 namespace dpcpp {

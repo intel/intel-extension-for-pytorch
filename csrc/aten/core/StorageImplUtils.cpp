@@ -1,8 +1,9 @@
 #include <c10/util/intrusive_ptr.h>
 
-#include <core/Allocator.h>
 #include <runtime/DPCPPUtils.h>
 #include <runtime/Exception.h>
+#include <core/Allocator.h>
+#include <core/StorageImplUtils.h>
 #include <core/Memory.h>
 
 

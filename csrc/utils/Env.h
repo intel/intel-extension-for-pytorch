@@ -1,42 +1,26 @@
 #pragma once
 #include <c10/util/Exception.h>
 
-enum DPCPP_ENV {
-  ENV_VERBOSE = 0,
-  ENV_FORCE_SYNC,
-  ENV_DISABLE_PROFILING,
-  ENV_LAZY_REORDER,
-  ENV_WEIGHT_CACHE,
-  ENV_DISABLE_TILE_PARTITION };
+/*
+ * All available launch options for IPEX
+ * IPEX_VERBOSE:                Default = 0, Set verbose level in IPEX
+ * IPEX_FORCE_SYNC:             Default = 0, Set 1 to enforce blocked/sync execution mode
+ * IPEX_DISABLE_PROFILING:      Default = 0, Set 1 to disable IPEX event profiling
+ * IPEX_LAZY_REORDER:           Default = 0, Set 1 to enable lazy reorder to avoid unnecessary reorders
+ * IPEX_WEIGHT_CACHE:           Default = 0, Set 1 to cache the packed weight in original weight Tensor
+ * IPEX_DISABLE_TILE_PARTITION: Default = 0, Set 1 to disable tile partition and map device per physical device.
+ */
 
 int dpcpp_env(int env);
 
-static inline int dpcpp_verbose() {
-  return dpcpp_env(ENV_VERBOSE);
-}
+int dpcpp_verbose();
 
-static inline int dpcpp_force_sync() {
-  return dpcpp_env(ENV_FORCE_SYNC);
-}
+int dpcpp_force_sync();
 
-static inline bool dpcpp_profiling() {
-  return !dpcpp_env(ENV_DISABLE_PROFILING);
-}
+bool dpcpp_profiling();
 
-static inline int lazy_reorder_enabled() {
-  return dpcpp_env(ENV_LAZY_REORDER);
-}
+int lazy_reorder_enabled();
 
-static inline int weight_cache_enabled() {
-  auto weight_cache_env = dpcpp_env(ENV_WEIGHT_CACHE);
-  if (weight_cache_env) {
-    TORCH_CHECK(
-        lazy_reorder_enabled() == 1,
-        "IPEX_WEIGHT_CACHE can be set only when IPEX_LAZY_REORDER=1.");
-  }
-  return weight_cache_env;
-}
+int weight_cache_enabled();
 
-static inline bool disable_tile_partition() {
-  return (bool)dpcpp_env(ENV_DISABLE_TILE_PARTITION);
-}
+bool disable_tile_partition();

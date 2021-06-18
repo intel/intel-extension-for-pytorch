@@ -1,11 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <utility>
-
 #include <c10/core/Stream.h>
-#include <c10/util/Exception.h>
-#include <c10/core/DeviceGuard.h>
 
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
@@ -19,49 +14,28 @@ class IPEX_API DPCPPStream {
  public:
   enum Unchecked { UNCHECKED };
 
-  explicit DPCPPStream(Stream stream) : stream_(stream) {
-    TORCH_CHECK(stream_.device_type() == DeviceType::XPU);
-  }
+  explicit DPCPPStream(Stream stream);
 
   // Construct a DPCPPStream from a Stream with no error checking.
-  explicit DPCPPStream(Unchecked, Stream stream) : stream_(stream) {}
+  explicit DPCPPStream(Unchecked, Stream stream);
 
-  bool operator==(const DPCPPStream& other) const noexcept {
-    return unwrap() == other.unwrap();
-  }
+  bool operator==(const DPCPPStream& other) const noexcept;
 
-  bool operator!=(const DPCPPStream& other) const noexcept {
-    return unwrap() != other.unwrap();
-  }
+  bool operator!=(const DPCPPStream& other) const noexcept;
 
-  operator Stream() const {
-    return unwrap();
-  }
+  operator Stream() const;
 
-  DeviceIndex device_index() const {
-    return stream_.device_index();
-  }
+  DeviceIndex device_index() const;
 
-  Device device() const {
-    return Device(DeviceType::XPU, device_index());
-  }
+  Device device() const;
 
-  StreamId id() const {
-    return stream_.id();
-  }
+  StreamId id() const;
 
-  void synchronize() const {
-    DeviceGuard guard{stream_.device()};
-    dpcpp_queue().wait();
-  }
+  void synchronize() const;
 
-  Stream unwrap() const {
-    return stream_;
-  }
+  Stream unwrap() const;
 
-  uint64_t pack() const noexcept {
-    return stream_.pack();
-  }
+  uint64_t pack() const noexcept;
 
   static DPCPPStream unpack(uint64_t bits) {
     return DPCPPStream(Stream::unpack(bits));

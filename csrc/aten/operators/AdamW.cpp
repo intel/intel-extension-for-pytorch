@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
+#include <ATen/record_function.h>
 #include <ATen/native/Activation.h>
 
 #include <core/Memory.h>

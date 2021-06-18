@@ -295,9 +295,8 @@ setup(
             '*.py',
             'lib/*.so',
             'include/*.h',
-            'include/gpu/*',
-            'include/gpu/aten/utils/*.h',
-            'include/core/*.h',
+            'include/aten/*.h',
+            'include/aten/core/*.h',
             'include/utils/*.h']
         },
     long_description=long_description,

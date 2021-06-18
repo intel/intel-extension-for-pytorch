@@ -1,5 +1,5 @@
 #pragma once
-
+#include <c10/util/Optional.h>
 #include <utils/DPCPP.h>
 #include <core/Stream.h>
 
@@ -51,7 +51,7 @@ struct  DPCPPEvent {
 //    return left.event_ < right.event_;
 //  }
 
-  optional<at::Device> device() const {
+  at::optional<at::Device> device() const {
     if (!events_.empty()) {
       return at::Device(at::kXPU, device_index_);
     } else {
