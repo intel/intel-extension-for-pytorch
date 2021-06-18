@@ -27,40 +27,10 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
  |[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
 
- Take Intel-Extension-for-Pytorch v1.8.0 as the example.
+For IPEX version earlier than 1.8.0, a patch has to be manually applied to PyTorch source code. Please check previous installation guide.
 
- 1. Install PyTorch from binary
-    ```bash
-    conda install pytorch torchvision torchaudio cpuonly -c pytorch
-    ```
+From IPEX 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
 
- 2. Install PyTorch from source
-    
-    Get PyTorch v1.8.0 source(Refer to [PyTorch guide](https://github.com/pytorch/pytorch#get-the-pytorch-source) for more details)
-    ```bash
-    git clone --recursive https://github.com/pytorch/pytorch
-    ```
-    
-    Checkout PyTorch to the specified version
-    ```bash
-    cd pytorch
-    git checkout v1.8.0
-    ```
-
-    Update submodules
-    ```bash
-    git submodule sync
-    git submodule update --init --recursive
-    ```
-
-    Build and install PyTorch (Refer to [PyTorch guide](https://github.com/pytorch/pytorch#install-pytorch) for more details)
-    ```bash
-    python setup.py install
-    ```
-
-### Install Intel Extension for PyTorch from Source
-
-Get the source code of Intel Extension for PyTorch
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 cd intel-extension-for-pytorch
@@ -68,16 +38,8 @@ cd intel-extension-for-pytorch
 # if you are updating an existing checkout
 git submodule sync
 git submodule update --init --recursive
-```
 
-Install dependencies
-```bash
-pip install lark-parser hypothesis
-```
-
-Install the extension
-```bash
-cd ${intel_extension_for_pytorch_directory}
+# run setup.py to compile IPEX and install the binaries
 python setup.py install
 ```
 
