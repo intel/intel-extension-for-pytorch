@@ -251,8 +251,6 @@ MAKE_REGISTER_FUNC(ADD_NS(grid_sampler), "grid_sampler",
                    Tensor(const Tensor &, const Tensor &, int64_t, int64_t,
                           bool),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(gather), "gather",
-                   Tensor(const Tensor &, int64_t, const Tensor &, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(polar), "polar",
                    Tensor(const Tensor &, const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(heaviside), "heaviside",
