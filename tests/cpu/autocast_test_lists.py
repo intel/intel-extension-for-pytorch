@@ -98,8 +98,6 @@ class AutocastCPUTestLists(object):
             ("grid_sampler", (torch.randn((2, 3, 33, 22), dtype=torch.bfloat16, device=dev),
                               torch.randn((2, 22, 11, 2), dtype=torch.bfloat16, device=dev),
                               0, 0, False)),
-            ("gather", (torch.tensor([[1, 2], [3, 4]], dtype=torch.bfloat16, device=dev),
-                              1, torch.tensor([[0, 0], [1, 0]], device=dev))),
             ("heaviside", (dummy_bf16[1][0], dummy_bf16[0][0])),
             ("take_along_dim", (torch.tensor([[10, 30, 20], [60, 40, 50]], dtype=torch.bfloat16), torch.tensor([1, 0]))),
             ("acosh", torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16)),
