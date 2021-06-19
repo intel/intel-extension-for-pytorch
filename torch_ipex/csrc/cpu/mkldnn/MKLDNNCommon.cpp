@@ -104,6 +104,25 @@ ideep::tensor itensor_from_tensor(const Tensor& tensor) {
   }
 }
 
+// Init a aten tensor according to ideep tensor's desc.
+at::Tensor empty_aten_tensor_from_desc(const ideep::tensor::desc& desc, const at::TensorOptions& options) {
+  auto ndims = desc.data.ndims;
+  auto nblks = desc.blocking_desc().inner_nblks;
+  std::vector<int64_t> at_sizes(ndims + nblks);
+  auto padded_dims = desc.padded_dims();
+  auto blk_sizes = desc.blocking_desc().inner_blks;
+  auto blk_idxs = desc.blocking_desc().inner_idxs;
+  std::vector<int64_t> blk_size_per_dim(ndims, 1);
+  for (auto i = 0; i < nblks; i++){
+    at_sizes[i + ndims] = blk_sizes[i];
+    blk_size_per_dim[blk_idxs[i]] *= blk_sizes[i];
+  }
+  for (auto i = 0; i < ndims; i++){
+    at_sizes[i] = padded_dims[i] / blk_size_per_dim[i];
+  }
+  return at::empty(at_sizes, options);
+}
+
 }}
 
 #endif // AT_MKLDNN_ENABLED()

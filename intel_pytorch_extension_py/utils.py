@@ -5,6 +5,8 @@ import warnings
 
 from .ops.lstm import IpexLSTM
 from .fx import *
+from .weight_prepack import _weight_prepack_with_ipex
+from .optimizer_utils import _ipex_optimizer
 
 def _replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
@@ -32,12 +34,12 @@ def _replace_lstm_with_ipex_lstm(model):
             else:
                 _replace_lstm_with_ipex_lstm(child)
 
-def convert_module_data_type(module, dtype):
+def _convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
     module_convert_list = [torch.nn.Conv2d,
-                          torch.nn.Linear,
-                          torch.nn.Embedding,
-                          torch.nn.LayerNorm]
+                           torch.nn.Linear,
+                           torch.nn.Embedding,
+                           torch.nn.LayerNorm]
     for module_cls in module_convert_list:
         if isinstance(module, module_cls):
             weight_data = module.weight.detach().clone().to(dtype)
@@ -45,17 +47,33 @@ def convert_module_data_type(module, dtype):
             if hasattr(module, 'bias') and module.bias is not None:
                 bias_data = module.bias.detach().clone().to(dtype)
                 module.bias.data = bias_data
-            break 
+            break
     for child in module.children():
-        convert_module_data_type(child, dtype)
+        _convert_module_data_type(child, dtype)
     return module
 
-def optimize(model, dtype=torch.bfloat16, level='O1'):
-    try:
-        optimized_model = conv_bn_fuse(model)
-    except:
-        warnings.warn("Conv BN folding failed during the optimize process.")
-        optimized_model = model
-    if dtype == torch.bfloat16:
-        optimized_model = convert_module_data_type(optimized_model, torch.bfloat16)
-    return optimized_model
+def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1'):
+    optimized_model = copy.deepcopy(model)
+    if not model.training:
+        try:
+            optimized_model = conv_bn_fuse(optimized_model)
+        except:
+            warnings.warn("Conv BN folding failed during the optimize process.")
+        # do weight data type convert for inference model.
+        if dtype == torch.bfloat16:
+            optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
+
+    new_optimizer = None
+    weight_params_attr = None
+    # Do weight prepack if level is 'O1', and convert optimizer for training case.
+    if level == 'O1':
+        # for training case, getting fp32 weight format form give dtype for autocast.
+        # i.e, reorder fp32 weight to block format(query for bf16 path).
+        # for inference, always reorder weight to block format(query for weight's dtype path).
+        weight_format_from_dtype = dtype if model.training else None
+        optimized_model, weight_params_attr = _weight_prepack_with_ipex(optimized_model, weight_format_from_dtype)
+    if optimizer is not None:
+        assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
+        new_optimizer = _ipex_optimizer(model, optimized_model, optimizer, weight_params_attr)
+
+    return optimized_model, new_optimizer

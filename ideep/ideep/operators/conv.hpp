@@ -180,18 +180,20 @@ struct convolution_forward
     kernel_size.push_back(dims_in[ndims - 2]);
     kernel_size.push_back(dims_in[ndims - 1]);
     if (src_dims.empty()) {
-      // Construct a dummy case
-      x_dims.push_back(1);
+      // Construct a dummy case, those shapes are from resnet50 model,
+      // just make some simple tests to make sure it can get our expected format(real case),
+      // may be changed in the future.
+      x_dims.push_back(32);
       x_dims.push_back(ic);
-      y_dims.push_back(1);
+      y_dims.push_back(32);
       y_dims.push_back(oc);
       if (4 == src_size) {
-        x_dims.push_back(2 * kernel_size[0]);
-        x_dims.push_back(4 * kernel_size[1]);
+        x_dims.push_back(14 * kernel_size[0]);
+        x_dims.push_back(14 * kernel_size[1]);
       } else {
-        x_dims.push_back(2 * kernel_size[0]);
-        x_dims.push_back(4 * kernel_size[1]);
-        x_dims.push_back(8 * kernel_size[2]);
+        x_dims.push_back(14 * kernel_size[0]);
+        x_dims.push_back(14 * kernel_size[1]);
+        x_dims.push_back(14 * kernel_size[2]);
       }
     } else {
       // Use the real data
@@ -693,20 +695,34 @@ struct convolution_backward_weights
     // embed group info into diff_weights_desc
     auto expected_diff_weights_desc =
         tensor::desc(pd.diff_weights_desc(), groups);
-    diff_weights.reinit_if_possible(expected_diff_weights_desc);
+    tensor expected_diff_weights;
+    // diff_weights not init in FW or has expected desc.
+    if (diff_weights.is_empty() || diff_weights.get_desc() == expected_diff_weights_desc) {
+      diff_weights.reinit_if_possible(expected_diff_weights_desc);
+      expected_diff_weights = diff_weights;
+    } else {
+      expected_diff_weights.init(expected_diff_weights_desc);
+    }
 
     if (with_diff_bias) {
       diff_bias.reinit_if_possible(pd.diff_bias_desc());
       super(pd).execute(stream::default_stream(),
                         {{DNNL_ARG_DIFF_DST, expected_diff_dst},
                          {DNNL_ARG_SRC, expected_src},
-                         {DNNL_ARG_DIFF_WEIGHTS, diff_weights},
+                         {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights},
                          {DNNL_ARG_DIFF_BIAS, diff_bias}});
     } else {
       super(pd).execute(stream::default_stream(),
                         {{DNNL_ARG_DIFF_DST, expected_diff_dst},
                          {DNNL_ARG_SRC, expected_src},
-                         {DNNL_ARG_DIFF_WEIGHTS, diff_weights}});
+                         {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights}});
+    }
+    // diff_weights has been init in FW side, but has diff desc with expected_diff_weights.
+    if (diff_weights.get_desc() != expected_diff_weights_desc) {
+      //TODO: there has an issue when reorder block to block,
+      // will be removed after https://jira.devtools.intel.com/browse/MFDNN-5557 is fixed.
+      auto temp = expected_diff_weights.to_public(nullptr, expected_diff_weights.get_data_type());
+      diff_weights.feed_from(temp);
     }
   }
 };

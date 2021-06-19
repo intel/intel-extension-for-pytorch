@@ -24,6 +24,8 @@ ideep::tensor itensor_view_from_dense(const Tensor& tensor);
 // Helper function for getting an ideep tensor out of an aten Tensor or MKL-DNN tensor.
 ideep::tensor itensor_from_tensor(const Tensor& tensor);
 
+at::Tensor empty_aten_tensor_from_desc(const ideep::tensor::desc& desc, const at::TensorOptions& options);
+
 }}
 
 #endif // AT_MKLDNN_ENABLED

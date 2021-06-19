@@ -375,14 +375,26 @@ class tensor : public memory {
       return desc(md);
     }
 
+    const blocking_desc_t &blocking_desc() const {
+      IDEEP_ENFORCE(is_blocking_desc(),
+                    "Cannot get blocking desc on a non-blocking desc");
+      return data.format_desc.blocking;
+    }
+
+    dims_t& blocking_strides() const {
+      IDEEP_ENFORCE(is_blocking_desc(),
+                    "Cannot get blocking desc on a non-blocking desc");
+      return const_cast<dnnl_memory_desc_t&>(data).format_desc.blocking.strides;
+    }
+
+    const dims_t &padded_dims() const { return data.padded_dims; }
+
    private:
 
     /// Returns dimension vector
     inline dims get_internal_dims() const {
       return dims(data.dims, data.dims + data.ndims);
     }
-
-    const dims_t &padded_dims() const { return data.padded_dims; }
 
     const dims_t &padded_offsets() const { return data.padded_offsets; }
 
@@ -396,18 +408,6 @@ class tensor : public memory {
 
     bool is_rnn_packed_desc() const {
       return format_kind() == dnnl_format_kind_rnn_packed;
-    }
-
-    const blocking_desc_t &blocking_desc() const {
-      IDEEP_ENFORCE(is_blocking_desc(),
-                    "Cannot get blocking desc on a non-blocking desc");
-      return data.format_desc.blocking;
-    }
-
-    dims_t& blocking_strides() const {
-      IDEEP_ENFORCE(is_blocking_desc(),
-                    "Cannot get blocking desc on a non-blocking desc");
-      return const_cast<dnnl_memory_desc_t&>(data).format_desc.blocking.strides;
     }
 
     void set_g(dim groups) {
@@ -953,6 +953,23 @@ class tensor : public memory {
     *this = std::move(src.permute(perms));
   }
 
+  /// Set a descriptor into tensor to replace the older one, keep buffer
+  /// It is caller's responsibility to make sure the original buffer is large
+  /// enough for specified descriptor
+  tensor& set_desc(const desc &new_desc) {
+    // Keep the original management
+    auto buf = std::move(buffer_);
+    auto ws = std::move(workspace_);
+    auto scale = std::move(scale_);
+    auto zp = std::move(zero_point_);
+    init(new_desc, get_data_handle(), get_engine());
+    buffer_ = std::move(buf);
+    workspace_ = std::move(ws);
+    scale_ = std::move(scale);
+    zero_point_ = std::move(zp);
+    return *this;
+  }
+
  private:
   void reset_internal(const desc &adesc, const engine &aengine, void *ahandle) {
     dnnl_memory_t result;
@@ -977,23 +994,6 @@ class tensor : public memory {
     auto volume_new = std::accumulate(new_dims.begin(), new_dims.end(), 1,
                                       std::multiplies<dim_t>());
     return volume_old == volume_new;
-  }
-
-  /// Set a descriptor into tensor to replace the older one, keep buffer
-  /// It is caller's responsibility to make sure the original buffer is large
-  /// enough for specified descriptor
-  tensor& set_desc(const desc &new_desc) {
-    // Keep the original management
-    auto buf = std::move(buffer_);
-    auto ws = std::move(workspace_);
-    auto scale = std::move(scale_);
-    auto zp = std::move(zero_point_);
-    init(new_desc, get_data_handle(), get_engine());
-    buffer_ = std::move(buf);
-    workspace_ = std::move(ws);
-    scale_ = std::move(scale);
-    zero_point_ = std::move(zp);
-    return *this;
   }
 
   std::shared_ptr<tensor> workspace_;
