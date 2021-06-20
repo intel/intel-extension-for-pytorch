@@ -269,7 +269,13 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) 
+  {
+    dbl::comm::reorder_to_dtype(input, at::kFloat);
+  }
+  else{
+    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  }
   dil_input = dbl::comm::try_gen_dil_tensor(input);
 
   if (bias.defined()) {
