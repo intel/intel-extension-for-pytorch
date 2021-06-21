@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 TORCH_VERSION = '1.8.0'
-TORCH_IPEX_VERSION = '1.8.0'
+TORCH_IPEX_VERSION = '1.8.0.1'
 
 # import torch
 import platform
@@ -64,6 +64,7 @@ try:
 except ImportError as e:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch=='+TORCH_VERSION+'+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
     import torch
+    from torch.utils.cpp_extension import include_paths, library_paths
 
 PYTHON_VERSION = sys.version_info
 IS_WINDOWS = (platform.system() == 'Windows')
@@ -107,12 +108,7 @@ import glob
 import inspect
 import multiprocessing
 import multiprocessing.pool
-import os
-import platform
-import re
 import shutil
-import subprocess
-import sys
 import pathlib
 
 
@@ -250,7 +246,6 @@ class IPEXClean(distutils.command.clean.clean, object):
 
   def run(self):
     import glob
-    import re
     with open('.gitignore', 'r') as f:
       ignores = f.read()
       pat = re.compile(r'^#( BEGIN NOT-CLEAN-FILES )?')
@@ -293,7 +288,7 @@ class IPEXBuild(build_ext, object):
     ipex_exts = [ext for ext in self.extensions if isinstance(ext, IPEXExt)]
     for ext in ipex_exts:
       self.build_ipex_extension(ext)
-    
+
     self.extensions = [ext for ext in self.extensions if not isinstance(ext, IPEXExt)]
     super(IPEXBuild, self).run()
 
@@ -321,6 +316,7 @@ class IPEXBuild(build_ext, object):
             '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
+            '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
             '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib",
