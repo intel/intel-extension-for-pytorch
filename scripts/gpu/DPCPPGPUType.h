@@ -624,3 +624,5 @@ static std::tuple<Tensor &,Tensor &,Tensor &> svd_out(Tensor & U, Tensor & S, Te
 static std::tuple<Tensor,Tensor,Tensor> svd(const Tensor & self, bool some, bool compute_uv); // {"schema": "aten::svd(Tensor self, bool some=True, bool compute_uv=True) -> (Tensor U, Tensor S, Tensor V)", "dispatch": "False", "math": "False"}
 static std::tuple<Tensor,Tensor,Tensor> _svd_helper(const Tensor & self, bool some, bool compute_uv); // {"schema": "aten::_svd_helper(Tensor self, bool some, bool compute_uv) -> (Tensor, Tensor, Tensor)", "dispatch": "True", "math": "False"}
 static Tensor & sgn_out(Tensor & out, const Tensor & self); // {"schema": "aten::sgn.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)", "dispatch": "True", "math": "False"}
+std::tuple<Tensor,Tensor> _fused_dropout(const Tensor & self, double p, Generator * generator); // aten::_fused_dropout(Tensor self, float p, Generator? generator=None) -> (Tensor, Tensor)
+Tensor _masked_scale(const Tensor & self, const Tensor & mask, double scale); // {"schema": "aten::_masked_scale(Tensor self, Tensor mask, float scale) -> Tensor", "dispatch": "True", "math": "False"}
