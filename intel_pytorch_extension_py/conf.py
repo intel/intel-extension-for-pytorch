@@ -36,13 +36,10 @@ class AmpConf(object):
         # q+dq+op1+q+dq+q+dq+op2+q+dq => q+dq+op1+q+dq+op2+q+dq
         default_configures = configures
         num_ops = len(default_configures)
-        add_ids = []
         for cur_id in range(num_ops):
             cur_op = default_configures[cur_id]['name']
             if cur_op == 'dropout':
                 continue
-            if cur_op == 'add':
-                add_ids.append(cur_id)
             inputs = default_configures[cur_id]['inputs_flow']
             num_input = len(inputs)
             pre_ops = {}
@@ -87,10 +84,13 @@ class AmpConf(object):
                 default_configures[cur_id]['inputs_quantized'][0] = False
                 default_configures[cur_id]['inputs_quantized'][1] = False
 
-        for add_id in add_ids:
-            # if add hasn't post quantized op, i.e. 'outputs_quantized' is true.
-            # not need add q, dq for output.
-            if default_configures[add_id]['outputs_quantized'][0]:
-                default_configures[add_id]['outputs_quantized'][0] = False
+        # post process for add, linear, if cur op hasn't post quantized op, i.e. 'outputs_quantized' is True,
+        # for good perfromance, the default recipe:
+        # int8_input -> op -> q -> dq will converted to int8_input -> op.
+        post_process_ops = ['add', 'linear', 'conv2d']
+        for cur_id in range(num_ops):
+            cur_op = default_configures[cur_id]['name']
+            if cur_op in post_process_ops and default_configures[cur_id]['outputs_quantized'][0]:
+                default_configures[cur_id]['outputs_quantized'][0] = False
 
         return default_configures

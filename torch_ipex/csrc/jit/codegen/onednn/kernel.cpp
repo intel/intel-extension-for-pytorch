@@ -131,7 +131,10 @@ ArgSpecs LlgaKernel::specializeOutputSpecs(
         spec = getQuantizedSpec(spec, i);
       }
     } else {
-      spec = spec.dtype(inputSpecs[0].dtype());
+      // TODO: need run with profiling graph executor turned on to know the exact output dtype.
+      // Hard-coded to f32 when can't infer from the node that produces the
+      // output node. This will make bf16 fail to run.
+      spec = spec.dtype(data_type::f32);
     }
 
     if (useOpaqueLayout(i))
