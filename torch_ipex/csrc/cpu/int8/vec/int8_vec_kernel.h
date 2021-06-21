@@ -63,6 +63,54 @@ void move_ker(int32_t *out, const int32_t *in, int64_t len) {
 }
 
 static inline __attribute__((always_inline))
+void move_ker(int16_t *out, const int16_t *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(2)
+  for (i = 0; i < len - 31 ; i += 32) {
+    auto in0 = _mm512_loadu_si512(in + i);
+    _mm512_storeu_si512(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
+    _mm512_mask_storeu_epi16(out + i, mask, in0);
+  }
+}
+
+static inline __attribute__((always_inline))
+void move_ker(unsigned char *out, const unsigned char *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(2)
+  for (i = 0; i < len - 63 ; i += 64) {
+    auto in0 = _mm512_loadu_si512(in + i);
+    _mm512_storeu_si512(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
+    _mm512_mask_storeu_epi8(out + i, mask, in0);
+  }
+}
+
+static inline __attribute__((always_inline))
+void move_ker(bool *out, const bool *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(2)
+  for (i = 0; i < len - 63 ; i += 64) {
+    auto in0 = _mm512_loadu_si512(in + i);
+    _mm512_storeu_si512(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
+    _mm512_mask_storeu_epi8(out + i, mask, in0);
+  }
+}
+
+static inline __attribute__((always_inline))
 void move_ker(int8_t *out, const int8_t *in, int64_t len) {
   int64_t i;
   #pragma unroll(2)

@@ -38,6 +38,7 @@
 
 #include "cpu/toolkit/sklearn.h"
 #include "cpu/toolkit/thread.h"
+#include "cpu/toolkit/concat.h"
 
 namespace torch_ipex {
 namespace {
@@ -249,6 +250,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
   m.def("roc_auc_score", &toolkit::roc_auc_score);
   m.def("thread_bind", &toolkit::thread_bind);
+  m.def("concat_all_continue", &toolkit::concat_all_continue);
 }
 }  // namespace
 using namespace torch::jit;

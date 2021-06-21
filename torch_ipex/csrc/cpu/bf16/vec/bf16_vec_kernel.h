@@ -133,6 +133,21 @@ static inline void add_ker(float *inout, at::BFloat16 *in, int len) {
   }
 }
 
+static inline void move_ker(double *out, const double *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(4)
+  for (i = 0; i < len - 7 ; i += 8) {
+    auto in0 = _mm512_loadu_pd(in + i);
+    _mm512_storeu_pd(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_loadu_pd(mask, in + i);
+    _mm512_mask_storeu_pd(out + i, mask, in0);
+  }
+}
+
 static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
   int64_t i;
   #pragma unroll(4)
@@ -158,7 +173,7 @@ static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
 
 static inline void move_ker(float *out, const float *in, int64_t len) {
   int64_t i;
-  #pragma unroll(8)
+  #pragma unroll(4)
   for (i = 0; i < len - 15 ; i += 16) {
     auto in0 = _mm512_loadu_ps(in + i);
     _mm512_storeu_ps(out + i, in0);
