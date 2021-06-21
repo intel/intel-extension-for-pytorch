@@ -424,15 +424,15 @@ class MatmulDiv(nn.Module):
         else:
             mm_res = torch.matmul(x, y)
         if self.div_scalar:
-            return mm_res.div(2.0)  
+            return mm_res.div(2.0)
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
-          
+
 class AtenSoftmaxRepalce(nn.Module):
     def __init__(self, dim=-1):
         super(AtenSoftmaxRepalce, self).__init__()
         self.softmax = torch.nn.Softmax(dim)
-        
+
     def forward(self, x):
         return self.softmax(x)
 
@@ -443,7 +443,7 @@ class Tester(TestCase):
         modelName = model.__class__.__name__
         core.disable_jit_opt()
         model = model.eval()
-        model = ipex.optimize(model, dtype=torch.float32)
+        model = ipex.optimize(model, dtype=torch.float32, level='O0')
         if x.dim() == 4:
             x = x.to(memory_format=torch.channels_last)
         with torch.no_grad():
@@ -480,7 +480,7 @@ class Tester(TestCase):
 
         core.enable_jit_opt()
         model = model.eval()
-        model = ipex.optimize(model, dtype=torch.bfloat16)
+        model = ipex.optimize(model, dtype=torch.bfloat16, level='O0')
         if x.dim() == 4:
             x = x.to(memory_format=torch.channels_last)
         x2 = x.clone()
@@ -831,7 +831,7 @@ class Tester(TestCase):
             ConvSumInDiffBlock(2, 3, 32, kernel_size=1, stride=1, padding=0),
             torch.rand(32, 3, 64, 64),
             kind_not_in_graph="ipex::conv2d_sum")
-    
+
     def test_matmul_div(self):
         self._test_output(
             MatmulDiv(div_scalar=True, with_out=True),
@@ -877,7 +877,7 @@ class Tester(TestCase):
             kind_in_graph="ipex::matmul_div",
             kind_not_in_graph=None,
             prec=5e-3)
- 
+
     def test_ipex_softmax(self):
         self._test_output(
             AtenSoftmaxRepalce(),

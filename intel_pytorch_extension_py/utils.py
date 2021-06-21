@@ -76,4 +76,8 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1'):
         assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
         new_optimizer = _ipex_optimizer(model, optimized_model, optimizer, weight_params_attr)
 
-    return optimized_model, new_optimizer
+    #TODO: model list, optimizer list.
+    if optimizer is None:
+        return optimized_model
+    else:
+        return optimized_model, new_optimizer

@@ -159,8 +159,8 @@ class TestPrepackCases(TestCase):
         model = model.to(memory_format=torch.channels_last)
         for dtype in [torch.float32, torch.bfloat16]:
             # inference case, will do conv+bn folding for 'O0' and 'O1'. will do weight' prepack for 'O1'.
-            ipex_model1, _= ipex.optimize(model.eval(), dtype=dtype, level='O0')
-            ipex_model2, _= ipex.optimize(model.eval(), dtype=dtype, level='O1')
+            ipex_model1 = ipex.optimize(model.eval(), dtype=dtype, level='O0')
+            ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1')
             x = torch.randn(32, 3, 224, 224).to(memory_format=torch.channels_last)
             conf = ipex.AmpConf(dtype)
             with ipex.amp.autocast(enabled=True, configure=conf):
@@ -172,9 +172,9 @@ class TestPrepackCases(TestCase):
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
             # do nothing for 'O0'
-            ipex_model1, ipex_optimizer1= ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O0')
+            ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O0')
             # do weight prepack for 'O1'
-            ipex_model2, ipex_optimizer2= ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+            ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # run two iterations, and then compare the results.
 
             xx = [torch.randn(32, 3, 224, 224), torch.randn(32, 3, 224, 224)]
