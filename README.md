@@ -31,6 +31,8 @@ For IPEX version earlier than 1.8.0, a patch has to be manually applied to PyTor
 
 From IPEX 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
 
+**Note:** Compiling with gcc 7 on some environments, like CentOS 7, may fail. Please use GCC >= 8 to compile.
+
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 cd intel-extension-for-pytorch
