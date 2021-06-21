@@ -12,7 +12,6 @@
 #include <utils/oneMKLUtils.h>
 #endif
 
-
 DPCPP_DEF_K2(fill_with_conjugate_symmetry_ker, typename scalar_t);
 
 using namespace xpu::dpcpp::detail;
@@ -135,11 +134,14 @@ void _mkl_dft(
     mkl_istrides[i] = complex_input ? istrides[i] >> 1 : istrides[i];
     mkl_ostrides[i] = complex_output ? ostrides[i] >> 1 : ostrides[i];
   }
-  desc.set_value(oneapi::mkl::dft::config_param::INPUT_STRIDES, mkl_istrides.data());
-  desc.set_value(oneapi::mkl::dft::config_param::OUTPUT_STRIDES, mkl_ostrides.data());
+  desc.set_value(
+      oneapi::mkl::dft::config_param::INPUT_STRIDES, mkl_istrides.data());
+  desc.set_value(
+      oneapi::mkl::dft::config_param::OUTPUT_STRIDES, mkl_ostrides.data());
   if (!complex_input || !complex_output) {
     desc.set_value(
-        oneapi::mkl::dft::config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
+        oneapi::mkl::dft::config_param::CONJUGATE_EVEN_STORAGE,
+        DFTI_COMPLEX_COMPLEX);
   }
 
   // rescale if requested
@@ -148,15 +150,16 @@ void _mkl_dft(
     auto signal_numel = at::prod_intlist(checked_signal_sizes);
     double double_scale;
     if (norm == at::native::fft_norm_mode::by_root_n) {
-      double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);;
+      double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);
     } else {
       double_scale = 1.0 / static_cast<double>(signal_numel);
     }
     desc.set_value(
         inverse ? oneapi::mkl::dft::config_param::BACKWARD_SCALE
                 : oneapi::mkl::dft::config_param::FORWARD_SCALE,
-        prec == oneapi::mkl::dft::precision::DOUBLE ? double_scale
-                                            : static_cast<float>(double_scale));
+        prec == oneapi::mkl::dft::precision::DOUBLE
+            ? double_scale
+            : static_cast<float>(double_scale));
   }
 
   desc.commit(dpcpp_queue);
@@ -165,9 +168,19 @@ void _mkl_dft(
   auto out_data = (scalar_t*)output.data_ptr();
 
   if (!inverse) {
-    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::dft::compute_forward, desc, in_data, out_data);
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::dft::compute_forward,
+        desc,
+        in_data,
+        out_data);
   } else {
-    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::dft::compute_backward, desc, in_data, out_data);
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::dft::compute_backward,
+        desc,
+        in_data,
+        out_data);
   }
 
   if (!complex_input && complex_output && !onesided) {
@@ -199,20 +212,20 @@ Tensor _fft_with_size(
     IntArrayRef output_sizes) {
 #ifdef USE_ONEMKL
   int64_t batch = self.size(0);
-  Tensor input = self;
+  Tensor input_ = self;
   // real/imag dimension must aligned when viewed as of complex type
 
   if (complex_input) {
-    bool need_contiguous = input.stride(-1) != 1;
+    bool need_contiguous = input_.stride(-1) != 1;
     for (int64_t i = 0; !need_contiguous && i <= signal_ndim; i++) {
-      need_contiguous |= input.stride(i) % 2 != 0;
+      need_contiguous |= input_.stride(i) % 2 != 0;
     }
     if (need_contiguous) {
-      input = input.contiguous();
+      input_ = input_.contiguous();
     }
   }
 
-  Tensor output = at::empty(output_sizes, input.options());
+  Tensor output = at::empty(output_sizes, input_.options());
 
   bool complex_type;
   if (!inverse) {
@@ -221,69 +234,106 @@ Tensor _fft_with_size(
     complex_type = complex_output ? true : false;
   }
 
-  if (input.scalar_type() == ScalarType::Float) {
-    if (complex_type) {
-      impl::_mkl_dft<
-          oneapi::mkl::dft::precision::SINGLE,
-          oneapi::mkl::dft::domain::COMPLEX,
-          float>(
-          input,
-          output,
-          signal_ndim,
-          complex_input,
-          complex_output,
-          inverse,
-          checked_signal_sizes,
-          normalization,
-          onesided,
-          batch);
-    } else {
-      impl::
-          _mkl_dft<oneapi::mkl::dft::precision::SINGLE, oneapi::mkl::dft::domain::REAL, float>(
-              input,
-              output,
-              signal_ndim,
-              complex_input,
-              complex_output,
-              inverse,
-              checked_signal_sizes,
-              normalization,
-              onesided,
-              batch);
-    }
-  } else if (input.scalar_type() == ScalarType::Double) {
-    if (complex_type) {
-      impl::_mkl_dft<
-          oneapi::mkl::dft::precision::DOUBLE,
-          oneapi::mkl::dft::domain::COMPLEX,
-          double>(
-          input,
-          output,
-          signal_ndim,
-          complex_input,
-          complex_output,
-          inverse,
-          checked_signal_sizes,
-          normalization,
-          onesided,
-          batch);
-    } else {
-      impl::
-          _mkl_dft<oneapi::mkl::dft::precision::DOUBLE, oneapi::mkl::dft::domain::REAL, double>(
-              input,
-              output,
-              signal_ndim,
-              complex_input,
-              complex_output,
-              inverse,
-              checked_signal_sizes,
-              normalization,
-              onesided,
-              batch);
-    }
+  Tensor input;
+  if (input_.scalar_type() == ScalarType::BFloat16) {
+    input = at::empty(input_.numel(), input_.options().dtype(at::kFloat));
+    dpcppMemoryCopyType(
+        input.data_ptr<float>(),
+        input_.data_ptr<at::BFloat16>(),
+        input_.numel());
+    auto output_ =
+        at::empty(output.numel(), output.options().dtype(at::kFloat));
+    impl::_mkl_dft<
+        oneapi::mkl::dft::precision::SINGLE,
+        oneapi::mkl::dft::domain::REAL,
+        float>(
+        input,
+        output_,
+        signal_ndim,
+        complex_input,
+        complex_output,
+        inverse,
+        checked_signal_sizes,
+        normalization,
+        onesided,
+        batch);
+    dpcppMemoryCopyType(
+        output.data_ptr<at::BFloat16>(),
+        output_.data_ptr<float>(),
+        output.numel());
+
   } else {
-    AT_ERROR("MKL FFT doesn't support tensor of type");
+    input = self;
+
+    if (input.scalar_type() == ScalarType::Float) {
+      if (complex_type) {
+        impl::_mkl_dft<
+            oneapi::mkl::dft::precision::SINGLE,
+            oneapi::mkl::dft::domain::COMPLEX,
+            float>(
+            input,
+            output,
+            signal_ndim,
+            complex_input,
+            complex_output,
+            inverse,
+            checked_signal_sizes,
+            normalization,
+            onesided,
+            batch);
+      } else {
+        impl::_mkl_dft<
+            oneapi::mkl::dft::precision::SINGLE,
+            oneapi::mkl::dft::domain::REAL,
+            float>(
+            input,
+            output,
+            signal_ndim,
+            complex_input,
+            complex_output,
+            inverse,
+            checked_signal_sizes,
+            normalization,
+            onesided,
+            batch);
+      }
+    } else if (input.scalar_type() == ScalarType::Double) {
+      if (complex_type) {
+        impl::_mkl_dft<
+            oneapi::mkl::dft::precision::DOUBLE,
+            oneapi::mkl::dft::domain::COMPLEX,
+            double>(
+            input,
+            output,
+            signal_ndim,
+            complex_input,
+            complex_output,
+            inverse,
+            checked_signal_sizes,
+            normalization,
+            onesided,
+            batch);
+      } else {
+        impl::_mkl_dft<
+            oneapi::mkl::dft::precision::DOUBLE,
+            oneapi::mkl::dft::domain::REAL,
+            double>(
+            input,
+            output,
+            signal_ndim,
+            complex_input,
+            complex_output,
+            inverse,
+            checked_signal_sizes,
+            normalization,
+            onesided,
+            batch);
+      }
+    } else {
+      AT_ERROR("MKL FFT doesn't support tensor of type");
+    }
   }
+
   return output;
 
 #else
