@@ -251,19 +251,51 @@ at::Tensor conv2d_weight_unpack(
 }
 
 ideep::tensor get_linear_prepacked_weight(
-    const ideep::tensor& input,
-    const at::Tensor& weight) {
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features){
+  auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
+  ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
+    {out_features, in_features},
+    /*input_size*/{}, // pack weight without input, will use default batchsize=128
+    /*dtype*/weight_dtype, //assume input_dype is same with weight
+    /*input_dtype*/weight_dtype);
+
+  // get ideep blocked tensor
+  ideep::tensor result;
+  if (weight.ndimension() == 2) {
+    // weight is not prepacked
+    ideep::tensor w = at::native::itensor_view_from_dense(weight);
+    result.init(expected_desc);
+    result.feed_from(w);
+  } else  {
+    if (weight.scalar_type() == at::ScalarType::Float) {
+      result.init(expected_desc, weight.template data_ptr<float>());
+    } else {
+      result.init(expected_desc, weight.template data_ptr<c10::BFloat16>());
+    }
+  }
+  return result;
+}
+
+ideep::tensor get_linear_prepacked_weight(
+    const at::Tensor& weight,
+    const int64_t batch_size,
+    const at::ScalarType src_dtype) {
   auto it = cached_weights.find(weight.unsafeGetTensorImpl());
   if (it != cached_weights.end()) {
     return std::get<1>(it->second);
   } else {
     auto weight_ = weight.is_contiguous() ? weight : weight.contiguous();
     ideep::tensor w = at::native::itensor_view_from_dense(weight_);
+    auto out_features = weight_.size(0);
+    auto in_features = weight_.size(1);
+    ideep::dims input_dims({batch_size, weight.size(1)});
     auto packed_desc = ideep::inner_product_forward::expected_weights_desc(
-        w.get_dims(),
-        input.get_dims(),
-        w.get_data_type(),
-        input.get_data_type()); 
+      {weight.sizes().cbegin(), weight.sizes().cend()},
+      input_dims,
+      w.get_data_type(),
+      at::native::get_mkldnn_dtype(src_dtype)); 
     ideep::tensor result;
     result.init(packed_desc);
     result.feed_from(w);
@@ -364,6 +396,72 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
   }
 }
 
+at::Tensor linear_weight_prepack(
+    const at::Tensor& weight,
+    c10::optional<at::ScalarType> dtype) {
+  TORCH_CHECK(weight.ndimension() == 2, "expected unpack weight which dim == 2");
+  auto weight_ = IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous();
+  auto w = at::native::itensor_view_from_dense(weight_);
+  // get the format with given data type.
+  ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : w.get_data_type();
+  ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
+    w.get_dims(),
+    /*input_size*/{}, // pack weight without input, will use default batchsize=128
+    /*dtype*/desc_dtype, //assume input_dype is same with weight
+    /*input_dtype*/desc_dtype);
+
+  auto weight_dtype = w.get_data_type();
+  expected_desc = expected_desc.to_type(weight_dtype);
+  auto output = at::native::empty_aten_tensor_from_desc(expected_desc, weight.options());
+  ideep::tensor y;
+  if (ideep::data_type::f32 == weight_dtype) {
+    y.init(expected_desc, output.template data_ptr<float>());
+  } else {
+    y.init(expected_desc, output.template data_ptr<c10::BFloat16>());
+  }
+  y.feed_from(w);
+  return output;
+}
+
+at::Tensor linear_weight_unpack(
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features,
+    c10::optional<at::ScalarType> dtype) {
+  // weight is not prepacked.
+  if (weight.ndimension() == 2) {
+    return weight;
+  }
+  auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
+  // get the format give data type.
+  ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : weight_dtype;
+
+  // get ideep weight's desc
+  ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
+    {out_features, in_features},
+    /*input_size*/{}, // pack weight without input, will use default batchsize=128
+    /*dtype*/desc_dtype, //assume input_dype is same with weight
+    /*input_dtype*/desc_dtype).to_type(weight_dtype);
+
+  // get ideep blocked tensor
+  ideep::tensor blocked_weight;
+  if (ideep::data_type::f32 == weight_dtype) {
+    blocked_weight.init(expected_desc, weight.template data_ptr<float>());
+  } else {
+    blocked_weight.init(expected_desc, weight.template data_ptr<c10::BFloat16>());
+  }
+
+  //reorder to public format
+  at::Tensor result = at::empty({out_features, in_features}, weight.options());
+  auto pub_tensor =
+      ideep::data_type::f32 == weight_dtype
+      ? blocked_weight.to_public(result.template data_ptr<float>(),
+                                 ideep::data_type::f32)
+      : blocked_weight.to_public(result.template data_ptr<c10::BFloat16>(),
+                                ideep::data_type::bf16);
+  return result;
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex
 
@@ -372,6 +470,8 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def("conv2d_weight_prepack(Tensor weight, int[] padding, int[] stride, int[] dilation, int groups, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::conv2d_weight_prepack);
   m.def("conv2d_weight_unpack(Tensor weight, int[] padding, int[] stride, int[] dilation, int[] kernel_size, int groups, int output_channel, int input_channel, bool is_channels_last, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::conv2d_weight_unpack);
+  m.def("linear_weight_prepack(Tensor weight, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_prepack);
+  m.def("linear_weight_unpack(Tensor weight, int out_features, int in_features, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_unpack);
 }
 
 }

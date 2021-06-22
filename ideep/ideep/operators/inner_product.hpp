@@ -48,9 +48,9 @@ struct inner_product_forward : public dnnl::inner_product_forward {
       prop_kind aprop_kind = prop_kind::forward,
       const engine& aengine = engine::cpu_engine()) {
     auto x_dims = weights_dims;
-    x_dims[0] = src_dims.empty() ? 1 : src_dims[0];
+    // 128 is default batch size for inner product
+    x_dims[0] = src_dims.empty() ? 128 : src_dims[0];
     auto y_dims = {x_dims[0], weights_dims[0]};
-    auto ndims = weights_dims.size();
     auto y_dtype = (dtype != data_type::s8) ? dtype : data_type::s32;
 
     IDEEP_ENFORCE(x_dims.size() == weights_dims.size(),
@@ -256,7 +256,7 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     }
 
     auto diff_dst_desc = diff_dst.get_desc().to_format_any();
-    auto weights_desc = weights_.get_desc();
+    auto weights_desc = weights_.get_desc().to_format_any();
     auto diff_src_desc =
         tensor::desc(diff_src_dims, diff_dst.get_data_type(), tag::any);
 
@@ -270,6 +270,15 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
 
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
     auto expected_weights = weights_.reorder_if_differ_in(pd.weights_desc());
+    // diff_src's origin content are not used, so it can be re-init directly
+    // It's caller's duty to make sure diff_src's buffer size is same with it actually needed
+    // Here we dose not support to write to given strided buffer since we know the grad is always contiguous
+    if (diff_src.is_empty()){
+      diff_src.init(pd.diff_src_desc());
+    }
+    else{
+      diff_src.init(pd.diff_src_desc(), diff_src.get_data_handle());
+    }
     diff_src.reinit_if_possible(pd.diff_src_desc());
 
     super(pd).execute(stream::default_stream(),
@@ -344,18 +353,31 @@ private:
 
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
+    if (diff_weights.is_empty()){
+      diff_weights.init(pd.diff_weights_desc());
+    }
+    // Here we need to write to given strided buffer, so if given buffer is different with the best format
+    // We need to firstly init a new buffer to store the output, and copy the output to a given buffer
+    tensor expected_diff_weights = diff_weights.get_desc() == pd.diff_weights_desc() ? diff_weights : tensor(pd.diff_weights_desc());
+
     diff_weights.reinit_if_possible(pd.diff_weights_desc());
 
     exec_args args {{DNNL_ARG_DIFF_DST, expected_diff_dst},
                     {DNNL_ARG_SRC, expected_src},
-                    {DNNL_ARG_DIFF_WEIGHTS ,diff_weights}};
+                    {DNNL_ARG_DIFF_WEIGHTS ,expected_diff_weights}};
 
     if (with_diff_bias) {
-      diff_bias.reinit_if_possible(pd.diff_bias_desc());
+      if (diff_bias.is_empty()){
+        diff_bias.init(pd.diff_bias_desc());
+      }
+      else{
+        diff_bias.init(pd.diff_bias_desc(), diff_bias.get_data_handle());
+      }
       args.insert({DNNL_ARG_DIFF_BIAS, diff_bias});
     }
 
     super(pd).execute(stream::default_stream(), args);
+    expected_diff_weights.reorder_to_if_differ_from(diff_weights);
   }
 };
 

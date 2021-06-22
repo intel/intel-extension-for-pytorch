@@ -44,10 +44,9 @@ ideep::tensor get_conv_prepacked_weight(
     bool is_channels_last);
 
 // Prepack convolution's weight according to dummy input.
-// Note: dtype info is useful for bf16 training path, it will be at::kFloat,
-// the reason it that we hope the preapck weight's format is queried form bf16 path,
-// so we can use Split SGD to do some optimization(master weight).
-// For other case, the dtype is None.
+// weight: weight need to be prepacked
+// dtype: if given dtype, will use this dtype to override weight's dtype
+
 at::Tensor conv2d_weight_prepack(
     const at::Tensor& weight,
     at::IntArrayRef padding,
@@ -77,8 +76,18 @@ at::Tensor conv2d_weight_unpack(
 // input: an ideep tensor, getting from the linear's input,
 // weight: linear's weight
 ideep::tensor get_linear_prepacked_weight(
-    const ideep::tensor& input,
-    const at::Tensor& weight);
+    const at::Tensor& weight,
+    const int64_t batch_size,
+    const at::ScalarType src_dtype);
+
+// Get the linear's expected ideep weight tensor, the weight may be a 2-D tensor
+// or has benn prepacked to a n-D tensor, if it is a plain tensor, it will reorder to a
+// expected weight according queried desc of OneDNN linear, or if it is prepack, it will init
+// a ideep tensor according queried desc and weight's data_ptr(not has memory copy).
+ideep::tensor get_linear_prepacked_weight(
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features);
 
 std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
     const at::Tensor& weight_ih,
@@ -96,6 +105,21 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
 inline ideep::tensor get_mkldnn_tensor_view(const at::Tensor& tensor, const ideep::tensor::desc& desc);
 
 bool is_prepacked(const at::Tensor& weight);
+
+// Prepack linear's weight according to dummy input.
+// weight: weight need to be prepacked
+// dtype: dtype used to query best weight format
+
+at::Tensor linear_weight_prepack(
+    const at::Tensor& weight,
+    c10::optional<at::ScalarType> dtype);
+
+// Unpack Linear's weight according to dummy input
+at::Tensor linear_weight_unpack(
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features,
+    c10::optional<at::ScalarType> dtype);
 
 } // namespace cpu
 }  // namespace torch_ipex

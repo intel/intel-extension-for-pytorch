@@ -36,6 +36,12 @@ def _optimizer_convert(model, optimized_model, optimizer, weight_params_attr):
                             attr['dilation'],
                             attr['groups'],
                             attr['dtype'])
+                    if attr['op'] is torch.nn.Linear:
+                        new_optimizer.state[new_param]['momentum_buffer'] = torch.ops.torch_ipex.linear_weight_prepack(
+                            new_optimizer.state[new_param]['momentum_buffer'],
+                            attr['out_features'],
+                            attr['in_features'],
+                            attr['dtype'])
     return new_optimizer
 
 class _ipex_optimizer(object):
@@ -81,6 +87,13 @@ class _ipex_optimizer(object):
                                 weight_attr['out_channels'],
                                 weight_attr['in_channels'],
                                 weight_attr['weight_channels_last'],
+                                weight_attr['dtype'])
+                        if weight_attr['op'] is torch.nn.Linear:
+                            # change optimizer_temp's momentum_buffer, origin optimizer should not be changed.
+                            v2['momentum_buffer'] = torch.ops.torch_ipex.linear_weight_unpack(
+                                v2['momentum_buffer'],
+                                weight_attr['out_features'],
+                                weight_attr['in_features'],
                                 weight_attr['dtype'])
                 else:
                     # TODO: other optimizer

@@ -35,6 +35,8 @@ class _IPEXConv2d(_IPEXConvNd):
         self.dtype = dtype
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last)
         self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_prepack(
+            # TODO: ".clone()" will make weight shared by multiple module not shared anymore
+            # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
             dense_module.weight.detach().clone(),
             self.padding,
             self.stride,
@@ -66,6 +68,42 @@ class _IPEXConv2d(_IPEXConvNd):
                               missing_keys, unexpected_keys, error_msgs):
         assert False, "_IPEXConv2d does not support _load_from_state_dict method"
 
+class _IPEXLinear(torch.nn.Module):
+    def __init__(self, dense_module, dtype):
+        super(_IPEXLinear, self).__init__()
+        # use out features to restore origin 2D weight
+        self.dtype = dtype
+        self.out_features = dense_module.out_features
+        self.in_features = dense_module.in_features
+        self.weight = torch.nn.Parameter(
+            # TODO:".clone()" will make weight shared by multiple module not shared anymore
+            # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
+            torch.ops.torch_ipex.linear_weight_prepack(dense_module.weight.detach().clone(), self.dtype)
+        )
+        if dense_module.bias is not None:
+            self.bias = torch.nn.Parameter(dense_module.bias.detach().clone())
+        else:
+            self.register_parameter('bias', None)
+
+    def forward(self, x):
+        return torch.ops.torch_ipex.ipex_linear(
+          x, self.weight, self.out_features, self.in_features, self.bias
+        )
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        assert not keep_vars, "can not using keep_vars true when to save _IPEXLinear's parameters"
+        if self.bias is not None:
+            destination[prefix + 'bias'] = self.bias if keep_vars else self.bias.detach()
+        destination[prefix + 'weight'] = torch.ops.torch_ipex.linear_weight_unpack(
+            self.weight.detach().clone(),
+            self.out_features,
+            self.in_features,
+            self.dtype)
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        assert False, "_IPEXLinear does not support _load_from_state_dict method"
+
 def _weight_prepack_with_ipex(module, dtype=None):
     weight_params_attr = {}
     def convert(m, dtype):
@@ -76,6 +114,13 @@ def _weight_prepack_with_ipex(module, dtype=None):
                                                     'kernel_size': new_model.kernel_size, 'groups': new_model.groups, \
                                                     'out_channels': new_model.out_channels, 'in_channels': new_model.in_channels, \
                                                     'weight_channels_last': new_model.weight_channels_last, 'dtype': new_model.dtype}
+            return new_model
+        elif isinstance(m, torch.nn.Linear):
+            new_model = _IPEXLinear(m, dtype)
+            weight_params_attr[new_model.weight] = {'op': torch.nn.Linear, 
+                                                    'out_features': new_model.out_features,
+                                                    'in_features': new_model.in_features,
+                                                    'dtype': new_model.dtype}
             return new_model
         else:
             return m

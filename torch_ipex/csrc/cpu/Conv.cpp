@@ -436,7 +436,7 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   std::array<bool,3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1]= ctx->saved_data["weight_requires_grad"].toBool();
-  output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();;
+  output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
   at::Tensor weight = saved[1];

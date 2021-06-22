@@ -215,5 +215,97 @@ class TestPrepackCases(TestCase):
         model = torchvision.models.resnet.resnext50_32x4d(pretrained=False)
         self._test_imagenet_model(model)
 
+    def test_linear_inference(self):
+        class L(torch.nn.Module):
+            def __init__(self, in_f, out_f):
+                super(L, self).__init__()
+                self.linear = torch.nn.Linear(in_f, out_f)
+            
+            def forward(self, x):
+                return self.linear(x)
+
+        out_features = torch.randint(3, 10, (1,)).item()
+        in_features = torch.randint(3, 10, (1,)).item()
+
+        input_shapes = [(8, in_features), (2, 4, in_features), (2, 2, 2, in_features)]
+        options = itertools.product([True, False], input_shapes)
+        for bias, x_shape in options:
+            x = torch.randn(x_shape, dtype=torch.float32)
+            model = L(in_features, out_features).float().eval()
+            for dtype in [torch.float32, torch.bfloat16]:
+                x1 = x.clone().requires_grad_()
+                x2 = x.clone().requires_grad_()
+                origin_model = copy.deepcopy(model).eval()
+                conf = ipex.AmpConf(dtype)
+                ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
+                self.assertEqual(ipex_model.linear.weight.dtype, dtype)
+                ipex_model = ipex_model.eval()
+                # prepack's weight's dim need great than 2
+                self.assertTrue(ipex_model.linear.weight.dim() > 2)
+                with ipex.amp.autocast(enabled=True, configure=conf):
+                    # original path
+                    y1 = origin_model(x1)
+                    loss1 = y1.sum()
+                    # ipex path
+                    y2 = ipex_model(x2)
+                    loss2 = y2.sum()
+                self.assertEqual(y1, y2)
+                self.assertEqual(loss1, loss2)
+  
+    def test_linear_training(self):
+        linear_module = torch.nn.Linear
+        out_features = torch.randint(3, 10, (1,)).item()
+        in_features = torch.randint(3, 10, (1,)).item()
+
+        input_shapes = [(8, in_features), (2, 4, in_features), (2, 2, 2, in_features)]
+        options = itertools.product([True, False], input_shapes)
+        for bias, x_shape in options:
+            x = torch.randn(x_shape, dtype=torch.float32)
+            model = torch.nn.Linear(in_features, out_features).float().train()
+            for dtype in [torch.float32, torch.bfloat16]:
+                x1 = x.clone().requires_grad_()
+                x2 = x.clone().requires_grad_()
+                origin_model = copy.deepcopy(model).train()
+                origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+                conf = ipex.AmpConf(dtype)
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+                self.assertEqual(ipex_model.weight.storage()[0], origin_model.weight.storage()[0])
+                ipex_model = ipex_model.train()
+                # prepack's weight's dim need great than 2
+                self.assertTrue(ipex_model.weight.dim() > 2)
+                # for training case, weight's dtype always float.
+                self.assertTrue(ipex_model.weight.dtype == torch.float32)
+                with ipex.amp.autocast(enabled=True, configure=conf):
+                    # original path
+                    y1 = origin_model(x1)
+                    loss1 = y1.sum()
+                    origin_optimizer.zero_grad()
+                    loss1.backward()
+                    origin_optimizer.step()
+                    # ipex path
+                    y2 = ipex_model(x2)
+                    loss2 = y2.sum()
+                    ipex_optimizer.zero_grad()
+                    loss2.backward()
+                    ipex_optimizer.step()
+                self.assertEqual(y1, y2)
+                self.assertEqual(loss1, loss2)
+                self.assertEqual(x1.grad, x2.grad)
+                self.assertEqual(ipex_model.weight.grad.storage()[0], origin_model.weight.grad.storage()[0])
+                if bias:
+                    self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad)
+                # compare origin_model parameters with origin_model parameters after grad updata
+                origin_model_state = origin_model.state_dict()
+                ipex_model_state = ipex_model.state_dict()
+                for var_name in origin_model_state:
+                    self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+                # compare momentum_buffer in optimizer's state(sgd)
+                # TODO: other optimizer.
+                origin_oprimizer_state = origin_optimizer.state_dict()
+                ipex_oprimizer_state = ipex_optimizer.state_dict()
+                for var_name in origin_oprimizer_state:
+                    if var_name == 'state':
+                        self.assertEqual(origin_oprimizer_state[var_name], ipex_oprimizer_state[var_name])
+
 if __name__ == '__main__':
     test = unittest.main()

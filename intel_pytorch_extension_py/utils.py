@@ -70,6 +70,8 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1'):
         # for training case, getting fp32 weight format form give dtype for autocast.
         # i.e, reorder fp32 weight to block format(query for bf16 path).
         # for inference, always reorder weight to block format(query for weight's dtype path).
+        # for bf16 training, weight is always fp32 we need to set dtype = torch.bfloat16 to override weight's type
+        # TODO: save master weight in optimizer, the model's weight will bf16, then we can deperate this "weight_format_from_dtype" args.
         weight_format_from_dtype = dtype if model.training else None
         optimized_model, weight_params_attr = _weight_prepack_with_ipex(optimized_model, weight_format_from_dtype)
     if optimizer is not None:
