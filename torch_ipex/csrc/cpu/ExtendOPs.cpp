@@ -392,7 +392,8 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
     __m512i convert_to_s16_buf[vector_nums * 4] __attribute__((aligned(64)));
     std::vector<int8_t*> input_addr(vector_nums);
     for (int64_t i = start; i < end; i++) {
-      int8_t* flat_buf = (int8_t*)(&out_data[i * out_data_line_len] + vector_size);
+      int8_t* out_ptr = &out_data[i * out_data_line_len];
+      int8_t* flat_buf = (int8_t*)(out_ptr + vector_size);
       auto row_len = i * vector_size;
       if (vector_size == 128) {
         int k = 0;
@@ -402,13 +403,13 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
         for (; k < vector_nums; k++) {
           load_s8x128_to_s16x128(&convert_to_s16_buf[k * 4], &input_data[k][row_len]);
         }
-        scale_and_move_ker_128(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale);
+        scale_and_move_ker_128(out_ptr, &input_data[0][i * vector_size], dense_scale);
         _interaction_s8s8_scale_s32s8_128(flat_buf, vector_nums, out_in_scales, convert_to_s16_buf, cat_buf);
       } else {
         for (int k = 0; k < vector_nums; k++) {
           input_addr[k] = &input_data[k][row_len];
         }
-        scale_and_move_ker(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale, vector_size);
+        scale_and_move_ker(out_ptr, &input_data[0][i * vector_size], dense_scale, vector_size);
         _interaction_s8s8_scale_s32s8(flat_buf, input_addr, vector_nums, vector_size, out_in_scales);
       }
     }
