@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/SpectralOpsUtils.h>
-#include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
+#include "comm/Scalar.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
@@ -237,7 +237,7 @@ Tensor _fft_with_size(
   Tensor input;
   if (input_.scalar_type() == ScalarType::BFloat16) {
     input = at::empty(input_.numel(), input_.options().dtype(at::kFloat));
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         input.data_ptr<float>(),
         input_.data_ptr<at::BFloat16>(),
         input_.numel());
@@ -257,7 +257,7 @@ Tensor _fft_with_size(
         normalization,
         onesided,
         batch);
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         output.data_ptr<at::BFloat16>(),
         output_.data_ptr<float>(),
         output.numel());

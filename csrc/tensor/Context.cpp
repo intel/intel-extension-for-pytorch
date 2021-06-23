@@ -1,5 +1,6 @@
 #include "Context.h"
 #include <oneDNN/oneDNN.h>
+#include <operators/comm/Scalar.h>
 
 using namespace xpu::oneDNN;
 
@@ -59,7 +60,7 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
     mem_desc_t plain_md = {ctx.dims(), ctx.dtype(), ctx.get_plain_tag()};
     if (opaque_md == plain_md) {
       Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
-      dpcppMemoryCopyType(to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
+      dtype_convert_by_scalar(to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
       return to;
     }
   }
@@ -80,7 +81,7 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   // 1. convert to plain 2. copy to int64
   if (from.scalar_type() == at::ScalarType::Long) {
     Tensor to_ = at::empty(ctx.dims(), from.options(), c10::nullopt);
-    dpcppMemoryCopyType(to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
+    dtype_convert_by_scalar(to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
     to = to_;
   }
 

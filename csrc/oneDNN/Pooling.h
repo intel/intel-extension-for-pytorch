@@ -6,6 +6,7 @@
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
 #include <tensor/Context.h>
+#include <operators/comm/Scalar.h>
 #include "Utils.h"
 #include "Reorder.h"
 
@@ -292,7 +293,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
 
     if (!lazy_reorder_enabled() ||
         src.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-      dpcppMemoryCopyType(idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
+      dtype_convert_by_scalar(idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
     } else {
       // reorder if materialized
       auto idx_internal_ctx = DPCPPTensorContext::release_tensor_ctx(idx_);
@@ -542,7 +543,7 @@ static at::Tensor pooling_backward(
   at::Tensor idx_usr;
   if (idx_ctx.is_plain()) {
     idx_usr = at::empty({diff_dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
-    dpcppMemoryCopyType(idx_usr.data_ptr<int32_t>(), idx.data_ptr<int64_t>(), idx_usr.numel());
+    dtype_convert_by_scalar(idx_usr.data_ptr<int32_t>(), idx.data_ptr<int64_t>(), idx_usr.numel());
 
     idx_usr_m = dpcpp_onednn_memory(
         {diff_dst_tz, (memory::data_type)expexted_idx_md.data.data_type, format},
