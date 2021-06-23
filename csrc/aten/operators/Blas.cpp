@@ -138,20 +138,17 @@ Tensor& addmm_out(
           0,
           true);
   checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
-  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
-              "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
 
-    impl::gemm_broadcast(
-            result,
-            m1,
-            m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-            // bias convert to fp32 for accuracy when self is fp16
-            attr,
-            // bias convert to fp32 for accuracy when self is fp16
-            self.scalar_type() == ScalarType::Half ? self.to(ScalarType::Float) : self);
+  impl::gemm_broadcast(
+      result,
+      m1,
+      m2.scalar_type() == m1.scalar_type() ? m2 :
+                          (m1.scalar_type() == ScalarType::BFloat16 || m2.scalar_type() == ScalarType::BFloat16) ? m2 :
+                          m2.to(m1.scalar_type()),
+      attr,
+      self);
 
   return result;
 }
@@ -162,28 +159,10 @@ Tensor& addmm_(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      true);
-  checkBackend("addmm_", {self, m1, m2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
               "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
-
-  impl::gemm_broadcast(
-  self,
-  m1,
-  m2.scalar_type() == m1.scalar_type() ? m2 :
-                     (m1.scalar_type() == ScalarType::BFloat16 || m2.scalar_type() == ScalarType::BFloat16) ? m2 :
-                      m2.to(m1.scalar_type()),
-  // bias convert to fp32 for accuracy when self is fp16
-  attr,
-  self.scalar_type() == ScalarType::Half ? self.to(ScalarType::Float) : self);
-
+  at::AtenIpexTypeXPU::addmm_out(self, self, m1, m2, beta, alpha);
   return self;
 }
 
@@ -193,17 +172,6 @@ Tensor addmm(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      true);
-
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-
-  checkBackend("addmm", {input, m1, m2}, Backend::XPU);
-
   Tensor result;
   if (m1.scalar_type() == at::ScalarType::BFloat16){
     // align with bf16 input
@@ -212,16 +180,7 @@ Tensor addmm(
     result = at::empty({0}, input.options());
   }
 
-  impl::gemm_broadcast(
-  result,
-  m1,
-  m2.scalar_type() == m1.scalar_type() ? m2 :
-                     (m1.scalar_type() == ScalarType::BFloat16 || m2.scalar_type() == ScalarType::BFloat16) ? m2 :
-                      m2.to(m1.scalar_type()),
-  // bias convert to fp32 for accuracy when input is fp16
-  attr,
-  input.scalar_type() == ScalarType::Half ? input.to(ScalarType::Float) : input);
-
+  at::AtenIpexTypeXPU::addmm_out(result, input, m1, m2, beta, alpha);
   return result;
 }
 
@@ -460,11 +419,8 @@ Tensor trans_linear(
                          (m1.scalar_type() == ScalarType::BFloat16 ||
                           m2.scalar_type() == ScalarType::BFloat16) ? m2 :
                           m2.to(m1.scalar_type()),
-      // bias convert to fp32 for accuracy when input is fp16 or bf16
       attr,
-      input.scalar_type() == ScalarType::Half ||
-                             input.scalar_type() == ScalarType::BFloat16 ?
-                             input.to(ScalarType::Float) : input);
+      input);
 
   return result;
 }
