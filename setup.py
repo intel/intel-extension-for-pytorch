@@ -324,9 +324,9 @@ class IPEXBuild(build_ext, object):
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
-            '-DIPEX_VERSION=' + TORCH_IPEX_VERSION,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
             '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib",
+            '-DIPEX_VERSION=' + TORCH_IPEX_VERSION,
             #'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
             #'-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
         ]
