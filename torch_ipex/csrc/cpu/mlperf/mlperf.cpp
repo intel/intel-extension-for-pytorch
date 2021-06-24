@@ -10,8 +10,7 @@
 namespace torch_ipex {
     namespace mlperf {
         namespace dlrm {
-            static inline void update_cache(const int ci, const int i,
-                                            const int8_t *p, __m512i (&cache_reg)[27*4]) {
+            static inline void convert_to_s16(const int ci, const int8_t *p, __m512i (&cache_reg)[27*4]) {
               cache_reg[ci * 4 + 0] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)p));
               cache_reg[ci * 4 + 1] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 32)));
               cache_reg[ci * 4 + 2] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 64)));
@@ -23,10 +22,7 @@ namespace torch_ipex {
                                             int (&cache_idx)[27]) {
                 if (cache_idx[ci] != i) {
                     cache_idx[ci] = i;
-                    cache_reg[ci * 4 + 0] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)p));
-                    cache_reg[ci * 4 + 1] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 32)));
-                    cache_reg[ci * 4 + 2] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 64)));
-                    cache_reg[ci * 4 + 3] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 96)));
+		    convert_to_s16(ci, p, cache_reg);
                 }
 	    }
 
@@ -88,6 +84,7 @@ namespace torch_ipex {
 
                 at::parallel_for(0, Batch, 0, [&](int64_t start, int64_t end) {
                   __m512i cat_buf[352] __attribute__((aligned(64)));
+                  cat_buf[351] = _mm512_setzero_si512();
                   __m512i convert_to_s16_buf[27*4] __attribute__((aligned(64)));
                   int cache_idx[27] __attribute__((aligned(64))) = {
                       -1, -1, -1, -1, -1, -1, -1, -1,
@@ -100,11 +97,15 @@ namespace torch_ipex {
                     scale_and_move_ker_128(output0_ptr, input0_ptr, c_scale);
 
                     // dot product of each pair
-                    update_cache(0, i, input0_ptr, convert_to_s16_buf);
-                    for (int j = 1; j < 27; ++j) {
-                      int ii = index[j - 1][offset[j - 1][i]];
-                      update_cache(j, ii, &(weight[j - 1][ii * Dim]), convert_to_s16_buf, cache_idx);
+                    convert_to_s16(0, input0_ptr, convert_to_s16_buf);
+                    int ii = index[0][offset[0][i]];
+                    const int8_t *p = &(weight[0][ii * Dim]);
+                    for (int j = 2; j < 27; ++j) {
+                      update_cache(j - 1, ii, p, convert_to_s16_buf, cache_idx);
+                      ii = index[j - 1][offset[j - 1][i]];
+                      p = &(weight[j - 1][ii * Dim]);
                     }
+                    update_cache(26, ii, p, convert_to_s16_buf, cache_idx);
 
                     auto * a = (const __m512i *)&convert_to_s16_buf[0];
                     auto * b = (const __m512i *)&convert_to_s16_buf[4];
@@ -134,70 +135,8 @@ namespace torch_ipex {
                       reduce_add_s32x16x16_with_scales(output_ptr + off, cat_buf + off, scale_16);
                     }
 
-                    __m512i itv0 = _mm512_unpacklo_epi32(cat_buf[off + 0], cat_buf[off + 1]);
-                    __m512i itv1 = _mm512_unpackhi_epi32(cat_buf[off + 0], cat_buf[off + 1]);
-                    __m512i itv2 = _mm512_unpacklo_epi32(cat_buf[off + 2], cat_buf[off + 3]);
-                    __m512i itv3 = _mm512_unpackhi_epi32(cat_buf[off + 2], cat_buf[off + 3]);
-                    __m512i itv4 = _mm512_unpacklo_epi32(cat_buf[off + 4], cat_buf[off + 5]);
-                    __m512i itv5 = _mm512_unpackhi_epi32(cat_buf[off + 4], cat_buf[off + 5]);
-                    __m512i itv6 = _mm512_unpacklo_epi32(cat_buf[off + 6], cat_buf[off + 7]);
-                    __m512i itv7 = _mm512_unpackhi_epi32(cat_buf[off + 6], cat_buf[off + 7]);
-
-                    itv0 = _mm512_add_epi32(itv0, itv1);
-                    itv2 = _mm512_add_epi32(itv2, itv3);
-                    itv4 = _mm512_add_epi32(itv4, itv5);
-                    itv6 = _mm512_add_epi32(itv6, itv7);
-
-                    itv1 = _mm512_unpacklo_epi64(itv0, itv2);
-                    itv3 = _mm512_unpackhi_epi64(itv0, itv2);
-                    itv5 = _mm512_unpacklo_epi64(itv4, itv6);
-                    itv7 = _mm512_unpackhi_epi64(itv4, itv6);
-
-                    itv1 = _mm512_add_epi32(itv1, itv3);
-                    itv5 = _mm512_add_epi32(itv5, itv7);
-
-                    itv0 = _mm512_shuffle_i32x4(itv1, itv5, 136);
-                    itv2 = _mm512_shuffle_i32x4(itv1, itv5, 221);
-                    itv0 = _mm512_add_epi32(itv0, itv2);
-
-                    __m512i out_15 = _mm512_setzero_si512();
-
-                    __m512i itv8 = _mm512_unpacklo_epi32(cat_buf[off + 8], cat_buf[off + 9]);
-                    __m512i itv9 = _mm512_unpackhi_epi32(cat_buf[off + 8], cat_buf[off + 9]);
-                    __m512i itva = _mm512_unpacklo_epi32(cat_buf[off + 10], cat_buf[off + 11]);
-                    __m512i itvb = _mm512_unpackhi_epi32(cat_buf[off + 10], cat_buf[off + 11]);
-                    __m512i itvc = _mm512_unpacklo_epi32(cat_buf[off + 12], cat_buf[off + 13]);
-                    __m512i itvd = _mm512_unpackhi_epi32(cat_buf[off + 12], cat_buf[off + 13]);
-                    __m512i itve = _mm512_unpacklo_epi32(cat_buf[off + 14], out_15);
-                    __m512i itvf = _mm512_unpackhi_epi32(cat_buf[off + 14], out_15);
-
-                    itv8 = _mm512_add_epi32(itv8, itv9);
-                    itva = _mm512_add_epi32(itva, itvb);
-                    itvc = _mm512_add_epi32(itvc, itvd);
-                    itve = _mm512_add_epi32(itve, itvf);
-
-                    itv9 = _mm512_unpacklo_epi64(itv8, itva);
-                    itvb = _mm512_unpackhi_epi64(itv8, itva);
-                    itvd = _mm512_unpacklo_epi64(itvc, itve);
-                    itvf = _mm512_unpackhi_epi64(itvc, itve);
-
-                    itv9 = _mm512_add_epi32(itv9, itvb);
-                    itvd = _mm512_add_epi32(itvd, itvf);
-
-                    itv8 = _mm512_shuffle_i32x4(itv9, itvd, 136);
-                    itva = _mm512_shuffle_i32x4(itv9, itvd, 221);
-                    itv8 = _mm512_add_epi32(itv8, itva);
-
-                    itv1 = _mm512_shuffle_i32x4(itv0, itv8, 136);
-                    itv2 = _mm512_shuffle_i32x4(itv0, itv8, 221);
-                    __m512i resi32 = _mm512_add_epi32(itv1, itv2);
-
-                    __m512 scale = _mm512_load_ps(&scales[off]);
-                    __m512 resf32 = _mm512_cvtepi32_ps(resi32);
-                    resf32 = _mm512_mul_ps(resf32, scale);
-                    resi32 = _mm512_cvt_roundps_epi32(resf32, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
-                    __m128i resi8 = _mm512_cvtepi32_epi8(resi32);
-                    _mm_mask_storeu_epi8(output_ptr + off, 32767, resi8);
+                    __m512 scale_16 = _mm512_load_ps((const void *)(scales + off));
+                    reduce_add_s32x16x16_with_scales_and_mask_store(output_ptr + off, 0x7fff, cat_buf + off, scale_16);
                   }
 		});
                 return output;
