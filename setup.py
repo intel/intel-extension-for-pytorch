@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 TORCH_VERSION = '1.8.0'
-TORCH_IPEX_VERSION = '1.8.0'
+TORCH_IPEX_VERSION = '1.8.0.1'
 
 # import torch
 import platform
@@ -64,6 +64,7 @@ try:
 except ImportError as e:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch=='+TORCH_VERSION+'+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
     import torch
+    from torch.utils.cpp_extension import include_paths, library_paths
 
 PYTHON_VERSION = sys.version_info
 IS_WINDOWS = (platform.system() == 'Windows')
@@ -107,12 +108,7 @@ import glob
 import inspect
 import multiprocessing
 import multiprocessing.pool
-import os
-import platform
-import re
 import shutil
-import subprocess
-import sys
 import pathlib
 
 
@@ -250,7 +246,6 @@ class IPEXClean(distutils.command.clean.clean, object):
 
   def run(self):
     import glob
-    import re
     with open('.gitignore', 'r') as f:
       ignores = f.read()
       pat = re.compile(r'^#( BEGIN NOT-CLEAN-FILES )?')
