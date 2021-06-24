@@ -119,6 +119,7 @@ at::Tensor linear_weight_unpack(
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
+    const bool original_weight_transposed,
     c10::optional<at::ScalarType> dtype);
 
 } // namespace cpu

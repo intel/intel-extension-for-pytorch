@@ -15,6 +15,8 @@ enum DPCPPSubDev {
   CPU,
 };
 
+bool is_transposed_2d(const at::Tensor& tensor);
+
 enum IPEXFuncStatus {
   IPEX_SUCCESS,
   IPEX_UNIMPLEMENTED,

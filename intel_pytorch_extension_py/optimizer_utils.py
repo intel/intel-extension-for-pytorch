@@ -94,6 +94,7 @@ class _ipex_optimizer(object):
                                 v2['momentum_buffer'],
                                 weight_attr['out_features'],
                                 weight_attr['in_features'],
+                                weight_attr['weight_transposed'],
                                 weight_attr['dtype'])
                 else:
                     # TODO: other optimizer

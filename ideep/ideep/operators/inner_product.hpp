@@ -275,11 +275,9 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     // Here we dose not support to write to given strided buffer since we know the grad is always contiguous
     if (diff_src.is_empty()){
       diff_src.init(pd.diff_src_desc());
-    }
-    else{
+    } else{
       diff_src.init(pd.diff_src_desc(), diff_src.get_data_handle());
     }
-    diff_src.reinit_if_possible(pd.diff_src_desc());
 
     super(pd).execute(stream::default_stream(),
                       {{DNNL_ARG_DIFF_DST, expected_diff_dst},
@@ -359,8 +357,6 @@ private:
     // Here we need to write to given strided buffer, so if given buffer is different with the best format
     // We need to firstly init a new buffer to store the output, and copy the output to a given buffer
     tensor expected_diff_weights = diff_weights.get_desc() == pd.diff_weights_desc() ? diff_weights : tensor(pd.diff_weights_desc());
-
-    diff_weights.reinit_if_possible(pd.diff_weights_desc());
 
     exec_args args {{DNNL_ARG_DIFF_DST, expected_diff_dst},
                     {DNNL_ARG_SRC, expected_src},

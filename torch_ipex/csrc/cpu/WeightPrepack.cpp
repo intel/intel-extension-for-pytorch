@@ -264,8 +264,10 @@ ideep::tensor get_linear_prepacked_weight(
   // get ideep blocked tensor
   ideep::tensor result;
   if (weight.ndimension() == 2) {
-    // weight is not prepacked
+    // weight is public format
     ideep::tensor w = at::native::itensor_view_from_dense(weight);
+    // weight is already best format
+    if (expected_desc == w.get_desc()) return w;
     result.init(expected_desc);
     result.feed_from(w);
   } else  {
@@ -400,8 +402,8 @@ at::Tensor linear_weight_prepack(
     const at::Tensor& weight,
     c10::optional<at::ScalarType> dtype) {
   TORCH_CHECK(weight.ndimension() == 2, "expected unpack weight which dim == 2");
-  auto weight_ = IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous();
-  auto w = at::native::itensor_view_from_dense(weight_);
+  TORCH_CHECK(weight.is_contiguous() || is_transposed_2d(weight), "ipex linear prepack only support contiguous or transposed weight");
+  auto w = at::native::itensor_view_from_dense(weight);
   // get the format with given data type.
   ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : w.get_data_type();
   ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
@@ -412,6 +414,16 @@ at::Tensor linear_weight_prepack(
 
   auto weight_dtype = w.get_data_type();
   expected_desc = expected_desc.to_type(weight_dtype);
+
+  // Case1: expect desc is public format 
+  if (expected_desc.is_plain()){
+    // Case1.1: expected desc is same with weight's format
+    if (expected_desc == w.get_desc()) return weight;
+    // Case2.2: expected desc equals to weight's transpose
+    return weight.t().contiguous().t();
+  }
+
+  // Case2: expected desc is block format
   auto output = at::native::empty_aten_tensor_from_desc(expected_desc, weight.options());
   ideep::tensor y;
   if (ideep::data_type::f32 == weight_dtype) {
@@ -427,10 +439,24 @@ at::Tensor linear_weight_unpack(
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
+    const bool original_weight_transposed,
     c10::optional<at::ScalarType> dtype) {
-  // weight is not prepacked.
+  // packed weight and original weight can only be transposed or contiguous
   if (weight.ndimension() == 2) {
-    return weight;
+    // packed weight is public format
+    if (weight.is_contiguous() != original_weight_transposed ){
+      // packed weight and original_weight have same format include
+      // 1.both packed weight and original_weight is contiguous
+      // 2.both packed weight and original_weight is transposed
+      return weight;
+    } else if (weight.is_contiguous() && original_weight_transposed){
+      // weight is contiguous but original weight is transposed
+      return weight.t().contiguous().t();
+    } else {
+       // weight is transposed but original weight is contiguous
+      TORCH_CHECK(!weight.is_contiguous() && !original_weight_transposed);
+      return weight.contiguous();
+    }
   }
   auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
   // get the format give data type.
@@ -459,6 +485,7 @@ at::Tensor linear_weight_unpack(
                                  ideep::data_type::f32)
       : blocked_weight.to_public(result.template data_ptr<c10::BFloat16>(),
                                 ideep::data_type::bf16);
+  if (original_weight_transposed) result = result.t().contiguous().t();
   return result;
 }
 
@@ -471,7 +498,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def("conv2d_weight_prepack(Tensor weight, int[] padding, int[] stride, int[] dilation, int groups, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::conv2d_weight_prepack);
   m.def("conv2d_weight_unpack(Tensor weight, int[] padding, int[] stride, int[] dilation, int[] kernel_size, int groups, int output_channel, int input_channel, bool is_channels_last, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::conv2d_weight_unpack);
   m.def("linear_weight_prepack(Tensor weight, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_prepack);
-  m.def("linear_weight_unpack(Tensor weight, int out_features, int in_features, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_unpack);
+  m.def("linear_weight_unpack(Tensor weight, int out_features, int in_features, bool transposed, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_unpack);
 }
 
 }

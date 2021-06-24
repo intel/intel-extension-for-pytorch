@@ -60,4 +60,12 @@ const char* LayoutName(const at::Layout layout) {
   }
 }
 
+bool is_transposed_2d(const at::Tensor& tensor){
+  return (
+    tensor.ndimension() == 2 &&
+    tensor.stride(0) == 1 &&
+    tensor.stride(1) == tensor.size(0)
+  );
+}
+
 }  // namespace torch_ipex

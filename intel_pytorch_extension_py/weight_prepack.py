@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import _torch_ipex as core
+import warnings
 
 class _IPEXConvNd(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
@@ -71,10 +72,14 @@ class _IPEXConv2d(_IPEXConvNd):
 class _IPEXLinear(torch.nn.Module):
     def __init__(self, dense_module, dtype):
         super(_IPEXLinear, self).__init__()
-        # use out features to restore origin 2D weight
+        # use in_features, out features and weight_transposed to restore origin 2D weight
         self.dtype = dtype
         self.out_features = dense_module.out_features
         self.in_features = dense_module.in_features
+        self.weight_transposed = (
+          dense_module.weight.stride()[0] == 1 and
+          dense_module.weight.stride()[1] == dense_module.weight.size()[0]
+        )
         self.weight = torch.nn.Parameter(
             # TODO:".clone()" will make weight shared by multiple module not shared anymore
             # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
@@ -98,6 +103,7 @@ class _IPEXLinear(torch.nn.Module):
             self.weight.detach().clone(),
             self.out_features,
             self.in_features,
+            self.weight_transposed,
             self.dtype)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
@@ -116,12 +122,17 @@ def _weight_prepack_with_ipex(module, dtype=None):
                                                     'weight_channels_last': new_model.weight_channels_last, 'dtype': new_model.dtype}
             return new_model
         elif isinstance(m, torch.nn.Linear):
-            new_model = _IPEXLinear(m, dtype)
-            weight_params_attr[new_model.weight] = {'op': torch.nn.Linear, 
-                                                    'out_features': new_model.out_features,
-                                                    'in_features': new_model.in_features,
-                                                    'dtype': new_model.dtype}
-            return new_model
+            try: 
+                new_model = _IPEXLinear(m, dtype)
+                weight_params_attr[new_model.weight] = {'op': torch.nn.Linear, 
+                                                        'out_features': new_model.out_features,
+                                                        'in_features': new_model.in_features,
+                                                        'weight_transposed': new_model.weight_transposed,
+                                                        'dtype': new_model.dtype}
+                return new_model
+            except:
+                warnings.warn(m.__str__()  + " not be packed because weight is not transposed or contiguous")
+                return m
         else:
             return m
 

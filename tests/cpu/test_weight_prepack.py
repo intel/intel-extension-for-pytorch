@@ -200,7 +200,7 @@ class TestPrepackCases(TestCase):
                     loss2.backward()
                     ipex_optimizer2.step()
             self.assertEqual(y, y1)
-            self.assertEqual(y1, y2)
+            self.assertEqual(y1, y2, rtol=1e-5, atol=1e-3)
             self.assertEqual(loss, loss1)
             self.assertEqual(loss1, loss2)
 
@@ -240,8 +240,6 @@ class TestPrepackCases(TestCase):
                 ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
                 self.assertEqual(ipex_model.linear.weight.dtype, dtype)
                 ipex_model = ipex_model.eval()
-                # prepack's weight's dim need great than 2
-                self.assertTrue(ipex_model.linear.weight.dim() > 2)
                 with ipex.amp.autocast(enabled=True, configure=conf):
                     # original path
                     y1 = origin_model(x1)
@@ -254,12 +252,14 @@ class TestPrepackCases(TestCase):
   
     def test_linear_training(self):
         linear_module = torch.nn.Linear
-        out_features = torch.randint(3, 10, (1,)).item()
-        in_features = torch.randint(3, 10, (1,)).item()
-
-        input_shapes = [(8, in_features), (2, 4, in_features), (2, 2, 2, in_features)]
-        options = itertools.product([True, False], input_shapes)
-        for bias, x_shape in options:
+        out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]
+        in_feature = [128, 479, torch.randint(3, 10, (1, )).item()]
+        input_shapes=[]
+        for s in in_feature:
+            input_shapes += [(128, s), (2, 64, s), (2, 2, 32, s)]
+        options = itertools.product(out_feature, [True, False], input_shapes)
+        for out_features, bias, x_shape in options:
+            in_features = x_shape[-1]
             x = torch.randn(x_shape, dtype=torch.float32)
             model = torch.nn.Linear(in_features, out_features).float().train()
             for dtype in [torch.float32, torch.bfloat16]:
@@ -271,27 +271,26 @@ class TestPrepackCases(TestCase):
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                 self.assertEqual(ipex_model.weight.storage()[0], origin_model.weight.storage()[0])
                 ipex_model = ipex_model.train()
-                # prepack's weight's dim need great than 2
-                self.assertTrue(ipex_model.weight.dim() > 2)
                 # for training case, weight's dtype always float.
                 self.assertTrue(ipex_model.weight.dtype == torch.float32)
-                with ipex.amp.autocast(enabled=True, configure=conf):
-                    # original path
-                    y1 = origin_model(x1)
-                    loss1 = y1.sum()
-                    origin_optimizer.zero_grad()
-                    loss1.backward()
-                    origin_optimizer.step()
-                    # ipex path
-                    y2 = ipex_model(x2)
-                    loss2 = y2.sum()
-                    ipex_optimizer.zero_grad()
-                    loss2.backward()
-                    ipex_optimizer.step()
+                for i in range(2):
+                    with ipex.amp.autocast(enabled=True, configure=conf):
+                        # original path
+                        y1 = origin_model(x1)
+                        loss1 = y1.sum()
+                        origin_optimizer.zero_grad()
+                        loss1.backward()
+                        origin_optimizer.step()
+                        # ipex path
+                        y2 = ipex_model(x2)
+                        loss2 = y2.sum()
+                        ipex_optimizer.zero_grad()
+                        loss2.backward()
+                        ipex_optimizer.step()
                 self.assertEqual(y1, y2)
                 self.assertEqual(loss1, loss2)
-                self.assertEqual(x1.grad, x2.grad)
-                self.assertEqual(ipex_model.weight.grad.storage()[0], origin_model.weight.grad.storage()[0])
+                self.assertEqual(x1.grad, x2.grad, rtol=1e-5, atol=1e-3)
+                self.assertEqual(ipex_model.weight.grad.storage()[0], origin_model.weight.grad.storage()[0], rtol=1e-5, atol=1e-3)
                 if bias:
                     self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad)
                 # compare origin_model parameters with origin_model parameters after grad updata
@@ -305,7 +304,7 @@ class TestPrepackCases(TestCase):
                 ipex_oprimizer_state = ipex_optimizer.state_dict()
                 for var_name in origin_oprimizer_state:
                     if var_name == 'state':
-                        self.assertEqual(origin_oprimizer_state[var_name], ipex_oprimizer_state[var_name])
+                        self.assertEqual(origin_oprimizer_state[var_name], ipex_oprimizer_state[var_name], rtol=1e-5, atol=1e-3)
 
 if __name__ == '__main__':
     test = unittest.main()
