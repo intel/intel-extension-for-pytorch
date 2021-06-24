@@ -11,7 +11,7 @@ SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn EXCLUDE_FROM_ALL)
 find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -141,6 +141,7 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
+include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 include_directories(${TORCHCCL_INCLUDE_DIR})
@@ -201,3 +202,8 @@ target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
+
+#set_property(TARGET ${PLUGIN_NAME} PROPERTY VERSION "${IPEX_VERSION}")
+#set_property(TARGET ${PLUGIN_NAME} PROPERTY SOVERSION "${IPEX_VERSION}")
+install(TARGETS ${PLUGIN_NAME}
+	PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

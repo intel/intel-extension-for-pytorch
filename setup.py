@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 TORCH_VERSION = '1.8.0'
-TORCH_IPEX_VERSION = '1.8.0.1'
+TORCH_IPEX_VERSION = '1.8.0'
 
 # import torch
 import platform
@@ -64,7 +64,6 @@ try:
 except ImportError as e:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch=='+TORCH_VERSION+'+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
     import torch
-    from torch.utils.cpp_extension import include_paths, library_paths
 
 PYTHON_VERSION = sys.version_info
 IS_WINDOWS = (platform.system() == 'Windows')
@@ -108,7 +107,12 @@ import glob
 import inspect
 import multiprocessing
 import multiprocessing.pool
+import os
+import platform
+import re
 import shutil
+import subprocess
+import sys
 import pathlib
 
 
@@ -239,13 +243,14 @@ class IPEXExt(Extension, object):
   def __init__(self, name, project_dir=os.path.dirname(__file__)):
     Extension.__init__(self, name, sources=[])
     self.project_dir = os.path.abspath(project_dir)
-    self.build_dir = os.path.join(project_dir, 'build')
+    #self.build_dir = os.path.join(project_dir, 'build_' + self.name)
 
 
 class IPEXClean(distutils.command.clean.clean, object):
 
   def run(self):
     import glob
+    import re
     with open('.gitignore', 'r') as f:
       ignores = f.read()
       pat = re.compile(r'^#( BEGIN NOT-CLEAN-FILES )?')
@@ -296,8 +301,9 @@ class IPEXBuild(build_ext, object):
     if not isinstance(ext, IPEXExt):
       return super(IPEXBuild, self).build_extension(ext)
     ext_dir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-    if not os.path.exists(ext.build_dir):
-      os.mkdir(ext.build_dir)
+    build_dir = os.path.join(ext_dir, '..', 'build_' + ext.name)
+    if not os.path.exists(build_dir):
+      os.mkdir(build_dir)
 
     build_type = 'Release'
     use_ninja = False
@@ -306,20 +312,23 @@ class IPEXBuild(build_ext, object):
       build_type = 'Debug'
 
     # install _torch_ipex.so as python module
-    if ext.name == 'torch_ipex' and _check_env_flag("USE_SYCL"):
-      ext_dir = ext_dir + '/torch_ipex'
+    if ext.name == 'torch_ipex':
+      ext_dir = os.path.join(ext_dir, ext.name)
+    if not os.path.exists(ext_dir):
+      os.mkdir(ext_dir)
 
     cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + build_type,
-            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
-            '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
-            '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
-            '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
             '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
+            '-DPYTHON_EXECUTABLE=' + sys.executable,
+            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
+            '-DIPEX_VERSION=' + TORCH_IPEX_VERSION,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
             '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib",
+            #'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
+            #'-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
         ]
 
     if _check_env_flag("IPEX_DISP_OP"):
@@ -343,16 +352,18 @@ class IPEXBuild(build_ext, object):
     env = os.environ.copy()
     if _check_env_flag("USE_SYCL"):
       os.environ['CXX'] = 'compute++'
-      check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
+      check_call([self.cmake, ext.project_dir] + cmake_args, cwd=build_dir, env=env)
     else:
-      check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
+      check_call([self.cmake, ext.project_dir] + cmake_args, cwd=build_dir, env=env)
 
     # build_args += ['VERBOSE=1']
     if use_ninja:
-      check_call(['ninja'] + build_args, cwd=ext.build_dir, env=env)
+      print('use_ninja')
+      check_call(['ninja'] + build_args, cwd=build_dir, env=env)
     else:
-      check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
-    check_call(['make', 'install'] + build_args, cwd=ext.build_dir, env=env)
+      print('make')
+      check_call(['make'] + build_args, cwd=build_dir, env=env)
+    check_call(['make', 'install'] + build_args, cwd=build_dir, env=env)
 
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
 version = get_build_version(ipex_git_sha)
@@ -382,9 +393,11 @@ def get_c_module():
     main_sources = ["torch_ipex/csrc/_C.cpp"]
     cwd = os.path.dirname(os.path.abspath(__file__))
     # lib_path = os.path.join(cwd, "torch_ipex", "lib")
-    lib_path = os.path.join(cwd, "build")
-    lib_path_1 = os.path.join(cwd, "build", "lib.linux-x86_64-3.8")
-    library_dirs = [lib_path, lib_path_1]
+    #lib_path = os.path.join(cwd, "build")
+    lib_path = os.path.join(cwd, "build", "build_torch_ipex")
+    library_dirs = [lib_path]
+    #lib_path_1 = os.path.join(cwd, "build", "lib.linux-x86_64-3.8")
+    #library_dirs = [lib_path, lib_path_1]
     extra_link_args = []
     extra_compile_args = [
         '-Wall',
@@ -406,9 +419,6 @@ def get_c_module():
         '-Wno-missing-braces',
     ]
 
-    def make_relative_rpath(path):
-            return '-Wl,-rpath,$ORIGIN/' + path
-
     C_ext = Extension("torch_ipex._C",
                   libraries=main_libraries,
                   sources=main_sources,
@@ -416,8 +426,8 @@ def get_c_module():
                   extra_compile_args=main_compile_args + extra_compile_args,
                   include_dirs=include_paths(),
                   library_dirs=library_dirs,
-                  # extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
-                  extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('..')])
+                  extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+                  # extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('..')])
     return C_ext
 
 setup(
@@ -437,16 +447,16 @@ setup(
       'intel_pytorch_extension.ops',
       'intel_pytorch_extension.optim'],
     package_dir={'intel_pytorch_extension': 'torch_ipex'},
-    package_data={
-        'torch_ipex':[
-            'README.md',
-            'requirements.txt',
-            '*.py',
-            'lib/*.so',
-            'include/*.h',
-            'include/core/*.h',
-            'include/utils/*.h']
-        },
+    #package_data={
+    #    'torch_ipex':[
+    #        'README.md',
+    #        'requirements.txt',
+    #        '*.py',
+    #        'lib/*.so',
+    #        'include/*.h',
+    #        'include/core/*.h',
+    #        'include/utils/*.h']
+    #    },
     zip_safe=False,
     ext_modules=[IPEXExt('torch_ipex'), get_c_module()],
     cmdclass={
