@@ -192,7 +192,7 @@ struct DPCPPTensorContext {
         tag_ctx->data(),
         tag_ctx,
         getDeviceAllocator()->raw_deleter(),
-        t.device().type());
+        t.device());
 
     // release raw data to avoid auto-free after data_ptr dtor
     DPCPPTensorContext* cur_ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
