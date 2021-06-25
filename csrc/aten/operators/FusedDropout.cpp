@@ -27,9 +27,13 @@ void bernoulliDistr(scalar_t* rand,
     float p) {
   auto &sycl_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
   std::initializer_list<std::uint64_t> seed = { seeds.first, 0, seeds.second };
+#ifdef USE_ONEMKL
   oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
   oneapi::mkl::rng::bernoulli<scalar_t> distr(p); 
   oneapi::mkl::rng::generate(distr, engine, numel, rand);
+#else
+  AT_ERROR("lu: oneMKL library not found in compilation");
+#endif
 }
 
 template <typename...>
