@@ -50,7 +50,8 @@ public:
       at::IntArrayRef kernel_size,
       int64_t groups,
       int64_t output_channel,
-      bool weight_channels_last);
+      bool weight_channels_last,
+      bool weight_prepacked);
 
  static at::Tensor forward(
     torch::autograd::AutogradContext *ctx,
@@ -63,7 +64,8 @@ public:
     at::IntArrayRef kernel_size,
     int64_t groups,
     int64_t output_channel,
-    bool weight_channels_last);
+    bool weight_channels_last,
+    bool weight_prepacked);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext *ctx,

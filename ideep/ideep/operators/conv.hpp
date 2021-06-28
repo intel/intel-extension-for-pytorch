@@ -518,10 +518,20 @@ private:
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
     auto expected_weights = weights.make_grouped_weights(param.groups)
                                 .reorder_if_differ_in(pd.weights_desc());
-    dst.reinit_if_possible(pd.dst_desc());
 
-    if (!param.dst_scales.empty() && dst.get_data_type() != data_type::f32) {
-      dst.set_scale(param.dst_scales);
+    auto expected_dst_desc = pd.dst_desc();
+    tensor expected_dst;
+    // dst not init in FW or has same desc with expected desc.
+    if (dst.is_empty() || dst.get_desc() == expected_dst_desc) {
+      dst.reinit_if_possible(expected_dst_desc);
+      // For int8 case, dst is empty or dst.get_desc() == expected_dst_desc, because
+      // dst always acdb.
+      if (!param.dst_scales.empty() && dst.get_data_type() != data_type::f32) {
+        dst.set_scale(param.dst_scales);
+      }
+      expected_dst = dst;
+    } else {
+      expected_dst.init(expected_dst_desc);
     }
 
     if (with_bias) {
@@ -531,14 +541,19 @@ private:
                         {{DNNL_ARG_SRC, expected_src},
                          {DNNL_ARG_WEIGHTS, expected_weights},
                          {DNNL_ARG_BIAS, expected_bias},
-                         {DNNL_ARG_DST, dst},
+                         {DNNL_ARG_DST, expected_dst},
                          {DNNL_ARG_SCRATCHPAD, scratchpad}});
     } else {
       super(pd).execute(stream::default_stream(), 
                         {{DNNL_ARG_SRC, expected_src},
                          {DNNL_ARG_WEIGHTS, expected_weights},
-                         {DNNL_ARG_DST, dst},
+                         {DNNL_ARG_DST, expected_dst},
                          {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    }
+
+    // dst has been init in FW side, but has diff desc with expected_dst.
+    if (dst.get_desc() != expected_dst_desc) {
+      dst.feed_from(expected_dst);
     }
   }
 };
@@ -584,12 +599,26 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
 
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
     auto expected_weights = weights_.reorder_if_differ_in(pd.weights_desc());
-    diff_src.reinit_if_possible(pd.diff_src_desc());
+
+    auto expected_diff_src_desc = pd.diff_src_desc();
+    tensor expected_diff_src;
+    // diff_src not init in FW or has same desc with expected desc.
+    if (diff_src.is_empty() || diff_src.get_desc() == expected_diff_src_desc) {
+      diff_src.reinit_if_possible(expected_diff_src_desc);
+      expected_diff_src = diff_src;
+    } else {
+      expected_diff_src.init(expected_diff_src_desc);
+    }
 
     super(pd).execute(stream::default_stream(), 
                       {{DNNL_ARG_DIFF_DST, expected_diff_dst},
                        {DNNL_ARG_WEIGHTS, expected_weights},
-                       {DNNL_ARG_DIFF_SRC, diff_src}});
+                       {DNNL_ARG_DIFF_SRC, expected_diff_src}});
+
+    // diff_src has been init in FW side, but has diff desc with expected_diff_src.
+    if (diff_src.get_desc() != expected_diff_src_desc) {
+      diff_src.feed_from(expected_diff_src);
+    }
   }
 };
 
@@ -696,7 +725,7 @@ struct convolution_backward_weights
     auto expected_diff_weights_desc =
         tensor::desc(pd.diff_weights_desc(), groups);
     tensor expected_diff_weights;
-    // diff_weights not init in FW or has expected desc.
+    // diff_weights not init in FW or has same desc with expected desc.
     if (diff_weights.is_empty() || diff_weights.get_desc() == expected_diff_weights_desc) {
       diff_weights.reinit_if_possible(expected_diff_weights_desc);
       expected_diff_weights = diff_weights;

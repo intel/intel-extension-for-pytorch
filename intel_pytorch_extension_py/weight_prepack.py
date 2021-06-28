@@ -28,13 +28,15 @@ class _IPEXConvNd(nn.Module):
             self.kernel_size,
             self.groups,
             self.out_channels,
-            self.weight_channels_last)
+            self.weight_channels_last,
+            self.weight_prepacked)
 
 class _IPEXConv2d(_IPEXConvNd):
     def __init__(self, dense_module, dtype):
         super(_IPEXConv2d, self).__init__(dense_module)
         self.dtype = dtype
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last)
+        self.weight_prepacked = True
         self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_prepack(
             # TODO: ".clone()" will make weight shared by multiple module not shared anymore
             # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
@@ -122,9 +124,9 @@ def _weight_prepack_with_ipex(module, dtype=None):
                                                     'weight_channels_last': new_model.weight_channels_last, 'dtype': new_model.dtype}
             return new_model
         elif isinstance(m, torch.nn.Linear):
-            try: 
+            try:
                 new_model = _IPEXLinear(m, dtype)
-                weight_params_attr[new_model.weight] = {'op': torch.nn.Linear, 
+                weight_params_attr[new_model.weight] = {'op': torch.nn.Linear,
                                                         'out_features': new_model.out_features,
                                                         'in_features': new_model.in_features,
                                                         'weight_transposed': new_model.weight_transposed,

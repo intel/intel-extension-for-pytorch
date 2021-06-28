@@ -48,8 +48,6 @@ class TestPrepackCases(TestCase):
                 conf = ipex.AmpConf(dtype)
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                 ipex_model = ipex_model.train()
-                # prepack's weight's dim need great than dim+2
-                self.assertTrue(ipex_model.weight.dim() > dim +2)
                 # for training case, weight's dtype always float.
                 self.assertTrue(ipex_model.weight.dtype == torch.float32)
                 with ipex.amp.autocast(enabled=True, configure=conf):
@@ -66,7 +64,6 @@ class TestPrepackCases(TestCase):
                     loss2.backward()
                     ipex_optimizer.step()
                 self.assertEqual(y1, y2)
-                self.assertEqual(loss1, loss2)
                 self.assertEqual(x1.grad, x2.grad)
                 if bias:
                     self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad)
@@ -77,15 +74,55 @@ class TestPrepackCases(TestCase):
                     self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
                 # compare momentum_buffer in optimizer's state(sgd)
                 # TODO: other optimizer.
-                origin_oprimizer_state = origin_optimizer.state_dict()
-                ipex_oprimizer_state = ipex_optimizer.state_dict()
-                for var_name in origin_oprimizer_state:
+                origin_optimizer_state = origin_optimizer.state_dict()
+                ipex_optimizer_state = ipex_optimizer.state_dict()
+                for var_name in origin_optimizer_state:
                     if var_name == 'state':
-                        self.assertEqual(origin_oprimizer_state[var_name], ipex_oprimizer_state[var_name])
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name])
 
     def test_conv2d(self):
         self._test_convolution_training_base(dim = 2)
         # TODO: add inference case.
+
+    def test_conv2d_nc11(self):
+        # related issue: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/pull/86.
+        model = torch.nn.Conv2d(256, 324, kernel_size=(1, 1), stride=(1, 1), padding=(1, 1), bias=False)
+        model = model.to(memory_format=torch.channels_last).train()
+        x = torch.randn(32, 256, 1, 1).to(memory_format=torch.channels_last)
+        for dtype in [torch.bfloat16]:
+            conf = ipex.AmpConf(dtype)
+            x1 = x.clone().requires_grad_()
+            x2 = x.clone().requires_grad_()
+            origin_model = copy.deepcopy(model).train()
+            origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+            with ipex.amp.autocast(enabled=True, configure=conf):
+                # train one step for origin.
+                y1 = origin_model(x1)
+                loss1 = y1.sum()
+                origin_optimizer.zero_grad()
+                loss1.backward()
+                origin_optimizer.step()
+                # train one step for ipex.
+                y2 = ipex_model(x2)
+                loss2 = y2.sum()
+                ipex_optimizer.zero_grad()
+                loss2.backward()
+                ipex_optimizer.step()
+            self.assertEqual(y1, y2)
+            self.assertEqual(x1.grad, x2.grad)
+            # compare origin_model parameters with origin_model parameters after grad updata
+            origin_model_state = origin_model.state_dict()
+            ipex_model_state = ipex_model.state_dict()
+            for var_name in origin_model_state:
+                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+            # compare momentum_buffer in optimizer's state(sgd)
+            # TODO: other optimizer.
+            origin_optimizer_state = origin_optimizer.state_dict()
+            ipex_optimizer_state = ipex_optimizer.state_dict()
+            for var_name in origin_optimizer_state:
+                if var_name == 'state':
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name])
 
     def test_model_serialization(self):
         model = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
@@ -220,7 +257,7 @@ class TestPrepackCases(TestCase):
             def __init__(self, in_f, out_f):
                 super(L, self).__init__()
                 self.linear = torch.nn.Linear(in_f, out_f)
-            
+
             def forward(self, x):
                 return self.linear(x)
 
@@ -249,7 +286,7 @@ class TestPrepackCases(TestCase):
                     loss2 = y2.sum()
                 self.assertEqual(y1, y2)
                 self.assertEqual(loss1, loss2)
-  
+
     def test_linear_training(self):
         linear_module = torch.nn.Linear
         out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]
@@ -300,11 +337,11 @@ class TestPrepackCases(TestCase):
                     self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
                 # compare momentum_buffer in optimizer's state(sgd)
                 # TODO: other optimizer.
-                origin_oprimizer_state = origin_optimizer.state_dict()
-                ipex_oprimizer_state = ipex_optimizer.state_dict()
-                for var_name in origin_oprimizer_state:
+                origin_optimizer_state = origin_optimizer.state_dict()
+                ipex_optimizer_state = ipex_optimizer.state_dict()
+                for var_name in origin_optimizer_state:
                     if var_name == 'state':
-                        self.assertEqual(origin_oprimizer_state[var_name], ipex_oprimizer_state[var_name], rtol=1e-5, atol=1e-3)
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name], rtol=1e-5, atol=1e-3)
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -40,8 +40,9 @@ ideep::tensor get_conv_prepacked_weight(
     at::IntArrayRef kernel_size,
     int64_t groups,
     int64_t output_channel,
-     int64_t input_channel,
-    bool is_channels_last);
+    int64_t input_channel,
+    bool is_channels_last,
+    bool weight_prepacked);
 
 // Prepack convolution's weight according to dummy input.
 // weight: weight need to be prepacked

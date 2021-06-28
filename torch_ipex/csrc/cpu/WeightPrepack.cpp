@@ -80,8 +80,8 @@ ideep::tensor get_conv_prepacked_weight(
     int64_t groups,
     int64_t output_channel,
     int64_t input_channel,
-    bool is_channels_last
-    ) {
+    bool is_channels_last,
+    bool weight_prepacked) {
   std::vector<int64_t> origin_weight_dims;
   origin_weight_dims.push_back(output_channel);
   origin_weight_dims.push_back(input_channel / groups);
@@ -113,7 +113,7 @@ ideep::tensor get_conv_prepacked_weight(
         ideep::algorithm::convolution_direct);
   }
   ideep::tensor result;
-  if (weight.ndimension() == origin_weight_dims.size()) {
+  if (!weight_prepacked) {
     // weight is not preack
     ideep::tensor w = at::native::itensor_view_from_dense(weight);
     result.init(packed_desc);
@@ -138,7 +138,6 @@ at::Tensor conv2d_weight_prepack(
   auto weight_ = IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(weight.suggest_memory_format());
   bool is_channels_last = weight_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
   auto w = at::native::itensor_view_from_dense(weight_);
-
   // get the format give data type.
   ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : w.get_data_type();
   ideep::tensor::desc expected_desc;
@@ -196,11 +195,6 @@ at::Tensor conv2d_weight_unpack(
   for (auto&s:kernel_size) {
     origin_weight_dims.push_back(s);
   }
-  // weight is not prepacked.
-  if (weight.ndimension() == origin_weight_dims.size()) {
-    return weight;
-  }
-
   auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
   // get the format give data type.
   ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : weight_dtype;
@@ -236,17 +230,13 @@ at::Tensor conv2d_weight_unpack(
     blocked_weight.init(expected_desc, weight.template data_ptr<c10::BFloat16>());
   }
 
-  // result is nchw. 
+  // init output.
   at::Tensor result = at::empty(origin_weight_dims, weight.options());
-  auto pub_tensor =
-      ideep::data_type::f32 == weight_dtype
-      ? blocked_weight.to_public(result.template data_ptr<float>(),
-                                 ideep::data_type::f32)
-      : blocked_weight.to_public(result.template data_ptr<c10::BFloat16>(),
-                                ideep::data_type::bf16);
   if (is_channels_last) {
     result = result.to(at::MemoryFormat::ChannelsLast);
   }
+  auto y = at::native::itensor_view_from_dense(result);
+  y.feed_from(blocked_weight);
   return result;
 }
 
