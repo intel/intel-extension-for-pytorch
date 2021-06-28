@@ -8,6 +8,7 @@
 #include <tensor/Context.h>
 #include "Utils.h"
 #include "Reorder.h"
+#include <operators/comm/Scalar.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
 
@@ -101,29 +102,29 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   if (useScaleShift) {
     auto wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
     if (wgh.scalar_type() == ScalarType::Half) {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<at::Half>(),
           ih);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>() + ih,
           bia.data_ptr<at::Half>(),
           ih);
     } else if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<at::BFloat16>(),
           ih);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>() + ih,
           bia.data_ptr<at::BFloat16>(),
           ih);
     } else {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<float>(),
           ih);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>() + ih,
           bia.data_ptr<float>(),
           ih);
@@ -264,12 +265,12 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   if (useScaleShift) {
     auto wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
     if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<at::BFloat16>(),
           ih);
     } else {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<float>(),
           ih);
@@ -302,20 +303,20 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   Tensor diff_bia = at::empty_like(wgh);
   if (useScaleShift) {
     if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_wgh.data_ptr<at::BFloat16>(),
           diff_wgh_bia.data_ptr<float>(),
           ih);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_bia.data_ptr<at::BFloat16>(),
           diff_wgh_bia.data_ptr<float>() + ih,
           ih);
     } else {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_wgh.data_ptr<float>(),
           diff_wgh_bia.data_ptr<float>(),
           ih);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_bia.data_ptr<float>(),
           diff_wgh_bia.data_ptr<float>() + ih,
           ih);

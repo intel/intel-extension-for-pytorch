@@ -1,9 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/native/SpectralOpsUtils.h>
-#include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
 #include "comm/ATDispatch.h"
+#include <runtime/DPCPPUtils.h>
 #include "comm/Numerics.h"
+#include "comm/Scalar.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
@@ -30,14 +31,13 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(
     int64_t numel) {
   TensorInfo<scalar_t, int64_t> output_info =
       getTensorInfo<scalar_t, int64_t>(output);
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   int64_t last_dim_to_fill_size =
       size_last_dim - start_last_dim_idx; // (last - 1) dim to be filled size
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_acc = get_buffer<dpcpp_rw_mode>(cgh, output_info.data);
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> id) {
-      auto out_ptr = get_pointer<scalar_t>(out_acc);
+      auto out_ptr = output_info.data;
       size_t idx = id.get_id(0);
 
       // work item index => write index
@@ -115,7 +115,7 @@ void _mkl_dft(
     int64_t normalization,
     bool onesided,
     int64_t batch) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   std::vector<int64_t> mkl_signal_sizes(
       checked_signal_sizes.begin(), checked_signal_sizes.end());
   oneapi::mkl::dft::descriptor<prec, signal_type> desc(mkl_signal_sizes);
@@ -237,7 +237,7 @@ Tensor _fft_with_size(
   Tensor input;
   if (input_.scalar_type() == ScalarType::BFloat16) {
     input = at::empty(input_.numel(), input_.options().dtype(at::kFloat));
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         input.data_ptr<float>(),
         input_.data_ptr<at::BFloat16>(),
         input_.numel());
@@ -257,7 +257,7 @@ Tensor _fft_with_size(
         normalization,
         onesided,
         batch);
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         output.data_ptr<at::BFloat16>(),
         output_.data_ptr<float>(),
         output.numel());

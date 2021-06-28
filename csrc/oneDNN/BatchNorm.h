@@ -8,6 +8,7 @@
 #include <quantized/Quantizer.h>
 #include <tensor/Context.h>
 #include <operators/comm/Math.h>
+#include <operators/comm/Scalar.h>
 #include "Utils.h"
 #include "Reorder.h"
 
@@ -141,29 +142,29 @@ batch_normalization(
       bn_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
 
   if (wgh.scalar_type() == ScalarType::Half) {
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         wgh_bia.data_ptr<float>(),
         wgh.data_ptr<at::Half>(),
         feature_num);
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         wgh_bia.data_ptr<float>() + feature_num,
         bia.data_ptr<at::Half>(),
         feature_num);
   } else if (wgh.scalar_type() == ScalarType::BFloat16) {
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         wgh_bia.data_ptr<float>(),
         wgh.data_ptr<at::BFloat16>(),
         feature_num);
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         wgh_bia.data_ptr<float>() + feature_num,
         bia.data_ptr<at::BFloat16>(),
         feature_num);
   } else {
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         wgh_bia.data_ptr<float>(),
         wgh.data_ptr<float>(),
         feature_num);
-    dpcppMemoryCopyType(
+    dtype_convert_by_scalar(
         wgh_bia.data_ptr<float>() + feature_num,
         bia.data_ptr<float>(),
         feature_num);
@@ -348,12 +349,12 @@ batch_normalization_backward(
     auto wgh_bia_m = dpcpp_onednn_memory(
         bn_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
     if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<at::BFloat16>(),
           feature_num);
     } else {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           wgh_bia.data_ptr<float>(),
           wgh.data_ptr<float>(),
           feature_num);
@@ -374,20 +375,20 @@ batch_normalization_backward(
 
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
     if (wgh.scalar_type() == ScalarType::BFloat16) {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_wgh.data_ptr<at::BFloat16>(),
           diff_wgh_bia.data_ptr<float>(),
           feature_num);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_bia.data_ptr<at::BFloat16>(),
           diff_wgh_bia.data_ptr<float>() + feature_num,
           feature_num);
     } else {
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_wgh.data_ptr<float>(),
           diff_wgh_bia.data_ptr<float>(),
           feature_num);
-      dpcppMemoryCopyType(
+      dtype_convert_by_scalar(
           diff_bia.data_ptr<float>(),
           diff_wgh_bia.data_ptr<float>() + feature_num,
           feature_num);
