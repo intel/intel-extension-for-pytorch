@@ -23,6 +23,36 @@ sudo usermod -a -G render $USER
 logout
 ```
 
+## IPEX code organization
+
+```
+IPEX code org
+    ├── cmake                 // cmake files for build process and dependencies
+    ├── csrc                  // IPEX native source code
+    │   ├── aten              // XPU aten implementations
+    │   │   ├── core          // [External] aten integration layer
+    │   │   │   └── detail    // Mutable implementations
+    │   │   ├── operators     // aten operator implementations
+    │   │   │   └── comm      // [Header only] Common code for operators
+    │   │   └── quantized     // Quantization utilities
+    │   ├── intrinsic         // IPEX intrinsic
+    │   ├── jit               // JIT passes and patterns
+    │   ├── oneDNN            // [Header only] oneDNN integration layer
+    │   ├── runtime           // DPCPP runtime intergation & utilities
+    │   ├── tensor            // IPEX tensor details
+    │   └── utils             // [External] IPEX utilities
+    ├── scripts               // Build scripts
+    ├── tests                 // IPEX test suites
+    │   └── gpu               // IPEX gpu test suites
+    │       ├── examples      // IPEX gpu examples and unit tests
+    │       └── pytorch       // Test suites ported from PyTorch proper
+    ├── torch_ipex            // IPEX Python layer
+    │   └── csrc              // IPEX native implementation for Python
+    │       ├── gpu           // IPEX gpu Python API implementation
+    │       └── itt           // ITT support
+    └── torch_patches         // Remaining patches for PyTorch proper
+```
+
 ## **Compiler Version and Setting**
 
 
