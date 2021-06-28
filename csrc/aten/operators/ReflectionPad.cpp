@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include "comm/Atomics.h"
@@ -50,7 +50,7 @@ void reflection_pad1d_out_kernel(
     int64_t nbatch,
     int64_t nplane,
     int64_t output_w) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int work_group_size = output_w > 256 ? 256 : output_w;
   int work_group_num = CeilDiv(output_w, (int64_t)256);
 
@@ -161,7 +161,7 @@ void reflection_pad1d_backward_out_kernel(
     int64_t nbatch,
     int64_t nplane,
     int64_t output_w) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int work_group_size = output_w > 256 ? 256 : output_w;
   int work_group_num = CeilDiv(output_w, (int64_t)256);
 

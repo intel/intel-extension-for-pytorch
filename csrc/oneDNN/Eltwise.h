@@ -2,7 +2,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <oneDNN/Utils.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 
 DPCPP_DEF_K1(data_type_convert);
 

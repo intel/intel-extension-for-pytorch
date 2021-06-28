@@ -6,6 +6,7 @@
 #include "comm/ApplyUtils.h"
 #include <core/Generator.h>
 #include <utils/DPCPP.h>
+#include <runtime/Utils.h>
 
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
@@ -92,7 +93,7 @@ static void RReLU_updateOutput(
     }
     if (inplace)
     {
-      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto total_threads = input_.numel();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
@@ -127,7 +128,7 @@ static void RReLU_updateOutput(
     {
       output.resize_as_(input_);
 
-      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto total_threads = input_.numel();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
@@ -229,7 +230,7 @@ void inline prelu_kernel_share_weights(
   Tensor& result,
   const Tensor& input,
   const Tensor& weight) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = input.numel();
   auto weight_val = weight.data_ptr<scalar_t>()[0];
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -260,7 +261,7 @@ void inline prelu_kernel_multi_weights(
   int64_t input_stride0,
   int64_t input_stride1) {
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = input.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -295,7 +296,7 @@ void inline prelu_backward_kernel_share_weights(
   Tensor& input_grad,
   Tensor& weight_grad_collector) {
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = input_grad.numel();
   auto weight_val = weight.data_ptr<scalar_t>()[0];
 
@@ -335,7 +336,7 @@ void inline prelu_backward_kernel_multi_weights(
   int64_t input_stride0,
   int64_t input_stride1) {
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = input.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -369,7 +370,7 @@ class gelu_dpcpp_kernel{};
 
 template <typename scalar_t>
 void GeluKernelImpl(const Tensor& X, Tensor& Y){
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = X.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -399,7 +400,7 @@ void GeluBackwardKernelImpl(
   const Tensor& X,
   Tensor& dX){
   auto kAlpha = M_2_SQRTPI * M_SQRT1_2 * scalar_t(0.5);
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = X.numel();
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto dY_data = dY.data_ptr<scalar_t>();

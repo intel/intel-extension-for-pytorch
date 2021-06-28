@@ -1,6 +1,6 @@
 #include <core/Device.h>
 #include <core/Stream.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <runtime/Exception.h>
 #include <utils/Env.h>
 

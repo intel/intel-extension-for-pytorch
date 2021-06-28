@@ -2,10 +2,11 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
+#include <runtime/Utils.h>
+#include <oneDNN/oneDNN.h>
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
-#include <oneDNN/oneDNN.h>
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
@@ -26,7 +27,7 @@ namespace impl {
 
 template <typename scalar_t>
 void copy_triangle_symmetric_template(Tensor& self, bool upper) {
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto &dpcpp_queue = dpcppGetCurrentQueue();
   auto row_stride = self.stride(0);
   auto column_stride = self.stride(1);
   auto n = self.size(0);
@@ -84,7 +85,7 @@ Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper) {
     dnnl::primitive_attr attr;
     assert(attr.get_scratchpad_mode() == dnnl::scratchpad_mode::library);
     attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto &dpcpp_queue = dpcppGetCurrentQueue();
     auto upper_lower = upper ? (oneapi::mkl::uplo::upper) : (oneapi::mkl::uplo::lower);
     std::int64_t scratchpadsize = oneapi::mkl::lapack::potri_scratchpad_size<scalar_t>(dpcpp_queue, upper_lower, n, lda);
     Tensor scratchpad_at = at::empty({scratchpadsize}, out.options());
@@ -121,7 +122,7 @@ Tensor& ger_out(Tensor & out, const Tensor & self, const Tensor & vec2) {
   TORCH_CHECK(out.is_contiguous(), "the out is not contiguous");
 
   IPEX_DISPATCH_FLOATING_TYPES(out.scalar_type(), "ger_out", [&] {
-    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto &dpcpp_queue = dpcppGetCurrentQueue();
     auto x = (scalar_t *)self.data_ptr();
     auto y = (scalar_t *)vec2.data_ptr();
     auto a = (scalar_t *)out.data_ptr();
@@ -180,7 +181,7 @@ Tensor dot(const Tensor& self, const Tensor& other){
   Tensor result = at::empty({}, self.options());
   // torch.dot supports all types and complex datatype, but oneapi::mkl::blas only supports float/double
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "dot", [&] {
-    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto &dpcpp_queue = dpcppGetCurrentQueue();
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
         oneapi::mkl::blas::dot,

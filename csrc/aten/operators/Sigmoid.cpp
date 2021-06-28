@@ -2,7 +2,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include "comm/Numerics.h"
 #include "comm/Pointwise.h"

@@ -2,7 +2,7 @@
 #include <utils/Profiler.h>
 #include <runtime/Context.h>
 #include <runtime/Exception.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <tensor/Context.h>
 
 
@@ -566,7 +566,7 @@ void CachingDeviceAllocator::resetPeakStats(DeviceId di) {
 std::vector<SegmentInfo> CachingDeviceAllocator::snapshot() const {
   std::lock_guard<std::recursive_mutex> lock(mutex);
 
-  std::vector<xpu::dpcpp::SegmentInfo> result;
+  std::vector<SegmentInfo> result;
   const auto all_blocks = get_all_blocks();
 
   for (const Block* const head_block : all_blocks) {

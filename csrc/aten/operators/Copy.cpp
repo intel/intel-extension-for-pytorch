@@ -6,6 +6,7 @@
 #include <ATen/quantized/QTensorImpl.h>
 
 #include <runtime/Exception.h>
+#include <runtime/Utils.h>
 #include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
@@ -254,7 +255,7 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     dpcppMemcpy(dst, src, nbytes, kind);
     // FIXME: Without queue wait, resource exhaustion occurs due to never release kernel events.
     // Need to confirm with compiler team the root cause here.
-    auto& queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto& queue = dpcppGetCurrentQueue();
     queue.wait();
   }
 }

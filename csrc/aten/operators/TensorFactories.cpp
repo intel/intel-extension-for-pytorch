@@ -7,7 +7,7 @@
 #include <ATen/quantized/Quantizer.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-
+#include <runtime/Utils.h>
 #include <core/Allocator.h>
 #include <core/TensorImplUtils.h>
 #include <core/Generator.h>
@@ -108,7 +108,7 @@ Tensor randperm_dpcpp(
     int64_t n,
     c10::optional<Generator> generator) {
 #ifdef USE_ONEDPL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
 
   auto keys = at::empty(result.sizes(), result.options()).random_(generator);
@@ -221,7 +221,7 @@ void triu_indices_dpcpp_kernel(
     int64_t col,
     int64_t rectangle_size,
     int64_t triu_size) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = triu_size;
   auto num_groups = CeilDiv(totalElements, group_size);
@@ -269,7 +269,7 @@ void tril_indices_dpcpp_kernel(
     int64_t col,
     int64_t trapezoid_size,
     int64_t tril_size) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = tril_size;
   auto num_groups = CeilDiv(totalElements, group_size);

@@ -7,7 +7,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
 
 #include "comm/Atomics.h"

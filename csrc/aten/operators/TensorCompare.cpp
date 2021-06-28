@@ -2,7 +2,7 @@
 #include "comm/AccumulateType.h"
 
 #include "comm/ApplyUtils.h"
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 
 #include "comm/ATDispatch.h"

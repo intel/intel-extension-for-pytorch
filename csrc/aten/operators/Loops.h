@@ -7,7 +7,7 @@
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include "MemoryAccess.h"
 
@@ -233,7 +233,7 @@ static inline void launch_unrolled_kernel(int64_t N, const func_t& f, array_t da
   using ret_t = typename traits::result_type;
 
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int thread_num = (N + THREAD_WORK_SIZE - 1)/THREAD_WORK_SIZE;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
@@ -276,7 +276,7 @@ template<typename func_t, typename array_t>
 static inline void launch_vectorized_kernel(int64_t N, const func_t& f, array_t data) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int vec_size = at::native::Memory::can_vectorize_up_to<func_t>(data);
   int thread_num = (N + vec_size - 1)/vec_size;
 
@@ -453,7 +453,7 @@ void dpcpp_small_index_kernel_impl(
     const func_t f) {
   auto numel = iter.numel();
   auto indices_size = iter.tensor(2).size(-1);
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t max_group_num = dpcppMaxDSSNum(dpcpp_queue);
 
   // process the tail
@@ -576,7 +576,7 @@ void dpcpp_index_kernel_impl(
     strides[i] = index_stride[i];
   }
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = (char*)iter.data_ptr(0);
@@ -655,7 +655,7 @@ void dpcpp_index_kernel(
     }
   }
   if (small_index) {
-    auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto& dpcpp_queue = dpcppGetCurrentQueue();
     int64_t max_group_num = dpcppMaxDSSNum(dpcpp_queue);
     auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
     auto indices_size = iter.tensor(2).size(-1);

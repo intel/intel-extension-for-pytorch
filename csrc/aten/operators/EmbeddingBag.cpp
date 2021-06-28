@@ -2,7 +2,7 @@
 #include <torch/torch.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/TensorImplUtils.h>
 #include <core/Memory.h>
 
@@ -46,7 +46,7 @@ void krn_partials_per_segment(
     const int64_t* segment_offsets,
     int64_t num_of_segments,
     int64_t numel) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = 32;
   auto num_groups = CeilDiv(num_of_segments, group_size);
   auto total_items = num_groups * group_size;
@@ -82,7 +82,7 @@ void krn_partial_segment_offset(
     const int64_t* partials_per_segment_offset,
     const int64_t* segment_offsets,
     int64_t num_of_segments) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = 32;
   auto num_groups = CeilDiv(num_of_segments, group_size);
   auto total_items = num_groups * group_size;
@@ -132,7 +132,7 @@ void compute_grad_weight_bags(
     const Tensor& segment_offsets,
     int64_t num_of_segments,
     const Tensor& grad_weight_per_segment) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
   int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
@@ -224,7 +224,7 @@ void compute_grad_weight(
     const Tensor& segment_offsets,
     int64_t num_of_segments,
     const Tensor& grad_weight_per_segment) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
   int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
@@ -293,7 +293,7 @@ void sum_and_scatter(
     const Tensor& segment_sizes_offsets,
     int64_t num_of_partial_segments,
     const int64_t padding_idx) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
   int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
@@ -364,7 +364,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 #ifndef USE_ONEDPL
   throw std::runtime_error("no oneDPL found when compile. USM embedding not supported");
 #else
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
   const int64_t numel = sorted_indices.numel();
   auto grad_weight = at::zeros({num_weights, grad.size(-1)}, grad.options());
@@ -510,7 +510,7 @@ void EmbeddingBag_updateOutputKernel(
   // the strategy here is that each bag x feature is handled by a single thread
 
   using accscalar_t = acc_type<scalar_t>;
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   auto workersPerChunk = [featureSize] () -> int64_t {
     int64_t _workersPerChunk = 64;
     if (featureSize < 64 && featureSize >= 32) {
@@ -661,7 +661,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   auto sorted_indices = at::empty_like(indices);
   auto orig_indices = at::empty_like(indices);
 
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
   // directly
   {
@@ -729,7 +729,7 @@ void EmbeddingBag_accGradParametersKernel_max(
     scalar_t* gradWeight,
     int64_t stride,
     int64_t numBags) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t chunksPerBag = CeilDiv(stride, (int64_t)64);
   int64_t numChunks = numBags * chunksPerBag;
   int64_t kernel_range = 1024 * 64;

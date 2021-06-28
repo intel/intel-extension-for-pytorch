@@ -7,7 +7,7 @@
 
 #include "comm/ApplyUtils.h"
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
@@ -624,7 +624,7 @@ void MultiMarginCriterion_updateOutput(
 
   bool has_weights = weights.defined() ? true : false;
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<dpcpp_dev_max_wgroup_size>();
@@ -764,7 +764,7 @@ void MultiMarginCriterion_updateGradInput(
       ? static_cast<scalar_t>(1. / (nframe * dim))
       : static_cast<scalar_t>(1. / dim);
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<dpcpp_dev_max_wgroup_size>();
@@ -875,7 +875,7 @@ void MultilabelMarginCriterion_updateOutput(
     output.resize_({nframe});
   }
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<dpcpp_dev_max_wgroup_size>();
@@ -1047,7 +1047,7 @@ void MultilabelMarginCriterion_updateGradInput(
   scalar_t g = static_cast<scalar_t>(
       reduction == Reduction::Mean ? 1. / (nframe * dim) : 1. / dim);
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<dpcpp_dev_max_wgroup_size>();

@@ -129,7 +129,7 @@ inline void bitonicSortKVInPlace(
     IndexType valueSliceStride,
     Comparator comp) {
   // Find the slice of the tensor that we are sorting
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t local_size = Power2SortSize / 2;
   int64_t global_size = keySlices * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {

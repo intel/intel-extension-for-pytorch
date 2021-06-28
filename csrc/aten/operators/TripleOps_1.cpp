@@ -4,6 +4,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
 
@@ -139,7 +140,7 @@ static inline void packed_add_kernel(
   static const auto read_mode = DPCPP::access::mode::read;
   static const auto write_mode = DPCPP::access::mode::write;
   static const auto read_write_mode = DPCPP::access::mode::read_write;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
       auto MSB_data = w_MSB;
@@ -202,7 +203,7 @@ static inline void fusion_amdd_kernel(
 
   static const auto read_mode = DPCPP::access::mode::read;
   static const auto read_write_mode = DPCPP::access::mode::read_write;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto w = p;

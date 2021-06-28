@@ -1,5 +1,5 @@
 #include <ATen/core/op_registration/op_registration.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
 
 #include "comm/ParamUtils.h"

@@ -2,6 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
+#include <runtime/Utils.h>
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
@@ -25,7 +26,7 @@ Tensor mv(const Tensor & self, const Tensor & vec) {
   auto lda = n;
 
   Tensor out = at::empty({m}, vec.options());
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "mv", [&] {
     DPCPP_ONEMKL_SUBMIT(

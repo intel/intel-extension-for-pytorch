@@ -2,6 +2,7 @@
 
 #include <ATen/TensorUtils.h>
 
+#include <runtime/Utils.h>
 #include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -242,7 +243,7 @@ void kernelPointwiseApply1(
     detail::TensorInfo<scalar, IndexType> a,
     IndexType totalElements,
     const Op op) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
@@ -445,7 +446,7 @@ void kernelPointwiseApply2(
     detail::TensorInfo<scalar2, IndexType> input,
     IndexType totalElements,
     const Op op) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
@@ -658,7 +659,7 @@ void kernelPointwiseApply3(
     detail::TensorInfo<scalar3, IndexType> input2,
     IndexType totalElements,
     const Op op) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
@@ -930,7 +931,7 @@ void kernelPointwiseApply4(
     detail::TensorInfo<scalar4, IndexType> input3,
     IndexType totalElements,
     const Op op) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 

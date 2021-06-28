@@ -3,7 +3,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/RNN.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
 
 

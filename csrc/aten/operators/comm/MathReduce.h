@@ -3,7 +3,7 @@
 #include <ATen/ATen.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 
@@ -72,7 +72,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     at::Tensor& src,
     std::pair<K, Index> init,
     BinaryFunction binary_op) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = src.numel();
   auto num_groups = CeilDiv(totalElements, group_size);
@@ -141,7 +141,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
     int64_t rdim,
     std::pair<K, Index> init,
     BinaryFunction binary_op) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = src.numel();
   auto num_groups = CeilDiv(totalElements, group_size);

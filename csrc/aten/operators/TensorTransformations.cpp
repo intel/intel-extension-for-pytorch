@@ -6,7 +6,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/Helpers.h"
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 
 #include <cstddef>
@@ -52,7 +52,7 @@ void flip_dpcpp_kernel(
     strides_t[i] = strides_v[i];
 
   const int64_t N = in_tensor.numel();
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(N, tileSize, rng, GRange);
 
@@ -134,7 +134,7 @@ void roll_dpcpp_kernel(
     int64_t total_dims) {
   static const auto write_mode = DPCPP::access::mode::discard_write;
   static const auto read_mode = DPCPP::access::mode::read;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   auto offset = ((size - start) * stride);
   parallel_for_setup(N, tileSize, rng, GRange);

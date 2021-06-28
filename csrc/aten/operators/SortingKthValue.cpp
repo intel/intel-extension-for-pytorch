@@ -3,7 +3,7 @@
 #include <c10/macros/Macros.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -42,7 +42,7 @@ void gatherKthValue(
   // Indices are limited to integer fp precision, so counts can fit in
   // int32, regardless of index_t
 
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t local_size =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
@@ -248,7 +248,7 @@ std::tuple<Tensor &,Tensor &> mode_out_template(
     bool keepdim) {
 
   auto self_ = self.contiguous();
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = values.size(0);
 
   // vertical

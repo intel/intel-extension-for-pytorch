@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 #include <ATen/NativeFunctions.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include "comm/NumericLimits.h"
 #include "comm/Atomics.h"
@@ -30,7 +30,7 @@ void max_unpooling2d_forward_kernel(
     const int64_t outputHeight,
     const int64_t outputWidth,
     scalar_t* output) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   int64_t num_groups = CeilDiv(numInputElements, group_size);
   int64_t total_items = num_groups * group_size;
@@ -78,7 +78,7 @@ void max_unpooling3d_forward_kernel(
     const int64_t oH,
     const int64_t oW,
     const int64_t offsetZ) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t totalZ = batchSize * inputSlices * iT;
   int64_t num_groups_0 = CeilDiv(iW, (int64_t)32);
   int64_t num_groups_1 = CeilDiv(iH, (int64_t)8);
@@ -130,7 +130,7 @@ void max_unpooling2d_backward_kernel(
     const int64_t outputHeight,
     const int64_t outputWidth,
     scalar_t* output) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   int64_t num_groups = CeilDiv(numInputElements, group_size);
   int64_t total_items = num_groups * group_size;
@@ -178,7 +178,7 @@ void max_unpooling3d_backward_kernel(
     int64_t* indices,
     scalar_t* gradInput,
     int offsetZ) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t totalZ = batchSize * inputSlices * iT;
   int64_t num_groups_0 = CeilDiv(iW, (int64_t)32);
   int64_t num_groups_1 = CeilDiv(iH, (int64_t)8);

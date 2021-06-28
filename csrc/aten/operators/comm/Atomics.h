@@ -1,7 +1,7 @@
 #pragma once
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include "Numerics.h"
 #include "Scalar.h"
 

@@ -1,12 +1,12 @@
-#include "comm/ApplyUtils.h"
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
 
+#include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
-
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -106,7 +106,7 @@ void THDPCPPTensor_gatherKernel(
     TensorInfo<int64_t, IndexType> index,
     const int dim,
     const IndexType totalElements) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto tensor_data = tensor.data;
@@ -160,7 +160,7 @@ void THSyclTensor_scatterKernel(
     TensorInfo<int64_t, IndexType> index,
     const int dim,
     const IndexType totalElements) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
@@ -216,7 +216,7 @@ void THSyclTensor_scatterAddKernel(
     TensorInfo<int64_t, IndexType> index,
     const int dim,
     const IndexType totalElements) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
@@ -272,7 +272,7 @@ void THSyclTensor_scatterFillKernel(
     Real value,
     const int dim,
     const IndexType totalElements) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;

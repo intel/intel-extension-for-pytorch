@@ -4,6 +4,7 @@
 #include <ATen/CPUApplyUtils.h>
 #include <core/TensorImplUtils.h>
 
+#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
 #include <vector>
 
@@ -104,7 +105,7 @@ void gemm_broadcast(Tensor& result,
           mb, "m1 mb", _m1.size(0), " m2 mb: ", _m2.size(0));
     }
 
-    auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto& dpcpp_queue = dpcppGetCurrentQueue();
     DPCPP_ONEMKL_SUBMIT(
       dpcpp_queue,
       oneapi::mkl::blas::row_major::gemm_batch, dpcpp_queue, oneapi::mkl::transpose::N, oneapi::mkl::transpose::N, m, n, k, attr.alpha_, (double *)_m1.data_ptr(), m, stridea, (double *)_m2.data_ptr(), k, strideb, attr.beta_, (double *)_result.data_ptr(), m, stridec, mb);

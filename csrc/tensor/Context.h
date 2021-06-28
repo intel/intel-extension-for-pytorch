@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/Allocator.h>
 #include <oneapi/dnnl/dnnl.hpp>

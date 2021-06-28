@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 
@@ -62,7 +62,7 @@ void sample_multinomial_with_replacement(
   at::Tensor& result,
   at::Tensor& norm_dist_prefix_sum,
   at::Tensor& norm_dist) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   size_t work_group_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   // Each work item in a work group will generate a sample from one
@@ -123,7 +123,7 @@ void sample_multinomial_without_replacement(
   at::Tensor& result,
   at::Tensor& norm_dist_prefix_sum,
   at::Tensor& norm_dist) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   size_t work_group_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   // Each work item in a work group will generate a sample from one

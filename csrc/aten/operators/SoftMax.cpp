@@ -1,14 +1,16 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
+
 #include <intrinsic/ipex_intrinsic.h>
-#include "comm/AccumulateType.h"
-#include "comm/ATDispatch.h"
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
-#include "comm/Numerics.h"
-#include "comm/SimpelReduce.h"
+#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
 
+#include "comm/AccumulateType.h"
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
+#include "comm/SimpelReduce.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp::detail;
@@ -89,7 +91,7 @@ void SpatialSoftMaxForward(
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   local_size = std::min(local_size, dim_size);
   size_t global_size = outer_size * local_size;
@@ -166,7 +168,7 @@ void SpatialSoftMaxBackward(
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   local_size = std::min(local_size, dim_size);
   size_t global_size = outer_size * local_size;

@@ -2,7 +2,7 @@
 #include <ATen/native/Distance.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include "comm/Numerics.h"
@@ -179,7 +179,7 @@ static void pdist_kernel_impl(
     const double n2,
     const double n2_squared_minus_1) {
   const auto ngroups = result.numel();
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
 
   // TODO: this is not optimized if the m is smaller than 256. The work item is
@@ -244,7 +244,7 @@ static void pdist_backward_kernel_impl(
     const scalar_t p,
     const double n2,
     const double n2_squared_minus_1) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
 
   // TODO: this is not optimized if the m is smaller than 256. The work item is

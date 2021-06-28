@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"
@@ -48,7 +48,7 @@ Tensor& log_normal_(Tensor& self, double mean_, double std_, c10::optional<Gener
       auto std = static_cast<scalar_t>(std_);
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(1.0);
-      auto &dpcpp_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
       oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
       oneapi::mkl::rng::lognormal<scalar_t, oneapi::mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
       DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::rng::generate, distribution, engine, self.numel(), (scalar_t *)(self.data_ptr()));

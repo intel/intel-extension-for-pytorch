@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include "comm/AccumulateType.h"
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/TensorImplUtils.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"
@@ -39,7 +39,7 @@ static inline void embedding_backward_dpcpp_kernel(
   static const auto write_mode = DPCPP::access::mode::write;
   static const auto rw_mode = DPCPP::access::mode::discard_read_write;
   static const auto gbuffer_target = DPCPP::access::target::global_buffer;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   if (scale_grad_by_freq) {
     auto row_num_weights = numel_weights / stride;
     DPCPP::buffer<uint32_t, 1> idx_cnt(DPCPP::range<1>{(size_t)row_num_weights});

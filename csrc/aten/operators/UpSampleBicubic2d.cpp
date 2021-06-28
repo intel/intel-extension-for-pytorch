@@ -29,7 +29,7 @@ static void upsample_bicubic2d_out_frame(
     int64_t onum,
     bool align_corners) {
 
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
   parallel_for_setup(onum, tile_size, rng, grng);
 
@@ -120,7 +120,7 @@ static void upsample_bicubic2d_backward_out_frame(
     int64_t channels,
     int64_t onum,
     bool align_corners) {
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
   parallel_for_setup(onum, tile_size, rng, grng);
 

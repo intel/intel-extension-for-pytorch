@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
@@ -93,7 +93,7 @@ void ctc_loss_log_alpha_kernel(
   int64_t __la_input_stride = log_alpha.stride(1);
   int64_t __la_target_stride = log_alpha.stride(2);
 
-  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
@@ -317,7 +317,7 @@ void ctc_loss_backward_log_beta_kernel(
   int64_t __lb_input_stride = log_beta.stride(1);
   int64_t __lb_target_stride = log_beta.stride(2);
 
-  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
@@ -536,7 +536,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
   int64_t lb_input_stride = log_beta.stride(1);
   int64_t lb_target_stride = log_beta.stride(2);
 
-  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, max_target_length, batch_size);
@@ -663,7 +663,7 @@ void ctc_loss_backward_collect_kernel(
   int64_t lb_input_stride = log_beta.stride(1);
   int64_t lb_target_stride = log_beta.stride(2);
 
-  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, log_probs.size(0), batch_size);
@@ -779,7 +779,7 @@ void ctc_loss_zero_padded_gradients(
     int64_t max_input_length, /* T */
     int64_t batch_size, /* B */
     int64_t num_labels /* D */) {
-  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
 
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =

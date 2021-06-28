@@ -2,7 +2,7 @@
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/detail/TensorInfo.h>
 #include "comm/ATDispatch.h"
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include "comm/Numerics.h"
 #include "comm/Scalar.h"
 

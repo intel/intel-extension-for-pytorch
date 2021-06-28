@@ -5,7 +5,7 @@
 
 #include "comm/ApplyUtils.h"
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include "comm/ATDispatch.h"

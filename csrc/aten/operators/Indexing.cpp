@@ -2,13 +2,14 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include "comm/ApplyUtils.h"
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/Helpers.h"
 #include "comm/MathReduce.h"
@@ -96,7 +97,7 @@ void indexSelect(
 
   auto slice_size = dst_num_elem / num_slices;
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
@@ -231,7 +232,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
 #if defined(USE_ONEDPL)
-    auto dpcpp_queue = dpcppGetCurrentQueue();
+    auto& dpcpp_queue = dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     auto tensor_begin = tensor.data_ptr<long>();
     auto self_begin = self.data_ptr<scalar_t>();
@@ -370,7 +371,7 @@ void indexAdd(
   int src_add_dim = src_info.collapseDims(dim);
   src_info.reduceDim(src_add_dim);
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
@@ -473,7 +474,7 @@ void indexFill(
   int dst_fill_dim = dst_info.collapseDims(dim);
   dst_info.reduceDim(dst_fill_dim);
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
@@ -574,7 +575,7 @@ void indexCopy(
   int dst_fill_dim = dst_info.collapseDims(dim);
   dst_info.reduceDim(dst_fill_dim);
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
@@ -647,7 +648,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
       static const auto write_mode = DPCPP::access::mode::discard_write;
       static const auto read_mode = DPCPP::access::mode::read;
-      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_data = src.data_ptr<scalar_t>();
@@ -677,7 +678,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
       static const auto write_mode = DPCPP::access::mode::discard_write;
       static const auto read_mode = DPCPP::access::mode::read;
-      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_data = src.data_ptr<scalar_t>();
@@ -762,7 +763,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
       maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(size, tileSize, rng, GRange);
 
@@ -859,7 +860,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
-  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(size, tileSize, rng, GRange);
 
@@ -959,7 +960,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
       getTensorInfo<scalar_t, uint64_t>(source);
   source_info.collapseDims();
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = self.data_ptr<scalar_t>();
@@ -1092,7 +1093,7 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
     return;
   }
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<scalar_t>();
     auto dst_data = dst.data_ptr<scalar_t>();

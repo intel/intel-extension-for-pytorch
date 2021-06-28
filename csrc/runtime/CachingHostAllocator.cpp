@@ -58,7 +58,7 @@ void CachingHostAllocator::processEvents() {
 
 bool CachingHostAllocator::isHostPtr(void* ptr) {
   return DPCPP::usm::alloc::host ==
-    DPCPP::get_pointer_type(ptr, xpu::dpcpp::getDeviceContext());
+    DPCPP::get_pointer_type(ptr, getDeviceContext());
 }
 
 void CachingHostAllocator::emptyCache() {
@@ -68,7 +68,7 @@ void CachingHostAllocator::emptyCache() {
   for (auto& blk : mAvailable) {
     auto it = mBlocks.find(blk.getPtr());
     AT_ASSERT(it != mBlocks.end() && !it->second.isAllocated());
-    DPCPP::free(blk.getPtr(), xpu::dpcpp::getDeviceContext());
+    DPCPP::free(blk.getPtr(), getDeviceContext());
     mBlocks.erase(it);
   }
 
@@ -107,7 +107,7 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     return DPCPP_SUCCESS;
   }
 
-  *ptr = DPCPP::malloc_host(size, xpu::dpcpp::getDeviceContext());
+  *ptr = DPCPP::malloc_host(size, getDeviceContext());
   mBlocks.insert({*ptr, {size, *ptr, true}});
   return DPCPP_SUCCESS;
 }

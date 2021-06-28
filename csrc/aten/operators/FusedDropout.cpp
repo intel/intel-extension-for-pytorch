@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 
 #include <core/Generator.h>
+#include <runtime/Utils.h>
 #include "comm/ApplyUtils.h"
 #include "comm/ATDispatch.h"
 #include "Distributions.h"
@@ -25,7 +26,7 @@ void bernoulliDistr(scalar_t* rand,
     std::pair<uint64_t, uint64_t> seeds,
     int64_t numel,
     float p) {
-  auto &sycl_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
   std::initializer_list<std::uint64_t> seed = { seeds.first, 0, seeds.second };
 #ifdef USE_ONEMKL
   oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
@@ -47,7 +48,7 @@ void fused_dropout_kernel(const Tensor& self,
     accscalar_t p,
     std::pair<uint64_t, uint64_t> seeds) {
   
-  auto &sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto &sycl_queue = dpcppGetCurrentQueue();
   auto self_info = getTensorInfo<scalar_t, uint64_t>(self);
   self_info.collapseDims();
   
@@ -104,7 +105,7 @@ template <typename...>
 class masked_scale_ker {};
 template<typename scalar_t, typename accscalar_t>
 void masked_scale_kernel(at::Tensor& ret, const Tensor & self, const Tensor mask, accscalar_t scale){
-  auto sycl_queue = dpcppGetCurrentQueue();
+  auto& sycl_queue = dpcppGetCurrentQueue();
   auto self_info = getTensorInfo<scalar_t, uint64_t>(self);
   auto mask_info = getTensorInfo<uint8_t, uint64_t>(mask);
   self_info.collapseDims();

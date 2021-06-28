@@ -3,7 +3,7 @@
 #include <ATen/Config.h>
 
 #include <runtime/Context.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Device.h>
 #include <core/Memory.h>
 #include <utils/Profiler.h>

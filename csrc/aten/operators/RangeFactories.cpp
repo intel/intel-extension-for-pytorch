@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include "comm/Algorithm.h"
@@ -74,7 +74,7 @@ Tensor& linspace_dpcpp_out(
       scalar_t step =
           (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
       LinspaceOp<scalar_t> linspace_method(scalar_start, step);
-      auto dpcpp_queue = dpcppGetCurrentQueue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto r_data =
             r.data_ptr<scalar_t>();
@@ -125,7 +125,7 @@ Tensor& logspace_dpcpp_out(
       scalar_t step =
           (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
       LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
-      auto dpcpp_queue = dpcppGetCurrentQueue();
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto r_data =
             r.data_ptr<scalar_t>();
@@ -177,7 +177,7 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
         }
         Tensor r = result.is_contiguous() ? result : result.contiguous();
         LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
-        auto dpcpp_queue = dpcppGetCurrentQueue();
+        auto& dpcpp_queue = dpcppGetCurrentQueue();
 
         // command group functions
         auto cgf = DPCPP_Q_CGF(cgh) {
@@ -252,7 +252,7 @@ Tensor& arange_dpcpp_out(
           result.resize_({size});
         }
         LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
-        auto dpcpp_queue = dpcppGetCurrentQueue();
+        auto& dpcpp_queue = dpcppGetCurrentQueue();
 
         // command group functions
         auto cgf = DPCPP_Q_CGF(cgh) {

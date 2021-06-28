@@ -577,7 +577,7 @@ static void launch_reduce_kernel(
     const R reduction) {
   using acc_t = typename R::arg_t;
   using output_t = typename R::out_t;
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   // This is a work-around because dpcpp_discard_w_mode doesn't work in some
   // conditions
@@ -656,7 +656,7 @@ inline void dpcpp_reduce_kernel(
     out_data_extra = nullptr;
   }
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t wg_size = dpcppMaxWorkGroupSize(queue);
   // firstly hardcoded; to be replaced with get_sub_group_max_size
   int sg_size = DPCPP_SUB_GROUP_SIZE;

@@ -441,7 +441,7 @@ void gatherTopK(
     IndexType topKWithinSliceStride,
     TensorInfo<int64_t, IndexType> indices,
     IndexType indicesWithinSliceStride) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<dpcpp_dev_max_wgroup_size>();

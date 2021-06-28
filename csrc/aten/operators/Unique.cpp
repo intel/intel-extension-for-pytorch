@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 
-
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <tuple>
@@ -100,7 +100,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   const bool return_counts
 ) {
 #ifdef USE_ONEDPL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
 
   auto options = self.options().dtype(kLong);
@@ -173,7 +173,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   const bool return_counts
 ) {
 #ifdef USE_ONEDPL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
 
   auto sizes = self.sizes().vec();

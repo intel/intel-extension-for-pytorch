@@ -58,10 +58,13 @@ IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
 } // namespace dpcpp
 } // namespace xpu
 
+
+using namespace xpu::dpcpp;
+
 namespace std {
 template <>
-struct hash<xpu::dpcpp::DPCPPStream> {
-  size_t operator()(xpu::dpcpp::DPCPPStream s) const noexcept {
+struct hash<DPCPPStream> {
+  size_t operator()(DPCPPStream s) const noexcept {
     return std::hash<c10::Stream>{}(s.unwrap());
   }
 };

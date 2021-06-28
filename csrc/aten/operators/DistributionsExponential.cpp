@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include "comm/Numerics.h"
@@ -32,7 +32,7 @@ Tensor& exponential_(Tensor& self, double lambda_, c10::optional<Generator> gen_
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(std::abs(1/lambda_));
-      auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto &dpcpp_queue = dpcppGetCurrentQueue();
       uint64_t seed;
       {
         // See Note [Acquire lock when using random generators]

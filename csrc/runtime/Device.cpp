@@ -26,7 +26,7 @@ struct DPCPPDevicePool {
 } gDevPool;
 
 static void clearDPCPPContextAndDevices() {
-  xpu::dpcpp::clearDeviceContext();
+  clearDeviceContext();
   gDevPool.devices.clear();
 }
 

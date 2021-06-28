@@ -6,12 +6,13 @@
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include "comm/ApplyUtils.h"
 
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
 
+using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
 
 namespace at {
@@ -35,7 +36,7 @@ static void ComputeAdamWeightDecayKernel (
     double weight_decay,
     const bool correct_bias){
 
-    auto& dpcpp_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+    auto& dpcpp_queue = dpcppGetCurrentQueue();
     auto total_threads = grad_input.numel();
 
     auto cgf = DPCPP_Q_CGF(cgh) {

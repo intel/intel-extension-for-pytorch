@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include "comm/Helpers.h"
 
@@ -19,7 +19,7 @@ static void repeat_interleave_dpcpp_kernel(
     int64_t* cumsum_ptr,
     int64_t* result_ptr,
     int64_t size) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
   parallel_for_setup(size, tile_size, rng, grng);
 

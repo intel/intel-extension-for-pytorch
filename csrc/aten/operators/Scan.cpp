@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include "comm/MathReduce.h"
@@ -33,7 +34,7 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
   auto dst_size = dst.nbytes();
   ptrdiff_t size = src.numel();
 
-  auto& queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<scalar_t>();
     auto dst_data = dst.data_ptr<scalar_t>();
@@ -62,7 +63,7 @@ void scanOuterDim(
   int64_t stride = src.stride(dimension);
   int64_t batch = totalElements / (n * stride);
 
-  auto& queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
@@ -102,7 +103,7 @@ void scanInnermostDim(
     Tensor& src,
     scalar_t init,
     BinaryFunction binary_op) {
-  auto& queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& queue = dpcppGetCurrentQueue();
 
   auto totalElements = tgt.numel();
   auto tgt_size = tgt.nbytes();

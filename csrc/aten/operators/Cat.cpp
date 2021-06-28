@@ -2,7 +2,7 @@
 #include <ATen/Config.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include "comm/ATDispatch.h"
@@ -93,7 +93,7 @@ void CatArrayBatchedCopy(
     IndexType dimStride,
     int batchCounter) {
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   //Get grid where x dim fills half gpu and y dim is number of tensors.
   //This will have cating two tensors fill the entire grid, but prevent

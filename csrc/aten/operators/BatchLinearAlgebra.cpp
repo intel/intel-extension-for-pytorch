@@ -2,7 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 
 #include "comm/ApplyUtils.h"
 #include "comm/ATDispatch.h"
@@ -47,7 +47,7 @@ void apply_triu_tril(
     Tensor& result,
     const Tensor& self,
     const int64_t k) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   auto N = self.numel();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(N, group_size);
@@ -139,7 +139,7 @@ static void apply_lu_dpcpp_(
     Tensor& pivots_,
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
   int64_t m = self_.size(-2);
   int64_t n = self_.size(-1);
@@ -171,7 +171,7 @@ static void apply_lu_solve_dpcpp_(
     Tensor& pivots_,
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(b_);
   int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
@@ -228,7 +228,7 @@ static void apply_inverse_dpcpp_(
   impl::apply_lu_dpcpp_<scalar_t>(self_, pivots_, infos_);
 
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
   int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
@@ -274,7 +274,7 @@ static void apply_geqrf_dpcpp_(
     int64_t n_,
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
   int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
@@ -322,7 +322,7 @@ static void apply_orgqr_dpcpp_(
     int64_t k_,
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
   int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
@@ -374,7 +374,7 @@ static void apply_ormqr_dpcpp_(
     const bool transpose_,
     int64_t& info_) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto left_right = (left_ ? oneapi::mkl::side::left : oneapi::mkl::side::right);
   auto trans = (transpose_ ? oneapi::mkl::transpose::trans : oneapi::mkl::transpose::nontrans);
   int64_t m = m_;
@@ -411,7 +411,7 @@ static void apply_svd(
     char jobz,
     std::vector<int64_t>& infos) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   using value_t = typename c10::scalar_value_type<scalar_t>::type;
   scalar_t* self_data = (scalar_t*)(self.data_ptr());
   auto U_data = U.data_ptr<scalar_t>();
@@ -468,7 +468,7 @@ static void apply_symeig(
     bool upper,
     std::vector<int64_t>& infos) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto n = self.size(-1);
   auto batch_size = native::batchCount(self);
   auto jobz = eigenvectors ? oneapi::mkl::job::vec : oneapi::mkl::job::novec;
@@ -503,7 +503,7 @@ static void apply_triangular_solve(
     bool transpose,
     bool unitriangular) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   oneapi::mkl::transpose trans =
       transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;

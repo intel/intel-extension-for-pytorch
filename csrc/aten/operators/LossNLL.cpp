@@ -5,7 +5,7 @@
 #include <ATen/core/Reduction.h>
 
 #include <utils/DPCPP.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -82,7 +82,7 @@ void ClassNLLCriterion_updateOutput(
 
     auto weights_cont = weights.defined() ? weights.contiguous() : weights;
 
-    auto queue = dpcppGetCurrentQueue();
+    auto& queue = dpcppGetCurrentQueue();
     int64_t local_size =
         queue.get_device()
             .template get_info<dpcpp_dev_max_wgroup_size>();
@@ -147,7 +147,7 @@ void ClassNLLCriterion_updateOutput(
   scalar_t* _output_data = output.data_ptr<scalar_t>();
   scalar_t* _total_weight_data = total_weight.data_ptr<scalar_t>();
   bool has_weights = _weights_data != NULL ? true : false;
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
 
   if (input_cont.dim() == 1 || input_cont.dim() == 0) {
     int64_t local_size = 1;
@@ -291,7 +291,7 @@ void ClassNLLCriterion_updateGradInput(
     check_dim_size(gradOutput, 1, 0, batch_size);
     auto weights_cont = weights.defined() ? weights.contiguous() : weights;
 
-    auto queue = dpcppGetCurrentQueue();
+    auto& queue = dpcppGetCurrentQueue();
     int64_t local_size =
         queue.get_device()
             .template get_info<dpcpp_dev_max_wgroup_size>();
@@ -356,7 +356,7 @@ void ClassNLLCriterion_updateGradInput(
       "Expected a single element grad_output tensor, but got: ",
       gradOutput.sizes());
 
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   if (input.dim() == 1) {
 
     auto cgf = DPCPP_Q_CGF(cgh) {
@@ -504,7 +504,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
     getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = output.data_ptr<scalar_t>();
@@ -555,7 +555,7 @@ void spatial_class_nll_criterion_update_output_kernel(
   int64_t reduction,
   int64_t ignore_index) {
   auto numel = target.numel();
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   auto cu_num = dpcppMaxComputeUnitSize(dpcpp_queue);
   auto num_groups = (numel - 1) / wgroup_size + 1;
@@ -688,7 +688,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
     getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = grad_input.data_ptr<scalar_t>();
@@ -752,7 +752,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
     getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto &dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = grad_input.data_ptr<scalar_t>();

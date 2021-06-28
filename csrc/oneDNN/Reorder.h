@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
 #include <tensor/Context.h>

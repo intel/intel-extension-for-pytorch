@@ -1,6 +1,7 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 
+#include <runtime/Utils.h>
 #include "comm/Math.h"
 
 
@@ -19,7 +20,7 @@ void dpcppMemoryScale(
     const float alpha) {
   static constexpr auto write_mode = DPCPP::access::mode::discard_write;
   static constexpr auto read_mode = DPCPP::access::mode::read;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
@@ -48,7 +49,7 @@ void dpcppMemoryScale1(
     const double eps) {
   static constexpr auto write_mode = DPCPP::access::mode::discard_write;
   static constexpr auto read_mode = DPCPP::access::mode::read;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
@@ -79,7 +80,7 @@ void dpcppMemoryScale2(
     const double eps) {
   static constexpr auto write_mode = DPCPP::access::mode::discard_write;
   static constexpr auto read_mode = DPCPP::access::mode::read;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 

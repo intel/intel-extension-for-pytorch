@@ -1,5 +1,6 @@
 #pragma once
 
+#include <runtime/Utils.h>
 #include "Random.h"
 #include "Loops.h"
 #include "comm/Numerics.h"
@@ -16,7 +17,7 @@ void distribution_elementwise_grid_stride_kernel(at::TensorIterator& iter,
                                                  const dist_t dist_func,
                                                  const transform_t transform_func) {
 
-  auto &sycl_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+  auto &sycl_queue = dpcppGetCurrentQueue();
 
   auto offset_calc = xpu::dpcpp::make_offset_calculator<1>(iter);
   auto cgf = DPCPP_Q_CGF(cgh) {

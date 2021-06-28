@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include "comm/NumericLimits.h"
 #include "comm/AccumulateType.h"
@@ -51,7 +51,7 @@ void fractional_max_pool3d_out_frame(
     int poolSizeH,
     int poolSizeW) {
   using accscalar_t = acc_type<scalar_t>;
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int outputPlaneSize = outputSizeT * outputSizeH * outputSizeW;
   int work_group_size = outputPlaneSize > 128 ? 128 : outputPlaneSize;
   int work_group_num = (outputPlaneSize + 127) / 128;
@@ -172,7 +172,7 @@ void fractional_max_pool3d_backward_out_frame(
     int gradOutputSizeT,
     int gradOutputSizeH,
     int gradOutputSizeW) {
-  auto queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   int gradOutputPlaneSize = gradOutputSizeT * gradOutputSizeH * gradOutputSizeW;
   int work_group_size = gradOutputPlaneSize > 128 ? 128 : gradOutputPlaneSize;
   int work_group_num = (gradOutputPlaneSize + 127) / 128;

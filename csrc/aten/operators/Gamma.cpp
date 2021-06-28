@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include "comm/Numerics.h"
@@ -27,7 +27,7 @@ Tensor lgamma(const Tensor & self) {
 #ifdef USE_ONEMKL
   int64_t n = self.numel();
   Tensor out = at::empty_like(self);
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma", [&] {
     DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::vm::lgamma, dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)out.data_ptr());
   });
@@ -41,7 +41,7 @@ Tensor lgamma(const Tensor & self) {
 Tensor& lgamma_(Tensor & self) {
 #ifdef USE_ONEMKL
   int64_t n = self.numel();
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma_", [&] {
     DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::vm::lgamma, dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)self.data_ptr());
   });

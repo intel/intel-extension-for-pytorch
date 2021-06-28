@@ -1,6 +1,6 @@
 #include <intrinsic/ipex_intrinsic.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <runtime/DPCPPUtils.h>
+#include <runtime/Utils.h>
 #include <core/TensorImplUtils.h>
 #include <tensor/Context.h>
 #include "comm/ParamUtils.h"

@@ -3,6 +3,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "UpSample.h"
 
@@ -33,7 +34,7 @@ static void im2col_kernel(
     T* data_col) {
   const int64_t height_col = output_height;
   const int64_t width_col = output_width;
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = channels * output_width * output_height;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -90,7 +91,7 @@ static void col2im_kernel(
     const int64_t dilation_h,
     const int64_t dilation_w,
     T* data_im) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = channels * width * height;
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = data_col;

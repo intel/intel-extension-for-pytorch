@@ -1,7 +1,10 @@
 #include <ATen/Context.h>
 #include <ATen/native/TensorIterator.h>
+
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/detail/IndexUtils.h>
+
 #include "comm/Atomics.h"
 #include "comm/ATDispatch.h"
 #include "Loops.h"
@@ -54,7 +57,7 @@ void kernelHistogram1D(
     input_t maxvalue,
     IndexType totalElements,
     Op getOp) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = a.data;
