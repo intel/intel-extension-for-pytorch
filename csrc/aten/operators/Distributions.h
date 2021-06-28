@@ -20,10 +20,10 @@ void distribution_elementwise_grid_stride_kernel(at::TensorIterator& iter,
 
   auto offset_calc = xpu::dpcpp::make_offset_calculator<1>(iter);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, (char*)iter.data_ptr(0));
+    auto out_data = (char*)iter.data_ptr(0);
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
       size_t sample_id = item_id.get_id(0);
-      auto out_ptr = get_pointer(out_data);
+      auto out_ptr = out_data;
       RandomState<Philox4_32_10> state(seeds.first, sample_id, seeds.second);
       auto rand = dist_func(&state);
       accscalar_t r = ScalarConvert<scalar_t, accscalar_t>::to(rand);

@@ -51,13 +51,13 @@ static inline void embedding_backward_dpcpp_kernel(
     DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_fill);
 
     auto cgf_scale = DPCPP_Q_CGF(cgh) {
-      auto idx_data = get_buffer<read_mode>(cgh, indices_data);
+      auto idx_data = indices_data;
       DPCPP::accessor<uint32_t, 1, rw_mode, gbuffer_target> idx_cnt_ptr(
           idx_cnt, cgh, DPCPP::range<1>(row_num_weights), 0);
 
       cgh.parallel_for<embedding_dense_backeward_dpcpp_idx_cnt_ker<scalar_t>>(
           DPCPP::range<1>(1), [=](DPCPP::item<1> item) {
-          auto idx_ptr = get_pointer(idx_data);
+          auto idx_ptr = idx_data;
           for (int i = 0; i < num_indices; ++i) {
             idx_cnt_ptr[idx_ptr[i]] += static_cast<uint32_t>(1);
           }
@@ -67,16 +67,16 @@ static inline void embedding_backward_dpcpp_kernel(
 
     auto cgf_scatter = DPCPP_Q_CGF(cgh) {
       auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
-      auto idx_data = get_buffer<read_mode>(cgh, indices_data);
-      auto g_data = get_buffer<read_mode>(cgh, grad_data);
-      auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
+      auto idx_data = indices_data;
+      auto g_data = grad_data;
+      auto gw_data = grad_weight_data;
 
       cgh.parallel_for<embedding_dense_backeward_dpcpp_ker_scale<scalar_t>>(
           DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
             int64_t gid = item.get_linear_id();
-            auto idx_ptr = get_pointer(idx_data);
-            auto g_ptr = get_pointer(g_data);
-            auto gw_ptr = get_pointer(gw_data);
+            auto idx_ptr = idx_data;
+            auto g_ptr = g_data;
+            auto gw_ptr = gw_data;
             for (int nidx = 0; nidx < num_indices; nidx++) {
               auto idx = idx_ptr[nidx];
               gw_ptr[gid + idx * stride] += static_cast<scalar_t>(g_ptr[gid + nidx * stride] * 1.0 / (scalar_t)idx_cnt_acc[idx]);
@@ -87,12 +87,12 @@ static inline void embedding_backward_dpcpp_kernel(
 
     if (padding_idx != -1) {
       auto cgf_pad = DPCPP_Q_CGF(cgh) {
-        auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
+        auto gw_data = grad_weight_data;
 
         cgh.parallel_for<embedding_dense_backeward_dpcpp_ker_scale_pad<scalar_t>>(
             DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
             int64_t gid = item.get_linear_id();
-            auto gw_ptr = get_pointer(gw_data);
+            auto gw_ptr = gw_data;
             gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
         });
       };
@@ -102,16 +102,16 @@ static inline void embedding_backward_dpcpp_kernel(
   } else {
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-    auto idx_data = get_buffer<read_mode>(cgh, indices_data);
-    auto g_data = get_buffer<read_mode>(cgh, grad_data);
-    auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
+    auto idx_data = indices_data;
+    auto g_data = grad_data;
+    auto gw_data = grad_weight_data;
 
     cgh.parallel_for<embedding_dense_backeward_dpcpp_ker<scalar_t>>(
         DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
           int64_t gid = item.get_linear_id();
-          auto idx_ptr = get_pointer(idx_data);
-          auto g_ptr = get_pointer(g_data);
-          auto gw_ptr = get_pointer(gw_data);
+          auto idx_ptr = idx_data;
+          auto g_ptr = g_data;
+          auto gw_ptr = gw_data;
           for (int nidx = 0; nidx < num_indices; nidx++) {
             auto idx = idx_ptr[nidx];
             gw_ptr[gid + idx * stride] += static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
@@ -122,12 +122,12 @@ static inline void embedding_backward_dpcpp_kernel(
 
     if (padding_idx != -1) {
       auto cgf_pad = DPCPP_Q_CGF(cgh) {
-        auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
+        auto gw_data = grad_weight_data;
 
         cgh.parallel_for<embedding_dense_backeward_dpcpp_ker_pad<scalar_t>>(
             DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
             int64_t gid = item.get_linear_id();
-            auto gw_ptr = get_pointer(gw_data);
+            auto gw_ptr = gw_data;
             gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
         });
       };

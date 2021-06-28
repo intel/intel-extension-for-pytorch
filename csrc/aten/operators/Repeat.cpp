@@ -24,14 +24,14 @@ static void repeat_interleave_dpcpp_kernel(
   parallel_for_setup(size, tile_size, rng, grng);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto rep_data = get_buffer<dpcpp_rw_mode>(cgh, repeat_ptr);
-    auto cum_data = get_buffer<dpcpp_rw_mode>(cgh, cumsum_ptr);
-    auto res_data = get_buffer<dpcpp_rw_mode>(cgh, result_ptr);
+    auto rep_data = repeat_ptr;
+    auto cum_data = cumsum_ptr;
+    auto res_data = result_ptr;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto rep_ptr = get_pointer(rep_data);
-      auto cum_ptr = get_pointer(cum_data);
-      auto res_ptr = get_pointer(res_data);
+      auto rep_ptr = rep_data;
+      auto cum_ptr = cum_data;
+      auto res_ptr = res_data;
 
       for (int64_t i = item.get_global_id(0); i < size;
            i += item.get_global_range()[0]) {

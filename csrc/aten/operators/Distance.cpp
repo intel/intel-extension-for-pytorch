@@ -185,15 +185,15 @@ static void pdist_kernel_impl(
   // TODO: this is not optimized if the m is smaller than 256. The work item is
   // wasted (m-256).
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, result.data_ptr<scalar_t>());
-    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, self.data_ptr<scalar_t>());
+    auto out_data = result.data_ptr<scalar_t>();
+    auto in_data = self.data_ptr<scalar_t>();
     // Create the local shared memory for reducing
     DPCPP::accessor<scalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
         shared(wgroup_size, __cgh);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-      auto out_ptr = get_pointer(out_data);
-      auto in_ptr = get_pointer(in_data);
+      auto out_ptr = out_data;
+      auto in_ptr = in_data;
 
       const size_t k = item_id.get_group_linear_id();
       const size_t stride = item_id.get_local_range().size();
@@ -256,16 +256,16 @@ static void pdist_backward_kernel_impl(
   DPCPP::nd_range<2> work_load(global_range, local_range);
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, buffer.data_ptr<scalar_t>());
-    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, self.data_ptr<scalar_t>());
-    auto grad_data = get_buffer<dpcpp_r_mode>(__cgh, grad.data_ptr<scalar_t>());
-    auto dist_data = get_buffer<dpcpp_r_mode>(__cgh, dist.data_ptr<scalar_t>());
+    auto out_data = buffer.data_ptr<scalar_t>();
+    auto in_data = self.data_ptr<scalar_t>();
+    auto grad_data = grad.data_ptr<scalar_t>();
+    auto dist_data = dist.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      auto out_ptr = get_pointer(out_data);
-      auto in_ptr = get_pointer(in_data);
-      auto grad_ptr = get_pointer(grad_data);
-      auto dist_ptr = get_pointer(dist_data);
+      auto out_ptr = out_data;
+      auto in_ptr = in_data;
+      auto grad_ptr = grad_data;
+      auto dist_ptr = dist_data;
 
       const int k = item_id.get_global_id(0);
       const int init = item_id.get_group(1) * item_id.get_local_range(1) +

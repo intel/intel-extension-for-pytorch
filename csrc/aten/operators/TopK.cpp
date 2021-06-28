@@ -446,9 +446,9 @@ void gatherTopK(
       queue.get_device()
           .template get_info<dpcpp_dev_max_wgroup_size>();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data);
-    auto topk_data = get_buffer<dpcpp_w_mode>(cgh, topK.data);
-    auto indices_data = get_buffer<dpcpp_w_mode>(cgh, indices.data);
+    auto in_data = input.data;
+    auto topk_data = topK.data;
+    auto indices_data = indices.data;
     auto smem_acc = dpcpp_local_acc_t<int>(32, cgh);
     auto smem_scan_acc = dpcpp_local_acc_t<int>(local_size, cgh);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
@@ -461,10 +461,9 @@ void gatherTopK(
           IndexToOffset<T, IndexType, Dim>::get(slice, topK);
       IndexType indicesSliceStartIndex =
           IndexToOffset<int64_t, IndexType, Dim>::get(slice, indices);
-      T* inputSliceStart = get_pointer(in_data) + sliceStartIndex;
-      T* topKSliceStart = get_pointer(topk_data) + topKSliceStartIndex;
-      int64_t* indicesSliceStart =
-          get_pointer(indices_data) + indicesSliceStartIndex;
+      T* inputSliceStart = in_data + sliceStartIndex;
+      T* topKSliceStart = topk_data + topKSliceStartIndex;
+      int64_t* indicesSliceStart = indices_data + indicesSliceStartIndex;
       // Find the k-th highest element in our input
       T topKValue = 0;
       radixSelect<T, typename TopKTypeConfig<T>::RadixType, IndexType, Order>(

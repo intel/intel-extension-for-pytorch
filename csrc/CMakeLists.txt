@@ -46,6 +46,8 @@ set(IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS}
         ${IPEX_GPU_GEN_FILES}
         ${IPEX_TENSOR_SRCS}
         ${IPEX_UTILS_SRCS})
+# WARNING XXX: We assume that kernel codes only are contained in IPEX_ATEN_OPS_SRCS.
+# WARNING XXX: Therefore we only set sycl flags for these C++ files here.
 set_sycl_flag("${IPEX_ATEN_OPS_SRCS}")
 add_library(ipex_gpu_core SHARED ${IPEX_GPU_CORE_SRC})
 

@@ -96,12 +96,12 @@ static void RReLU_updateOutput(
       auto total_threads = input_.numel();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = get_buffer<dpcpp_r_mode>(cgh, input_.data_ptr<scalar_t>());
-        auto noise_data = get_buffer<dpcpp_discard_w_mode>(cgh, noise.data_ptr<scalar_t>());
+        auto in_data = input_.data_ptr<scalar_t>();
+        auto noise_data = noise.data_ptr<scalar_t>();
         cgh.parallel_for<rrelu_updateOutput_dpcpp_inplace_kernel<scalar_t>>(
           DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-            auto in_ptr = get_pointer(in_data);
-            auto noise_ptr = get_pointer(noise_data);
+            auto in_ptr = in_data;
+            auto noise_ptr = noise_data;
             auto id = itemId.get_id(0);
             auto linear_id = itemId.get_linear_id();
 
@@ -131,14 +131,14 @@ static void RReLU_updateOutput(
       auto total_threads = input_.numel();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = get_buffer<dpcpp_r_mode>(cgh, input_.data_ptr<scalar_t>());
-        auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output.data_ptr<scalar_t>());
-        auto noise_data = get_buffer<dpcpp_discard_w_mode>(cgh, noise.data_ptr<scalar_t>());
+        auto in_data = input_.data_ptr<scalar_t>();
+        auto out_data = output.data_ptr<scalar_t>();
+        auto noise_data = noise.data_ptr<scalar_t>();
         cgh.parallel_for<rrelu_updateOutput_dpcpp_kernel<scalar_t>>(
           DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-            auto in_ptr = get_pointer(in_data);
-            auto out_ptr = get_pointer(out_data);
-            auto noise_ptr = get_pointer(noise_data);
+            auto in_ptr = in_data;
+            auto out_ptr = out_data;
+            auto noise_ptr = noise_data;
             auto id = itemId.get_id(0);
             auto linear_id = itemId.get_linear_id();
 
@@ -233,13 +233,13 @@ void inline prelu_kernel_share_weights(
   auto total_threads = input.numel();
   auto weight_val = weight.data_ptr<scalar_t>()[0];
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, result.data_ptr<scalar_t>());
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data_ptr<scalar_t>());
+    auto out_data = result.data_ptr<scalar_t>();
+    auto in_data = input.data_ptr<scalar_t>();
 
     cgh.parallel_for<prelu_dpcpp_kernel_share_weights<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-        auto out_ptr = get_pointer(out_data);
-        auto in_ptr = get_pointer(in_data);
+        auto out_ptr = out_data;
+        auto in_ptr = in_data;
         auto id = itemId.get_id(0);
         out_ptr[id] = (in_ptr[id] >= 0) ? in_ptr[id] : weight_val * static_cast<scalar_t>(in_ptr[id]);
       });
@@ -264,14 +264,14 @@ void inline prelu_kernel_multi_weights(
   auto total_threads = input.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, result.data_ptr<scalar_t>());
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data_ptr<scalar_t>());
-    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight.data_ptr<scalar_t>());
+    auto out_data = result.data_ptr<scalar_t>();
+    auto in_data = input.data_ptr<scalar_t>();
+    auto weight_data = weight.data_ptr<scalar_t>();
     cgh.parallel_for<prelu_dpcpp_kernel_multi_weights<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-        auto out_ptr = get_pointer(out_data);
-        auto in_ptr = get_pointer(in_data);
-        auto weight_ptr = get_pointer(weight_data);
+        auto out_ptr = out_data;
+        auto in_ptr = in_data;
+        auto weight_ptr = weight_data;
         auto id = itemId.get_id(0);
 
         int64_t channel = (id % input_stride0) / input_stride1;
@@ -300,17 +300,17 @@ void inline prelu_backward_kernel_share_weights(
   auto weight_val = weight.data_ptr<scalar_t>()[0];
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_grad_data = get_buffer<dpcpp_discard_w_mode>(cgh, input_grad.data_ptr<scalar_t>());
-    auto weight_grad_collector_data = get_buffer<dpcpp_discard_w_mode>(cgh, weight_grad_collector.data_ptr<scalar_t>());
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data_ptr<scalar_t>());
-    auto grad_out_data = get_buffer<dpcpp_r_mode>(cgh, grad_out.data_ptr<scalar_t>());
+    auto in_grad_data = input_grad.data_ptr<scalar_t>();
+    auto weight_grad_collector_data = weight_grad_collector.data_ptr<scalar_t>();
+    auto in_data = input.data_ptr<scalar_t>();
+    auto grad_out_data = grad_out.data_ptr<scalar_t>();
 
     cgh.parallel_for<prelu_backward_dpcpp_kernel_share_weights<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-        auto in_grad_ptr = get_pointer(in_grad_data);
-        auto weight_grad_collector_ptr = get_pointer(weight_grad_collector_data);
-        auto in_ptr = get_pointer(in_data);
-        auto grad_out_ptr = get_pointer(grad_out_data);
+        auto in_grad_ptr = in_grad_data;
+        auto weight_grad_collector_ptr = weight_grad_collector_data;
+        auto in_ptr = in_data;
+        auto grad_out_ptr = grad_out_data;
         auto id = itemId.get_id(0);
 
         in_grad_ptr[id] = (in_ptr[id] > 0) ? grad_out_ptr[id] : weight_val * static_cast<scalar_t>(grad_out_ptr[id]);
@@ -339,18 +339,18 @@ void inline prelu_backward_kernel_multi_weights(
   auto total_threads = input.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data_ptr<scalar_t>());
-    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight.data_ptr<scalar_t>());
-    auto gred_out_data = get_buffer<dpcpp_r_mode>(cgh, grad_out.data_ptr<scalar_t>());
-    auto in_grad_data = get_buffer<dpcpp_discard_w_mode>(cgh, input_grad.data_ptr<scalar_t>());
-    auto weight_grad_collector_data = get_buffer<dpcpp_discard_w_mode>(cgh, weight_grad_collector.data_ptr<scalar_t>());
+    auto in_data = input.data_ptr<scalar_t>();
+    auto weight_data = weight.data_ptr<scalar_t>();
+    auto gred_out_data = grad_out.data_ptr<scalar_t>();
+    auto in_grad_data = input_grad.data_ptr<scalar_t>();
+    auto weight_grad_collector_data = weight_grad_collector.data_ptr<scalar_t>();
     cgh.parallel_for<prelu_backward_dpcpp_kernel_multi_weights<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-        auto in_ptr = get_pointer(in_data);
-        auto weight_ptr = get_pointer(weight_data);
-        auto grad_out_ptr = get_pointer(gred_out_data);
-        auto in_grad_ptr = get_pointer(in_grad_data);
-        auto weight_grad_collector_ptr = get_pointer(weight_grad_collector_data);
+        auto in_ptr = in_data;
+        auto weight_ptr = weight_data;
+        auto grad_out_ptr = gred_out_data;
+        auto in_grad_ptr = in_grad_data;
+        auto weight_grad_collector_ptr = weight_grad_collector_data;
         auto id = itemId.get_id(0);
 
         int64_t channel = (id % input_stride0) / input_stride1;
@@ -373,13 +373,13 @@ void GeluKernelImpl(const Tensor& X, Tensor& Y){
   auto total_threads = X.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto X_data = get_buffer<dpcpp_r_mode>(cgh, X.data_ptr<scalar_t>());
-    auto Y_data = get_buffer<dpcpp_discard_w_mode>(cgh, Y.data_ptr<scalar_t>());
+    auto X_data = X.data_ptr<scalar_t>();
+    auto Y_data = Y.data_ptr<scalar_t>();
 
     cgh.parallel_for<gelu_dpcpp_kernel<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-        auto X_ptr = get_pointer(X_data);
-        auto Y_ptr = get_pointer(Y_data);
+        auto X_ptr = X_data;
+        auto Y_ptr = Y_data;
         auto id = itemId.get_id(0);
 
         Y_ptr[id] = DPCPP::erf(X_ptr[id] * M_SQRT1_2);
@@ -402,15 +402,15 @@ void GeluBackwardKernelImpl(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto total_threads = X.numel();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto dY_data = get_buffer<dpcpp_r_mode>(cgh, dY.data_ptr<scalar_t>());
-    auto X_data = get_buffer<dpcpp_r_mode>(cgh, X.data_ptr<scalar_t>());
-    auto dX_data = get_buffer<dpcpp_discard_w_mode>(cgh, dX.data_ptr<scalar_t>());
+    auto dY_data = dY.data_ptr<scalar_t>();
+    auto X_data = X.data_ptr<scalar_t>();
+    auto dX_data = dX.data_ptr<scalar_t>();
     
     cgh.parallel_for<gelu_backward_dpcpp_kernel<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
-        auto dY_ptr = get_pointer(dY_data);
-        auto X_ptr = get_pointer(X_data);
-        auto dX_ptr = get_pointer(dX_data);
+        auto dY_ptr = dY_data;
+        auto X_ptr = X_data;
+        auto dX_ptr = dX_data;
         auto id = itemId.get_id(0);
 
         dX_ptr[id] = Numerics<scalar_t>::exp(-scalar_t(0.5) * static_cast<scalar_t>(X_ptr[id]) * static_cast<scalar_t>(X_ptr[id]));

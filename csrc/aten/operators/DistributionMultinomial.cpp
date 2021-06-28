@@ -72,17 +72,16 @@ void sample_multinomial_with_replacement(
     local_range(1, work_group_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto result_data = get_buffer<dpcpp_rw_mode>(cgh, result.data_ptr<long>());
-    auto norm_dist_prefix_sum_data =
-      get_buffer<dpcpp_r_mode>(cgh, norm_dist_prefix_sum.data_ptr<scalar_t>());
-    auto norm_dist_data = get_buffer<dpcpp_r_mode>(cgh, norm_dist.data_ptr<scalar_t>());
+    auto result_data = result.data_ptr<long>();
+    auto norm_dist_prefix_sum_data = norm_dist_prefix_sum.data_ptr<scalar_t>();
+    auto norm_dist_data = norm_dist.data_ptr<scalar_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       size_t dist_id = item_id.get_group(0);
       size_t sample_id = item_id.get_local_id(1);
       size_t global_linear_id = item_id.get_global_linear_id();
-      long* result_ptr = get_pointer(result_data);
-      scalar_t* norm_dist_prefix_sum_ptr = get_pointer(norm_dist_prefix_sum_data);
-      scalar_t* norm_dist_ptr = get_pointer(norm_dist_data);
+      long* result_ptr = result_data;
+      scalar_t* norm_dist_prefix_sum_ptr = norm_dist_prefix_sum_data;
+      scalar_t* norm_dist_ptr = norm_dist_data;
 
       RandomState<Philox4_32_10> state(
         seeds.first, global_linear_id, seeds.second);
@@ -133,16 +132,15 @@ void sample_multinomial_without_replacement(
   DPCPP::range<1> range(distributions);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto result_data = get_buffer<dpcpp_rw_mode>(cgh, result.data_ptr<long>());
-    auto norm_dist_prefix_sum_data =
-      get_buffer<dpcpp_r_mode>(cgh, norm_dist_prefix_sum.data_ptr<scalar_t>());
-    auto norm_dist_data = get_buffer<dpcpp_r_mode>(cgh, norm_dist.data_ptr<scalar_t>());
+    auto result_data = result.data_ptr<long>();
+    auto norm_dist_prefix_sum_data = norm_dist_prefix_sum.data_ptr<scalar_t>();
+    auto norm_dist_data = norm_dist.data_ptr<scalar_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       size_t dist_id = item_id.get_id(0);
       size_t linear_id = item_id.get_linear_id();
-      long* result_ptr = get_pointer(result_data);
-      scalar_t* norm_dist_prefix_sum_ptr = get_pointer(norm_dist_prefix_sum_data);
-      scalar_t* norm_dist_ptr = get_pointer(norm_dist_data);
+      long* result_ptr = result_data;
+      scalar_t* norm_dist_prefix_sum_ptr = norm_dist_prefix_sum_data;
+      scalar_t* norm_dist_ptr = norm_dist_data;
 
       RandomState<Philox4_32_10> state(seeds.first, linear_id, seeds.second);
       float rand = state.uniform<float>();
