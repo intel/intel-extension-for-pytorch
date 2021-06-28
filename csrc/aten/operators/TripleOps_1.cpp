@@ -142,17 +142,17 @@ static inline void packed_add_kernel(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-      auto MSB_data = get_buffer<read_write_mode>(cgh, w_MSB);
-      auto LSB_data = get_buffer<read_write_mode>(cgh, w_LSB);
-      auto gw_data = get_buffer<read_mode>(cgh, gw);
+      auto MSB_data = w_MSB;
+      auto LSB_data = w_LSB;
+      auto gw_data = gw;
 
       cgh.parallel_for<PackedAdd_ker<scalar_t>>(
         DPCPP::range<1>(num_elem), [=](DPCPP::item<1> item) {
 
           int64_t gid = item.get_linear_id();
-          auto MSB_p = get_pointer(MSB_data);
-          auto LSB_p = get_pointer(LSB_data);
-          auto gw_p = get_pointer(gw_data);
+          auto MSB_p = MSB_data;
+          auto LSB_p = LSB_data;
+          auto gw_p = gw_data;
 
           packed_bf16 p16;
           p16.s[0] = LSB_p[gid];
@@ -205,9 +205,9 @@ static inline void fusion_amdd_kernel(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto w = get_buffer<read_write_mode>(cgh, p);
-    auto m_buf = get_buffer<read_write_mode>(cgh, buf);
-    auto gw = get_buffer<read_write_mode>(cgh, d_p);
+    auto w = p;
+    auto m_buf = buf;
+    auto gw = d_p;
 
     cgh.parallel_for<FusionAmdd_ker<scalar_t>>(
       DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {

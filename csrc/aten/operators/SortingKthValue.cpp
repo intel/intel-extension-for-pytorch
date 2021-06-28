@@ -47,9 +47,9 @@ void gatherKthValue(
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data);
-    auto kth_data = get_buffer<dpcpp_w_mode>(cgh, kthValue.data);
-    auto indices_data = get_buffer<dpcpp_w_mode>(cgh, indices.data);
+    auto in_data = input.data;
+    auto kth_data = kthValue.data;
+    auto indices_data = indices.data;
 
     auto smem = dpcpp_local_acc_t<int>(32, cgh);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
@@ -66,9 +66,9 @@ void gatherKthValue(
           IndexToOffset<int64_t, index_t, Dim>::get(
               slice, indices);
 
-      scalar_t* inputSliceStart = get_pointer(in_data) + sliceStartIndex;
-      scalar_t* kthValueSliceStart = get_pointer(kth_data) + kthValueSliceStartIndex;
-      int64_t* indicesSliceStart = get_pointer(indices_data) + indicesSliceStartIndex;
+      scalar_t* inputSliceStart = in_data + sliceStartIndex;
+      scalar_t* kthValueSliceStart = kth_data + kthValueSliceStartIndex;
+      int64_t* indicesSliceStart = indices_data + indicesSliceStartIndex;
 
       // Find the k-th highest element in our input
       scalar_t kValue = ScalarConvert<int, scalar_t>::to(0);
@@ -262,15 +262,15 @@ std::tuple<Tensor &,Tensor &> mode_out_template(
     auto length = self_.size(1);
     auto cgf = DPCPP_Q_CGF(cgh) {
 
-    auto self_data = get_buffer<dpcpp_r_mode>(cgh, self_.data_ptr<scalar_t>());
-    auto values_data = get_buffer<dpcpp_discard_w_mode>(cgh, values.data_ptr<scalar_t>());
-    auto indices_data = get_buffer<dpcpp_discard_w_mode>(cgh, indices.data_ptr<long>());
+    auto self_data = self_.data_ptr<scalar_t>();
+    auto values_data = values.data_ptr<scalar_t>();
+    auto indices_data = indices.data_ptr<long>();
 
     cgh.parallel_for<mode_updateOutput_dpcpp_kernel_vertical<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item){
-        auto self_ptr = get_pointer(self_data);
-        auto values_ptr = get_pointer(values_data);
-        auto indices_ptr = get_pointer(indices_data);
+        auto self_ptr = self_data;
+        auto values_ptr = values_data;
+        auto indices_ptr = indices_data;
 
         auto id = item.get_linear_id();
         scalar_t value;
@@ -334,15 +334,15 @@ std::tuple<Tensor &,Tensor &> mode_out_template(
     auto cgf = DPCPP_Q_CGF(cgh) {
 
     auto length = self_.size(0);
-    auto self_data = get_buffer<dpcpp_r_mode>(cgh, self_.data_ptr<scalar_t>());
-    auto values_data = get_buffer<dpcpp_discard_w_mode>(cgh, values.data_ptr<scalar_t>());
-    auto indices_data = get_buffer<dpcpp_discard_w_mode>(cgh, indices.data_ptr<long>());
+    auto self_data = self_.data_ptr<scalar_t>();
+    auto values_data = values.data_ptr<scalar_t>();
+    auto indices_data = indices.data_ptr<long>();
 
     cgh.parallel_for<mode_updateOutput_dpcpp_kernel_horizontal<scalar_t>>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item){
-        auto self_ptr = get_pointer(self_data);
-        auto values_ptr = get_pointer(values_data);
-        auto indices_ptr = get_pointer(indices_data);
+        auto self_ptr = self_data;
+        auto values_ptr = values_data;
+        auto indices_ptr = indices_data;
 
         auto id = item.get_linear_id();
         scalar_t value;

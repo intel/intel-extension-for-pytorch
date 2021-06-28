@@ -57,15 +57,15 @@ void fractional_max_pool3d_out_frame(
   int work_group_num = (outputPlaneSize + 127) / 128;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
-    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output);
-    auto indices_data = get_buffer<dpcpp_w_mode>(cgh, indices);
-    auto samples_data = get_buffer<dpcpp_r_mode>(cgh, samples);
+    auto input_data = input;
+    auto output_data = output;
+    auto indices_data = indices;
+    auto samples_data = samples;
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
-      auto input_ptr = get_pointer(input_data);
-      auto output_ptr = get_pointer(output_data);
-      auto indices_ptr = get_pointer(indices_data);
-      auto samples_ptr = get_pointer(samples_data);
+      auto input_ptr = input_data;
+      auto output_ptr = output_data;
+      auto indices_ptr = indices_data;
+      auto samples_ptr = samples_data;
 
       int ourOutputPoint = item.get_global_id()[0];
       int plane = item.get_group()[1];
@@ -178,13 +178,13 @@ void fractional_max_pool3d_backward_out_frame(
   int work_group_num = (gradOutputPlaneSize + 127) / 128;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradInput_data = get_buffer<dpcpp_w_mode>(cgh, gradInput);
-    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
-    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
+    auto gradInput_data = gradInput;
+    auto gradOutput_data = gradOutput;
+    auto indices_data = indices;
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
-      auto gradInput_ptr = get_pointer(gradInput_data);
-      auto gradOutput_ptr = get_pointer(gradOutput_data);
-      auto indices_ptr = get_pointer(indices_data);
+      auto gradInput_ptr = gradInput_data;
+      auto gradOutput_ptr = gradOutput_data;
+      auto indices_ptr = indices_data;
 
       int ourOutputPoint = item.get_global_id()[0];
       int plane = item.get_group()[1];

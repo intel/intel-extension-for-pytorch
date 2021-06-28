@@ -57,14 +57,14 @@ void kernelHistogram1D(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_rw_mode>(__cgh, a.data);
-    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, b.data);
-    auto weight_data = get_buffer<dpcpp_r_mode>(__cgh, c.data);
+    auto out_data = a.data;
+    auto in_data = b.data;
+    auto weight_data = c.data;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = get_pointer(out_data);
-      auto in_ptr = get_pointer(in_data);
-      auto weight_ptr = get_pointer(weight_data);
+      auto out_ptr = out_data;
+      auto in_ptr = in_data;
+      auto weight_ptr = weight_data;
 
       auto linearIndex = item_id.get_id(0);
       // Convert `linearIndex` into an offset of `b`

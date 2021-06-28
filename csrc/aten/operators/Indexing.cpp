@@ -106,18 +106,18 @@ void indexSelect(
   auto n_work_item_iter = (slice_size + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(__cgh, src.data_ptr<scalar_t>());
-    auto dst_data = get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
-    auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<int64_t>());
+    auto src_data = src.data_ptr<scalar_t>();
+    auto dst_data = dst.data_ptr<scalar_t>();
+    auto idx_data = indices.data_ptr<int64_t>();
 
     __cgh.parallel_for<DPCPP_K(index_select_ker, scalar_t)>(
       DPCPP::nd_range</*dim=*/1>(
         DPCPP::range</*dim=*/1>(num_slices*wgroup_size),
         DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          auto src_ptr = get_pointer(src_data);
-          auto dst_ptr = get_pointer(dst_data);
-          auto idx_ptr = get_pointer(idx_data);
+          auto src_ptr = src_data;
+          auto dst_ptr = dst_data;
+          auto idx_ptr = idx_data;
 
           auto dst_slice_id = item_id.get_group(0);
 
@@ -380,19 +380,18 @@ void indexAdd(
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(__cgh, src.data_ptr<scalar_t>());
-    auto dst_data =
-        get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
-    auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<long>());
+    auto src_data = src.data_ptr<scalar_t>();
+    auto dst_data = dst.data_ptr<scalar_t>();
+    auto idx_data = indices.data_ptr<long>();
 
     __cgh.parallel_for<DPCPP_K(index_add_ker, scalar_t)>(
       DPCPP::nd_range</*dim=*/1>(
         DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
         DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          auto src_ptr = get_pointer(src_data);
-          auto dst_ptr = get_pointer(dst_data);
-          auto idx_ptr = get_pointer(idx_data);
+          auto src_ptr = src_data;
+          auto dst_ptr = dst_data;
+          auto idx_ptr = idx_data;
 
           auto dst_slice_id = item_id.get_group(0);
           // auto slice_off = IndexToOffset<int64_t, unsigned
@@ -485,16 +484,16 @@ void indexFill(
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto dst_data =
-        get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
-    auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<long>());
+        dst.data_ptr<scalar_t>();
+    auto idx_data = indices.data_ptr<long>();
 
     __cgh.parallel_for<DPCPP_K(index_fill_ker, scalar_t)>(
       DPCPP::nd_range</*dim=*/1>(
         DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
         DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          auto dst_ptr = get_pointer(dst_data);
-          auto idx_ptr = get_pointer(idx_data);
+          auto dst_ptr = dst_data;
+          auto idx_ptr = idx_data;
 
           auto dst_slice_id = item_id.get_group(0);
           // auto slice_off = IndexToOffset<int64_t, unsigned
@@ -584,14 +583,14 @@ void indexCopy(
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto dst_data = get_buffer<dpcpp_discard_w_mode>(cgh, dst.data_ptr<scalar_t>());
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, source.data_ptr<scalar_t>());
-    auto idx_data = get_buffer<dpcpp_r_mode>(cgh, indices.data_ptr<long>());
+    auto dst_data = dst.data_ptr<scalar_t>();
+    auto src_data = source.data_ptr<scalar_t>();
+    auto idx_data = indices.data_ptr<long>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-        auto dst_ptr = get_pointer(dst_data);
-        auto src_ptr = get_pointer(src_data);
-        auto idx_ptr = get_pointer(idx_data);
+        auto dst_ptr = dst_data;
+        auto src_ptr = src_data;
+        auto idx_ptr = idx_data;
 
         auto dst_slice_id = item_id.get_group(0);
         auto g_idx_ptr = idx_ptr;
@@ -651,12 +650,12 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = get_buffer<read_mode>(cgh, src.data_ptr<scalar_t>());
-        auto out_data = get_buffer<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto in_data = src.data_ptr<scalar_t>();
+        auto out_data = dst.data_ptr<scalar_t>();
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
-          auto in_ptr = get_pointer(in_data);
-          auto out_ptr = get_pointer(out_data);
+          auto in_ptr = in_data;
+          auto out_ptr = out_data;
           const int64_t bOffset = start + (stride0 + stride1) * id;
           out_ptr[strideSelf * id] = in_ptr[bOffset];
         };
@@ -681,12 +680,12 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = get_buffer<read_mode>(cgh, src.data_ptr<scalar_t>());
-        auto out_data = get_buffer<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto in_data = src.data_ptr<scalar_t>();
+        auto out_data = dst.data_ptr<scalar_t>();
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
-          auto in_ptr = get_pointer(in_data);
-          auto out_ptr = get_pointer(out_data);
+          auto in_ptr = in_data;
+          auto out_ptr = out_data;
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out_ptr[aOffset] = in_ptr[strideSrc * id];
         };
@@ -769,13 +768,13 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong_data = get_buffer<dpcpp_r_mode>(cgh, maskLong.data_ptr<int64_t>());
-    auto acc_maskPrefixSum_data = get_buffer<dpcpp_discard_w_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_maskLong_data = maskLong.data_ptr<int64_t>();
+    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
-      auto maskLong_ptr = get_pointer(acc_maskLong_data);
-      auto maskPrefixSum_ptr = get_pointer(acc_maskPrefixSum_data);
+      auto maskLong_ptr = acc_maskLong_data;
+      auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
       dpcpp_exclusive_scan(
           maskLong_ptr,
           maskLong_ptr + size,
@@ -796,20 +795,20 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
     auto acc_src_data =
-        get_buffer<dpcpp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
-    auto acc_mask_data = get_buffer<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
+        contigSrc.data_ptr<scalar_t>();
+    auto acc_mask_data = mask.data_ptr<bool>();
     auto acc_maskPrefixSum_data =
-        get_buffer<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+        maskPrefixSum.data_ptr<int64_t>();
     auto acc_tensor_data =
-        get_buffer<dpcpp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
+        tensor.data_ptr<scalar_t>();
 
     // kernel function
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
-      auto src_ptr = get_pointer(acc_src_data);
-      auto mask_ptr = get_pointer(acc_mask_data);
-      auto maskPrefix_ptr = get_pointer(acc_maskPrefixSum_data);
-      auto tensor_ptr = get_pointer(acc_tensor_data);
+      auto src_ptr = acc_src_data;
+      auto mask_ptr = acc_mask_data;
+      auto maskPrefix_ptr = acc_maskPrefixSum_data;
+      auto tensor_ptr = acc_tensor_data;
       if (linear_index < size) {
         if (mask_ptr[linear_index]) {
           tensor_ptr[linear_index] = src_ptr[maskPrefix_ptr[linear_index]];
@@ -867,14 +866,13 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto acc_maskLong_data =
-        get_buffer<dpcpp_r_mode>(cgh, maskLong.data_ptr<int64_t>());
-    auto acc_maskPrefixSum_data = get_buffer<dpcpp_discard_w_mode>(
-        cgh, maskPrefixSum.data_ptr<int64_t>());
+        maskLong.data_ptr<int64_t>();
+    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
-      auto maskLong_ptr = get_pointer(acc_maskLong_data);
-      auto maskPrefixSum_ptr = get_pointer(acc_maskPrefixSum_data);
+      auto maskLong_ptr = acc_maskLong_data;
+      auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
       dpcpp_inclusive_scan(
           maskLong_ptr,
           maskLong_ptr + size,
@@ -898,21 +896,19 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   // command group function
   auto cgfMaskedSelect = DPCPP_Q_CGF(cgh) {
-    auto acc_src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto acc_mask_data = get_buffer<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum_data =
-        get_buffer<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor_data = get_buffer<dpcpp_discard_w_mode>(
-        cgh, tensorContig.data_ptr<scalar_t>());
+    auto acc_src_data = src.data_ptr<scalar_t>();
+    auto acc_mask_data = mask.data_ptr<bool>();
+    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
+    auto acc_tensor_data = tensorContig.data_ptr<scalar_t>();
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
 
-      auto src_ptr = get_pointer(acc_src_data);
-      auto mask_ptr = get_pointer(acc_mask_data);
-      auto maskPrefix_ptr = get_pointer(acc_maskPrefixSum_data);
-      auto tensor_ptr = get_pointer(acc_tensor_data);
+      auto src_ptr = acc_src_data;
+      auto mask_ptr = acc_mask_data;
+      auto maskPrefix_ptr = acc_maskPrefixSum_data;
+      auto tensor_ptr = acc_tensor_data;
 
       if (linear_index < size) {
         // The mask tensor maybe not contiguos.
@@ -966,14 +962,14 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, self.data_ptr<scalar_t>());
-    auto indices_data = get_buffer<dpcpp_r_mode>(__cgh, index.data_ptr<long>());
-    auto source_data = get_buffer<dpcpp_r_mode>(__cgh, source.data_ptr<scalar_t>());
+    auto out_data = self.data_ptr<scalar_t>();
+    auto indices_data = index.data_ptr<long>();
+    auto source_data = source.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = (char*)get_pointer(out_data);
-      auto indices_ptr = get_pointer(indices_data);
-      auto source_ptr = (char*)get_pointer(source_data);
+      auto out_ptr = (char*)out_data;
+      auto indices_ptr = indices_data;
+      auto source_ptr = (char*)source_data;
 
       auto linear_idx = item_id.get_id(0);
       auto idx_offset =
@@ -1098,14 +1094,14 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto dst_data = get_buffer<dpcpp_discard_w_mode>(cgh, dst.data_ptr<scalar_t>());
-    auto idx_data = get_buffer<dpcpp_r_mode>(cgh, index.data_ptr<int64_t>());
+    auto src_data = src.data_ptr<scalar_t>();
+    auto dst_data = dst.data_ptr<scalar_t>();
+    auto idx_data = index.data_ptr<int64_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
-      auto src_ptr = get_pointer(src_data);
-      auto dst_ptr = get_pointer(dst_data);
-      auto idx_ptr = get_pointer(idx_data);
+      auto src_ptr = src_data;
+      auto dst_ptr = dst_data;
+      auto idx_ptr = idx_data;
 
       auto idx = item.get_linear_id();
       auto offset = idx_ptr[idx];

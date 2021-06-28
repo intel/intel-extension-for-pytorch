@@ -34,12 +34,12 @@ static void upsample_bicubic2d_out_frame(
   parallel_for_setup(onum, tile_size, rng, grng);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, idata);
-    auto out_data = get_buffer<dpcpp_w_mode>(cgh, odata);
+    auto in_data = idata;
+    auto out_data = odata;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto in_ptr = get_pointer(in_data);
-      auto out_ptr = get_pointer(out_data);
+      auto in_ptr = in_data;
+      auto out_ptr = out_data;
       int global_id = item.get_global_linear_id();
 
       if (global_id < output_height * output_width) {
@@ -125,12 +125,12 @@ static void upsample_bicubic2d_backward_out_frame(
   parallel_for_setup(onum, tile_size, rng, grng);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_w_mode>(cgh, idata);
-    auto out_data = get_buffer<dpcpp_r_mode>(cgh, odata);
+    auto in_data = idata;
+    auto out_data = odata;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto in_ptr = get_pointer(in_data);
-      auto out_ptr = get_pointer(out_data);
+      auto in_ptr = in_data;
+      auto out_ptr = out_data;
       int global_id = item.get_global_linear_id();
 
       if (global_id < output_height * output_width) {

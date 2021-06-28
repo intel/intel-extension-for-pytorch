@@ -133,8 +133,8 @@ inline void bitonicSortKVInPlace(
   int64_t local_size = Power2SortSize / 2;
   int64_t global_size = keySlices * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto keys_data = get_buffer<dpcpp_rw_mode>(cgh, keys.data);
-    auto values_data = get_buffer<dpcpp_rw_mode>(cgh, values.data);
+    auto keys_data = keys.data;
+    auto values_data = values.data;
     auto sharedKeys_acc = dpcpp_local_acc_t<K>(Power2SortSize, cgh);
     auto sharedValues_acc = dpcpp_local_acc_t<V>(Power2SortSize, cgh);
     auto sharedValid_acc = dpcpp_local_acc_t<bool>(Power2SortSize, cgh);
@@ -146,8 +146,8 @@ inline void bitonicSortKVInPlace(
           IndexToOffset<K, IndexType, KeyDims>::get(group_id, keys);
       const IndexType valueStartOffset =
           IndexToOffset<V, IndexType, ValueDims>::get(group_id, values);
-      auto keys_ptr = get_pointer(keys_data) + keyStartOffset;
-      auto values_ptr = get_pointer(values_data) + valueStartOffset;
+      auto keys_ptr = keys_data + keyStartOffset;
+      auto values_ptr = values_data + valueStartOffset;
       // If the sort size is 1, the data is already sorted
       if (Power2SortSize == 1) {
         return;

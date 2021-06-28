@@ -488,12 +488,12 @@ void dpcpp_small_index_kernel_impl(
   int64_t element_size_bytes = iter.tensor(1).element_size();
   int64_t indice_size_bytes = iter.tensor(2).element_size();
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
-    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(1));
-    using index_buf_type = decltype(get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(0)));
+    auto out_data = (char*)iter.data_ptr(0);
+    auto in_data = (char*)iter.data_ptr(1);
+    using index_buf_type = decltype((char*)iter.data_ptr(0));
     at::detail::Array<index_buf_type, MAX_TENSORINFO_DIMS> index_ptrs;
     for (size_t i = 0; i < num_indices; i++) {
-      index_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 2));
+      index_ptrs[i] = (char*)iter.data_ptr(i + 2);
     }
 
     using local_accessor_t = DPCPP::accessor<
@@ -531,8 +531,8 @@ void dpcpp_small_index_kernel_impl(
         group_linear_id = group_num * group_numel + (group_id - group_num) * group_numel_tail;
         group_numel_range = group_numel_tail;
       }
-      auto out_ptr = get_pointer(out_data);
-      auto in_ptr = get_pointer(in_data);
+      auto out_ptr = out_data;
+      auto in_ptr = in_data;
       item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // compute the in/out/indices offsets and perform memory copy
@@ -579,20 +579,20 @@ void dpcpp_index_kernel_impl(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
-    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(1));
-    using index_buf_type = decltype(get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(0)));
+    auto out_data = (char*)iter.data_ptr(0);
+    auto in_data = (char*)iter.data_ptr(1);
+    using index_buf_type = decltype((char*)iter.data_ptr(0));
     at::detail::Array<index_buf_type, MAX_TENSORINFO_DIMS> index_ptrs;
     for (size_t i = 0; i < num_indices; i++) {
-      index_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 2));
+      index_ptrs[i] = (char*)iter.data_ptr(i + 2);
     }
 
     auto offset_calc = make_offset_calculator<3>(iter);
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto linear_idx = item_id.get_linear_id();
       auto offsets    = offset_calc.get(linear_idx);
-      auto out_ptr = get_pointer(out_data) + offsets[0];
-      auto in_ptr = get_pointer(in_data) + offsets[1];
+      auto out_ptr = out_data + offsets[0];
+      auto in_ptr = in_data + offsets[1];
       int64_t offset  = 0;
       //#pragma unroll
       for (size_t i = 0; i < num_indices; i++) {

@@ -52,11 +52,11 @@ void krn_partials_per_segment(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto ret_data = get_buffer<dpcpp_w_mode>(cgh, ret);
-    auto offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
+    auto ret_data = ret;
+    auto offsets_data = segment_offsets;
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto ret_ptr = get_pointer(ret_data);
-      auto offsets_ptr = get_pointer(offsets_data);
+      auto ret_ptr = ret_data;
+      auto offsets_ptr = offsets_data;
       int64_t id = item.get_global_id(0);
       if (id < num_of_segments) {
         const int64_t idx_start = offsets_ptr[id];
@@ -88,18 +88,15 @@ void krn_partial_segment_offset(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto ret_data = get_buffer<dpcpp_w_mode>(cgh, ret);
-    auto partials_per_segment_data =
-        get_buffer<dpcpp_r_mode>(cgh, partials_per_segment);
-    auto partials_per_segment_offset_data =
-        get_buffer<dpcpp_r_mode>(cgh, partials_per_segment_offset);
-    auto segment_offsets_data =
-        get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
+    auto ret_data = ret;
+    auto partials_per_segment_data = partials_per_segment;
+    auto partials_per_segment_offset_data = partials_per_segment_offset;
+    auto segment_offsets_data = segment_offsets;
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto ret_ptr = get_pointer<int64_t>(ret_data);
-      auto partials_per_segment_ptr = get_pointer(partials_per_segment_data);
-      auto partials_per_segment_offset_ptr = get_pointer(partials_per_segment_offset_data);
-      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+      auto ret_ptr = ret_data;
+      auto partials_per_segment_ptr = partials_per_segment_data;
+      auto partials_per_segment_offset_ptr = partials_per_segment_offset_data;
+      auto segment_offsets_ptr = segment_offsets_data;
 
       int64_t id = item.get_global_id(0);
       if (id < num_of_segments) {
@@ -148,32 +145,32 @@ void compute_grad_weight_bags(
   int64_t per_sample_weights_stride = per_sample_weights.defined() ? per_sample_weights.stride(0) : 0;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_weight_per_segment_data = get_buffer<dpcpp_w_mode>(cgh, grad_weight_per_segment.data_ptr<acc_type<scalar_t>>());
-    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices.data_ptr<int64_t>());
-    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-    auto offset2bag_data = get_buffer<dpcpp_r_mode>(cgh, offset2bag.data_ptr<int64_t>());
+    auto grad_weight_per_segment_data = grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
+    auto indices_data = indices.data_ptr<int64_t>();
+    auto gradOutput_data = gradOutput.data_ptr<scalar_t>();
+    auto offset2bag_data = offset2bag.data_ptr<int64_t>();
     auto count_data = count_defined
-        ? get_buffer<dpcpp_r_mode>(cgh, count.data_ptr<int64_t>())
+        ? count.data_ptr<int64_t>()
         : offset2bag_data; // use the offset2bag_data handler as the dummy buffer.
-    auto bag_size_data = get_buffer<dpcpp_r_mode>(cgh, bag_size.data_ptr<int64_t>());
+    auto bag_size_data = bag_size.data_ptr<int64_t>();
     auto per_sample_weights_data = per_sample_weight_defined
-        ? get_buffer<dpcpp_r_mode>(cgh, per_sample_weights.data_ptr<scalar_t>())
+        ? per_sample_weights.data_ptr<scalar_t>()
         : gradOutput_data; // ise the gradOutput_data handler as the dummy buffer.
-    auto segment_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets.data_ptr<int64_t>());
+    auto segment_offsets_data = segment_offsets.data_ptr<int64_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
-      auto indices_ptr = get_pointer(indices_data);
-      auto gradOutput_ptr = get_pointer(gradOutput_data);
-      auto offset2bag_ptr = get_pointer(offset2bag_data);
+      auto grad_weight_per_segment_ptr = grad_weight_per_segment_data;
+      auto indices_ptr = indices_data;
+      auto gradOutput_ptr = gradOutput_data;
+      auto offset2bag_ptr = offset2bag_data;
       auto count_ptr = count_defined
-          ? get_pointer(count_data)
+          ? count_data
           : NULL;
-      auto bag_size_ptr = get_pointer(bag_size_data);
+      auto bag_size_ptr = bag_size_data;
       auto per_sample_weights_ptr = per_sample_weight_defined
-          ? get_pointer(per_sample_weights_data)
+          ? per_sample_weights_data
           : NULL;
-      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+      auto segment_offsets_ptr = segment_offsets_data;
 
       const int gid = item.get_global_linear_id();
       const int id = gid / stride_warped;
@@ -238,22 +235,22 @@ void compute_grad_weight(
   bool count_defined = count.defined();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_weight_per_segment_data = get_buffer<dpcpp_w_mode>(cgh, grad_weight_per_segment.data_ptr<acc_type<scalar_t>>());
-    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices.data_ptr<int64_t>());
-    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output.data_ptr<scalar_t>());
+    auto grad_weight_per_segment_data = grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
+    auto indices_data = indices.data_ptr<int64_t>();
+    auto grad_output_data = grad_output.data_ptr<scalar_t>();
     auto count_data = count_defined
-        ? get_buffer<dpcpp_r_mode>(cgh, count.data_ptr<int64_t>())
+        ? count.data_ptr<int64_t>()
         : indices_data; // use the indices_data handler as the dummy buffer.
-    auto segment_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets.data_ptr<int64_t>());
+    auto segment_offsets_data = segment_offsets.data_ptr<int64_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
-      auto indices_ptr = get_pointer(indices_data);
-      auto grad_output_ptr = get_pointer(grad_output_data);
+      auto grad_weight_per_segment_ptr = grad_weight_per_segment_data;
+      auto indices_ptr = indices_data;
+      auto grad_output_ptr = grad_output_data;
       auto count_ptr = count_defined
-          ? get_pointer(count_data)
+          ? count_data
           : NULL;
-      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+      auto segment_offsets_ptr = segment_offsets_data;
 
       const int gid = item.get_global_linear_id();
       const int id = gid / stride_warped;
@@ -305,18 +302,18 @@ void sum_and_scatter(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_weight_data = get_buffer<dpcpp_w_mode>(cgh, grad_weight.data_ptr<scalar_t>());
-    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input.data_ptr<int64_t>());
-    auto segment_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets.data_ptr<int64_t>());
-    auto grad_weight_per_segment_data = get_buffer<dpcpp_r_mode>(cgh, grad_weight_per_segment.data_ptr<acc_type<scalar_t>>());
-    auto segment_sizes_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_sizes_offsets.data_ptr<int64_t>());
+    auto grad_weight_data = grad_weight.data_ptr<scalar_t>();
+    auto input_data = input.data_ptr<int64_t>();
+    auto segment_offsets_data = segment_offsets.data_ptr<int64_t>();
+    auto grad_weight_per_segment_data = grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
+    auto segment_sizes_offsets_data = segment_sizes_offsets.data_ptr<int64_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto grad_weight_ptr = get_pointer(grad_weight_data);
-      auto input_ptr = get_pointer(input_data);
-      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
-      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
-      auto segment_sizes_offsets_ptr = get_pointer(segment_sizes_offsets_data);
+      auto grad_weight_ptr = grad_weight_data;
+      auto input_ptr = input_data;
+      auto segment_offsets_ptr = segment_offsets_data;
+      auto grad_weight_per_segment_ptr = grad_weight_per_segment_data;
+      auto segment_sizes_offsets_ptr = segment_sizes_offsets_data;
 
       const int gid = item.get_global_linear_id();
       const int id = gid / stride_warped;
@@ -530,32 +527,32 @@ void EmbeddingBag_updateOutputKernel(
   bool per_sample_weights_defined = per_sample_weights ? true : false;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
-    auto offsets_data = get_buffer<dpcpp_r_mode>(cgh, offsets);
-    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight);
-    auto output_data= get_buffer<dpcpp_discard_w_mode>(cgh, output);
-    auto offset2bag_data = get_buffer<dpcpp_discard_w_mode>(cgh, offset2bag);
-    auto bag_size_data = get_buffer<dpcpp_discard_w_mode>(cgh, bag_size);
+    auto input_data = input;
+    auto offsets_data = offsets;
+    auto weight_data = weight;
+    auto output_data= output;
+    auto offset2bag_data = offset2bag;
+    auto bag_size_data = bag_size;
     // use the weight handler as the dummy handler.
     // The kernel would not access the data thru the per_sample_weights_ptr in false case
     auto per_sample_weights_data = per_sample_weights_defined
-                                  ? get_buffer<dpcpp_r_mode>(cgh, per_sample_weights)
+                                  ? per_sample_weights
                                   : weight_data;
     // use the offset2bag handler as the dummy handler.
     // The kernel would not access the data thru the max_indices_ptr in false case
     auto max_indices_data = mode == MODE_MAX
-                           ? get_buffer<dpcpp_discard_w_mode>(cgh, max_indices)
+                           ? max_indices
                            : offset2bag_data;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      auto input_ptr = get_pointer(input_data);
-      auto offsets_ptr = get_pointer(offsets_data);
-      auto weight_ptr = get_pointer(weight_data);
-      auto output_ptr= get_pointer(output_data);
-      auto offset2bag_ptr = get_pointer(offset2bag_data);
-      auto bag_size_ptr = get_pointer(bag_size_data);
-      auto per_sample_weights_ptr = get_pointer(per_sample_weights_data);
-      auto max_indices_ptr = get_pointer(max_indices_data);
+      auto input_ptr = input_data;
+      auto offsets_ptr = offsets_data;
+      auto weight_ptr = weight_data;
+      auto output_ptr= output_data;
+      auto offset2bag_ptr = offset2bag_data;
+      auto bag_size_ptr = bag_size_data;
+      auto per_sample_weights_ptr = per_sample_weights_data;
+      auto max_indices_ptr = max_indices_data;
 
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
           item.get_local_id()[1];
@@ -738,14 +735,14 @@ void EmbeddingBag_accGradParametersKernel_max(
   int64_t kernel_range = 1024 * 64;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto max_indices_data = get_buffer<dpcpp_r_mode>(cgh, max_indices);
-    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
-    auto gradWeight_data = get_buffer<dpcpp_w_mode>(cgh, gradWeight);
+    auto max_indices_data = max_indices;
+    auto gradOutput_data = gradOutput;
+    auto gradWeight_data = gradWeight;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      auto max_indices_ptr = get_pointer(max_indices_data);
-      auto gradOutput_ptr = get_pointer(gradOutput_data);
-      auto gradWeight_ptr = get_pointer(gradWeight_data);
+      auto max_indices_ptr = max_indices_data;
+      auto gradOutput_ptr = gradOutput_data;
+      auto gradWeight_ptr = gradWeight_data;
 
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
           item.get_local_id()[1];

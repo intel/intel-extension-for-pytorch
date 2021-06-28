@@ -88,14 +88,14 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<K>());
-    auto tgt1_data = get_buffer<dpcpp_w_mode>(cgh, tgt1.data_ptr<K>());
-    auto tgt2_data = get_buffer<dpcpp_w_mode>(cgh, tgt2.data_ptr<Index>());
+    auto src_data = src.data_ptr<K>();
+    auto tgt1_data = tgt1.data_ptr<K>();
+    auto tgt2_data = tgt2.data_ptr<Index>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = get_pointer<K>(src_data);
-      auto tgt1_ptr = get_pointer<K>(tgt1_data);
-      auto tgt2_ptr = get_pointer<Index>(tgt2_data);
+      auto src_ptr = src_data;
+      auto tgt1_ptr = tgt1_data;
+      auto tgt2_ptr = tgt2_data;
 
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
@@ -156,14 +156,14 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<K>());
-    auto tgt1_data = get_buffer<dpcpp_w_mode>(cgh, tgt1.data_ptr<K>());
-    auto tgt2_data = get_buffer<dpcpp_w_mode>(cgh, tgt2.data_ptr<Index>());
+    auto src_data = src.data_ptr<K>();
+    auto tgt1_data = tgt1.data_ptr<K>();
+    auto tgt2_data = tgt2.data_ptr<Index>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = get_pointer(src_data);
-      auto tgt1_ptr = get_pointer(tgt1_data);
-      auto tgt2_ptr = get_pointer(tgt2_data);
+      auto src_ptr = src_data;
+      auto tgt1_ptr = tgt1_data;
+      auto tgt2_ptr = tgt2_data;
 
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;

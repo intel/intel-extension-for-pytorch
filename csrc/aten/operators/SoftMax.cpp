@@ -95,8 +95,8 @@ void SpatialSoftMaxForward(
   size_t global_size = outer_size * local_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input);
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output);
+    auto in_data = input;
+    auto out_data = output;
     auto local_acc_max = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxForwardKernelName<
@@ -110,8 +110,8 @@ void SpatialSoftMaxForward(
           auto data_offset =
               IndexToOffset<scalar_t, uint64_t>::get(
                   group_id, outer_info);
-          auto in_ptr = get_pointer(in_data) + data_offset;
-          auto out_ptr = get_pointer(out_data)+ data_offset;
+          auto in_ptr = in_data + data_offset;
+          auto out_ptr = out_data+ data_offset;
           // get max
           auto max_input = in_ptr[0];
           for (uint32_t i = local_id; i < dim_size; i += local_size) {
@@ -172,9 +172,9 @@ void SpatialSoftMaxBackward(
   size_t global_size = outer_size * local_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradInput_data = get_buffer<dpcpp_discard_w_mode>(cgh, gradInput);
-    auto output_data = get_buffer<dpcpp_r_mode>(cgh, output);
-    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
+    auto gradInput_data = gradInput;
+    auto output_data = output;
+    auto gradOutput_data = gradOutput;
     auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxBackwardKernelName<
         scalar_t,
@@ -187,9 +187,9 @@ void SpatialSoftMaxBackward(
           auto data_offset =
               IndexToOffset<outscalar_t, uint64_t>::get(
                   group_id, outer_info);
-          auto gradInput_ptr = get_pointer(gradInput_data) + data_offset;
-          auto output_ptr = get_pointer(output_data) + data_offset;
-          auto gradOutput_ptr = get_pointer(gradOutput_data) + data_offset;
+          auto gradInput_ptr = gradInput_data + data_offset;
+          auto output_ptr = output_data + data_offset;
+          auto gradOutput_ptr = gradOutput_data + data_offset;
 
           auto thread_sum = static_cast<accscalar_t>(0);
           for (size_t i = local_id; i < dim_size; i += local_size) {

@@ -100,28 +100,28 @@ void ctc_loss_log_alpha_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto log_alpha_data =
-        get_buffer<dpcpp_rw_mode>(cgh, log_alpha.data_ptr<scalar_t>());
+        log_alpha.data_ptr<scalar_t>();
     auto log_probs_data =
-        get_buffer<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr<scalar_t>());
+        log_probs.data_ptr<scalar_t>();
     auto input_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, input_lengths.data_ptr<int64_t>());
-    auto targets_data = get_buffer<dpcpp_rw_mode>(cgh, targets.data_ptr<target_t>());
+        input_lengths.data_ptr<int64_t>();
+    auto targets_data = targets.data_ptr<target_t>();
     auto target_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, target_lengths.data_ptr<int64_t>());
+        target_lengths.data_ptr<int64_t>();
     auto neg_log_likelihood_data =
-        get_buffer<dpcpp_r_mode>(cgh, neg_log_likelihood.data_ptr<scalar_t>());
+        neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data =
-        get_buffer<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr<int64_t>());
+        tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       size_t intra_batch_id = item_id.get_local_id(0);
       size_t intra_batch_size = item_id.get_local_range(0);
-      scalar_t* log_alpha_ptr = get_pointer(log_alpha_data);
-      scalar_t* log_probs_ptr = get_pointer(log_probs_data);
-      target_t* targets_ptr = get_pointer(targets_data);
-      scalar_t* neg_log_likelihood_ptr = get_pointer(neg_log_likelihood_data);
-      int64_t* input_lengths_ptr = get_pointer(input_lengths_data);
-      int64_t* target_lengths_ptr = get_pointer(target_lengths_data);
-      int64_t* tg_batch_offsets_ptr = get_pointer(tg_batch_offsets_data);
+      scalar_t* log_alpha_ptr = log_alpha_data;
+      scalar_t* log_probs_ptr = log_probs_data;
+      target_t* targets_ptr = targets_data;
+      scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
+      int64_t* input_lengths_ptr = input_lengths_data;
+      int64_t* target_lengths_ptr = target_lengths_data;
+      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
       // bookkeeping
       int64_t b = item_id.get_local_id(1) +
@@ -323,25 +323,25 @@ void ctc_loss_backward_log_beta_kernel(
       get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto log_beta_data = get_buffer<dpcpp_rw_mode>(cgh, log_beta.data_ptr<scalar_t>());
+    auto log_beta_data = log_beta.data_ptr<scalar_t>();
     auto log_probs_data =
-        get_buffer<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr<scalar_t>());
+        log_probs.data_ptr<scalar_t>();
     auto input_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, input_lengths.data_ptr<int64_t>());
-    auto targets_data = get_buffer<dpcpp_rw_mode>(cgh, targets.data_ptr<target_t>());
+        input_lengths.data_ptr<int64_t>();
+    auto targets_data = targets.data_ptr<target_t>();
     auto target_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, target_lengths.data_ptr<int64_t>());
+        target_lengths.data_ptr<int64_t>();
     auto tg_batch_offsets_data =
-        get_buffer<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr<int64_t>());
+        tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       size_t intra_batch_id = item_id.get_local_id(0);
       size_t intra_batch_size = item_id.get_local_range(0);
-      scalar_t* log_beta_ptr = get_pointer(log_beta_data);
-      scalar_t* log_probs_ptr = get_pointer(log_probs_data);
-      target_t* targets_ptr = get_pointer(targets_data);
-      int64_t* input_lengths_ptr = get_pointer(input_lengths_data);
-      int64_t* target_lengths_ptr = get_pointer(target_lengths_data);
-      int64_t* tg_batch_offsets_ptr = get_pointer(tg_batch_offsets_data);
+      scalar_t* log_beta_ptr = log_beta_data;
+      scalar_t* log_probs_ptr = log_probs_data;
+      target_t* targets_ptr = targets_data;
+      int64_t* input_lengths_ptr = input_lengths_data;
+      int64_t* target_lengths_ptr = target_lengths_data;
+      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
       // bookkeeping
       int64_t b = item_id.get_local_id(1) +
@@ -542,33 +542,33 @@ void ctc_loss_backward_collect_nonblank_kernel(
       get_work_range(sycl_queue, max_target_length, batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradient_data = get_buffer<dpcpp_rw_mode>(cgh, gradient.data_ptr<scalar_t>());
-    auto grad_out_data = get_buffer<dpcpp_rw_mode>(cgh, grad_out.data_ptr<scalar_t>());
+    auto gradient_data = gradient.data_ptr<scalar_t>();
+    auto grad_out_data = grad_out.data_ptr<scalar_t>();
     auto log_alpha_data =
-        get_buffer<dpcpp_rw_mode>(cgh, log_alpha.data_ptr<scalar_t>());
-    auto log_beta_data = get_buffer<dpcpp_rw_mode>(cgh, log_beta.data_ptr<scalar_t>());
+        log_alpha.data_ptr<scalar_t>();
+    auto log_beta_data = log_beta.data_ptr<scalar_t>();
     auto log_probs_data =
-        get_buffer<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr<scalar_t>());
+        log_probs.data_ptr<scalar_t>();
     auto input_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, input_lengths.data_ptr<int64_t>());
-    auto targets_data = get_buffer<dpcpp_rw_mode>(cgh, targets.data_ptr<target_t>());
+        input_lengths.data_ptr<int64_t>();
+    auto targets_data = targets.data_ptr<target_t>();
     auto target_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, target_lengths.data_ptr<int64_t>());
+        target_lengths.data_ptr<int64_t>();
     auto neg_log_likelihood_data =
-        get_buffer<dpcpp_r_mode>(cgh, neg_log_likelihood.data_ptr<scalar_t>());
+        neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data =
-        get_buffer<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr<int64_t>());
+        tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      auto* gradient_ptr = get_pointer(gradient_data);
-      scalar_t* grad_out_ptr = get_pointer(grad_out_data);
-      scalar_t* log_alpha_ptr = get_pointer(log_alpha_data);
-      scalar_t* log_beta_ptr = get_pointer(log_beta_data);
-      scalar_t* log_probs_ptr = get_pointer(log_probs_data);
-      target_t* targets_ptr = get_pointer(targets_data);
-      scalar_t* neg_log_likelihood_ptr = get_pointer(neg_log_likelihood_data);
-      int64_t* input_lengths_ptr = get_pointer(input_lengths_data);
-      int64_t* target_lengths_ptr = get_pointer(target_lengths_data);
-      int64_t* tg_batch_offsets_ptr = get_pointer(tg_batch_offsets_data);
+      auto* gradient_ptr = gradient_data;
+      scalar_t* grad_out_ptr = grad_out_data;
+      scalar_t* log_alpha_ptr = log_alpha_data;
+      scalar_t* log_beta_ptr = log_beta_data;
+      scalar_t* log_probs_ptr = log_probs_data;
+      target_t* targets_ptr = targets_data;
+      scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
+      int64_t* input_lengths_ptr = input_lengths_data;
+      int64_t* target_lengths_ptr = target_lengths_data;
+      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
       int64_t b = item_id.get_local_id(1) +
           item_id.get_group(1) * item_id.get_local_range(1);
@@ -668,33 +668,33 @@ void ctc_loss_backward_collect_kernel(
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, log_probs.size(0), batch_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradient_data = get_buffer<dpcpp_rw_mode>(cgh, gradient.data_ptr<scalar_t>());
-    auto grad_out_data = get_buffer<dpcpp_rw_mode>(cgh, grad_out.data_ptr<scalar_t>());
+    auto gradient_data = gradient.data_ptr<scalar_t>();
+    auto grad_out_data = grad_out.data_ptr<scalar_t>();
     auto log_alpha_data =
-        get_buffer<dpcpp_rw_mode>(cgh, log_alpha.data_ptr<scalar_t>());
-    auto log_beta_data = get_buffer<dpcpp_rw_mode>(cgh, log_beta.data_ptr<scalar_t>());
+        log_alpha.data_ptr<scalar_t>();
+    auto log_beta_data = log_beta.data_ptr<scalar_t>();
     auto log_probs_data =
-        get_buffer<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr<scalar_t>());
+        log_probs.data_ptr<scalar_t>();
     auto input_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, input_lengths.data_ptr<int64_t>());
-    auto targets_data = get_buffer<dpcpp_rw_mode>(cgh, targets.data_ptr<target_t>());
+        input_lengths.data_ptr<int64_t>();
+    auto targets_data = targets.data_ptr<target_t>();
     auto target_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, target_lengths.data_ptr<int64_t>());
+        target_lengths.data_ptr<int64_t>();
     auto neg_log_likelihood_data =
-        get_buffer<dpcpp_r_mode>(cgh, neg_log_likelihood.data_ptr<scalar_t>());
+        neg_log_likelihood.data_ptr<scalar_t>();
     auto tg_batch_offsets_data =
-        get_buffer<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr<int64_t>());
+        tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      scalar_t* gradient_ptr = get_pointer(gradient_data);
-      scalar_t* grad_out_ptr = get_pointer(grad_out_data);
-      scalar_t* log_alpha_ptr = get_pointer(log_alpha_data);
-      scalar_t* log_beta_ptr = get_pointer(log_beta_data);
-      scalar_t* log_probs_ptr = get_pointer(log_probs_data);
-      target_t* targets_ptr = get_pointer(targets_data);
-      scalar_t* neg_log_likelihood_ptr = get_pointer(neg_log_likelihood_data);
-      int64_t* input_lengths_ptr = get_pointer(input_lengths_data);
-      int64_t* target_lengths_ptr = get_pointer(target_lengths_data);
-      int64_t* tg_batch_offsets_ptr = get_pointer(tg_batch_offsets_data);
+      scalar_t* gradient_ptr = gradient_data;
+      scalar_t* grad_out_ptr = grad_out_data;
+      scalar_t* log_alpha_ptr = log_alpha_data;
+      scalar_t* log_beta_ptr = log_beta_data;
+      scalar_t* log_probs_ptr = log_probs_data;
+      target_t* targets_ptr = targets_data;
+      scalar_t* neg_log_likelihood_ptr = neg_log_likelihood_data;
+      int64_t* input_lengths_ptr = input_lengths_data;
+      int64_t* target_lengths_ptr = target_lengths_data;
+      int64_t* tg_batch_offsets_ptr = tg_batch_offsets_data;
 
       int64_t b = item_id.get_local_id(1) +
           item_id.get_group(1) * item_id.get_local_range(1);
@@ -786,12 +786,12 @@ void ctc_loss_zero_padded_gradients(
       get_work_range(sycl_queue, max_input_length, batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradient_data = get_buffer<dpcpp_rw_mode>(cgh, gradient.data_ptr<scalar_t>());
+    auto gradient_data = gradient.data_ptr<scalar_t>();
     auto input_lengths_data =
-        get_buffer<dpcpp_r_mode>(cgh, input_lengths.data_ptr<int64_t>());
+        input_lengths.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      scalar_t* gradient_ptr = get_pointer(gradient_data);
-      int64_t* input_lengths_ptr = get_pointer(input_lengths_data);
+      scalar_t* gradient_ptr = gradient_data;
+      int64_t* input_lengths_ptr = input_lengths_data;
 
       int64_t b = item_id.get_local_id(1) +
           item_id.get_group(1) * item_id.get_local_range(1);

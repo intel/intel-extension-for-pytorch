@@ -57,20 +57,20 @@ void flip_dpcpp_kernel(
   parallel_for_setup(N, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_tensor_d = get_buffer<dpcpp_r_mode>(cgh, in_tensor.data_ptr<scalar_t>());
-    auto out_tensor_d = get_buffer<dpcpp_w_mode>(cgh, out_tensor.data_ptr<scalar_t>());
-    auto stride_contiguous_d = get_buffer<dpcpp_r_mode>(cgh, stride_contiguous_t.data_ptr<int64_t>());
-    auto sizes_d = get_buffer<dpcpp_r_mode>(cgh, sizes_t.data_ptr<int64_t>());
-    auto strides_d = get_buffer<dpcpp_r_mode>(cgh, strides_t.data_ptr<int64_t>());
+    auto in_tensor_d = in_tensor.data_ptr<scalar_t>();
+    auto out_tensor_d = out_tensor.data_ptr<scalar_t>();
+    auto stride_contiguous_d = stride_contiguous_t.data_ptr<int64_t>();
+    auto sizes_d = sizes_t.data_ptr<int64_t>();
+    auto strides_d = strides_t.data_ptr<int64_t>();
 
     // auto local_output_data = dpcpp_local_acc_t<scalar_t>(1024, cgh);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto in_tensor_ptr = get_pointer(in_tensor_d);
-      auto out_tensor_ptr = get_pointer(out_tensor_d);
-      auto stride_contiguous_ptr = get_pointer(stride_contiguous_d);
-      auto sizes_ptr = get_pointer(sizes_d);
-      auto strides_ptr = get_pointer(strides_d);
+      auto in_tensor_ptr = in_tensor_d;
+      auto out_tensor_ptr = out_tensor_d;
+      auto stride_contiguous_ptr = stride_contiguous_d;
+      auto sizes_ptr = sizes_d;
+      auto strides_ptr = strides_d;
       auto linear_index = item.get_global_id(0);
 
       int64_t cur_indices = linear_index;
@@ -140,15 +140,15 @@ void roll_dpcpp_kernel(
   parallel_for_setup(N, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
+    auto in_data = in_tensor.data_ptr<scalar_t>();
     auto out_data =
-        get_buffer<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
+        out_tensor.data_ptr<scalar_t>();
     cgh.parallel_for<roll_dpcpp_ker<scalar_t>>(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
-          auto in_ptr = get_pointer(in_data);
-          auto out_ptr = get_pointer(out_data);
+          auto in_ptr = in_data;
+          auto out_ptr = out_data;
           if (linear_index < N) {
             // roll dim idx is the index of linear_index along the rolling
             // dimension.

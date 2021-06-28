@@ -35,12 +35,12 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
 
   auto& queue = getCurrentDPCPPStream().dpcpp_queue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto dst_data = get_buffer<dpcpp_discard_w_mode>(cgh, dst.data_ptr<scalar_t>());
+    auto src_data = src.data_ptr<scalar_t>();
+    auto dst_data = dst.data_ptr<scalar_t>();
     // (TODO) single_task need replaced due to low efficiency
     cgh.single_task<scanthrust_dpcpp_ker<scalar_t, BinaryFunction>>([=]() {
-      auto ptr_dst = get_pointer(dst_data);
-      auto ptr_src = get_pointer(src_data);
+      auto ptr_dst = dst_data;
+      auto ptr_src = src_data;
       dpcpp_inclusive_scan(ptr_src, ptr_src + size, ptr_dst, binary_op);
     });
   };
@@ -67,12 +67,12 @@ void scanOuterDim(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto tgt_data = get_buffer<dpcpp_discard_w_mode>(cgh, tgt.data_ptr<scalar_t>());
+    auto src_data = src.data_ptr<scalar_t>();
+    auto tgt_data = tgt.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = get_pointer(src_data);
-      auto tgt_ptr = get_pointer(tgt_data);
+      auto src_ptr = src_data;
+      auto tgt_ptr = tgt_data;
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
            linearIndex += item.get_global_range()[0]) {
@@ -116,12 +116,12 @@ void scanInnermostDim(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto tgt_data = get_buffer<dpcpp_discard_w_mode>(cgh, tgt.data_ptr<scalar_t>());
+    auto src_data = src.data_ptr<scalar_t>();
+    auto tgt_data = tgt.data_ptr<scalar_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = get_pointer(src_data);
-      auto tgt_ptr = get_pointer(tgt_data);
+      auto src_ptr = src_data;
+      auto tgt_ptr = tgt_data;
 
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
