@@ -2924,7 +2924,7 @@ at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self,
   return at::Tensor();
 }
 
-at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self, at::Scalar &other) {
+at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self, const at::Scalar &other) {
   auto tensor = at::scalar_to_tensor(other);
   DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
   auto impl = tensor.unsafeGetTensorImpl();
@@ -2940,7 +2940,7 @@ at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self,
   return AtenIpexCPUDev::dil_div_out(self, self, other);
 }
 
-at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self, at::Scalar &other) {
+at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self, const at::Scalar &other) {
   auto tensor = at::scalar_to_tensor(other);
   DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
   auto impl = tensor.unsafeGetTensorImpl();

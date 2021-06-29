@@ -1,5 +1,5 @@
 from .interaction import interaction
-from .embeddingbag import embeddingbag
+from .embeddingbag import ipex_embedding_bag
 from .linear import *
 from .pooling import *
 from .mlp import *
