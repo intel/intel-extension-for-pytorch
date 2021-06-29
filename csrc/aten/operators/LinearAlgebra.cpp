@@ -66,8 +66,73 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
+Tensor chain_matmul_three_matrices(TensorList matrices) {
+  int64_t a = matrices[0].size(0);  // first dimension
+  int64_t b = matrices[1].size(0);  // the common dimension between the first two matrices
+  int64_t c = matrices[2].size(0);  // the common dimension between the last two matrices
+  int64_t d = matrices[2].size(1);  // the last dimension
+
+  int64_t cost_1 = (a * c) * (b + d);
+  int64_t cost_2 = (b * d) * (a + c);
+  if (cost_1 > cost_2) {
+    return at::mm(matrices[0], at::mm(matrices[1], matrices[2]));
+  } else {
+    return at::mm(at::mm(matrices[0], matrices[1]), matrices[2]);
+  }
+}
+
+Tensor chain_matmul_recursion(TensorList matrices, std::vector<std::vector<int64_t>>& order, int64_t i, int64_t j) {
+  if (i == j)
+    return matrices[i];
+  else
+    return at::mm(chain_matmul_recursion(matrices, order, i, order[i][j]), chain_matmul_recursion(matrices, order, order[i][j] + 1, j));
+}
 
 } // namespace impl
+
+Tensor chain_matmul(TensorList matrices) {
+  native::checkAllSameDim(matrices, 2);
+
+  TORCH_CHECK(matrices.size() > 0, "chain_matmul: Expected one or more matrices");
+  if (matrices.size() == 1) {
+    return matrices[0];
+  } else if (matrices.size() == 2) {
+    return at::mm(matrices[0], matrices[1]);
+  } else if (matrices.size() == 3) {
+    return impl::chain_matmul_three_matrices(matrices);
+  } else {
+
+    auto n = matrices.size();
+
+    std::vector<int64_t> p;
+    p.push_back(matrices[0].size(0));
+    for (size_t i = 0; i < n; i++) {
+      p.push_back(matrices[i].size(1));
+    }
+
+    std::vector<std::vector<int64_t>> m(n, std::vector<int64_t>(n, 0));
+
+    std::vector<std::vector<int64_t>> s(n, std::vector<int64_t>(n));
+
+    int64_t j, q;
+
+    for (int64_t l = 1; l < n; l++) {
+      for (int64_t i = 0; i < n - l; i++) {
+        j = i + l;
+        m[i][j] = std::numeric_limits<int64_t>::max();
+        for (int64_t k = i; k < j; k++) {
+          q = m[i][k] + m[k + 1][j] + p[i] * p[k + 1] * p[j + 1];
+          if (q < m[i][j]) {
+            m[i][j] = q;
+            s[i][j] = k;
+          }
+        }
+      }
+    }
+
+    return impl::chain_matmul_recursion(matrices, s, 0, n - 1);
+  }
+}
 
 Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper) {
 #ifdef USE_ONEMKL

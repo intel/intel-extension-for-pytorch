@@ -157,6 +157,7 @@ static Tensor & bitwise_xor_out(Tensor & out, const Tensor & self, Scalar other)
 static Tensor bmm(const Tensor & self, const Tensor & mat2); // aten::bmm(Tensor self, Tensor mat2) -> Tensor
 static Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2); // aten::bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & ceil_out(Tensor & out, const Tensor & self); // aten::ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor chain_matmul(TensorList matrices); // aten::chain_matmul(Tensor[] matrices) -> Tensor
 static Tensor cholesky_inverse(const Tensor & self, bool upper); // aten::cholesky_inverse(Tensor self, bool upper=False) -> Tensor
 static Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper); // aten::cholesky_inverse.out(Tensor self, bool upper=False, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor cholesky_solve(const Tensor & self, const Tensor & input2, bool upper); // aten::cholesky_solve(Tensor self, Tensor input2, bool upper=False) -> Tensor
