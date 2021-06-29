@@ -42,9 +42,10 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
 
 FROM dev-base AS build
 ARG IPEX_VERSION=v1.8.0
+ARG PYTORCH_VERSION=v1.8.0
 COPY --from=conda /opt/conda /opt/conda
 RUN --mount=type=cache,target=/opt/ccache \
-    pip3 install torch==${IPEX_VERSION}+cpu torchvision \
+    pip3 install torch==${PYTORCH_VERSION}+cpu torchvision \
     -f https://download.pytorch.org/whl/torch_stable.html && \
     git clone -b ${IPEX_VERSION} --single-branch https://github.com/intel/intel-extension-for-pytorch && \
     cd intel-extension-for-pytorch && git submodule sync && \
