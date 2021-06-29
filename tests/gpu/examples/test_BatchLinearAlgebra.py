@@ -32,6 +32,45 @@ class TestTorchMethod(TestCase):
                          torch.triu(y_dpcpp2).to(cpu_device))
 
     @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
+    def test_cholesky_solve(self, dtype=torch.float):
+        a = torch.randn([3, 3], device=cpu_device)
+        print (" cpu a  ", a)
+        a = torch.mm(a, a.t())
+        print (" cpu mm a  ", a)
+        a_dpcpp = a.to(dpcpp_device)
+        print (" xpu a_dpcpp  ", a_dpcpp.cpu())
+
+        u = torch.cholesky(a)
+        print (" =cpu u ==", u)
+        u_dpcpp = u.to(dpcpp_device)
+        print (" xpu u_dpcpp  ", u_dpcpp.cpu())
+
+        b = torch.randn([3, 2], device=cpu_device)
+        print (" cpu b  ", b)
+        b_dpcpp = b.to(dpcpp_device)
+        print (" xpu b_dpcpp  ", b_dpcpp.cpu())
+
+        res = torch.cholesky_solve(b, u)
+        print (" cpu res  ", res)
+        check_res = torch.mm(a.inverse(), b)
+        print (" cpu check_res  ", check_res)
+        res_tensor = b.cholesky_solve(u)
+        print (" cpu res_tensor  ", res_tensor)
+
+        res_dpcpp = torch.cholesky_solve(b_dpcpp, u_dpcpp)
+        print (" xpu res_dpcpp  ", res_dpcpp.cpu())
+
+        check_res_dpcpp = torch.mm(a_dpcpp.inverse(), b_dpcpp)
+        print (" xpu check_res_dpcpp  ", check_res_dpcpp.cpu())
+
+        res_tensor_dpcpp = b_dpcpp.cholesky_solve(u_dpcpp)
+        print (" xpu res_tensor_dpcpp  ", res_tensor_dpcpp.cpu())
+
+        self.assertEqual(res.to(cpu_device), res_dpcpp.to(cpu_device))
+        self.assertEqual(check_res.to(cpu_device), check_res_dpcpp.to(cpu_device))
+        self.assertEqual(res_tensor.to(cpu_device), res_tensor_dpcpp.to(cpu_device))
+
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_logdet(self, dtype=torch.float):
         ts = int(time.time())
         torch.manual_seed(ts)

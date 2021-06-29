@@ -159,6 +159,8 @@ static Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
 static Tensor & ceil_out(Tensor & out, const Tensor & self); // aten::ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor cholesky_inverse(const Tensor & self, bool upper); // aten::cholesky_inverse(Tensor self, bool upper=False) -> Tensor
 static Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper); // aten::cholesky_inverse.out(Tensor self, bool upper=False, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor cholesky_solve(const Tensor & self, const Tensor & input2, bool upper); // aten::cholesky_solve(Tensor self, Tensor input2, bool upper=False) -> Tensor
+static Tensor & cholesky_solve_out(Tensor & out, const Tensor & self, const Tensor & input2, bool upper); // aten::cholesky_solve.out(Tensor self, Tensor input2, bool upper=False, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor clamp(const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> Tensor
 static Tensor & clamp_(Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp_(Tensor(a!) self, Scalar? min=None, Scalar? max=None) -> Tensor(a!)
 static Tensor & clamp_max_(Tensor & self, Scalar max); // aten::clamp_max_(Tensor(a!) self, Scalar max) -> Tensor(a!)

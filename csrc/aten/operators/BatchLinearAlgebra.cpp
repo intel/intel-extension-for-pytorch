@@ -538,6 +538,56 @@ static void apply_triangular_solve(
 #endif
 }
 
+template <typename scalar_t>
+static void apply_cholesky_solve_dpcpp_(
+    const Tensor& b_,
+    const Tensor& A_,
+    bool upper_,
+    std::vector<int64_t>& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo = upper_ ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  int64_t batch_size = native::batchCount(b_);
+  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+  int64_t group_count = (batch_size + local_size - 1) / local_size;
+  int64_t* group_sizes = new int64_t[group_count];
+  for (auto i = 0; i < group_count; i++)
+    group_sizes[i] = std::min(local_size, batch_size-i*local_size);
+
+  std::vector<oneapi::mkl::transpose> trans(group_count, oneapi::mkl::transpose::nontrans);
+  std::vector<int64_t> n(group_count, A_.size(-2));
+  std::vector<int64_t> nrhs(group_count, b_.size(-1));
+  std::vector<int64_t> lda(group_count, A_.size(-2));
+  std::vector<int64_t> ldb(group_count, b_.size(-2));
+
+  scalar_t *a_ptr = (scalar_t*)(A_.data_ptr());
+  scalar_t *b_ptr = (scalar_t*)(b_.data_ptr());
+  std::vector<scalar_t*> a;
+  std::vector<scalar_t*> b;
+  int64_t stride_a = native::matrixStride(A_);
+  int64_t stride_b = native::matrixStride(b_);
+  for (auto i = 0; i < batch_size; i++) {
+    a.push_back(&a_ptr[i * stride_a]);
+    b.push_back(&b_ptr[i * stride_b]);
+  }
+
+  int64_t scratchpadsize =
+    oneapi::mkl::lapack::potrs_batch_scratchpad_size<scalar_t>(
+        dpcpp_queue, &uplo, n.data(), nrhs.data(), lda.data(), ldb.data(), group_count, group_sizes);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, b_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::lapack::potrs_batch,
+        dpcpp_queue, &uplo, n.data(), nrhs.data(),
+        a.data(), lda.data(), b.data(), ldb.data(), group_count, group_sizes,
+        (scalar_t *)(scratchpad_at.data_ptr()), scratchpadsize);
+  } catch (oneapi::mkl::lapack::batch_error be) {
+    error_handle(infos_, be);
+  }
+#else
+  AT_ERROR("lu: oneMKL library not found in compilation");
+#endif
+}
+
 } // namespace impl
 
 Tensor& triu_out(Tensor& out, const Tensor& self, int64_t diagonal) {
@@ -1023,6 +1073,38 @@ std::tuple<Tensor&, Tensor&> triangular_solve_out(
   result.resize_as_(result_tmp).copy_(result_tmp);
   clone_A.resize_as_(clone_A_tmp).copy_(clone_A_tmp);
   return std::tuple<Tensor&, Tensor&>(result, clone_A);
+}
+
+Tensor _cholesky_solve_helper(const Tensor& self, const Tensor& input2, bool upper) {
+  auto self_working_copy = native::cloneBatchedColumnMajor(self);
+  auto input2_working_copy = native::cloneBatchedColumnMajor(input2);
+  std::vector<int64_t> infos(native::batchCount(self), 0);
+  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_solve_dpcpp", [&]{
+    impl::apply_cholesky_solve_dpcpp_<scalar_t>(self_working_copy, input2_working_copy, upper, infos);
+  });
+  if (self.dim() > 2) {
+    native::batchCheckErrors(infos, "cholesky_solve_dpcpp");
+  } else {
+    native::singleCheckErrors(infos[0], "cholesky_solve_dpcpp");
+  }
+  return self_working_copy;
+}
+
+Tensor cholesky_solve(const Tensor& self, const Tensor& input2, bool upper) {
+  TORCH_CHECK(self.dim() >= 2,
+              "b should have at least 2 dimensions, but has ", self.dim(), " dimensions instead");
+  TORCH_CHECK(input2.dim() >= 2,
+              "u should have at least 2 dimensions, but has ", input2.dim(), " dimensions instead");
+  Tensor self_broadcasted, input2_broadcasted;
+  std::tie(self_broadcasted, input2_broadcasted) =
+      native::_linalg_broadcast_batch_dims(self, input2, "cholesky_solve_dpcpp");
+  return at::AtenIpexTypeXPU::_cholesky_solve_helper(self_broadcasted, input2_broadcasted, upper);
+}
+
+Tensor& cholesky_solve_out(Tensor & out, const Tensor & self, const Tensor & input2, bool upper) {
+  Tensor out_tmp = at::AtenIpexTypeXPU::cholesky_solve(self, input2, upper);
+  out.resize_as_(out_tmp).copy_(out_tmp);
+  return out;
 }
 
 } // namespace AtenIpexTypeXPU
