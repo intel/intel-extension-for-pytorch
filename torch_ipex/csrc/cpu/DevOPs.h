@@ -45,6 +45,7 @@ class AtenIpexCPUDev {
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask);
   static at::Tensor dil_dropout(const at::Tensor& self, double ratio, bool train);
   static at::Tensor dil_dropout_backward(const at::Tensor& grady, const at::Tensor& mask, double ratio);
+  static at::Tensor dil_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var, bool train, double momentum, double eps, bool cudnn_enabled);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var, bool train, double momentum, double eps);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_batch_norm_backward(const at::Tensor& grad_output, const at::Tensor& input, const at::Tensor& weight, const at::Tensor& running_mean, const at::Tensor& running_var, const at::Tensor& save_mean, const at::Tensor& save_invstd, bool train,double eps, std::array<bool,3> grad_input_mask);
   static at::Tensor dil_frozen_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var, double eps);

@@ -1232,6 +1232,27 @@ at::Tensor AtenIpexCPUDev::dil_dropout_backward(
   return dbl::comm::gen_aten_tensor_by(std::move(dX));
 }
 
+at::Tensor AtenIpexCPUDev::dil_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    bool train,
+    double momentum,
+    double eps,
+    bool cudnn_enabled) {
+  return std::get<0>(at::native_batch_norm(
+    input,
+    weight,
+    bias,
+    running_mean,
+    running_var,
+    train,
+    momentum,
+    eps));
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_norm(
     const at::Tensor& input,
     const at::Tensor& weight,
