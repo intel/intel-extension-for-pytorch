@@ -20,13 +20,12 @@ RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     vim \
     build-essential \
     ccache \
-    libjemalloc-dev \
+    libgoogle-perftools-dev \
     numactl \
     cmake \
     libjpeg-dev \
     pybind11-dev \
     libpng-dev \
-	pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN /usr/sbin/update-ccache-symlinks
 RUN mkdir /opt/ccache && ccache --set-config=cache_dir=/opt/ccache
@@ -42,22 +41,16 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
     /opt/conda/bin/conda clean -ya
 
 FROM dev-base AS build
+ARG IPEX_VERSION=v1.8.0
 COPY --from=conda /opt/conda /opt/conda
-ARG TORCHVISION_VERSION=0.6
 RUN --mount=type=cache,target=/opt/ccache \
-    pip install torchvision==${TORCHVISION_VERSION}+cpu --no-deps \
+    pip3 install torch==${IPEX_VERSION}+cpu torchvision \
     -f https://download.pytorch.org/whl/torch_stable.html && \
-    pip install lark-parser hypothesis && \
-    git clone https://github.com/intel/intel-extension-for-pytorch && \
+    git clone -b ${IPEX_VERSION} --single-branch https://github.com/intel/intel-extension-for-pytorch && \
     cd intel-extension-for-pytorch && git submodule sync && \
     git submodule update --init --recursive && \
-    git clone https://github.com/pytorch/pytorch && \
-    cd pytorch && git checkout v1.7.0 && git submodule sync && \
-    git submodule update --init --recursive && \
-    git apply ../torch_patches/xpu-1.7.patch && \
-    USE_MKLDNN=1 USE_CUDA=0 USE_NNPACK=0 USE_CUDNN=0 \
-    CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" pip install -v . && \
-    cd .. && pip install -v . && rm -rf *
+    pip3 install -r requirements.txt && \
+    pip3 install -v . && rm -rf *
 
 FROM dev-base as dev
 COPY --from=build /opt/conda /opt/conda
@@ -67,6 +60,5 @@ ARG KMP_BLOCKTIME=1
 ENV KMP_BLOCKTIME ${KMP_BLOCKTIME} 
 ARG KMP_HW_SUBSET=1T
 ENV KMP_HW_SUBSET ${KMP_HW_SUBSET}
-ENV MALLOC_CONF "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
-ENV LD_PRELOAD "/opt/conda/lib/libiomp5.so /usr/lib/x86_64-linux-gnu/libjemalloc.so"
+ENV LD_PRELOAD "/opt/conda/lib/libiomp5.so /usr/lib/x86_64-linux-gnu/libtcmalloc.so"
 ENV LD_LIBRARY_PATH "/opt/conda/lib/python3.8/site-packages/lib/"
