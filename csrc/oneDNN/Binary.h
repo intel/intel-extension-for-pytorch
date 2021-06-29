@@ -18,12 +18,14 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace oneDNN {
 
-template <dnnl::algorithm algo>
+template <
+    dnnl::algorithm algo,
+    dnnl::algorithm algo_post = dnnl::algorithm::binary_add>
 static inline Tensor bin(
-  Tensor& output,
-  const Tensor& t1,
-  const Tensor& t2,
-  const Tensor t3 = at::Tensor()) {
+    Tensor& output,
+    const Tensor& t1,
+    const Tensor& t2,
+    const Tensor t3 = at::Tensor()) {
   auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
   auto ctx1 = DPCPPTensorContext::get_tensor_ctx(t1);
@@ -63,7 +65,7 @@ static inline Tensor bin(
                      get_onednn_strides(t3)) :
         ctx3.meta();
     m3_usr = dpcpp_onednn_memory(md3, engine, t3.data_ptr());
-    post.append_binary(dnnl::algorithm::binary_add, md3);
+    post.append_binary(algo_post, md3);
     attr.set_post_ops(post);
   }
 
@@ -128,5 +130,4 @@ static inline Tensor bin(
 
   return output;
 }
-
 }}
