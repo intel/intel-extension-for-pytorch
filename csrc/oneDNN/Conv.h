@@ -151,7 +151,7 @@ static at::Tensor convolution(
 
   auto dst_tz = conv_dst_tz(
       ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
-  if (!lazy_reorder_enabled() && !dst.defined()) {
+  if (!onednn_layout_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
       dst_opt = attr.with_relu() ?
@@ -172,11 +172,6 @@ static at::Tensor convolution(
                     get_onednn_dtype(wgh);
   auto dst_data_t = dst.defined() ? get_onednn_dtype(dst) : src_data_t;
   auto bia_data_t = memory::data_type::f32;
-  if (bia.defined()) {
-    bia_data_t = (!lazy_reorder_enabled() && src.is_quantized()) ?
-                 memory::data_type::s32 :
-                 get_onednn_dtype(bia);
-  }
   auto usr_bia_data_t = memory::data_type::f32;
 
   // master wgh
@@ -220,7 +215,7 @@ static at::Tensor convolution(
   auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia) : memory::desc();
 
   // block combination
-  if (lazy_reorder_enabled()) {
+  if (onednn_layout_enabled()) {
     src_md = memory::desc(src_tz, src_data_t, fmt_any);
     dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
@@ -295,20 +290,21 @@ static at::Tensor convolution(
       convolution_forward::primitive_desc(conv_forward_desc, pattr, engine);
 
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md;
-  if (!lazy_reorder_enabled()) {
+
+  // block weight when NHWC
+  auto wgh_ctx = DPCPPTensorContext::get_tensor_ctx(wgh);
+  wgh_usr_md = wgh_ctx.is_plain()
+      ? memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh)
+      : wgh_ctx.meta();
+
+  if (!onednn_layout_enabled()) {
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
-    wgh_usr_md = memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh);
     dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   } else {
     auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
     src_usr_md = src_ctx.is_plain()
         ? memory::desc(src_tz, src_data_t, fmt_src)
         : src_ctx.meta();
-
-    auto wgh_ctx = DPCPPTensorContext::get_tensor_ctx(wgh);
-    wgh_usr_md = wgh_ctx.is_plain()
-        ? memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh)
-        : wgh_ctx.meta();
 
     if (dst.defined()) {
       auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
@@ -345,10 +341,18 @@ static at::Tensor convolution(
     }
   }
 
+  auto weight_cache_optimization = [&]() {
+    bool onoff = false;
+    onoff |= onednn_layout_enabled();
+    onoff |= src.is_contiguous(at::MemoryFormat::ChannelsLast);
+    onoff &= !wgh.requires_grad();
+    return onoff;
+  } ();
+
   auto expected_wgh_md = conv_forward_pd.weights_desc();
   auto wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
   if (wgh_usr_md != expected_wgh_md) {
-    if (weight_cache_enabled() && src.is_quantized()) {
+    if (weight_cache_optimization && src.is_quantized()) {
         QuantizerPtr quantizer;
 
         if (wgh.is_quantized() && wgh.qscheme() == kPerChannelAffine) {
@@ -371,7 +375,7 @@ static at::Tensor convolution(
     wgh_m = dpcpp_onednn_memory(expected_wgh_md, engine, wgh_.data_ptr());
     xpu::oneDNN::reorder(wgh, wgh_);
 
-    if (weight_cache_enabled()) {
+    if (weight_cache_optimization) {
       strm.wait();
       auto wgh_opt_ctx = DPCPPTensorContext::release_tensor_ctx(wgh_);
       DPCPPTensorContext::set_tensor_ctx(wgh, std::move(wgh_opt_ctx));
@@ -381,7 +385,7 @@ static at::Tensor convolution(
   auto expected_dst_md = conv_forward_pd.dst_desc();
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
-    if (lazy_reorder_enabled() && dst.is_quantized()) {
+    if (onednn_layout_enabled() && dst.is_quantized()) {
       auto quantizer =
           xpu::dpcpp::make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
           typeMetaToScalarType(dst.options().dtype()));
@@ -425,7 +429,7 @@ static at::Tensor convolution(
       bia_m = dpcpp_onednn_memory(bia_md, engine, bia_.data_ptr());
       xpu::oneDNN::reorder(bia, bia_, reorder_attr);
 
-      if (weight_cache_enabled()) {
+      if (weight_cache_optimization) {
         strm.wait();
         // FIXME: thread safty
         auto bia_opt_ctx = DPCPPTensorContext::release_tensor_ctx(bia_);
@@ -464,7 +468,7 @@ static at::Tensor convolution(
   );
 #endif
 
-  if (lazy_reorder_enabled() && dst_.data_ptr() != dst.data_ptr()) {
+  if (onednn_layout_enabled() && dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }

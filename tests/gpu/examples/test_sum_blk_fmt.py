@@ -13,10 +13,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_sum_blk_fusion(self, dtype=torch.float):
-        #env_origin = copy.deepcopy(os.environ)
-        #os.environ["IPEX_LAZY_REORDER"] = "1"
-        #os.environ["IPEX_WEIGHT_CACHE"] = "1"
-
         conv1 = nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1, bias=True)
         conv2 = nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1, bias=True)
         x_cpu = torch.randn([1, 16, 3, 3], device=cpu_device)

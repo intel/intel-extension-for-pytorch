@@ -15,8 +15,9 @@ from . import _C
 from .version import __version__, __ipex_gitrev__
 from .streams import Stream, Event
 
-from . import profiler as profiler
 from . import itt as itt
+from . import optim
+from . import profiler as profiler
 
 
 default_generators: Tuple[torch._C.Generator] = _C.default_generators

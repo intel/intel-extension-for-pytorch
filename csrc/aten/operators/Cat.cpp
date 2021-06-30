@@ -382,7 +382,7 @@ void dnnl_cat(
     auto format_plain = get_dnnl_default_format(cat_tensors[i].dim());
 
     memory::desc tensor_md;
-    if (!lazy_reorder_enabled()) {
+    if (!onednn_layout_enabled()) {
       tensor_md = memory::desc({input_tz}, data_t, format_plain);
     } else {
       auto input_ctx =
@@ -411,7 +411,7 @@ void dnnl_cat(
 
   //Tensor output;
   memory output_usr_memory;
-  if (!lazy_reorder_enabled()) {
+  if (!onednn_layout_enabled()) {
     output_usr_memory = dpcpp_onednn_memory(
         output_md, engine, output.data_ptr());
   } else {

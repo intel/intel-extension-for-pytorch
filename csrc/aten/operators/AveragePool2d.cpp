@@ -138,6 +138,15 @@ Tensor& avg_pool2d_backward_out_template(
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
 
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
@@ -188,9 +197,6 @@ Tensor& avg_pool2d_backward_out_template(
       outputHeight,
       outputWidth);
 
-  /* get contiguous gradOutput */
-  const Tensor gradOutput = gradOutput_.contiguous();
-
   if (count_include_pad){
     ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_include_padding>(
         gradInput,
@@ -234,8 +240,6 @@ Tensor& avg_pool2d_backward_out_template(
         padH,
         padW);
   }
-
-
   return gradInput;
 }
 
@@ -329,7 +333,10 @@ Tensor avg_pool2d_backward(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor grad_input = at::empty_like(input, MemoryFormat::Contiguous);
+  Tensor grad_input = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::empty_like(input, at::MemoryFormat::ChannelsLast)
+      : at::empty_like(input, MemoryFormat::Contiguous);
+
   return at::AtenIpexTypeXPU::avg_pool2d_backward_out(
       grad_input,
       grad_output,

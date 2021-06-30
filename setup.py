@@ -293,6 +293,7 @@ setup(
             'README.md',
             'requirements.txt',
             '*.py',
+            'optim/*.py',
             'lib/*.so',
             'include/*.h',
             'include/aten/*.h',

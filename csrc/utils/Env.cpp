@@ -7,7 +7,6 @@ enum DPCPP_ENV {
   ENV_FORCE_SYNC,
   ENV_DISABLE_PROFILING,
   ENV_LAZY_REORDER,
-  ENV_WEIGHT_CACHE,
   ENV_DISABLE_TILE_PARTITION };
 
 #define DPCPP_ENV_TYPE_DEF(type, var)                                    \
@@ -34,7 +33,6 @@ int dpcpp_env(int env_type) {
     DPCPP_ENV_TYPE_DEF(force_sync, FORCE_SYNC);
     DPCPP_ENV_TYPE_DEF(disable_profiling, DISABLE_PROFILING);
     DPCPP_ENV_TYPE_DEF(lazy_reorder, LAZY_REORDER);
-    DPCPP_ENV_TYPE_DEF(weight_cache, WEIGHT_CACHE);
     DPCPP_ENV_TYPE_DEF(disable_tile_partition, DISABLE_TILE_PARTITION);
   } env;
 
@@ -52,8 +50,6 @@ int dpcpp_env(int env_type) {
       return env.disable_profiling;
     case ENV_LAZY_REORDER:
       return env.lazy_reorder;
-    case ENV_WEIGHT_CACHE:
-      return env.weight_cache;
     case ENV_DISABLE_TILE_PARTITION:
       return env.disable_tile_partition;
     default:
@@ -77,16 +73,10 @@ int lazy_reorder_enabled() {
   return dpcpp_env(ENV_LAZY_REORDER);
 }
 
-int weight_cache_enabled() {
-  auto weight_cache_env = dpcpp_env(ENV_WEIGHT_CACHE);
-  if (weight_cache_env) {
-    TORCH_CHECK(
-        lazy_reorder_enabled() == 1,
-        "IPEX_WEIGHT_CACHE can be set only when IPEX_LAZY_REORDER=1.");
-  }
-  return weight_cache_env;
-}
-
 bool disable_tile_partition() {
   return (bool)dpcpp_env(ENV_DISABLE_TILE_PARTITION);
+}
+
+bool onednn_layout_enabled() {
+  return (bool)lazy_reorder_enabled();
 }

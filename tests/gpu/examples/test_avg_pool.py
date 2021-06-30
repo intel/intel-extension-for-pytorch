@@ -60,3 +60,26 @@ class TestNNMethod(TestCase):
         print(ref)
 
         self.assertEqual(real, ref)
+
+    def test_channels_last_simple_bwd(self, dtype=torch.float):
+        x_cpu = torch.ones([2, 2, 3, 3], device=cpu_device)
+        grad_cpu = torch.ones([2, 2, 3, 3], device=cpu_device)
+        x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
+        grad_dpcpp = grad_cpu.to(dpcpp_device)
+
+        avg_pool = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+
+        x_cpu.requires_grad_(True)
+        y_cpu = avg_pool(x_cpu)
+        print("y_cpu", y_cpu)
+        output_cpu = y_cpu.backward(grad_cpu)
+        print("x_cpu.grad", x_cpu.grad)
+
+
+        avg_pool.to(dpcpp_device)
+        x_dpcpp.requires_grad_(True)
+        y_dpcpp = avg_pool(x_dpcpp)
+        print("y_dpcpp", y_dpcpp.to("cpu"))
+        output_dpcpp = y_dpcpp.backward(grad_dpcpp)
+        print("x_dpcpp.grad", x_dpcpp.grad.to("cpu"))
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))

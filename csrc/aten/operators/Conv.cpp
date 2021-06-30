@@ -106,7 +106,7 @@ Tensor dpcpp_convolution_backward_input(
 #endif
 
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
-  if (!lazy_reorder_enabled()) {
+  if (!onednn_layout_enabled()) {
     grad_output_usr_memory = dpcpp_onednn_memory(
       {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
@@ -186,13 +186,15 @@ Tensor dpcpp_convolution_backward_input(
 #endif
       });
 
-  if (!lazy_reorder_enabled() && grad_input_memory != grad_input_usr_memory) {
+  if (!onednn_layout_enabled() &&
+      grad_input_memory != grad_input_usr_memory) {
     DPCPP_ONEDNN_EXEC(
         dnnl::reorder(grad_input_memory, grad_input_usr_memory),
         strm,
         {{DNNL_ARG_FROM, grad_input_memory},
         {DNNL_ARG_TO, grad_input_usr_memory}});
-  } else if (lazy_reorder_enabled() && grad_input_memory != grad_input_usr_memory) {
+  } else if (onednn_layout_enabled() &&
+      grad_input_memory != grad_input_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
   }
@@ -289,7 +291,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
 #endif
 
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
-  if (!lazy_reorder_enabled()) {
+  if (!onednn_layout_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(
         {input_tz, data_grad, format_input}, engine, input.data_ptr());
 
@@ -354,7 +356,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
 
   memory grad_bias_memory = memory({{}, bias_t, format_bias}, engine);
   if (bias_defined) {
-    if (!lazy_reorder_enabled()) {
+    if (!onednn_layout_enabled()) {
       grad_bias_memory = dpcpp_onednn_memory(
         {bias_tz, bias_t, format_bias}, engine, grad_bias.data_ptr());
     } else {
@@ -386,7 +388,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
 
   if (grad_weight_memory.get_desc() != grad_weight_usr_memory.get_desc()) {
     // grad_weight_ contains the result of gw backward, while it is blk format.
-    // In training mode, plain gw output is expected for sgd update regardless of lazy_reorder_enabled or not.
+    // In training mode, plain gw output is expected for sgd update regardless of onednn_layout_enabled or not.
     // Thus, we need one additional reorder here to make grad_weight plain.
     DPCPP_ONEDNN_EXEC(
         dnnl::reorder(grad_weight_memory, grad_weight_usr_memory),

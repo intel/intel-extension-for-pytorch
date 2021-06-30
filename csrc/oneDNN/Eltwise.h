@@ -33,18 +33,24 @@ static inline void eltwise(
 
   memory::dims src_tz = dims;
   auto data_t = get_onednn_dtype(src);
-  auto format_data = get_dnnl_default_format(src.dim());
+  auto format_data = get_dnnl_default_format(
+      src.dim(),
+      src.dim() == 4 ? (!src.is_contiguous() &&
+                        src.is_contiguous(at::MemoryFormat::ChannelsLast))
+                     : (!src.is_contiguous() &&
+                        src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
   auto src_md = memory::desc({src_tz}, data_t, format_data);
 
   memory src_memory;
-  if (!lazy_reorder_enabled()) {
+  if (!onednn_layout_enabled() ||
+      src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     src_memory = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   } else {
     auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
     src_md = src_ctx.is_plain() ? src_md : src_ctx.meta();
     src_memory = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   }
-
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -62,9 +68,12 @@ static inline void eltwise(
 #endif
 
   memory dst_memory;
-  if (!lazy_reorder_enabled()) {
-    if (!dst.defined())
-      dst = at::empty_like(src);
+  if (!onednn_layout_enabled()) {
+    if (!dst.defined()) {
+      dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+          ? at::empty_like(src, at::MemoryFormat::ChannelsLast)
+          : at::empty_like(src);
+    }
     dst_memory = dpcpp_onednn_memory(eltwise_forward_pd.dst_desc(), engine, dst.data_ptr());
   } else {
     if (dst.defined()) {
@@ -121,7 +130,7 @@ template <algorithm alg_kind>
 static inline void eltwise_backward(
     at::Tensor& diff_src,
     const at::Tensor& src_dst,
-    const at::Tensor& diff_dst,
+    const at::Tensor& diff_dst_,
     float alpha = 0,
     float beta = 0) {
   Device curDevice = Device(kXPU, current_device());
@@ -135,12 +144,28 @@ static inline void eltwise_backward(
   }
 
   memory::dims src_dst_tz = src_dst_dims;
-  auto format_data = get_dnnl_default_format(src_dst.dim());
+  auto format_data = get_dnnl_default_format(
+      src_dst.dim(),
+      src_dst.dim() == 4
+          ? (!src_dst.is_contiguous() &&
+             src_dst.is_contiguous(at::MemoryFormat::ChannelsLast))
+          : (!src_dst.is_contiguous() &&
+             src_dst.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
   auto src_dst_md = memory::desc({src_dst_tz}, data_t, format_data);
   auto diff_dst_md = memory::desc({src_dst_tz}, data_t, format_data);
+  Tensor diff_dst;
+  if (src_dst.is_contiguous(MemoryFormat::ChannelsLast)) {
+    diff_dst = diff_dst_.contiguous(MemoryFormat::ChannelsLast);
+  } else if (src_dst.is_contiguous(MemoryFormat::ChannelsLast3d)) {
+    diff_dst = diff_dst_.contiguous(MemoryFormat::ChannelsLast3d);
+  } else {
+    diff_dst = diff_dst_;
+  }
 
   memory src_dst_usr_memory, diff_dst_usr_memory;
-  if (!lazy_reorder_enabled()) {
+  if (!onednn_layout_enabled() ||
+      src_dst.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      src_dst.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     src_dst_usr_memory  = dpcpp_onednn_memory(src_dst_md, engine, src_dst.data_ptr());
     diff_dst_usr_memory = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
   } else {
@@ -165,7 +190,7 @@ static inline void eltwise_backward(
   auto eltwise_forward_pd =eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
 
   auto expected_dst_md = eltwise_forward_pd.dst_desc();
-  if (lazy_reorder_enabled()) {
+  if (onednn_layout_enabled()) {
     auto src_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src_dst);
     auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
     if ((diff_dst_ctx.is_plain()) && (!src_dst_ctx.is_plain())) {
@@ -174,7 +199,7 @@ static inline void eltwise_backward(
       diff_dst_md = expected_dst_md;
       DPCPP_ONEDNN_EXEC(reorder(diff_dst_usr_memory, diff_dst_memory),
           strm, {{DNNL_ARG_FROM, diff_dst_usr_memory}, {DNNL_ARG_TO, diff_dst_memory}});
-    } 
+    }
   }
 
   eltwise_backward::desc eltwise_eltwiseBwd_desc(alg_kind, diff_dst_md, src_dst_md, alpha, beta);
@@ -190,9 +215,13 @@ static inline void eltwise_backward(
 #endif
 
   memory diff_src_memory;
-  if (!lazy_reorder_enabled()) {
+  if (!onednn_layout_enabled()) {
     if (!diff_src.defined()) {
-      diff_src = at::empty_like(src_dst);
+      if (src_dst.is_contiguous(MemoryFormat::ChannelsLast)) {
+        diff_src = at::empty_like(src_dst, MemoryFormat::ChannelsLast);
+      } else {
+        diff_src = at::empty_like(src_dst);
+      }
     }
     auto diff_src_md = memory::desc({src_dst_tz, data_t, format_data});
     diff_src_memory = dpcpp_onednn_memory(diff_src_md, engine, diff_src.data_ptr());

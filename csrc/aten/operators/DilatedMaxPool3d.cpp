@@ -115,9 +115,10 @@ void max_pool3d_with_indices_out_template(
       /*check_input_size=*/true);
 
   /* get contiguous input */
-  Tensor input = input_.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                 input_ :
-                 input_.contiguous();
+  Tensor input = input_.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+          input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+      ? input_
+      : input_.contiguous();
 
   if (input.ndimension() == 4) {
     // cannot give channels last for 4D tensor from frontend user perspective
@@ -130,6 +131,11 @@ void max_pool3d_with_indices_out_template(
           at::MemoryFormat::ChannelsLast);
       indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast);
+    } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast3d);
+      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
       indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
@@ -169,6 +175,20 @@ Tensor& max_pool3d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
+
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast3d);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast3d);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
+
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "max_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -219,17 +239,9 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       (input.ndimension() == 4 || input.ndimension() == 5),
       "non-empty 4D or 5D (batch mode) tensor expected for input");
 
-  /* get contiguous gradOutput */
-  const Tensor gradOutput = gradOutput_.contiguous();
-
   TORCH_CHECK(
       (gradOutput.ndimension() == 4 || gradOutput.ndimension() == 5),
       "non-empty 4D or 5D (batch mode) tensor expected for gradOutput");
-
-  /* resize */
-  gradInput.resize_as_(input);
-  gradInput.zero_();
-  TORCH_CHECK(gradInput.is_contiguous(), "gradInput must be contiguous");
 
   /* sizes */
   const int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
@@ -352,7 +364,14 @@ Tensor max_pool3d_with_indices_backward(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  Tensor grad_input;
+  if (self.is_contiguous(MemoryFormat::ChannelsLast)) {
+    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast);
+  } else if (self.is_contiguous(MemoryFormat::ChannelsLast3d)) {
+    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast3d);
+  } else {
+    grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  }
   return at::AtenIpexTypeXPU::max_pool3d_with_indices_backward_out(
       grad_input,
       grad_output,

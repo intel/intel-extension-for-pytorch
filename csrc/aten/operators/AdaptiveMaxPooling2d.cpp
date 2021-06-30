@@ -106,7 +106,15 @@ Tensor& adaptive_max_pool2d_backward_out_template(
     const Tensor& indices) {
   TORCH_CHECK(
       input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
-  Tensor gradOutput = gradOutput_.contiguous();
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
 
   int64_t nbatch = input.size(0);
   int64_t nPlane = input.size(1);
@@ -128,8 +136,6 @@ Tensor& adaptive_max_pool2d_backward_out_template(
 
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
-
-  gradInput.resize_as_(input);
 
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
@@ -190,7 +196,9 @@ Tensor adaptive_max_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices) {
-  auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
+  Tensor grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::empty_like(self, at::MemoryFormat::ChannelsLast)
+      : at::empty_like(self, MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::adaptive_max_pool2d_backward_out(
       grad_input, grad_output, self, indices);
 }

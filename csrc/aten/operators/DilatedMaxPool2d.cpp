@@ -130,6 +130,17 @@ Tensor& max_pool2d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
+
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
+
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "max_pool2d: kernel_size must either be a single int, or a tuple "
@@ -160,9 +171,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
 
   TORCH_CHECK(input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
-
-  /* get contiguous gradOutput */
-  const Tensor gradOutput = gradOutput_.contiguous();
 
   /* sizes */
   const auto nbatch = input.size(-4);
@@ -298,7 +306,10 @@ Tensor max_pool2d_with_indices_backward(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
+  Tensor grad_input =
+      self.is_contiguous() || self.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::empty_like(self)
+      : at::empty_like(self, MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::max_pool2d_with_indices_backward_out(
       grad_input,
       grad_output,

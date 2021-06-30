@@ -7,7 +7,6 @@
  * IPEX_FORCE_SYNC:             Default = 0, Set 1 to enforce blocked/sync execution mode
  * IPEX_DISABLE_PROFILING:      Default = 0, Set 1 to disable IPEX event profiling
  * IPEX_LAZY_REORDER:           Default = 0, Set 1 to enable lazy reorder to avoid unnecessary reorders
- * IPEX_WEIGHT_CACHE:           Default = 0, Set 1 to cache the packed weight in original weight Tensor
  * IPEX_DISABLE_TILE_PARTITION: Default = 0, Set 1 to disable tile partition and map device per physical device.
  */
 
@@ -24,3 +23,5 @@ int lazy_reorder_enabled();
 int weight_cache_enabled();
 
 bool disable_tile_partition();
+
+bool onednn_layout_enabled();

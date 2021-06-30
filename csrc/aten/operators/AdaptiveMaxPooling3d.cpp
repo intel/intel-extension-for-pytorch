@@ -42,9 +42,10 @@ void adaptive_max_pool3d_out_template(
       output_size.size() == 3,
       "adaptive_max_pool3d: internal error: output_size.size() must be 3");
 
-  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                  input :
-                  input.contiguous();
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+          input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+      ? input
+      : input.contiguous();
 
   int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
   int64_t nblock = input_.size(-4);
@@ -80,11 +81,11 @@ void adaptive_max_pool3d_out_template(
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast);
+          at::MemoryFormat::ChannelsLast3d);
       indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast);
+          at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
       indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
@@ -119,7 +120,18 @@ Tensor& adaptive_max_pool3d_backward_out_template(
     const Tensor& gradOutput_,
     const Tensor& input,
     const Tensor& indices) {
-  Tensor gradOutput = gradOutput_.contiguous();
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast3d);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast3d);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
 
   int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
   int64_t nblock = input.size(-4);
@@ -148,9 +160,6 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   int padD = (dD * (gradOutputDepth - 1) + kD - gradInputDepth) / 2;
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
-
-  gradInput.resize_as_(input);
-  gradInput.zero_();
 
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
@@ -210,7 +219,14 @@ Tensor adaptive_max_pool3d_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices) {
-  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  Tensor grad_input;
+  if (self.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast);
+  } else if (self.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast3d);
+  } else {
+    grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  }
   impl::adaptive_max_pool3d_backward_out_template(
       grad_input, grad_output, self, indices);
   return grad_input;

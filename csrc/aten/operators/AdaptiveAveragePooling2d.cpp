@@ -80,9 +80,17 @@ void adaptive_avg_pool2d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput_,
     const Tensor& input) {
-  Tensor gradOutput = gradOutput_.contiguous();
 
   TORCH_CHECK((input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
 
   auto output_size_vec = gradOutput.sizes();
   auto nOutputCols = output_size_vec[3];
@@ -175,7 +183,6 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
     Tensor& gradInput,
     const Tensor& gradOutput,
     const Tensor& input) {
-  gradInput.resize_as_(input);
   impl::adaptive_avg_pool2d_backward_out_template(gradInput, gradOutput, input);
   return gradInput;
 }
@@ -183,7 +190,9 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
 Tensor _adaptive_avg_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
-  auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
+  Tensor grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::empty_like(self, at::MemoryFormat::ChannelsLast)
+      : at::empty_like(self, MemoryFormat::Contiguous);
   impl::adaptive_avg_pool2d_backward_out_template(grad_input, grad_output, self);
   return grad_input;
 }

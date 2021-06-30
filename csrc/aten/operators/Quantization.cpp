@@ -121,7 +121,7 @@ Tensor quantize_tensor_per_tensor_affine(
     int64_t zero_point) {
   auto r_ctx =
       at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(rtensor);
-  if (lazy_reorder_enabled()) {
+  if (onednn_layout_enabled()) {
     // this is a temporary implementation for forcing linear to fp32 path
     // and get better performance,due to oneDNN int8 kernel slower than fp32
     // kernel by currently.
@@ -155,7 +155,7 @@ Tensor quantize_tensor_per_tensor_affine(
 
   memory r_m, q_m;
   Tensor qtensor_opt;
-  if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
+  if (!r_ctx.is_plain() && onednn_layout_enabled()) {
     if (rtensor.is_quantized())
       return rtensor;
     r_m = r_ctx.is_plain() ? dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr())
@@ -185,7 +185,7 @@ Tensor quantize_tensor_per_tensor_affine(
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, r_m}, {DNNL_ARG_TO, q_m}});
 
-  if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
+  if (!r_ctx.is_plain() && onednn_layout_enabled()) {
     auto q_opt_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(qtensor_opt);
     at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(rtensor, std::move(q_opt_ctx));
     return rtensor;

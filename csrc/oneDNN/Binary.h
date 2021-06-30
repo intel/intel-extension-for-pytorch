@@ -92,7 +92,7 @@ static inline Tensor bin(
     output = at::empty_like(t1);
   // 1. output: undefined, lazy_reorder: on, output: block
   // 2. output: defined, lazy_reorder: on, output block
-  else if (lazy_reorder_enabled() && !tar_ctx.is_plain())
+  else if (onednn_layout_enabled() && !tar_ctx.is_plain())
     output = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
 
   auto mo = dpcpp_onednn_memory(tar_md, engine, output.data_ptr());

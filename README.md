@@ -273,7 +273,6 @@ The following lauch options are supported in Intel GPU Extension for PyTorch.
 | IPEX_FORCE_SYNC | Enable synchronized execution mode. This mode will perform blocking <br> wait for the completion of submitted kernel. |
 | IPEX_DISABLE_PROFILING | Disable IPEX profiling solution. If set to 1, the queue profiling flag will be unset and kernel profiling information will be reset. |
 | IPEX_LAZY_REORDER | Enable lazy reorder. When enabled, reorders on activation tensors are <br> eliminated when oneDNN block format can be propagated for more than one operator.  |
-| IPEX_WEIGHT_CACHE | Cache packed weight. When enabled, the packed weight is cached <br> in original weight tensor. This option can be enabled only when <br> IPEX_LAZY_REORDER is set to 1. |
 | IPEX_DISABLE_TILE_PARTITION | Device partition. When enabled, tile partition will be disabled and map frameworkd device to physical device. |
 
 
@@ -291,7 +290,7 @@ IPEX_VERBOSE=1 python ResNet50.py
 
 3. Set multiple options when running model
 ```bash
-IPEX_VERBOSE=1 IPEX_LAZY_REORDER=1 IPEX_WEIGHT_CACHE=1 python ResNet50.py
+IPEX_VERBOSE=1 IPEX_LAZY_REORDER=1 python ResNet50.py
 ```
 
 ## Feature Introduction

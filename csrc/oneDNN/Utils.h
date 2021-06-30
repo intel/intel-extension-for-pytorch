@@ -9,22 +9,27 @@ using namespace dnnl;
 namespace xpu {
 namespace oneDNN {
 
-static inline dnnl::memory::format_tag get_dnnl_default_format(int ndims) {
+static inline dnnl::memory::format_tag get_dnnl_default_format(
+    int ndims,
+    bool is_channels_last = false) {
   switch (ndims) {
     case 1:
-      return dnnl::memory::format_tag::a;
+      return memory::format_tag::a;
     case 2:
-      return dnnl::memory::format_tag::ab;
+      return memory::format_tag::ab;
     case 3:
-      return dnnl::memory::format_tag::abc;
+      return is_channels_last ? memory::format_tag::acb
+                              : memory::format_tag::abc;
     case 4:
-      return dnnl::memory::format_tag::abcd;
+      return is_channels_last ? memory::format_tag::acdb
+                              : memory::format_tag::abcd;
     case 5:
-      return dnnl::memory::format_tag::abcde;
+      return is_channels_last ? memory::format_tag::acdeb
+                              : memory::format_tag::abcde;
     case 6:
-      return dnnl::memory::format_tag::abcdef;
+      return memory::format_tag::abcdef;
     default:
-      return dnnl::memory::format_tag::any;
+      return memory::format_tag::any;
   }
 }
 

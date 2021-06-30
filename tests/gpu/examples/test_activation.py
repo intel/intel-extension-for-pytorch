@@ -53,6 +53,28 @@ class  TestNNMethod(TestCase):
         print(ref)
         self.assertEqual(real, ref)
 
+    def test_activation_relu_channels_last_bwd(self, dtype=torch.float):
+        relu = torch.nn.functional.relu
+        x_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float)
+        grad_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float)
+        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last)
+        grad_dpcpp = grad_cpu.to("xpu")
+
+        x_cpu.requires_grad_(True)
+        x_dpcpp.requires_grad_(True)
+        y_cpu = relu(x_cpu)
+        y_dpcpp = relu(x_dpcpp)
+        print("cpu relu ", y_cpu)
+        print("dpcpp relu ", y_dpcpp.cpu())
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+
+        y_cpu.backward(grad_cpu)
+        y_dpcpp.backward(grad_dpcpp)
+
+        print("cpu relu bwd", x_cpu.grad)
+        print("dpcpp relu bwd", x_dpcpp.grad.cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
     def test_activation_rrelu(self, dtype=torch.float):
         # Will not check the result due to different random seeds on cpu and xpu
         RReLU = torch.nn.RReLU(0.1,0.3)

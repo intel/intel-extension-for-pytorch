@@ -65,17 +65,18 @@ void adaptive_avg_pool3d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                  input :
-                  input.contiguous();
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+          input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+      ? input
+      : input.contiguous();
   if (input_.ndimension() == 4) {
     // cannot give channels last for 4D tensor from frontend user perspective
     // the 2nd dim is outputDepth, not channel dim
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast);
+          at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
     }
@@ -107,7 +108,18 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput_,
     const Tensor& input) {
-  auto gradOutput = gradOutput_.contiguous();
+  Tensor gradOutput;
+  /* resize */
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast3d);
+    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast3d);
+  } else {
+    gradInput.resize_as_(input);
+    gradOutput = gradOutput_.contiguous();
+  }
 
   auto nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
   auto nblock = input.size(-4);
@@ -180,7 +192,6 @@ Tensor& adaptive_avg_pool3d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self) {
-  grad_input.resize_as_(self).zero_();
   impl::adaptive_avg_pool3d_backward_out_template(grad_input, grad_output, self);
   return grad_input;
 }
@@ -188,8 +199,16 @@ Tensor& adaptive_avg_pool3d_backward_out(
 Tensor adaptive_avg_pool3d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
-  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  impl::adaptive_avg_pool3d_backward_out_template(grad_input, grad_output, self);
+  Tensor grad_input;
+  if (self.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast);
+  } else if (self.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast3d);
+  } else {
+    grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  }
+  impl::adaptive_avg_pool3d_backward_out_template(
+      grad_input, grad_output, self);
   return grad_input;
 }
 
