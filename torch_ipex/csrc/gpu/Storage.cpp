@@ -11,6 +11,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 #include <core/Allocator.h>
 #include <core/Memory.h>
+#include <core/Stream.h>
 
 #if defined(USE_ONEDPL)
 #include <oneapi/dpl/algorithm>
@@ -419,7 +420,7 @@ public:
   {
 #if defined(USE_ONEDPL)
     //TODO: only dpcpp runtime here. naive CPU TBD.
-    auto dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
+    auto dpcpp_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     scalar_t* data_ptr = THXStorage_data(storage);
     auto self_begin = data_ptr;

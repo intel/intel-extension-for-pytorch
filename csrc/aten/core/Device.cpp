@@ -28,5 +28,13 @@ DeviceIndex get_devie_index_from_ptr(void *ptr) {
   return device_index;
 }
 
+DeviceProp* getCurrentDeviceProperties() {
+  return dpcppGetCurrentDeviceProperties();
+}
+
+DeviceProp* getDeviceProperties(DeviceIndex device) {
+  return dpcppGetDeviceProperties(device);
+}
+
 } // namespace dpcpp
 } // namespace xpu

@@ -17,7 +17,7 @@ namespace dpcpp {
 static std::once_flag init_device_flag;
 static std::once_flag init_prop_flag;
 static std::deque<std::once_flag> device_prop_flags;
-static std::vector<XPUDeviceProp> device_properties;
+static std::vector<DeviceProp> device_properties;
 static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
@@ -148,21 +148,15 @@ int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr) {
   return DPCPP_SUCCESS;
 }
 
-XPUDeviceProp* getCurrentDeviceProperties() {
-  DeviceId device = 0;
-  AT_DPCPP_CHECK(dpcppGetDevice(&device));
-  return getDeviceProperties(device);
-}
-
-void initXPUContextVectors() {
+static void initContextVectors() {
   auto num_gpus = 0;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_gpus));
   device_prop_flags.resize(num_gpus);
   device_properties.resize(num_gpus);
 }
 
-void initDeviceProperty(DeviceIndex device_id) {
-  XPUDeviceProp device_prop;
+static void initDeviceProperty(DeviceId device_id) {
+  DeviceProp device_prop;
   auto device = dpcppGetRawDevice(device_id);
   device_prop.name = device.get_info<dpcpp_dev_name>();
   device_prop.dev_type = device.get_info<dpcpp_dev_type>();
@@ -173,8 +167,14 @@ void initDeviceProperty(DeviceIndex device_id) {
   device_properties[device_id] = device_prop;
 }
 
-XPUDeviceProp* getDeviceProperties(DeviceId device) {
-  std::call_once(init_prop_flag, initXPUContextVectors);
+DeviceProp* dpcppGetCurrentDeviceProperties() {
+  DeviceId device = 0;
+  AT_DPCPP_CHECK(dpcppGetDevice(&device));
+  return dpcppGetDeviceProperties(device);
+}
+
+DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
+  std::call_once(init_prop_flag, initContextVectors);
   DeviceId device_id = device;
   if (device_id == -1) {
     AT_DPCPP_CHECK(dpcppGetDevice(&device_id));

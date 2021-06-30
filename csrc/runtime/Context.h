@@ -1,6 +1,6 @@
 #pragma once
 
-#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include <runtime/Device.h>
 
 namespace xpu {

@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 
+#include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>

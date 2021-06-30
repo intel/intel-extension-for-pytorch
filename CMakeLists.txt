@@ -41,9 +41,8 @@ include(${PROJECT_SOURCE_DIR}/cmake/BuildOptions.cmake)
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-add_subdirectory(./csrc)
-add_subdirectory(./torch_ipex/csrc)
-
+add_subdirectory(${IPEX_ROOT_DIR}/csrc)
+add_subdirectory(${IPEX_ROOT_DIR}/torch_ipex/csrc)
 
 function (print_configuration_summary)
   get_directory_property(CMAKE_COMPILE_DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)

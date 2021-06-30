@@ -3,8 +3,6 @@
 #include <utils/DPCPP.h>
 #include <core/Stream.h>
 
-DPCPP_DEF_K1(memory_copy);
-
 namespace xpu {
 namespace dpcpp {
 

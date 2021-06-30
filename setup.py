@@ -287,17 +287,15 @@ setup(
     author='Intel PyTorch Team',
     url='https://github.com/intel/intel-extension-for-pytorch',
     # Exclude the build files.
-    packages=['torch_ipex'],
+    packages=['torch_ipex', 'torch_ipex.optim'],
     package_data={
         'torch_ipex':[
             'README.md',
             'requirements.txt',
             '*.py',
-            'optim/*.py',
             'lib/*.so',
             'include/*.h',
-            'include/aten/*.h',
-            'include/aten/core/*.h',
+            'include/core/*.h',
             'include/utils/*.h']
         },
     long_description=long_description,

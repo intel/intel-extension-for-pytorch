@@ -217,7 +217,7 @@ static struct PyMethodDef _THPModule_methods[] = {
   {nullptr}
 };
 
-std::string get_dev_type(const XPUDeviceProp &prop) {
+std::string get_dev_type(const DeviceProp &prop) {
   std::ostringstream stream;
   switch(prop.dev_type) {
     case DPCPP::info::device_type::cpu:
@@ -239,20 +239,20 @@ std::string get_dev_type(const XPUDeviceProp &prop) {
 
 
 static void register_xpu_device_properties(PyObject* module) {
-  // Add _XPUDeviceProperties class to torch_ipex._C
+  // Add _DeviceProperties class to torch_ipex._C
   auto m = py::handle(module).cast<py::module>();
-  py::class_<XPUDeviceProp>(m, "_XPUDeviceProperties")
-    .def_readonly("name", &XPUDeviceProp::name)
-    .def_readonly("platform_name", &XPUDeviceProp::platform_name)
-    .def_readonly("total_global_memory", &XPUDeviceProp::total_global_mem)
-    .def_readonly("max_compute_units", &XPUDeviceProp::max_compute_units)
-    .def_readonly("sub_devices_number", &XPUDeviceProp::sub_devices_number)
-    .def_property_readonly("dev_type", [](const XPUDeviceProp &prop) {
+  py::class_<DeviceProp>(m, "_DeviceProperties")
+    .def_readonly("name", &DeviceProp::name)
+    .def_readonly("platform_name", &DeviceProp::platform_name)
+    .def_readonly("total_global_memory", &DeviceProp::total_global_mem)
+    .def_readonly("max_compute_units", &DeviceProp::max_compute_units)
+    .def_readonly("sub_devices_number", &DeviceProp::sub_devices_number)
+    .def_property_readonly("dev_type", [](const DeviceProp &prop) {
       return get_dev_type(prop);
     })
-    .def("__repr__", [](const XPUDeviceProp &prop) {
+    .def("__repr__", [](const DeviceProp &prop) {
       std::ostringstream stream;
-      stream << "_XPUDeviceProperties(name='" << prop.name
+      stream << "_DeviceProperties(name='" << prop.name
              << "', platform_name='" << prop.platform_name
              << "', dev_type='" << get_dev_type(prop)
              << "', sub_devices_number=" << prop.sub_devices_number
@@ -265,7 +265,7 @@ static void register_xpu_device_properties(PyObject* module) {
 static void bindGetDeviceProperties(PyObject* module) {
   // Add method to torch_ipex._C
   auto m = py::handle(module).cast<py::module>();
-  m.def("_get_device_properties", [](int device) -> XPUDeviceProp * {
+  m.def("_get_device_properties", [](int device) -> DeviceProp * {
       return xpu::dpcpp::getDeviceProperties(device);
   }, py::return_value_policy::reference);
 

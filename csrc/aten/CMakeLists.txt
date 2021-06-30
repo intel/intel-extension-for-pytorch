@@ -32,6 +32,7 @@ list(APPEND aten_core_headers
   ${IPEX_GPU_ATEN_CORE_DIR}/Allocator.h
   ${IPEX_GPU_ATEN_CORE_DIR}/AllocationInfo.h
   ${IPEX_GPU_ATEN_CORE_DIR}/Device.h
+  ${IPEX_GPU_ATEN_CORE_DIR}/DeviceProp.h
   ${IPEX_GPU_ATEN_CORE_DIR}/Event.h
   ${IPEX_GPU_ATEN_CORE_DIR}/Generator.h
   ${IPEX_GPU_ATEN_CORE_DIR}/Guard.h

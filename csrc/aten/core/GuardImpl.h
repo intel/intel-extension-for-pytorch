@@ -15,52 +15,25 @@ namespace impl {
 struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   static constexpr DeviceType static_type = DeviceType::XPU;
 
-  DPCPPGuardImpl() {}
+  DPCPPGuardImpl();
 
-  DPCPPGuardImpl(DeviceType t) {
-    TORCH_INTERNAL_ASSERT(t == DeviceType::XPU);
-  }
+  DPCPPGuardImpl(DeviceType t);
 
-  DeviceType type() const override {
-    return DeviceType::XPU;
-  }
+  DeviceType type() const override;
 
-  Device exchangeDevice(Device d) const override {
-    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::XPU);
-    Device old_device = getDevice();
-    if (old_device.index() != d.index()) {
-      set_device(d.index());
-    }
-    return old_device;
-  }
+  Device exchangeDevice(Device d) const override;
 
-  Device getDevice() const override {
-    return Device(DeviceType::XPU, current_device());
-  }
+  Device getDevice() const override;
 
-  void setDevice(Device d) const override {
-    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::XPU);
-    set_device(d.index());
-  }
+  void setDevice(Device d) const override;
 
-  void uncheckedSetDevice(Device d) const noexcept override {
-    set_device(d.index());
-  }
+  void uncheckedSetDevice(Device d) const noexcept override;
 
-  Stream getStream(Device d) const noexcept override {
-    return getCurrentDPCPPStream().unwrap();
-  }
+  Stream getStream(Device d) const noexcept override;
 
-  Stream exchangeStream(Stream s) const noexcept override {
-    DPCPPStream cs(s);
-    auto old_stream = getCurrentDPCPPStream(s.device().index());
-    setCurrentDPCPPStream(cs);
-    return old_stream.unwrap();
-  }
+  Stream exchangeStream(Stream s) const noexcept override;
 
-  DeviceIndex deviceCount() const noexcept override {
-    return device_count();
-  }
+  DeviceIndex deviceCount() const noexcept override;
 };
 } // namespace impl
 } // namespace dpcpp

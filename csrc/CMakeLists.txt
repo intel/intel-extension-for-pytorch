@@ -37,7 +37,6 @@ set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
         ${SYCL_INCLUDE_DIR}
         ${IPEX_GPU_ROOT}
         ${IPEX_GPU_ATEN_SRC_DIR}
-        ${IPEX_GPU_RUNTIME_SRC_DIR}
         ${IPEX_GPU_ATEN_GENERATED})
 
 set(IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS}
@@ -141,5 +140,20 @@ target_link_libraries(ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} ipex_gpu_core)
 
 install(TARGETS ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(TARGETS ipex_gpu_core LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES ${IPEX_ATEN_HEADERS} DESTINATION include/aten/core)
+
+install(FILES ${IPEX_ATEN_HEADERS} DESTINATION include/core)
 install(FILES ${IPEX_UTILS_HEADERS} DESTINATION include/utils)
+
+# Generate the IPEX All-In-One header
+set(ipex_header "#pragma once\n")
+foreach(uheader ${IPEX_UTILS_HEADERS})
+  get_filename_component(header ${uheader} NAME)
+  append(ipex_header "\n#include <utils/${header}>")
+endforeach()
+append(ipex_header "\n")
+foreach(aheader ${IPEX_ATEN_HEADERS})
+  get_filename_component(header ${aheader} NAME)
+  append(ipex_header "\n#include <core/${header}>")
+endforeach()
+file(APPEND ${IPEX_GPU_ATEN_GENERATED}/ipex.h ${ipex_header})
+install(FILES ${IPEX_GPU_ATEN_GENERATED}/ipex.h DESTINATION include)
