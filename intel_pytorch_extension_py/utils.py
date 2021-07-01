@@ -54,29 +54,38 @@ def _convert_module_data_type(module, dtype):
 
 def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1'):
     optimized_model = copy.deepcopy(model)
-    if not model.training:
-        try:
-            optimized_model = conv_bn_fuse(optimized_model)
-        except:
-            warnings.warn("Conv BN folding failed during the optimize process.")
-        # do weight data type convert for inference model.
-        if dtype == torch.bfloat16:
-            optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
+    if level == 'O0':
+        # will be removed after customer op can be traced with autocast,
+        # see https://github.com/pytorch/pytorch/pull/60251.
+        # after removed, will directly return original model and optimizer.
+        if not model.training:
+            try:
+                optimized_model = conv_bn_fuse(optimized_model)
+            except:
+                warnings.warn("Conv BN folding failed during the optimize process.")
+            # do weight data type convert for inference model.
+            if dtype == torch.bfloat16:
+                optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
 
     new_optimizer = None
-    weight_params_attr = None
-    # Do weight prepack if level is 'O1', and convert optimizer for training case.
+    weight_params_attr = {}
     if level == 'O1':
-        # for training case, getting fp32 weight format form give dtype for autocast.
-        # i.e, reorder fp32 weight to block format(query for bf16 path).
-        # for inference, always reorder weight to block format(query for weight's dtype path).
-        # for bf16 training, weight is always fp32 we need to set dtype = torch.bfloat16 to override weight's type
-        # TODO: save master weight in optimizer, the model's weight will bf16, then we can deperate this "weight_format_from_dtype" args.
-        weight_format_from_dtype = dtype if model.training else None
-        optimized_model, weight_params_attr = _weight_prepack_with_ipex(optimized_model, weight_format_from_dtype)
+        optimized_model = copy.deepcopy(model)
+        if not model.training:
+            try:
+                optimized_model = conv_bn_fuse(optimized_model)
+            except:
+                warnings.warn("Conv BN folding failed during the optimize process.")
+
+        new_optimizer = None
+        weight_params_attr = None
+        # Do weight prepack if level is 'O1', and convert optimizer for training case.
+        if level == 'O1':
+            optimized_model, weight_params_attr = _weight_prepack_with_ipex(optimized_model, dtype)
+
     if optimizer is not None:
         assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
-        new_optimizer = _ipex_optimizer(model, optimized_model, optimizer, weight_params_attr)
+        new_optimizer = _ipex_optimizer(model, optimized_model, optimizer, weight_params_attr, dtype)
 
     #TODO: model list, optimizer list.
     if optimizer is None:

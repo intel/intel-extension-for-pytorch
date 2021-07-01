@@ -37,15 +37,29 @@ class _IPEXConv2d(_IPEXConvNd):
         self.dtype = dtype
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last)
         self.weight_prepacked = True
-        self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_prepack(
-            # TODO: ".clone()" will make weight shared by multiple module not shared anymore
-            # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
-            dense_module.weight.detach().clone(),
-            self.padding,
-            self.stride,
-            self.dilation,
-            self.groups,
-            self.dtype))
+
+        # TODO: ".clone()" will make weight shared by multiple module not shared anymore
+        # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
+        if self.dtype == torch.bfloat16:
+            self.master_weight = torch.ops.torch_ipex.conv2d_weight_prepack(
+                dense_module.weight.detach().clone(),
+                self.padding,
+                self.stride,
+                self.dilation,
+                self.groups,
+                self.dtype)
+            self.master_weight.requires_grad_()
+            self.weight = nn.Parameter(self.master_weight.detach().to(torch.bfloat16))
+        else:
+            self.master_weight = None
+            self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_prepack(
+                dense_module.weight.detach().clone(),
+                self.padding,
+                self.stride,
+                self.dilation,
+                self.groups,
+                self.dtype))
+
         if dense_module.bias is not None:
             self.bias = nn.Parameter(dense_module.bias.detach().clone())
         else:
@@ -56,7 +70,7 @@ class _IPEXConv2d(_IPEXConvNd):
         if self.bias is not None:
             destination[prefix + 'bias'] = self.bias if keep_vars else self.bias.detach()
         destination[prefix + 'weight'] = torch.ops.torch_ipex.conv2d_weight_unpack(
-            self.weight.detach().clone(),
+            self.master_weight.detach() if self.dtype == torch.bfloat16 else self.weight.detach(),
             self.padding,
             self.stride,
             self.dilation,
@@ -82,11 +96,19 @@ class _IPEXLinear(torch.nn.Module):
           dense_module.weight.stride()[0] == 1 and
           dense_module.weight.stride()[1] == dense_module.weight.size()[0]
         )
-        self.weight = torch.nn.Parameter(
-            # TODO:".clone()" will make weight shared by multiple module not shared anymore
-            # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
-            torch.ops.torch_ipex.linear_weight_prepack(dense_module.weight.detach().clone(), self.dtype)
-        )
+
+        # TODO:".clone()" will make weight shared by multiple module not shared anymore
+        # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
+        if self.dtype == torch.bfloat16:
+            self.master_weight = torch.ops.torch_ipex.linear_weight_prepack(dense_module.weight.detach().clone(), self.dtype)
+            self.master_weight.requires_grad_()
+            self.weight = nn.Parameter(self.master_weight.detach().to(torch.bfloat16))
+        else:
+            self.master_weight = None
+            self.weight = torch.nn.Parameter(
+                torch.ops.torch_ipex.linear_weight_prepack(dense_module.weight.detach().clone(), self.dtype)
+            )
+
         if dense_module.bias is not None:
             self.bias = torch.nn.Parameter(dense_module.bias.detach().clone())
         else:
@@ -102,7 +124,7 @@ class _IPEXLinear(torch.nn.Module):
         if self.bias is not None:
             destination[prefix + 'bias'] = self.bias if keep_vars else self.bias.detach()
         destination[prefix + 'weight'] = torch.ops.torch_ipex.linear_weight_unpack(
-            self.weight.detach().clone(),
+            self.master_weight.detach() if self.dtype == torch.bfloat16 else self.weight.detach(),
             self.out_features,
             self.in_features,
             self.weight_transposed,
@@ -117,16 +139,19 @@ def _weight_prepack_with_ipex(module, dtype=None):
     def convert(m, dtype):
         if isinstance(m, torch.nn.Conv2d):
             new_model = _IPEXConv2d(m, dtype)
-            weight_params_attr[new_model.weight] = {'op': torch.nn.Conv2d, 'padding': new_model.padding, \
-                                                    'stride': new_model.stride, 'dilation': new_model.dilation, \
-                                                    'kernel_size': new_model.kernel_size, 'groups': new_model.groups, \
-                                                    'out_channels': new_model.out_channels, 'in_channels': new_model.in_channels, \
-                                                    'weight_channels_last': new_model.weight_channels_last, 'dtype': new_model.dtype}
+            weight_params_attr[new_model.weight] = {'op': torch.nn.Conv2d, 'master_weight': new_model.master_weight, \
+                                                    'padding': new_model.padding, 'stride': new_model.stride, \
+                                                    'dilation': new_model.dilation, 'kernel_size': new_model.kernel_size, \
+                                                    'groups': new_model.groups, 'out_channels': new_model.out_channels, \
+                                                    'in_channels': new_model.in_channels, \
+                                                    'weight_channels_last': new_model.weight_channels_last, \
+                                                    'dtype': new_model.dtype}
             return new_model
         elif isinstance(m, torch.nn.Linear):
             try:
                 new_model = _IPEXLinear(m, dtype)
                 weight_params_attr[new_model.weight] = {'op': torch.nn.Linear,
+                                                        'master_weight': new_model.master_weight,
                                                         'out_features': new_model.out_features,
                                                         'in_features': new_model.in_features,
                                                         'weight_transposed': new_model.weight_transposed,

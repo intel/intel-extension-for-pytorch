@@ -48,8 +48,7 @@ class TestPrepackCases(TestCase):
                 conf = ipex.AmpConf(dtype)
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                 ipex_model = ipex_model.train()
-                # for training case, weight's dtype always float.
-                self.assertTrue(ipex_model.weight.dtype == torch.float32)
+                self.assertTrue(ipex_model.weight.dtype == dtype)
                 with ipex.amp.autocast(enabled=True, configure=conf):
                     # original path
                     y1 = origin_model(x1)
@@ -89,7 +88,7 @@ class TestPrepackCases(TestCase):
         model = torch.nn.Conv2d(256, 324, kernel_size=(1, 1), stride=(1, 1), padding=(1, 1), bias=False)
         model = model.to(memory_format=torch.channels_last).train()
         x = torch.randn(32, 256, 1, 1).to(memory_format=torch.channels_last)
-        for dtype in [torch.bfloat16]:
+        for dtype in [torch.float32, torch.bfloat16]:
             conf = ipex.AmpConf(dtype)
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
@@ -173,6 +172,8 @@ class TestPrepackCases(TestCase):
             origin_model2.load_state_dict(ipex_checkpoint['model_state_dict'])
             origin_optimizer2.load_state_dict(ipex_checkpoint['optimizer_state_dict'])
             self.assertEqual(origin_model1.weight, origin_model2.weight)
+            # check momentum_buffer works.
+            ipex_model, ipex_optimizer = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
             with ipex.amp.autocast(enabled=True, configure=conf):
                 # train second step for origin.
                 y1 = origin_model1(origin_x)
@@ -186,9 +187,22 @@ class TestPrepackCases(TestCase):
                 origin_optimizer2.zero_grad()
                 loss2.backward()
                 origin_optimizer2.step()
+                # traing second step for ipex model.
+                y3 = ipex_model(origin_x)
+                loss3 = y3.sum()
+                ipex_optimizer.zero_grad()
+                loss3.backward()
+                ipex_optimizer.step()
             self.assertEqual(y1, y2)
+            self.assertEqual(y1, y3)
             self.assertEqual(loss1, loss2)
-            self.assertEqual(origin_model1.weight, origin_model2.weight)
+            self.assertEqual(loss1, loss3)
+            origin_model_state1 = origin_model1.state_dict()
+            origin_model_state2 = origin_model2.state_dict()
+            ipex_model_state = ipex_model.state_dict()
+            for var_name in origin_model_state:
+                self.assertEqual(origin_model_state1[var_name], origin_model_state2[var_name])
+                self.assertEqual(origin_model_state1[var_name], ipex_model_state[var_name])
             os.remove('origin_checkpoint.pth')
             os.remove('ipex_checkpoint.pth')
 
@@ -306,10 +320,7 @@ class TestPrepackCases(TestCase):
                 origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                 conf = ipex.AmpConf(dtype)
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-                self.assertEqual(ipex_model.weight.storage()[0], origin_model.weight.storage()[0])
-                ipex_model = ipex_model.train()
-                # for training case, weight's dtype always float.
-                self.assertTrue(ipex_model.weight.dtype == torch.float32)
+                self.assertTrue(ipex_model.weight.dtype == dtype)
                 for i in range(2):
                     with ipex.amp.autocast(enabled=True, configure=conf):
                         # original path
@@ -327,7 +338,6 @@ class TestPrepackCases(TestCase):
                 self.assertEqual(y1, y2)
                 self.assertEqual(loss1, loss2)
                 self.assertEqual(x1.grad, x2.grad, rtol=1e-5, atol=1e-3)
-                self.assertEqual(ipex_model.weight.grad.storage()[0], origin_model.weight.grad.storage()[0], rtol=1e-5, atol=1e-3)
                 if bias:
                     self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad)
                 # compare origin_model parameters with origin_model parameters after grad updata

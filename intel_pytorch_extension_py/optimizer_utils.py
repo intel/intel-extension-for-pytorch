@@ -17,16 +17,22 @@ def _optimizer_convert(model, optimized_model, optimizer, weight_params_attr):
     new_optimizer.state.clear()
     for group1, group2 in zip(optimizer.param_groups, new_optimizer.param_groups):
         for i, p in enumerate(group1['params']):
-            # find the new tensor
-            new_param = dic_param[p]
+            # find the new model's param.
+            new_model_param = dic_param[p]
+            # for bf16 path, replace bf16 weight with master weight.
+            if new_model_param in weight_params_attr and new_model_param.dtype == torch.bfloat16:
+                new_param = weight_params_attr[new_model_param]['master_weight']
+            else:
+                new_param = new_model_param
+
             group2['params'][i] = new_param
-            # copy optimizer's state
+            # copy optimizer's state.
             if p in optimizer.state:
                 new_optimizer.state[new_param] = copy.deepcopy(optimizer.state[p])
                 # for conv weight, preprack momentum_buffer using weight's attr.
                 # TODO: Linear and LSTM.
-                if new_param in weight_params_attr:
-                    attr = weight_params_attr[new_para]
+                if new_model_param in weight_params_attr:
+                    attr = weight_params_attr[new_model_param]
                     # TODO: Linear or other ops.
                     if attr['op'] is torch.nn.Conv2d:
                         new_optimizer.state[new_param]['momentum_buffer'] = torch.ops.torch_ipex.conv2d_weight_prepack(
@@ -44,7 +50,8 @@ def _optimizer_convert(model, optimized_model, optimizer, weight_params_attr):
                             attr['dtype'])
     return new_optimizer
 
-class _ipex_optimizer(object):
+
+class _ipex_optimizer(torch.optim.Optimizer):
     """
     Convert user's optimizer to ipex optimizer, it is a temporary implementation,
     it will be removed by directly overwrite optimizer's methods.
@@ -57,7 +64,7 @@ class _ipex_optimizer(object):
             momentum_buffer or other state according those attrs.
     """
 
-    def __init__(self, model, optimized_model, optimizer, weight_params_attr):
+    def __init__(self, model, optimized_model, optimizer, weight_params_attr, dtype):
         if isinstance(optimizer, torch.optim.SGD):
             self.optimizer = _optimizer_convert(model, optimized_model, optimizer, weight_params_attr)
         else:
@@ -65,16 +72,29 @@ class _ipex_optimizer(object):
             assert False, "optimizer is not supported now for IPEX"
         self.weight_params_attr = weight_params_attr
         self.param_groups = self.optimizer.param_groups
+        self.dtype = dtype
 
     def state_dict(self):
         optimizer_temp = copy.deepcopy(self.optimizer)
+        weight_params_attr_ = {}
+        # For bf16 path, the optimizer's params are master weight,
+        # but self.weight_params_attr's keys are bf16 weight, it hard to
+        # query the weight's attr, so recreate a dic which using master weight
+        # as key for easily to query.
+        if self.dtype == torch.bfloat16:
+           for _, values in self.weight_params_attr.items():
+                master_weight = values['master_weight']
+                weight_params_attr_[master_weight] = values
+        else:
+            weight_params_attr_ = self.weight_params_attr
+
         # need conver master weight's momentum to plain format.
         for (k1, _), (_, v2) in zip(self.optimizer.state.items(), optimizer_temp.state.items()):
-            if k1 in self.weight_params_attr:
+            if k1 in weight_params_attr_:
                 #  for sgd optimizer, unpack momentum_buffer using weight's attr.
                 if isinstance(self.optimizer, torch.optim.SGD):
-                    if k1 in self.weight_params_attr:
-                        weight_attr = self.weight_params_attr[k1]
+                    if k1 in weight_params_attr_:
+                        weight_attr = weight_params_attr_[k1]
                         if weight_attr['op'] is torch.nn.Conv2d:
                             # change optimizer_temp's momentum_buffer, origin optimizer should not be changed.
                             v2['momentum_buffer'] = torch.ops.torch_ipex.conv2d_weight_unpack(
@@ -105,8 +125,30 @@ class _ipex_optimizer(object):
         assert False, "_ipex_optimizer does not suppory load_state_dict"
 
     def zero_grad(self, set_to_none: bool = False):
+        if self.dtype == torch.bfloat16:
+            for p in self.weight_params_attr:
+                if p.grad is not None:
+                    if set_to_none:
+                        p.grad = None
+                    else:
+                        if p.grad.grad_fn is not None:
+                            p.grad.detach_()
+                        else:
+                            p.grad.requires_grad_(False)
+                        p.grad.zero_()
+
         self.optimizer.zero_grad(set_to_none)
 
     def step(self, closure=None):
-        return self.optimizer.step(closure)
+        if self.dtype == torch.bfloat16:
+            # convert bf16 weight'grad to float.
+            for k, value in self.weight_params_attr.items():
+                value["master_weight"].grad = k.grad.detach().to(torch.float)
+        loss = self.optimizer.step(closure)
+        # sync mater weight to model's paramerter
+        if self.dtype == torch.bfloat16:
+            for k, value in self.weight_params_attr.items():
+                torch.ops.torch_ipex.sync_master_weight_to_bf16(value["master_weight"], k)
+        return loss
+
 

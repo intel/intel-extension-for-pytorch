@@ -479,6 +479,15 @@ at::Tensor linear_weight_unpack(
   return result;
 }
 
+void sync_master_weight_to_bf16(const at::Tensor master_weight, at::Tensor& bf16_weight) {
+  TORCH_CHECK(master_weight.sizes() == bf16_weight.sizes(), "expected master weight has same sizes with bf16 weight");
+  TORCH_CHECK(master_weight.scalar_type() == at::kFloat && bf16_weight.scalar_type() == at::kBFloat16,
+              "expected master weght has same dims with bf16 weight");
+  auto w_master = at::native::itensor_view_from_dense(master_weight);
+  auto w_bf16 = at::native::itensor_view_from_dense(bf16_weight);
+  w_bf16.feed_from(w_master);
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex
 
@@ -489,6 +498,8 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def("conv2d_weight_unpack(Tensor weight, int[] padding, int[] stride, int[] dilation, int[] kernel_size, int groups, int output_channel, int input_channel, bool is_channels_last, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::conv2d_weight_unpack);
   m.def("linear_weight_prepack(Tensor weight, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_prepack);
   m.def("linear_weight_unpack(Tensor weight, int out_features, int in_features, bool transposed, ScalarType? dtype=None) -> Tensor", torch_ipex::cpu::linear_weight_unpack);
+  m.def("sync_master_weight_to_bf16(Tensor master_weight, Tensor bf16_weight) -> ()", torch_ipex::cpu::sync_master_weight_to_bf16);
+
 }
 
 }
