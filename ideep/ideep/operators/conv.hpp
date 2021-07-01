@@ -10,6 +10,7 @@ struct convolution_forward_params {
   scale_t dst_scales;
   int groups;
   tensor scratchpad;
+  attr_t op_attr;
 };
 
 struct convolution_forward
@@ -506,7 +507,7 @@ private:
     // allocate scratchpad
     tensor scratchpad(pd.scratchpad_desc());
 
-    param = {pd, bias_attr, dst_scales, groups, scratchpad};
+    param = {pd, bias_attr, dst_scales, groups, scratchpad, op_attr};
   }
 
   template <bool with_bias>
@@ -531,7 +532,10 @@ private:
       }
       expected_dst = dst;
     } else {
-      expected_dst.init(expected_dst_desc);
+      expected_dst.init(expected_dst_desc); 
+      if (param.op_attr.has_op_kind(kind::sum)) {
+        expected_dst.feed_from(dst);
+      }
     }
 
     if (with_bias) {
@@ -552,7 +556,7 @@ private:
     }
 
     // dst has been init in FW side, but has diff desc with expected_dst.
-    if (dst.get_desc() != expected_dst_desc) {
+    if (dst.get_desc() != expected_dst.get_desc()) {
       dst.feed_from(expected_dst);
     }
   }

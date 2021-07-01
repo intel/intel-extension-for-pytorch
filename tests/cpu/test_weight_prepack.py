@@ -253,7 +253,7 @@ class TestPrepackCases(TestCase):
             self.assertEqual(y, y1)
             self.assertEqual(y1, y2, rtol=1e-5, atol=1e-3)
             self.assertEqual(loss, loss1)
-            self.assertEqual(loss1, loss2)
+            self.assertEqual(loss1, loss2, rtol=1e-5, atol=1e-3)
 
 
     @skipIfNoTorchVision
