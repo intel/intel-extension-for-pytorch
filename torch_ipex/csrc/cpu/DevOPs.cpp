@@ -1242,34 +1242,9 @@ at::Tensor AtenIpexCPUDev::dil_batch_norm(
     double momentum,
     double eps,
     bool cudnn_enabled) {
-  return std::get<0>(at::native_batch_norm(
-    input,
-    weight,
-    bias,
-    running_mean,
-    running_var,
-    train,
-    momentum,
-    eps));
-}
 
-void check_dims_match_num_input_features(const char* arg_name, int64_t expected, int64_t actual){
-  IPEX_CHECK(actual == expected,
-             arg_name, " should contain ", expected, " elements not ", actual);
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_norm(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& running_mean,
-    const at::Tensor& running_var,
-    bool train,
-    double momentum,
-    double eps) {
-  DEBUG("AtenIpexCPUDev::dil_native_batch_norm\n");
-#define CHECK_MISMATCH(arg_name, expected, actual) \
-  IPEX_CHECK(actual == expected, arg_name, " should contain ", expected, " elements not ", actual)
+  #define CHECK_MISMATCH(arg_name, expected, actual) \
+    IPEX_CHECK(actual == expected, arg_name, " should contain ", expected, " elements not ", actual)
 
   auto num_features = input.sizes()[1];
   if (running_mean.defined()) {
@@ -1284,6 +1259,28 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   if (bias.defined()) {
     CHECK_MISMATCH("bias", num_features, bias.numel());
   }
+
+  return std::get<0>(at::native_batch_norm(
+    input,
+    weight,
+    bias,
+    running_mean,
+    running_var,
+    train,
+    momentum,
+    eps));
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    bool train,
+    double momentum,
+    double eps) {
+  DEBUG("AtenIpexCPUDev::dil_native_batch_norm\n");
 
   bool is_layer_norm = (!weight.defined()) && (!bias.defined()) && (!running_mean.defined()) && (!running_var.defined());
   if (is_layer_norm) {
