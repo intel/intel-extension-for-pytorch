@@ -2,7 +2,8 @@
 #include <immintrin.h>
 #include <cstdlib>
 
-static inline void zero_ker(int32_t *out, int64_t len) {
+static inline __attribute__((always_inline))
+void zero_ker(int32_t *out, int64_t len) {
   int64_t i;
   __m512i zero_512 = _mm512_setzero_si512();
   #pragma unroll(4)
@@ -16,7 +17,8 @@ static inline void zero_ker(int32_t *out, int64_t len) {
   }
 }
 
-static inline void zero_ker(int8_t *out, int64_t len) {
+static inline __attribute__((always_inline))
+void zero_ker(int8_t *out, int64_t len) {
   int64_t i;
   __m512i zero_512 = _mm512_setzero_si512();
   #pragma unroll(4)
@@ -560,20 +562,54 @@ __m512i reduce_add_s32x16x16(__m512i* acc_sums) {
 }
 
 static inline __attribute__((always_inline))
-void reduce_add_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, __m512& scales) {
+void reduce_add_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, const float* scales) {
   auto l1 =  reduce_add_s32x16x16(acc_sums);
+  __m512 scale_16 = _mm512_load_ps((const void *)scales);
   auto l1_f = _mm512_cvtepi32_ps(l1);
-  l1_f = _mm512_mul_round_ps(l1_f, scales, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l1_f = _mm512_mul_round_ps(l1_f, scale_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   l1 = _mm512_cvtps_epi32(l1_f);
   auto out_16 = _mm512_cvtsepi32_epi8(l1);
   _mm_storeu_si128((__m128i*)outs, out_16);
 }
 
 static inline __attribute__((always_inline))
-void reduce_add_s32x16x16_with_scales_and_mask_store(int8_t* outs, __mmask16 mask, __m512i* acc_sums, __m512& scales) {
+void reduce_add_s32x16x16x4_with_scales(int8_t* outs, __m512i* acc_sums, const float* scales) {
   auto l1 =  reduce_add_s32x16x16(acc_sums);
+  auto l2 =  reduce_add_s32x16x16(acc_sums + 16);
+  auto l3 =  reduce_add_s32x16x16(acc_sums + 32);
+  auto l4 =  reduce_add_s32x16x16(acc_sums + 48);
+  __m512 scale0_16 = _mm512_load_ps((const void *)scales);
+  __m512 scale1_16 = _mm512_load_ps((const void *)(scales + 16));
+  __m512 scale2_16 = _mm512_load_ps((const void *)(scales + 32));
+  __m512 scale3_16 = _mm512_load_ps((const void *)(scales + 48));
   auto l1_f = _mm512_cvtepi32_ps(l1);
-  l1_f = _mm512_mul_round_ps(l1_f, scales, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto l2_f = _mm512_cvtepi32_ps(l2);
+  auto l3_f = _mm512_cvtepi32_ps(l3);
+  auto l4_f = _mm512_cvtepi32_ps(l4);
+  l1_f = _mm512_mul_round_ps(l1_f, scale0_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l2_f = _mm512_mul_round_ps(l2_f, scale1_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l3_f = _mm512_mul_round_ps(l3_f, scale2_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l4_f = _mm512_mul_round_ps(l4_f, scale3_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l1 = _mm512_cvtps_epi32(l1_f);
+  l2 = _mm512_cvtps_epi32(l2_f);
+  l3 = _mm512_cvtps_epi32(l3_f);
+  l4 = _mm512_cvtps_epi32(l4_f);
+  auto out1_16 = _mm512_cvtsepi32_epi8(l1);
+  auto out2_16 = _mm512_cvtsepi32_epi8(l2);
+  auto out3_16 = _mm512_cvtsepi32_epi8(l3);
+  auto out4_16 = _mm512_cvtsepi32_epi8(l4);
+  _mm_storeu_si128((__m128i*)outs, out1_16);
+  _mm_storeu_si128((__m128i*)(outs + 16), out2_16);
+  _mm_storeu_si128((__m128i*)(outs + 32), out3_16);
+  _mm_storeu_si128((__m128i*)(outs + 48), out4_16);
+}
+
+static inline __attribute__((always_inline))
+void reduce_add_s32x16x16_with_scales_and_mask_store(int8_t* outs, __mmask16 mask, __m512i* acc_sums, const float* scales) {
+  auto l1 =  reduce_add_s32x16x16(acc_sums);
+  __m512 scale_16 = _mm512_load_ps((const void *)scales);
+  auto l1_f = _mm512_cvtepi32_ps(l1);
+  l1_f = _mm512_mul_round_ps(l1_f, scale_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   l1 = _mm512_cvtps_epi32(l1_f);
   auto out_16 = _mm512_cvtsepi32_epi8(l1);
   _mm_mask_storeu_epi8((__m128i*)outs, mask, out_16);

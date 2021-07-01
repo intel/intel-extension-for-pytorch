@@ -2,7 +2,8 @@
 #include <immintrin.h>
 #include "vec_type_cvt.h"
 
-inline __m512 pack_bf16_to_fp32(const __m256i top, const __m256i bot) {
+static inline __attribute__((always_inline))
+__m512 pack_bf16_to_fp32(const __m256i top, const __m256i bot) {
   auto x1 = _mm512_cvtepu16_epi32(top);
   auto x2 = _mm512_cvtepu16_epi32(bot);
   auto y = _mm512_add_epi32(_mm512_bslli_epi128(x1, 2), x2);
@@ -10,10 +11,11 @@ inline __m512 pack_bf16_to_fp32(const __m256i top, const __m256i bot) {
 }
 
 // Only support AVX512 impl at current stage. Will expand this impl to cover AVX2 and other cases.
-inline void packed_bf16_add_ker(at::BFloat16 *a1, at::BFloat16 *a2, at::BFloat16 *b, int len, float alpha) {
+static inline __attribute__((always_inline))
+void packed_bf16_add_ker(at::BFloat16 *a1, at::BFloat16 *a2, at::BFloat16 *b, int len, float alpha) {
   auto vAlpha = _mm512_set1_ps(alpha);
   int i = 0;
-  #pragma unroll(4)
+  #pragma unroll(2)
   for (; i < len - 15; i += 16) {
     auto x1 = _mm256_loadu_si256((__m256i *)(a1 + i));
     auto x2 = _mm256_loadu_si256((__m256i *)(a2 + i));
@@ -42,9 +44,10 @@ inline void packed_bf16_add_ker(at::BFloat16 *a1, at::BFloat16 *a2, at::BFloat16
   }
 }
 
-inline void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
+static inline __attribute__((always_inline))
+void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
   int i;
-  #pragma unroll(4)
+  #pragma unroll(2)
   for(i = 0; i < len - 31; i += 32) {
     auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
     auto inout2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i + 16)));
@@ -73,9 +76,10 @@ inline void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
   }
 }
 
-static inline void add_ker(float *inout, float *in, int len) {
+static inline __attribute__((always_inline))
+void add_ker(float *inout, float *in, int len) {
   int i;
-  #pragma unroll(4)
+  #pragma unroll(2)
   for(i = 0; i < len - 31; i += 32) {
     auto out1 = _mm512_loadu_ps(inout + i);
     auto out2 = _mm512_loadu_ps(inout + i + 16);
@@ -102,9 +106,10 @@ static inline void add_ker(float *inout, float *in, int len) {
   }
 }
 
-static inline void add_ker(float *inout, at::BFloat16 *in, int len) {
+static inline __attribute__((always_inline))
+void add_ker(float *inout, at::BFloat16 *in, int len) {
   int i;
-  #pragma unroll(4)
+  #pragma unroll(2)
   for(i = 0; i < len - 31; i += 32) {
     auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
     auto in2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i + 16)));
@@ -133,7 +138,8 @@ static inline void add_ker(float *inout, at::BFloat16 *in, int len) {
   }
 }
 
-static inline void move_ker(double *out, const double *in, int64_t len) {
+static inline __attribute__((always_inline))
+void move_ker(double *out, const double *in, int64_t len) {
   int64_t i;
   #pragma unroll(4)
   for (i = 0; i < len - 7 ; i += 8) {
@@ -148,9 +154,10 @@ static inline void move_ker(double *out, const double *in, int64_t len) {
   }
 }
 
-static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
+static inline __attribute__((always_inline))
+void move_ker(at::BFloat16 *out, float *in, int64_t len) {
   int64_t i;
-  #pragma unroll(4)
+  #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i));
     auto in1 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i + 16));
@@ -171,7 +178,8 @@ static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
   }
 }
 
-static inline void move_ker(float *out, const float *in, int64_t len) {
+static inline __attribute__((always_inline))
+void move_ker(float *out, const float *in, int64_t len) {
   int64_t i;
   #pragma unroll(4)
   for (i = 0; i < len - 15 ; i += 16) {
@@ -186,7 +194,8 @@ static inline void move_ker(float *out, const float *in, int64_t len) {
   }
 }
 
-static inline void move_ker(at::BFloat16 *out, const at::BFloat16 *in, int64_t len) {
+static inline __attribute__((always_inline))
+void move_ker(at::BFloat16 *out, const at::BFloat16 *in, int64_t len) {
   int64_t i;
   #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
@@ -201,7 +210,8 @@ static inline void move_ker(at::BFloat16 *out, const at::BFloat16 *in, int64_t l
   }
 }
 
-static inline void zero_ker(float *out, int64_t len) {
+static inline __attribute__((always_inline))
+void zero_ker(float *out, int64_t len) {
   int64_t i;
   __m512 zero_512 = _mm512_setzero_ps();
   #pragma unroll(4)
@@ -215,7 +225,8 @@ static inline void zero_ker(float *out, int64_t len) {
   }
 }
 
-static inline void zero_ker(at::BFloat16 *out, int64_t len) {
+static inline __attribute__((always_inline))
+void zero_ker(at::BFloat16 *out, int64_t len) {
   int64_t i;
   __m512i zero_512 = _mm512_setzero_si512();
   #pragma unroll(4)

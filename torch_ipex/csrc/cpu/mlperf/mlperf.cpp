@@ -10,16 +10,17 @@
 namespace torch_ipex {
     namespace mlperf {
         namespace dlrm {
-            static inline void convert_to_s16(const int ci, const int8_t *p, __m512i (&cache_reg)[27*4]) {
+            static inline __attribute__((always_inline))
+            void convert_to_s16(const int ci, const int8_t *p, __m512i (&cache_reg)[27*4]) {
               cache_reg[ci * 4 + 0] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)p));
               cache_reg[ci * 4 + 1] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 32)));
               cache_reg[ci * 4 + 2] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 64)));
               cache_reg[ci * 4 + 3] = _mm512_cvtepi8_epi16(_mm256_load_si256((const __m256i *)(p + 96)));
             }
 
-            static inline void update_cache(const int ci, const int i,
-                                            const int8_t *p, __m512i (&cache_reg)[27*4],
-                                            int (&cache_idx)[27]) {
+            static inline __attribute__((always_inline))
+            void update_cache(const int ci, const int i, const int8_t *p,
+                              __m512i (&cache_reg)[27*4], int (&cache_idx)[27]) {
                 if (cache_idx[ci] != i) {
                     cache_idx[ci] = i;
 		    convert_to_s16(ci, p, cache_reg);
@@ -95,9 +96,8 @@ namespace torch_ipex {
                     int8_t* input0_ptr = densex + i * Dim;
                     int8_t* output0_ptr = res + i * ROW;
                     scale_and_move_ker_128(output0_ptr, input0_ptr, c_scale);
-
-                    // dot product of each pair
                     convert_to_s16(0, input0_ptr, convert_to_s16_buf);
+
                     int ii = index[0][offset[0][i]];
                     const int8_t *p = &(weight[0][ii * Dim]);
                     for (int j = 2; j < 27; ++j) {
@@ -107,6 +107,7 @@ namespace torch_ipex {
                     }
                     update_cache(26, ii, p, convert_to_s16_buf, cache_idx);
 
+                    // dot product of each pair
                     auto * a = (const __m512i *)&convert_to_s16_buf[0];
                     auto * b = (const __m512i *)&convert_to_s16_buf[4];
                     mul_and_sum_s16x128_to_s32x16(cat_buf[0], b, a);
@@ -127,16 +128,16 @@ namespace torch_ipex {
                       }
                     }
 
-                    int8_t* output_ptr = output0_ptr + Dim;
+                    int8_t* outp = output0_ptr + Dim;
                     //Do reduce add with scale
                     size_t off = 0;
-                    for (; off < total_off - 15 ; off += 16) {
-                      __m512 scale_16 = _mm512_load_ps((const void *)(scales + off));
-                      reduce_add_s32x16x16_with_scales(output_ptr + off, cat_buf + off, scale_16);
+                    for (; off < total_off - 63 ; off += 64) {
+                      reduce_add_s32x16x16x4_with_scales(outp + off, cat_buf + off, scales + off);
                     }
 
-                    __m512 scale_16 = _mm512_load_ps((const void *)(scales + off));
-                    reduce_add_s32x16x16_with_scales_and_mask_store(output_ptr + off, 0x7fff, cat_buf + off, scale_16);
+                    reduce_add_s32x16x16_with_scales(outp + off, cat_buf + off, scales + off);
+                    off += 16;
+                    reduce_add_s32x16x16_with_scales_and_mask_store(outp + off, 0x7fff, cat_buf + off, scales + off);
                   }
 		});
                 return output;

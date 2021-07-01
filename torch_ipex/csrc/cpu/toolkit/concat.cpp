@@ -19,29 +19,43 @@ struct InputMeta {
 
 
 template<typename scalar_t>
-void _concat_all_continue(at::Tensor& result, const std::vector<at::Tensor>& input_tensors, int64_t dim) {
-  const int VEC_NUM = 64;
-  const int VEC_NUM_LOG2 = 6;
-  auto result_dim_stride = result.stride(dim);
+at::Tensor _concat_all_continue(std::vector<at::Tensor>& input_tensors, int64_t dim) {
+  auto first_tensor_mem_format = input_tensors[0].suggest_memory_format();
   uint32_t input_size = input_tensors.size();
+  int64_t cat_dim_size = 0;
+  for (int i = 0; i < input_size; i++) {
+    auto const &tensor = input_tensors[i];
+    assert(tensor.is_contiguous(first_tensor_mem_format));
+    cat_dim_size += tensor.size(dim);
+  }
+  at::Tensor result = at::empty({0}, input_tensors[0].options().dtype());
+  auto result_size = input_tensors[0].sizes().vec();
+  result_size[dim] = cat_dim_size;
+  result.resize_(result_size, first_tensor_mem_format);
+  int64_t outer = 1;
+  for (int i = 0; i < dim; ++i) {
+    outer *= result_size[i];
+  }
+
   std::vector<InputMeta> inputs(input_size);
-  int64_t max_inner_size = inputs[0].inner_size;
-  at::parallel_for(0, input_size, 64, [&](int64_t start, int64_t end) {
+  int64_t max_inner_size = 0;
+  auto result_dim_stride = result.stride(dim);
+  at::parallel_for(0, input_size, 16, [&](int64_t start, int64_t end) {
     for (int64_t j = start; j < end; j++) {
       InputMeta input_meta(input_tensors[j], dim, result_dim_stride);
-      inputs[j] = input_meta; 
+      inputs[j] = input_meta;
       max_inner_size = (inputs[j].inner_size > max_inner_size) ? inputs[j].inner_size : max_inner_size; 
     }
   });
 
-  int64_t outer = result.numel() / (result.size(dim) * result_dim_stride);
   //std::cout << "sizeof (scalar_t) is " << sizeof(scalar_t) << ",  outer is " << outer << std::endl;
   scalar_t* result_data = result.data_ptr<scalar_t>();
+  auto half_vec_size = (64 / sizeof(scalar_t)) >> 1;
 
   if (outer == 1) {
-    scalar_t* result_ptr = result_data;
     //std::cout << "max_inner_size is  " << max_inner_size << ", input_size is " << input_size << std::endl;
-    if ((input_size > 16) && (max_inner_size < input_size)) {
+    if (max_inner_size < (input_size << 1)) {
+      scalar_t* result_ptr = result_data;
       std::vector<scalar_t*> results_addr_array(input_size);
       results_addr_array[0] = result_ptr;
       result_ptr += inputs[0].inner_size;
@@ -49,12 +63,12 @@ void _concat_all_continue(at::Tensor& result, const std::vector<at::Tensor>& inp
         results_addr_array[j] = result_ptr;
         result_ptr += inputs[j].inner_size;
       }
-      at::parallel_for(0, input_size, 0, [&](int64_t start, int64_t end) {
+      at::parallel_for(0, input_size, 64, [&](int64_t start, int64_t end) {
         for (int64_t j = start; j < end; j++) {
           int64_t local_inner = inputs[j].inner_size;
           scalar_t* input_ptr = (scalar_t*)(inputs[j].data_ptr);
           scalar_t* result_ptr = results_addr_array[j];
-	  if (local_inner < 8) {
+	  if (local_inner < half_vec_size) {
 	    for (auto k = 0; k < local_inner; k++) {
               result_ptr[k] = input_ptr[k];
 	    }
@@ -64,95 +78,87 @@ void _concat_all_continue(at::Tensor& result, const std::vector<at::Tensor>& inp
         }
       });
     } else {
+      scalar_t* result_ptr = result_data;
       for (int64_t j = 0; j < input_size; j++) {
         int64_t local_inner = inputs[j].inner_size;
         scalar_t* input_ptr = (scalar_t*)(inputs[j].data_ptr);
-        at::parallel_for(0, local_inner, 0, [&](int64_t start, int64_t end) {
-          move_ker(result_ptr, input_ptr, end - start);
+        at::parallel_for(0, local_inner, 64, [&](int64_t start, int64_t end) {
+          move_ker(result_ptr + start, input_ptr + start, end - start);
         });
         result_ptr += local_inner;
       }
     }
   } else {
-    auto total_addrs = outer * input_size;
-    std::vector<scalar_t*> results_addr_array(total_addrs);
-    std::vector<scalar_t*> inputs_addr_array(total_addrs);
-    std::vector<int64_t> local_inner_array(total_addrs);
-    scalar_t* result_ptr = result_data;
-    for (int64_t i = 0; i < outer; ++i) {
-      for (int64_t j = 0; j < input_size; j++) {
-	int64_t off = i * input_size + j;
-	int64_t local_inner = inputs[j].inner_size;
-	local_inner_array[off] = local_inner;
-	results_addr_array[off] = result_ptr;
-	inputs_addr_array[off] = (scalar_t*)(inputs[j].data_ptr) + i * local_inner;
-        result_ptr += local_inner;
+    if (outer > 16){
+      int64_t inner = 1;
+      for (int i = dim + 1; i < int(result_size.size()); ++i) {
+        inner *= result_size[i];
       }
-    }
-
-    //std::cout << "max_inner_size is  " << max_inner_size << ", total_addrs is " << total_addrs << std::endl;
-    if (max_inner_size < total_addrs) {
-      at::parallel_for(0, total_addrs, 64, [&](int64_t start, int64_t end) {
-        for (int64_t off = start; off < end; off++) {
-          move_ker(results_addr_array[off], inputs_addr_array[off], local_inner_array[off]);
+      auto outer_stride = inner * cat_dim_size;
+      //std::cout << "outer is " << outer << ", outer_stride is " << outer_stride << ", input_size is " << input_size  <<std::endl;
+      at::parallel_for(0, outer, 1, [&](int64_t start, int64_t end) {
+        for (int o = start; o < end; ++o) {
+          scalar_t* result_ptr = result_data + o * outer_stride;
+          for (int j = 0; j < input_size; ++j) {
+            int64_t local_inner = inputs[j].inner_size;
+            scalar_t* input_ptr = (scalar_t*)(inputs[j].data_ptr) + o * local_inner;
+	    if (local_inner == 1) {
+              result_ptr[0] = input_ptr[0];
+	    } else {
+              move_ker(result_ptr, input_ptr, local_inner);
+	    }
+	    result_ptr += local_inner;
+	  }
         }
       });
     } else {
-      for (int64_t off = 0; off < total_addrs; off++) {
-	int64_t local_inner = local_inner_array[off];
-	scalar_t * result_ptr = results_addr_array[off];
-	scalar_t * input_ptr = inputs_addr_array[off];
-        at::parallel_for(0, local_inner, 0, [&](int64_t start, int64_t end) {
-          move_ker(result_ptr, input_ptr, end - start);
-        });
+      //std::cout << "outer is " << outer << std::endl;
+      int64_t offset = 0;
+      for (int o = 0; o < outer; ++o) {
+        for (int64_t j = 0; j < input_size; j++) {
+          int64_t local_inner = inputs[j].inner_size;
+          scalar_t* input_ptr = (scalar_t*)(inputs[j].data_ptr) + o * local_inner;
+          scalar_t* result_ptr = result_data + offset;
+          at::parallel_for(0, local_inner, 64, [&](int64_t start, int64_t end) {
+            move_ker(result_ptr + start, input_ptr + start, end - start);
+          });
+	  offset += local_inner;
+        }
       }
     }
   }
+  return result;
 }
 
 at::Tensor concat_all_continue(std::vector<at::Tensor> input_tensors, int64_t dim) {
   
   auto scalar_type = input_tensors[0].scalar_type();
-  auto first_tensor_mem_format = input_tensors[0].suggest_memory_format();
-  uint32_t input_size = input_tensors.size();
-  int64_t cat_dim_size = 0;
-  for (int i = 0; i < input_size; i++) {
-    auto const &tensor = input_tensors[i];
-    if (!tensor.is_contiguous(first_tensor_mem_format)) {
-      input_tensors[i] = tensor.contiguous();
-    }
-    cat_dim_size += tensor.size(dim);
-  }
-
-  at::Tensor result = at::empty({0}, input_tensors[0].options().dtype());
-  auto result_size = input_tensors[0].sizes().vec();
-  result_size[dim] = cat_dim_size;
-  result.resize_(result_size, first_tensor_mem_format);
   if (scalar_type == at::kFloat) {
-    _concat_all_continue<float>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Float typei !\n";
+    return _concat_all_continue<float>(input_tensors, dim);
   } else if (scalar_type == at::kBFloat16) {
-    _concat_all_continue<at::BFloat16>(result, input_tensors, dim);
-    return result;
+    //std::cout << "BFloat16 type !\n";
+    return _concat_all_continue<at::BFloat16>(input_tensors, dim);
   } else if (scalar_type == at::kLong) {
-    _concat_all_continue<int64_t>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Long type !\n";
+    return _concat_all_continue<int64_t>(input_tensors, dim);
   } else if (scalar_type == at::kInt) {
-    _concat_all_continue<int32_t>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Int type !\n";
+    return _concat_all_continue<int32_t>(input_tensors, dim);
   } else if (scalar_type == at::kByte) {
-    _concat_all_continue<uint8_t>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Byte type !\n";
+    return _concat_all_continue<uint8_t>(input_tensors, dim);
   } else if (scalar_type == at::kChar) {
-    _concat_all_continue<int8_t>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Char type !\n";
+    return _concat_all_continue<int8_t>(input_tensors, dim);
   } else if (scalar_type == at::kBool) {
-    _concat_all_continue<bool>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Bool type !\n";
+    return _concat_all_continue<bool>(input_tensors, dim);
   } else if (scalar_type == at::kShort) {
-    _concat_all_continue<int16_t>(result, input_tensors, dim);
-    return result;
+    //std::cout << "Short type !\n";
+    return _concat_all_continue<int16_t>(input_tensors, dim);
   } else {
+    //std::cout << "Unknown type !\n";
     return at::cat(input_tensors, dim);
   }
 }

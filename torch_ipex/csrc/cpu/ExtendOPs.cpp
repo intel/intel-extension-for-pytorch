@@ -312,13 +312,14 @@ static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, size_t M, cons
 
   //Do reduce add with scale
   size_t off = 0;
+  for (; off < offset - 63 ; off += 64) {
+    reduce_add_s32x16x16x4_with_scales(out + off, cat_buf + off, scales + off);
+  }
   for (; off < offset - 15 ; off += 16) {
-    __m512 scale_16 = _mm512_load_ps((const void *)(scales + off));
-    reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scale_16);
+    reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scales + off);
   }
-  for (; off < offset; off++) {
-    out[off] = reduce_add_s32x16_with_scale(cat_buf[off], scales[off]);
-  }
+  auto mask = ((1 << (offset - off)) - 1);
+  reduce_add_s32x16x16_with_scales_and_mask_store(out + off, mask, cat_buf + off, scales + off);
 }
 
 static inline void _interaction_s8s8_scale_s32s8(int8_t *out, const std::vector<int8_t *>& input_addr,
@@ -376,7 +377,9 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
   dil::tensor out_dil{dst_desc};
   out_dil.set_scale(scales[1]);
   auto out_data = (int8_t*)out_dil.get_data_handle();
-  float out_in_scales[interact_feature_size] __attribute__((aligned(64)));
+  auto aligned_off = (interact_feature_size >> 4) << 4;
+  aligned_off = (aligned_off < interact_feature_size) ? (aligned_off + 16) : aligned_off;
+  float out_in_scales[aligned_off] __attribute__((aligned(64)));
   size_t offset = 0;
   for (int i = 1; i < vector_nums; i++) {
     for (int j = 0; j < i; j++) {
@@ -385,10 +388,11 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
       offset++;
     }
   }
+
   float dense_scale = output_scale / in_scales[0];
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-    __m512i cat_buf[offset] __attribute__((aligned(64)));
+    __m512i cat_buf[aligned_off] __attribute__((aligned(64)));
     __m512i convert_to_s16_buf[vector_nums * 4] __attribute__((aligned(64)));
     std::vector<int8_t*> input_addr(vector_nums);
     for (int64_t i = start; i < end; i++) {
