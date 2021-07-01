@@ -68,7 +68,8 @@ batch_normalization(
   auto prop = training ?
               prop_kind::forward_training :
               prop_kind::forward_inference;
-  auto flag = normalization_flags::use_scale_shift;
+  auto flag = normalization_flags::use_scale |
+              normalization_flags::use_shift;
 
   auto feature_num = src.size(1);
   auto feature_size = src.numel() / feature_num;
@@ -90,6 +91,10 @@ batch_normalization(
   auto src_md = src_ctx.is_plain() ?
                 memory::desc({src_tz}, src_dt, src_fmt) :
                 src_ctx.meta();
+  auto scl_md = memory::desc(
+      {feature_num}, memory::data_type::f32, memory::format_tag::a);
+  auto sft_md = memory::desc(
+      {feature_num}, memory::data_type::f32, memory::format_tag::a);
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -136,40 +141,20 @@ batch_normalization(
       {DNNL_ARG_DST, dst_m},
   };
 
-  auto wgh_bia = at::empty(2 * feature_num, wgh.options().dtype(at::kFloat));
-  auto wgh_bia_m = dpcpp_onednn_memory(
-      bn_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
-
-  if (wgh.scalar_type() == ScalarType::Half) {
-    dtype_convert_by_scalar(
-        wgh_bia.data_ptr<float>(),
-        wgh.data_ptr<at::Half>(),
-        feature_num);
-    dtype_convert_by_scalar(
-        wgh_bia.data_ptr<float>() + feature_num,
-        bia.data_ptr<at::Half>(),
-        feature_num);
-  } else if (wgh.scalar_type() == ScalarType::BFloat16) {
-    dtype_convert_by_scalar(
-        wgh_bia.data_ptr<float>(),
-        wgh.data_ptr<at::BFloat16>(),
-        feature_num);
-    dtype_convert_by_scalar(
-        wgh_bia.data_ptr<float>() + feature_num,
-        bia.data_ptr<at::BFloat16>(),
-        feature_num);
-  } else {
-    dtype_convert_by_scalar(
-        wgh_bia.data_ptr<float>(),
-        wgh.data_ptr<float>(),
-        feature_num);
-    dtype_convert_by_scalar(
-        wgh_bia.data_ptr<float>() + feature_num,
-        bia.data_ptr<float>(),
-        feature_num);
+  if (wgh.scalar_type() == ScalarType::Half ||
+      wgh.scalar_type() == ScalarType::BFloat16) {
+    wgh = wgh.to(at::kFloat);
   }
 
-  args.insert({DNNL_ARG_SCALE_SHIFT, wgh_bia_m});
+  if (bia.scalar_type() == ScalarType::Half ||
+      bia.scalar_type() == ScalarType::BFloat16) {
+    bia = bia.to(at::kFloat);
+  }
+
+  auto scl_m = dpcpp_onednn_memory(scl_md, engine, wgh.data_ptr());
+  auto sft_m = dpcpp_onednn_memory(sft_md, engine, bia.data_ptr());
+  args.insert({DNNL_ARG_SCALE, scl_m});
+  args.insert({DNNL_ARG_SHIFT, sft_m});
 
   at::Tensor save_mean = at::empty(feature_num, wgh.options().dtype(at::kFloat));
   at::Tensor save_var = at::empty(feature_num, wgh.options().dtype(at::kFloat));
@@ -198,7 +183,7 @@ batch_normalization(
   args.insert({DNNL_ARG_MEAN, mean_m});
   args.insert({DNNL_ARG_VARIANCE, var_m});
 
- #ifdef USE_SCRATCHPAD_MODE
+#ifdef USE_SCRATCHPAD_MODE
   int scratchpad_size = bn_fwd_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src.options(), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(bn_fwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
