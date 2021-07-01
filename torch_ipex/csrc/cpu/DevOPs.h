@@ -122,6 +122,10 @@ class AtenIpexCPUDev {
   static at::Tensor &dil_div_out(at::Tensor &out, const at::Tensor &self,
                                  const at::Tensor &other);
   static at::Tensor dil_permute(const at::Tensor & self, at::IntArrayRef dims);
+  static at::Tensor dil_to(const at::Tensor & self, c10::optional<at::ScalarType> dtype, c10::optional<c10::Layout> layout, c10::optional<c10::Device> device, c10::optional<bool> pin_memory, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor dil_to(const at::Tensor & self, c10::Device device, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor dil_to(const at::Tensor & self, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor dil_to(const at::Tensor& self, const at::Tensor& other, bool non_blocking, bool copy, c10::optional<c10::MemoryFormat> optional_memory_format);
 };
 
 }  // namespace cpu

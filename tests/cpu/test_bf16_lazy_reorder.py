@@ -2488,7 +2488,7 @@ class TestFallbackOP(TestCase):
         seqs = [torch.FloatTensor(random.randint(1, 6)).to(ipex.DEVICE) for _ in range(5)]
         seqs = [s.random_(-128, 128) for s in seqs]
         ordered = sorted(seqs, key=len, reverse=True)
-        lengths = list(map(len, ordered))
+        lengths = torch.as_tensor(list(map(len, ordered)), dtype=torch.int64).to(ipex.DEVICE)
         padded_tensor = rnn_utils.pad_sequence(ordered)
         with AutoDNNL(True):
             for enforce_sorted in [True, False]:

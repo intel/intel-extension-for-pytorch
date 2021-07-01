@@ -6,6 +6,7 @@ VF_lstm = _VF.lstm
 def ipex_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first, device):
     # For LSTM training with dropout, fallback to cpu due to performance issue in oneDNN mode
     if training and dropout != 0:
+        assert input.device.type != 'xpu'
         return fallback_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first, device=device)
     else:
         return torch.ops.torch_ipex.lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
@@ -49,7 +50,7 @@ def lstm(*args):
     device = get_device(*args)
     if device == "cpu":
         return VF_lstm(*args)
-    
+
     # For LSTM with pack_padded_sequence as input, fallback to cpu due to performance issue in oneDNN mode
     if isinstance(args[1], torch.Tensor):
         return fallback_lstm(*args, device=device)

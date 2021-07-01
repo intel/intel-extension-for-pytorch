@@ -10,6 +10,8 @@ def ipex_gru(input, hx, _flat_weights, bias, num_layers, dropout, training, bidi
     if input.device.type == 'xpu' and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.gru(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
+        if training:
+            assert input.device.type != 'xpu'
         return VF_gru(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
 
 def gru(*args):
