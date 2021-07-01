@@ -8,7 +8,7 @@
 #include <tensor/Context.h>
 #include "Utils.h"
 #include "Reorder.h"
-#include <operators/comm/Scalar.h>
+#include <operators/MemoryHelpers.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
 

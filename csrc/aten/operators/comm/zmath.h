@@ -5,7 +5,7 @@
 #include <c10/util/math_compat.h>
 #include<ATen/NumericUtils.h>
 
-namespace xpu { namespace dpcpp {
+namespace at { namespace AtenIpexTypeXPU {
 namespace {
 
 template <typename SCALAR_TYPE, typename VALUE_TYPE=SCALAR_TYPE>
@@ -233,4 +233,4 @@ inline TYPE min_impl (TYPE a, TYPE b) {
 }
 
 } // end namespace
-}} //end at::native
+}} //end at::AtenIpexTypeXPU

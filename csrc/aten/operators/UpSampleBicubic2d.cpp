@@ -3,9 +3,9 @@
 #include <ATen/NativeFunctions.h>
 
 #include <utils/DPCPP.h>
+#include <utils/Helpers.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"
-#include "comm/Helpers.h"
 
 #include "UpSample.h"
 

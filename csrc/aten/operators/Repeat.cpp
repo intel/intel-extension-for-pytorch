@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
 
+#include <utils/Helpers.h>
 #include <runtime/Utils.h>
 #include <core/Memory.h>
-#include "comm/Helpers.h"
 
 
 using namespace at::native;

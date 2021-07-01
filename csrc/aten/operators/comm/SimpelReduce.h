@@ -3,8 +3,8 @@
 #include <utils/DPCPP.h>
 
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 template <typename reduce_op, typename nd_item_id, typename local_shared>
 DPCPP_DEVICE static inline void simple_reduce(
@@ -26,5 +26,5 @@ DPCPP_DEVICE static inline void simple_reduce(
   item_id.barrier(DPCPP::access::fence_space::local_space);
 }
 
-} // namespace dpcpp
-} // namespace xpu
+} // namespace AtenIpexTypeXPU
+} // namespace at

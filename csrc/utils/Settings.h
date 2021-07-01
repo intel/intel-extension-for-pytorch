@@ -1,0 +1,67 @@
+#pragma once
+
+namespace xpu {
+namespace dpcpp {
+
+#define XSETS xpu::dpcpp::Settings::Instance()
+
+enum class XPU_BACKEND {
+  XB_GPU = 0,
+  XB_CPU = 1,
+  XB_AUTO = 2 };
+
+class Settings final {
+public:
+  static Settings& Instance() {
+    static Settings mySettings;
+    return mySettings;
+  }
+
+  int get_verbose_level() const;
+  void set_verbose_level(int level);
+
+  XPU_BACKEND get_xpu_backend() const;
+  void set_xpu_backend(XPU_BACKEND backend);
+
+  bool is_force_sync_exec() const;
+  void enable_force_sync_exec(bool force_sync);
+  void disable_force_sync_exec(bool force_sync);
+
+  bool is_event_profiling_enabled() const;
+  void enable_event_profiling();
+  void disable_event_profiling();
+
+  bool is_tile_partition_enabled() const;
+  void enable_tile_partition();
+  void disable_tile_partition();
+
+  bool is_onednn_layout_enabled() const;
+  void enable_onednn_layout();
+  void disable_onednn_layout();
+
+  bool is_tf32_mode_enabled() const;
+  void enable_tf32_mode();
+  void disable_tf32_mode();
+
+private:
+  Settings() :
+    verbose_level(0),
+    xpu_backend(XPU_BACKEND::XB_GPU),
+    force_sync_exec_enabled(false),
+    event_profiling_enabled(true),
+    tile_partition_enabled(true),
+    onednn_layout_enabled(false),
+    tf32_mode_enabled(false) {}
+
+  int verbose_level;
+  XPU_BACKEND xpu_backend;
+
+  bool force_sync_exec_enabled;
+  bool event_profiling_enabled;
+  bool tile_partition_enabled;
+  bool onednn_layout_enabled;
+  bool tf32_mode_enabled;
+};
+
+} // namespace dpcpp
+} // namespace xpu

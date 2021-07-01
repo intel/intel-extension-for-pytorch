@@ -14,6 +14,7 @@
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_NO_L0_ONEDNN    - to build oneDNN without LevelZero support
+# BUILD_STRIPPED_BIN    - to strip all symbols after build
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
 # BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)
 #

@@ -7,7 +7,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <assert.h>
 
-#include "comm/Array.h"
+#include <core/Array.h>
 #include <core/Allocator.h>
 #include <utils/DPCPP.h>
 #include <core/Memory.h>
@@ -27,8 +27,8 @@ using xpu::dpcpp::Array;
 
 DPCPP_DEF_K1(reduce_kernel);
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 static inline int64_t div_up(int64_t a, int64_t b) {
   return (a + b - 1) / b;
@@ -700,9 +700,9 @@ inline void dpcpp_reduce_kernel(
   at::DataPtr buffer;
   at::DataPtr semaphores;
   if (config.should_global_reduce()) {
-    auto& allocator = *dpcpp::getDeviceAllocator();
-    buffer = allocator.allocate(config.global_memory_size());
-    semaphores = allocator.allocate(config.semaphore_size());
+    auto allocator = getDeviceAllocator();
+    buffer = allocator->allocate(config.global_memory_size());
+    semaphores = allocator->allocate(config.semaphore_size());
     dpcppMemset(semaphores.get(), 0, config.semaphore_size());
   }
 
@@ -743,5 +743,5 @@ inline void dpcpp_reduce_kernel(
     launch_reduce_kernel<scalar_t>(config, reduce);
   }
 }
-} // namespace dpcpp
+} // namespace AtenIpexTypeXPU
 } // namespace at

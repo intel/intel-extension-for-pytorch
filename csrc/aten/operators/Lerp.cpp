@@ -66,7 +66,7 @@ Tensor& lerp_out(
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_out");
   out.resize_as_(b_self);
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
-    impl::lerp<scalar_t>(out, b_self, b_end, at::wrapped_scalar_tensor(weight, at::kXPU).to(self.dtype()));
+    impl::lerp<scalar_t>(out, b_self, b_end, wrapped_scalar_tensor(weight, at::kXPU).to(self.dtype()));
   });
   return out;
 }
@@ -100,7 +100,7 @@ Tensor& lerp_(Tensor& self, const Tensor& end, Scalar weight) {
       " doesn't match the broadcast shape ",
       b_self.sizes());
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
-    impl::lerp<scalar_t>(self, b_self, b_end, at::wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
+    impl::lerp<scalar_t>(self, b_self, b_end, wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
   });
   return self;
 }
@@ -112,7 +112,7 @@ Tensor lerp(const Tensor& self, const Tensor& end, const Tensor& weight) {
 
 Tensor lerp(const Tensor& self, const Tensor& end, Scalar weight) {
   Tensor result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::lerp_out(result, self, end, at::wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
+  return at::AtenIpexTypeXPU::lerp_out(result, self, end, wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
 }
 
 } // namespace AtenIpexTypeXPU

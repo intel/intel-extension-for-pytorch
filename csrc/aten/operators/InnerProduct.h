@@ -5,8 +5,8 @@
 using namespace dnnl;
 using namespace xpu::oneDNN;
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 void inner_product(
     int M,
@@ -72,5 +72,5 @@ void inner_product(
        {DNNL_ARG_DST, output_memory}});
 }
 
-} // namespace dpcpp
+} // namespace AtenIpexTypeXPU
 } // namespace at

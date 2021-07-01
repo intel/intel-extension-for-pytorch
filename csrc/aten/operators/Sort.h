@@ -13,6 +13,9 @@ using namespace at;
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
+namespace at {
+namespace AtenIpexTypeXPU {
+
 // Collection of kernel sort routimes
 // Collection of kernel sort routines
 template <typename T>
@@ -366,3 +369,5 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
 #undef HANDLE_SORT_CASE
 #undef HANDLE_A_CASE
 }
+
+}} // namespace at::AtenIpexTypeXPU

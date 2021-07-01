@@ -81,7 +81,7 @@ Tensor& add_out(
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
@@ -109,7 +109,7 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
@@ -129,12 +129,12 @@ Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
 
 Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::add(
-      self, at::wrapped_scalar_tensor(other), alpha);
+      self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::add_(
-      self, at::wrapped_scalar_tensor(other), alpha);
+      self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_out(
@@ -172,17 +172,17 @@ Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
 
 Tensor sub(const Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::sub(
-      self, at::wrapped_scalar_tensor(other), alpha);
+      self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_(Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::sub_(
-      self, at::wrapped_scalar_tensor(other), alpha);
+      self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::rsub(
-      self, at::wrapped_scalar_tensor(other), alpha);
+      self, wrapped_scalar_tensor(other), alpha);
 }
 
 } // namespace AtenIpexTypeXPU
@@ -196,8 +196,8 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       _self.defined() &&
       _other.defined() &&
       _self.sizes() == _other.sizes() &&
-      !at::is_wrapped_number(_self) &&
-      !at::is_wrapped_number(_other) &&
+      !is_wrapped_number(_self) &&
+      !is_wrapped_number(_other) &&
       (!DPCPPTensorContext::is_plain(_self) ||
        !DPCPPTensorContext::is_plain(_other))) {
     xpu::oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});

@@ -246,11 +246,7 @@ struct vectorized {
     for (int i = 0; i < loop_size; i++) {
       int linear_idx = thread_idx + i;
       vec_t v = from_[linear_idx];
-//      DPCPP_KER_STRING(format_str, "load_single_arg ptr %p\n");
-//      DPCPP_PRINTF(format_str, &from_[linear_idx]);
       for (int j = 0; j < vec_size; j++) {
-//        DPCPP_KER_STRING(format_str, "linear_idx %d, i %d, j %d, load_single_arg %f\n");
-//        DPCPP_PRINTF(format_str, linear_idx, i, j, bitwise_cast<scalar_t>(v[j]));
         to(vec_size * i + j) = bitwise_cast<scalar_t>(v[j]);
       }
     }
@@ -273,39 +269,12 @@ struct vectorized {
       int linear_idx = thread_idx + i;
       vec_t v;
       for (int j = 0; j < vec_size; j++) {
-//        DPCPP_KER_STRING(format_str, "store linear_idx %d, i %d, j %d, store %f\n");
-//        DPCPP_PRINTF(format_str, linear_idx, i, j, (scalar_t)from_[vec_size * i + j]);
         v[j] = from_[vec_size * i + j];
       }
-//      DPCPP_KER_STRING(format_str, "store ptr %p\n");
-//      DPCPP_PRINTF(format_str, &to_[linear_idx]);
       to_[linear_idx] = v;
     }
   }
 };
-
-//template <typename data_t, typename inp_calc_t, typename out_calc_t, int num_outputs>
-//struct multi_outputs_unroll : unroll<data_t, inp_calc_t, out_calc_t, LoadWithoutCast, StoreWithoutCast, num_outputs> {
-//
-//   multi_outputs_unroll(data_t data, int remaining, inp_calc_t ic, out_calc_t oc):
-//    unroll<data_t, inp_calc_t, out_calc_t, LoadWithoutCast, StoreWithoutCast, num_outputs>(data, remaining, ic, oc, LoadWithoutCast(), StoreWithoutCast()) {}
-//
-//  template <typename return_t>
-//   inline void store(return_t *from, int idx) {
-////    int thread_idx = threadIdx.x;
-//    int thread_idx = 0;//threadIdx.x;
-////    #pragma unroll
-//    for (int i = 0; i < THREAD_WORK_SIZE; i++) {
-//      if (thread_idx >= this->remaining) {
-//        return;
-//      }
-//      int linear_idx = thread_idx + block_work_size * idx;
-//      auto offsets = this->output_offset_calculator.get(linear_idx);
-//      Memory::detail::static_unroll<detail::multi_outputs_store_helper, num_outputs>::with_args(this->data, offsets, from[i]);
-//      thread_idx += num_threads;
-//    }
-//  }
-//};
 
 }  // namespace policies
 

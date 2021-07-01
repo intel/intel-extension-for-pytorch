@@ -309,7 +309,7 @@ void BCECriterion_updateOutput(
   if (reduction == at::Reduction::None) {
     output.resize_as_(input);
 
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         output, input, target, TensorBCEOp<scalar_t>());
 
     if (weights.defined()) {
@@ -320,7 +320,7 @@ void BCECriterion_updateOutput(
 
   output.resize_({});
   Tensor output_ = at::empty(input.sizes(), input.options());
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       output_, input, target, TensorBCEOp<scalar_t>());
   if (weights.defined()) {
     output_.mul_(weights);
@@ -357,11 +357,11 @@ void BCECriterion_updateGradInput(
         input.numel() == gradOutput.numel(),
         "input and gradOutput have different number of elements");
 
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         gradInput, input, target, TensorBCEGradOp<scalar_t>());
 
     if (weights.defined()) {
-      xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
           gradInput, weights, gradOutput, TensorBCEWeightsOp<scalar_t>());
 
     } else {
@@ -379,7 +379,7 @@ void BCECriterion_updateGradInput(
   norm.copy_(gradOutput);
   norm.mul_(reduction == Reduction::Mean ? 1. / ((int)input.numel()) : 1.);
 
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       gradInput, input, target, TensorBCEGradOp<scalar_t>());
 
   gradInput.mul_(norm);
@@ -399,7 +399,7 @@ void MSECriterion_updateOutput(
   if (reduction != at::Reduction::None) {
     output.resize_({});
     Tensor output_ = at::empty(input.sizes(), input.options());
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         output_, input, target, TensorMSEOp<scalar_t>());
     optional<ScalarType> dtype;
     if (reduction == at::Reduction::Mean) {
@@ -413,7 +413,7 @@ void MSECriterion_updateOutput(
 
   output.resize_as_(input);
 
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       output, input, target, TensorMSEOp<scalar_t>());
 }
 
@@ -430,7 +430,7 @@ void MSECriterion_updateGradInput(
   grad_input.resize_as_(input);
 
   if (reduction == Reduction::None) {
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         grad_input, input, target, TensorMSEGradOp<scalar_t>());
     at::mul_out(grad_input, grad_input, grad_output);
     return;
@@ -439,7 +439,7 @@ void MSECriterion_updateGradInput(
   scalar_t norm =
       (reduction == Reduction::Mean ? 2. / (scalar_t)input.numel() : 2.) *
       gradOutput0d;
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       grad_input, input, target, TensorMSENormOp<scalar_t>(norm));
 }
 
@@ -453,14 +453,14 @@ void AbsCriterion_updateOutput(
 
   if (reduction == Reduction::None) {
     output.resize_as_(input);
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         output, input, target, TensorAbsOp<scalar_t>());
     return;
   }
 
   output.resize_({});
   Tensor output_ = at::empty(input.sizes(), input.options());
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       output_, input, target, TensorAbsOp<scalar_t>());
   optional<ScalarType> dtype;
   if (reduction == at::Reduction::Mean) {
@@ -485,7 +485,7 @@ void AbsCriterion_updateGradInput(
     TORCH_CHECK(
         check_size(grad_output, input),
         "input and gradOutput shape do not match");
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         grad_input, input, target, TensorAbsGradOp<scalar_t>());
     at::mul_out(grad_input, grad_input, grad_output);
     return;
@@ -495,7 +495,7 @@ void AbsCriterion_updateGradInput(
   scalar_t norm =
       (reduction == Reduction::Mean ? 1. / (scalar_t)input.numel() : 1.) *
       gradOutput0d;
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       grad_input, input, target, TensorAbsNormOp<scalar_t>(norm));
 }
 
@@ -537,14 +537,14 @@ void SoftMarginCriterion_updateOutput(
 
   if (reduction == Reduction::None) {
     output.resize_as_(input);
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         output, input, target, TensorSoftMarginOp<scalar_t>());
     return;
   }
 
   output.resize_({});
   Tensor output_ = at::empty(input.sizes(), input.options());
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       output_, input, target, TensorSoftMarginOp<scalar_t>());
   optional<ScalarType> dtype;
   if (reduction == at::Reduction::Mean) {
@@ -565,7 +565,7 @@ void SoftMarginCriterion_updateGradInput(
   grad_input.resize_as_(input);
 
   if (reduction == Reduction::None) {
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         grad_input, input, target, TensorSoftMarginGradOp<scalar_t>());
     at::mul_out(grad_input, grad_input, grad_output);
     return;
@@ -574,7 +574,7 @@ void SoftMarginCriterion_updateGradInput(
   scalar_t norm =
       (reduction == Reduction::Mean ? 1. / (scalar_t)input.numel() : 1.) *
       gradOutput0d;
-  xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       grad_input, input, target, TensorSoftMarginNormOp<scalar_t>(norm));
 }
 

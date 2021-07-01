@@ -4,8 +4,8 @@
 #include <intrinsic/ipex_intrinsic.h>
 
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeQuantizedXPU {
 
 struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
   explicit DPCPPPerTensorAffineQuantizer(ScalarType scalar_type, double scale, int64_t zero_point)
@@ -142,7 +142,7 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
   const int64_t axis_;
 };
 
-inline QuantizerPtr make_per_tensor_affine_quantizer(
+static inline QuantizerPtr dpcpp_make_per_tensor_affine_quantizer(
     double scale,
     int64_t zero_point,
     ScalarType scalar_type) {
@@ -150,7 +150,7 @@ inline QuantizerPtr make_per_tensor_affine_quantizer(
       scalar_type, scale, zero_point);
 }
 
-inline QuantizerPtr make_per_channel_affine_quantizer(
+static inline QuantizerPtr dpcpp_make_per_channel_affine_quantizer(
     const Tensor& scales,
     const Tensor& zero_points,
     int64_t axis,
@@ -170,4 +170,4 @@ inline QuantizerPtr make_per_channel_affine_quantizer(
       scalar_type, scales_double, zero_points_int64, axis);
 }
 
-}} // xpu::dpcpp
+}} // at::AtenIpexTypeQuantizedXPU

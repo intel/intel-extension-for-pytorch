@@ -3,8 +3,8 @@
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 struct TopKTypeConfig {};
@@ -429,5 +429,6 @@ void radixSelect(
   // matching `desired` exactly
   *topK = TopKTypeConfig<scalar_t>::deconvert(desired);
 }
-} // namespace dpcpp
+
+} // namespace AtenIpexTypeXPU
 } // namespace at

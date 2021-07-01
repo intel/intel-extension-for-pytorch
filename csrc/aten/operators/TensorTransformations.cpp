@@ -5,7 +5,8 @@
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-#include "comm/Helpers.h"
+
+#include <utils/Helpers.h>
 #include <runtime/Utils.h>
 #include <core/Memory.h>
 

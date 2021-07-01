@@ -31,6 +31,10 @@ endif()
 
 set_target_properties(ipex_python PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
 
+if(BUILD_STRIPPED_BIN)
+  set_target_properties(ipex_python PROPERTIES LINK_FLAGS_RELEASE -s)
+endif()
+
 target_link_libraries(ipex_python PUBLIC ipex_gpu)
 
 install(TARGETS ipex_python LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

@@ -12,6 +12,8 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 
+using namespace at::AtenIpexTypeXPU;
+using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace xpu {
 namespace oneDNN {
@@ -119,7 +121,7 @@ static at::Tensor pooling(
     if (expected_dst_md != dst_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
       if (src.is_quantized()) {
-        auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(
+        auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
             src.q_scale(),
             src.q_zero_point(),
             at::typeMetaToScalarType(src.options().dtype()));
@@ -249,7 +251,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     if (expected_dst_md != dst_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
       if (src.is_quantized()) {
-        auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(
+        auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
             src.q_scale(),
             src.q_zero_point(),
             at::typeMetaToScalarType(src.options().dtype()));

@@ -11,6 +11,9 @@
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
+namespace at {
+namespace AtenIpexTypeXPU {
+
 // Compute the offsets into the given tensors for a linear index. For the 't2'
 // tensor, dimension 'dim' is skipped. The tensors are assumed to have the same
 // size (with the exception of 't2' in dimension 'dim').
@@ -309,3 +312,5 @@ void THSyclTensor_scatterFillKernel(
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
+
+}} // at::AtenIpexTypeXPU

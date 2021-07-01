@@ -63,7 +63,7 @@ Tensor int_repr(const Tensor& self) {
     .add_input(self)
     .check_all_same_dtype(false)
     .build();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(intrepr)>(
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter<DPCPP_K(intrepr)>(
         iter, [=](scalar_t value) -> underlying_t { return value.val_; });
   });
   return dst;

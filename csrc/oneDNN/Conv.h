@@ -15,6 +15,7 @@
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
+using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace xpu {
 namespace oneDNN {
@@ -356,14 +357,13 @@ static at::Tensor convolution(
         QuantizerPtr quantizer;
 
         if (wgh.is_quantized() && wgh.qscheme() == kPerChannelAffine) {
-          quantizer = xpu::dpcpp::make_per_channel_affine_quantizer(
+          quantizer = dpcpp_make_per_channel_affine_quantizer(
               wgh.q_per_channel_scales(),
               wgh.q_per_channel_zero_points(),
               0,
               kQInt8);
         } else {
-          quantizer =
-              xpu::dpcpp::make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
+          quantizer = dpcpp_make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
         }
         wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
     } else {
@@ -387,7 +387,7 @@ static at::Tensor convolution(
   if (dst_usr_md != expected_dst_md) {
     if (onednn_layout_enabled() && dst.is_quantized()) {
       auto quantizer =
-          xpu::dpcpp::make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
+        dpcpp_make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
           typeMetaToScalarType(dst.options().dtype()));
       dst_ = empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
     } else {

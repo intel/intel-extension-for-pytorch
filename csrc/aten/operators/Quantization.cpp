@@ -19,6 +19,8 @@ using namespace xpu::oneDNN;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+using namespace at::AtenIpexTypeQuantizedXPU;
+
 Tensor _make_per_tensor_quantized_tensor(
   const Tensor& self,
   double scale,
@@ -161,7 +163,7 @@ Tensor quantize_tensor_per_tensor_affine(
     r_m = r_ctx.is_plain() ? dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr())
         : dpcpp_onednn_memory({r_ctx.meta()}, r_eng, rtensor.data_ptr());
     auto q_type = qtensor.scalar_type();
-    auto quantizer = make_per_tensor_affine_quantizer(scale, zero_point, q_type);
+    auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, q_type);
     qtensor_opt = AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
 
     q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor_opt.data_ptr());
@@ -203,7 +205,7 @@ Tensor quantize_per_tensor(
   if(self.is_quantized()){
     return self;
   }
-  auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, dtype);
   return quantizer->quantize(self);
 }
 
@@ -213,7 +215,7 @@ Tensor quantize_per_channel(
     const Tensor& zero_points,
     int64_t axis,
     ScalarType dtype) {
-  auto quantizer = xpu::dpcpp::make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
+  auto quantizer = dpcpp_make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
   return quantizer->quantize(self);
 }
 
@@ -235,8 +237,7 @@ Tensor _empty_affine_quantized(
   return AtenIpexTypeXPU::new_qtensor(
           size,
           options,
-          xpu::dpcpp::make_per_tensor_affine_quantizer(
-                  scale, zero_point, typeMetaToScalarType(options.dtype())));
+          dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
 Tensor _empty_per_channel_affine_quantized(
@@ -261,7 +262,7 @@ Tensor _empty_per_channel_affine_quantized(
   return AtenIpexTypeXPU::new_qtensor(
       size,
       options,
-      xpu::dpcpp::make_per_channel_affine_quantizer(
+      dpcpp_make_per_channel_affine_quantizer(
           scales, zero_points, axis, typeMetaToScalarType(options.dtype())));
 }
 
@@ -287,8 +288,7 @@ Tensor _empty_affine_quantized(
   return AtenIpexTypeXPU::new_qtensor(
           size,
           options,
-          xpu::dpcpp::make_per_tensor_affine_quantizer(
-                  scale, zero_point, typeMetaToScalarType(options.dtype())));
+          dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
 Tensor quantize_per_tensor(
@@ -299,7 +299,7 @@ Tensor quantize_per_tensor(
   if(self.is_quantized()){
     return self;
   }
-  auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, dtype);
   return quantizer->quantize(self);
 }
 
@@ -309,7 +309,7 @@ Tensor quantize_per_channel(
     const Tensor& zero_points,
     int64_t axis,
     ScalarType dtype) {
-  auto quantizer = xpu::dpcpp::make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
+  auto quantizer = dpcpp_make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
   return quantizer->quantize(self);
 }
 

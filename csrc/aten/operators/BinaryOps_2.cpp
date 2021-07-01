@@ -75,11 +75,11 @@ Tensor& mul_(Tensor& self, const Tensor& other) {
 }
 
 Tensor mul(const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::mul(self, at::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::mul(self, wrapped_scalar_tensor(other));
 }
 
 Tensor& mul_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::mul_(self, at::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::mul_(self, wrapped_scalar_tensor(other));
 }
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
@@ -94,7 +94,7 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
   } else {
     auto iter = TensorIterator::binary_op(result, self, other);
@@ -115,7 +115,7 @@ Tensor div(const Tensor& self, const Tensor& other) {
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
     return result;
   } else {

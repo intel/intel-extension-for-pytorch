@@ -3,9 +3,8 @@
 #include <ATen/ExpandUtils.h>
 #include <ATen/native/TensorIterator.h>
 
-
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 [[noreturn]] static void invalid_mask(
     const Tensor& self,
@@ -295,5 +294,6 @@ static TensorIterator make_index_iterator(const AdvancedIndex& info) {
   }
   return config.build();
 }
-} // namespace dpcpp
+
+} // namespace AtenIpexTypeXPU
 } // namespace at

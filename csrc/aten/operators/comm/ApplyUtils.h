@@ -2,17 +2,19 @@
 
 #include <ATen/TensorUtils.h>
 
+#include <utils/Helpers.h>
 #include <runtime/Utils.h>
 #include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 
 #include <math.h>
-#include "Helpers.h"
 
+using namespace xpu::dpcpp;
+using namespace xpu::dpcpp::detail;
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 // We pull the kernel name from anonymous namespace to outside,
 // because otherwise dpcpp compiler will fail to recognize
@@ -52,10 +54,10 @@ template <
     typename T3 = void,
     typename T4 = void>
 inline void rearrangeDims(
-    detail::TensorInfo<T1, IndexType>* aInfo,
-    detail::TensorInfo<T2, IndexType>* bInfo = nullptr,
-    detail::TensorInfo<T3, IndexType>* cInfo = nullptr,
-    detail::TensorInfo<T4, IndexType>* dInfo = nullptr) {
+    TensorInfo<T1, IndexType>* aInfo,
+    TensorInfo<T2, IndexType>* bInfo = nullptr,
+    TensorInfo<T3, IndexType>* cInfo = nullptr,
+    TensorInfo<T4, IndexType>* dInfo = nullptr) {
   int numInfos = 1;
   int dims = aInfo->dims;
   IndexType* sizes[4] = {
@@ -146,7 +148,7 @@ template <
     typename... Offsets>
 struct ApplyOp1 {
   inline static void apply(
-      const detail::TensorInfo<scalar, IndexType>& a,
+      const TensorInfo<scalar, IndexType>& a,
       const Op& op,
       void *a_pointer,
       int n,
@@ -154,7 +156,7 @@ struct ApplyOp1 {
       Offsets... aOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar, IndexType, ADims>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     ApplyOp1<
@@ -180,7 +182,7 @@ template <
     typename Offset>
 struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
   inline static void apply(
-      const detail::TensorInfo<scalar, IndexType>& a,
+      const TensorInfo<scalar, IndexType>& a,
       const Op& op,
       void *a_pointer,
       int n,
@@ -201,7 +203,7 @@ template <
     typename Offset>
 struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   inline static void apply(
-      const detail::TensorInfo<scalar, IndexType>& a,
+      const TensorInfo<scalar, IndexType>& a,
       const Op& op,
       void *a_pointer,
       int n,
@@ -221,7 +223,7 @@ template <
     typename... Offsets>
 struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
   inline static void apply(
-      const detail::TensorInfo<scalar, IndexType>& a,
+      const TensorInfo<scalar, IndexType>& a,
       const Op& op,
       void *a_pointer,
       int n,
@@ -240,7 +242,7 @@ template <
     int step,
     bool with_offset>
 void kernelPointwiseApply1(
-    detail::TensorInfo<scalar, IndexType> a,
+    TensorInfo<scalar, IndexType> a,
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -282,8 +284,8 @@ template <
     typename... Offsets>
 struct ApplyOp2 {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -293,11 +295,11 @@ struct ApplyOp2 {
       Offsets... bOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
+        ? IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
         : 0;
     ApplyOp2<
         Op,
@@ -346,8 +348,8 @@ struct ApplyOp2<
     0,
     Offset> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -382,8 +384,8 @@ struct ApplyOp2<
     0,
     Offset> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -417,8 +419,8 @@ struct ApplyOp2<
     0,
     Offsets...> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -442,8 +444,8 @@ template <
     int step,
     bool with_offset>
 void kernelPointwiseApply2(
-    detail::TensorInfo<scalar1, IndexType> output,
-    detail::TensorInfo<scalar2, IndexType> input,
+    TensorInfo<scalar1, IndexType> output,
+    TensorInfo<scalar2, IndexType> input,
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -501,9 +503,9 @@ template <
     typename... Offsets>
 struct ApplyOp3 {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
-      const detail::TensorInfo<scalar3, IndexType>& c,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar3, IndexType>& c,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -515,15 +517,15 @@ struct ApplyOp3 {
       Offsets... cOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
+        ? IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
         : 0;
     // Convert 'linearIndex' into an offset of input 'c'
     const IndexType cOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
+        ? IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
         : 0;
 
     ApplyOp3<
@@ -583,9 +585,9 @@ struct ApplyOp3<
     0,
     Offset> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
-      const detail::TensorInfo<scalar3, IndexType>& c,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar3, IndexType>& c,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -624,9 +626,9 @@ struct ApplyOp3<
     0,
     Offsets...> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
-      const detail::TensorInfo<scalar3, IndexType>& c,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar3, IndexType>& c,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -654,9 +656,9 @@ template <
     int CDims,
     int step>
 void kernelPointwiseApply3(
-    detail::TensorInfo<scalar1, IndexType> output,
-    detail::TensorInfo<scalar2, IndexType> input1,
-    detail::TensorInfo<scalar3, IndexType> input2,
+    TensorInfo<scalar1, IndexType> output,
+    TensorInfo<scalar2, IndexType> input1,
+    TensorInfo<scalar3, IndexType> input2,
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -727,10 +729,10 @@ template <
     typename... Offsets>
 struct ApplyOp4 {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
-      const detail::TensorInfo<scalar3, IndexType>& c,
-      const detail::TensorInfo<scalar3, IndexType>& d,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar3, IndexType>& c,
+      const TensorInfo<scalar3, IndexType>& d,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -744,19 +746,19 @@ struct ApplyOp4 {
       Offsets... dOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
     const IndexType aOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
+        ? IndexToOffset<scalar1, IndexType, ADims>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
+        ? IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
         : 0;
     // Convert 'linearIndex' into an offset of input 'c'
     const IndexType cOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
+        ? IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
         : 0;
     // Convert 'linearIndex' into an offset of input 'c'
     const IndexType dOffset = static_cast<int>(sizeof...(Offsets)) < n
-        ? detail::IndexToOffset<scalar4, IndexType, DDims>::get(linearIndex, d)
+        ? IndexToOffset<scalar4, IndexType, DDims>::get(linearIndex, d)
         : 0;
 
     ApplyOp4<
@@ -822,10 +824,10 @@ struct ApplyOp4<
     0,
     Offset> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
-      const detail::TensorInfo<scalar3, IndexType>& c,
-      const detail::TensorInfo<scalar3, IndexType>& d,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar3, IndexType>& c,
+      const TensorInfo<scalar3, IndexType>& d,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -871,10 +873,10 @@ struct ApplyOp4<
     0,
     Offsets...> {
   inline static void apply(
-      const detail::TensorInfo<scalar1, IndexType>& a,
-      const detail::TensorInfo<scalar2, IndexType>& b,
-      const detail::TensorInfo<scalar3, IndexType>& c,
-      const detail::TensorInfo<scalar3, IndexType>& d,
+      const TensorInfo<scalar1, IndexType>& a,
+      const TensorInfo<scalar2, IndexType>& b,
+      const TensorInfo<scalar3, IndexType>& c,
+      const TensorInfo<scalar3, IndexType>& d,
       const Op& op,
       void *a_pointer,
       void *b_pointer,
@@ -925,10 +927,10 @@ template <
     int DDims,
     int step>
 void kernelPointwiseApply4(
-    detail::TensorInfo<scalar1, IndexType> output,
-    detail::TensorInfo<scalar2, IndexType> input1,
-    detail::TensorInfo<scalar3, IndexType> input2,
-    detail::TensorInfo<scalar4, IndexType> input3,
+    TensorInfo<scalar1, IndexType> output,
+    TensorInfo<scalar2, IndexType> input1,
+    TensorInfo<scalar3, IndexType> input2,
+    TensorInfo<scalar4, IndexType> input3,
     IndexType totalElements,
     const Op op) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -991,8 +993,6 @@ void kernelPointwiseApply4(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-// } // namespace
-
 template <typename scalar, int step, typename Op, bool with_offset = false>
 inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
   checkBackend("DPCPP_Tensor_apply1", {a}, Backend::XPU);
@@ -1022,7 +1022,7 @@ inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
   }
 
   Tensor oldA;
-  if (detail::maybeOverlappingIndices(a)) {
+  if (maybeOverlappingIndices(a)) {
     // Must perform in contiguous space
     oldA = a;
     a = a.contiguous();
@@ -1055,15 +1055,15 @@ inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
     }                          \
   }
 
-  if (detail::canUse32BitIndexMath(a)) {
-    detail::TensorInfo<scalar, unsigned int> aInfo =
-        detail::getTensorInfo<scalar, unsigned int>(a);
+  if (canUse32BitIndexMath(a)) {
+    TensorInfo<scalar, unsigned int> aInfo =
+        getTensorInfo<scalar, unsigned int>(a);
     rearrangeDims(&aInfo);
     aInfo.collapseDims();
     HANDLE_A_CASE(unsigned int, aInfo.dims);
   } else {
-    detail::TensorInfo<scalar, uint64_t> aInfo =
-        detail::getTensorInfo<scalar, uint64_t>(a);
+    TensorInfo<scalar, uint64_t> aInfo =
+        getTensorInfo<scalar, uint64_t>(a);
     rearrangeDims(&aInfo);
     aInfo.collapseDims();
 
@@ -1113,7 +1113,7 @@ inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
   }
 
   Tensor old_dst;
-  if (detail::maybeOverlappingIndices(dst)) {
+  if (maybeOverlappingIndices(dst)) {
     // Must perform in contiguous space
     old_dst = dst;
     dst = dst.contiguous();
@@ -1161,12 +1161,12 @@ inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
     }                               \
   }
 
-  if (detail::canUse32BitIndexMath(dst) && detail::canUse32BitIndexMath(src)) {
-    detail::TensorInfo<scalar1, unsigned int> dstInfo =
-        detail::getTensorInfo<scalar1, unsigned int>(dst);
+  if (canUse32BitIndexMath(dst) && canUse32BitIndexMath(src)) {
+    TensorInfo<scalar1, unsigned int> dstInfo =
+        getTensorInfo<scalar1, unsigned int>(dst);
 
-    detail::TensorInfo<scalar2, unsigned int> srcInfo =
-        detail::getTensorInfo<scalar2, unsigned int>(src);
+    TensorInfo<scalar2, unsigned int> srcInfo =
+        getTensorInfo<scalar2, unsigned int>(src);
     rearrangeDims(&dstInfo, &srcInfo);
     dstInfo.collapseDims();
     srcInfo.collapseDims();
@@ -1178,10 +1178,10 @@ inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
 
     //   HANDLE_A_CASE(unsigned int, dstInfo.dims, srcInfo.dims);
   } else {
-    detail::TensorInfo<scalar1, uint64_t> dstInfo =
-        detail::getTensorInfo<scalar1, uint64_t>(dst);
-    detail::TensorInfo<scalar2, uint64_t> srcInfo =
-        detail::getTensorInfo<scalar2, uint64_t>(src);
+    TensorInfo<scalar1, uint64_t> dstInfo =
+        getTensorInfo<scalar1, uint64_t>(dst);
+    TensorInfo<scalar2, uint64_t> srcInfo =
+        getTensorInfo<scalar2, uint64_t>(src);
     rearrangeDims(&dstInfo, &srcInfo);
     dstInfo.collapseDims();
     srcInfo.collapseDims();
@@ -1240,7 +1240,7 @@ inline void DPCPP_tensor_apply3(
   }
 
   Tensor old_dst;
-  if (detail::maybeOverlappingIndices(dst)) {
+  if (maybeOverlappingIndices(dst)) {
     // Must perform in contiguous space
     old_dst = dst;
     dst = dst.contiguous();
@@ -1304,16 +1304,16 @@ inline void DPCPP_tensor_apply3(
     }                                  \
   }
 
-  if (detail::canUse32BitIndexMath(dst) && detail::canUse32BitIndexMath(src1) &&
-      detail::canUse32BitIndexMath(src2)) {
-    detail::TensorInfo<scalar1, unsigned int> dstInfo =
-        detail::getTensorInfo<scalar1, unsigned int>(dst);
+  if (canUse32BitIndexMath(dst) && canUse32BitIndexMath(src1) &&
+      canUse32BitIndexMath(src2)) {
+    TensorInfo<scalar1, unsigned int> dstInfo =
+        getTensorInfo<scalar1, unsigned int>(dst);
 
-    detail::TensorInfo<scalar2, unsigned int> src1Info =
-        detail::getTensorInfo<scalar2, unsigned int>(src1);
+    TensorInfo<scalar2, unsigned int> src1Info =
+        getTensorInfo<scalar2, unsigned int>(src1);
 
-    detail::TensorInfo<scalar3, unsigned int> src2Info =
-        detail::getTensorInfo<scalar3, unsigned int>(src2);
+    TensorInfo<scalar3, unsigned int> src2Info =
+        getTensorInfo<scalar3, unsigned int>(src2);
 
     rearrangeDims(&dstInfo, &src1Info, &src2Info);
     dstInfo.collapseDims();
@@ -1328,12 +1328,12 @@ inline void DPCPP_tensor_apply3(
     //   HANDLE_A_CASE(unsigned int, dstInfo.dims, src1Info.dims,
     //   src2Info.dims);
   } else {
-    detail::TensorInfo<scalar1, uint64_t> dstInfo =
-        detail::getTensorInfo<scalar1, uint64_t>(dst);
-    detail::TensorInfo<scalar2, uint64_t> src1Info =
-        detail::getTensorInfo<scalar2, uint64_t>(src1);
-    detail::TensorInfo<scalar3, uint64_t> src2Info =
-        detail::getTensorInfo<scalar3, uint64_t>(src2);
+    TensorInfo<scalar1, uint64_t> dstInfo =
+        getTensorInfo<scalar1, uint64_t>(dst);
+    TensorInfo<scalar2, uint64_t> src1Info =
+        getTensorInfo<scalar2, uint64_t>(src1);
+    TensorInfo<scalar3, uint64_t> src2Info =
+        getTensorInfo<scalar3, uint64_t>(src2);
 
     rearrangeDims(&dstInfo, &src1Info, &src2Info);
     dstInfo.collapseDims();
@@ -1398,7 +1398,7 @@ inline void DPCPP_tensor_apply4(
   }
 
   Tensor old_dst;
-  if (detail::maybeOverlappingIndices(dst)) {
+  if (maybeOverlappingIndices(dst)) {
     // Must perform in contiguous space
     old_dst = dst;
     dst = dst.contiguous();
@@ -1484,20 +1484,20 @@ inline void DPCPP_tensor_apply4(
     }                                     \
   }
 
-  if (detail::canUse32BitIndexMath(dst) && detail::canUse32BitIndexMath(src1) &&
-      detail::canUse32BitIndexMath(src2) &&
-      detail::canUse32BitIndexMath(src3)) {
-    detail::TensorInfo<scalar1, unsigned int> dstInfo =
-        detail::getTensorInfo<scalar1, unsigned int>(dst);
+  if (canUse32BitIndexMath(dst) && canUse32BitIndexMath(src1) &&
+      canUse32BitIndexMath(src2) &&
+      canUse32BitIndexMath(src3)) {
+    TensorInfo<scalar1, unsigned int> dstInfo =
+        getTensorInfo<scalar1, unsigned int>(dst);
 
-    detail::TensorInfo<scalar2, unsigned int> src1Info =
-        detail::getTensorInfo<scalar2, unsigned int>(src1);
+    TensorInfo<scalar2, unsigned int> src1Info =
+        getTensorInfo<scalar2, unsigned int>(src1);
 
-    detail::TensorInfo<scalar3, unsigned int> src2Info =
-        detail::getTensorInfo<scalar3, unsigned int>(src2);
+    TensorInfo<scalar3, unsigned int> src2Info =
+        getTensorInfo<scalar3, unsigned int>(src2);
 
-    detail::TensorInfo<scalar4, unsigned int> src3Info =
-        detail::getTensorInfo<scalar4, unsigned int>(src3);
+    TensorInfo<scalar4, unsigned int> src3Info =
+        getTensorInfo<scalar4, unsigned int>(src3);
 
     rearrangeDims(&dstInfo, &src1Info, &src2Info, &src3Info);
     dstInfo.collapseDims();
@@ -1515,17 +1515,17 @@ inline void DPCPP_tensor_apply4(
     // HANDLE_CASE(uint64_t, dstInfo.dims, src1Info.dims, src2Info.dims,
     // src3Info.dims);
   } else {
-    detail::TensorInfo<scalar1, uint64_t> dstInfo =
-        detail::getTensorInfo<scalar1, uint64_t>(dst);
+    TensorInfo<scalar1, uint64_t> dstInfo =
+        getTensorInfo<scalar1, uint64_t>(dst);
 
-    detail::TensorInfo<scalar2, uint64_t> src1Info =
-        detail::getTensorInfo<scalar2, uint64_t>(src1);
+    TensorInfo<scalar2, uint64_t> src1Info =
+        getTensorInfo<scalar2, uint64_t>(src1);
 
-    detail::TensorInfo<scalar3, uint64_t> src2Info =
-        detail::getTensorInfo<scalar3, uint64_t>(src2);
+    TensorInfo<scalar3, uint64_t> src2Info =
+        getTensorInfo<scalar3, uint64_t>(src2);
 
-    detail::TensorInfo<scalar4, uint64_t> src3Info =
-        detail::getTensorInfo<scalar4, uint64_t>(src3);
+    TensorInfo<scalar4, uint64_t> src3Info =
+        getTensorInfo<scalar4, uint64_t>(src3);
 
     rearrangeDims(&dstInfo, &src1Info, &src2Info, &src3Info);
     dstInfo.collapseDims();
@@ -1572,5 +1572,5 @@ inline void DPCPP_tensor_apply4(
       a, b, c, d, op);
 }
 
-} // namespace dpcpp
+} // namespace AtenIpexTypeXPU
 } // namespace at

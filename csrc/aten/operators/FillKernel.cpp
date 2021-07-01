@@ -29,7 +29,7 @@ struct TensorFillOp {
 void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       kHalf, kBFloat16, kBool, iter.dtype(), "fill_dpcpp", [&] {
-        xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+        DPCPP_tensor_apply1<scalar_t>(
             iter.tensor(0), TensorFillOp<scalar_t>(value.to<scalar_t>()));
       });
 }

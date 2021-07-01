@@ -618,11 +618,11 @@ void spatial_class_nll_criterion_update_output_kernel(
       partial_sums[local_idx] = input_sum;
       partial_weight[local_idx] = acc_weight;
 
-      xpu::dpcpp::simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
+      simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
         return Numerics<accscalar_t>::add(a, b);
       });
 
-      xpu::dpcpp::simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
+      simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
         return Numerics<accscalar_t>::add(a, b);
       });
 

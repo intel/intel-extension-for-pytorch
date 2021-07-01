@@ -5,8 +5,10 @@
 #include "Numerics.h"
 #include "Scalar.h"
 
-
 using namespace xpu::dpcpp;
+
+namespace at {
+namespace AtenIpexTypeXPU {
 
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<float>& address,
@@ -99,6 +101,8 @@ static inline DPCPP_DEVICE void atomicAdd(
   DPCPP::atomic<long> address_var(address_multi_ptr);
   address_var.fetch_add(val);
 }
+
+}} // at::AtenIpexTypeXPU
 
 // (TODO) add support for atomicAdd
 // dpcpp_global_ptr_pt<uint8_t *>

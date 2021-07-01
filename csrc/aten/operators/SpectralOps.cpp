@@ -4,7 +4,7 @@
 #include "comm/ATDispatch.h"
 #include <runtime/Utils.h>
 #include "comm/Numerics.h"
-#include "comm/Scalar.h"
+#include "MemoryHelpers.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>

@@ -184,7 +184,7 @@ Tensor& bitwise_and_out(Tensor & out, const Tensor & self, const Tensor & other)
 }
 
 Tensor& bitwise_and_out(Tensor & out, const Tensor & self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, at::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, wrapped_scalar_tensor(other));
 }
 
 Tensor& bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other) {
@@ -194,7 +194,7 @@ Tensor& bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other) 
 }
 
 Tensor& bitwise_or_out(Tensor & out, const Tensor & self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, at::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, wrapped_scalar_tensor(other));
 }
 
 Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other) {
@@ -204,7 +204,7 @@ Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other)
 }
 
 Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, at::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, wrapped_scalar_tensor(other));
 }
 
 } // namespace AtenIpexTypeXPU

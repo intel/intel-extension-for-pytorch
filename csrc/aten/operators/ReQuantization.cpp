@@ -17,7 +17,7 @@ Tensor requantize(
                                                  get_onednn_strides(src))
                                            : src_ctx.meta();
   memory::desc dst_md = src_md;
-  auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(
+  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
       scale_out, zero_point_out, typeMetaToScalarType(src.options().dtype()));
   auto dst_ = empty_opaque_qtensor(dst_md, c10::nullopt, quantizer);
 

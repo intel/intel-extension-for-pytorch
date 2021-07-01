@@ -10,8 +10,6 @@
 #include "comm/zmath.h"
 #include "Loops.h"
 
-using namespace xpu::dpcpp;
-
 namespace at {
 namespace AtenIpexTypeXPU {
 

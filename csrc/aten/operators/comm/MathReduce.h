@@ -14,6 +14,13 @@
 using namespace at::native;
 using namespace xpu::dpcpp;
 
+DPCPP_DEF_K1(reduceInnermostDimIndex);
+
+DPCPP_DEF_K1(reduceOuterDimIndex);
+
+namespace at {
+namespace AtenIpexTypeXPU {
+
 template <typename scalar_t>
 DPCPP_DEVICE struct AddOp {
   scalar_t operator()(const scalar_t& lhs, const scalar_t& rhs) const {
@@ -61,9 +68,7 @@ DPCPP_DEVICE struct ReduceMax {
   }
 };
 
-DPCPP_DEF_K1(reduceInnermostDimIndex);
 
-DPCPP_DEF_K1(reduceOuterDimIndex);
 
 template <typename K, typename Index, class BinaryFunction>
 DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
@@ -297,3 +302,6 @@ struct MinValuePair {
         : b;
   }
 };
+
+} // namespace AtenIpexTypeXPU
+} // namespace at

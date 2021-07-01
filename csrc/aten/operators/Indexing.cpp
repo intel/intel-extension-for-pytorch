@@ -4,6 +4,7 @@
 
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include <utils/Helpers.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/TensorImplUtils.h>
@@ -11,7 +12,6 @@
 #include <core/detail/TensorInfo.h>
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
-#include "comm/Helpers.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
@@ -714,7 +714,7 @@ template <typename scalar_t>
 void MaskedFillBool(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(
+  DPCPP_tensor_apply2<scalar_t, bool>(
       tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
 }
 
@@ -722,7 +722,7 @@ template <typename scalar_t>
 void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, uint8_t>(
+  DPCPP_tensor_apply2<scalar_t, uint8_t>(
       tensor, mask, TensorMaskedFillOp<scalar_t, unsigned char>(value));
 }
 

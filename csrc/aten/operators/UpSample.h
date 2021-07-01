@@ -14,8 +14,8 @@
 #include "comm/ParamUtils.h"
 
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 DPCPP_DEVICE inline scalar_t min(scalar_t a, scalar_t b) {
@@ -241,5 +241,5 @@ static inline void set_params(
   }
 }
 
-} // namespace dpcpp
+} // namespace AtenIpexTypeXPU
 } // namespace at

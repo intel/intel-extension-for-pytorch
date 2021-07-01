@@ -123,7 +123,7 @@ void SpatialSoftMaxForward(
           // to accscalar_t
           local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
 
-          xpu::dpcpp::simple_reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
+          simple_reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
             return Numerics<accscalar_t>::max(a, b);
           });
 
@@ -136,7 +136,7 @@ void SpatialSoftMaxForward(
           }
           local_acc_sum[local_id] = sum_input;
 
-          xpu::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+          simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
             return a + b;
           });
 
@@ -200,7 +200,7 @@ void SpatialSoftMaxBackward(
           }
           local_acc_sum[local_id] = thread_sum;
 
-          xpu::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+          simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
             return a + b;
           });
 

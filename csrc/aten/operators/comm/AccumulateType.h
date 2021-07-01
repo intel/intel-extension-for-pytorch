@@ -3,6 +3,9 @@
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 
+namespace at {
+namespace AtenIpexTypeXPU {
+
 template <typename T>
 struct AccumulateType {};
 
@@ -49,3 +52,5 @@ struct AccumulateType<int64_t> {
 
 template <typename T>
 using acc_type = typename AccumulateType<T>::type;
+
+}} // namespace at::AtenIpexTypeXPU

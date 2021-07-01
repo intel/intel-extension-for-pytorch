@@ -138,6 +138,11 @@ target_compile_definitions(ipex_gpu_core PUBLIC ${IPEX_COMPILE_DEFINITIONS})
 
 target_link_libraries(ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} ipex_gpu_core)
 
+if(BUILD_STRIPPED_BIN)
+  set_target_properties(ipex_gpu PROPERTIES LINK_FLAGS_RELEASE -s)
+  set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS_RELEASE -s)
+endif()
+
 install(TARGETS ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(TARGETS ipex_gpu_core LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 

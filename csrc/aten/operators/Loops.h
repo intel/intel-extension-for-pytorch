@@ -14,8 +14,8 @@
 
 using namespace xpu::dpcpp;
 
-namespace xpu {
-namespace dpcpp {
+namespace at {
+namespace AtenIpexTypeXPU {
 
 #define MAX_INPUT_TENSOR_NUM 3
 #define MAX_TOTAL_TENSOR_NUM 4
@@ -686,5 +686,5 @@ void dpcpp_index_kernel(
   dpcpp_index_kernel_impl<kernel_name, func_t>(iter, index_size, index_stride, f);
 }
 
-} // namespace dpcpp
-} // namespace xpu
+} // namespace AtenIpexTypeXPU
+} // namespace at

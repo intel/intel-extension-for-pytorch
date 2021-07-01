@@ -2,10 +2,11 @@
 #include <core/Stream.h>
 #include <runtime/Utils.h>
 #include <runtime/Exception.h>
+
+#include <utils/Helpers.h>
 #include <utils/Env.h>
 
 #include <cmath>
-#include "comm/Helpers.h"
 
 namespace xpu {
 namespace dpcpp {

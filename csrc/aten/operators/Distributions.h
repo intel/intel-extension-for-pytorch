@@ -19,7 +19,7 @@ void distribution_elementwise_grid_stride_kernel(at::TensorIterator& iter,
 
   auto &sycl_queue = dpcppGetCurrentQueue();
 
-  auto offset_calc = xpu::dpcpp::make_offset_calculator<1>(iter);
+  auto offset_calc = make_offset_calculator<1>(iter);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = (char*)iter.data_ptr(0);
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
