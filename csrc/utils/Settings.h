@@ -1,18 +1,20 @@
 #pragma once
 
+#include <utils/Macros.h>
+
 namespace xpu {
 namespace dpcpp {
 
-#define XSETS xpu::dpcpp::Settings::Instance()
-
-enum class XPU_BACKEND {
+enum IPEX_API XPU_BACKEND {
   XB_GPU = 0,
   XB_CPU = 1,
-  XB_AUTO = 2 };
+  XB_AUTO = 2,
+  XB_MAX = 3
+};
 
-class Settings final {
+class IPEX_API Settings final {
 public:
-  static Settings& Instance() {
+  static Settings& I() {
     static Settings mySettings;
     return mySettings;
   }
@@ -20,12 +22,15 @@ public:
   int get_verbose_level() const;
   void set_verbose_level(int level);
 
+  int get_warning_level() const;
+  void set_warning_level(int level);
+
   XPU_BACKEND get_xpu_backend() const;
   void set_xpu_backend(XPU_BACKEND backend);
 
   bool is_force_sync_exec() const;
-  void enable_force_sync_exec(bool force_sync);
-  void disable_force_sync_exec(bool force_sync);
+  void enable_force_sync_exec();
+  void disable_force_sync_exec();
 
   bool is_event_profiling_enabled() const;
   void enable_event_profiling();
@@ -46,6 +51,7 @@ public:
 private:
   Settings() :
     verbose_level(0),
+    warning_level(0),
     xpu_backend(XPU_BACKEND::XB_GPU),
     force_sync_exec_enabled(false),
     event_profiling_enabled(true),
@@ -54,6 +60,7 @@ private:
     tf32_mode_enabled(false) {}
 
   int verbose_level;
+  int warning_level;
   XPU_BACKEND xpu_backend;
 
   bool force_sync_exec_enabled;

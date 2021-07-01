@@ -2,7 +2,7 @@
 #include <runtime/Device.h>
 #include <utils/Macros.h>
 #include <runtime/Exception.h>
-#include <utils/Env.h>
+#include <utils/Settings.h>
 #include <runtime/Context.h>
 
 #include <cmath>
@@ -63,9 +63,7 @@ static void initGlobalDevicePoolState() {
 
   // Mapping framework device to physical tile by default.
   // If IPEX_DISABLE_TILE_PARTITION enabled, mapping framework device to physical device.
-  if (disable_tile_partition()) {
-    gDevPool.devices = std::move(root_devices);
-  } else {
+  if (Settings::I().is_tile_partition_enabled()) {
     constexpr DPCPP::info::partition_property partition_by_affinity =
       DPCPP::info::partition_property::partition_by_affinity_domain;
     constexpr DPCPP::info::partition_affinity_domain next_partitionable =
@@ -80,6 +78,8 @@ static void initGlobalDevicePoolState() {
         gDevPool.devices.push_back(root_device);
       }
     }
+  } else {
+      gDevPool.devices = std::move(root_devices);
   }
 
   auto device_count = gDevPool.devices.size();

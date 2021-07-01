@@ -1,7 +1,7 @@
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
 #include <runtime/Queue.h>
-#include <utils/Env.h>
+#include <utils/Settings.h>
 
 #include <array>
 #include <atomic>

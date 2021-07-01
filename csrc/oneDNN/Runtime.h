@@ -17,17 +17,17 @@
 using namespace dnnl;
 using namespace xpu::dpcpp;
 
-#define DPCPP_ONEDNN_FORCE_SYNC(stream)             \
-  {                                                 \
-    static auto force_sync = dpcpp_force_sync();    \
-    if (force_sync) {                               \
-        (stream).wait();                            \
-    }                                               \
+#define DPCPP_ONEDNN_FORCE_SYNC(stream)                           \
+  {                                                               \
+    static auto force_sync = Settings::I().is_force_sync_exec();  \
+    if (force_sync) {                                             \
+        (stream).wait();                                          \
+    }                                                             \
   }
 
 #define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                        \
   {                                                                                 \
-    static auto verbose = dpcpp_verbose();                                          \
+    static auto verbose = Settings::I().get_verbose_level();                        \
     auto q = dnnl::sycl_interop::get_queue((stream));                               \
     if (verbose) {                                                                  \
       IPEX_TIMER(t, verbose, __func__);                                             \

@@ -4,7 +4,7 @@
 #ifdef BUILD_INTERNAL_DEBUG
 #define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \
   {                                                                           \
-    static auto verbose = dpcpp_verbose();                                    \
+    static auto verbose = Settings::I().get_verbose_level();                  \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
       auto e = routine(__VA_ARGS__);                                          \
@@ -24,7 +24,7 @@
 #else
 #define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \
   {                                                                           \
-    static auto verbose = dpcpp_verbose();                                    \
+    static auto verbose = Settings::I().get_verbose_level();                  \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
       auto e = routine(__VA_ARGS__);                                          \

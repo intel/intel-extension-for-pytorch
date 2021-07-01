@@ -2,7 +2,7 @@
 #include <torch/csrc/autograd/profiler.h>
 #include <c10/core/Allocator.h>
 #include <utils/Profiler.h>
-#include <utils/Env.h>
+#include <utils/Settings.h>
 #include <sstream>
 
 #if defined(USE_ITT)
@@ -102,7 +102,7 @@ struct RegisterDPCPPMethods {
 static RegisterDPCPPMethods reg;
 
 bool is_profiler_enabled() {
-  return (dpcpp_profiling() && profilerEnabled());
+  return (xpu::dpcpp::Settings::I().is_event_profiling_enabled() && profilerEnabled());
 }
 
 void dpcpp_mark(std::string name, cl::sycl::event& event) {

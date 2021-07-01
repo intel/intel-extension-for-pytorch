@@ -72,13 +72,13 @@ Tensor dpcpp_convolution_backward_input(
     bias_t = dnnl::memory::data_type::bf16;
   }
 
-  auto input_md = lazy_reorder_enabled() ?
+  auto input_md = Settings::I().is_onednn_layout_enabled() ?
                   memory::desc(input_tz, data_grad, format_any) :
                   memory::desc(input_tz, data_grad, format_input);
-  auto weight_md = ((!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) || lazy_reorder_enabled()) ?
+  auto weight_md = ((!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) || Settings::I().is_onednn_layout_enabled()) ?
                    memory::desc(weight_tz, weight_t, format_any) :
                    memory::desc(weight_tz, weight_t, format_weight);
-  auto output_md = lazy_reorder_enabled() ?
+  auto output_md = Settings::I().is_onednn_layout_enabled() ?
                    memory::desc(output_tz, data_grad, format_any) :
                    memory::desc(output_tz, data_grad, format_input);
   auto bias_md = bias_defined ? memory::desc(bias_tz, bias_t, format_any) : memory::desc();
@@ -106,7 +106,7 @@ Tensor dpcpp_convolution_backward_input(
 #endif
 
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
-  if (!onednn_layout_enabled()) {
+  if (!Settings::I().is_onednn_layout_enabled()) {
     grad_output_usr_memory = dpcpp_onednn_memory(
       {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
@@ -186,14 +186,14 @@ Tensor dpcpp_convolution_backward_input(
 #endif
       });
 
-  if (!onednn_layout_enabled() &&
+  if (!Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     DPCPP_ONEDNN_EXEC(
         dnnl::reorder(grad_input_memory, grad_input_usr_memory),
         strm,
         {{DNNL_ARG_FROM, grad_input_memory},
         {DNNL_ARG_TO, grad_input_usr_memory}});
-  } else if (onednn_layout_enabled() &&
+  } else if (Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
@@ -257,7 +257,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   memory::dims _padding = padding.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
-  auto input_md = lazy_reorder_enabled() ?
+  auto input_md = Settings::I().is_onednn_layout_enabled() ?
                   memory::desc(input_tz, data_grad, format_any) :
                   memory::desc(input_tz, data_grad, format_input);
   // Master weight - for now, we want plain gw output and gb output because weight and bias in sgd is plain.
@@ -265,7 +265,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   //                 Thus, we still use format_any here and add one reorder in the end.
   auto weight_md = memory::desc(weight_tz, grad_weight_t, format_any);
   auto bias_md = bias_defined ? memory::desc(bias_tz, grad_bias_t, format_any) : memory::desc();
-  auto output_md = lazy_reorder_enabled() ?
+  auto output_md = Settings::I().is_onednn_layout_enabled() ?
                   memory::desc(output_tz, weight_t, format_any) :
                   memory::desc(output_tz, weight_t, format_input);
   auto conv_forward_desc = convolution_forward::desc(
@@ -291,7 +291,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
 #endif
 
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
-  if (!onednn_layout_enabled()) {
+  if (!Settings::I().is_onednn_layout_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(
         {input_tz, data_grad, format_input}, engine, input.data_ptr());
 
@@ -356,7 +356,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
 
   memory grad_bias_memory = memory({{}, bias_t, format_bias}, engine);
   if (bias_defined) {
-    if (!onednn_layout_enabled()) {
+    if (!Settings::I().is_onednn_layout_enabled()) {
       grad_bias_memory = dpcpp_onednn_memory(
         {bias_tz, bias_t, format_bias}, engine, grad_bias.data_ptr());
     } else {

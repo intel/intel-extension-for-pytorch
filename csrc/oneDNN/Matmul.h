@@ -196,7 +196,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
         b_md = memory::desc({mb, m, n}, b_dt, {b.stride(0), b.stride(1), b.stride(2)});
     }
 
-    if (dims == 2 && onednn_layout_enabled()) {
+    if (dims == 2 && Settings::I().is_onednn_layout_enabled()) {
       // attr + blk
     #ifdef USE_PRIMITIVE_CACHE
       create_key(key, m1_any_md, m2_any_md, b_md, dst_any_md, attr.beta_, attr.alpha_, post_flags);
@@ -210,7 +210,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
       matmul_desc = matmul::desc(m1_md, m2_md, b_md, dst_md);
     }
   } else {
-    if (dims == 2 && onednn_layout_enabled()) {
+    if (dims == 2 && Settings::I().is_onednn_layout_enabled()) {
       // no attr + blk
     #ifdef USE_PRIMITIVE_CACHE
       create_key(key, m1_any_md, m2_any_md, dst_any_md, attr.beta_, attr.alpha_, post_flags);
@@ -264,7 +264,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
-    onoff |= onednn_layout_enabled();
+    onoff |= Settings::I().is_onednn_layout_enabled();
     onoff &= !m2.requires_grad();
     return onoff;
   } ();
@@ -324,7 +324,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     });
   }
 
-  if (onednn_layout_enabled() && dst_m != dst_usr_m && dims == 2) {
+  if (Settings::I().is_onednn_layout_enabled() && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }

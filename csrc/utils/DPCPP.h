@@ -3,7 +3,7 @@
 #include <CL/sycl.hpp>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
-#include <utils/Env.h>
+#include <utils/Settings.h>
 
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
@@ -36,52 +36,52 @@ namespace DPCPP = cl::sycl;
       }                                                   \
     }
 
-#define DPCPP_Q_FORCE_SYNC(q)                           \
-    {                                                   \
-        static auto force_sync = dpcpp_force_sync();    \
-        if (force_sync) {                               \
-            (q).wait_and_throw();                       \
-        }                                               \
+#define DPCPP_Q_FORCE_SYNC(q)                                           \
+    {                                                                   \
+        static auto force_sync = Settings::I().is_force_sync_exec();    \
+        if (force_sync) {                                               \
+            (q).wait_and_throw();                                       \
+        }                                                               \
     }
 
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                \
-    {                                                   \
-        static auto verbose = dpcpp_verbose();          \
-        if (verbose) {                                  \
-            IPEX_TIMER(t, verbose, __func__);           \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
-            t.now("submit");                            \
-            e.wait_and_throw();                         \
-            t.now("event wait");                        \
-            DPCPP_Q_FORCE_SYNC(q);                      \
-            t.now("queue wait");                        \
-            dpcpp_log("dpcpp_kernel", e);               \
-        } else {                                        \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
-            dpcpp_log("dpcpp_kernel", e);               \
-            e.wait_and_throw();                         \
-            DPCPP_Q_FORCE_SYNC(q);                      \
-        }                                               \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                            \
+    {                                                               \
+        static auto verbose = Settings::I().get_verbose_level();    \
+        if (verbose) {                                              \
+            IPEX_TIMER(t, verbose, __func__);                       \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
+            t.now("submit");                                        \
+            e.wait_and_throw();                                     \
+            t.now("event wait");                                    \
+            DPCPP_Q_FORCE_SYNC(q);                                  \
+            t.now("queue wait");                                    \
+            dpcpp_log("dpcpp_kernel", e);                           \
+        } else {                                                    \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
+            dpcpp_log("dpcpp_kernel", e);                           \
+            e.wait_and_throw();                                     \
+            DPCPP_Q_FORCE_SYNC(q);                                  \
+        }                                                           \
     }
 
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)               \
-    {                                                   \
-        static auto verbose = dpcpp_verbose();          \
-        if (verbose) {                                  \
-            IPEX_TIMER(t, verbose, __func__);           \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
-            t.now("submit");                            \
-            (q).throw_asynchronous();                   \
-            t.now("DPCPP throw asynchronous");          \
-            DPCPP_Q_FORCE_SYNC(q);                      \
-            t.now("queue wait");                        \
-            dpcpp_log("dpcpp_kernel", e);               \
-        } else {                                        \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
-            (q).throw_asynchronous();                   \
-            dpcpp_log("dpcpp_kernel", e);               \
-            DPCPP_Q_FORCE_SYNC(q);                      \
-        }                                               \
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)                           \
+    {                                                               \
+        static auto verbose = Settings::I().get_verbose_level();    \
+        if (verbose) {                                              \
+            IPEX_TIMER(t, verbose, __func__);                       \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
+            t.now("submit");                                        \
+            (q).throw_asynchronous();                               \
+            t.now("DPCPP throw asynchronous");                      \
+            DPCPP_Q_FORCE_SYNC(q);                                  \
+            t.now("queue wait");                                    \
+            dpcpp_log("dpcpp_kernel", e);                           \
+        } else {                                                    \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
+            (q).throw_asynchronous();                               \
+            dpcpp_log("dpcpp_kernel", e);                           \
+            DPCPP_Q_FORCE_SYNC(q);                                  \
+        }                                                           \
     }
 
 // the descriptor as entity attribute

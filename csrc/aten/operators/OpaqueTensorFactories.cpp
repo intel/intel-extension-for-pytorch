@@ -91,7 +91,7 @@ Tensor empty_opaque_qtensor(
 }
 
 inline bool need_to_plain(const Tensor& tensor) {
-  if (!onednn_layout_enabled())
+  if (!Settings::I().is_onednn_layout_enabled())
     return false;
 
   if (!tensor.defined())
@@ -125,7 +125,7 @@ Tensor to_plain_if_needed_(const Tensor& tensor) {
 }
 
 std::vector<Tensor> to_plain_if_needed(TensorList tensors) {
-  if (!onednn_layout_enabled())
+  if (!Settings::I().is_onednn_layout_enabled())
     return tensors.vec();
 
   std::vector<Tensor> _tensors;

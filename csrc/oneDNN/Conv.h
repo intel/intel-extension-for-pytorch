@@ -152,7 +152,7 @@ static at::Tensor convolution(
 
   auto dst_tz = conv_dst_tz(
       ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
-  if (!onednn_layout_enabled() && !dst.defined()) {
+  if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
       dst_opt = attr.with_relu() ?
@@ -216,7 +216,7 @@ static at::Tensor convolution(
   auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia) : memory::desc();
 
   // block combination
-  if (onednn_layout_enabled()) {
+  if (Settings::I().is_onednn_layout_enabled()) {
     src_md = memory::desc(src_tz, src_data_t, fmt_any);
     dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
@@ -298,7 +298,7 @@ static at::Tensor convolution(
       ? memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh)
       : wgh_ctx.meta();
 
-  if (!onednn_layout_enabled()) {
+  if (!Settings::I().is_onednn_layout_enabled()) {
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
     dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   } else {
@@ -344,7 +344,7 @@ static at::Tensor convolution(
 
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
-    onoff |= onednn_layout_enabled();
+    onoff |= Settings::I().is_onednn_layout_enabled();
     onoff |= src.is_contiguous(at::MemoryFormat::ChannelsLast);
     onoff &= !wgh.requires_grad();
     return onoff;
@@ -385,7 +385,7 @@ static at::Tensor convolution(
   auto expected_dst_md = conv_forward_pd.dst_desc();
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
-    if (onednn_layout_enabled() && dst.is_quantized()) {
+    if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
       auto quantizer =
         dpcpp_make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
           typeMetaToScalarType(dst.options().dtype()));
@@ -468,7 +468,7 @@ static at::Tensor convolution(
   );
 #endif
 
-  if (onednn_layout_enabled() && dst_.data_ptr() != dst.data_ptr()) {
+  if (Settings::I().is_onednn_layout_enabled() && dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }

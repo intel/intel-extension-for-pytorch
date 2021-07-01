@@ -24,7 +24,7 @@ class Queue {
       DeviceId di,
       DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
       : queue_([&]() -> DPCPP::queue {
-              return dpcpp_profiling() ?
+              return Settings::I().is_event_profiling_enabled() ?
                   DPCPP::queue(dpcppGetRawDevice(di), asyncHandler,
                    {DPCPP::property::queue::in_order(),
                     DPCPP::property::queue::enable_profiling()})
