@@ -149,6 +149,8 @@ _FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     "aten::softmax.int(Tensor self, int dim, ScalarType? dtype=None) -> Tensor",
     "aten::softmax.Dimname(Tensor self, Dimname dim, *, ScalarType? dtype=None) -> Tensor",
     "aten::contiguous(Tensor(a) self, *, MemoryFormat memory_format=contiguous_format) -> Tensor(a)",
+    "aten::dropout(Tensor input, float p, bool train) -> Tensor",
+    "aten::dropout_(Tensor(a!) self, float p, bool train) -> Tensor(a!)",
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'

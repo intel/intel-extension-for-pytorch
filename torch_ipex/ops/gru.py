@@ -10,8 +10,9 @@ def ipex_gru(input, hx, _flat_weights, bias, num_layers, dropout, training, bidi
     if input.device.type == 'xpu' and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.gru(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
-        if training:
-            assert input.device.type != 'xpu'
+        if training and input.device.type == 'xpu':
+            raise Exception("IPEX does not support LSTM training if its dropout is not 0. \
+                Please explicity convert the gru module and its tensors to CPU and convert the output tensor back to ipex.DEVICE.")
         return VF_gru(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
 
 def gru(*args):

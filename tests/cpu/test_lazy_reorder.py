@@ -1603,7 +1603,7 @@ class TestRNN(TestCase):
             "bias": [False, True],
             "empty_state": [False, True],
             "batch_first": [False, True],
-            "dropout": [0, 1], # [0, 0.5, 1] # TODO 0.5 will fail
+            "dropout": [0], # [0, 0.5, 1] # TODO 0.5 will fail
             "batch_size": [1, 2],
             "seq_len": [1, 3]
         }

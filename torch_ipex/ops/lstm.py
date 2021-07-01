@@ -6,6 +6,9 @@ VF_lstm = _VF.lstm
 def ipex_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first, device):
     # For LSTM training with dropout, fallback to cpu due to performance issue in oneDNN mode
     if training and dropout != 0:
+            if input.device.type == 'xpu':
+                raise Exception("IPEX does not support LSTM training if its dropout is not 0. \
+                    Please explicity convert the gru module and its tensors to CPU and convert the output tensor back to ipex.DEVICE.")
         assert input.device.type != 'xpu'
         return fallback_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first, device=device)
     else:
