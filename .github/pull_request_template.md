@@ -1,4 +1,4 @@
-# Motivation<br>
+# Motivation
 Why the change is needed
 For bugs, describe the issue details and root cause.  
 For features, describe the goal to achieve.
