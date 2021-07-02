@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-TORCH_VERSION = '1.8.0'
-TORCH_IPEX_VERSION = '1.8.0.1'
+TORCH_VERSION = '1.9.0'
+TORCH_IPEX_VERSION = '1.9.0'
 
 # import torch
 import platform
