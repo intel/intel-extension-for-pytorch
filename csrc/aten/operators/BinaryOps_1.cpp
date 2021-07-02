@@ -9,6 +9,8 @@
 #include <oneDNN/oneDNN.h>
 
 #include "Loops.h"
+#include "EltwiseNaiveKer.h"
+
 
 using namespace xpu::dpcpp;
 
@@ -65,13 +67,26 @@ static inline void sub_check(const Tensor& self, const Tensor& other) {
 
 namespace AtenIpexTypeXPU {
 
+template <class T> class AddNaiveOp {
+public:
+  AddNaiveOp(T alpha) : alpha_(alpha) {}
+
+  void operator()(T* res, T* op1, T* op2) const {
+    *res = *op1 + alpha_ * (*op2);
+  }
+
+private:
+  T alpha_;
+};
+
 Tensor& add_out(
     Tensor& result,
     const Tensor& _self,
     const Tensor& _other,
     Scalar alpha) {
-  Tensor self, other;
- if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
+  Tensor self = _self, other = _other;
+  if (_self.is_xpu() && _other.is_xpu() &&
+      1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
       xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
@@ -84,8 +99,72 @@ Tensor& add_out(
       !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
+  } else if (_self.is_xpu() && _other.is_xpu() &&
+             _self.sizes() == _other.sizes() &&
+             _self.is_contiguous() && other.is_contiguous()) {
+    // propogate block format in case: alpha != 1
+    if (!DPCPPTensorContext::is_plain(result) ||
+        !DPCPPTensorContext::is_plain(_self) ||
+        !DPCPPTensorContext::is_plain(_other)) {
+      auto r_ctx = DPCPPTensorContext::get_tensor_ctx(result);
+      auto s_ctx = DPCPPTensorContext::get_tensor_ctx(_self);
+      auto o_ctx = DPCPPTensorContext::get_tensor_ctx(_other);
+      auto r_md = r_ctx.meta();
+      auto s_md = s_ctx.meta();
+      auto o_md = o_ctx.meta();
+
+      auto tar_ctx = !r_ctx.is_plain() ? r_ctx :
+                     (!s_ctx.is_plain() ? s_ctx :
+                     (!o_ctx.is_plain() ? o_ctx : s_ctx));
+      auto tar_md = tar_ctx.meta();
+
+      if (r_md != tar_md) {
+        auto _res = at::AtenIpexTypeXPU::empty_opaque_tensor(
+            tar_md, result.options(), c10::nullopt);
+
+        if (result.is_same(_self))
+          xpu::oneDNN::reorder(result, _res);
+
+        // result is alias, have to write back
+        auto tar_r_ctx = DPCPPTensorContext::release_tensor_ctx(_res);
+        DPCPPTensorContext::set_tensor_ctx(result, std::move(tar_r_ctx));
+      }
+
+      // avoid redundant reorder in inplace case
+      if (!result.is_same(_self) && s_md != tar_md) {
+        self = at::AtenIpexTypeXPU::empty_opaque_tensor(
+            tar_md, _self.options(), c10::nullopt);
+        xpu::oneDNN::reorder(_self, self);
+      }
+
+      if (o_md != tar_md) {
+        other = at::AtenIpexTypeXPU::empty_opaque_tensor(
+            tar_md, _other.options(), c10::nullopt);
+        xpu::oneDNN::reorder(_other, other);
+      }
+    }
+
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        result.scalar_type(),
+        "eltwise_binary_naive::add",
+        [&]() {
+          const auto op = AddNaiveOp<scalar_t>(alpha.to<scalar_t>());
+          int nelem = !DPCPPTensorContext::is_plain(result) ?
+                      DPCPPTensorContext::get_tensor_ctx(result).padded_size() :
+                      prod_intlist(result.sizes());
+          eltwise_binary_naive_kernel(result.data_ptr<scalar_t>(),
+                                      self.data_ptr<scalar_t>(),
+                                      other.data_ptr<scalar_t>(),
+                                      nelem, op);
+        }
+    );
+    return result;
   } else {
-    result = to_plain_if_needed(result);
+    // loops
+    // use inplace conversion not to break alias property "Tensor& result"
+    result = to_plain_if_needed_(result);
     self = to_plain_if_needed(_self);
     other = to_plain_if_needed(_other);
   }
@@ -94,33 +173,16 @@ Tensor& add_out(
   impl::alpha_check(iter, alpha);
   impl::add_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
+
   return result;
 }
 
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
-  Tensor result, self, other;
- if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
-      _self.dim() > 0 && _other.dim() > 0 &&
-      _self.dim() == _other.dim() &&
-      _self.is_contiguous() && _other.is_contiguous() &&
-      !(DPCPPTensorContext::is_plain(_self) &&
-        !DPCPPTensorContext::is_plain(_other) &&
-        _self.sizes() != _other.sizes()) &&
-      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-      !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
-    xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
-    return result;
-  } else {
-    self = to_plain_if_needed(_self);
-    other = to_plain_if_needed(_other);
-  }
-
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::alpha_check(iter, alpha);
-  impl::add_kernel_dpcpp(iter, alpha);
-  return iter.output();
+  // find a correct output shape by TensorIterator
+  Tensor result;
+  auto _iter = TensorIterator::binary_op(result, _self, _other);
+  result = _iter.output();
+  return at::AtenIpexTypeXPU::add_out(result, _self, _other, alpha);
 }
 
 Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
@@ -187,7 +249,6 @@ Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
 
 } // namespace AtenIpexTypeXPU
 
-
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
@@ -212,6 +273,5 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   impl::add_kernel_dpcpp(iter, alpha);
   return iter.output();
 }
-
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

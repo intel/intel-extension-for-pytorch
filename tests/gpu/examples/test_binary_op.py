@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
@@ -135,3 +136,23 @@ class TestTorchMethod(TestCase):
             y_dpcpp1, y_dpcpp2).to(cpu_device))
         self.assertEqual(torch.fmod(y_cpu1, y_cpu2), torch.fmod(
             y_dpcpp1, y_dpcpp2).to(cpu_device))
+
+    def test_add_with_alpha_block_format(self, dtype=torch.float):
+        x1 = torch.randn(1, 2, 3, 3)
+        x1_xpu = x1.to("xpu")
+        x2 = torch.randn(1, 2, 3, 3)
+        x2_xpu = x2.to("xpu")
+        conv = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+
+        y = conv(x1)
+        y.add_(x2, alpha=10)
+        x1.add_(y, alpha=0.1)
+        print(x1)
+
+        conv.to("xpu")
+        y_xpu = conv(x1_xpu)
+        y_xpu.add_(x2_xpu, alpha=10)
+        x1_xpu.add_(y_xpu, alpha=0.1)
+        print(x1_xpu.cpu())
+
+        self.assertEqual(x1, x1_xpu.cpu())
