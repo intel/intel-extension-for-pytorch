@@ -2113,9 +2113,8 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   for (auto i =0; i< tensors.size(); i++) {
-    IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
-      "Currently Mkldnn cat operators do not support empty tensor.");
-
+    if(tensors[i].numel() == 0)
+      continue;
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors[i], true);
 
     x.push_back(dbl::comm::try_gen_dil_tensor(tensors[i]));
@@ -2141,8 +2140,8 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   std::vector<int32_t> data_shift;
 
   for (auto i = 0; i < tensors.size(); i++) {
-    IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
-      "Currently Mkldnn cat operators do not support empty tensor.");
+    if(tensors[i].numel() == 0)
+      continue;
     tensors_contiguous[i] = IS_CONTIGUOUS_ANY(tensors[i]) ? tensors[i] : tensors[i].contiguous();
 
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i], true);
