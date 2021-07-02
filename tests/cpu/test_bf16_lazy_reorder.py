@@ -293,7 +293,7 @@ class TestDeconv(TestCase):
                         self.assertEqual(
                             y_aten, y_auto_mix_train, atol=1e-1, rtol=1e-5)
                         self.assertEqual(
-                            module.weight.grad, module_auto_mix_train.weight.grad, atol=1e-1, rtol=1e-5)
+                            module.weight.grad, module_auto_mix_train.weight.grad, atol=2e-1, rtol=1e-3)
                         self.assertEqual(
                             x_aten.grad, x_auto_mix_train.grad, atol=1e-1, rtol=1e-5)
                         if bias:

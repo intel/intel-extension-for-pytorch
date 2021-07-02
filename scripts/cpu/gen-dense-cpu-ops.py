@@ -151,6 +151,9 @@ _FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     "aten::contiguous(Tensor(a) self, *, MemoryFormat memory_format=contiguous_format) -> Tensor(a)",
     "aten::dropout(Tensor input, float p, bool train) -> Tensor",
     "aten::dropout_(Tensor(a!) self, float p, bool train) -> Tensor(a!)",
+    "aten::nll_loss_nd(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
+    "aten::nll_loss(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
+    "aten::nll_loss.out(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100, *, Tensor(a!) out) -> Tensor(a!)",
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
