@@ -19,6 +19,8 @@ namespace AtenIpexTypeXPU {
 
 #define MAX_INPUT_TENSOR_NUM 3
 #define MAX_TOTAL_TENSOR_NUM 4
+// DPCPP suggest: it’s possible (and even desirable) to oversubscribe tasks to device;
+constexpr int OVER_SUBSCRIBE_DSS_FACTOR = 16;
 
 // Work around for passing the offsets to the dpcpp kernel instead of using
 // OffsetCalculator.
@@ -454,10 +456,12 @@ void dpcpp_small_index_kernel_impl(
   auto numel = iter.numel();
   auto indices_size = iter.tensor(2).size(-1);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t max_group_num = dpcppMaxDSSNum(dpcpp_queue);
+  int64_t max_group_num = dpcppMaxDSSNum(dpcpp_queue) * OVER_SUBSCRIBE_DSS_FACTOR;
+
+  auto total_index_iter = numel / indices_size;
+  max_group_num = std::min(int64_t(total_index_iter / 2), max_group_num);
 
   // process the tail
-  auto total_index_iter = numel / indices_size;
   auto group_index_iter = (total_index_iter + max_group_num - 1) / max_group_num;
   auto group_num_tail = group_index_iter * max_group_num - total_index_iter;
   auto group_num = max_group_num - group_num_tail;
