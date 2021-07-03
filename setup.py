@@ -295,10 +295,9 @@ class IPEXBuild(build_ext, object):
   def build_ipex_extension(self, ext):
     if not isinstance(ext, IPEXExt):
       return super(IPEXBuild, self).build_extension(ext)
-    ext_dir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-    build_dir = os.path.join(ext_dir, '..', 'build_' + ext.name)
+    build_dir = os.path.join(ext.project_dir, 'build', 'build_' + ext.name)
     if not os.path.exists(build_dir):
-      os.mkdir(build_dir)
+      os.makedirs(build_dir)
 
     build_type = 'Release'
     use_ninja = False
@@ -307,16 +306,17 @@ class IPEXBuild(build_ext, object):
       build_type = 'Debug'
 
     # install _torch_ipex.so as python module
+    ext_dir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
     if ext.name == 'torch_ipex':
       ext_dir = os.path.join(ext_dir, ext.name)
     if not os.path.exists(ext_dir):
-      os.mkdir(ext_dir)
+      os.makedirs(ext_dir)
 
     cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + build_type,
             '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
             '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
-            '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
+            '-DPYTHON_INCLUDE_DIRS=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
@@ -382,15 +382,32 @@ install_requires=[
         TORCH_URL,
 ]
 def get_c_module():
-    main_compile_args = []
+    main_compile_args = ['-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI))]
     main_libraries = ['torch_ipex']
-    main_link_args = []
-    main_sources = ["torch_ipex/csrc/_C.cpp"]
+    main_link_args = [
+            '-ltorch_python',
+            '-ldnnl'
+    ]
+    main_sources = [os.path.join("torch_ipex", "csrc", "_C.cpp")]
     cwd = os.path.dirname(os.path.abspath(__file__))
-    # lib_path = os.path.join(cwd, "torch_ipex", "lib")
+    include_dirs = [
+            ".",
+            os.path.join("torch_ipex", "csrc"),
+            os.path.join("third_party", "mkl-dnn", "include"),
+            os.path.join("third_party", "torch_ccl", "src"),
+            os.path.join("third_party", "torch_ccl", "third_party", "oneCCL", "include"),
+            os.path.join("build", "build_torch_ipex", "third_party", "mkl-dnn", "include"),
+            os.path.join(pytorch_install_dir, "include"),
+            os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")
+    ]
+    #lib_path = os.path.join(cwd, "torch_ipex", "lib")
     #lib_path = os.path.join(cwd, "build")
-    lib_path = os.path.join(cwd, "build", "build_torch_ipex")
-    library_dirs = [lib_path]
+    #lib_path = os.path.join(cwd, "build", "build_torch_ipex")
+    library_dirs = [
+            os.path.join(cwd, "build", "build_torch_ipex"),
+            os.path.join(cwd, "build", "build_torch_ipex", "third_party", "mkl-dnn", "src"),
+            os.path.join(pytorch_install_dir, "lib")
+    ]
     #lib_path_1 = os.path.join(cwd, "build", "lib.linux-x86_64-3.8")
     #library_dirs = [lib_path, lib_path_1]
     extra_link_args = []
@@ -419,7 +436,7 @@ def get_c_module():
                   sources=main_sources,
                   language='c',
                   extra_compile_args=main_compile_args + extra_compile_args,
-                  include_dirs=include_paths(),
+                  include_dirs=include_dirs,
                   library_dirs=library_dirs,
                   extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
                   # extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('..')])

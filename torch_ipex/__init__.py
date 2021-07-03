@@ -11,7 +11,7 @@ base_dir = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 if base_dir == 'intel_pytorch_extension':
     print('[WARNING] "import intel_pytorch_extension" will be deprecated in future releases. Please use "import torch_ipex" instead.')
 
-core.enable_torch_ccl()
+#core.enable_torch_ccl()
 DEVICE = 'xpu:0'
 
 class AmpConf(object):

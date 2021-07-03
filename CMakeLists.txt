@@ -20,6 +20,4 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Common dependencies
 
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/pybind11)
-
 include(cmake/CPU.cmake)

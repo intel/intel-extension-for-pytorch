@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.autograd import Function
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 import torch_ipex._C as core
 from typing import Callable, List, Optional, Tuple
 

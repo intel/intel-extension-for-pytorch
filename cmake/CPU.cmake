@@ -141,8 +141,6 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
-include_directories(${PYTHON_INCLUDE_DIR})
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 include_directories(${TORCHCCL_INCLUDE_DIR})
 
@@ -168,9 +166,7 @@ ExternalProject_Add(xsmm
     "-j"
   INSTALL_COMMAND ""
   )
-# Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
-# pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
@@ -190,14 +186,12 @@ else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-add_dependencies(${PLUGIN_NAME} pybind11)
 add_dependencies(${PLUGIN_NAME} torch_ccl)
 add_dependencies(${PLUGIN_NAME} dnnl)
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
 add_dependencies(${PLUGIN_NAME} xsmm)
 target_link_libraries(${PLUGIN_NAME} PUBLIC torch_ccl)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
