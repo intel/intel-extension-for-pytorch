@@ -253,6 +253,7 @@ static Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other); // aten
 static Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor gelu(const Tensor & self); // aten::gelu(Tensor self) -> Tensor
 static Tensor gelu_backward(const Tensor & grad, const Tensor & self); // aten::gelu_backward(Tensor grad, Tensor self) -> Tensor
+static Tensor & geometric_(Tensor & self, double p, Generator * generator); // aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
 static std::tuple<Tensor,Tensor> geqrf(const Tensor & self); // aten::geqrf(Tensor self) -> (Tensor a, Tensor tau)
 static std::tuple<Tensor &,Tensor &> geqrf_out(Tensor & a, Tensor & tau, const Tensor & self); // aten::geqrf.a(Tensor self, *, Tensor(a!) a, Tensor(b!) tau) -> (Tensor(a!) a, Tensor(b!) tau)
 static Tensor ger(const Tensor & self, const Tensor & vec2); // aten::ger(Tensor self, Tensor vec2) -> Tensor
