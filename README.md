@@ -78,7 +78,7 @@ please update ${PATH_To_Your_Compiler} to where you install DPC++ compiler with 
 <br>Example: /20210401/build/linux_prod/compiler
 
 ### **Validation of Compiler Installation**
-Follow instrcutions in test/device_enum.cpp to chech the compiler and device. It is optional.
+Follow instrcutions in test/gpu/device_enum.cpp to chech the compiler and device. It is optional.
 
 ## **oneMKL Version and Setting**
 
