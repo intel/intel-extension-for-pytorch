@@ -16,11 +16,6 @@
 ```bash
 # Install python dependencies
 python3 -m pip install -r requirements.txt
-# Add ubuntu user to video and render group
-sudo usermod -a -G video $USER
-sudo usermod -a -G render $USER
-## logout and relogin
-logout
 ```
 
 ## IPEX code organization
@@ -63,17 +58,18 @@ IPEX code org
 - Environment Variables Setting for DPC++:
 
 ```bash
-<PATH_To_Your_Compiler>
-      +-- env
-      +-- linux
-          +-- bin
-          +-- compiler
-          ¦   +-- include
-          ¦   +-- lib
-          +-- include
-          ¦   +-- sycl
-          +-- lib
-
+DPC++ compiler org
+      ├── env
+      └── linux
+          ├── bin
+          ├── compiler
+          │   ├── include
+          │   └── lib
+          ├── include
+          │   └── sycl
+          └── lib
+```
+```bash
 export DPCPP_ROOT=${PATH_To_Your_Compiler}/linux
 source ${PATH_To_Your_Compiler}/env/vars.sh
 ```
@@ -82,85 +78,7 @@ please update ${PATH_To_Your_Compiler} to where you install DPC++ compiler with 
 <br>Example: /20210401/build/linux_prod/compiler
 
 ### **Validation of Compiler Installation**
-Compile and execute the following program and check the result. It is optional.
-
-- Source Code:
-
-```c++
-// source file: device_enum.cpp
-#include <CL/sycl.hpp>
-#include <stdlib.h>
-
-int main(int argc, char *argv[]) {
-  std::cout
-      << "================================================================\n";
-  std::cout
-      << "           Available DPC++ Platforms / Devices                  \n";
-  std::cout
-      << "================================================================\n";
-  sycl::vector_class<sycl::platform> platforms =
-      sycl::platform::get_platforms();
-  for (size_t pid = 0; pid < platforms.size(); pid++) {
-    sycl::string_class pname =
-        platforms[pid].get_info<sycl::info::platform::name>();
-    std::cout << "|Platform" << pid << " :\n"
-              << "|" << pname << std::endl;
-    sycl::vector_class<sycl::device> devices =
-        platforms[pid].get_devices(sycl::info::device_type::all);
-    for (size_t device_id = 0; device_id < devices.size(); device_id++) {
-      sycl::string_class dname =
-          devices[device_id].get_info<sycl::info::device::name>();
-      sycl::string_class dtype;
-      if (devices[device_id].is_gpu()) {
-        dtype = "GPU";
-      } else {
-        dtype = "NonGPU";
-      }
-      std::cout << "|\t|__|Device" << device_id << " :\n"
-                << "|\t|  |" << dname << " (" << dtype << ")" << std::endl;
-    }
-    std::cout
-        << "----------------------------------------------------------------\n";
-  }
-}
-
-```
-
-- Compile Command:
-
-```bash
-$ clang++ device_enum.cpp -fsycl -o device_enum
-```
-
-- Expected Result:
-
-```bash
-## dual dg1 card host on a Xeon hw env with Level-Zero
-./device_enum
-================================================================
-           Available DPC++ Platforms / Devices
-================================================================
-|Platform0 :
-|Intel(R) OpenCL HD Graphics
-|       |__|Device0 :
-|       |  |Intel(R) Graphics [0x4905] (GPU)
-|       |__|Device1 :
-|       |  |Intel(R) Graphics [0x4905] (GPU)
-----------------------------------------------------------------
-|Platform1 :
-|Intel(R) Level-Zero
-|       |__|Device0 :
-|       |  |Intel(R) Graphics [0x4905] (GPU)
-|       |__|Device1 :
-|       |  |Intel(R) Graphics [0x4905] (GPU)
-----------------------------------------------------------------
-|Platform2 :
-|SYCL host platform
-|       |__|Device0 :
-|       |  |SYCL host device (NonGPU)
-----------------------------------------------------------------
-
-```
+Follow instrcutions in test/device_enum.cpp to chech the compiler and device. It is optional.
 
 ## **oneMKL Version and Setting**
 
@@ -261,6 +179,7 @@ The following build options are supported in Intel GPU Extension for PyTorch.
 | USE_ITT | OFF | (Experimental) Use Intel(R) VTune Profiler ITT functionality if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |
 | BUILD_NO_L0_ONEDNN | OFF | Build oneDNN without LevelZero support if set to ON. |
+| BUILD_STRIPPED_BIN | OFF | Strip all symbols when building IPEX libraries. |
 | BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path if set to ON. |
 | BUILD_DOUBLE_KERNEL | OFF | Build double data type kernels. This option is set to ON only if <br> BUILD_INTERNAL_DEBUG is set to ON. |
 
@@ -269,12 +188,12 @@ The following lauch options are supported in Intel GPU Extension for PyTorch.
 
 | **Launch Option** | **Description** |
 | ------ | ------ |
-| IPEX_VERBOSE | Provide verbose output for IPEX customized kernel. |
+| IPEX_VERBOSE | Verbose level in integer. Provide verbose output for IPEX customized kernel. |
+| IPEX_WARNING | WARNING level in integer. Provide warning messages for IPEX runtime. |
 | IPEX_FORCE_SYNC | Enable synchronized execution mode. This mode will perform blocking <br> wait for the completion of submitted kernel. |
 | IPEX_DISABLE_PROFILING | Disable IPEX profiling solution. If set to 1, the queue profiling flag will be unset and kernel profiling information will be reset. |
-| IPEX_LAZY_REORDER | Enable lazy reorder. When enabled, reorders on activation tensors are <br> eliminated when oneDNN block format can be propagated for more than one operator.  |
 | IPEX_DISABLE_TILE_PARTITION | Device partition. When enabled, tile partition will be disabled and map frameworkd device to physical device. |
-
+| IPEX_ONEDNN_LAYOUT | Enable oneDNN specific layout. When enabled, IPEX tries to use blocked layouts querying from oneDNN.  |
 
 All these options are set to zero by default. User may configure one or more options like below examples.</br>
 
@@ -290,7 +209,7 @@ IPEX_VERBOSE=1 python ResNet50.py
 
 3. Set multiple options when running model
 ```bash
-IPEX_VERBOSE=1 IPEX_LAZY_REORDER=1 python ResNet50.py
+IPEX_VERBOSE=1 IPEX_ONEDNN_LAYOUT=1 python ResNet50.py
 ```
 
 ## Feature Introduction
@@ -375,8 +294,3 @@ Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set f
 ## Caveat
 ### 1. Build order of PyTorch and extension:
 Please build IPEX after pytorch is built and installed, otherwise you will get an error “ModuleNotFoundError: No module named 'torch'”.
-
-### 2. To use pybind11 provided by PyTorch
-Please DO NOT install system pybind11 via package manager (such as apt).
-After the PyTorch was installed, please confirm that the pybind11 folder exists under <path to env>/lib/python3.x/site-packages/torch/include/.
-This pybind11 folder should be included in the release version of PyTorch, or should be copied automatically while building PyTorch from source.
