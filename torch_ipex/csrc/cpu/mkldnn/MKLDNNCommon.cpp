@@ -2,11 +2,9 @@
 #include <ATen/OpaqueTensorImpl.h>
 #include <c10/core/Allocator.h>
 
-#if AT_MKLDNN_ENABLED()
-
 #include "ideep/ideep.hpp"
 
-namespace at { namespace native {
+namespace torch_ipex { namespace cpu {
 
 /**
  * `IntrusivePtrTargetWrapper` wraps a custom storage handle  of a tensor
@@ -37,36 +35,36 @@ public:
 
 using IDeepTensorWrapper = IntrusivePtrTargetWrapper<ideep::tensor>;
 using IDeepTensorWrapperPtr = c10::intrusive_ptr<IDeepTensorWrapper>;
-using MKLDNNTensorImpl = OpaqueTensorImpl<IDeepTensorWrapperPtr>;
-using MKLDNNTensor = Tensor;
+using MKLDNNTensorImpl = at::OpaqueTensorImpl<IDeepTensorWrapperPtr>;
+using MKLDNNTensor = at::Tensor;
 
-ideep::tensor::data_type get_mkldnn_dtype(ScalarType type) {
+ideep::tensor::data_type get_mkldnn_dtype(at::ScalarType type) {
   switch (type) {
-    case ScalarType::Float:
+    case at::ScalarType::Float:
       return ideep::tensor::data_type::f32;
-    case ScalarType::QInt32:
+    case at::ScalarType::QInt32:
       return ideep::tensor::data_type::s32;
-    case ScalarType::QInt8:
+    case at::ScalarType::QInt8:
       return ideep::tensor::data_type::s8;
-    case ScalarType::QUInt8:
-    case ScalarType::Byte:
+    case at::ScalarType::QUInt8:
+    case at::ScalarType::Byte:
       return ideep::tensor::data_type::u8;
-    case ScalarType::BFloat16:
+    case at::ScalarType::BFloat16:
       return ideep::tensor::data_type::bf16;
     default:
       TORCH_CHECK(false, "get_mkldnn_dtype: unsupported data type");
   }
 }
 
-Tensor new_with_itensor_mkldnn(ideep::tensor&& it, c10::optional<ScalarType> dtype, c10::optional<Device> device) {
+at::Tensor new_with_itensor_mkldnn(ideep::tensor&& it, c10::optional<at::ScalarType> dtype, c10::optional<c10::Device> device) {
   // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
   // TODO: support int64_t dims in ideep::tensor to avoid extra conversion
   auto dims = it.get_dims();
   IDeepTensorWrapperPtr handle = c10::make_intrusive<IDeepTensorWrapper>(std::move(it));
   caffe2::TypeMeta dtype_ = scalarTypeToTypeMeta(dtype_or_default(dtype));
-  Device device_ = device_or_default(device);
-  return detail::make_tensor<MKLDNNTensorImpl>(
-    DispatchKeySet(DispatchKey::MkldnnCPU),
+  c10::Device device_ = device_or_default(device);
+  return at::detail::make_tensor<MKLDNNTensorImpl>(
+    c10::DispatchKeySet(c10::DispatchKey::MkldnnCPU),
     dtype_, device_, handle,
     std::vector<int64_t>(dims.begin(), dims.end()));
 }
@@ -78,14 +76,14 @@ ideep::tensor& itensor_from_mkldnn(const MKLDNNTensor& mkldnn_tensor) {
   return mklimpl->unsafe_opaque_handle()->get_target();
 }
 
-ideep::tensor itensor_view_from_dense(const Tensor& tensor) {
+ideep::tensor itensor_view_from_dense(const at::Tensor& tensor) {
   TORCH_CHECK(
       tensor.device().is_cpu(),
       "itensor_view_from_dense expects CPU tensor input");
   TORCH_CHECK(
-      tensor.layout() == Layout::Strided,
+      tensor.layout() == c10::Layout::Strided,
       "itensor_view_from_dense expects dense tensor input");
-  TORCH_CHECK(tensor.scalar_type() == ScalarType::Float || tensor.scalar_type() == ScalarType::BFloat16,
+  TORCH_CHECK(tensor.scalar_type() == at::ScalarType::Float || tensor.scalar_type() == at::ScalarType::BFloat16,
              "itensor_view_from_dense expects float tensor input");
   return {{tensor.sizes().vec(), get_mkldnn_dtype(tensor.scalar_type()), tensor.strides().vec()},
           tensor.data_ptr()};
@@ -96,7 +94,7 @@ ideep::tensor itensor_view_from_dense(const Tensor& tensor) {
 // tensor is just a view of the storage of the aten dense tensor, so
 // caller needs to make sure the aten dense tensor's lifetime is
 // longer than the ideep tensor.
-ideep::tensor itensor_from_tensor(const Tensor& tensor) {
+ideep::tensor itensor_from_tensor(const at::Tensor& tensor) {
   if (tensor.is_mkldnn()) {
     return itensor_from_mkldnn(tensor);
   } else {
@@ -124,5 +122,3 @@ at::Tensor empty_aten_tensor_from_desc(const ideep::tensor::desc& desc, const at
 }
 
 }}
-
-#endif // AT_MKLDNN_ENABLED()

@@ -1,4 +1,5 @@
 #include "mkldnn/MKLDNNCommon.h"
+#include "mkldnn/MKLDNNConversions.h"
 #include "torch_ipex/csrc/utils.h"
 
 #include <ATen/native/Pool.h>
@@ -74,7 +75,7 @@ at::Tensor pooling_impl(
 // TODO: the input will be actively converted to channels last format
 // after the 5-D tensor supports channels last format.
   auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(input.suggest_memory_format());
-  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input_);
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
   std::vector<int64_t> output_sizes;
 
   if (ceil_mode) {
@@ -125,7 +126,7 @@ at::Tensor pooling_impl(
   auto output = at::empty(output_sizes, input_.options().memory_format(input_.suggest_memory_format()));
   ideep::tensor mkldnn_output;
   if (is_channels_last) {
-    mkldnn_output = at::native::itensor_view_from_dense(output);
+    mkldnn_output = itensor_view_from_dense(output);
   }
 
   auto aprop_kind = ideep::prop_kind::forward;
@@ -152,8 +153,8 @@ at::Tensor pooling_impl(
   if (is_channels_last) {
     return output;
   } else {
-    return at::native::mkldnn_to_dense(
-        at::native::new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
+    return mkldnn_to_dense(
+        new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
                                 input.options().device_opt()));
   }
 }

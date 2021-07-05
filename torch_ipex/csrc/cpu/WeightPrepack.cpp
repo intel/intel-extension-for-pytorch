@@ -28,7 +28,7 @@ ideep::tensor get_conv_prepacked_weight(
     return std::get<1>(it->second);
   } else { 
     auto weight_ = weight.contiguous(mkldnn_memory_format);
-    ideep::tensor w = at::native::itensor_view_from_dense(weight_);
+    ideep::tensor w = itensor_view_from_dense(weight_);
     // TODO: 3d check
     bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
     ideep::tensor::desc packed_desc;
@@ -94,7 +94,7 @@ ideep::tensor get_conv_prepacked_weight(
   if (is_channels_last) {
     packed_desc = ideep::convolution_forward::expected_weights_desc<true>(
         {origin_weight_dims.begin(), origin_weight_dims.end()},
-        at::native::get_mkldnn_dtype(data_type),
+        get_mkldnn_dtype(data_type),
         stride.vec(),
         padding.vec(),
         padding.vec(),
@@ -104,7 +104,7 @@ ideep::tensor get_conv_prepacked_weight(
   } else {
     packed_desc = ideep::convolution_forward::expected_weights_desc<false>(
         {origin_weight_dims.begin(), origin_weight_dims.end()},
-        at::native::get_mkldnn_dtype(data_type),
+        get_mkldnn_dtype(data_type),
         stride.vec(),
         padding.vec(),
         padding.vec(),
@@ -115,7 +115,7 @@ ideep::tensor get_conv_prepacked_weight(
   ideep::tensor result;
   if (!weight_prepacked) {
     // weight is not preack
-    ideep::tensor w = at::native::itensor_view_from_dense(weight);
+    ideep::tensor w = itensor_view_from_dense(weight);
     result.init(packed_desc);
     result.feed_from(w);
   } else  {
@@ -137,9 +137,9 @@ at::Tensor conv2d_weight_prepack(
     c10::optional<at::ScalarType> dtype) {
   auto weight_ = IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(weight.suggest_memory_format());
   bool is_channels_last = weight_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  auto w = at::native::itensor_view_from_dense(weight_);
+  auto w = itensor_view_from_dense(weight_);
   // get the format give data type.
-  ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : w.get_data_type();
+  ideep::data_type desc_dtype = dtype.has_value() ? get_mkldnn_dtype(dtype.value()) : w.get_data_type();
   ideep::tensor::desc expected_desc;
   if (is_channels_last) {
     expected_desc =
@@ -167,7 +167,7 @@ at::Tensor conv2d_weight_prepack(
 
   auto weight_dtype = w.get_data_type();
   expected_desc = expected_desc.to_type(weight_dtype);
-  auto output = at::native::empty_aten_tensor_from_desc(expected_desc, weight.options());
+  auto output = empty_aten_tensor_from_desc(expected_desc, weight.options());
   ideep::tensor y;
   if (ideep::data_type::f32 == weight_dtype) {
     y.init(expected_desc, output.template data_ptr<float>());
@@ -195,9 +195,9 @@ at::Tensor conv2d_weight_unpack(
   for (auto&s:kernel_size) {
     origin_weight_dims.push_back(s);
   }
-  auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
+  auto weight_dtype = get_mkldnn_dtype(weight.scalar_type());
   // get the format give data type.
-  ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : weight_dtype;
+  ideep::data_type desc_dtype = dtype.has_value() ? get_mkldnn_dtype(dtype.value()) : weight_dtype;
   ideep::tensor::desc expected_desc;
   if (is_channels_last) {
     expected_desc =
@@ -235,7 +235,7 @@ at::Tensor conv2d_weight_unpack(
   if (is_channels_last) {
     result = result.to(at::MemoryFormat::ChannelsLast);
   }
-  auto y = at::native::itensor_view_from_dense(result);
+  auto y = itensor_view_from_dense(result);
   y.feed_from(blocked_weight);
   return result;
 }
@@ -244,7 +244,7 @@ ideep::tensor get_linear_prepacked_weight(
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features){
-  auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
+  auto weight_dtype = get_mkldnn_dtype(weight.scalar_type());
   ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
     {out_features, in_features},
     /*input_size*/{}, // pack weight without input, will use default batchsize=128
@@ -255,7 +255,7 @@ ideep::tensor get_linear_prepacked_weight(
   ideep::tensor result;
   if (weight.ndimension() == 2) {
     // weight is public format
-    ideep::tensor w = at::native::itensor_view_from_dense(weight);
+    ideep::tensor w = itensor_view_from_dense(weight);
     // weight is already best format
     if (expected_desc == w.get_desc()) return w;
     result.init(expected_desc);
@@ -279,7 +279,7 @@ ideep::tensor get_linear_prepacked_weight(
     return std::get<1>(it->second);
   } else {
     auto weight_ = weight.is_contiguous() ? weight : weight.contiguous();
-    ideep::tensor w = at::native::itensor_view_from_dense(weight_);
+    ideep::tensor w = itensor_view_from_dense(weight_);
     auto out_features = weight_.size(0);
     auto in_features = weight_.size(1);
     ideep::dims input_dims({batch_size, weight.size(1)});
@@ -287,7 +287,7 @@ ideep::tensor get_linear_prepacked_weight(
       {weight.sizes().cbegin(), weight.sizes().cend()},
       input_dims,
       w.get_data_type(),
-      at::native::get_mkldnn_dtype(src_dtype)); 
+      get_mkldnn_dtype(src_dtype)); 
     ideep::tensor result;
     result.init(packed_desc);
     result.feed_from(w);
@@ -346,8 +346,8 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
     ideep::tensor w_hh = std::get<1>(it_h->second);
     return std::make_tuple(w_ih, w_hh);
   } else {
-    auto w1 = get_mkldnn_tensor_view(weight_ih, {{1, 1, input_size, num_gates, hidden_size}, at::native::get_mkldnn_dtype(weight_ih.scalar_type()), ideep::format_tag::ldgoi});
-    auto w2 = get_mkldnn_tensor_view(weight_hh, {{1, 1, hidden_size, num_gates, hidden_size}, at::native::get_mkldnn_dtype(weight_hh.scalar_type()), ideep::format_tag::ldgoi});
+    auto w1 = get_mkldnn_tensor_view(weight_ih, {{1, 1, input_size, num_gates, hidden_size}, get_mkldnn_dtype(weight_ih.scalar_type()), ideep::format_tag::ldgoi});
+    auto w2 = get_mkldnn_tensor_view(weight_hh, {{1, 1, hidden_size, num_gates, hidden_size}, get_mkldnn_dtype(weight_hh.scalar_type()), ideep::format_tag::ldgoi});
   
     ideep::tensor::desc packed_desc_ih, packed_desc_hh;
     std::tie(packed_desc_ih, packed_desc_hh) = ideep::lstm_forward::expected_weights_desc(
@@ -393,9 +393,9 @@ at::Tensor linear_weight_prepack(
     c10::optional<at::ScalarType> dtype) {
   TORCH_CHECK(weight.ndimension() == 2, "expected unpack weight which dim == 2");
   TORCH_CHECK(weight.is_contiguous() || is_transposed_2d(weight), "ipex linear prepack only support contiguous or transposed weight");
-  auto w = at::native::itensor_view_from_dense(weight);
+  auto w = itensor_view_from_dense(weight);
   // get the format with given data type.
-  ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : w.get_data_type();
+  ideep::data_type desc_dtype = dtype.has_value() ? get_mkldnn_dtype(dtype.value()) : w.get_data_type();
   ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
     w.get_dims(),
     /*input_size*/{}, // pack weight without input, will use default batchsize=128
@@ -414,7 +414,7 @@ at::Tensor linear_weight_prepack(
   }
 
   // Case2: expected desc is block format
-  auto output = at::native::empty_aten_tensor_from_desc(expected_desc, weight.options());
+  auto output = empty_aten_tensor_from_desc(expected_desc, weight.options());
   ideep::tensor y;
   if (ideep::data_type::f32 == weight_dtype) {
     y.init(expected_desc, output.template data_ptr<float>());
@@ -448,9 +448,9 @@ at::Tensor linear_weight_unpack(
       return weight.contiguous();
     }
   }
-  auto weight_dtype = at::native::get_mkldnn_dtype(weight.scalar_type());
+  auto weight_dtype = get_mkldnn_dtype(weight.scalar_type());
   // get the format give data type.
-  ideep::data_type desc_dtype = dtype.has_value() ? at::native::get_mkldnn_dtype(dtype.value()) : weight_dtype;
+  ideep::data_type desc_dtype = dtype.has_value() ? get_mkldnn_dtype(dtype.value()) : weight_dtype;
 
   // get ideep weight's desc
   ideep::tensor::desc expected_desc = ideep::inner_product_forward::expected_weights_desc(
@@ -483,8 +483,8 @@ void sync_master_weight_to_bf16(const at::Tensor master_weight, at::Tensor& bf16
   TORCH_CHECK(master_weight.sizes() == bf16_weight.sizes(), "expected master weight has same sizes with bf16 weight");
   TORCH_CHECK(master_weight.scalar_type() == at::kFloat && bf16_weight.scalar_type() == at::kBFloat16,
               "expected master weght has same dims with bf16 weight");
-  auto w_master = at::native::itensor_view_from_dense(master_weight);
-  auto w_bf16 = at::native::itensor_view_from_dense(bf16_weight);
+  auto w_master = itensor_view_from_dense(master_weight);
+  auto w_bf16 = itensor_view_from_dense(bf16_weight);
   w_bf16.feed_from(w_master);
 }
 

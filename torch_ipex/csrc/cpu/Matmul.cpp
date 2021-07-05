@@ -24,8 +24,8 @@ at::Tensor bmm_impl(
   auto tensor1_ = tensor1.is_contiguous() ? tensor1 : tensor1.contiguous();
   auto tensor2_ = tensor2.is_contiguous() ? tensor2 : tensor2.contiguous();
   const int64_t dim = tensor1.dim();
-  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(tensor1_);
-  const ideep::tensor mkldnn_tensor2 = at::native::itensor_view_from_dense(tensor2_);
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(tensor1_);
+  const ideep::tensor mkldnn_tensor2 = itensor_view_from_dense(tensor2_);
   
   auto output = out;
   if (!out.defined()) {
@@ -36,7 +36,7 @@ at::Tensor bmm_impl(
     output_size[dim -1] = tensor2.size(dim - 1);
     output = at::empty(output_size, tensor1.options());
   }  
-  ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
   ideep::matmul_forward::compute(
     mkldnn_input,
     mkldnn_tensor2,

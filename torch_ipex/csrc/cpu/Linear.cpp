@@ -20,15 +20,15 @@ at::Tensor linear_kernel(
   // reshape first if input dim != 2 and the reshape will cost a memory copy.
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
-  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(self_reshaped);
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
 
   std::vector<int64_t> output_size_reshaped = {self_reshaped.size(0), mkldnn_weight.get_dim(0)};
   auto output = at::empty(output_size_reshaped, self.options());
-  ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
-    const ideep::tensor mkldnn_bias = at::native::itensor_view_from_dense(bias_);
+    const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
     ideep::inner_product_forward::compute(
         mkldnn_input,
         mkldnn_weight,
@@ -92,17 +92,17 @@ at::Tensor linear_inplace_impl(
   const int64_t dim = self.dim();  
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
-  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(self_reshaped);
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
   const ideep::tensor mkldnn_weight = get_linear_prepacked_weight(weight, mkldnn_input.get_dim(0), self.scalar_type());
 
   std::vector<int64_t> output_size_reshaped = {self_reshaped.size(0), weight.size(0)};
   output = output.reshape(output_size_reshaped);
   output = output.to(self_.suggest_memory_format());
-  ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
   if (bias.defined()) {
     auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
-    const ideep::tensor mkldnn_bias = at::native::itensor_view_from_dense(bias_);
+    const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
     ideep::inner_product_forward::compute(
         mkldnn_input,
         mkldnn_weight,
@@ -157,10 +157,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
   const ideep::tensor w = get_linear_prepacked_weight(weight, out_features, in_features);
   auto input_reshaped = input.dim() > 2 ? input.reshape({-1, input.size(input.dim() - 1)}) : input;
   auto grad_output_reshaped = grad_output.dim() > 2 ? grad_output.reshape({-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
-  const ideep::tensor grady = at::native::itensor_view_from_dense(grad_output_reshaped);
+  const ideep::tensor grady = itensor_view_from_dense(grad_output_reshaped);
   if (output_mask[0]) {
     at::Tensor grad_input_reshaped = at::empty_like(input_reshaped);
-    ideep::tensor gradx = at::native::itensor_view_from_dense(grad_input_reshaped);
+    ideep::tensor gradx = itensor_view_from_dense(grad_input_reshaped);
 
     //bw_d
     ideep::inner_product_backward_data::compute(
@@ -171,12 +171,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
   if (output_mask[1] || output_mask[2]) {
   //bw_w
     grad_weight = at::empty_like(weight);
-    const ideep::tensor x = at::native::itensor_view_from_dense(input_reshaped);
+    const ideep::tensor x = itensor_view_from_dense(input_reshaped);
     auto diff_weight_type = w.get_data_type();
     ideep::tensor gradw(w.get_desc(), grad_weight.data_ptr());
     if (output_mask[2]){
       grad_bias = at::empty({w.get_dim(0)}, weight.options());
-      ideep::tensor gradb = at::native::itensor_view_from_dense(grad_bias);
+      ideep::tensor gradb = itensor_view_from_dense(grad_bias);
       ideep::inner_product_backward_weights::compute(x, grady, gradw, gradb, diff_weight_type);
     } else {
       ideep::inner_product_backward_weights::compute(x, grady, gradw, diff_weight_type);

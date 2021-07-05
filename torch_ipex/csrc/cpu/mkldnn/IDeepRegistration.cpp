@@ -1,8 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#if AT_MKLDNN_ENABLED()
-
 // needs to be included only once in library.
 #include "ideep/ideep_pin_singletons.hpp"
 
@@ -18,7 +16,7 @@ RegisterEngineAllocator cpu_alloc(
   }
 );
 
-namespace at { namespace native { namespace mkldnn {
+namespace torch_ipex { namespace cpu { namespace mkldnn {
 
 void clear_computation_cache() {
   // Reset computation_cache for forward convolutions
@@ -26,6 +24,4 @@ void clear_computation_cache() {
   ideep::convolution_forward::t_store().clear();
 }
 
-}}} // namespace  at::native::mkldnn
-
-#endif // AT_MKLDNN_ENALBED()
+}}}
