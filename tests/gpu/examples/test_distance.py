@@ -40,3 +40,85 @@ class TestNNMethod(TestCase):
         output_dpcpp = cos_dpcpp(input1, input2)
         print(output_dpcpp.to(cpu_device))
         self.assertEqual(output, output_dpcpp.to(cpu_device))
+
+    def test_pdist(self, dtype=torch.float):
+        for p in (0, 1, 2, 3, float('inf')):
+            print("p = ", p)
+
+            a = torch.randn([10, 15], requires_grad=True)
+            y = torch.pdist(a, p)
+            g = torch.ones_like(y, requires_grad=True)
+            y.backward(g)
+            grad_cpu = a.grad.detach().clone()
+            print("output_cpu = ", y)
+            print("grad_cpu = ", grad_cpu)
+            a.grad.zero_()
+
+            a_xpu = a.to('xpu')
+            a_xpu.retain_grad()
+            y_xpu = torch.pdist(a_xpu, p)
+            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
+            y_xpu.backward(g_xpu)
+            grad_xpu = a_xpu.grad.detach().clone()
+            print("output_xpu = ", y_xpu.cpu())
+            print("grad_xpu = ", grad_xpu.cpu())
+            a_xpu.grad.zero_()
+
+            self.assertEqual(y, y_xpu)
+            self.assertEqual(grad_cpu, grad_xpu)
+
+    def test_cdist(self, dtype=torch.float):
+        for p in (0, 1, 2, 3, float('inf')):
+            print("p = ", p)
+
+            # small test: P < 25 & R < 25
+            a = torch.randn([3, 10, 15], requires_grad=True)
+            b = torch.randn([3, 5, 15], requires_grad=True)
+            y = torch.cdist(a, b, p)
+            g = torch.ones_like(y, requires_grad=True)
+            y.backward(g)
+            grad_cpu = a.grad.detach().clone()
+            print("output_cpu = ", y)
+            print("grad_cpu = ", grad_cpu)
+            a.grad.zero_()
+
+            a_xpu = a.to('xpu')
+            b_xpu = b.to('xpu')
+            a_xpu.retain_grad()
+            b_xpu.retain_grad()
+            y_xpu = torch.cdist(a_xpu, b_xpu, p)
+            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
+            y_xpu.backward(g_xpu)
+            grad_xpu = a_xpu.grad.detach().clone()
+            print("output_xpu = ", y_xpu.cpu())
+            print("grad_xpu = ", grad_xpu.cpu())
+            a_xpu.grad.zero_()
+
+            self.assertEqual(y, y_xpu)
+            self.assertEqual(grad_cpu, grad_xpu)
+            
+            # large test: P > 25 & R > 25
+            a = torch.randn([3, 30, 15], requires_grad=True)
+            b = torch.randn([3, 35, 15], requires_grad=True)
+            y = torch.cdist(a, b, p)
+            g = torch.ones_like(y, requires_grad=True)
+            y.backward(g)
+            grad_cpu = a.grad.detach().clone()
+            print("output_cpu = ", y)
+            print("grad_cpu = ", grad_cpu)
+            a.grad.zero_()
+
+            a_xpu = a.to('xpu')
+            b_xpu = b.to('xpu')
+            a_xpu.retain_grad()
+            b_xpu.retain_grad()
+            y_xpu = torch.cdist(a_xpu, b_xpu, p)
+            g_xpu = torch.ones_like(y_xpu, requires_grad=True).to('xpu')
+            y_xpu.backward(g_xpu)
+            grad_xpu = a_xpu.grad.detach().clone()
+            print("output_xpu = ", y_xpu.cpu())
+            print("grad_xpu = ", grad_xpu.cpu())
+            a_xpu.grad.zero_()
+
+            self.assertEqual(y, y_xpu)
+            self.assertEqual(grad_cpu, grad_xpu)

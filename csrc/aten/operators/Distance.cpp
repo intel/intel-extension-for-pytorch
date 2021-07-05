@@ -8,6 +8,7 @@
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
 
+#include <torch/custom_class.h>
 
 using namespace xpu::dpcpp;
 
@@ -164,6 +165,18 @@ static inline scalar_t reduce_agg(
     __k *= 2;
   } while (__k < group_size);
   return local_shared_mem[local_idx];
+}
+
+Tensor _euclidean_dist(const Tensor& x1, const Tensor& x2) {
+  Tensor x1_norm = x1.pow(2).sum(-1, true);
+  Tensor x1_pad = at::ones_like(x1_norm, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor x2_norm = x2.pow(2).sum(-1, true);
+  Tensor x2_pad = at::ones_like(x2_norm, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor x1_ = at::cat({x1.mul(-2), x1_norm, x1_pad}, -1);
+  Tensor x2_ = at::cat({x2, x2_pad, x2_norm}, -1);
+  Tensor result = x1_.matmul(x2_.transpose(-2, -1));
+  result.clamp_min_(0).sqrt_();
+  return result;
 }
 
 template <int p_tpye, typename... T>
@@ -438,6 +451,244 @@ void pdist_backward(
   at::sum_out(result, buffer, 0);
 }
 
+template <int p_type, typename... T>
+class DPCPPOpCdist {};
+
+template <typename scalar_t, typename F, int p_type>
+static void cdist_forward_kernel_impl(
+    Tensor& result,
+    const Tensor& x1,
+    const Tensor& x2,
+    const scalar_t p,
+    const int64_t r1,
+    const int64_t r2,
+    const int64_t m,
+    const int64_t r_size,
+    const int64_t l1_size,
+    const int64_t l2_size) {
+  const auto ngroups = result.numel();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+
+  auto out_ptr = result.data_ptr<scalar_t>();
+  auto x1_ptr = x1.data_ptr<scalar_t>();
+  auto x2_ptr = x2.data_ptr<scalar_t>();
+
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    // Create the local shared memory for reducing
+    DPCPP::accessor<scalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
+        shared(wgroup_size, __cgh);
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      const int64_t group_id = item_id.get_group_linear_id();
+      const int64_t local_id = item_id.get_local_linear_id();
+      const int64_t l = group_id / r_size;
+      const int64_t k = group_id % r_size;
+      const int64_t i = k / r2;
+      const int64_t j = k % r2;
+      const size_t stride = item_id.get_local_range().size();
+
+      scalar_t* start = x1_ptr +l * l1_size + i * m;
+      scalar_t* end = start + m;
+      scalar_t* a = start + local_id;
+      scalar_t* b = x2_ptr + l * l2_size + j * m + local_id;
+
+      scalar_t agg = 0.0;
+      for (; a < end; a += stride, b += stride) {
+        F::inc(
+            agg,
+            Numerics<scalar_t>::abs(
+                static_cast<scalar_t>(*a) - static_cast<scalar_t>(*b)),
+            p);
+      }
+      agg = reduce_agg<scalar_t, F>(agg, item_id, shared);
+      if (local_id == 0) {
+        out_ptr[group_id] = F::finish(agg, p);
+      }   
+    };
+
+    __cgh.parallel_for<DPCPPOpCdist<p_type, scalar_t>>(
+        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+  };
+
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
+static Tensor cdist_forward(const Tensor& x1, const Tensor& x2, const double p, c10::optional<int64_t> compute_mode) {
+  int64_t mode = compute_mode.value_or(0);
+  int64_t r1 = x1.size(-2);
+  int64_t r2 = x2.size(-2);
+  int64_t m  = x1.size(-1);
+  int64_t dim1 = x1.dim();
+  int64_t dim2 = x2.dim();
+  IntArrayRef batchsize1(x1.sizes().data(), dim1 - 2);
+  IntArrayRef batchsize2(x2.sizes().data(), dim2 - 2);
+  std::vector<int64_t> expand_batchsize = at::infer_size(batchsize1, batchsize2);
+  std::vector<int64_t> x1_expand_size(expand_batchsize);
+  x1_expand_size.insert(x1_expand_size.end(), {r1, m});
+  std::vector<int64_t> x2_expand_size(expand_batchsize);
+  x2_expand_size.insert(x2_expand_size.end(), {r2, m});
+
+  int expand_batch_product = std::accumulate(expand_batchsize.begin(), expand_batchsize.end(), 1, std::multiplies<int64_t>());
+  std::vector<int64_t> x1_view{expand_batch_product, r1, m};
+  std::vector<int64_t> x2_view{expand_batch_product, r2, m};
+
+  Tensor x1_expanded = x1.expand(x1_expand_size).contiguous().view(x1_view);
+  Tensor x2_expanded = x2.expand(x2_expand_size).contiguous().view(x2_view);
+
+  std::vector<int64_t> output_shape(expand_batchsize);
+  output_shape.insert(output_shape.end(), {r1, r2});
+
+  Tensor result;
+  if (r1 == 0 || r2 == 0) {
+    result = at::empty(output_shape, x1.options());
+  } else if (m == 0) {
+    result = at::zeros(output_shape, x1.options());
+  } else if (p == 2 && (mode == 1 || (mode == 0 && (r1 > 25 || r2 > 25)))) {
+    Tensor dist = (expand_batch_product == 1) ? impl::_euclidean_dist(x1, x2)
+                                              : impl::_euclidean_dist(x1_expanded, x2_expanded);
+    result = dist.view(output_shape);
+  } else {
+    result = at::empty(output_shape, x1.options());
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half, at::ScalarType::BFloat16, x1.scalar_type(), "cdist_forward_dpcpp", [&] {
+          if (p == 0.0) {
+            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
+                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+          } else if (p == 1.0) {
+            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
+                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+          } else if (p == 2.0) {
+            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+          } else if (std::isinf(p)) {
+            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+          } else {
+            cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+          }
+        });
+  }
+  return result;
+}
+
+template <int p_type, typename... T>
+class DPCPPOpCdistBackward {};
+
+template <typename scalar_t, typename F, int p_type>
+static void cdist_backward_kernel_impl(
+    Tensor& buffer,
+    const Tensor& grad,
+    const Tensor& x1,
+    const Tensor& x2,
+    const Tensor& dist,
+    int64_t gs,
+    const scalar_t p,
+    const int64_t r1,
+    const int64_t r2,
+    const int64_t m,
+    const int64_t count,
+    const int64_t r_size,
+    const int64_t l1_size,
+    const int64_t l2_size) {
+  auto batch = (x1.dim() > 2) ? x1.size(0) : 1;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  int64_t m_round = ((r_size*batch + wgroup_size - 1) / (wgroup_size));
+  DPCPP::range<2> global_range(
+      /**wgroup_size*/ wgroup_size, m_round * wgroup_size);
+  DPCPP::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
+  DPCPP::nd_range<2> work_load(global_range, local_range);
+
+  auto buff_ptr = buffer.data_ptr<scalar_t>();
+  auto grad_ptr = grad.data_ptr<scalar_t>();
+  auto dist_ptr = dist.data_ptr<scalar_t>();
+  auto x1_ptr = x1.data_ptr<scalar_t>();
+  auto x2_ptr = x2.data_ptr<scalar_t>();
+
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
+      const int64_t y = item_id.get_global_id(1);
+      const int64_t init = item_id.get_global_id(0);
+      if (y >= count || init >= m) {
+        return;
+      }
+      const int64_t l = y / r_size;
+      const int64_t k = y % r_size;
+      const size_t stride = item_id.get_local_range(0);
+      const int64_t l_size = r_size * m;
+
+      int64_t i = k / r2;
+      int64_t j = k % r2;
+      
+      const scalar_t grad_k = grad_ptr[y];
+      const scalar_t dist_k = dist_ptr[y];
+
+      const scalar_t* start = x1_ptr +l * l1_size + i * m;
+      const scalar_t* end = start + m;
+      const scalar_t* self_i = start + init;
+      const scalar_t* self_j = x2_ptr + l * l2_size + j * m + init;
+
+      scalar_t* buff_i = buff_ptr + l * l_size + (r1 * j + i) * m + init;
+
+      for (; self_i < end; self_i += stride, self_j += stride, buff_i += stride) {
+        const scalar_t res = F::backward(
+            static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j),
+            grad_k,
+            dist_k,
+            p);
+        *buff_i = res;
+      }
+    };
+
+    __cgh.parallel_for<DPCPPOpCdistBackward<p_type, scalar_t>>(work_load, kfn);
+  };
+
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
+static Tensor cdist_backward(const Tensor& grad, const Tensor& x1, const Tensor& x2, const double p, const Tensor& cdist) {
+  const int64_t r1 = x1.size(-2);
+  const int64_t r2 = x2.size(-2);
+  const int64_t m  = x1.size(-1);
+  const int64_t count = cdist.numel();
+  const int64_t gs = 1;
+  const int64_t batch = (x1.dim() > 2) ? x1.size(0) : 1;
+  Tensor result = at::empty_like(x1, x1.options(), LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  if (p == 0.0 || grad.numel() == 0 || x1.numel() == 0 || x2.numel() == 0) {
+    result.fill_(0);
+    return result;
+  }
+  Tensor buffer = (x1.dim() > 2) ? at::empty({batch, r2, r1, m}, result.options())
+                                 : at::empty({r2, r1, m}, result.options());
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, x1.scalar_type(), "cdist_backward_dpcpp", [&] {
+        if (p == 1.0) {
+          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(
+              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+        } else if (p < 2.0) {
+          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::lt_two, 1>(
+              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+        } else if (p == 2.0) {
+          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+        } else if (std::isinf(p)) {
+          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+        } else {
+          cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+        }
+      });
+  if (x1.dim() > 2) {
+    at::sum_out(result, buffer, 1);
+  } else {
+    at::sum_out(result, buffer, 0);
+  }
+  return result;
+}
+
 } // namespace impl
 
 Tensor _pdist_forward(const Tensor& self, const double p) {
@@ -473,5 +724,42 @@ Tensor _pdist_backward(
   impl::pdist_backward(result, grad, self, p, pdist);
   return result;
 }
+
+Tensor _cdist_forward(const Tensor& x1, const Tensor& x2, double p, c10::optional<int64_t> compute_mode) {
+  TORCH_CHECK(x1.dim() >= 2, "cdist only supports at least 2D tensors, X1 got: ", x1.dim(), "D");
+  TORCH_CHECK(x2.dim() >= 2, "cdist only supports at least 2D tensors, X2 got: ", x2.dim(), "D");
+  TORCH_CHECK(x1.size(-1) == x2.size(-1), "X1 and X2 must have the same number of columns. X1: ", x1.size(-1), " X2: ", x2.size(-1));
+  TORCH_CHECK(at::isFloatingType(x1.scalar_type()), "cdist only supports floating-point dtypes, but X1 got: ", x1.scalar_type());
+  TORCH_CHECK(at::isFloatingType(x2.scalar_type()), "cdist only supports floating-point dtypes, but X2 got: ", x2.scalar_type());
+  TORCH_CHECK(p >= 0, "cdist only supports non-negative p values");
+  TORCH_CHECK(!x1.is_xpu() || x1.get_device() == x2.get_device(), "device of X1 (", x1.get_device(), ") must match device of X2 (", x2.get_device(), ")");
+  return impl::cdist_forward(x1, x2, p, compute_mode);
+}
+
+Tensor _cdist_backward(const Tensor& grad, const Tensor& x1, const Tensor& x2, double p, const Tensor& cdist) {
+  TORCH_CHECK(x1.is_contiguous(), "_cdist_backward requires X1 to be contiguous");
+  TORCH_CHECK(x2.is_contiguous(), "_cdist_backward requires X2 to be contiguous");
+  TORCH_CHECK(cdist.is_contiguous(), "_cdist_backward requires dist to be contiguous");
+  TORCH_CHECK(grad.is_contiguous(), "_cdist_backward requires grad to be contiguous");
+  return impl::cdist_backward(grad, x1, x2, p, cdist);
+}
+
+Tensor cdist(const Tensor& x1, const Tensor& x2, double p, c10::optional<int64_t> compute_mode) {
+  TORCH_CHECK(x1.dim() >= 2, "cdist only supports at least 2D tensors, X1 got: ", x1.dim(), "D");
+  TORCH_CHECK(x2.dim() >= 2, "cdist only supports at least 2D tensors, X2 got: ", x2.dim(), "D");
+  TORCH_CHECK(x1.size(-1) == x2.size(-1), "X1 and X2 must have the same number of columns. X1: ", x1.size(-1), " X2: ", x2.size(-1));
+  int64_t r1 = x1.size(-2);
+  int64_t r2 = x2.size(-2);
+  int64_t mode = compute_mode.value_or(0);
+  return at::_cdist_forward(x1, x2, p, compute_mode);
+}
+
+TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
+  m.impl("cdist",
+  torch::dispatch(c10::DispatchKey::AutogradXPU,
+  torch::CppFunction::makeUnboxedOnly(&AtenIpexTypeXPU::cdist))
+  );
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
