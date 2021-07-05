@@ -43,13 +43,13 @@ static inline DPCPP_DEVICE float __int_as_float(uint32_t val) {
   return cn.out;
 }
 
-static inline DPCPP_DEVICE uint32_t __double_as_long_long(double val) {
+static inline DPCPP_DEVICE unsigned long long __double_as_long_long(double val) {
   double_to_ull cn;
   cn.in = val;
   return cn.out;
 }
 
-static inline DPCPP_DEVICE float __long_long_as_double(unsigned long long val) {
+static inline DPCPP_DEVICE double __long_long_as_double(unsigned long long val) {
   ull_to_double cn;
   cn.in = val;
   return cn.out;
