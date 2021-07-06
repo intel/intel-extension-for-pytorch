@@ -12,7 +12,6 @@ SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn EXCLUDE_FROM_ALL)
-find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 FIND_PACKAGE(AVX)
@@ -142,7 +141,6 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
-include_directories(${TORCHCCL_INCLUDE_DIR})
 
 # sources
 set(DPCPP_SRCS)
@@ -186,11 +184,9 @@ else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-add_dependencies(${PLUGIN_NAME} torch_ccl)
 add_dependencies(${PLUGIN_NAME} dnnl)
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
 add_dependencies(${PLUGIN_NAME} xsmm)
-target_link_libraries(${PLUGIN_NAME} PUBLIC torch_ccl)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)

@@ -9,7 +9,6 @@ LIST(APPEND DPCPP_COMMON_SRCS
     ${DPCPP_ROOT}/ipex_sparse_tensor_impl.cpp
     ${DPCPP_ROOT}/version.cpp
     ${DPCPP_ROOT}/utils.cpp
-    ${DPCPP_ROOT}/distributed/xpu_ccl.cpp
 )
 
 # Pass to parent
