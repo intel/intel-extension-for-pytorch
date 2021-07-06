@@ -25,6 +25,7 @@ RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     cmake \
     libjpeg-dev \
     libpng-dev \
+    pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN /usr/sbin/update-ccache-symlinks
 RUN mkdir /opt/ccache && ccache --set-config=cache_dir=/opt/ccache
@@ -41,21 +42,18 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
 
 FROM dev-base AS build
 COPY --from=conda /opt/conda /opt/conda
-ARG TORCHVISION_VERSION=0.6
+ARG TORCHVISION_VERSION=0.10.0+cpu
+ARG TORCHAUDIO_VERSION=0.9.0
 RUN --mount=type=cache,target=/opt/ccache \
-    pip install torchvision==${TORCHVISION_VERSION}+cpu --no-deps \
-    -f https://download.pytorch.org/whl/torch_stable.html && \
-    pip install lark-parser hypothesis && \
     git clone https://github.com/intel/intel-extension-for-pytorch && \
-    cd intel-extension-for-pytorch && git submodule sync && \
+    cd intel-extension-for-pytorch && \
+	git checkout v1.9.0 && \
+	git submodule sync && \
     git submodule update --init --recursive && \
-    git clone https://github.com/pytorch/pytorch && \
-    cd pytorch && git checkout v1.7.0 && git submodule sync && \
-    git submodule update --init --recursive && \
-    git apply ../torch_patches/xpu-1.7.patch && \
-    USE_MKLDNN=1 USE_CUDA=0 USE_NNPACK=0 USE_CUDNN=0 \
-    CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" pip install -v . && \
-    cd .. && pip install -v . && rm -rf *
+    python setup.py bdist_wheel && \
+	pip install dist/*.whl && \
+    cd .. && rm -rf intel-extension-for-pytorch && \
+    pip install torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} -f https://download.pytorch.org/whl/torch_stable.html
 
 FROM dev-base as dev
 COPY --from=build /opt/conda /opt/conda
