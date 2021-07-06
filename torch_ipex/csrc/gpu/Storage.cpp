@@ -13,7 +13,7 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 
-#if defined(USE_ONEDPL)
+#ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/numeric>

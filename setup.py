@@ -186,12 +186,19 @@ class DPCPPBuild(BuildExtension, object):
                         args.append('-D{}={}'.format(key, value))
 
             cmake_args = []
+            try:
+                import pybind11
+            except ImportError as e:
+                cmake_prefix_path = torch.utils.cmake_prefix_path
+            else:
+                cmake_prefix_path = ';'.join([torch.utils.cmake_prefix_path, pybind11.get_cmake_dir()])
+                
             build_options = {
                 # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
                 # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
                 'CMAKE_BUILD_TYPE': build_type,
                 # The value cannot be easily obtained in CMakeLists.txt.
-                'CMAKE_PREFIX_PATH': torch.utils.cmake_prefix_path,
+                'CMAKE_PREFIX_PATH': cmake_prefix_path,
                 'PYTHON_EXECUTABLE': sys.executable,
                 'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.absolute()), "torch_ipex"]),
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
@@ -268,12 +275,20 @@ def get_c_module():
     def make_relative_rpath(path):
             return '-Wl,-rpath,$ORIGIN/' + path
 
+    include_dirs=include_paths()
+    try:
+        import pybind11
+    except ImportError as e:
+        pass
+    else:
+        include_dirs.append(pybind11.get_include())
+
     C_ext = CppExtension("torch_ipex._C",
                   libraries=main_libraries,
                   sources=main_sources,
                   language='c',
                   extra_compile_args=main_compile_args + extra_compile_args,
-                  include_dirs=include_paths(),
+                  include_dirs=include_dirs,
                   library_dirs=library_dirs,
                   extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
     return C_ext

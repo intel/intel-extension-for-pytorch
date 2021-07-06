@@ -1,6 +1,6 @@
 set(IPEX_GPU_SRCS)
 add_subdirectory(./gpu)
-set_sycl_flag("${IPEX_GPU_SRCS}")
+append_sycl_flag(IPEX_GPU_SRCS ${IPEX_SYCL_KERNEL_FLAGS})
 
 set(IPEX_COMMON_SRCS)
 FILE(GLOB IPEX_COMMON_SRCS "*.cpp")
@@ -8,8 +8,24 @@ list(REMOVE_ITEM IPEX_COMMON_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/_C.cpp")
 
 set(TORCH_IPEX_SRCS)
 list(APPEND TORCH_IPEX_SRCS ${IPEX_COMMON_SRCS} ${IPEX_GPU_SRCS})
+# TODO: remove this flag after building host files with gcc/g++
+append_sycl_flag(TORCH_IPEX_SRCS "-fsized-deallocation")
 add_library(ipex_python SHARED ${TORCH_IPEX_SRCS})
 
+find_package(pybind11)
+if(NOT pybind11_FOUND)
+    find_package(pybind11 CONFIG)
+    if(NOT pybind11_FOUND)
+        message(FATAL_ERROR "System pybind11 not found")
+    else()
+        message(STATUS "SYSTEM pybind11 found")
+    endif()
+else()
+    message(STATUS "pybind11 found")
+endif()
+
+message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
+target_include_directories(ipex_python PUBLIC ${pybind11_INCLUDE_DIRS})
 
 if (USE_ITT)
     find_package(ITT QUIET)
