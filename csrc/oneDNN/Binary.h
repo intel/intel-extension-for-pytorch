@@ -5,6 +5,7 @@
 #include <runtime/Utils.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
+#include <quantized/Quantizer.h>
 #include <tensor/Context.h>
 #include <ATen/AtenIpexTypeXPU.h>
 #include "Utils.h"
@@ -14,6 +15,7 @@
 
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
+using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace xpu {
 namespace oneDNN {
@@ -69,6 +71,13 @@ static inline Tensor bin(
     attr.set_post_ops(post);
   }
 
+  if(t1.is_quantized()){
+    float t1_scale = t1.q_scale();
+    float t2_scale = t2.q_scale();
+    attr.set_scales(DNNL_ARG_SRC_0, 0, {t1_scale});
+    attr.set_scales(DNNL_ARG_SRC_1, 0, {t2_scale});
+  }
+
   Tensor _t1;
   auto m1 = m1_usr;
   if (md1 != tar_md) {
@@ -88,13 +97,19 @@ static inline Tensor bin(
 
   // 1. output: undefined, lazy_reorder: off
   // 2. output: undefined, lazy_reorder: on, output: plain
-  if (!output.defined() && tar_ctx.is_plain())
+  if (!output.defined() && tar_ctx.is_plain()) {
     output = at::empty_like(t1);
+  }
   // 1. output: undefined, lazy_reorder: on, output: block
   // 2. output: defined, lazy_reorder: on, output block
-  else if (Settings::I().is_onednn_layout_enabled() && !tar_ctx.is_plain())
-    output = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
-
+  else if (Settings::I().is_onednn_layout_enabled() && !tar_ctx.is_plain()) {
+    if (t1.is_quantized()) {
+      auto quantizer = dpcpp_make_per_tensor_affine_quantizer(output.q_scale(), 0, kQInt8);
+      output = empty_opaque_qtensor(tar_md, c10::nullopt, quantizer);
+    } else {
+      output = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
+    }
+  }
   auto mo = dpcpp_onednn_memory(tar_md, engine, output.data_ptr());
 
 #ifdef USE_PRIMITIVE_CACHE

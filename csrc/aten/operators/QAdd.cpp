@@ -16,12 +16,8 @@ namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor qAdd(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
-  auto a = at::dequantize(qa);
-  auto b = at::dequantize(qb);
-  auto c = at::add(a, b, 1.f);
-
-  auto qc = at::quantize_per_tensor(c, scale, zero_point, qa.scalar_type());
-  return qc;
+  auto c = at::add(qa, qb, scale);
+  return c;
 }
 
 Tensor qAddRelu(Tensor qa, Tensor qb, double scale, int64_t zero_point) {

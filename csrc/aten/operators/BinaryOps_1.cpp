@@ -263,6 +263,21 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
        !DPCPPTensorContext::is_plain(_other))) {
     xpu::oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
     return result;
+  } else if ( _self.is_quantized() &&
+      _self.defined() &&
+      _other.defined() &&
+      _self.sizes() == _other.sizes() &&
+      !is_wrapped_number(_self) &&
+      !is_wrapped_number(_other)) {// &&
+    Tensor _post = at::empty({1}, _self.options().dtype(at::kFloat));
+    _post.fill_(1/alpha.to<float>());
+    result = at::_empty_affine_quantized(_self.sizes(),
+                   _self.options(),
+                   alpha.to<float>(),
+                   0,
+                   MemoryFormat::Contiguous);
+    xpu::oneDNN::bin<dnnl::algorithm::binary_add, dnnl::algorithm::binary_mul>(result, _self, _other, _post);
+    return result;
   } else {
     self = to_plain_if_needed(_self);
     other = to_plain_if_needed(_other);
