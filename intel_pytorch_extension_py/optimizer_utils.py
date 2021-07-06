@@ -29,25 +29,30 @@ def _optimizer_convert(model, optimized_model, optimizer, weight_params_attr):
             # copy optimizer's state.
             if p in optimizer.state:
                 new_optimizer.state[new_param] = copy.deepcopy(optimizer.state[p])
-                # for conv weight, preprack momentum_buffer using weight's attr.
-                # TODO: Linear and LSTM.
+                # It covers both conv and linear now. TODO: LSTM or other ops.
                 if new_model_param in weight_params_attr:
                     attr = weight_params_attr[new_model_param]
-                    # TODO: Linear or other ops.
-                    if attr['op'] is torch.nn.Conv2d:
-                        new_optimizer.state[new_param]['momentum_buffer'] = torch.ops.torch_ipex.conv2d_weight_prepack(
-                            new_optimizer.state[new_param]['momentum_buffer'],
-                            attr['padding'],
-                            attr['stride'],
-                            attr['dilation'],
-                            attr['groups'],
-                            attr['dtype'])
-                    if attr['op'] is torch.nn.Linear:
-                        new_optimizer.state[new_param]['momentum_buffer'] = torch.ops.torch_ipex.linear_weight_prepack(
-                            new_optimizer.state[new_param]['momentum_buffer'],
-                            attr['out_features'],
-                            attr['in_features'],
-                            attr['dtype'])
+                    state = new_optimizer.state[new_param]
+                    for state_key, state_value in state.items():
+                        if isinstance(state_value, torch.Tensor):
+                            assert state_value.size() == p.size(), \
+                                "Only support the optimizer state's size has the same shape with model's parameter."
+                            if attr['op'] is torch.nn.Conv2d:
+                                value_temp = state_value.to(memory_format=torch.channels_last) \
+                                    if attr['weight_channels_last'] else state_value
+                                state[state_key] = torch.ops.torch_ipex.conv2d_weight_prepack(
+                                    value_temp,
+                                    attr['padding'],
+                                    attr['stride'],
+                                    attr['dilation'],
+                                    attr['groups'],
+                                    attr['dtype'])
+                            elif attr['op'] is torch.nn.Linear:
+                                state[state_key] = torch.ops.torch_ipex.linear_weight_prepack(
+                                    state_value,
+                                    attr['out_features'],
+                                    attr['in_features'],
+                                    attr['dtype'])
     return new_optimizer
 
 
@@ -65,11 +70,7 @@ class _ipex_optimizer(torch.optim.Optimizer):
     """
 
     def __init__(self, model, optimized_model, optimizer, weight_params_attr, dtype):
-        if isinstance(optimizer, torch.optim.SGD):
-            self.optimizer = _optimizer_convert(model, optimized_model, optimizer, weight_params_attr)
-        else:
-            # TODO: other optimizers
-            assert False, "optimizer is not supported now for IPEX"
+        self.optimizer = _optimizer_convert(model, optimized_model, optimizer, weight_params_attr)
         self.weight_params_attr = weight_params_attr
         self.param_groups = self.optimizer.param_groups
         self.dtype = dtype
@@ -88,17 +89,16 @@ class _ipex_optimizer(torch.optim.Optimizer):
         else:
             weight_params_attr_ = self.weight_params_attr
 
-        # need conver master weight's momentum to plain format.
         for (k1, _), (_, v2) in zip(self.optimizer.state.items(), optimizer_temp.state.items()):
+            # unpack tensor state using weight's attr.
             if k1 in weight_params_attr_:
-                #  for sgd optimizer, unpack momentum_buffer using weight's attr.
-                if isinstance(self.optimizer, torch.optim.SGD):
-                    if k1 in weight_params_attr_:
-                        weight_attr = weight_params_attr_[k1]
+                weight_attr = weight_params_attr_[k1]
+                for state_key, state_value in v2.items():
+                    if isinstance(state_value, torch.Tensor):
+                        # It covers both conv and linear now. TODO: LSTM or other ops.
                         if weight_attr['op'] is torch.nn.Conv2d:
-                            # change optimizer_temp's momentum_buffer, origin optimizer should not be changed.
-                            v2['momentum_buffer'] = torch.ops.torch_ipex.conv2d_weight_unpack(
-                                v2['momentum_buffer'],
+                            v2[state_key] = torch.ops.torch_ipex.conv2d_weight_unpack(
+                                state_value,
                                 weight_attr['padding'],
                                 weight_attr['stride'],
                                 weight_attr['dilation'],
@@ -108,17 +108,13 @@ class _ipex_optimizer(torch.optim.Optimizer):
                                 weight_attr['in_channels'],
                                 weight_attr['weight_channels_last'],
                                 weight_attr['dtype'])
-                        if weight_attr['op'] is torch.nn.Linear:
-                            # change optimizer_temp's momentum_buffer, origin optimizer should not be changed.
-                            v2['momentum_buffer'] = torch.ops.torch_ipex.linear_weight_unpack(
-                                v2['momentum_buffer'],
+                        elif weight_attr['op'] is torch.nn.Linear:
+                            v2[state_key] = torch.ops.torch_ipex.linear_weight_unpack(
+                                state_value,
                                 weight_attr['out_features'],
                                 weight_attr['in_features'],
                                 weight_attr['weight_transposed'],
                                 weight_attr['dtype'])
-                else:
-                    # TODO: other optimizer
-                    assert False, "only sgd optmizer's state_dict is supported now for IPEX"
         return optimizer_temp.state_dict()
 
     def load_state_dict(self, state_dict):
@@ -150,5 +146,4 @@ class _ipex_optimizer(torch.optim.Optimizer):
             for k, value in self.weight_params_attr.items():
                 torch.ops.torch_ipex.sync_master_weight_to_bf16(value["master_weight"], k)
         return loss
-
 

@@ -15,7 +15,7 @@ skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 import torch
 import intel_pytorch_extension as ipex
 from torch.testing._internal.common_utils import TestCase
-
+from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
 
 class TestPrepackCases(TestCase):
     def _test_convolution_training_base(self, dim):
@@ -44,7 +44,7 @@ class TestPrepackCases(TestCase):
                 x1 = x.clone().requires_grad_()
                 x2 = x.clone().requires_grad_()
                 origin_model = copy.deepcopy(model).train()
-                origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+                origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                 conf = ipex.AmpConf(dtype)
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                 ipex_model = ipex_model.train()
@@ -93,7 +93,7 @@ class TestPrepackCases(TestCase):
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
             origin_model = copy.deepcopy(model).train()
-            origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+            origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             with ipex.amp.autocast(enabled=True, configure=conf):
                 # train one step for origin.
@@ -128,12 +128,14 @@ class TestPrepackCases(TestCase):
         model = model.to(memory_format=torch.channels_last).train()
 
         x = torch.randn(64, 3, 224, 224).to(memory_format=torch.channels_last)
-        for dtype in [torch.float32, torch.bfloat16]:
+        optimizer_options = [Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
+        options = itertools.product([torch.float32, torch.bfloat16], optimizer_options)
+        for dtype, optimizer in options:
             conf = ipex.AmpConf(dtype)
             origin_x = x.clone()
             ipex_x = x.clone()
             origin_model = copy.deepcopy(model).train()
-            origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+            origin_optimizer = optimizer(origin_model.parameters(), lr=0.01)
             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             ipex_model = ipex_model.train()
             with ipex.amp.autocast(enabled=True, configure=conf):
@@ -162,12 +164,12 @@ class TestPrepackCases(TestCase):
             for var_name in origin_model_state:
                 self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
             origin_model1 = copy.deepcopy(model).train()
-            origin_optimizer1 = torch.optim.SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
+            origin_optimizer1 = optimizer(origin_model1.parameters(), lr=0.01)
             origin_checkpoint = torch.load('origin_checkpoint.pth')
             origin_model1.load_state_dict(origin_checkpoint['model_state_dict'])
             origin_optimizer1.load_state_dict(origin_checkpoint['optimizer_state_dict'])
             origin_model2 = copy.deepcopy(model)
-            origin_optimizer2 = torch.optim.SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
+            origin_optimizer2 = optimizer(origin_model2.parameters(), lr=0.01)
             ipex_checkpoint = torch.load('ipex_checkpoint.pth')
             origin_model2.load_state_dict(ipex_checkpoint['model_state_dict'])
             origin_optimizer2.load_state_dict(ipex_checkpoint['optimizer_state_dict'])
@@ -221,7 +223,7 @@ class TestPrepackCases(TestCase):
             # traing case.
             conf = ipex.AmpConf(dtype)
             origin_model = copy.deepcopy(model).train()
-            origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+            origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
             # do nothing for 'O0'
             ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O0')
             # do weight prepack for 'O1'
@@ -317,7 +319,7 @@ class TestPrepackCases(TestCase):
                 x1 = x.clone().requires_grad_()
                 x2 = x.clone().requires_grad_()
                 origin_model = copy.deepcopy(model).train()
-                origin_optimizer = torch.optim.SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+                origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                 conf = ipex.AmpConf(dtype)
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                 self.assertTrue(ipex_model.weight.dtype == dtype)
