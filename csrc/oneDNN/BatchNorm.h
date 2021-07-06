@@ -8,6 +8,7 @@
 #include <quantized/Quantizer.h>
 #include <tensor/Context.h>
 #include <operators/MemoryHelpers.h>
+#include <operators/comm/ATDispatch.h>
 #include "Utils.h"
 #include "Reorder.h"
 
@@ -193,17 +194,30 @@ batch_normalization(
   DPCPP_ONEDNN_EXEC(bn_fwd, strm, args);
 
   if (training && running_mean.defined() && running_var.defined()) {
-    dpcppMemoryScale1(
-        running_mean.data_ptr(), save_mean.data_ptr(), feature_num, momentum);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half, at::ScalarType::BFloat16,
+        running_mean.scalar_type(), "mScale1", [&]() {
+            dpcppMemoryScale1(
+                running_mean.data_ptr<scalar_t>(),
+                save_mean.data_ptr<float>(),
+                feature_num,
+                momentum);
+        }
+    );
     size_t orig_size = feature_size;
     size_t adjust_size = orig_size - 1;
     float adjust_factor = (static_cast<float>(orig_size)) / adjust_size;
-    dpcppMemoryScale2(
-        running_var.data_ptr(),
-        save_var.data_ptr(),
-        feature_num,
-        adjust_factor,
-        momentum);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half, at::ScalarType::BFloat16,
+        running_var.scalar_type(), "mScale2", [&]() {
+            dpcppMemoryScale2(
+                running_var.data_ptr<scalar_t>(),
+                save_var.data_ptr<float>(),
+                feature_num,
+                adjust_factor,
+                momentum);
+        }
+    );
   }
 
   return {dst, save_mean, save_var};
