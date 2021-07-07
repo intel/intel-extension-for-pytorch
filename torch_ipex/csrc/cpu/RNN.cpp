@@ -177,14 +177,10 @@ at::Tensor mkldnn_rnn_layer(at::Tensor& hy_, at::Tensor& cy_,
   bool has_bias = weights.size() == 4;
   auto weight_ih = _shuffle_weight(weights[0], rnn.mode);
   auto weight_hh = _shuffle_weight(weights[1], rnn.mode);
-  auto bias_ = has_bias ? _shuffle_bias(weights[2], weights[3], rnn.mode)
-                       : at::zeros({rnn.num_bias_gates * rnn.hidden_size}, weight_ih.options());
-  // bias should always be fp32 for mkldnn lstm
-  // When the user used: model.to(torch.bfloat16) from the front-end,
-  // both the weight and the bias has been transformed to bfloat16
-  // TODO: skip for fp32 LSTM
-  auto bias = at::empty(bias_.sizes(), bias_.options().dtype(at::ScalarType::Float));
-  bias.copy_(bias_);
+
+  auto bias = has_bias ? _shuffle_bias(weights[2], weights[3], rnn.mode)
+                       : at::zeros({rnn.num_bias_gates * rnn.hidden_size}, weight_ih.options().dtype(at::ScalarType::Float));
+
   // per layer input size
   int64_t input_size = input.size(2);
   auto x = torch_ipex::cpu::get_mkldnn_tensor_view(input, rnn.src_layer_desc(input_size, get_mkldnn_dtype(input.scalar_type())));
@@ -250,18 +246,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn(
   input = input.contiguous();
 
   auto hx = hx_.contiguous();
-  auto cx_tmp = cx_.defined() ? cx_.contiguous() : at::Tensor();
+  auto cx = cx_.defined() ? cx_.contiguous() : at::Tensor();
 
   auto hy = at::empty(_hidden_size(fn), hx.options());
   // NB: Not allowed to return undefined tensors
-  auto cy_tmp = cx_tmp.defined() ? at::empty(_hidden_size(fn), cx_tmp.options())
-                         : at::empty({0}, hx.options());
-
-  auto cx = at::empty(cx_tmp.sizes(), cx_tmp.options().dtype(at::ScalarType::Float));
-  cx.copy_(cx_tmp);
-
-  auto cy = at::empty(cy_tmp.sizes(), cy_tmp.options().dtype(at::ScalarType::Float));
-  cy.copy_(cy_tmp);
+  auto cy = cx.defined() ? at::empty(_hidden_size(fn), cx.options())
+                         : at::empty({0}, hx.options().dtype(at::ScalarType::Float));
 
   at::MatrixRef<at::Tensor> weights{weight, static_cast<size_t>(weight_stride0)};
 
@@ -344,7 +334,12 @@ std::pair<at::Tensor, hidden_type> mkldnn_impl(
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::lstm(
     const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
     int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-
+#if defined(IPEX_DISP_OP)
+  printf("IpexExternal::lstm\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IpexExternal::lstm", std::vector<c10::IValue>({}));
+#endif
   auto result = mkldnn_impl(input, std::make_tuple(hx[0], hx[1]), params, has_biases,
       ideep::rnn_kind::LSTM, num_layers, dropout_p, train, bidirectional, batch_first);
   auto output = result.first;
@@ -381,8 +376,28 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lstm(
   // only have bf16 support now, keep fp32 for other target_type
   bool cast_to_bfloat16 = !at::GradMode::is_enabled() && at::kBFloat16 == target_type;
   auto casted_input = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, input) : input;
-  auto casted_hx = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, hx) : hx;
-  auto casted_params = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, params) : params;
+
+  // TODO: currently, oneDNN bf16 LSTM requires hx[1] and bias to be fp32.
+  // It is a workaround here in the autocast to only cast hx[0] and weight to bf16,
+  // while keeping hx[1] and bias as fp32, for better performance during inference.
+  // Remove the special handling here once oneDNN bf16 LSTM supported
+  // hx[0], hx[1], weight and bias to all be bf16
+  // (https://jira.devtools.intel.com/browse/MFDNN-5176)
+  std::vector<at::Tensor> casted_hx = {};
+  casted_hx.push_back(cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, hx[0]) : hx[0]);
+  casted_hx.push_back(cpu_cached_cast(at::kFloat, hx[1]));
+
+  std::vector<at::Tensor> casted_params = {};
+  if (has_biases) {
+    for (size_t i = 0; i < params.size() - 3; i+=4) {
+      casted_params.push_back(cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, params[i]) : params[i]);
+      casted_params.push_back(cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, params[i+1]) : params[i+1]);
+      casted_params.push_back(cpu_cached_cast(at::kFloat, params[i+2]));
+      casted_params.push_back(cpu_cached_cast(at::kFloat, params[i+3]));
+    }
+  } else {
+    casted_params = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, params) : params;
+  }
   return op.call(casted_input, casted_hx, casted_params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
 }
 
