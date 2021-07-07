@@ -3,7 +3,7 @@
 Intel Extension for PyTorch is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
 
  - [Installation](#installation)
-     - [Install PyTorch from Source](#install-pytorch-from-source)
+     - [Install PyTorch](#install-pytorch)
      - [Install Intel Extension for PyTorch from Source](#install-intel-extension-for-pytorch-from-source)
  - [Getting Started](#getting-started)
      - [Automatically Mix Precison](#automatically-mix-precision)
@@ -17,62 +17,30 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
 
 ## Installation
 
-### Install PyTorch from Source
+### Install PyTorch
  |IPEX Version|PyTorch Version|
  |--|--|
+ |[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|
+ |[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|
  |[v1.2.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.2.0)|[v1.7.0](https://github.com/pytorch/pytorch/tree/v1.7.0 "v1.7.0")|
  |[v1.1.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.1.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.2](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.2)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
 
- Take Intel-Extension-for-Pytorch v1.2.0 as the example.
+For IPEX version earlier than 1.8.0, a patch has to be manually applied to PyTorch source code. Please check previous installation guide.
 
- 1. Get PyTorch v1.7.0 source(Refer to [PyTorch guide](https://github.com/pytorch/pytorch#get-the-pytorch-source) for more details)
-    ```bash
-    git clone --recursive https://github.com/pytorch/pytorch
-    cd pytorch
+From IPEX 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
 
-    # checkout source code to the specified version
-    git checkout v1.7.0
-
-    # update submodules for the specified PyTorch version
-    git submodule sync
-    git submodule update --init --recursive
-    ```
-
- 2. Get the source code of Intel Extension for PyTorch
-    ```bash
-    git clone --recursive https://github.com/intel/intel-extension-for-pytorch
-    cd intel-extension-for-pytorch
-
-    # if you are updating an existing checkout
-    git submodule sync
-    git submodule update --init --recursive
-    ```
-
- 3. Add an new backend for Intel Extension for PyTorch
-    ```bash
-    # Apply git patch to pytorch code
-    cd ${pytorch_directory}
-    git apply ${intel_extension_for_pytorch_directory}/torch_patches/xpu-1.7.patch
-    ```
-
- 4. Build and install PyTorch (Refer to [PyTorch guide](https://github.com/pytorch/pytorch#install-pytorch) for more details)
-    ```bash
-    cd ${pytorch_directory}
-    python setup.py install
-    ```
-
-### Install Intel Extension for PyTorch from Source
-Install dependencies
 ```bash
-pip install lark-parser hypothesis
-```
+git clone --recursive https://github.com/intel/intel-extension-for-pytorch
+cd intel-extension-for-pytorch
 
-Install the extension
-```bash
-cd ${intel_extension_for_pytorch_directory}
+# if you are updating an existing checkout
+git submodule sync
+git submodule update --init --recursive
+
+# run setup.py to compile IPEX and install the binaries
 python setup.py install
 ```
 
@@ -254,10 +222,27 @@ Supported Quantization Operators:
 
 
 ### Supported Customized Operators
-
+* ROIAlign
+* NMS
+* BatchScoreNMS
+* MLP
+* Interaction
+* FrozenBatchNorm2d
 
 ### Supported Fusion Patterns
-
+* Conv2D + ReLU
+* Conv2D + SUM
+* Conv2D + SUM + ReLU
+* Conv2D + Sigmoid
+* Conv2D + Sigmoid + MUL
+* Conv2D + HardTanh
+* Conv2D + ELU
+* Conv3D + ReLU
+* Conv3D + SUM
+* Conv3D + SUM + ReLU
+* Linear + ReLU
+* Linear + GELU
+* View + Transpose + Contiguous + View
 
 ## Tutorials
 *  [Performance Tuning](tutorials/Performance_Tuning.md)
