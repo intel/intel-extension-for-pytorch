@@ -3,6 +3,7 @@
 #include <c10/core/Allocator.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
+#include <aten/core/Stream.h>
 #include <sstream>
 
 #if defined(USE_ITT)
@@ -17,7 +18,11 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
   DPCPPEventStubImpl(cl::sycl::event event) : event_(std::move(event)), is_onednn_kernel(false) {};
   DPCPPEventStubImpl(cl::sycl::event start_evt, cl::sycl::event end_evt)
     : event_(std::move(start_evt)), event_end_(std::move(end_evt)), is_onednn_kernel(true) {};
-  virtual float elapsed() override;
+  float elapsed();
+  float elapsed(DPCPPEventStubImpl& event);
+  uint64_t getSubmitTime();
+  uint64_t getStartTime();
+  uint64_t getEndTime();
   virtual ~DPCPPEventStubImpl() = default;
 
  private:
@@ -26,9 +31,30 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
   bool is_onednn_kernel; // True for onednn kernel
 };
 
+static inline cl::sycl::event submit_barrier(cl::sycl::queue& Q) {
+  cl::sycl::event e;
+  if (is_profiler_enabled()) {
+    e = Q.submit_barrier();
+  }
+  return e;
+}
+
 struct DPCPPProfilerStubsImpl : public XPUStubs {
+  void record(XPUEventStub& event) override {
+    auto& Q = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+    auto evt = submit_barrier(Q);
+    event.reset(new DPCPPEventStubImpl(evt));
+  }
+
+  float elapsed(XPUEventStub event, XPUEventStub event2) override {
+    DPCPPEventStubImpl* dpcpp_event = dynamic_cast<DPCPPEventStubImpl*>(event.get());
+    DPCPPEventStubImpl* dpcpp_event2 = dynamic_cast<DPCPPEventStubImpl*>(event2.get());
+    return dpcpp_event->elapsed(*dpcpp_event2);
+  }
+
   float elapsed(XPUEventStub event) override {
-    return event->elapsed();
+    DPCPPEventStubImpl* dpcpp_event = dynamic_cast<DPCPPEventStubImpl*>(event.get());
+    return dpcpp_event->elapsed();
   }
   bool enabled() override {
     return true;
@@ -89,6 +115,41 @@ float DPCPPEventStubImpl::elapsed() {
     us = (end - start) / 1000.0;
   }
 
+  return us;
+}
+
+uint64_t DPCPPEventStubImpl::getSubmitTime() {
+  event_.wait();
+  return event_.template get_profiling_info<
+          cl::sycl::info::event_profiling::command_submit>();
+}
+
+uint64_t DPCPPEventStubImpl::getStartTime() {
+  event_.wait();
+  if (is_onednn_kernel) {
+    return event_.template get_profiling_info<
+            cl::sycl::info::event_profiling::command_end>();
+  }
+  return event_.template get_profiling_info<
+          cl::sycl::info::event_profiling::command_start>();
+}
+
+uint64_t DPCPPEventStubImpl::getEndTime() {
+  event_.wait();
+  if (is_onednn_kernel) {
+    event_end_.wait();
+    return event_end_.template get_profiling_info<
+            cl::sycl::info::event_profiling::command_start>();
+  }
+  return event_.template get_profiling_info<
+          cl::sycl::info::event_profiling::command_end>();
+}
+
+float DPCPPEventStubImpl::elapsed(DPCPPEventStubImpl& other) {
+  float us;
+  auto start_ns_1 = getStartTime();
+  auto start_ns_2 = other.getStartTime();
+  us = (start_ns_2 - start_ns_1) / 1000.0;
   return us;
 }
 
