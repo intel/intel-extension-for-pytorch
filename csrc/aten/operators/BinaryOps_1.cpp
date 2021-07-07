@@ -87,7 +87,9 @@ Tensor& add_out(
   Tensor self = _self, other = _other;
   if (_self.is_xpu() && _other.is_xpu() &&
       1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      _self.scalar_type() == _other.scalar_type() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_self) &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
       _self.is_contiguous() && _other.is_contiguous() &&
@@ -101,7 +103,8 @@ Tensor& add_out(
     return result;
   } else if (_self.is_xpu() && _other.is_xpu() &&
              _self.sizes() == _other.sizes() &&
-             _self.is_contiguous() && other.is_contiguous()) {
+             _self.is_contiguous() && _other.is_contiguous() &&
+             _self.scalar_type() == _other.scalar_type()) {
     // propogate block format in case: alpha != 1
     if (!DPCPPTensorContext::is_plain(result) ||
         !DPCPPTensorContext::is_plain(_self) ||

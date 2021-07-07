@@ -86,8 +86,9 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   Tensor _self = self, _other = other;
   if (_self.defined() && _other.defined() && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
-      xpu::oneDNN::is_supported_dtype_in_binary(
-          _self.scalar_type(), _other.scalar_type()) &&
+      _self.scalar_type() == _other.scalar_type() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_self) &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
       _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
@@ -107,8 +108,9 @@ Tensor div(const Tensor& self, const Tensor& other) {
   Tensor result, _self = self, _other = other;
   if (_self.defined() && _other.defined() && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
-      xpu::oneDNN::is_supported_dtype_in_binary(
-          _self.scalar_type(), _other.scalar_type()) &&
+      _self.scalar_type() == _other.scalar_type() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_self) &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
       _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
