@@ -3,7 +3,6 @@
 Intel Extension for PyTorch is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
 
  - [Installation](#installation)
-     - [Install PyTorch](#install-pytorch)
      - [Install Intel Extension for PyTorch from Source](#install-intel-extension-for-pytorch-from-source)
  - [Getting Started](#getting-started)
      - [Automatically Mix Precison](#automatically-mix-precision)
@@ -17,7 +16,6 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
 
 ## Installation
 
-### Install PyTorch
  |IPEX Version|PyTorch Version|
  |--|--|
  |[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|
@@ -29,6 +27,8 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
  |[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
 
 For IPEX version earlier than 1.8.0, a patch has to be manually applied to PyTorch source code. Please check previous installation guide.
+
+### Install Intel Extension for PyTorch from Source
 
 From IPEX 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
 
