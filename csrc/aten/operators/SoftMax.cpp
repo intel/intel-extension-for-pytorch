@@ -162,14 +162,17 @@ template <
     template <typename, typename, typename> class Epilogue>
 void SpatialSoftMaxBackward(
     scalar_t* gradInput,
-    outscalar_t* output,
-    outscalar_t* gradOutput,
+    const outscalar_t* output,
+    const outscalar_t* gradOutput,
     TensorInfo<scalar_t, uint64_t> outer_info,
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  // Because of softmax backward using reduce, 512(max) WG size may cause much work-item waste(1/2 + 1/4 + 1/8) in tree reduction and is harmful to occupancy.
+  // Thus, 64 is chosen here to set as WG size. In addition, SLM has 65 banks in ATS and 64 here is extremely avoidable for bank conflict.
+  // 64 is both compatible for Gen9 and Gen12.
+  size_t local_size = 64;
   local_size = std::min(local_size, dim_size);
   size_t global_size = outer_size * local_size;
 
@@ -177,6 +180,8 @@ void SpatialSoftMaxBackward(
     auto gradInput_data = gradInput;
     auto output_data = output;
     auto gradOutput_data = gradOutput;
+
+    // create SLM
     auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxBackwardKernelName<
         scalar_t,
