@@ -89,7 +89,6 @@ void kernelHistogram1D(
         histogram_kernel<has_weight, output_t, input_t, IndexType>>(
         DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
-
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
@@ -186,6 +185,33 @@ Tensor bincount_template(
   return output;
 }
 
+template <typename scalar_t, typename input_t>
+Tensor histc_template(
+    const Tensor& self,
+    int64_t nbins,
+    input_t min,
+    input_t max) {
+  input_t minvalue = min;
+  input_t maxvalue = max;
+  if (min == max) {
+    minvalue = self.min().item<input_t>();
+    maxvalue = self.max().item<input_t>();
+  }
+  if (minvalue == maxvalue) {
+    minvalue = minvalue - 1;
+    maxvalue = maxvalue + 1;
+  }
+  TORCH_CHECK(
+      !(std::isinf(minvalue) || std::isinf(maxvalue) || std::isnan(minvalue) ||
+        std::isnan(maxvalue)),
+      "range of [", minvalue, ", ", maxvalue, "] is not finite");
+  TORCH_CHECK(minvalue < maxvalue, "max must be larger than min");
+  Tensor output = at::zeros({nbins},self.options());
+  auto ret = dpcpp_tensor_histogram<scalar_t, input_t, false>(
+    output, self, Tensor(), nbins, minvalue, maxvalue);
+  return output;
+}
+
 } // namespace impl
 
 Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
@@ -196,6 +222,19 @@ Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
     return impl::bincount_template<scalar_t, double>(
             self, weights.to(kDouble), minlength);
   });
+}
+
+Tensor histc(const Tensor & self, int64_t bins, Scalar min, Scalar max) {
+  TORCH_CHECK(bins > 0, "bins should be > 0, but is ", bins, " instead");
+  return IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "histc", [&] {
+    return impl::histc_template<scalar_t>(self, bins, min.to<scalar_t>(), max.to<scalar_t>());
+  });
+}
+
+Tensor& histc_out(Tensor & out, const Tensor & self, int64_t bins, Scalar min, Scalar max) {
+  Tensor out_tmp = at::AtenIpexTypeXPU::histc(self, bins, min, max);
+  out.resize_as_(out_tmp).copy_(out_tmp);
+  return out;
 }
 
 } // namespace AtenIpexTypeXPU
