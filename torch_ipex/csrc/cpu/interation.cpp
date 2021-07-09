@@ -8,6 +8,7 @@
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/cpu/mkldnn/MKLDNNCommon.h"
 
 /*
  Custom op to optimize DLRM interaction part
@@ -72,40 +73,14 @@ static inline void flat_triangle_backward(const T *in, T *out, size_t size) {
   }
 }
 
-static inline void mm_backward(float *out, const float *in1, const float *in2,
-                               uint32_t vector_nums, uint32_t vector_size,
-                               libxsmm_smmfunction mm_ker) {
-  // Calculate gy + gy'
-  float sum_buf[vector_nums * vector_nums];
+template <typename T>
+static inline void transpose_add(T *out, const T *in, uint32_t vector_nums) {
   for (int32_t j = 0; j < vector_nums; j++) {
     for (int32_t k = 0; k < vector_nums; k++) {
-      sum_buf[j * vector_nums + k] =
-          in1[j * vector_nums + k] + in1[k * vector_nums + j];
+      out[j * vector_nums + k] =
+          in[j * vector_nums + k] + in[k * vector_nums + j];
     }
   }
-  // mm backward
-  mm_ker(in2, sum_buf, out);
-}
-
-static inline void mm_backward(at::BFloat16 *out, const at::BFloat16 *in1,
-                               const at::BFloat16 *in2, uint32_t vector_nums,
-                               uint32_t vector_size,
-                               libxsmm_smmfunction mm_ker) {
-  float tmp_in1[vector_nums * vector_nums];
-  float tmp_in2[vector_nums * vector_size];
-  float tmp_out[vector_nums * vector_size];
-
-  cvt_bf16_to_fp32(tmp_in1, in1, vector_nums * vector_nums);
-  cvt_bf16_to_fp32(tmp_in2, in2, vector_nums * vector_size);
-  // Calculate gy + gy'
-  for (int32_t j = 0; j < vector_nums; j++) {
-    for (int32_t k = 0; k < vector_nums; k++) {
-      tmp_in1[j * vector_nums + k] += tmp_in1[k * vector_nums + j];
-    }
-  }
-  // mm backward w/ fp32
-  mm_ker(tmp_in2, tmp_in1, tmp_out);
-  cvt_fp32_to_bf16(out, tmp_out, vector_nums * vector_size);
 }
 
 template <typename T>
@@ -128,24 +103,38 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
   auto vector_nums = total_feature_size / vector_size;
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(total_feature_size % vector_size == 0);
   auto interact_feature_size = vector_nums * (vector_nums - 1) / 2;
-  auto tr_vector_size = sizeof(T) == 4 ? vector_size : vector_size / 2;
   auto out = at::empty({batch_size, interact_feature_size + vector_size},
                        input[0].options());
   auto out_data = out.data_ptr<T>();
 
-  auto mm_kernel = get_mm_kernel<T>(vector_nums, vector_nums, vector_size);
-  auto tr_kernel = get_tr_kernel(tr_vector_size, vector_nums, vector_nums);
+  auto mkldnn_dtype = cpu::get_mkldnn_dtype(input[0].scalar_type());
+  std::vector<int64_t> lhs_shape({vector_nums, vector_size});
+  std::vector<int64_t> lhs_stride({vector_size, 1});
+  std::vector<int64_t> rhs_shape({vector_size, vector_nums});
+  std::vector<int64_t> rhs_stride({1, vector_size});
+  std::vector<int64_t> res_shape({vector_nums, vector_nums});
+  std::vector<int64_t> res_stride({vector_nums, 1});
+  ideep::tensor::desc lhs_desc(std::move(lhs_shape), mkldnn_dtype, std::move(lhs_stride));
+  ideep::tensor::desc rhs_desc(std::move(rhs_shape), mkldnn_dtype, std::move(rhs_stride));
+  ideep::tensor::desc res_desc(std::move(res_shape), mkldnn_dtype, std::move(res_stride));
+  auto pd = ideep::matmul_forward::primitive_desc({lhs_desc, rhs_desc, res_desc}, ideep::engine::cpu_engine());
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     T cat_buf[vector_nums * vector_size];
-    T tr_buf[vector_nums * vector_size];
+    ideep::tensor lhs({lhs_desc, cat_buf});
+    ideep::tensor rhs({lhs_desc, cat_buf});
     T mm_buf[vector_nums * vector_nums];
+    ideep::tensor res({res_desc, mm_buf});
     T flat_buf[interact_feature_size];
+    auto p = dnnl::matmul(pd);
     for (int64_t i = start; i < end; i++) {
       cat<T>(cat_buf, input_data, feature_sizes, i);
-      tr_kernel(cat_buf, &tr_vector_size, tr_buf, &vector_nums);
-      mm_kernel((xsmm_dtype<T> *)tr_buf, (xsmm_dtype<T> *)cat_buf,
-                (xsmm_dtype<T> *)mm_buf);
+      p.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, lhs},
+        {DNNL_ARG_WEIGHTS, rhs},
+        {DNNL_ARG_DST, res}}
+      );
       flat_triangle<T>(mm_buf, flat_buf, vector_nums);
       cat<T>(&input_data[0][i * vector_size], flat_buf,
              &out_data[i * (interact_feature_size + vector_size)], vector_size,
@@ -185,14 +174,29 @@ _interaction_backward(const at::Tensor &grad_out,
   auto interact_feature_size = vector_nums * (vector_nums - 1) / 2;
   auto grad_out_data = grad_out.data_ptr<T>();
 
-  auto mm_kernel = get_mm_kernel<float>(vector_nums, vector_size, vector_nums);
+  auto mkldnn_dtype = cpu::get_mkldnn_dtype(input[0].scalar_type());
+  std::vector<int64_t> lhs_shape({vector_nums, vector_nums});
+  std::vector<int64_t> lhs_stride({vector_nums, 1});
+  std::vector<int64_t> rhs_shape({vector_nums, vector_size});
+  std::vector<int64_t> rhs_stride({vector_size, 1});
+  std::vector<int64_t> res_shape({vector_nums, vector_size});
+  std::vector<int64_t> res_stride({vector_size, 1});
+  ideep::tensor::desc lhs_desc(std::move(lhs_shape), mkldnn_dtype, std::move(lhs_stride));
+  ideep::tensor::desc rhs_desc(std::move(rhs_shape), mkldnn_dtype, std::move(rhs_stride));
+  ideep::tensor::desc res_desc(std::move(res_shape), mkldnn_dtype, std::move(res_stride));
+  auto pd = ideep::matmul_forward::primitive_desc({lhs_desc, rhs_desc, res_desc}, ideep::engine::cpu_engine());
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     T grad_input0_buf[vector_size];
     T grad_flat_buf[interact_feature_size];
     T grad_mm_buf[vector_nums * vector_nums];
+    T sum_buf[vector_nums * vector_nums];
     T grad_cat_buf[vector_nums * vector_size];
     T cat_buf[vector_nums * vector_size];
+    ideep::tensor lhs({lhs_desc, sum_buf});
+    ideep::tensor rhs({lhs_desc, cat_buf});
+    ideep::tensor res({res_desc, grad_cat_buf});
+    auto p = dnnl::matmul(pd);
     for (int64_t i = start; i < end; i++) {
       cat_backward<T>(&grad_out_data[i * (interact_feature_size + vector_size)],
                       grad_input0_buf, grad_flat_buf, vector_size,
@@ -220,8 +224,14 @@ _interaction_backward(const at::Tensor &grad_out,
 
       // Calculate A
       cat<T>(cat_buf, input_data, feature_sizes, i);
-      mm_backward(grad_cat_buf, grad_mm_buf, cat_buf, vector_nums, vector_size,
-                  mm_kernel);
+      // Calculate gy + gy'
+      transpose_add(sum_buf, grad_mm_buf, vector_nums);
+      p.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, lhs},
+        {DNNL_ARG_WEIGHTS, rhs},
+        {DNNL_ARG_DST, res}}
+      );
       cat_backward<T>(grad_cat_buf, output_data, feature_sizes, i);
       add_ker(grad_input0_buf, &output_data[0][i * vector_size], vector_size);
     }
