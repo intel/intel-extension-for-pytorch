@@ -8,6 +8,18 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
+    def test_binary_op_channels_last(self, dtype=torch.float):
+        a_cpu = torch.randn(1,2,3,4)
+        b_cpu = torch.randn(1,2,3,4)
+        y_cpu = a_cpu + b_cpu
+
+        a_xpu = a_cpu.to("xpu").to(memory_format=torch.channels_last)
+        b_xpu = b_cpu.to("xpu").to(memory_format=torch.channels_last)
+        # a_xpu = a_cpu.to("xpu")
+        # b_xpu = b_cpu.to("xpu")
+        y_xpu = a_xpu + b_xpu
+        self.assertEqual(y_cpu, y_xpu.cpu())
+
     def test_binary_op(self, dtype=torch.float):
         x_cpu = torch.randn(5)
 

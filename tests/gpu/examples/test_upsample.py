@@ -1,7 +1,7 @@
 import numpy
 import torch
 import torch.nn as nn
-
+from torch.autograd import Variable
 import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 
@@ -10,6 +10,35 @@ cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
+    def test_upsamle_last_channel(self, dtype=torch.float):
+      conv = torch.nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1, bias=False)
+      upsample = torch.nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
+      x_cpu = torch.randn(2,3,4,5)
+      grad_i = torch.randn([2, 3, 8, 10], device=cpu_device)
+
+      x_cpu = Variable(x_cpu, requires_grad=True)
+      grad_cpu = Variable(grad_i, requires_grad=True)
+      # y_cpu = upsample(conv(x_cpu))
+      y_cpu = upsample(x_cpu)
+      y_cpu.backward(grad_cpu)
+      # print("cpu result ", y_cpu)
+      print("cpu grad result ", x_cpu.grad)
+
+      x_xpu = x_cpu.to("xpu").to(memory_format=torch.channels_last)
+      grad_xpu = grad_cpu.to("xpu").to(memory_format=torch.channels_last)
+      # x_xpu = x_cpu.to("xpu")
+      # grad_xpu = grad_cpu.to("xpu")
+      x_xpu = Variable(x_xpu, requires_grad=True)
+      grad_xpu = Variable(grad_xpu, requires_grad=True)
+      conv.to("xpu")
+      # y_xpu = upsample(conv(x_xpu))
+      y_xpu = upsample(x_xpu)
+      y_xpu.backward(grad_xpu)
+      # print("xpu result ", y_xpu.cpu())
+      print("xpu grad result ", x_xpu.grad.cpu())
+      self.assertEqual(y_cpu, y_xpu.cpu())
+      self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())
+
     def test_upsamle(self, dtype=torch.float):
       x_cpu = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]], dtype=torch.float32, device = cpu_device)
       #x_sycl = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]], dtype=torch.float32, device = sycl_device)

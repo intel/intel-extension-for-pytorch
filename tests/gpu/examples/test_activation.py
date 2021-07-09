@@ -37,15 +37,19 @@ class  TestNNMethod(TestCase):
         x = torch.randn(1, 2, 3, 3, dtype=torch.float)
         w = torch.randn(2, 2, 3, 3, dtype=torch.float)
         conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+        bn = torch.nn.BatchNorm2d(2)
         relu = torch.nn.ReLU()
         conv.weight.data = w
         ref = conv(x)
+        ref = bn(ref)
         ref = relu(ref)
 
         x = x.to("xpu").to(memory_format=torch.channels_last)
         w = w.to("xpu").to(memory_format=torch.channels_last)
+        bn = bn.to("xpu")
         conv.weight.data = w
         real = conv(x)
+        real = bn(real)
         real = relu(real)
         real = real.contiguous().cpu()
 

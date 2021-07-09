@@ -98,7 +98,24 @@ static inline Tensor bin(
   // 1. output: undefined, lazy_reorder: off
   // 2. output: undefined, lazy_reorder: on, output: plain
   if (!output.defined() && tar_ctx.is_plain()) {
-    output = at::empty_like(t1);
+    auto ndim = t1.ndimension();
+    if (4 == ndim) {
+      if (!t1.is_contiguous() && t1.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+        output = at::empty_like(t1, at::MemoryFormat::ChannelsLast);
+      } else {
+        output = at::empty_like(t1);
+      }
+    }
+    else if (5 == ndim) {
+      if (!t1.is_contiguous() && t1.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+        output = at::empty_like(t1, at::MemoryFormat::ChannelsLast3d);
+      } else {
+        output = at::empty_like(t1);
+      }
+    }
+    else {
+      output = at::empty_like(t1);
+    }
   }
   // 1. output: undefined, lazy_reorder: on, output: block
   // 2. output: defined, lazy_reorder: on, output block

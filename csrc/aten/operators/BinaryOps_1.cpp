@@ -92,7 +92,9 @@ Tensor& add_out(
       xpu::oneDNN::is_supported_onednn_dtype(_other) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
-      _self.is_contiguous() && _other.is_contiguous() &&
+      ((_self.is_contiguous() && _other.is_contiguous()) ||
+       (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
+        _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -103,7 +105,9 @@ Tensor& add_out(
     return result;
   } else if (_self.is_xpu() && _other.is_xpu() &&
              _self.sizes() == _other.sizes() &&
-             _self.is_contiguous() && _other.is_contiguous() &&
+             ((_self.is_contiguous() && _other.is_contiguous()) ||
+              (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
+               _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
              _self.scalar_type() == _other.scalar_type()) {
     // propogate block format in case: alpha != 1
     if (!DPCPPTensorContext::is_plain(result) ||
