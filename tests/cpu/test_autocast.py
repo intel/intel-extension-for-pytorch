@@ -116,18 +116,24 @@ class TestCustomerOps(TestCase):
         dtypes=[torch.float32]
         for dtype in dtypes:
             x1 = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
-            x2 = x1.clone().bfloat16().detach().requires_grad_()
+            x1_bf16 = x1.clone().bfloat16().detach().requires_grad_()
+            x2 = x1.clone().detach().requires_grad_()
+            x2_bf16 = x1.clone().bfloat16().detach().requires_grad_()
             ly1 = []
+            ly1_bf16 = []
             ly2 = []
+            ly2_bf16 = []
             for i in range(0, 26):
                 V = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
                 ly1.append(V)
-                ly2.append(V.clone().bfloat16().detach().requires_grad_())
+                ly1_bf16.append(V.clone().bfloat16().detach().requires_grad_())
+                ly2.append(V.clone().detach().requires_grad_())
+                ly2_bf16.append(V.clone().bfloat16().detach().requires_grad_())
 
             A = interact_fusion(x1, ly1) # all fp32
-            B = interact_fusion_autocast(x2, ly2) # all bf16
-            C = interact_fusion_autocast(x1, ly2) # fp32 dense bf16 emb
-            D = interact_fusion_autocast(x2, ly1) # bf16 dense fp32 emb
+            B = interact_fusion_autocast(x1_bf16, ly1_bf16) # all bf16
+            C = interact_fusion_autocast(x2, ly2_bf16) # fp32 dense bf16 emb
+            D = interact_fusion_autocast(x2_bf16, ly2) # bf16 dense fp32 emb
 
             self.assertEqual(A.dtype, torch.float)
             self.assertEqual(B.dtype, torch.bfloat16)
@@ -141,15 +147,25 @@ class TestCustomerOps(TestCase):
 
             A.mean().backward()
             B.mean().backward()
+            C.mean().backward()
+            D.mean().backward()
             
             self.assertEqual(x1.grad.dtype, torch.float)
-            self.assertEqual(x2.grad.dtype, torch.bfloat16)
+            self.assertEqual(x1_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(x2.grad.dtype, torch.float)
+            self.assertEqual(x2_bf16.grad.dtype, torch.bfloat16)
 
-            self.assertEqual(x1.grad, x2.grad.float(), 1e-03)
+            self.assertEqual(x1.grad, x1_bf16.grad.float(), 1e-03)
+            self.assertEqual(x1.grad, x2.grad)
+            self.assertEqual(x1.grad, x2_bf16.grad.float(), 1e-03)
             for i in range(0, 26):
                 self.assertEqual(ly1[i].grad.dtype, torch.float)
-                self.assertEqual(ly2[i].grad.dtype, torch.bfloat16)
-                torch.testing.assert_allclose(ly1[i].grad, ly2[i].grad.float(), rtol=1e-02, atol=1e-04)
+                self.assertEqual(ly1_bf16[i].grad.dtype, torch.bfloat16)
+                self.assertEqual(ly2[i].grad.dtype, torch.float)
+                self.assertEqual(ly2_bf16[i].grad.dtype, torch.bfloat16)
+                torch.testing.assert_allclose(ly1[i].grad, ly1_bf16[i].grad.float(), rtol=1e-02, atol=1e-04)
+                torch.testing.assert_allclose(ly1[i].grad, ly2[i].grad)
+                torch.testing.assert_allclose(ly1[i].grad, ly2_bf16[i].grad.float(), rtol=1e-02, atol=1e-04)
 
     def test_embeddingbag_op(self):
         cpu_emb = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)

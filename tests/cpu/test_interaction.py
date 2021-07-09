@@ -31,7 +31,6 @@ class TestInteractionCases(TestCase):
         def interact_features(x, ly):
             (batch_size, d) = x.shape
             T = torch.cat([x] + ly, dim=1).view((batch_size, -1, d))
-            # Z = pcl_embedding_bag.bdot(T)
             Z = torch.bmm(T, torch.transpose(T, 1, 2))
             _, ni, nj = Z.shape
             offset =  0
@@ -42,7 +41,7 @@ class TestInteractionCases(TestCase):
             R = torch.cat([x] + [Zflat], dim=1)
             return R
 
-        dtypes=[torch.float32]
+        dtypes=[torch.float32, torch.bfloat16]
         for dtype in dtypes:
             x1 = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
             x2 = x1.clone().detach().requires_grad_()
@@ -57,11 +56,11 @@ class TestInteractionCases(TestCase):
             B = interact_features(x2, ly2)
             self.assertEqual(A, B)
 
-            A.mean().backward()
-            B.mean().backward()
-            self.assertEqual(x1.grad, x2.grad)
+            A.sum().backward()
+            B.sum().backward()
+            torch.testing.assert_allclose(x1.grad, x2.grad, rtol=0.005, atol=0.1)
             for i in range(0, 26):
-                self.assertEqual(ly1[i].grad, ly2[i].grad)
+                torch.testing.assert_allclose(ly1[i].grad, ly2[i].grad, rtol=0.005, atol=0.1)
 
 if __name__ == '__main__':
     test = unittest.main()

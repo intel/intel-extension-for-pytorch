@@ -233,7 +233,7 @@ _interaction_backward(const at::Tensor &grad_out,
         {DNNL_ARG_DST, res}}
       );
       cat_backward<T>(grad_cat_buf, output_data, feature_sizes, i);
-      add_ker(grad_input0_buf, &output_data[0][i * vector_size], vector_size);
+      add_ker(&output_data[0][i * vector_size], grad_input0_buf, vector_size);
     }
   });
   return output;
@@ -259,7 +259,7 @@ std::vector<at::Tensor>
 AtenIpexTypeExt::interaction_backward(const at::Tensor &grad_out,
                                       const std::vector<at::Tensor> &input) {
   if (grad_out.scalar_type() == at::kFloat) {
-    return _interaction_backward<float>(grad_out, input);
+    return _interaction_backward<float>(grad_out, torch_ipex::autocast::cpu_cached_cast(at::kFloat, input));
   } else {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
     // todo: move the autograd registion from python into C++.
