@@ -460,8 +460,7 @@ Tensor _softmax_backward_onednn(
     grad_opt = empty_opaque_tensor(softmax_forward_pd.dst_desc(), grad.options(), c10::nullopt);
     grad_memory = dpcpp_onednn_memory(softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
     grad_md = softmax_forward_pd.dst_desc();
-    DPCPP_ONEDNN_EXEC(dnnl::reorder(grad_usr_memory, grad_memory),
-        strm, {{DNNL_ARG_FROM, grad_usr_memory}, {DNNL_ARG_TO, grad_memory}});
+    xpu::oneDNN::reorder(grad, grad_opt);
   }
 
   auto softmax_backward_desc = softmax_backward::desc(grad_md, output_md, axis);
