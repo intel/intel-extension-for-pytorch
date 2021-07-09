@@ -3,7 +3,7 @@
 #include <c10/core/Allocator.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
-#include <aten/core/Stream.h>
+#include <runtime/Utils.h>
 #include <sstream>
 
 #if defined(USE_ITT)
@@ -41,7 +41,7 @@ static inline cl::sycl::event submit_barrier(cl::sycl::queue& Q) {
 
 struct DPCPPProfilerStubsImpl : public XPUStubs {
   void record(XPUEventStub& event) override {
-    auto& Q = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+    auto& Q = xpu::dpcpp::dpcppGetCurrentQueue();
     auto evt = submit_barrier(Q);
     event.reset(new DPCPPEventStubImpl(evt));
   }
