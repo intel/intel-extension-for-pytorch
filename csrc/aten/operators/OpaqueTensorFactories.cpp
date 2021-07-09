@@ -100,6 +100,10 @@ inline bool need_to_plain(const Tensor& tensor) {
   if (tensor.options().backend() != at::Backend::XPU ||
       !DPCPPTensorConvertor::is_opaque_tensor(tensor))
     return false;
+
+  if (tensor.is_sparse())
+    return false;
+
   return true;
 }
 

@@ -1,16 +1,27 @@
+#include <ATen/ATen.h>
 #include <ATen/Context.h>
 #include <ATen/record_function.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/SparseTensorUtils.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
-#include "comm/Pointwise.h"
 
+#include "comm/AccumulateType.h"
+#include "comm/Pointwise.h"
 #include "Loops.h"
 
+#ifdef USE_ONEDPL
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>
+#include <oneapi/dpl/iterator>
+#endif
+
 using namespace xpu::dpcpp;
+using namespace at::sparse;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -137,9 +148,6 @@ static inline void packed_add_kernel(
     unsigned short s[2];
     float f;
   };
-  static const auto read_mode = DPCPP::access::mode::read;
-  static const auto write_mode = DPCPP::access::mode::write;
-  static const auto read_write_mode = DPCPP::access::mode::read_write;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -166,24 +174,166 @@ static inline void packed_add_kernel(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
+DPCPP_DEF_K2(SparsePackedAdd_ker, typename scalar_t);
+
+template <typename scalar_t>
+static inline void sparse_packed_add_kernel(
+    unsigned short* __restrict__ w_MSB,
+    unsigned short* __restrict__ w_LSB,
+    const at::BFloat16* __restrict__ values,
+    int64_t* indices1D,
+    int64_t* origIndices,
+    int64_t* uniqueOffsets,
+    int64_t stride,
+    int64_t nnz,
+    float lr) {
+#ifndef USE_ONEDPL
+  throw std::runtime_error("no oneDPL found when compile");
+#else
+  using accscalar_t = acc_type<scalar_t>;
+  union packed_bf16 {
+    unsigned short s[2];
+    float f;
+  };
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
+
+  int64_t newNnz;
+  {
+    auto countIterI = oneapi::dpl::counting_iterator<int64_t>(0);
+    auto countIterO = oneapi::dpl::counting_iterator<int64_t>(0);
+
+    std::copy(policy, countIterI, countIterI + nnz, origIndices);
+    std::copy(policy, countIterO, countIterO + nnz, uniqueOffsets);
+
+    // auto indices1D_ptr = indices1D.data_ptr<int64_t>();
+    auto zipped_indices = oneapi::dpl::make_zip_iterator(indices1D, origIndices);
+    std::sort(policy, zipped_indices, zipped_indices + nnz,
+        [](auto lhs, auto rhs) {
+          using std::get;
+          return get<0>(lhs) < get<0>(rhs);
+        });
+    auto zipped_uniqueOffsets = oneapi::dpl::make_zip_iterator(indices1D, uniqueOffsets);
+    auto newEnd = std::unique(policy, zipped_uniqueOffsets, zipped_uniqueOffsets + nnz,
+    [](auto lhs, auto rhs) {
+      using std::get;
+      return get<0>(lhs) == get<0>(rhs);
+    });
+    newNnz = std::distance(zipped_uniqueOffsets, newEnd);
+
+  }
+
+  const int num_group_0 = CeilDiv(newNnz, (int64_t)4);
+  const int num_group_1 = CeilDiv(stride, (int64_t)64);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    // auto newValues_data = newValues.data_ptr<scalar_t>();
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+      auto MSB_p = w_MSB;
+      auto LSB_p = w_LSB;
+      auto uniqueOffsets_ptr = uniqueOffsets;
+      auto origIndices_ptr = origIndices;
+      auto values_ptr = values;
+      auto indices1D_ptr = indices1D;
+      // auto newValues_ptr = newValues_data;
+
+      int seg = item.get_global_id()[0];
+
+      if (seg < newNnz) {
+        const int newValueRow = seg * stride;
+        const int begin = uniqueOffsets_ptr[seg];
+        const int end = (seg < newNnz - 1) ? uniqueOffsets_ptr[seg + 1] : nnz;
+        const int featureDim = item.get_global_id()[1];
+
+        accscalar_t tmp = 0;
+        for (int row = begin; row < end; row++) {
+          const int valueRow = ((int) origIndices_ptr[row]) * stride;
+          if (featureDim < stride) {
+            tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
+          }
+        }
+        if (featureDim < stride) {
+          const int weight_index = indices1D_ptr[seg] * stride + featureDim;
+          packed_bf16 p16;
+          p16.s[0] = LSB_p[weight_index];
+          p16.s[1] = MSB_p[weight_index];
+          p16.f += lr * (float)(tmp);
+          LSB_p[weight_index] = p16.s[0];
+          MSB_p[weight_index] = p16.s[1];
+          // newValues_ptr[newValueRow + featureDim] = static_cast<scalar_t>(tmp);
+        }
+      }
+    };
+
+    // kick off kernel
+    cgh.parallel_for<DPCPP_K(SparsePackedAdd_ker, scalar_t)>(
+        DPCPP::nd_range<2>(
+            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64), DPCPP::range<2>(4, 64)),
+        kfn);
+  };
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+#endif
+}
+
 Tensor packed_add(
     at::Tensor & top_half,
     at::Tensor & bot_half,
     const at::Tensor & grad,
     float alpha) {
   RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({top_half, bot_half, grad}));
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      top_half.scalar_type(),
-      "packed_add_kernel",
-      [&]() {
-        packed_add_kernel<scalar_t>(
-            (unsigned short *)top_half.data_ptr<scalar_t>(),
-            (unsigned short *)bot_half.data_ptr<scalar_t>(),
-            grad.data_ptr<at::BFloat16>(),
-            top_half.numel(),
-            static_cast<float>(alpha));
-      });
+  if (grad.is_sparse()) {
+    Tensor values = grad._values();
+    LongTensor indices = grad._indices();
+    int64_t nDim = top_half.dim();
+    int64_t nDimI = grad.sparse_dim();
+    const int64_t nnz = grad._nnz();
+    LongTensor indices1D = flatten_indices(indices, grad.sizes(), 0);
+    int64_t view_rows = 1;
+    int64_t view_columns = 1;
+    for (int i = 0; i < nDimI; i++) {
+      view_rows *= top_half.size(i);
+    }
+    for (int i = nDimI; i < nDim; i++) {
+      view_columns *= top_half.size(i);
+    }
+
+    Tensor top_half_view = top_half.view({view_rows, view_columns});
+    Tensor bot_half_view = bot_half.view({view_rows, view_columns});
+    values = values.contiguous();
+    int64_t stride = at::prod_intlist(values.sizes().slice(1));
+    LongTensor origIndices = at::empty({nnz}, indices.options());
+    LongTensor uniqueOffsets = at::empty({nnz}, indices.options());
+
+    IPEX_DISPATCH_FLOATING_TYPES_AND(
+        at::ScalarType::BFloat16,
+        top_half.scalar_type(),
+        "sparse_packed_add_kernel",
+        [&]() {
+          sparse_packed_add_kernel<scalar_t>(
+              (unsigned short *)top_half.data_ptr<scalar_t>(),
+              (unsigned short *)bot_half.data_ptr<scalar_t>(),
+              values.data_ptr<at::BFloat16>(),
+              indices1D.data_ptr<int64_t>(),
+              origIndices.data_ptr<int64_t>(),
+              uniqueOffsets.data_ptr<int64_t>(),
+              stride,
+              nnz,
+              static_cast<float>(alpha));
+        });
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES_AND(
+        at::ScalarType::BFloat16,
+        top_half.scalar_type(),
+        "packed_add_kernel",
+        [&]() {
+          packed_add_kernel<scalar_t>(
+              (unsigned short *)top_half.data_ptr<scalar_t>(),
+              (unsigned short *)bot_half.data_ptr<scalar_t>(),
+              grad.data_ptr<at::BFloat16>(),
+              top_half.numel(),
+              static_cast<float>(alpha));
+        });
+  }
   return top_half;
 }
 
@@ -201,8 +351,6 @@ static inline void fusion_amdd_kernel(
   float dampening,
   float lr) {
 
-  static const auto read_mode = DPCPP::access::mode::read;
-  static const auto read_write_mode = DPCPP::access::mode::read_write;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {

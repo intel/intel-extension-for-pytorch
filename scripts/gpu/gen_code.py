@@ -607,6 +607,8 @@ def backend_to_devicetype(backend):
         return 'CPU'
     elif backend == 'QuantizedXPU':
         return 'XPU'
+    elif backend == 'SparseXPU':
+        return 'XPU'
     return backend
 
 
@@ -721,6 +723,16 @@ def process_dpcpp_declarations(declarations, script_path):
     if len(schemas) != 0:
         raise RuntimeError("Those schemas are not found in pytorch. {}".format(schemas))
 
+    schemas, errors = extract_schema(script_path + '/gpu/SPARSEDPCPPGPUType.h')
+    assert len(errors) == 0, 'parse error'
+    for declaration in declarations:
+        if declaration['schema_string'] in schemas:
+            declaration['type_method_definition_dispatch']['SparseXPU'] = declaration['name']
+            schemas.remove(declaration['schema_string'])
+
+    if len(schemas) != 0:
+        raise RuntimeError("Those schemas are not found in pytorch. {}".format(schemas))
+
     for declaration in declarations:
         if len(declaration['type_method_definition_dispatch']) != 0:
             dpcpp_decls.append(declaration)
@@ -744,7 +756,7 @@ def gen_code(aten_path, out, script_path, selected_op_list=None):
     TYPE_DERIVED_CPP = CodeTemplate.from_file(TEMPLATE_PATH + "/TypeDerived.cpp")
     TYPE_DERIVED_H = CodeTemplate.from_file(TEMPLATE_PATH + "/TypeDerived.h")
 
-    backends = ['XPU', 'QuantizedXPU']
+    backends = ['XPU', 'QuantizedXPU', 'SparseXPU']
     for backend in backends:
         env = {}
         env['Type'] = "AtenIpexType{}".format(backend)
