@@ -32,7 +32,6 @@ Tensor dequantize_tensor_per_tensor_affine(
     double scale,
     int64_t zero_point) {
   auto q_eng = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
-  auto stream = GpuStreamManager::Instance().get_stream();
   memory::dims q_dims = qtensor.dim() == 4
       ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
@@ -52,23 +51,18 @@ Tensor dequantize_tensor_per_tensor_affine(
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   engine r_eng = q_eng;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
-  memory r_m = dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr());
 
-  primitive_attr attr;
+  ReorderAttr rattr = ReorderAttr();
   int mask = 0;
-  attr.set_output_scales(mask, {static_cast<float>(scale)});
-  attr.set_zero_points(DNNL_ARG_SRC, mask, {static_cast<int>(zero_point)});
+  std::vector<float> scls = {static_cast<float>(scale)};
+  std::vector<int> zps = {static_cast<int>(zero_point)};
 
-#ifdef USE_PRIMITIVE_CACHE
-     lru_key_t key;
-     create_key(key, q_md, r_md, scale);
-     auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, q_m, r_m, attr);
-#else
-     auto reorder_p = dnnl::reorder(q_m, r_m, attr);
-#endif
+  rattr.set_src_sc_and_zp(mask, scls, mask, zps);
 
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, q_m}, {DNNL_ARG_TO, r_m}});
-  return rtensor;
+  Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
+  xpu::oneDNN::reorder(qtensor, rtensor_, rattr);
+
+  return rtensor_;
 }
 
 Tensor dequantize_tensor_per_channel_affine(
@@ -78,7 +72,6 @@ Tensor dequantize_tensor_per_channel_affine(
     const Tensor& zero_points,
     int64_t axis) {
   auto q_eng = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
-  auto stream = GpuStreamManager::Instance().get_stream();
 
   memory::dims q_dims = qtensor.dim() == 4
       ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
@@ -95,9 +88,8 @@ Tensor dequantize_tensor_per_channel_affine(
   memory::format_tag r_fmt = q_fmt;
   engine r_eng = q_eng;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
-  memory r_m = dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr());
 
-  primitive_attr attr;
+  ReorderAttr rattr = ReorderAttr();
   int mask_0 = 1 << axis;
   int mask_1 = 0;
   std::vector<float> scls;
@@ -108,13 +100,13 @@ Tensor dequantize_tensor_per_channel_affine(
 
   // oneDNN only support single zero_point by currently.
   zps.push_back(zero_points[0] .item() .to<float>());
+  
+  rattr.set_src_sc_and_zp(mask_0, scls, mask_1, zps);
 
-  attr.set_output_scales(mask_0, {scls});
-  attr.set_zero_points(DNNL_ARG_SRC, mask_1, {zps});
-  auto reorder_p = dnnl::reorder(q_m, r_m, attr);
+  Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
+  xpu::oneDNN::reorder(qtensor, rtensor_, rattr);
 
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, q_m}, {DNNL_ARG_TO, r_m}});
-  return rtensor;
+  return rtensor_;
 }
 
 Tensor dequantize(const Tensor& self) {
