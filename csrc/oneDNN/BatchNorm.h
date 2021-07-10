@@ -265,7 +265,7 @@ batch_normalization_backward(
   auto diff_dst_md = diff_dst_ctx.is_plain() ?
                      memory::desc({src_tz}, src_dt, src_fmt) :
                      diff_dst_ctx.meta();
-  auto diff_dst_usr_m = dpcpp_onednn_memory(
+  auto diff_dst_usr_m = dpcpp_onednn_memory(	
       diff_dst_md, engine, diff_dst.data_ptr());
 
   batch_normalization_forward::desc bn_fwd_desc(
@@ -280,8 +280,7 @@ batch_normalization_backward(
     diff_dst_ = empty_opaque_tensor(expected_dst_md, src.options(), c10::nullopt);
     diff_dst_m = dpcpp_onednn_memory(expected_dst_md, engine, diff_dst_.data_ptr());
     diff_dst_md = expected_dst_md;
-    DPCPP_ONEDNN_EXEC(dnnl::reorder(diff_dst_usr_m, diff_dst_m),
-        strm, {{DNNL_ARG_FROM, diff_dst_usr_m}, {DNNL_ARG_TO, diff_dst_m}});
+    xpu::oneDNN::reorder(diff_dst, diff_dst_);
   }
 
 #ifdef USE_PRIMITIVE_CACHE

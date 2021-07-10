@@ -88,6 +88,42 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
+    def test_batch_norm_bwd(self, dtype=torch.float):
+        conv = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+        bn = nn.BatchNorm2d(2)
+
+        x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
+        grad_i = torch.randn([2, 2, 3, 3], device=cpu_device)
+
+        x_dpcpp_i = x_i.to(dpcpp_device)
+        grad_dpcpp_i = grad_i.to(dpcpp_device)
+
+        self.assertEqual(x_i, x_dpcpp_i.to(cpu_device))
+        self.assertEqual(grad_i, grad_dpcpp_i.to(cpu_device))
+
+        x_cpu = Variable(x_i, requires_grad=True)
+        grad_cpu = Variable(grad_i, requires_grad=True)
+        y_cpu1 = conv(x_cpu)
+        y_cpu = bn(y_cpu1)
+        y_cpu.backward(grad_cpu)
+
+        print("x_cpu = ", y_cpu)
+        print("x_cpu.grad = ", x_cpu.grad)
+
+        x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+        grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+        conv.to(dpcpp_device)
+        bn.to(dpcpp_device)
+
+        y_dpcpp1 = conv(x_dpcpp)
+        y_dpcpp = bn(y_dpcpp1)
+        y_dpcpp.backward(grad_dpcpp)
+
+        print("y_dpcpp = ", y_dpcpp.cpu())
+        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+        
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x = torch.randn(1, 2, 3, 3, dtype=torch.float)
         conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
