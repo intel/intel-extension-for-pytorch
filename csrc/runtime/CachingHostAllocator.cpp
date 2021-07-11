@@ -46,6 +46,10 @@ void CachingHostAllocator::BlockState::setAllocated(bool alloc) {
 CachingHostAllocator::CachingHostAllocator()
   : mAvailable(Block::Comparator) {}
 
+CachingHostAllocator::~CachingHostAllocator() {
+  emptyCache();
+}
+
 void CachingHostAllocator::processEvents() {
   for (auto& mb : mBlocks) {
     auto& block_state = mb.second;

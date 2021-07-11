@@ -78,6 +78,8 @@ class CachingDeviceAllocator final {
 
   CachingDeviceAllocator();
 
+  ~CachingDeviceAllocator();
+
   DeviceStats& get_stats_for_device(DeviceId device);
 
   void update_stat_array(StatArray& stat_array, int64_t amount, const StatTypes& stat_types);

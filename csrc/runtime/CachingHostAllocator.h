@@ -51,6 +51,8 @@ private:
 
   CachingHostAllocator();
 
+  ~CachingHostAllocator();
+
   void processEvents();
 
   std::mutex mMutex;

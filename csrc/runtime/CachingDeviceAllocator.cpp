@@ -57,6 +57,10 @@ static void update_stat(Stat& stat, int64_t amount) {
   }
 }
 
+CachingDeviceAllocator::~CachingDeviceAllocator() {
+  emptyCache();
+}
+
 void CachingDeviceAllocator::update_stat_array(StatArray& stat_array, int64_t amount, const StatTypes& stat_types) {
   for (size_t stat_type = 0; stat_type < stat_types.size(); ++stat_type) {
     if (stat_types[stat_type]) {
