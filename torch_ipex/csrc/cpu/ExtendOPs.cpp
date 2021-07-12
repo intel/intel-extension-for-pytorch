@@ -311,15 +311,22 @@ static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, size_t M, cons
   }
 
   //Do reduce add with scale
+  __m512 scale_m512[4];
   size_t off = 0;
   for (; off < offset - 63 ; off += 64) {
-    reduce_add_s32x16x16x4_with_scales(out + off, cat_buf + off, scales + off);
+    scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
+    scale_m512[1] = _mm512_load_ps((const void *)(scales + off + 16));
+    scale_m512[2] = _mm512_load_ps((const void *)(scales + off + 32));
+    scale_m512[3] = _mm512_load_ps((const void *)(scales + off + 48));
+    reduce_add_s32x16x16x4_with_scales(out + off, cat_buf + off, scale_m512);
   }
   for (; off < offset - 15 ; off += 16) {
-    reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scales + off);
+    scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
+    reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scale_m512[0]);
   }
+  scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
   auto mask = ((1 << (offset - off)) - 1);
-  reduce_add_s32x16x16_with_scales_and_mask_store(out + off, mask, cat_buf + off, scales + off);
+  reduce_add_s32x16x16_with_scales_and_mask_store(out + off, mask, cat_buf + off, scale_m512[0]);
 }
 
 static inline void _interaction_s8s8_scale_s32s8(int8_t *out, const std::vector<int8_t *>& input_addr,

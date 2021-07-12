@@ -145,6 +145,14 @@ static inline void move_ker(int8_t *out, const int32_t *in, int64_t len) {
   }
 }
 
+static inline void move_ker(int8_t *out, const __m512i *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(2)
+  for (i = 0; i < len ; i ++) {
+    _mm512_storeu_si512(out + i * 64, in[i]);
+  }
+}
+
 static inline void add_ker(int8_t *inout, int8_t *in, int64_t len) {
 /*
   for (int64_t i = 0; i < len; ++i) {
@@ -170,7 +178,51 @@ static inline void add_ker(int8_t *inout, int8_t *in, int64_t len) {
 }
 
 static inline __attribute__((always_inline))
-void scale_and_store_int8_128(void * out, const void *in, __m512 scale) {
+void scale_and_store_int8_128(void * out, const __m128i *in, __m512 scale) {
+  auto in0_0_32i = _mm512_cvtepi8_epi32(in[0]);
+  auto in0_1_32i = _mm512_cvtepi8_epi32(in[1]);
+  auto in0_2_32i = _mm512_cvtepi8_epi32(in[2]);
+  auto in0_3_32i = _mm512_cvtepi8_epi32(in[3]);
+  auto in0_4_32i = _mm512_cvtepi8_epi32(in[4]);
+  auto in0_5_32i = _mm512_cvtepi8_epi32(in[5]);
+  auto in0_6_32i = _mm512_cvtepi8_epi32(in[6]);
+  auto in0_7_32i = _mm512_cvtepi8_epi32(in[7]);
+  auto in0_0_32f = _mm512_cvt_roundepi32_ps(in0_0_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_1_32f = _mm512_cvt_roundepi32_ps(in0_1_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_2_32f = _mm512_cvt_roundepi32_ps(in0_2_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_3_32f = _mm512_cvt_roundepi32_ps(in0_3_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_4_32f = _mm512_cvt_roundepi32_ps(in0_4_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_5_32f = _mm512_cvt_roundepi32_ps(in0_5_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_6_32f = _mm512_cvt_roundepi32_ps(in0_6_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto in0_7_32f = _mm512_cvt_roundepi32_ps(in0_7_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_0_32f = _mm512_mul_round_ps(in0_0_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_1_32f = _mm512_mul_round_ps(in0_1_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_2_32f = _mm512_mul_round_ps(in0_2_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_3_32f = _mm512_mul_round_ps(in0_3_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_4_32f = _mm512_mul_round_ps(in0_4_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_5_32f = _mm512_mul_round_ps(in0_5_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_6_32f = _mm512_mul_round_ps(in0_6_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_7_32f = _mm512_mul_round_ps(in0_7_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_0_32i = _mm512_cvt_roundps_epi32(in0_0_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_1_32i = _mm512_cvt_roundps_epi32(in0_1_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_2_32i = _mm512_cvt_roundps_epi32(in0_2_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_3_32i = _mm512_cvt_roundps_epi32(in0_3_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_4_32i = _mm512_cvt_roundps_epi32(in0_4_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_5_32i = _mm512_cvt_roundps_epi32(in0_5_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_6_32i = _mm512_cvt_roundps_epi32(in0_6_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  in0_7_32i = _mm512_cvt_roundps_epi32(in0_7_32f, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  _mm_storeu_si128((__m128i*)out, _mm512_cvtsepi32_epi8(in0_0_32i));
+  _mm_storeu_si128((__m128i*)(out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
+  _mm_storeu_si128((__m128i*)(out + 32), _mm512_cvtsepi32_epi8(in0_2_32i));
+  _mm_storeu_si128((__m128i*)(out + 48), _mm512_cvtsepi32_epi8(in0_3_32i));
+  _mm_storeu_si128((__m128i*)(out + 64), _mm512_cvtsepi32_epi8(in0_4_32i));
+  _mm_storeu_si128((__m128i*)(out + 80), _mm512_cvtsepi32_epi8(in0_5_32i));
+  _mm_storeu_si128((__m128i*)(out + 96), _mm512_cvtsepi32_epi8(in0_6_32i));
+  _mm_storeu_si128((__m128i*)(out + 112), _mm512_cvtsepi32_epi8(in0_7_32i));
+}
+
+static inline __attribute__((always_inline))
+void scale_and_store_int8_128(void * out, const void *in, __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
   auto in0_2_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 32)));
@@ -213,7 +265,7 @@ void scale_and_store_int8_128(void * out, const void *in, __m512 scale) {
   _mm_storeu_si128((__m128i*)(out + 112), _mm512_cvtsepi32_epi8(in0_7_32i));
 }
 
-static inline void scale_and_store_int8_64(void * out, const void *in, __m512 scale) {
+static inline void scale_and_store_int8_64(void * out, const void *in, __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
   auto in0_2_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 32)));
@@ -236,7 +288,7 @@ static inline void scale_and_store_int8_64(void * out, const void *in, __m512 sc
   _mm_storeu_si128((__m128i*)(out + 48), _mm512_cvtsepi32_epi8(in0_3_32i));
 }
 
-static inline void scale_and_store_int8_32(void* out, const void *in, __m512 scale) {
+static inline void scale_and_store_int8_32(void* out, const void *in, __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
   auto in0_0_32f = _mm512_cvt_roundepi32_ps(in0_0_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
@@ -249,7 +301,7 @@ static inline void scale_and_store_int8_32(void* out, const void *in, __m512 sca
   _mm_storeu_si128((__m128i*)(out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
 }
 
-static inline void scale_and_store_int8_16(void* out, const void *in, __m512 scale) {
+static inline void scale_and_store_int8_16(void* out, const void *in, __m512& scale) {
   auto in0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_32f = _mm512_cvt_roundepi32_ps(in0_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   in0_32f = _mm512_mul_round_ps(in0_32f, scale, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
@@ -257,7 +309,7 @@ static inline void scale_and_store_int8_16(void* out, const void *in, __m512 sca
   _mm_storeu_si128((__m128i*)out, _mm512_cvtsepi32_epi8(in0_32i));
 }
 
-static inline void scale_and_store_int8_maskz_16(void * out, const void *in, __m512 scale, __mmask8 mask) {
+static inline void scale_and_store_int8_maskz_16(void * out, const void *in, __m512& scale, __mmask8 mask) {
   auto in0 = _mm_maskz_loadu_epi8(mask, in);
   auto in0_32i = _mm512_cvtepi8_epi32(_mm_maskz_loadu_epi8(mask, in));
   auto in0_32f = _mm512_cvt_roundepi32_ps(in0_32i, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
@@ -273,6 +325,16 @@ void scale_and_move_ker_128(int8_t *out, const int8_t *in, float scale) {
   } else {
     __m512 scale_vec512 = _mm512_set1_ps(scale);
     scale_and_store_int8_128((void*)out, (const void*)in, scale_vec512);
+  }
+}
+
+static inline __attribute__((always_inline))
+void scale_and_move_ker_128_m512i(int8_t *out, const __m512i *in, float scale) {
+  if (std::abs(scale - 1.0) < 0.0005) {
+    move_ker(out, in, 2);
+  } else {
+    __m512 scale_vec512 = _mm512_set1_ps(scale);
+    scale_and_store_int8_128((void*)out, (const __m128*)in, scale_vec512);
   }
 }
 
@@ -444,7 +506,8 @@ void mul_and_sum_s8x128x2_to_s32x16x2(__m512i& out0, __m512i& out1, const int8_t
 }
 
 static inline __attribute__((always_inline))
-void mul_and_sum_s16x128x2_to_s32x16x2(__m512i& out0, __m512i& out1, const __m512i *a0_16x4, const __m512i *b0_16x4, const __m512i *a1_16x4, const __m512i *b1_16x4) {
+void mul_and_sum_s16x128x2_to_s32x16x2(__m512i& out0, __m512i& out1,
+	       const __m512i* a0_16x4, const __m512i *b0_16x4, const __m512i *a1_16x4, const __m512i *b1_16x4) {
   auto a0_0_i = _mm512_madd_epi16(a0_16x4[0], b0_16x4[0]);
   auto a1_0_i = _mm512_madd_epi16(a1_16x4[0], b1_16x4[0]);
   auto a0_2_i = _mm512_madd_epi16(a0_16x4[2], b0_16x4[2]);
@@ -486,7 +549,7 @@ int32_t reduce_add_s32x16(__m512i& acc_sum) {
 }
 
 static inline __attribute__((always_inline))
-int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float scale) {
+int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float& scale) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto s_simd = _mm_set1_ps(scale);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
@@ -562,34 +625,29 @@ __m512i reduce_add_s32x16x16(__m512i* acc_sums) {
 }
 
 static inline __attribute__((always_inline))
-void reduce_add_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, const float* scales) {
+void reduce_add_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, const __m512& scales) {
   auto l1 =  reduce_add_s32x16x16(acc_sums);
-  __m512 scale_16 = _mm512_load_ps((const void *)scales);
   auto l1_f = _mm512_cvtepi32_ps(l1);
-  l1_f = _mm512_mul_round_ps(l1_f, scale_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l1_f = _mm512_mul_round_ps(l1_f, scales, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   l1 = _mm512_cvtps_epi32(l1_f);
   auto out_16 = _mm512_cvtsepi32_epi8(l1);
   _mm_storeu_si128((__m128i*)outs, out_16);
 }
 
 static inline __attribute__((always_inline))
-void reduce_add_s32x16x16x4_with_scales(int8_t* outs, __m512i* acc_sums, const float* scales) {
+void reduce_add_s32x16x16x4_with_scales(int8_t* outs, __m512i* acc_sums, const __m512 (&scales)[4]) {
   auto l1 =  reduce_add_s32x16x16(acc_sums);
   auto l2 =  reduce_add_s32x16x16(acc_sums + 16);
   auto l3 =  reduce_add_s32x16x16(acc_sums + 32);
   auto l4 =  reduce_add_s32x16x16(acc_sums + 48);
-  __m512 scale0_16 = _mm512_load_ps((const void *)scales);
-  __m512 scale1_16 = _mm512_load_ps((const void *)(scales + 16));
-  __m512 scale2_16 = _mm512_load_ps((const void *)(scales + 32));
-  __m512 scale3_16 = _mm512_load_ps((const void *)(scales + 48));
   auto l1_f = _mm512_cvtepi32_ps(l1);
   auto l2_f = _mm512_cvtepi32_ps(l2);
   auto l3_f = _mm512_cvtepi32_ps(l3);
   auto l4_f = _mm512_cvtepi32_ps(l4);
-  l1_f = _mm512_mul_round_ps(l1_f, scale0_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
-  l2_f = _mm512_mul_round_ps(l2_f, scale1_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
-  l3_f = _mm512_mul_round_ps(l3_f, scale2_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
-  l4_f = _mm512_mul_round_ps(l4_f, scale3_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l1_f = _mm512_mul_round_ps(l1_f, scales[0], (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l2_f = _mm512_mul_round_ps(l2_f, scales[1], (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l3_f = _mm512_mul_round_ps(l3_f, scales[2], (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l4_f = _mm512_mul_round_ps(l4_f, scales[3], (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   l1 = _mm512_cvtps_epi32(l1_f);
   l2 = _mm512_cvtps_epi32(l2_f);
   l3 = _mm512_cvtps_epi32(l3_f);
@@ -605,11 +663,10 @@ void reduce_add_s32x16x16x4_with_scales(int8_t* outs, __m512i* acc_sums, const f
 }
 
 static inline __attribute__((always_inline))
-void reduce_add_s32x16x16_with_scales_and_mask_store(int8_t* outs, __mmask16 mask, __m512i* acc_sums, const float* scales) {
+void reduce_add_s32x16x16_with_scales_and_mask_store(int8_t* outs, __mmask16 mask, __m512i* acc_sums, const __m512& scales) {
   auto l1 =  reduce_add_s32x16x16(acc_sums);
-  __m512 scale_16 = _mm512_load_ps((const void *)scales);
   auto l1_f = _mm512_cvtepi32_ps(l1);
-  l1_f = _mm512_mul_round_ps(l1_f, scale_16, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l1_f = _mm512_mul_round_ps(l1_f, scales, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   l1 = _mm512_cvtps_epi32(l1_f);
   auto out_16 = _mm512_cvtsepi32_epi8(l1);
   _mm_mask_storeu_epi8((__m128i*)outs, mask, out_16);

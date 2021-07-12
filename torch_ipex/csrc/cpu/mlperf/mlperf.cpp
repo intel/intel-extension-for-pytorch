@@ -54,7 +54,7 @@ namespace torch_ipex {
                 }
 
 		auto dx_dil_tensor = cpu::dbl::comm::try_gen_dil_tensor(dx);
-                int8_t *densex = static_cast<int8_t *>(dx_dil_tensor.get_data_handle());
+                const int8_t *densex = static_cast<const int8_t *>(dx_dil_tensor.get_data_handle());
                 // get scale
                 std::vector<std::vector<float>> scales_json = cpu::dbl::comm::get_int8_scales({dx}, /*uint8_used for output*/ false, ops_id);
                 in_scales[0] = dx_dil_tensor.get_scale()[0]; // dx.get_scale();
@@ -69,9 +69,6 @@ namespace torch_ipex {
                 dil::tensor::desc dst_desc(dst_dims, dil::data_type::s8);
                 dil::tensor output{dst_desc};
                 output.set_scale(scales_json[1]);
-
-                int8_t * res = static_cast<int8_t *>(output.get_data_handle());
-
                 float scales[352] __attribute__((aligned(64)));
                 size_t off = 0;
                 for (int i = 1; i < 27; i++) {
@@ -83,6 +80,7 @@ namespace torch_ipex {
                 }
                 scales[351] = 0.0f;
 
+                int8_t * res = static_cast<int8_t *>(output.get_data_handle());
                 at::parallel_for(0, Batch, 0, [&](int64_t start, int64_t end) {
                   __m512i cat_buf[352] __attribute__((aligned(64)));
                   cat_buf[351] = _mm512_setzero_si512();
@@ -92,8 +90,9 @@ namespace torch_ipex {
                       -1, -1, -1, -1, -1, -1, -1, -1,
                       -1, -1, -1, -1, -1, -1, -1, -1,
                       -1, -1, -1};
+		  __m512 scale_m512[4];
                   for (int i = start; i < end; ++i) {
-                    int8_t* input0_ptr = densex + i * Dim;
+                    const int8_t* input0_ptr = densex + i * Dim;
                     int8_t* output0_ptr = res + i * ROW;
                     scale_and_move_ker_128(output0_ptr, input0_ptr, c_scale);
                     convert_to_s16(0, input0_ptr, convert_to_s16_buf);
@@ -132,12 +131,18 @@ namespace torch_ipex {
                     //Do reduce add with scale
                     size_t off = 0;
                     for (; off < total_off - 63 ; off += 64) {
-                      reduce_add_s32x16x16x4_with_scales(outp + off, cat_buf + off, scales + off);
+		      scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
+		      scale_m512[1] = _mm512_load_ps((const void *)(scales + off + 16));
+		      scale_m512[2] = _mm512_load_ps((const void *)(scales + off + 32));
+		      scale_m512[3] = _mm512_load_ps((const void *)(scales + off + 48));
+                      reduce_add_s32x16x16x4_with_scales(outp + off, cat_buf + off, scale_m512);
                     }
 
-                    reduce_add_s32x16x16_with_scales(outp + off, cat_buf + off, scales + off);
+		    scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
+                    reduce_add_s32x16x16_with_scales(outp + off, cat_buf + off, scale_m512[0]);
                     off += 16;
-                    reduce_add_s32x16x16_with_scales_and_mask_store(outp + off, 0x7fff, cat_buf + off, scales + off);
+		    scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
+                    reduce_add_s32x16x16_with_scales_and_mask_store(outp + off, 0x7fff, cat_buf + off, scale_m512[0]);
                   }
 		});
                 return output;
