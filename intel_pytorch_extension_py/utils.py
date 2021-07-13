@@ -52,15 +52,20 @@ def _convert_module_data_type(module, dtype):
         _convert_module_data_type(child, dtype)
     return module
 
-def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1'):
-    optimized_model = copy.deepcopy(model)
+def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=False):
+    if inplace:
+        # only can inplace optimize model while optimizer==None
+        assert optimizer == None, "only support inplace optimize the model while optimizer==None"
+        optimized_model = model
+    else:
+        optimized_model = copy.deepcopy(model)
     if level == 'O0':
         # will be removed after customer op can be traced with autocast,
         # see https://github.com/pytorch/pytorch/pull/60251.
         # after removed, will directly return original model and optimizer.
         if not model.training:
             try:
-                optimized_model = conv_bn_fuse(optimized_model)
+                optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
             except:
                 warnings.warn("Conv BN folding failed during the optimize process.")
             # do weight data type convert for inference model.
@@ -70,10 +75,9 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1'):
     new_optimizer = None
     weight_params_attr = {}
     if level == 'O1':
-        optimized_model = copy.deepcopy(model)
         if not model.training:
             try:
-                optimized_model = conv_bn_fuse(optimized_model)
+                optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
             except:
                 warnings.warn("Conv BN folding failed during the optimize process.")
 
