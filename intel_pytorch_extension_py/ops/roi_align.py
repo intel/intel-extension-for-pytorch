@@ -6,48 +6,6 @@ from torch.autograd.function import once_differentiable
 from torch.nn.modules.utils import _pair
 
 
-class _ROIAlign(Function):
-    @staticmethod
-    def forward(ctx, input, roi, output_size, spatial_scale, sampling_ratio, aligned):
-        ctx.save_for_backward(roi)
-        ctx.output_size = _pair(output_size)
-        ctx.spatial_scale = spatial_scale
-        ctx.sampling_ratio = sampling_ratio
-        ctx.aligned = aligned
-        ctx.input_shape = input.size()
-        output = torch.ops.torch_ipex.ROIAlign_forward(
-            input, roi, spatial_scale, output_size[0], output_size[1], sampling_ratio, aligned
-        )
-        return output
-
-    @staticmethod
-    @once_differentiable
-    def backward(ctx, grad_output):
-        rois, = ctx.saved_tensors
-        output_size = ctx.output_size
-        spatial_scale = ctx.spatial_scale
-        sampling_ratio = ctx.sampling_ratio
-        aligned = ctx.aligned
-        bs, ch, h, w = ctx.input_shape
-        grad_input = torch.ops.torch_ipex.ROIAlign_backward(
-            grad_output,
-            rois,
-            spatial_scale,
-            output_size[0],
-            output_size[1],
-            bs,
-            ch,
-            h,
-            w,
-            sampling_ratio,
-            aligned
-        )
-        return grad_input, None, None, None, None, None
-
-
-roi_align = _ROIAlign.apply
-
-
 class ROIAlign(nn.Module):
     """
     Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN.
@@ -85,8 +43,8 @@ class ROIAlign(nn.Module):
         self.aligned = aligned
 
     def forward(self, input, rois):
-        return roi_align(
-            input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.aligned
+        return torch.ops.torch_ipex.ROIAlign_forward(
+            input, rois, self.spatial_scale, self.output_size[0], self.output_size[1], self.sampling_ratio, self.aligned
         )
 
     def __repr__(self):

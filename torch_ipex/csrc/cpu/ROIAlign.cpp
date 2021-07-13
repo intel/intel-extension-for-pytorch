@@ -489,6 +489,12 @@ at::Tensor roi_align_forward_kernel(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
+#if defined(IPEX_DISP_OP)
+  printf("AtenIpexTypeExt::ROIAlign_forward\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_forward", std::vector<c10::IValue>({}));
+#endif
   TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
   TORCH_CHECK(rois.size(1) == 5, "rois must have shape as Tensor[K, 5]");
@@ -544,6 +550,12 @@ at::Tensor roi_align_backward_kernel(
     int64_t width,
     int64_t sampling_ratio,
     bool aligned) {
+#if defined(IPEX_DISP_OP)
+  printf("AtenIpexTypeExt::ROIAlign_backward\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_backward", std::vector<c10::IValue>({}));
+#endif
   TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
 
@@ -553,7 +565,7 @@ at::Tensor roi_align_backward_kernel(
   at::checkAllSameType(c, {grad_t, rois_t});
 
   at::Tensor grad_input =
-      at::zeros({batch_size, channels, height, width}, grad.options());
+      at::zeros({batch_size, channels, height, width}, grad.options()).contiguous(grad.suggest_memory_format());
 
   // handle possibly empty gradients
   if (grad.numel() == 0) {
@@ -590,6 +602,61 @@ at::Tensor roi_align_backward_kernel(
   return grad_input;
 }
 
+at::Tensor IPEXROIAlignOp::_forward(
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IPEXROIAlignOp::_forward", std::vector<c10::IValue>({}));
+#endif
+  return roi_align_forward_kernel(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
+}
+
+at::Tensor IPEXROIAlignOp::forward(
+    torch::autograd::AutogradContext* ctx,
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IPEXROIAlignOp::forward", std::vector<c10::IValue>({}));
+#endif
+  ctx->saved_data["input_shape"] = input.sizes();
+  ctx->saved_data["spatial_scale"] = spatial_scale;
+  ctx->saved_data["pooled_height"] = pooled_height;
+  ctx->saved_data["pooled_width"] = pooled_width;
+  ctx->saved_data["sampling_ratio"] = sampling_ratio;
+  ctx->saved_data["aligned"] = aligned;
+  ctx->save_for_backward({rois});
+  return roi_align_forward_kernel(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
+}
+
+torch::autograd::variable_list IPEXROIAlignOp::backward(
+    torch::autograd::AutogradContext *ctx,
+    torch::autograd::variable_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IPEXROIAlignOp::backward", std::vector<c10::IValue>({}));
+#endif
+  auto input_shape = ctx->saved_data["input_shape"].toIntVector();
+  auto spatial_scale = ctx->saved_data["spatial_scale"].toDouble();
+  auto pooled_height = ctx->saved_data["pooled_height"].toInt();
+  auto pooled_width = ctx->saved_data["pooled_width"].toInt();
+  auto sampling_ratio = ctx->saved_data["sampling_ratio"].toInt();
+  auto aligned = ctx->saved_data["aligned"].toBool();
+  auto saved = ctx->get_saved_variables();
+  at::Tensor rois = saved[0];
+  at::Tensor grad_input = roi_align_backward_kernel(grad_outputs[0], rois, spatial_scale, pooled_height, pooled_width, input_shape[0], input_shape[1], input_shape[2], input_shape[3], sampling_ratio, aligned);
+  return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(),
+          at::Tensor(), at::Tensor(), at::Tensor()};
+}
+
 at::Tensor AtenIpexTypeExt::ROIAlign_forward(
     const at::Tensor& input,
     const at::Tensor& rois,
@@ -598,43 +665,20 @@ at::Tensor AtenIpexTypeExt::ROIAlign_forward(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-#if defined(IPEX_DISP_OP)
-  printf("AtenIpexTypeExt::ROIAlign_forward\n");
-#endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_forward", std::vector<c10::IValue>({}));
-#endif
-  return roi_align_forward_kernel(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
-}
-
-at::Tensor AtenIpexTypeExt::ROIAlign_backward(
-    const at::Tensor& grad,
-    const at::Tensor& rois,
-    double spatial_scale,
-    int64_t pooled_height,
-    int64_t pooled_width,
-    int64_t batch_size,
-    int64_t channels,
-    int64_t height,
-    int64_t width,
-    int64_t sampling_ratio,
-    bool aligned) {
-#if defined(IPEX_DISP_OP)
-  printf("AtenIpexTypeExt::ROIAlign_backward\n");
-#endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_backward", std::vector<c10::IValue>({}));
-#endif
-  return roi_align_backward_kernel(grad, rois, spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio, aligned);
+  if (at::GradMode::is_enabled()) {
+    return IPEXROIAlignOp::apply(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
+  }
+  return IPEXROIAlignOp::_forward(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
 }
 
 } // namespace torch_ipex
 
 namespace {
-static auto dispatch =
-    torch::RegisterOperators()
-        .op("torch_ipex::ROIAlign_forward", &torch_ipex::AtenIpexTypeExt::ROIAlign_forward)
-        .op("torch_ipex::ROIAlign_backward", &torch_ipex::AtenIpexTypeExt::ROIAlign_backward);
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def("ROIAlign_forward(Tensor input, Tensor rois, float spatial_scale, int pooled_height, int pooled_width, int sampling_ratio, bool aligned) -> Tensor", torch_ipex::AtenIpexTypeExt::ROIAlign_forward);
+}
+
 }
 
 namespace torch_ipex {
@@ -658,31 +702,8 @@ at::Tensor ROIAlign_forward(
   return op.call(cpu_cached_cast(at::kFloat, input), cpu_cached_cast(at::kFloat, rois), spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
 }
 
-at::Tensor ROIAlign_backward(
-    const at::Tensor& grad,
-    const at::Tensor& rois,
-    double spatial_scale,
-    int64_t pooled_height,
-    int64_t pooled_width,
-    int64_t batch_size,
-    int64_t channels,
-    int64_t height,
-    int64_t width,
-    int64_t sampling_ratio,
-    bool aligned) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  static auto op = torch::Dispatcher::singleton()
-    .findSchemaOrThrow("torch_ipex::ROIAlign_backward", "")
-    .typed<decltype(ROIAlign_backward)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("ROIAlign_backward");
-#endif
-  return op.call(cpu_cached_cast(at::kFloat, grad), cpu_cached_cast(at::kFloat, rois), spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio, aligned);
-}
-
 TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
   m.impl("ROIAlign_forward", torch_ipex::autocast::ROIAlign_forward);
-  m.impl("ROIAlign_backward", torch_ipex::autocast::ROIAlign_backward);
 }
 
 } // namespace autocast
