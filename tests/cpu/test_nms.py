@@ -4,7 +4,7 @@ import torch.nn as nn
 import intel_pytorch_extension as ipex
 from common_utils import TestCase
 import time, sys
-from intel_pytorch_extension import batch_score_nms, parallel_scale_back_batch, nms
+from intel_pytorch_extension import batch_score_nms, parallel_scale_back_batch, nms, rpn_nms, box_head_nms
 import torch.nn.functional as F
 import os
 
@@ -186,6 +186,99 @@ class TestNMS(TestCase):
                 self.assertTrue(torch.allclose(score_keep, score_keep_ref, rtol=1e-4, atol=1e-4))
                 self.assertTrue(torch.allclose(bbox_keep, bbox_keep_ref2, rtol=1e-4, atol=1e-4))
                 self.assertTrue(torch.allclose(score_keep, score_keep_ref2, rtol=1e-4, atol=1e-4))
+
+    def test_rpn_nms_result(self):
+        image_shapes = [(800, 824), (800, 1199)]
+        min_size = 0
+        nms_thresh = 0.7
+        post_nms_top_n = 1000
+        proposals = torch.load(os.path.join(os.path.dirname(__file__), "data/rpn_nms_proposals.pt"))
+        objectness = torch.load(os.path.join(os.path.dirname(__file__), "data/rpn_nms_objectness.pt"))
+
+        new_proposal = []
+        new_score = []
+        for proposal, score, im_shape in zip(proposals.clone(), objectness.clone(), image_shapes):
+            proposal[:, 0].clamp_(min=0, max=im_shape[0] - 1)
+            proposal[:, 1].clamp_(min=0, max=im_shape[1] - 1)
+            proposal[:, 2].clamp_(min=0, max=im_shape[0] - 1)
+            proposal[:, 3].clamp_(min=0, max=im_shape[1] - 1)
+            keep = (
+                (proposal[:, 2] - proposal[:, 0] >= min_size) & (proposal[:, 3] - proposal[:, 1] >= min_size)
+            ).nonzero().squeeze(1)
+            proposal = proposal[keep]
+            score = score[keep]
+            if nms_thresh > 0:
+                keep = nms(proposal, score, nms_thresh)
+                if post_nms_top_n > 0:
+                    keep = keep[: post_nms_top_n]
+            new_proposal.append(proposal[keep])
+            new_score.append(score[keep])
+
+        new_proposal_, new_score_ = rpn_nms(proposals, objectness, image_shapes, min_size, nms_thresh, post_nms_top_n)
+
+        self.assertEqual(new_proposal, new_proposal_)
+        self.assertEqual(new_score, new_score_)
+
+    def test_box_head_nms_result(self):
+        image_shapes = [(800, 824), (800, 1199)]
+        score_thresh = 0.05
+        nms_ = 0.5
+        detections_per_img = 100
+        num_classes = 81
+        proposals = torch.load(os.path.join(os.path.dirname(__file__), "data/box_head_nms_proposals.pt"))
+        class_prob = torch.load(os.path.join(os.path.dirname(__file__), "data/box_head_nms_class_prob.pt"))
+
+        boxes_out = []
+        scores_out = []
+        labels_out = []
+        for scores, boxes, image_shape in zip(
+            class_prob, proposals, image_shapes
+        ):
+            boxes = boxes.reshape(-1, 4)
+            boxes[:, 0].clamp_(min=0, max=image_shape[0] - 1)
+            boxes[:, 1].clamp_(min=0, max=image_shape[1] - 1)
+            boxes[:, 2].clamp_(min=0, max=image_shape[0] - 1)
+            boxes[:, 3].clamp_(min=0, max=image_shape[1] - 1)
+            boxes = boxes.reshape(-1, num_classes * 4)
+            scores = scores.reshape(-1, num_classes)
+
+            inds_all = scores > score_thresh
+            new_boxes = []
+            new_scores = []
+            new_labels = []
+            for j in range(1, num_classes):
+                inds = inds_all[:, j].nonzero().squeeze(1)
+                scores_j = scores[inds, j]
+                boxes_j = boxes[inds, j * 4 : (j + 1) * 4]
+                if nms_ > 0:
+                    keep = nms(boxes_j, scores_j, nms_)
+                new_boxes.append(boxes_j[keep])
+                new_scores.append(scores_j[keep])
+                new_labels.append(torch.full((len(keep),), j, dtype=torch.int64))
+
+            new_boxes, new_scores, new_labels = torch.cat(new_boxes, dim=0), \
+                   torch.cat(new_scores, dim=0), \
+                   torch.cat(new_labels, dim=0)
+            number_of_detections = new_boxes.size(0)
+            if number_of_detections > detections_per_img > 0:
+                image_thresh, _ = torch.kthvalue(
+                    new_scores, number_of_detections - detections_per_img + 1
+                )
+                keep = new_scores >= image_thresh.item()
+                keep = torch.nonzero(keep).squeeze(1)
+                boxes_out.append(new_boxes[keep])
+                scores_out.append(new_scores[keep])
+                labels_out.append(new_labels[keep])
+            else :
+                boxes_out.append(new_boxes)
+                scores_out.append(new_scores)
+                labels_out.append(new_labels)
+
+        boxes_out_, scores_out_, labels_out_ = box_head_nms(proposals, class_prob, image_shapes, score_thresh, nms_, detections_per_img, num_classes)
+
+        self.assertEqual(boxes_out, boxes_out_)
+        self.assertEqual(scores_out, scores_out_)
+        self.assertEqual(labels_out, labels_out_)
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -54,7 +54,7 @@ class AtenIpexTypeExt {
   /// \param threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val larger than the threshold.
   /// \param max_output: the max number of output bbox.
   ///
-  /// \return result is a list of tuble. In each tuble, there are 3 tensors:
+  /// \return result is a list of tuple. In each tuple, there are 3 tensors:
   ///   bboxes_out_: the selected out bboxes coordinate, size [max_output, 4].
   ///   labels_out_: the label of each selected out bboxes, size [max_output].
   ///   scores_out_: the score of each selected out bboxes, size [max_output].
@@ -62,6 +62,54 @@ class AtenIpexTypeExt {
                         const at::Tensor& scores,
                         const double threshold,
                         const int64_t max_output);
+
+  /// \brief Perform batch non-maximum suppression (NMS) for MaskRCNN RPN part.
+  ///
+  /// C++ version of batch NMS for MaskRCNN RPN part.
+  /// Refer to https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/modeling/rpn/inference.py#L111.
+  ///
+  /// \param batch_dets: predicted loc in ltrb format, size [BS, number_boxes, 4].
+  /// \param batch_scores: predicted score, size [BS, number_boxes].
+  /// \param image_shapes: the shapes of images, BS tuples in vector.
+  /// \param min_size: the minimum size of bboxs.
+  /// \param threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val larger than the threshold.
+  /// \param max_output: the maximum number of output bboxs.
+  ///
+  /// \return result is a tuple. There are 2 vectors of tensors in the tuple:
+  ///   bboxes_out_: the selected out bboxes coordinate, BS tensors in vector, and the size of each tensor: [selected_box_number, 4].
+  ///   scores_out_: the score of each selected out bboxes, BS tensors in vector, and the size of each tensor: [selected_box_number].
+  static std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(const at::Tensor& batch_dets,
+                          const at::Tensor& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const int64_t min_size,
+                          const double threshold,
+                          const int64_t max_output);
+
+  /// \brief Perform batch non-maximum suppression (NMS) for MaskRCNN box_head part.
+  ///
+  /// C++ version of batch NMS for MaskRCNN box_head part.
+  /// Refer to https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/modeling/roi_heads/box_head/inference.py#L79.
+  ///
+  /// \param batch_bboxes: predicted loc in ltrb format, BS tensors in vector, and the size of each tensor: [number_boxes, 4].
+  /// \param batch_scores: predicted score, BS tensors in vector, and the size of each tensor: [number_boxes].
+  /// \param image_shapes: the shapes of images, BS tuples in vector.
+  /// \param score_thresh: the threshold of score.
+  /// \param threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val larger than the threshold.
+  /// \param detections_per_img: the max number of detections per image.
+  /// \param num_classes: class number of objects.
+  ///
+  /// \return result is a tuple. There are 3 vectors of tensors in the tuple:
+  ///   bboxes_out_: the selected out bboxes coordinate, BS tensors in vector, and the size of each tensor: [selected_box_number, 4].
+  ///   scores_out_: the score of each selected out bboxes, BS tensors in vector, and the size of each tensor: [selected_box_number].
+  ///   labels_out_: the label of each selected out bboxes, BS tensors in vector, and the size of each tensor: [selected_box_number].
+  static std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> box_head_nms(
+                          const std::vector<at::Tensor>& batch_bboxes,
+                          const std::vector<at::Tensor>& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const double score_thresh,
+                          const double threshold,
+                          const int64_t detections_per_img,
+                          const int64_t num_classes);
 
   static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
   static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, 

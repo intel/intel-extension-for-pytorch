@@ -379,6 +379,142 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
   return output;
 }
 
+template <typename scalar_t>
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms_kernel(const at::Tensor& batch_dets,
+                          const at::Tensor& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const int min_size,
+                          const float threshold,
+                          const int max_output) {
+  auto nbatch = batch_dets.size(0); // number of batches
+
+  std::vector<at::Tensor> bboxes_out(nbatch);
+  std::vector<at::Tensor> scores_out(nbatch);
+
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+# pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (int i = 0; i < nbatch; i++) {
+    at::Tensor dets = batch_dets[i].squeeze(0); // dets for boxes per image: (num_box, 4); For example: (15130, 4)
+    at::Tensor scores = batch_scores[i].squeeze(0); // scores for boxes per image: (num_box); For example: (15130)
+    auto image_shape = image_shapes[i]; // image shape: (2)
+    dets.slice(1, 0, 1).clamp_(0, std::get<0>(image_shape) - 1);
+    dets.slice(1, 1, 2).clamp_(0, std::get<1>(image_shape) - 1);
+    dets.slice(1, 2, 3).clamp_(0, std::get<0>(image_shape) - 1);
+    dets.slice(1, 3, 4).clamp_(0, std::get<1>(image_shape) - 1);
+    at::Tensor keep_index = at::nonzero((dets.slice(1, 2, 3).squeeze(1) - dets.slice(1, 0, 1).squeeze(1) + 1 >= min_size) & (dets.slice(1, 3, 4).squeeze(1) - dets.slice(1, 1, 2).squeeze(1) + 1 >= min_size)).squeeze(1);
+    dets = at::index_select(dets, 0, keep_index);
+    scores = at::index_select(scores, 0, keep_index);
+    if (threshold > 0) {
+      at::Tensor keep = nms_cpu_kernel<scalar_t, /*sorted*/true>(dets, scores, threshold);
+      if (max_output > 0) {
+        keep = keep.slice(0, 0, max_output);
+      }
+      bboxes_out[i] = dets.index_select(0, keep);
+      scores_out[i] = scores.index_select(0, keep);
+    } else {
+      bboxes_out[i] = dets;
+      scores_out[i] = scores;
+    }
+  }
+  return std::make_tuple(bboxes_out, scores_out);
+}
+
+template <typename scalar_t>
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> box_head_nms_kernel(const std::vector<at::Tensor>& batch_bboxes,
+                          const std::vector<at::Tensor>& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const float score_thresh,
+                          const float threshold,
+                          const int detections_per_img,
+                          const int num_classes) {
+  auto nbatch = batch_scores.size(); // number of batches
+  auto nbatch_x_nclass = nbatch * num_classes; // (number of batches) * (number of labels)
+
+  std::vector<at::Tensor> bboxes_out(nbatch_x_nclass);
+  std::vector<at::Tensor> scores_out(nbatch_x_nclass);
+  std::vector<at::Tensor> labels_out(nbatch_x_nclass);
+
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+# pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (int bs = 0; bs < nbatch; bs++) {
+    at::Tensor bboxes = batch_bboxes[bs].reshape({-1, 4});
+    at::Tensor scores = batch_scores[bs];
+    auto image_shape = image_shapes[bs];
+    bboxes.slice(1, 0, 1).clamp_(0, std::get<0>(image_shape) - 1);
+    bboxes.slice(1, 1, 2).clamp_(0, std::get<1>(image_shape) - 1);
+    bboxes.slice(1, 2, 3).clamp_(0, std::get<0>(image_shape) - 1);
+    bboxes.slice(1, 3, 4).clamp_(0, std::get<1>(image_shape) - 1);
+    bboxes = bboxes.reshape({-1, num_classes * 4});
+    scores = scores.reshape({-1, num_classes});
+    at::Tensor indexes = scores > score_thresh;
+
+    for (int j = 1; j < num_classes; j++) {
+      at::Tensor index = at::nonzero(indexes.slice(1, j, j + 1).squeeze(1)).squeeze(1);
+      at::Tensor score = scores.slice(1, j, j + 1).squeeze(1).index_select(0, index);
+      at::Tensor bbox = bboxes.slice(1, j * 4, (j + 1) * 4).index_select(0, index);
+      if (score.size(0) == 0) {
+        continue;
+      }
+      auto iter = bs * num_classes + j;
+      if (threshold > 0) {
+        at::Tensor keep = nms_cpu_kernel<scalar_t, /*sorted*/false>(bbox, score, threshold);
+        bboxes_out[iter] = bbox.index_select(0, keep);
+        scores_out[iter] = score.index_select(0, keep);
+        labels_out[iter] = at::full({keep.sizes()}, j, torch::kInt64);
+      } else {
+        bboxes_out[iter] = bbox;
+        scores_out[iter] = score;
+        labels_out[iter] = at::full({score.sizes()}, j, torch::kInt64);
+      }
+    }
+  }
+
+  std::vector<at::Tensor> bboxes_out_(nbatch);
+  std::vector<at::Tensor> scores_out_(nbatch);
+  std::vector<at::Tensor> labels_out_(nbatch);
+
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+# pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (int bs = 0; bs < nbatch; bs++) {
+    std::vector<at::Tensor> valid_bboxes_out = remove_empty(bboxes_out, bs*num_classes, (bs+1)*num_classes);
+    std::vector<at::Tensor> valid_scores_out = remove_empty(scores_out, bs*num_classes, (bs+1)*num_classes);
+    std::vector<at::Tensor> valid_labels_out = remove_empty(labels_out, bs*num_classes, (bs+1)*num_classes);
+    if (valid_bboxes_out.size() > 0) {
+      bboxes_out_[bs] = at::cat(valid_bboxes_out, 0);
+      scores_out_[bs] = at::cat(valid_scores_out, 0);
+      labels_out_[bs] = at::cat(valid_labels_out, 0);
+    } else {
+      bboxes_out_[bs] = at::empty({0, 4}, torch::kFloat);
+      scores_out_[bs] = at::empty({0}, torch::kFloat);
+      labels_out_[bs] = at::empty({0}, torch::kInt64);
+    }
+    auto number_of_detections = bboxes_out_[bs].size(0);
+    if (number_of_detections > detections_per_img && detections_per_img > 0) {
+      auto out_ = scores_out_[bs].kthvalue(number_of_detections - detections_per_img + 1);
+      at::Tensor keep = at::nonzero(scores_out_[bs] >= std::get<0>(out_).item()).squeeze(1);
+      bboxes_out_[bs] = bboxes_out_[bs].index_select(0, keep);
+      scores_out_[bs] = scores_out_[bs].index_select(0, keep);
+      labels_out_[bs] = labels_out_[bs].index_select(0, keep);
+    }
+  }
+  return std::make_tuple(bboxes_out_, scores_out_, labels_out_);
+}
+
 at::Tensor nms_cpu(const at::Tensor& dets,
                const at::Tensor& scores,
                const float threshold,
@@ -397,6 +533,33 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_cpu(
   std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> result;
   AT_DISPATCH_FLOATING_TYPES(dets.type(), "batch_score_nms", [&] {
     result = batch_score_nms_kernel<scalar_t>(dets, scores, threshold, max_output);
+  });
+  return result;
+}
+
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms_cpu(const at::Tensor& batch_dets,
+                          const at::Tensor& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const int min_size,
+                          const float threshold,
+                          const int max_output) {
+  std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> result;
+  AT_DISPATCH_FLOATING_TYPES(batch_dets.type(), "rpn_nms", [&] {
+    result = rpn_nms_kernel<scalar_t>(batch_dets, batch_scores, image_shapes, min_size, threshold, max_output);
+  });
+  return result;
+}
+
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> box_head_nms_cpu(const std::vector<at::Tensor>& batch_bboxes,
+                          const std::vector<at::Tensor>& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const float score_thresh,
+                          const float threshold,
+                          const int detections_per_img,
+                          const int num_classes) {
+  std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> result;
+  AT_DISPATCH_FLOATING_TYPES(batch_bboxes[0].type(), "box_head_nms", [&] {
+    result = box_head_nms_kernel<scalar_t>(batch_bboxes, batch_scores, image_shapes, score_thresh, threshold, detections_per_img, num_classes);
   });
   return result;
 }
@@ -431,6 +594,44 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> AtenIpexTypeExt::bat
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
   auto&& result = batch_score_nms_cpu(dets, scores, threshold, max_output);
+  static_cast<void>(result); // Avoid warnings in case not used
+  return result;
+}
+
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> AtenIpexTypeExt::rpn_nms(const at::Tensor& batch_dets,
+                          const at::Tensor& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const int64_t min_size,
+                          const double threshold,
+                          const int64_t max_output) {
+#if defined(IPEX_DISP_OP)
+  printf("IpexExternal::rpn_nms\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IpexExternal::rpn_nms", std::vector<c10::IValue>({}));
+#endif
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_dets.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_scores.layout() == c10::kStrided);
+  auto&& result = rpn_nms_cpu(batch_dets, batch_scores, image_shapes, min_size, threshold, max_output);
+  static_cast<void>(result); // Avoid warnings in case not used
+  return result;
+}
+
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> AtenIpexTypeExt::box_head_nms(
+                          const std::vector<at::Tensor>& batch_bboxes,
+                          const std::vector<at::Tensor>& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const double score_thresh,
+                          const double threshold,
+                          const int64_t detections_per_img,
+                          const int64_t num_classes) {
+#if defined(IPEX_DISP_OP)
+  printf("IpexExternal::box_head_nms\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IpexExternal::box_head_nms", std::vector<c10::IValue>({}));
+#endif
+  auto&& result = box_head_nms_cpu(batch_bboxes, batch_scores, image_shapes, score_thresh, threshold, detections_per_img, num_classes);
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
 }
@@ -536,6 +737,8 @@ static auto dispatch =
     torch::RegisterOperators()
         .op("torch_ipex::nms", &torch_ipex::AtenIpexTypeExt::nms)
         .op("torch_ipex::batch_score_nms", &torch_ipex::AtenIpexTypeExt::batch_score_nms)
+        .op("torch_ipex::rpn_nms", &torch_ipex::AtenIpexTypeExt::rpn_nms)
+        .op("torch_ipex::box_head_nms", &torch_ipex::AtenIpexTypeExt::box_head_nms)
         .op("torch_ipex::parallel_scale_back_batch", &torch_ipex::AtenIpexTypeExt::parallel_scale_back_batch);
 }
 
@@ -569,6 +772,40 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(cons
   return op.call(cpu_cached_cast(at::kFloat, dets), cpu_cached_cast(at::kFloat, scores), threshold, max_output);
 }
 
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(const at::Tensor& batch_dets,
+                          const at::Tensor& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const int64_t min_size,
+                          const double threshold,
+                          const int64_t max_output) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::rpn_nms", "")
+    .typed<decltype(rpn_nms)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("rpn_nms");
+#endif
+  return op.call(cpu_cached_cast(at::kFloat, batch_dets), cpu_cached_cast(at::kFloat, batch_scores), image_shapes, min_size, threshold, max_output);
+}
+
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> box_head_nms(
+                          const std::vector<at::Tensor>& batch_bboxes,
+                          const std::vector<at::Tensor>& batch_scores,
+                          const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+                          const double score_thresh,
+                          const double threshold,
+                          const int64_t detections_per_img,
+                          const int64_t num_classes) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::box_head_nms", "")
+    .typed<decltype(box_head_nms)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("box_head_nms");
+#endif
+  return op.call(cpu_cached_cast(at::kFloat, batch_bboxes), cpu_cached_cast(at::kFloat, batch_scores), image_shapes, score_thresh, threshold, detections_per_img, num_classes);
+}
+
 std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(const at::Tensor& bboxes_in,
                                                                 const at::Tensor& scores_in,
                                                                 const at::Tensor& dboxes_xywh,
@@ -588,6 +825,8 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(const at::Tensor& b
 TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
   m.impl("nms", torch_ipex::autocast::nms);
   m.impl("batch_score_nms", torch_ipex::autocast::batch_score_nms);
+  m.impl("rpn_nms", torch_ipex::autocast::rpn_nms);
+  m.impl("box_head_nms", torch_ipex::autocast::box_head_nms);
   m.impl("parallel_scale_back_batch", torch_ipex::autocast::parallel_scale_back_batch);
 }
 
