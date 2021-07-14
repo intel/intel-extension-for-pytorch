@@ -11,6 +11,8 @@
 namespace xpu {
 namespace dpcpp {
 
+constexpr size_t kHostAlignment = 512;
+
 void* CachingHostAllocator::Block::getPtr() const {
   return mPtr;
 }
@@ -111,7 +113,14 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     return DPCPP_SUCCESS;
   }
 
-  *ptr = DPCPP::malloc_host(size, getDeviceContext());
+  *ptr = DPCPP::aligned_alloc_host(kHostAlignment, size, getDeviceContext());
+  if (*ptr == NULL) {
+    *ptr = DPCPP::aligned_alloc_host(kHostAlignment, size, getDeviceContext());
+    if (*ptr == NULL) {
+      return DPCPP_FAILURE;
+    }
+  }
+
   mBlocks.insert({*ptr, {size, *ptr, true}});
   return DPCPP_SUCCESS;
 }

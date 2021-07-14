@@ -9,6 +9,7 @@
 namespace xpu {
 namespace dpcpp {
 
+constexpr size_t kDevAlignment = 512;
 constexpr size_t kMinBlockSize = 512;
 constexpr size_t kSmallSize = 1048576;
 constexpr size_t kSmallBuffer = 2097152;
@@ -111,14 +112,13 @@ std::mutex* CachingDeviceAllocator::getDPCPPFreeMutex() const {
 int CachingDeviceAllocator::malloc_with_retry(DeviceId di, void** devPtr, size_t size) {
   auto syclDev = dpcppGetRawDevice(di);
   // Our minimum allocated memory is 512. Thus we set mem align to 512.
-  const size_t alignment = 512;
-  *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, getDeviceContext(di));
+  *devPtr = DPCPP::aligned_alloc_device(kDevAlignment, size, syclDev, getDeviceContext(di));
 
   if (*devPtr == NULL) {
     DeviceStats& stats = get_stats_for_device(di);
     stats.num_alloc_retries += 1;
     free_cached_blocks(di);
-    *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, getDeviceContext(di));
+    *devPtr = DPCPP::aligned_alloc_device(kDevAlignment, size, syclDev, getDeviceContext(di));
     if (*devPtr == NULL) {
       return DPCPP_FAILURE;
     }
