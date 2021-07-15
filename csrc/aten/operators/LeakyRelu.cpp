@@ -37,8 +37,23 @@ Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
 }
 
 Tensor leaky_relu(const Tensor& self, Scalar negative_slope) {
-  Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeXPU::leaky_relu_out(result, self, negative_slope);
+  bool is_channel_last = !self.is_contiguous() &&
+      (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+       self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
+  Tensor result;
+  if (is_channel_last) {
+    float alpha = negative_slope.to<float>();
+    result = self.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? at::empty(
+              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast)
+        : at::empty(
+              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast3d);
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
+        result, self, alpha, 0.0f);
+  } else {
+    result = at::empty(self.sizes(), self.options());
+    at::AtenIpexTypeXPU::leaky_relu_out(result, self, negative_slope);
+  }
   return result;
 }
 
@@ -75,13 +90,38 @@ Tensor leaky_relu_backward(
     Scalar negative_slope,
     bool self_is_result) {
   // TODO: self_is_result
-  Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeXPU::leaky_relu_backward_out(
-      grad_input, grad_output, self, negative_slope);
+  bool is_channel_last = !self.is_contiguous() &&
+      (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+       self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
+  Tensor grad_input;
+  if (is_channel_last) {
+    float alpha = negative_slope.to<float>();
+    grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? at::empty(
+              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast)
+        : at::empty(
+              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast3d);
+    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(grad_input, self, grad_output, alpha, 0.0f);
+    return grad_input;
+  } else {
+    grad_input = at::empty({0}, grad_output.options());
+    return at::AtenIpexTypeXPU::leaky_relu_backward_out(
+        grad_input, grad_output, self, negative_slope);
+  }
 }
 
 Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
-  return at::AtenIpexTypeXPU::leaky_relu_out(self, self, negative_slope);
+  bool is_channel_last = !self.is_contiguous() &&
+      (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+       self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
+  if (is_channel_last) {
+    float alpha = negative_slope.to<float>();
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
+        self, self, alpha, 0.0f);
+    return self;
+  } else {
+    return at::AtenIpexTypeXPU::leaky_relu_out(self, self, negative_slope);
+  }
 }
 
 } // namespace AtenIpexTypeXPU
