@@ -38,7 +38,6 @@ class  TestTorchMethod(TestCase):
             print("input.grad: ", input_sycl.grad)
         # input_sycl.grad.zero_()
 
-        # skip due to MFDNN-5243 unsolved
-        # self.assertEqual(output_cpu, output_sycl.cpu())
-        # self.assertEqual(input_cpu.grad, input_sycl.grad.cpu())
+        self.assertEqual(output_cpu, output_sycl.cpu())
+        self.assertEqual(input_cpu.grad, input_sycl.grad.cpu())
 

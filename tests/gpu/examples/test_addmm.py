@@ -29,8 +29,7 @@ class  TestTorchMethod(TestCase):
         print("dpcpp addmm_ self", x_dpcpp.cpu())
         x_dpcpp.addmm_(m1_dpcpp, m2_dpcpp)
         print("dpcpp addmm_ result", x_dpcpp.cpu())
-        # skip due to MFDNN-5243 unsolved
-        # self.assertEqual(x_cpu,x_dpcpp.cpu())
+        self.assertEqual(x_cpu,x_dpcpp.cpu())
 
         print("cpu addmm_ self", x_cpu2)
         y = x_cpu2.addmm(m1_cpu, m2_cpu)

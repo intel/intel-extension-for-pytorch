@@ -163,7 +163,10 @@ Tensor& addmm_(
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
               "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
-  at::AtenIpexTypeXPU::addmm_out(self, self, m1, m2, beta, alpha);
+  Tensor bias = at::empty_like(self).copy_(self);
+  // oneDNN cannot support result/bias (write/read) use the same memory.
+  // we will remove copy to keep performance once matmul refactor done.
+  at::AtenIpexTypeXPU::addmm_out(self, bias, m1, m2, beta, alpha);
   return self;
 }
 
