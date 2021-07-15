@@ -34,4 +34,6 @@
 
 #define IS_INT(scalar_t) (std::is_same<scalar_t, int>::value)
 
+#define IS_INT64(scalar_t) (std::is_same<scalar_t, int64_t>::value)
+
 #define IS_BOOL(scalar_t) (std::is_same<scalar_t, bool>::value)

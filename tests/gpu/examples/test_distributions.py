@@ -218,21 +218,19 @@ class TestDistributions(TestCase):
         #self._gradcheck_log_prob(lambda p: Multinomial(total_count, None, p.log()), [p])
         self.assertRaises(NotImplementedError, Multinomial(10, p).rsample)
         
-    # @pytest.mark.skipif(not TEST_NUMPY or "not torch_ipex._onemkl_is_enabled()")
-    @pytest.mark.skipif(reason="Not resolved scatter_add_ issue, skip this test temporarily")
     def test_multinomial_1d_log_prob(self):
         total_count = 10
         p = torch.tensor([0.1, 0.2, 0.3], requires_grad=True, device=sycl_device)
         dist = Multinomial(total_count, probs=p)
         x = dist.sample()
         log_prob = dist.log_prob(x)
-        expected = torch.tensor(scipy.stats.multinomial.logpmf(x.numpy(), n=total_count, p=dist.probs.detach().numpy()))
+        expected = torch.tensor(scipy.stats.multinomial.logpmf(x.cpu().numpy(), n=total_count, p=dist.probs.detach().cpu().numpy()), dtype=x.dtype)
         self.assertEqual(log_prob, expected)
 
         dist = Multinomial(total_count, logits=p.log())
         x = dist.sample()
         log_prob = dist.log_prob(x)
-        expected = torch.tensor(scipy.stats.multinomial.logpmf(x.numpy(), n=total_count, p=dist.probs.detach().numpy()))
+        expected = torch.tensor(scipy.stats.multinomial.logpmf(x.cpu().numpy(), n=total_count, p=dist.probs.detach().cpu().numpy()), dtype=x.dtype)
         self.assertEqual(log_prob, expected)
     
     def test_multinomial_2d(self):
