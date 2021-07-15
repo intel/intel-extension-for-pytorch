@@ -97,7 +97,8 @@ inline bool need_to_plain(const Tensor& tensor) {
   if (!tensor.defined())
     return false;
 
-  if (tensor.options().backend() != at::Backend::XPU ||
+  if ((tensor.options().backend() != at::Backend::XPU &&
+        tensor.options().backend() != at::Backend::QuantizedXPU) ||
       !DPCPPTensorConvertor::is_opaque_tensor(tensor))
     return false;
 

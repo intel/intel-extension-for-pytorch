@@ -70,7 +70,9 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
     options = options.dtype(kInt);
 
   // reorder to plain based on current shape
-  auto to = at::AtenIpexTypeXPU::empty(ctx.dims(), options, c10::nullopt);
+  auto to = !from.is_quantized() ?
+            at::AtenIpexTypeXPU::empty(ctx.dims(), options, c10::nullopt) :
+            at::AtenIpexTypeXPU::new_qtensor(ctx.dims(), options, from.quantizer());
   convert(to, from);
 
   // permute shape to original shape
