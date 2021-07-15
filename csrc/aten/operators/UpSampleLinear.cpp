@@ -53,8 +53,8 @@ static void upsample_linear_out_dpcpp_kernel(
   } else if (!input_.is_contiguous() && input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     output.resize_(dst_dims, at::MemoryFormat::ChannelsLast3d);
   } else {
-    input = input_.contiguous();
-    output.resize_(dst_dims);
+    input = input_.contiguous(input_.suggest_memory_format());
+    output.resize_(dst_dims, input_.suggest_memory_format());
   }
 
   auto data_format = get_dnnl_default_format(
@@ -143,8 +143,8 @@ static void upsample_linear_backward_out_dpcpp_kernel(
     grad_input.resize_(src_dims, at::MemoryFormat::ChannelsLast3d);
     grad_output = grad_output_.contiguous(at::MemoryFormat::ChannelsLast3d);
   } else {
-    grad_input.resize_(src_dims);
-    grad_output = grad_output_.contiguous();
+    grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
+    grad_output = grad_output_.contiguous(grad_output_.suggest_memory_format());
   }
 
   auto data_format = get_dnnl_default_format(
