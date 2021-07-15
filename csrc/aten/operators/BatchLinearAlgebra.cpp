@@ -42,6 +42,7 @@ void error_handle(std::vector<int64_t>& infos, oneapi::mkl::lapack::batch_error&
 }
 #endif
 
+
 template <typename scalar_t, typename IndexType, bool upper>
 void apply_triu_tril(
     Tensor& result,
@@ -414,15 +415,14 @@ static void apply_svd(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   using value_t = typename c10::scalar_value_type<scalar_t>::type;
   scalar_t* self_data = (scalar_t*)(self.data_ptr());
-  auto U_data = U.data_ptr<scalar_t>();
-  auto S_data = S.data_ptr<value_t>();
-  auto VT_data = VT.data_ptr<scalar_t>();
+  scalar_t* U_data = (scalar_t*)U.data_ptr();
+  value_t* S_data = (value_t*)S.data_ptr();
+  scalar_t* VT_data = (scalar_t*)VT.data_ptr();
   auto m = self.size(-2);
   auto n = self.size(-1);
-  auto mn = std::min(m, n);
   std::int64_t lda = m;
-  std::int64_t ldu = n;
-  std::int64_t ldvt = mn;
+  std::int64_t ldu = m;
+  std::int64_t ldvt = n;
   oneapi::mkl::jobsvd jobu, jobvt;
   if (jobz == 'N') {
     jobu = oneapi::mkl::jobsvd::N;

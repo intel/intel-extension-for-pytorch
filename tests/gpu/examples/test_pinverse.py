@@ -7,6 +7,16 @@ import pytest
 class TestNNMethod(TestCase):
     @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_pinverse(self): 
+        a = torch.randn(5, 3)
+        b = torch.pinverse(a)
+        print('output cpu = ', b)
+
+        a_xpu = a.detach().to('xpu')
+        b_xpu = torch.pinverse(a_xpu)
+        print('output xpu = ', b_xpu.cpu())
+
+        self.assertEqual(b, b_xpu.cpu())
+
         a = torch.randn(3, 5)
         b = torch.pinverse(a)
         print('output cpu = ', b)
@@ -15,4 +25,4 @@ class TestNNMethod(TestCase):
         b_xpu = torch.pinverse(a_xpu)
         print('output xpu = ', b_xpu.cpu())
 
-        self.assertEqual(b, b_xpu.cpu(), rtol=1e-3, atol=1)
+        self.assertEqual(b, b_xpu.cpu())
