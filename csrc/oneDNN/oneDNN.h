@@ -15,3 +15,4 @@
 #include "Conv.h"
 #include "Pooling.h"
 #include "BatchNorm.h"
+#include "GRU.h"
