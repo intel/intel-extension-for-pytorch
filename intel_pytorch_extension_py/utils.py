@@ -52,13 +52,29 @@ def _convert_module_data_type(module, dtype):
         _convert_module_data_type(child, dtype)
     return module
 
+def _copy_model_and_optimizer(model, optimizer):
+    new_model = copy.deepcopy(model)
+    if optimizer is None:
+        return new_model, optimizer
+    else:
+        new_optimizer = copy.deepcopy(optimizer)
+        new_optimizer.state.clear()
+        dic_param = {}
+        for k, value in zip(model.parameters(), new_model.parameters()):
+            dic_param[k] = value
+        for group1, group2 in zip(optimizer.param_groups, new_optimizer.param_groups):
+            for i, p in enumerate(group1['params']):
+                new_model_param = dic_param[p]
+                group2['params'][i] = new_model_param
+                new_optimizer.state[new_model_param] = copy.deepcopy(optimizer.state[p])
+        return new_model, new_optimizer
+
 def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=False):
     if inplace:
-        # only can inplace optimize model while optimizer==None
-        assert optimizer == None, "only support inplace optimize the model while optimizer==None"
         optimized_model = model
+        optimized_optimizer = optimizer
     else:
-        optimized_model = copy.deepcopy(model)
+        optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
     if level == 'O0':
         # will be removed after customer op can be traced with autocast,
         # see https://github.com/pytorch/pytorch/pull/60251.
@@ -71,28 +87,23 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=Fa
             # do weight data type convert for inference model.
             if dtype == torch.bfloat16:
                 optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
-
-    new_optimizer = None
-    weight_params_attr = {}
-    if level == 'O1':
+    elif level == 'O1':
         if not model.training:
             try:
                 optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
             except:
                 warnings.warn("Conv BN folding failed during the optimize process.")
 
-        new_optimizer = None
-        weight_params_attr = None
-        # Do weight prepack if level is 'O1', and convert optimizer for training case.
-        if level == 'O1':
-            optimized_model, weight_params_attr = _weight_prepack_with_ipex(optimized_model, dtype)
+        # Do weight prepack, and convert optimizer for training case.
+        optimized_model, optimized_optimizer, weight_params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, dtype)
+        if optimizer is not None:
+            assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
+            optimized_optimizer = _ipex_optimizer(optimized_optimizer, weight_params_attr, dtype)
+    else:
+        assert False, "Only support level O0 and O1 now for optimize"
 
-    if optimizer is not None:
-        assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
-        new_optimizer = _ipex_optimizer(model, optimized_model, optimizer, weight_params_attr, dtype)
-
-    #TODO: model list, optimizer list.
+    # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model
     else:
-        return optimized_model, new_optimizer
+        return optimized_model, optimized_optimizer

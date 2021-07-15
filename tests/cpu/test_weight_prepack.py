@@ -43,41 +43,64 @@ class TestPrepackCases(TestCase):
                 x = x.to(memory_format=torch.channels_last)
                 x1 = x.clone().requires_grad_()
                 x2 = x.clone().requires_grad_()
-                origin_model = copy.deepcopy(model).train()
-                origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
+                x3 = x.clone().requires_grad_()
+                origin_model1 = copy.deepcopy(model).train()
+                origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
+                origin_model2 = copy.deepcopy(model).train()
+                origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
                 conf = ipex.AmpConf(dtype)
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-                ipex_model = ipex_model.train()
-                self.assertTrue(ipex_model.weight.dtype == dtype)
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+                # inplace case
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
+                self.assertTrue(ipex_model1.weight.dtype == dtype)
+                self.assertTrue(ipex_model2.weight.dtype == dtype)
+
                 with ipex.amp.autocast(enabled=True, configure=conf):
                     # original path
-                    y1 = origin_model(x1)
+                    y1 = origin_model1(x1)
                     loss1 = y1.sum()
-                    origin_optimizer.zero_grad()
+                    origin_optimizer1.zero_grad()
                     loss1.backward()
-                    origin_optimizer.step()
-                    # ipex path
-                    y2 = ipex_model(x2)
+                    origin_optimizer1.step()
+                    # ipex path with inplace=False
+                    y2 = ipex_model1(x2)
                     loss2 = y2.sum()
-                    ipex_optimizer.zero_grad()
+                    ipex_optimizer1.zero_grad()
                     loss2.backward()
-                    ipex_optimizer.step()
+                    ipex_optimizer1.step()
+                    # ipex path with inplace=True
+                    y3 = ipex_model2(x3)
+                    loss3 = y3.sum()
+                    ipex_optimizer2.zero_grad()
+                    loss3.backward()
+                    ipex_optimizer2.step()
+
                 self.assertEqual(y1, y2)
+                self.assertEqual(y1, y3)
                 self.assertEqual(x1.grad, x2.grad)
+                self.assertEqual(x1.grad, x3.grad)
                 if bias:
-                    self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad)
+                    self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad)
+                    self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad)
+
                 # compare origin_model parameters with origin_model parameters after grad updata
-                origin_model_state = origin_model.state_dict()
-                ipex_model_state = ipex_model.state_dict()
+                origin_model_state = origin_model1.state_dict()
+                ipex_model_state1 = ipex_model1.state_dict()
+                ipex_model_state2 = ipex_model2.state_dict()
                 for var_name in origin_model_state:
-                    self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+                    self.assertEqual(origin_model_state[var_name], ipex_model_state1[var_name])
+                    self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name])
+
                 # compare momentum_buffer in optimizer's state(sgd)
                 # TODO: other optimizer.
-                origin_optimizer_state = origin_optimizer.state_dict()
-                ipex_optimizer_state = ipex_optimizer.state_dict()
+                origin_optimizer_state = origin_optimizer1.state_dict()
+                ipex_optimizer_state1 = ipex_optimizer1.state_dict()
+                ipex_optimizer_state2 = ipex_optimizer2.state_dict()
+
                 for var_name in origin_optimizer_state:
                     if var_name == 'state':
-                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name])
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name])
+                        self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name])
 
     def test_conv2d(self):
         self._test_convolution_training_base(dim = 2)
@@ -92,36 +115,54 @@ class TestPrepackCases(TestCase):
             conf = ipex.AmpConf(dtype)
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
-            origin_model = copy.deepcopy(model).train()
-            origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
-            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+            x3 = x.clone().requires_grad_()
+            origin_model1 = copy.deepcopy(model).train()
+            origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
+            origin_model2 = copy.deepcopy(model).train()
+            origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
+            ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+            ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
             with ipex.amp.autocast(enabled=True, configure=conf):
                 # train one step for origin.
-                y1 = origin_model(x1)
+                y1 = origin_model1(x1)
                 loss1 = y1.sum()
-                origin_optimizer.zero_grad()
+                origin_optimizer1.zero_grad()
                 loss1.backward()
-                origin_optimizer.step()
-                # train one step for ipex.
-                y2 = ipex_model(x2)
+                origin_optimizer1.step()
+                # train one step for ipex with inplace=False
+                y2 = ipex_model1(x2)
                 loss2 = y2.sum()
-                ipex_optimizer.zero_grad()
+                ipex_optimizer1.zero_grad()
                 loss2.backward()
-                ipex_optimizer.step()
+                ipex_optimizer1.step()
+                # train one step for ipex with inplace=False
+                y3 = ipex_model2(x3)
+                loss3 = y3.sum()
+                ipex_optimizer2.zero_grad()
+                loss3.backward()
+                ipex_optimizer2.step()
+
             self.assertEqual(y1, y2)
+            self.assertEqual(y1, y3)
             self.assertEqual(x1.grad, x2.grad)
+            self.assertEqual(x1.grad, x3.grad)
             # compare origin_model parameters with origin_model parameters after grad updata
-            origin_model_state = origin_model.state_dict()
-            ipex_model_state = ipex_model.state_dict()
+            origin_model_state = origin_model1.state_dict()
+            ipex_model_state1 = ipex_model1.state_dict()
+            ipex_model_state2 = ipex_model2.state_dict()
             for var_name in origin_model_state:
-                self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
+                self.assertEqual(origin_model_state[var_name], ipex_model_state1[var_name])
+                self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name])
+
             # compare momentum_buffer in optimizer's state(sgd)
             # TODO: other optimizer.
-            origin_optimizer_state = origin_optimizer.state_dict()
-            ipex_optimizer_state = ipex_optimizer.state_dict()
+            origin_optimizer_state = origin_optimizer1.state_dict()
+            ipex_optimizer_state1 = ipex_optimizer1.state_dict()
+            ipex_optimizer_state2 = ipex_optimizer2.state_dict()
             for var_name in origin_optimizer_state:
                 if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name])
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name])
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name])
 
     def test_model_serialization(self):
         model = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
@@ -137,7 +178,6 @@ class TestPrepackCases(TestCase):
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = optimizer(origin_model.parameters(), lr=0.01)
             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-            ipex_model = ipex_model.train()
             with ipex.amp.autocast(enabled=True, configure=conf):
                 # train one step for origin.
                 y1 = origin_model(origin_x)

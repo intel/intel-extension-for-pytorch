@@ -32,7 +32,7 @@ class TestOptimizeCases(TestCase):
 
               # inplace
               opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
-              # fused part cannot be inplaced 
+              # fused part cannot be inplaced
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
               # O1 level will prepack the linear weight, cannot be inplaced
               if level == "O1":
@@ -61,7 +61,6 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
-    #TODO: support inplace optimize while given optimizer, change this UT after supported
     def test_optimize_inplace_behavior_training_mode_with_optimizer(self):
           M = TestModule().train()
           sgd = torch.optim.SGD(M.parameters(), lr=0.1)
@@ -73,10 +72,11 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
 
-              # while given optimizer, ipex dose not support inplace optimize the model now
-              self.assertRaisesRegex(AssertionError,
-                        "only support inplace optimize the model while optimizer==None",
-                        lambda: ipex.optimize(M, dtype=dtype, optimizer=sgd,  level=level, inplace=True))
+              opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=True)
+              self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
+              self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
+              self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
+
 
 if __name__ == '__main__':
     test = unittest.main()

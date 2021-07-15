@@ -134,7 +134,58 @@ class _IPEXLinear(torch.nn.Module):
                               missing_keys, unexpected_keys, error_msgs):
         assert False, "_IPEXLinear does not support _load_from_state_dict method"
 
-def _weight_prepack_with_ipex(module, dtype=None):
+
+def _optimizer_convert(optimizer, origin_model, prepacked_model, attrs):
+    """
+    Convert user's optimizer state to expected state, for example, some optimizer has
+    momentum_buffer, need make sure the momentum_buffer is also prepacked if the corresponding
+    parameter has been prepacked.
+    """
+    if optimizer is None:
+        return
+    dict_param = {}
+    for k, value in zip(origin_model.parameters(), prepacked_model.parameters()):
+        dict_param[k] = value
+    for group in optimizer.param_groups:
+        for i, p in enumerate(group['params']):
+            if p in dict_param:
+                new_model_param = dict_param[p]
+                # for bf16 path, replace bf16 weight with master weight.
+                if new_model_param in attrs and new_model_param.dtype == torch.bfloat16:
+                    new_param = attrs[new_model_param]['master_weight']
+                else:
+                    new_param = new_model_param
+                group['params'][i] = new_param
+                # copy optimizer's state.
+                if p in optimizer.state:
+                    optimizer.state[new_param] = optimizer.state.pop(p)
+                    # Prepack the state according to the prepacked weight.
+                    # it covers both conv and linear now. TODO: LSTM or other ops.
+                    if new_model_param in attrs:
+                        attr = attrs[new_model_param]
+                        state = optimizer.state[new_param]
+                        for state_key, state_value in state.items():
+                            if isinstance(state_value, torch.Tensor):
+                                assert state_value.size() == p.size(), \
+                                    "Only support the optimizer state's size has the same shape with model's parameter."
+                                if attr['op'] is torch.nn.Conv2d:
+                                    value_temp = state_value.to(memory_format=torch.channels_last) \
+                                        if attr['weight_channels_last'] else state_value
+                                    state[state_key] = torch.ops.torch_ipex.conv2d_weight_prepack(
+                                        value_temp,
+                                        attr['padding'],
+                                        attr['stride'],
+                                        attr['dilation'],
+                                        attr['groups'],
+                                        attr['dtype'])
+                                elif attr['op'] is torch.nn.Linear:
+                                    state[state_key] = torch.ops.torch_ipex.linear_weight_prepack(
+                                        state_value,
+                                        attr['out_features'],
+                                        attr['in_features'],
+                                        attr['dtype'])
+
+def _weight_prepack_with_ipex(module, optimizer, dtype=None):
     weight_params_attr = {}
     def convert(m, dtype):
         if isinstance(m, torch.nn.Conv2d):
@@ -146,6 +197,8 @@ def _weight_prepack_with_ipex(module, dtype=None):
                                                     'in_channels': new_model.in_channels, \
                                                     'weight_channels_last': new_model.weight_channels_last, \
                                                     'dtype': new_model.dtype}
+            # replace optimizer's param with prepacked param, also prepack its state.
+            _optimizer_convert(optimizer, m, new_model, weight_params_attr)
             return new_model
         elif isinstance(m, torch.nn.Linear):
             try:
@@ -156,6 +209,8 @@ def _weight_prepack_with_ipex(module, dtype=None):
                                                         'in_features': new_model.in_features,
                                                         'weight_transposed': new_model.weight_transposed,
                                                         'dtype': new_model.dtype}
+                # replace optimizer's param with prepacked param, also prepack its state.
+                _optimizer_convert(optimizer, m, new_model, weight_params_attr)
                 return new_model
             except:
                 warnings.warn(m.__str__()  + " not be packed because weight is not transposed or contiguous")
@@ -169,4 +224,4 @@ def _weight_prepack_with_ipex(module, dtype=None):
             setattr(new_m, name, convert_rec(sub_m, dtype))
         return new_m
 
-    return convert_rec(module, dtype), weight_params_attr
+    return convert_rec(module, dtype), optimizer, weight_params_attr
