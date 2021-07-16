@@ -135,11 +135,11 @@ class CPUinfo():
             cur_socket_logical_core = []
             for line in self.cpuinfo:
                 if socket_id == int(line[2]):
-                    if line[1] not in cur_socket_physical_core:
-                        cur_socket_physical_core.append(line[1])
-                        self.physical_core_node_map[line[1]] = line[3]
-                    cur_socket_logical_core.append(line[0])
-                    self.logical_core_node_map[line[0]] = line[3]
+                    if int(line[1]) not in cur_socket_physical_core:
+                        cur_socket_physical_core.append(int(line[1]))
+                        self.physical_core_node_map[int(line[1])] = int(line[3])
+                    cur_socket_logical_core.append(int(line[0]))
+                    self.logical_core_node_map[int(line[0])] = int(line[3])
             self.socket_physical_cores.append(cur_socket_physical_core)
             self.socket_logical_cores.append(cur_socket_logical_core)
 
@@ -282,7 +282,8 @@ class Launcher():
             logger.warning("{} in environment variable is {} while the value you set is {}".format(env_name, os.environ[env_name], env_value))
         self.logger_env(env_name)
 
-    def set_multi_thread_and_allcator(self, ncore_per_instance, disable_iomp=False, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
+    # set_kmp_affinity is used to control whether to set KMP_AFFINITY or not. In scenario that use all cores on all sockets, including logical cores, setting KMP_AFFINITY disables logical cores. In this case, KMP_AFFINITY should not be set.
+    def set_multi_thread_and_allocator(self, ncore_per_instance, disable_iomp=False, set_kmp_affinity=True, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
         '''
         Set multi-thread configuration and enable Intel openMP and TCMalloc/JeMalloc.
         By default, GNU openMP and PTMalloc are used in PyTorch. but Intel openMP and TCMalloc/JeMalloc are better alternatives
@@ -300,7 +301,8 @@ class Launcher():
                    .format("iomp", "iomp5", expanduser("~")))
             else:
                 logger.info("Using Intel OpenMP")
-                self.set_env("KMP_AFFINITY", "granularity=fine,compact,1,0")
+                if set_kmp_affinity:
+                    self.set_env("KMP_AFFINITY", "granularity=fine,compact,1,0")
                 self.set_env("KMP_BLOCKTIME", "1")
         self.logger_env("LD_PRELOAD")
 
@@ -311,6 +313,7 @@ class MultiInstanceLauncher(Launcher):
     def launch(self, args):
         processes = []
         cores = []
+        set_kmp_affinity = True
         if args.core_list:#user specify what cores will be used by params
             cores = args.core_list.strip().split(",")
             if args.ncore_per_instance == -1:
@@ -327,6 +330,8 @@ class MultiInstanceLauncher(Launcher):
                     cores = self.cpuinfo.get_socket_logical_cores(args.socket_id)
                 else:
                     cores = self.cpuinfo.get_all_logical_cores()
+                    # When using all cores on all sockets, including logical cores, setting KMP_AFFINITY disables logical cores. Thus, KMP_AFFINITY should not be set.
+                    set_kmp_affinity = False
             else:
                 if args.socket_id != -1:
                     cores = self.cpuinfo.get_socket_physical_cores(args.socket_id)
@@ -355,8 +360,9 @@ class MultiInstanceLauncher(Launcher):
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
 
-        self.set_multi_thread_and_allcator(args.ncore_per_instance,
+        self.set_multi_thread_and_allocator(args.ncore_per_instance,
                                            args.disable_iomp,
+                                           set_kmp_affinity,
                                            args.enable_tcmalloc,
                                            args.enable_jemalloc,
                                            args.use_default_allocator)
@@ -367,10 +373,23 @@ class MultiInstanceLauncher(Launcher):
            if not args.disable_numactl:
                cmd = ["numactl"]
                core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
+               core_list = sorted(core_list)
                same_numa = self.cpuinfo.numa_aware_check(core_list)
+               core_ranges = []
                for core in core_list:
-                   cur_process_cores = cur_process_cores + str(core) + ","
-               numa_params = "-C {} ".format(cur_process_cores[:-1])
+                   if len(core_ranges) == 0:
+                       range_elem = {'start': core, 'end': core}
+                       core_ranges.append(range_elem)
+                   else:
+                       if core - core_ranges[-1]['end'] == 1:
+                           core_ranges[-1]['end'] = core
+                       else:
+                           range_elem = {'start': core, 'end': core}
+                           core_ranges.append(range_elem)
+               for r in core_ranges:
+                   cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
+               cur_process_cores = cur_process_cores[:-1]
+               numa_params = "-C {} ".format(cur_process_cores)
                if same_numa:
                    numa_params += "-m {}".format(self.cpuinfo.logical_core_node_map[core_list[0]])
                cmd.extend(numa_params.split())
@@ -380,11 +399,13 @@ class MultiInstanceLauncher(Launcher):
            if args.module:
                cmd.append("-m")
            cmd.append(args.program)
-           log_name = args.log_file_prefix + "_instance_{}_cores_".format(i) + cur_process_cores[:-1].replace(',', '_') + ".log"
+           log_name = args.log_file_prefix + "_instance_{}_cores_".format(i) + cur_process_cores.replace(',', '_') + ".log"
            log_name = os.path.join(args.log_path, log_name)
            cmd.extend(args.program_args)
            os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
-           cmd = " ".join(cmd) + " 2>&1 | tee {}".format(log_name)
+           cmd = " ".join(cmd)
+           if args.log_path:
+               cmd = "{} 2>&1 | tee {}".format(cmd, log_name)
            logger.info(cmd)
            process = subprocess.Popen(cmd, env=os.environ, shell=True)
            processes.append(process)
@@ -493,8 +514,9 @@ class DistributedTrainingLauncher(Launcher):
         cores_per_rank = total_cores // ppn
 
         opm_num_threads = cores_per_rank - args.ccl_worker_count
-        self.set_multi_thread_and_allcator(opm_num_threads,
+        self.set_multi_thread_and_allocator(opm_num_threads,
                                            args.disable_iomp,
+                                           True,
                                            args.enable_tcmalloc,
                                            args.enable_jemalloc,
                                            args.use_default_allocator)
@@ -589,8 +611,8 @@ def add_multi_instance_params(parser):
                          help="Disable numactl")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
                          help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
-    group.add_argument("--log_path", metavar='\b', default="./logs/", type=str,
-                         help="The log file path, default path is './logs/'")
+    group.add_argument("--log_path", metavar='\b', default="", type=str,
+                         help="The log file directory. Default path is '', which means disable logging to files.")
     group.add_argument("--log_file_prefix", metavar='\b', default="run", type=str,
                          help="log file prefix")
 
@@ -662,16 +684,17 @@ def main():
         raise RuntimeError("Windows platform is not supported!!!")
 
     args = parse_args()
-    path = os.path.dirname(args.log_path if args.log_path.endswith('/') else args.log_path + '/')
-    if not os.path.exists(path):
-        os.makedirs(path)
-    args.log_path = path
+    if args.log_path:
+        path = os.path.dirname(args.log_path if args.log_path.endswith('/') else args.log_path + '/')
+        if not os.path.exists(path):
+            os.makedirs(path)
+        args.log_path = path
 
-    args.log_file_prefix = '{}_{}'.format(args.log_file_prefix, datetime.now().strftime("%Y%m%d%H%M%S"))
-    fileHandler = logging.FileHandler("{0}/{1}_instances.log".format(args.log_path, args.log_file_prefix))
-    logFormatter = logging.Formatter(format_str)
-    fileHandler.setFormatter(logFormatter)
-    logger.addHandler(fileHandler)
+        args.log_file_prefix = '{}_{}'.format(args.log_file_prefix, datetime.now().strftime("%Y%m%d%H%M%S"))
+        fileHandler = logging.FileHandler("{0}/{1}_instances.log".format(args.log_path, args.log_file_prefix))
+        logFormatter = logging.Formatter(format_str)
+        fileHandler.setFormatter(logFormatter)
+        logger.addHandler(fileHandler)
 
     if args.distributed and args.multi_instance:
         raise RuntimeError("Either args.distributed or args.multi_instance should be set")

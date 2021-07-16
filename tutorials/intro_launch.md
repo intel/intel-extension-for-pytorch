@@ -28,7 +28,7 @@ Available knobs are listed below:
 | ```--use_logical_core``` | - | False | Whether only use physical cores |
 | ```--disable_numactl``` | - | False | Disable numactl |
 | ```--core_list``` | str | None | Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used. |
-| ```--log_path``` | str | './logs' | The log file path, default path is './logs/' |
+| ```--log_path``` | str | '' | The log file path. Default path is '', which means disable logging to files. |
 | ```--log_file_prefix``` | str | 'run' | log file prefix |
 | ```--disable_iomp``` | - | False | By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD |
 | ```--enable_tcmalloc``` | - | False | Enable tcmalloc allocator |
@@ -37,12 +37,12 @@ Available knobs are listed below:
 
 The *launch* script respects existing environment variables when it get launched, expect for *LD_PRELOAD*. If you have your favorite values for certain environment variables, you can set them before running the *launch* script. A typical usage scenario is as the following. Intel OpenMP library uses an environment variable *KMP_AFFINITY* to control its behavior. Different settings result in different performance numbers. By default, if you enable Intel OpenMP library, the *launch* script will set *KMP_AFFINITY* to "granularity=fine,compact,1,0". If you want to try with other values, you can use *export* command on Linux to set *KMP_AFFINITY* before you run the *launch* script. In this case, the script will not set the default value but take the existing value of *KMP_AFFINITY*, and print a message to stdout.
 
-Execution via the *launch* script dumps logs into files under a designated log directory. By default, it is ```log``` under your current directory. 2 types of files will be generated. One file (```<prefix>_timestamp_instances.log```) contains command and information when the script was launched. Another type of files (```<prefix>_timestamp_instance_N_cores_....log```) contain stdout print of each instance.
+Execution via the *launch* script can dump logs into files under a designated log directory so that it will be convenient to do some investigations afterward. By default, it is disabled to avoid undesired log files. You can enable logging by setting knob ```--log_path``` to be 1 directory to save log files. It can be absolute path or relative path. 2 types of files will be generated. One file (```<prefix>_timestamp_instances.log```) contains command and information when the script was launched. Another type of files (```<prefix>_timestamp_instance_N_core#-core#....log```) contain stdout print of each instance.
 
 E.g.
 ```
 run_20210712212258_instances.log
-run_20210712212258_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+run_20210712212258_instance_0_cores_0-43.log
 ```
 
 # Usage Examples
@@ -73,7 +73,7 @@ __Note:__ GIF files below intend to show CPU usage ONLY. Please do NOT induct pe
 ### I. Use all physical cores
 
 ```
-python -m torch_ipex.launch launch_example.py
+python -m torch_ipex.launch --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched physical core number of threads on all physical cores.
@@ -86,7 +86,7 @@ If you check your log directory, you will find directory structure as below.
 .
 ├── launch_example.py
 └── logs
-    ├── run_20210712212258_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+    ├── run_20210712212258_instance_0_cores_0-43.log
     └── run_20210712212258_instances.log
 ```
 
@@ -100,13 +100,13 @@ $ cat logs/run_20210712212258_instances.log
 2021-07-12 21:22:58,764 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 21:22:58,764 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
 2021-07-12 21:22:58,764 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
-2021-07-12 21:22:58,764 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712212258_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-12 21:22:58,764 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712212258_instance_0_cores_0-43.log
 ```
 
 ### II. Use all cores including logical cores
 
 ```
-python -m torch_ipex.launch --use_logical_core launch_example.py
+python -m torch_ipex.launch --use_logical_core --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all cores, including logical cores.
@@ -120,7 +120,7 @@ If you check your log directory, you will find directory structure as below.
 ├── launch_example.py
 └── logs
     ├── run_20210712223308_instances.log
-    └── run_20210712223308_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_44_45_46_47_48_49_50_51_52_53_54_55_56_57_58_59_60_61_62_63_64_65_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43_66_67_68_69_70_71_72_73_74_75_76_77_78_79_80_81_82_83_84_85_86_87.log
+    └── run_20210712223308_instance_0_cores_0-87.log
 ```
 
 The ```run_20210712223308_instances.log``` contains information and command that were used for this execution launch.
@@ -133,15 +133,13 @@ $ cat logs/run_20210712223308_instances.log
 2021-07-12 22:33:08,118 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:33:08,118 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
 2021-07-12 22:33:08,118 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80', '81', '82', '83', '84', '85', '86', '87'] in different NUMA node
-2021-07-12 22:33:08,118 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712223308_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_44_45_46_47_48_49_50_51_52_53_54_55_56_57_58_59_60_61_62_63_64_65_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43_66_67_68_69_70_71_72_73_74_75_76_77_78_79_80_81_82_83_84_85_86_87.log
+2021-07-12 22:33:08,118 - __main__ - INFO - numactl -C 0-87 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712223308_instance_0_cores_0-87.log
 ```
-
-__Note:__ A known issue is that if there are too many cores used, name of the log file will exceed length limit and thus not able to generate the log file. It will be fixed later showing range of cores, rather than enumerate all cores out.
 
 ### III. Use physical cores on 1 socket
 
 ```
-python -m torch_ipex.launch --socket_id 1 launch_example.py
+python -m torch_ipex.launch --socket_id 1 --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same socket.
@@ -154,8 +152,8 @@ If you check your log directory, you will find directory structure as below.
 .
 ├── launch_example.py
 └── logs
-	├── run_20210712214504_instances.log
-    └── run_20210712214504_instance_0_cores_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+    ├── run_20210712214504_instances.log
+    └── run_20210712214504_instance_0_cores_22-43.log
     
 ```
 
@@ -168,13 +166,13 @@ $ cat logs/run_20210712214504_instances.log
 2021-07-12 21:45:04,513 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 21:45:04,513 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 21:45:04,513 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 21:45:04,513 - __main__ - INFO - numactl -C 22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712214504_instance_0_cores_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-12 21:45:04,513 - __main__ - INFO - numactl -C 22-43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712214504_instance_0_cores_22-43.log
 ```
 
 ### IV. Use your designated number of cores
 
 ```
-python -m torch_ipex.launch --ninstances 1 --ncore_per_instance 10 launch_example.py
+python -m torch_ipex.launch --ninstances 1 --ncore_per_instance 10 --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on other 9 physical cores.
@@ -187,8 +185,8 @@ If you check your log directory, you will find directory structure as below.
 .
 ├── launch_example.py
 └── logs
-	├── run_20210712220928_instances.log
-    └── run_20210712220928_instance_0_cores_0_1_2_3_4_5_6_7_8_9.log
+    ├── run_20210712220928_instances.log
+    └── run_20210712220928_instance_0_cores_0-9.log
 ```
 
 The ```run_20210712220928_instances.log``` contains information and command that were used for this execution launch.
@@ -200,7 +198,7 @@ $ cat logs/run_20210712220928_instances.log
 2021-07-12 22:09:28,355 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 22:09:28,356 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:09:28,356 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 22:09:28,356 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712220928_instance_0_cores_0_1_2_3_4_5_6_7_8_9.log
+2021-07-12 22:09:28,356 - __main__ - INFO - numactl -C 0-9 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712220928_instance_0_cores_0-9.log
 ```
 
 ## Multiple instances for inference
@@ -208,7 +206,7 @@ $ cat logs/run_20210712220928_instances.log
 ### V. Throughput mode
 
 ```
-python -m torch_ipex.launch --throughput_mode launch_example.py
+python -m torch_ipex.launch --throughput_mode --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 2 main worker threads were launched on 2 socket respectively, then they launched threads on other physical cores.
@@ -221,9 +219,9 @@ If you check your log directory, you will find directory structure as below.
 .
 ├── launch_example.py
 └── logs
-	├── run_20210712221150_instances.log
-    ├── run_20210712221150_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21.log
-	└── run_20210712221150_instance_1_cores_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+    ├── run_20210712221150_instances.log
+    ├── run_20210712221150_instance_0_cores_0-21.log
+    └── run_20210712221150_instance_1_cores_22-43.log
 ```
 
 The ```run_20210712221150_instances.log``` contains information and command that were used for this execution launch.
@@ -235,14 +233,14 @@ $ cat logs/run_20210712221150_instances.log
 2021-07-12 22:11:50,233 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 22:11:50,233 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:11:50,233 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 22:11:50,233 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221150_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21.log
-2021-07-12 22:11:50,236 - __main__ - INFO - numactl -C 22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221150_instance_1_cores_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-12 22:11:50,233 - __main__ - INFO - numactl -C 0-21 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221150_instance_0_cores_0-21.log
+2021-07-12 22:11:50,236 - __main__ - INFO - numactl -C 22-43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221150_instance_1_cores_22-43.log
 ```
 
 ### VI. Latency mode
 
 ```
-python -m torch_ipex.launch --latency_mode launch_example.py
+python -m torch_ipex.launch --latency_mode --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 4 cores are used for each instance.
@@ -255,18 +253,18 @@ If you check your log directory, you will find directory structure as below.
 .
 ├── launch_example.py
 └── logs
-	├── run_20210712221415_instances.log
-    ├── run_20210712221415_instance_0_cores_0_1_2_3.log
-	├── run_20210712221415_instance_1_cores_4_5_6_7.log
-	├── run_20210712221415_instance_2_cores_8_9_10_11.log
-	├── run_20210712221415_instance_3_cores_12_13_14_15.log
-	├── run_20210712221415_instance_4_cores_16_17_18_19.log
-	├── run_20210712221415_instance_5_cores_20_21_22_23.log
-	├── run_20210712221415_instance_6_cores_24_25_26_27.log
-	├── run_20210712221415_instance_7_cores_28_29_30_31.log
-	├── run_20210712221415_instance_8_cores_32_33_34_35.log
-	├── run_20210712221415_instance_9_cores_36_37_38_39.log
-	└── run_20210712221415_instance_10_cores_40_41_42_43.log
+    ├── run_20210712221415_instances.log
+    ├── run_20210712221415_instance_0_cores_0-3.log
+    ├── run_20210712221415_instance_1_cores_4-7.log
+    ├── run_20210712221415_instance_2_cores_8-11.log
+    ├── run_20210712221415_instance_3_cores_12-15.log
+    ├── run_20210712221415_instance_4_cores_16-19.log
+    ├── run_20210712221415_instance_5_cores_20-23.log
+    ├── run_20210712221415_instance_6_cores_24-27.log
+    ├── run_20210712221415_instance_7_cores_28-31.log
+    ├── run_20210712221415_instance_8_cores_32-35.log
+    ├── run_20210712221415_instance_9_cores_36-39.log
+    └── run_20210712221415_instance_10_cores_40-43.log
 ```
 
 The ```run_20210712221415_instances.log``` contains information and command that were used for this execution launch.
@@ -278,24 +276,24 @@ $ cat logs/run_20210712221415_instances.log
 2021-07-12 22:14:15,140 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 22:14:15,140 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:14:15,140 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 22:14:15,140 - __main__ - INFO - numactl -C 0,1,2,3 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_0_cores_0_1_2_3.log
-2021-07-12 22:14:15,143 - __main__ - INFO - numactl -C 4,5,6,7 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_1_cores_4_5_6_7.log
-2021-07-12 22:14:15,146 - __main__ - INFO - numactl -C 8,9,10,11 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_2_cores_8_9_10_11.log
-2021-07-12 22:14:15,149 - __main__ - INFO - numactl -C 12,13,14,15 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_3_cores_12_13_14_15.log
-2021-07-12 22:14:15,151 - __main__ - INFO - numactl -C 16,17,18,19 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_4_cores_16_17_18_19.log
+2021-07-12 22:14:15,140 - __main__ - INFO - numactl -C 0-3 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_0_cores_0-3.log
+2021-07-12 22:14:15,143 - __main__ - INFO - numactl -C 4-7 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_1_cores_4-7.log
+2021-07-12 22:14:15,146 - __main__ - INFO - numactl -C 8-11 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_2_cores_8-11.log
+2021-07-12 22:14:15,149 - __main__ - INFO - numactl -C 12-15 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_3_cores_12-15.log
+2021-07-12 22:14:15,151 - __main__ - INFO - numactl -C 16-19 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_4_cores_16-19.log
 2021-07-12 22:14:15,154 - __main__ - WARNING - Numa Aware: cores:['20', '21', '22', '23'] in different NUMA node
-2021-07-12 22:14:15,154 - __main__ - INFO - numactl -C 20,21,22,23 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_5_cores_20_21_22_23.log
-2021-07-12 22:14:15,157 - __main__ - INFO - numactl -C 24,25,26,27 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_6_cores_24_25_26_27.log
-2021-07-12 22:14:15,159 - __main__ - INFO - numactl -C 28,29,30,31 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_7_cores_28_29_30_31.log
-2021-07-12 22:14:15,162 - __main__ - INFO - numactl -C 32,33,34,35 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_8_cores_32_33_34_35.log
-2021-07-12 22:14:15,164 - __main__ - INFO - numactl -C 36,37,38,39 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_9_cores_36_37_38_39.log
-2021-07-12 22:14:15,167 - __main__ - INFO - numactl -C 40,41,42,43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_10_cores_40_41_42_43.log
+2021-07-12 22:14:15,154 - __main__ - INFO - numactl -C 20-23 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_5_cores_20-23.log
+2021-07-12 22:14:15,157 - __main__ - INFO - numactl -C 24-27 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_6_cores_24-27.log
+2021-07-12 22:14:15,159 - __main__ - INFO - numactl -C 28-31 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_7_cores_28-31.log
+2021-07-12 22:14:15,162 - __main__ - INFO - numactl -C 32-35 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_8_cores_32-35.log
+2021-07-12 22:14:15,164 - __main__ - INFO - numactl -C 36-39 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_9_cores_36-39.log
+2021-07-12 22:14:15,167 - __main__ - INFO - numactl -C 40-43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221415_instance_10_cores_40-43.log
 ```
 
 ### VII. Your designated number of instances
 
 ```
-python -m torch_ipex.launch --ninstances 4 launch_example.py
+python -m torch_ipex.launch --ninstances 4 --log_dir ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 4 main worker thread were launched, then they launched threads on all other physical cores.
@@ -308,11 +306,11 @@ If you check your log directory, you will find directory structure as below.
 .
 ├── launch_example.py
 └── logs
-	├── run_20210712221305_instances.log
-    ├── run_20210712221305_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10.log
-	├── run_20210712221305_instance_1_cores_11_12_13_14_15_16_17_18_19_20_21.log
-	├── run_20210712221305_instance_2_cores_22_23_24_25_26_27_28_29_30_31_32.log
-	└── run_20210712221305_instance_3_cores_33_34_35_36_37_38_39_40_41_42_43.log
+    ├── run_20210712221305_instances.log
+    ├── run_20210712221305_instance_0_cores_0-10.log
+    ├── run_20210712221305_instance_1_cores_11-21.log
+    ├── run_20210712221305_instance_2_cores_22-32.log
+    └── run_20210712221305_instance_3_cores_33-43.log
 ```
 
 The ```run_20210712221305_instances.log``` contains information and command that were used for this execution launch.
@@ -324,10 +322,10 @@ $ cat logs/run_20210712221305_instances.log
 2021-07-12 22:13:05,470 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 22:13:05,470 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:13:05,470 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 22:13:05,471 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10.log
-2021-07-12 22:13:05,473 - __main__ - INFO - numactl -C 11,12,13,14,15,16,17,18,19,20,21 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_1_cores_11_12_13_14_15_16_17_18_19_20_21.log
-2021-07-12 22:13:05,476 - __main__ - INFO - numactl -C 22,23,24,25,26,27,28,29,30,31,32 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_2_cores_22_23_24_25_26_27_28_29_30_31_32.log
-2021-07-12 22:13:05,479 - __main__ - INFO - numactl -C 33,34,35,36,37,38,39,40,41,42,43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_3_cores_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-12 22:13:05,471 - __main__ - INFO - numactl -C 0-10 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_0_cores_0-10.log
+2021-07-12 22:13:05,473 - __main__ - INFO - numactl -C 11-21 -m 0 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_1_cores_11-21.log
+2021-07-12 22:13:05,476 - __main__ - INFO - numactl -C 22-32 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_2_cores_22-32.log
+2021-07-12 22:13:05,479 - __main__ - INFO - numactl -C 33-43 -m 1 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210712221305_instance_3_cores_33-43.log
 ```
 
 ## Usage of Jemalloc/TCMalloc/Default memory allocator
@@ -339,7 +337,7 @@ Memory allocator influences performance sometime. If users do not designate desi
 __Note:__ You can set your favorite value to *MALLOC_CONF* before running the *launch* script if you do not want to use its default setting.
 
 ```
-python -m torch_ipex.launch --enable_jemalloc launch_example.py
+python -m torch_ipex.launch --enable_jemalloc --log_dir ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -353,13 +351,13 @@ you can confirm usage in log file:
 2021-07-13 15:30:48,235 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-13 15:30:48,235 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so:<VIRTUAL_ENV>/lib/libjemalloc.so
 2021-07-13 15:30:48,236 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
-2021-07-13 15:30:48,236 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713153048_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-13 15:30:48,236 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713153048_instance_0_cores_0-43.log
 ```
 
 ### TCMalloc
 
 ```
-python -m torch_ipex.launch --enable_tcmalloc launch_example.py
+python -m torch_ipex.launch --enable_tcmalloc --log_dir ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -372,13 +370,13 @@ you can confirm usage in log file:
 2021-07-13 15:33:33,654 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-13 15:33:33,654 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so:<VIRTUAL_ENV>/lib/libtcmalloc.so
 2021-07-13 15:33:33,654 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
-2021-07-13 15:33:33,655 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713153333_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-13 15:33:33,655 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713153333_instance_0_cores_0-43.log
 ```
 
 ### Default memory allocator
 
 ```
-python -m torch_ipex.launch --use_default_allocator launch_example.py
+python -m torch_ipex.launch --use_default_allocator --log_dir ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -390,7 +388,7 @@ you can confirm usage in log file:
 2021-07-13 15:36:59,784 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-13 15:36:59,784 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
 2021-07-13 15:36:59,784 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
-2021-07-13 15:36:59,784 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713153659_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-13 15:36:59,784 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713153659_instance_0_cores_0-43.log
 ```
 
 ## Usage of OpenMP library
@@ -404,7 +402,7 @@ Generally, Intel OpenMP library brings better performance. Thus, in the *launch*
 It is, however, not always that Intel OpenMP library brings better performance comparing to GNU OpenMP library. In this case, you can use knob ```--disable_iomp``` to switch active OpenMP library to the GNU one.
 
 ```
-python -m torch_ipex.launch --disable_iomp launch_example.py
+python -m torch_ipex.launch --disable_iomp --log_dir ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -413,5 +411,5 @@ you can confirm usage in log file:
 2021-07-13 15:25:00,760 - __main__ - WARNING - Both TCMalloc and JeMalloc are not found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or /home/<user>/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance
 2021-07-13 15:25:00,761 - __main__ - INFO - OMP_NUM_THREADS=44
 2021-07-13 15:25:00,761 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
-2021-07-13 15:25:00,761 - __main__ - INFO - numactl -C 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713152500_instance_0_cores_0_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37_38_39_40_41_42_43.log
+2021-07-13 15:25:00,761 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python launch_example.py 2>&1 | tee ./logs/run_20210713152500_instance_0_cores_0-43.log
 ```
