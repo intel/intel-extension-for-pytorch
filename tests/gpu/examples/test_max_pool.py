@@ -19,19 +19,19 @@ class TestNNMethod(TestCase):
         max_pool = nn.MaxPool2d(kernel_size=3, stride=1,
                                 padding=1, return_indices=True)
 
-        # y_cpu = conv1(x_cpu)
         x_cpu.requires_grad_(True)
-        y_cpu = max_pool(x_cpu)
+        y_cpu1 = conv1(x_cpu)
+        y_cpu = max_pool(y_cpu1)
         print("y_cpu", y_cpu[0])
         output_cpu = y_cpu[0].backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
 
-        # conv1.to("xpu")
-
-        # y_dpcpp = conv1(x_dpcpp)
+        conv1.to("xpu")
         max_pool.to("xpu")
+        
         x_dpcpp.requires_grad_(True)
-        y_dpcpp = max_pool(x_dpcpp)
+        y_dpcpp1 = conv1(x_dpcpp)
+        y_dpcpp = max_pool(y_dpcpp1)
         print("y_dpcpp", y_dpcpp[0].to("cpu"))
         output_dpcpp = y_dpcpp[0].backward(grad_dpcpp)
         print("x_dpcpp.grad", x_dpcpp.grad.to("cpu"))

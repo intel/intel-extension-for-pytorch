@@ -559,7 +559,7 @@ static at::Tensor pooling_backward(
 
   auto expexted_idx_md = pooling_bwd_pd.workspace_desc();
   auto idx_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(idx);
-  at::Tensor idx_usr;
+  at::Tensor idx_usr = idx;
   if (idx_ctx.is_plain()) {
     idx_usr = at::empty({diff_dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
     dtype_convert_by_scalar(idx_usr.data_ptr<int32_t>(), idx.data_ptr<int64_t>(), idx_usr.numel());
@@ -575,11 +575,10 @@ static at::Tensor pooling_backward(
   auto idx_m = idx_usr_m;
   if (Settings::I().is_onednn_layout_enabled()) {
     if (idx_usr_m.get_desc() != expexted_idx_md) {
-      idx_opt = at::empty({expexted_idx_md.get_size() / idx.itemsize()},
-        at::TensorOptions(at::kXPU).dtype(at::kInt));
+      idx_opt = empty_opaque_tensor(
+          expexted_idx_md, at::TensorOptions(at::kXPU).dtype(at::kInt), c10::nullopt);
       idx_m = dpcpp_onednn_memory(expexted_idx_md, engine, idx_opt.data_ptr());
-      DPCPP_ONEDNN_EXEC(dnnl::reorder(idx_usr_m, idx_m),
-          strm, {{DNNL_ARG_FROM, idx_usr_m}, {DNNL_ARG_TO, idx_m}});
+      xpu::oneDNN::reorder(idx_usr, idx_opt);
     }
   }
 
