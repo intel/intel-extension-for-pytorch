@@ -136,28 +136,18 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_grad_output_md = conv_backward_data_pd.diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
   if (grad_output_usr_memory.get_desc() != expected_grad_output_md) {
-    auto item_num = static_cast<int64_t>(expected_grad_output_md.get_size() / grad_output.itemsize());
-    grad_output_ = at::AtenIpexTypeXPU::empty({item_num}, grad_output.options(), c10::nullopt);
+    grad_output_ = empty_opaque_tensor(expected_grad_output_md, grad_output.options(), c10::nullopt);
     grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_output_usr_memory, grad_output_memory),
-        strm,
-        {{DNNL_ARG_FROM, grad_output_usr_memory},
-        {DNNL_ARG_TO, grad_output_memory}});
+    xpu::oneDNN::reorder(grad_output, grad_output_);
   }
 
   Tensor weight_;
   auto expected_weight_md = conv_backward_data_pd.weights_desc();
   auto weight_memory = weight_usr_memory;
   if (weight_usr_memory.get_desc() != expected_weight_md) {
-    auto item_num = static_cast<int64_t>(expected_weight_md.get_size() / weight.itemsize());
-    weight_ = at::AtenIpexTypeXPU::empty({item_num}, weight.options(), c10::nullopt);
+    weight_ = empty_opaque_tensor(expected_weight_md, weight.options(), c10::nullopt);
     weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weight_usr_memory, weight_memory),
-        strm,
-        {{DNNL_ARG_FROM, weight_usr_memory},
-        {DNNL_ARG_TO, weight_memory}});
+    xpu::oneDNN::reorder(weight, weight_);
   }
 
   Tensor grad_input_;
@@ -188,11 +178,7 @@ Tensor dpcpp_convolution_backward_input(
 
   if (!Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_input_memory, grad_input_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, grad_input_memory},
-        {DNNL_ARG_TO, grad_input_usr_memory}});
+    xpu::oneDNN::reorder(grad_input_, grad_input);
   } else if (Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
@@ -321,36 +307,25 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto expected_input_md = conv_backward_weight_pd.src_desc();
   auto input_memory = input_usr_memory;
   if (input_usr_memory.get_desc() != expected_input_md) {
-    auto item_num = static_cast<int64_t>(expected_input_md.get_size() / input.itemsize());
-    input_ = at::AtenIpexTypeXPU::empty({item_num}, input.options(), c10::nullopt);
+    input_ = empty_opaque_tensor(expected_input_md, input.options(), c10::nullopt);
     input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(input_usr_memory, input_memory),
-        strm,
-        {{DNNL_ARG_FROM, input_usr_memory},
-        {DNNL_ARG_TO, input_memory}});
+    xpu::oneDNN::reorder(input, input_);
   }
 
   Tensor grad_output_;
   auto expected_grad_output_md = conv_backward_weight_pd.diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
   if (grad_output_usr_memory.get_desc() != expected_grad_output_md) {
-    auto item_num = static_cast<int64_t>(expected_grad_output_md.get_size() / grad_output.itemsize());
-    grad_output_ = at::AtenIpexTypeXPU::empty({item_num}, grad_output.options(), c10::nullopt);
+    grad_output_ = empty_opaque_tensor(expected_grad_output_md, grad_output.options(), c10::nullopt);
     grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_output_usr_memory, grad_output_memory),
-        strm,
-        {{DNNL_ARG_FROM, grad_output_usr_memory},
-        {DNNL_ARG_TO, grad_output_memory}});
+    xpu::oneDNN::reorder(grad_output, grad_output_);
   }
 
   Tensor grad_weight_;
   auto expected_grad_weight_md = conv_backward_weight_pd.diff_weights_desc();
   auto grad_weight_memory = grad_weight_usr_memory;
   if (grad_weight_usr_memory.get_desc() != expected_grad_weight_md) {
-    auto item_num = static_cast<int64_t>(expected_grad_weight_md.get_size() / grad_weight.itemsize());
-    grad_weight_ = at::AtenIpexTypeXPU::empty({item_num}, grad_weight.options(), c10::nullopt);
+    grad_weight_ = empty_opaque_tensor(expected_grad_weight_md, grad_weight.options(), c10::nullopt);
     grad_weight_memory = dpcpp_onednn_memory(expected_grad_weight_md, engine, grad_weight_.data_ptr());
   }
 
@@ -390,11 +365,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
     // grad_weight_ contains the result of gw backward, while it is blk format.
     // In training mode, plain gw output is expected for sgd update regardless of onednn_layout_enabled or not.
     // Thus, we need one additional reorder here to make grad_weight plain.
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_weight_memory, grad_weight_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, grad_weight_memory},
-        {DNNL_ARG_TO, grad_weight_usr_memory}});
+    xpu::oneDNN::reorder(grad_weight_, grad_weight);
   }
 
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
