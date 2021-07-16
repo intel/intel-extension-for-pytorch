@@ -584,7 +584,35 @@ static void apply_cholesky_solve_dpcpp_(
     error_handle(infos_, be);
   }
 #else
-  AT_ERROR("lu: oneMKL library not found in compilation");
+  AT_ERROR("cholesky_solve: oneMKL library not found in compilation");
+#endif
+}
+
+template<typename scalar_t>
+static void apply_cholesky_dpcpp(Tensor& self_, bool upper_, std::vector<int64_t>& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo = upper_ ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
+
+  auto n = self_.size(-1);
+
+  std::int64_t lda = self_.size(-2);
+
+  scalar_t *a = (scalar_t*)(self_.data_ptr());
+
+  int64_t scratchpadsize =
+    oneapi::mkl::lapack::potrf_scratchpad_size<scalar_t>(
+        dpcpp_queue, uplo, n, lda);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::lapack::potrf,
+        dpcpp_queue, uplo, n, a, lda,
+        (scalar_t *)(scratchpad_at.data_ptr()), scratchpadsize);
+  } catch (oneapi::mkl::lapack::batch_error be) {
+    error_handle(infos_, be);
+  }
+#else
+  AT_ERROR("cholesky: LAPACK library not found in compilation");
 #endif
 }
 
@@ -1103,6 +1131,40 @@ Tensor cholesky_solve(const Tensor& self, const Tensor& input2, bool upper) {
 
 Tensor& cholesky_solve_out(Tensor & out, const Tensor & self, const Tensor & input2, bool upper) {
   Tensor out_tmp = at::AtenIpexTypeXPU::cholesky_solve(self, input2, upper);
+  out.resize_as_(out_tmp).copy_(out_tmp);
+  return out;
+}
+
+Tensor _cholesky_helper(const Tensor& self, bool upper) {
+  std::vector<int64_t> infos(native::batchCount(self), 0);
+  auto self_working_copy = native::cloneBatchedColumnMajor(self);
+  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_dpcpp", [&]{
+    impl::apply_cholesky_dpcpp<scalar_t>(self_working_copy, upper, infos);
+  });
+  if (self.dim() > 2) {
+    native::batchCheckErrors(infos, "cholesky_dpcpp");
+  } else {
+    native::singleCheckErrors(infos[0], "cholesky_dpcpp");
+  }
+  return self_working_copy;
+}
+
+Tensor cholesky(const Tensor & self, bool upper) {
+  TORCH_CHECK(self.dim() == 2, "input must be 2-d matrix, input shape=", self.sizes());
+  if (self.size(-1) == 0) {
+    return at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  }
+  native::squareCheckInputs(self);
+  auto raw_cholesky_output = at::AtenIpexTypeXPU::_cholesky_helper(self, upper);
+  if (upper) {
+    return raw_cholesky_output.tril_();
+  } else {
+    return raw_cholesky_output.triu_();
+  }
+}
+
+Tensor & cholesky_out(Tensor & out, const Tensor & self, bool upper) {
+  Tensor out_tmp = at::AtenIpexTypeXPU::cholesky(self, upper);
   out.resize_as_(out_tmp).copy_(out_tmp);
   return out;
 }

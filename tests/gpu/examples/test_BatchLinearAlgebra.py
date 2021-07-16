@@ -32,6 +32,25 @@ class TestTorchMethod(TestCase):
                          torch.triu(y_dpcpp2).to(cpu_device))
 
     @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
+    def test_cholesky(self, dtype=torch.float):
+        x_cpu = torch.randn(3, 3)
+        print("x cpu \n", x_cpu)
+        x_cpu = torch.mm(x_cpu, x_cpu.t())
+        print("x mm cpu \n", x_cpu)
+
+        x_dpcpp = x_cpu.to(dpcpp_device)
+        print(" xpu x_dpcpp \n", x_dpcpp.cpu())
+
+        res = torch.cholesky(x_cpu)
+        print("res cpu \n", res)
+        res_dpcpp = torch.cholesky(x_dpcpp)
+        print("res_dpcpp  \n", res_dpcpp.cpu())
+        res_tensor_dpcpp = x_dpcpp.cholesky()
+        print("res_tensor_dpcpp  \n", res_tensor_dpcpp.cpu())
+        self.assertEqual(res.to(cpu_device), res_dpcpp.to(cpu_device))
+        self.assertEqual(res.to(cpu_device), res_tensor_dpcpp.to(cpu_device))
+
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_cholesky_solve(self, dtype=torch.float):
         a = torch.randn([3, 3], device=cpu_device)
         print (" cpu a  ", a)
