@@ -6,6 +6,15 @@ namespace jit {
 namespace fuser {
 namespace onednn {
 
+bool couldSupportOpaqueLayout(Node* node) {
+  switch (node->kind()) {
+    case aten::size:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void LayoutPropagation(Node* n) {
   if (!LlgaGraphHelper::isLlgaSubgraph(n))
     return;
@@ -16,7 +25,7 @@ void LayoutPropagation(Node* n) {
     if (LlgaGraphHelper::isLlgaSubgraph(prev)) {
       bool useOpaqueLayout = true;
       for (auto& use : input->uses()) {
-        if (!LlgaGraphHelper::isLlgaSubgraph(use.user)) {
+        if (!couldSupportOpaqueLayout(use.user) && !LlgaGraphHelper::isLlgaSubgraph(use.user)) {
           useOpaqueLayout = false;
           break;
         }

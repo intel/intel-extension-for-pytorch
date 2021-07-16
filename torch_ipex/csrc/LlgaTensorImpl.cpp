@@ -12,7 +12,11 @@ LlgaTensorImpl::LlgaTensorImpl(
           std::move(storage),
           c10::DispatchKeySet(DispatchKey::MkldnnCPU),
           data_type),
-      desc_(desc) {}
+      desc_(desc) {
+        for (int64_t i = 0; i < desc.sizes().size(); i++) {
+          c10::TensorImpl::set_size(i, desc.sizes()[i]);
+        }
+      }
 
 // The following are publically exposed as methods of Tensor
 IntArrayRef LlgaTensorImpl::strides() const {
@@ -31,11 +35,6 @@ int64_t LlgaTensorImpl::storage_offset() const {
   TORCH_CHECK(false, "Cannot access the storage_offset() of LlgaTensorImpl");
 }
 
-// The following are some internal inherited methods that we do not support.
-// They should never get called.
-void LlgaTensorImpl::set_size(int64_t dim, int64_t new_size) {
-  TORCH_INTERNAL_ASSERT(false, "Cannot set_size for LlgaTensorImpl");
-}
 void LlgaTensorImpl::set_stride(int64_t dim, int64_t new_stride) {
   TORCH_INTERNAL_ASSERT(false, "Cannot set_stride for LlgaTensorImpl");
 }

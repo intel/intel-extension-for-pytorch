@@ -193,7 +193,6 @@ struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
           at::MemoryFormat::Contiguous) const override;
   IntArrayRef strides() const override;
   int64_t stride(int64_t d) const override;
-  void set_size(int64_t dim, int64_t new_size) override;
   void set_stride(int64_t dim, int64_t new_stride) override;
   void set_storage_offset(int64_t storage_offset) override;
   bool has_storage() const override;
