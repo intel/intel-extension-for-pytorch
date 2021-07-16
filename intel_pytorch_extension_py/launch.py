@@ -264,7 +264,7 @@ class Launcher():
             if find_je:
                 logger.info("Use JeMallocl memory allocator")
                 return
-            logger.warning("Both TCMalloc and JeMalloc are not fount in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
+            logger.warning("Both TCMalloc and JeMalloc are not found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
                            " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
                            "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance"
                            .format(expanduser("~")))
@@ -576,7 +576,7 @@ def add_multi_instance_params(parser):
     group.add_argument("--ncore_per_instance", metavar='\b', default=-1, type=int,
                          help="Cores per instance")
     group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
-                         help="For multi-instance, you should give the cores number you used for per insantance.")
+                         help="For multi-instance, you should give the cores number you used for per instance.")
     group.add_argument("--latency_mode", action='store_true', default=False,
                          help="By detault 4 core per instance and use all physical cores")
     group.add_argument("--throughput_mode", action='store_true', default=False,
@@ -590,7 +590,7 @@ def add_multi_instance_params(parser):
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
                          help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
     group.add_argument("--log_path", metavar='\b', default="./logs/", type=str,
-                         help="The log file path, defualt path is './logs/'")
+                         help="The log file path, default path is './logs/'")
     group.add_argument("--log_file_prefix", metavar='\b', default="run", type=str,
                          help="log file prefix")
 
