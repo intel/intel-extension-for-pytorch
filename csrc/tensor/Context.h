@@ -222,7 +222,6 @@ class DPCPPTensorConvertor {
   }
 
 
-  static bool convert(at::Tensor& to, const at::Tensor& from);
   static at::Tensor to_plain(const at::Tensor& from);
   static at::Tensor to_plain_(at::Tensor& from);
 };

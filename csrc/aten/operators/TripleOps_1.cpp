@@ -5,6 +5,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/SparseTensorUtils.h>
 #include <ATen/AtenIpexTypeXPU.h>
+#include <oneDNN/oneDNN.h>
 
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -104,7 +105,7 @@ Tensor mul_add(
         if (cur_ctx.meta() != tar_ctx.meta()) {
           cur = empty_opaque_tensor(
               tar_ctx.meta(), inputs[i].options(), c10::nullopt);
-          AtenIpexTypeXPU::DPCPPTensorConvertor::convert(cur, inputs[i]);
+          xpu::oneDNN::reorder(inputs[i], cur);
         }
         _inputs.push_back(cur);
       } else {

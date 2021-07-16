@@ -7,45 +7,6 @@ using namespace xpu::oneDNN;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-bool DPCPPTensorConvertor::convert(at::Tensor& to, const at::Tensor& from) {
-  auto from_ctx = *(static_cast<DPCPPTensorContext*>(
-      from.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
-  auto to_ctx = *(static_cast<DPCPPTensorContext*>(
-      to.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
-
-  auto to_is_opaque_tensor = is_opaque_tensor(to);
-  auto from_is_opaque_tensor = is_opaque_tensor(from);
-
-  if (!to_is_opaque_tensor && !from_is_opaque_tensor)
-    return false;
-
-  auto opaque_ctx = from_is_opaque_tensor ? from_ctx : to_ctx;
-  mem_desc_t opaque_md = {opaque_ctx.meta().data};
-  mem_desc_t plain_md = {opaque_ctx.dims(),
-                         opaque_ctx.dtype(),
-                         opaque_ctx.plain_strides()};
-  mem_desc_t from_md = from_is_opaque_tensor ? opaque_md : plain_md;
-  mem_desc_t to_md = to_is_opaque_tensor ? opaque_md : plain_md;
-
-  at::Device curDevice = at::Device(at::kXPU, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  auto from_mem = dpcpp_onednn_memory(from_md, engine, from.data_ptr());
-  auto to_mem = dpcpp_onednn_memory(to_md, engine, to.data_ptr());
-
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, from_md, to_md);
-  auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, from_mem, to_mem);
-#else
-  auto reorder_p = dnnl::reorder(from_mem, to_mem);
-#endif
-  DPCPP_ONEDNN_EXEC(reorder_p, strm, {{DNNL_ARG_FROM, from_mem}, {DNNL_ARG_TO, to_mem}});
-
-  return true;
-}
-
 at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   if (!is_opaque_tensor(from))
     return from;
@@ -73,7 +34,7 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   auto to = !from.is_quantized() ?
             at::AtenIpexTypeXPU::empty(ctx.dims(), options, c10::nullopt) :
             at::AtenIpexTypeXPU::new_qtensor(ctx.dims(), options, from.quantizer());
-  convert(to, from);
+  xpu::oneDNN::reorder(from, to);
 
   // permute shape to original shape
   if (!ctx.permution().empty())
