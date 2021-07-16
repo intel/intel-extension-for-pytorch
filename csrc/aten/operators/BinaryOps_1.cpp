@@ -151,9 +151,10 @@ Tensor& add_out(
       }
     }
 
-    IPEX_DISPATCH_ALL_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND3(
         at::ScalarType::BFloat16,
-        at::ScalarType::Half,
+        at::ScalarType::Bool,
+	at::ScalarType::Half,
         result.scalar_type(),
         "eltwise_binary_naive::add",
         [&]() {

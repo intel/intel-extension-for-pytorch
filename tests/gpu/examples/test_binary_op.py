@@ -168,3 +168,9 @@ class TestTorchMethod(TestCase):
         print(x1_xpu.cpu())
 
         self.assertEqual(x1, x1_xpu.cpu())
+
+        a = torch.tensor([True, False], device="xpu")
+        b = torch.tensor([False, True], device="xpu")
+        t = torch.tensor([True, True], device="xpu")
+
+        assert torch.equal(a + b, t)
