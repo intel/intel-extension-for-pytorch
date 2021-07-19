@@ -117,8 +117,8 @@ private:
   std::string algorithm;
   std::string weight_granularity;
   std::vector<TensorQuantizationParams> input_params;
-  std::vector<TensorQuantizationParams> output_params; 
   std::vector<std::vector<float>> weights_scales;
+  std::vector<TensorQuantizationParams> output_params; 
   std::vector<std::string> input_quantized_dtypes;
   std::vector<std::string> output_quantized_dtypes;
   std::vector<bool> inputs_quantized;

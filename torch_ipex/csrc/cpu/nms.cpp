@@ -23,9 +23,9 @@ template <typename scalar_t, bool sorted>
 at::Tensor nms_cpu_kernel(const at::Tensor& dets,
                           const at::Tensor& scores,
                           const float threshold, float bias) {
-  AT_ASSERTM(!dets.type().is_cuda(), "dets must be a CPU tensor");
-  AT_ASSERTM(!scores.type().is_cuda(), "scores must be a CPU tensor");
-  AT_ASSERTM(dets.type() == scores.type(), "dets should have the same type as scores");
+  AT_ASSERTM(!dets.is_cuda(), "dets must be a CPU tensor");
+  AT_ASSERTM(!scores.is_cuda(), "scores must be a CPU tensor");
+  AT_ASSERTM(dets.scalar_type() == scores.scalar_type(), "dets should have the same type as scores");
 
   if (dets.numel() == 0) {
     return at::empty({0}, dets.options().dtype(at::kLong).device(at::kCPU));
@@ -45,13 +45,13 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
 
   at::Tensor suppressed_t = at::zeros({ndets}, dets.options().dtype(at::kByte).device(at::kCPU));
 
-  auto suppressed = suppressed_t.data<uint8_t>();
-  auto order = order_t.data<int64_t>();
-  auto x1 = x1_t.data<scalar_t>();
-  auto y1 = y1_t.data<scalar_t>();
-  auto x2 = x2_t.data<scalar_t>();
-  auto y2 = y2_t.data<scalar_t>();
-  auto areas = areas_t.data<scalar_t>();
+  auto suppressed = suppressed_t.data_ptr<uint8_t>();
+  auto order = order_t.data_ptr<int64_t>();
+  auto x1 = x1_t.data_ptr<scalar_t>();
+  auto y1 = y1_t.data_ptr<scalar_t>();
+  auto x2 = x2_t.data_ptr<scalar_t>();
+  auto y2 = y2_t.data_ptr<scalar_t>();
+  auto areas = areas_t.data_ptr<scalar_t>();
   for (int64_t _i = 0; _i < ndets; _i++) {
     auto i = order[_i];
     if (suppressed[i] == 1)
@@ -95,9 +95,9 @@ template <>
 at::Tensor nms_cpu_kernel</*scalar_t*/float, /*sorted*/true>(const at::Tensor& dets,
                           const at::Tensor& scores,
                           const float threshold, float bias) {
-  AT_ASSERTM(!dets.type().is_cuda(), "dets must be a CPU tensor");
-  AT_ASSERTM(!scores.type().is_cuda(), "scores must be a CPU tensor");
-  AT_ASSERTM(dets.type() == scores.type(), "dets should have the same type as scores");
+  AT_ASSERTM(!dets.is_cuda(), "dets must be a CPU tensor");
+  AT_ASSERTM(!scores.is_cuda(), "scores must be a CPU tensor");
+  AT_ASSERTM(dets.scalar_type() == scores.scalar_type(), "dets should have the same type as scores");
 
   AT_ASSERTM(dets.sizes().size() == 2, "dets should have 2 dimension");
   AT_ASSERTM(scores.sizes().size() == 1, "scores should have 1 dimension");
@@ -119,11 +119,11 @@ at::Tensor nms_cpu_kernel</*scalar_t*/float, /*sorted*/true>(const at::Tensor& d
   auto ndets_up_scale = (ndets/16+1)*16;
   auto ndets_down_scale = (ndets/16)*16;
   at::Tensor&& areas_t = at::zeros({ndets}, dets_bbox_number_in_lastdim.options()).contiguous();
-  auto areas = areas_t.data<float>();
-  auto x1 = x1_t.data<float>();
-  auto y1 = y1_t.data<float>();
-  auto x2 = x2_t.data<float>();
-  auto y2 = y2_t.data<float>();
+  auto areas = areas_t.data_ptr<float>();
+  auto x1 = x1_t.data_ptr<float>();
+  auto y1 = y1_t.data_ptr<float>();
+  auto x2 = x2_t.data_ptr<float>();
+  auto y2 = y2_t.data_ptr<float>();
   __m512 m512_zero = _mm512_setzero_ps();
   __m512 m512_bias = _mm512_set1_ps(bias);
   __m128i m128_zeroi = _mm_setzero_si128();
@@ -177,7 +177,7 @@ at::Tensor nms_cpu_kernel</*scalar_t*/float, /*sorted*/true>(const at::Tensor& d
   }
   // Step2: Go through the NMS flow
   at::Tensor suppressed_t = at::zeros({ndets}, dets_bbox_number_in_lastdim.options().dtype(at::kByte).device(at::kCPU));
-  auto suppressed = suppressed_t.data<uint8_t>();
+  auto suppressed = suppressed_t.data_ptr<uint8_t>();
   for (int64_t i = 0; i < ndets; i++) {
     if (suppressed[i] == 1)
       continue;
@@ -520,7 +520,7 @@ at::Tensor nms_cpu(const at::Tensor& dets,
                const float threshold,
                const bool sorted) {
   at::Tensor result;
-  AT_DISPATCH_FLOATING_TYPES(dets.type(), "nms", [&] {
+  AT_DISPATCH_FLOATING_TYPES(dets.scalar_type(), "nms", [&] {
     result = sorted ? nms_cpu_kernel<scalar_t, true>(dets, scores, threshold) : nms_cpu_kernel<scalar_t, false>(dets, scores, threshold);
   });
   return result;
@@ -531,7 +531,7 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_cpu(
                const float threshold,
                const int max_output) {
   std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> result;
-  AT_DISPATCH_FLOATING_TYPES(dets.type(), "batch_score_nms", [&] {
+  AT_DISPATCH_FLOATING_TYPES(dets.scalar_type(), "batch_score_nms", [&] {
     result = batch_score_nms_kernel<scalar_t>(dets, scores, threshold, max_output);
   });
   return result;
@@ -544,7 +544,7 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms_cpu(const a
                           const float threshold,
                           const int max_output) {
   std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> result;
-  AT_DISPATCH_FLOATING_TYPES(batch_dets.type(), "rpn_nms", [&] {
+  AT_DISPATCH_FLOATING_TYPES(batch_dets.scalar_type(), "rpn_nms", [&] {
     result = rpn_nms_kernel<scalar_t>(batch_dets, batch_scores, image_shapes, min_size, threshold, max_output);
   });
   return result;
@@ -558,7 +558,7 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Ten
                           const int detections_per_img,
                           const int num_classes) {
   std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>, std::vector<at::Tensor>> result;
-  AT_DISPATCH_FLOATING_TYPES(batch_bboxes[0].type(), "box_head_nms", [&] {
+  AT_DISPATCH_FLOATING_TYPES(batch_bboxes[0].scalar_type(), "box_head_nms", [&] {
     result = box_head_nms_kernel<scalar_t>(batch_bboxes, batch_scores, image_shapes, score_thresh, threshold, detections_per_img, num_classes);
   });
   return result;
@@ -722,7 +722,7 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexTypeExt::parallel_scale_back_batch(co
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dboxes_xywh.layout() == c10::kStrided);
 
   at::Tensor bbox_result;
-  AT_DISPATCH_FLOATING_TYPES(bboxes_in.type(), "scale_back_batch", [&] {
+  AT_DISPATCH_FLOATING_TYPES(bboxes_in.scalar_type(), "scale_back_batch", [&] {
     bbox_result = scale_back_batch_kernel<scalar_t>(bboxes_in, dboxes_xywh, scale_xy, scale_wh);
   });
 
