@@ -21,6 +21,7 @@ namespace dpcpp {
  * IPEX_TF32_MODE:              Default = 0, Set 1 to enable TF32 mode execution
  */
 
+static std::mutex s_mutex;
 static std::once_flag init_env_flag;
 
 static void init_dpcpp_env() {
@@ -127,93 +128,114 @@ static void init_dpcpp_env() {
 
 int Settings::get_verbose_level() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return verbose_level;
 }
 
 void Settings::set_verbose_level(int level) {
+  std::lock_guard<std::mutex> lock(s_mutex);
   verbose_level = level;
 }
 
 int Settings::get_warning_level() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return warning_level;
 }
 
 void Settings::set_warning_level(int level) {
+  std::lock_guard<std::mutex> lock(s_mutex);
   warning_level = level;
 }
 
 XPU_BACKEND Settings::get_xpu_backend() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return xpu_backend;
 }
 
 void Settings::set_xpu_backend(XPU_BACKEND backend) {
+  std::lock_guard<std::mutex> lock(s_mutex);
   xpu_backend = backend;
 }
 
 bool Settings::is_force_sync_exec() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return force_sync_exec_enabled;
 }
 
 void Settings::enable_force_sync_exec() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   force_sync_exec_enabled = true;
 }
 
 void Settings::disable_force_sync_exec() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   force_sync_exec_enabled = false;
 }
 
 bool Settings::is_event_profiling_enabled() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return event_profiling_enabled;
 }
 
 void Settings::enable_event_profiling() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   event_profiling_enabled = true;
 }
 
 void Settings::disable_event_profiling() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   event_profiling_enabled = false;
 }
 
 bool Settings::is_tile_partition_enabled() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return tile_partition_enabled;
 }
 
 void Settings::enable_tile_partition() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   tile_partition_enabled = true;
 }
 
 void Settings::disable_tile_partition() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   tile_partition_enabled = false;
 }
 
 bool Settings::is_onednn_layout_enabled() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return onednn_layout_enabled;
 }
 
 void Settings::enable_onednn_layout() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   onednn_layout_enabled = true;
 }
 
 void Settings::disable_onednn_layout() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   onednn_layout_enabled = false;
 }
 
 bool Settings::is_tf32_mode_enabled() const {
   std::call_once(init_env_flag, init_dpcpp_env);
+  std::lock_guard<std::mutex> lock(s_mutex);
   return tf32_mode_enabled;
 }
 
 void Settings::enable_tf32_mode() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   tf32_mode_enabled = true;
 }
 
 void Settings::disable_tf32_mode() {
+  std::lock_guard<std::mutex> lock(s_mutex);
   tf32_mode_enabled = false;
 }
 
