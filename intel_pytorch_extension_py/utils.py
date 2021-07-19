@@ -6,6 +6,7 @@ import warnings
 from .ops.lstm import IpexLSTM
 from .fx import *
 from .weight_prepack import _weight_prepack_with_ipex
+from .weight_cast import _weight_dtype_convert_with_ipex
 from .optimizer_utils import _ipex_optimizer
 
 def _replace_dropout_with_identity(model):
@@ -96,6 +97,8 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=Fa
 
         # Do weight prepack, and convert optimizer for training case.
         optimized_model, optimized_optimizer, weight_params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, dtype)
+        if dtype == torch.bfloat16 and model.training and optimizer is not None:
+            optimized_model, optimized_optimizer, weight_params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, weight_params_attr)
         if optimizer is not None:
             assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
             optimized_optimizer = _ipex_optimizer(optimized_optimizer, weight_params_attr, dtype)

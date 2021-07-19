@@ -1,5 +1,12 @@
 import torch
 import copy
+from .optim import *
+
+IPEX_OPTIMIZER_MAPPING = {
+  torch.optim.SGD: SplitSGD,
+  torch.optim.Adagrad: FusedSplitAdagrad,
+}
+
 class _ipex_optimizer(torch.optim.Optimizer):
     """
     Convert user's optimizer to ipex optimizer, it is a temporary implementation,
@@ -14,7 +21,12 @@ class _ipex_optimizer(torch.optim.Optimizer):
     """
 
     def __init__(self, optimizer, weight_params_attr, dtype):
-        self.optimizer = optimizer
+        if type(optimizer) in IPEX_OPTIMIZER_MAPPING and dtype == torch.bfloat16:
+            self.optimizer = IPEX_OPTIMIZER_MAPPING[type(optimizer)] (optimizer, weight_params_attr)
+            self.master_weight_split  = True
+        else:
+            self.optimizer = optimizer
+            self.master_weight_split  = False
         self.weight_params_attr = weight_params_attr
         self.param_groups = self.optimizer.param_groups
         self.dtype = dtype
@@ -26,7 +38,7 @@ class _ipex_optimizer(torch.optim.Optimizer):
         # but self.weight_params_attr's keys are bf16 weight, it hard to
         # query the weight's attr, so recreate a dic which using master weight
         # as key for easily to query.
-        if self.dtype == torch.bfloat16:
+        if self.dtype == torch.bfloat16 and not self.master_weight_split:
            for _, values in self.weight_params_attr.items():
                 master_weight = values['master_weight']
                 weight_params_attr_[master_weight] = values
@@ -41,6 +53,8 @@ class _ipex_optimizer(torch.optim.Optimizer):
                     if isinstance(state_value, torch.Tensor):
                         # It covers both conv and linear now. TODO: LSTM or other ops.
                         if weight_attr['op'] is torch.nn.Conv2d:
+                            if self.master_weight_split and state_value.dtype == torch.bfloat16:
+                                state_value = torch.ops.torch_ipex.cat_bfloat16_float(state_value, weight_attr['trail'])
                             v2[state_key] = torch.ops.torch_ipex.conv2d_weight_unpack(
                                 state_value,
                                 weight_attr['padding'],
@@ -53,6 +67,8 @@ class _ipex_optimizer(torch.optim.Optimizer):
                                 weight_attr['weight_channels_last'],
                                 weight_attr['dtype'])
                         elif weight_attr['op'] is torch.nn.Linear:
+                            if self.master_weight_split and state_value.dtype == torch.bfloat16:
+                                state_value = torch.ops.torch_ipex.cat_bfloat16_float(state_value, weight_attr['trail'])
                             v2[state_key] = torch.ops.torch_ipex.linear_weight_unpack(
                                 state_value,
                                 weight_attr['out_features'],
@@ -80,13 +96,13 @@ class _ipex_optimizer(torch.optim.Optimizer):
         self.optimizer.zero_grad(set_to_none)
 
     def step(self, closure=None):
-        if self.dtype == torch.bfloat16:
+        if self.dtype == torch.bfloat16 and not self.master_weight_split:
             # convert bf16 weight'grad to float.
             for k, value in self.weight_params_attr.items():
                 value["master_weight"].grad = k.grad.detach().to(torch.float)
         loss = self.optimizer.step(closure)
         # sync mater weight to model's paramerter
-        if self.dtype == torch.bfloat16:
+        if self.dtype == torch.bfloat16 and not self.master_weight_split:
             for k, value in self.weight_params_attr.items():
                 torch.ops.torch_ipex.sync_master_weight_to_bf16(value["master_weight"], k)
         return loss

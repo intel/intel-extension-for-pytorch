@@ -3,6 +3,7 @@ import intel_pytorch_extension as ipex
 from torch.testing._internal.common_utils import TestCase
 import unittest
 import itertools
+import copy
 
 class TestModule(torch.nn.Module):
     def __init__(self):
@@ -21,16 +22,18 @@ class TestModule(torch.nn.Module):
 
 class TestOptimizeCases(TestCase):
     def test_optimize_inplace_behavior_eval_mode(self):
-          M = TestModule().eval()
+          M_ori = TestModule()
           options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
           for dtype, level in options:
               # non-inplace
+              M = copy.deepcopy(M_ori).eval()
               opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=False)
               self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
 
               # inplace
+              M = copy.deepcopy(M_ori).eval()
               opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
               # fused part cannot be inplaced
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
@@ -43,10 +46,10 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
     def test_optimize_inplace_behavior_training_mode_without_optimizer(self):
-          M = TestModule().train()
-          sgd = torch.optim.SGD(M.parameters(), lr=0.1)
+          M_ori = TestModule()
           options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
           for dtype, level in options:
+              M = copy.deepcopy(M_ori).train()
               # non-inplace
               opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=False)
               self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
@@ -54,6 +57,7 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
 
               # inplace
+              M = copy.deepcopy(M_ori).train()
               opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
               # training mode will not generate GraphModule by convbn fusion, inplace indicate directly
               # modify the module given by user
@@ -62,21 +66,34 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
     def test_optimize_inplace_behavior_training_mode_with_optimizer(self):
-          M = TestModule().train()
-          sgd = torch.optim.SGD(M.parameters(), lr=0.1)
+          M_ori = TestModule()
           options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
           for dtype, level in options:
               # non-inplace
+              M = copy.deepcopy(M_ori).train()
+              sgd = torch.optim.SGD(M.parameters(), lr=0.1)
               opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=False)
               self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
-
+              
+              # inplace
+              M = copy.deepcopy(M_ori).train()
+              sgd = torch.optim.SGD(M.parameters(), lr=0.1)
               opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=True)
               self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
               self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
-
+    def test_tensor_convert(self):
+        tensor = torch.randn(100, 100)
+        bf16_tensor = tensor.bfloat16()
+        top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(tensor)
+        # truncated top half should equal with convert fp32 to bf16 by ".bfloat()"
+        self.assertEqual(bf16_tensor, top_half)
+        # recovery float tensor with top half and bottom half
+        float_tensor = torch.ops.torch_ipex.cat_bfloat16_float(top_half, bot_half)
+        self.assertEqual(tensor, float_tensor)
+  
 if __name__ == '__main__':
     test = unittest.main()
