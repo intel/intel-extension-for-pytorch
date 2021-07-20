@@ -225,5 +225,50 @@ Tensor coalesce(const Tensor& self) {
 #endif
 }
 
+Tensor sparse_mask(const Tensor & self, const Tensor & mask) {
+  SparseTensor r = at::empty({0}, self.options().layout(kSparse));
+  TORCH_CHECK(mask.is_coalesced(), "sparse_mask: mask is uncoalesced");
+  TORCH_CHECK(mask.sizes().equals(self.sizes()), "sparse_mask: operands have incompatible sizes; self has size ",
+      self.sizes(), " but mask has size ", mask.sizes());
+  r.resize_as_(mask);
+  if (mask._nnz() == 0) {
+    return r.zero_();
+  }
+  LongTensor mask_indices = mask._indices();
+  Tensor mask_values = mask._values();
+  Tensor r_values = at::empty(mask_values.sizes(), r._values().options());
+  alias_into_sparse(r, mask_indices.clone(at::MemoryFormat::Contiguous), r_values);
+  r._coalesced_(mask.is_coalesced());
+  if (self.numel() == 0) {  // if t is an empty tensor, there is no need to mask its elements
+    return r;
+  }
+
+  // Get a flattened sparse indices, similar to NOTE [ Flatten Sparse Indices ].
+  // Keeping this implementation because it is faster than flatten_indices()
+  LongTensor indices = at::zeros({mask._nnz()}, mask_indices.options());
+  for (int64_t d = 0; d < mask.sparse_dim(); d++) {
+    indices.mul_(mask.size(d));
+    // This used to use a buffer but I deoptimized it
+    indices.add_(mask_indices.select(0, d));
+  }
+
+  std::vector<int64_t> view_size(1 + mask.dense_dim());
+  view_size[0] = -1;
+  for (int64_t d = 0; d < mask.dense_dim(); d++) {
+    view_size[d + 1] = mask.size(mask.sparse_dim() + d);
+  }
+
+  Tensor self_view;
+  if (self.is_contiguous())
+      self_view = self.view(view_size);
+  else
+      self_view = self.contiguous().view(view_size);
+  // TODO: Re-audit this; it used to be an indexSelect directly into r_values
+  at::index_select_out(r_values, self_view, 0, indices);
+
+  return r;
+
+}
+
 } // AtenIpexTypeSparseXPU
 } // at
