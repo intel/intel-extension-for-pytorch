@@ -76,3 +76,29 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
 
+    def test_polygamma(self, dtype=torch.float):
+        x_cpu = torch.tensor([1, 0.5])
+        x_xpu = x_cpu.to('xpu')
+
+        for n in range(5):
+            print("n = ", n)
+            y_cpu = torch.polygamma(n, x_cpu)
+            y_xpu = torch.polygamma(n, x_xpu)
+            print("y_cpu = ", y_cpu)
+            print("y_xpu = ", y_xpu.cpu())
+            self.assertEqual(y_cpu, y_xpu)
+
+            y_cpu = x_cpu.polygamma(n)
+            y_xpu = x_xpu.polygamma(n)
+            print("y_cpu = ", y_cpu)
+            print("y_xpu = ", y_xpu.cpu())
+            self.assertEqual(y_cpu, y_xpu)
+
+            x_cpu_clone = x_cpu.clone()
+            x_xpu_clone = x_xpu.clone()
+            x_cpu_clone.polygamma_(n)
+            x_xpu_clone.polygamma_(n)
+            print("x_cpu_clone = ", x_cpu_clone)
+            print("x_xpu_clone = ", x_xpu_clone.cpu())
+            self.assertEqual(x_cpu_clone, x_xpu_clone)
+

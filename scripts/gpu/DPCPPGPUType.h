@@ -438,6 +438,9 @@ static Tensor orgqr(const Tensor & self, const Tensor & input2); // aten::orgqr(
 static Tensor & orgqr_out(Tensor & out, const Tensor & self, const Tensor & input2); // aten::orgqr.out(Tensor self, Tensor input2, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor ormqr(const Tensor & self, const Tensor & input2, const Tensor & input3, bool left, bool transpose); // aten::ormqr(Tensor self, Tensor input2, Tensor input3, bool left=True, bool transpose=False) -> Tensor
 static Tensor & ormqr_out(Tensor & out, const Tensor & self, const Tensor & input2, const Tensor & input3, bool left, bool transpose); // aten::ormqr.out(Tensor self, Tensor input2, Tensor input3, bool left=True, bool transpose=False, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor polygamma(int64_t n, const Tensor & self); // aten::polygamma(int n, Tensor self) -> Tensor
+static Tensor & polygamma_(Tensor & self, int64_t n); // aten::polygamma_(Tensor(a!) self, int n) -> Tensor(a!)
+static Tensor & polygamma_out(Tensor & out, int64_t n, const Tensor & self); // aten::polygamma.out(int n, Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
 static Tensor pow(const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
 static Tensor pow(Scalar self, const Tensor & exponent); // aten::pow.Scalar(Scalar self, Tensor exponent) -> Tensor

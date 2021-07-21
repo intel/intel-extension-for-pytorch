@@ -7,6 +7,7 @@
 #include <core/Memory.h>
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
+#include "comm/Math.h"
 
 #include "Random.h"
 #include "Loops.h"
@@ -23,6 +24,44 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+namespace impl {
+
+DPCPP_DEF_K1(DigammaOp);
+void digamma_kernel_xpu(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "digamma_xpu", [&]() {
+      dpcpp_kernel_for_tensor_iter<DPCPP_K(DigammaOp)>(iter, [=](scalar_t a) -> scalar_t {
+          return calc_digamma(a);
+      });
+  });
+}
+
+DPCPP_DEF_K1(TrigammaOp);
+void trigamma_kernel_xpu(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "trigamma_xpu", [&]() {
+      dpcpp_kernel_for_tensor_iter<DPCPP_K(TrigammaOp)>(iter, [=](scalar_t a) -> scalar_t {
+          return calc_trigamma(a);
+      });
+  });
+}
+
+DPCPP_DEF_K1(PolygammaOp);
+void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
+  if (n == 0) {
+    digamma_kernel_xpu(iter);
+  } else if (n == 1) {
+    trigamma_kernel_xpu(iter);
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "polygamma_xpu", [&]() {
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(PolygammaOp)>(iter, [=](scalar_t a) -> scalar_t {
+            return calc_polygamma(int(n), a);
+        });
+    });
+  }
+}
+
+} // namespace impl
+
+
 Tensor lgamma(const Tensor & self) {
 #ifdef USE_ONEMKL
   int64_t n = self.numel();
@@ -84,7 +123,43 @@ Tensor& mvlgamma_(Tensor& self, int64_t p) {
 #endif
 }
 
+Tensor digamma(const Tensor& self) {
+  Tensor result = at::empty_like(self);
+  auto iter = TensorIterator::unary_op(result, self);
+  impl::digamma_kernel_xpu(iter);
+  return result;
+}
 
+Tensor digamma_(Tensor& self) {
+  auto iter = TensorIterator::unary_op(self, self);
+  impl::digamma_kernel_xpu(iter);
+  return self;
+}
+
+Tensor digamma_out(Tensor& out, const Tensor& self) {
+  auto iter = TensorIterator::unary_op(out, self);
+  impl::digamma_kernel_xpu(iter);
+  return out;
+}
+
+Tensor polygamma(int64_t n, const Tensor& self) {
+  Tensor result = at::empty_like(self);
+  auto iter = TensorIterator::unary_op(result, self);
+  impl::polygamma_kernel_xpu(iter, n);
+  return result;
+}
+
+Tensor& polygamma_(Tensor& self, int64_t n) {
+  auto iter = TensorIterator::unary_op(self, self);
+  impl::polygamma_kernel_xpu(iter, n);
+  return self;
+}
+
+Tensor& polygamma_out(Tensor& out, int64_t n, const Tensor& self) {
+  auto iter = TensorIterator::unary_op(out, self);
+  impl::polygamma_kernel_xpu(iter, n);
+  return out;
+}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
