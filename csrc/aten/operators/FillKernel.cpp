@@ -45,7 +45,7 @@ void fillSliceWithIndex(
     IndexType sliceStride) {
   auto& queue = dpcppGetCurrentQueue();
   int64_t local_size =
-      queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+      queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = out.data;
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {

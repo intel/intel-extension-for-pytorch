@@ -97,27 +97,78 @@ namespace DPCPP = cl::sycl;
 #define THREAD_WORK_SIZE 4
 #define BLOCK_WORK_SIZE (THREAD_WORK_SIZE * NUM_THREADS)
 
+template<typename T, T v>
+using dpcpp_info_t = typename DPCPP::info::param_traits<T, v>::return_type;
+
+// dpcpp platform info
+static constexpr auto dpcpp_platform_name = DPCPP::info::platform::name;
+
 // dpcpp device info
-static constexpr auto dpcpp_dev_name =
-    DPCPP::info::device::name;
-static constexpr auto dpcpp_dev_type =
-    DPCPP::info::device::device_type;
-static constexpr auto dpcpp_dev_max_units =
-    DPCPP::info::device::max_compute_units;
-static constexpr auto dpcpp_dev_max_item_dims =
-    DPCPP::info::device::max_work_item_dimensions;
-static constexpr auto dpcpp_dev_max_item_sizes =
-    DPCPP::info::device::max_work_item_sizes;
-static constexpr auto dpcpp_dev_max_wgroup_size =
-    DPCPP::info::device::max_work_group_size;
-static constexpr auto dpcpp_dev_max_malloc_size =
-    DPCPP::info::device::max_mem_alloc_size;
-static constexpr auto dpcpp_dev_local_mem_type =
-    DPCPP::info::device::local_mem_type;
-static constexpr auto dpcpp_dev_local_mem_size =
-    DPCPP::info::device::local_mem_size;
-static constexpr auto dpcpp_dev_global_mem_size =
-    DPCPP::info::device::global_mem_size;
+// Returns the device name of this SYCL device
+static constexpr auto dpcpp_dev_name = DPCPP::info::device::name;
+// Returns the device type associated with the device.
+static constexpr auto dpcpp_dev_type = DPCPP::info::device::device_type;
+// Returns the SYCL platform associated with this SYCL device.
+static constexpr auto dpcpp_dev_platform = DPCPP::info::device::platform;
+// Returns the vendor of this SYCL device.
+static constexpr auto dpcpp_dev_vendor = DPCPP::info::device::vendor;
+// Returns a backend-defined driver version as a std::string.
+static constexpr auto dpcpp_dev_driver_version = DPCPP::info::device::driver_version;
+// Returns the SYCL version as a std::string in the form: <major_version>.<minor_version>
+static constexpr auto dpcpp_dev_version = DPCPP::info::device::version;
+// Returns a string describing the version of the SYCL backend associated with the device. 
+// static constexpr auto dpcpp_dev_backend_version = DPCPP::info::device::backend_version;
+// Returns true if the SYCL device is available and returns false if the device is not available.
+static constexpr auto dpcpp_dev_is_available = DPCPP::info::device::is_available;
+// Returns the maximum size in bytes of the arguments that can be passed to a kernel.
+static constexpr auto dpcpp_dev_max_param_size = DPCPP::info::device::max_parameter_size;
+// Returns the number of parallel compute units available to the device.
+static constexpr auto dpcpp_dev_max_compute_units = DPCPP::info::device::max_compute_units;
+// Returns the maximum dimensions that specify the global and local work-item IDs used
+// by the data parallel execution model. 
+static constexpr auto dpcpp_dev_max_work_item_dims = DPCPP::info::device::max_work_item_dimensions;
+// Returns the maximum number of workitems that are permitted in a work-group
+// executing a kernel on a single compute unit.
+static constexpr auto dpcpp_dev_max_work_group_size = DPCPP::info::device::max_work_group_size;
+// Returns the maximum number of subgroups in a work-group for any kernel executed on the device
+static constexpr auto dpcpp_dev_max_num_subgroup = DPCPP::info::device::max_num_sub_groups;
+// Returns a std::vector of size_t containing the set of sub-group sizes supported by the device
+static constexpr auto dpcpp_dev_subgroup_sizes = DPCPP::info::device::sub_group_sizes;
+// Returns the maximum configured clock frequency of this SYCL device in MHz.
+static constexpr auto dpcpp_dev_max_clock_freq = DPCPP::info::device::max_clock_frequency;
+// Returns the default compute device address space size specified as an unsigned integer
+// value in bits. Must return either 32 or 64.
+static constexpr auto dpcpp_dev_address_bits = DPCPP::info::device::address_bits;
+// Returns the maximum size of memory object allocation in bytes
+static constexpr auto dpcpp_dev_max_alloc_size = DPCPP::info::device::max_mem_alloc_size;
+// Returns the minimum value in bits of the largest supported SYCL built-in data type if
+// this SYCL device is not of device type info::device_type::custom.
+static constexpr auto dpcpp_dev_mem_base_addr_align = DPCPP::info::device::mem_base_addr_align;
+// Returns a std::vector of info::fp_config describing the half precision floating-point
+// capability of this SYCL device.
+static constexpr auto dpcpp_dev_half_fp_config = DPCPP::info::device::half_fp_config;
+// Returns a std::vector of info::fp_config describing the single precision floating-point
+// capability of this SYCL device.
+static constexpr auto dpcpp_dev_single_fp_config = DPCPP::info::device::single_fp_config;
+// Returns a std::vector of info::fp_config describing the double precision floatingpoint
+// capability of this SYCL device.
+static constexpr auto dpcpp_dev_double_fp_config = DPCPP::info::device::double_fp_config;
+// Returns the size of global device memory in bytes
+static constexpr auto dpcpp_dev_global_mem_size = DPCPP::info::device::global_mem_size;
+// Returns the type of global memory cache supported.
+static constexpr auto dpcpp_dev_global_mem_cache_type = DPCPP::info::device::global_mem_cache_type;
+// Returns the size of global memory cache in bytes.
+static constexpr auto dpcpp_dev_global_mem_cache_size = DPCPP::info::device::global_mem_cache_size;
+// Returns the size of global memory cache line in bytes.
+static constexpr auto dpcpp_dev_global_mem_cache_line_size = DPCPP::info::device::global_mem_cache_line_size;
+// Returns the type of local memory supported.
+static constexpr auto dpcpp_dev_local_mem_type = DPCPP::info::device::local_mem_type;
+// Returns the size of local memory arena in bytes. 
+static constexpr auto dpcpp_dev_local_mem_size = DPCPP::info::device::local_mem_size;
+// Returns the maximum number of sub-devices that can be created when this SYCL device is partitioned.
+static constexpr auto dpcpp_dev_max_sub_devices = DPCPP::info::device::partition_max_sub_devices;
+// Returns the resolution of device timer in nanoseconds.
+static constexpr auto dpcpp_dev_profiling_resolution = DPCPP::info::device::profiling_timer_resolution;
 
 // dpcpp access mode
 static constexpr auto dpcpp_r_mode = DPCPP::access::mode::read;

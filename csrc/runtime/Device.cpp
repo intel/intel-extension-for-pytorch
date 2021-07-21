@@ -158,12 +158,37 @@ static void initContextVectors() {
 static void initDeviceProperty(DeviceId device_id) {
   DeviceProp device_prop;
   auto device = dpcppGetRawDevice(device_id);
-  device_prop.name = device.get_info<dpcpp_dev_name>();
+
+  device_prop.dev_name = device.get_info<dpcpp_dev_name>();
   device_prop.dev_type = device.get_info<dpcpp_dev_type>();
-  device_prop.total_global_mem = device.get_info<dpcpp_dev_global_mem_size>();
-  device_prop.max_compute_units = device.get_info<dpcpp_dev_max_units>();
-  device_prop.platform_name = device.get_info<DPCPP::info::device::platform>().get_info<DPCPP::info::platform::name>();
-  device_prop.sub_devices_number = device.get_info<DPCPP::info::device::partition_max_sub_devices>();
+  device_prop.platform_name = device.get_info<dpcpp_dev_platform>().get_info<dpcpp_platform_name>();
+  device_prop.vendor = device.get_info<dpcpp_dev_vendor>();
+  device_prop.driver_version = device.get_info<dpcpp_dev_driver_version>();
+  device_prop.version = device.get_info<dpcpp_dev_version>();
+  // device_prop.backend_version = device.get_info<dpcpp_dev_backend_version>();
+  device_prop.is_available = device.get_info<dpcpp_dev_is_available>();
+  device_prop.max_param_size = device.get_info<dpcpp_dev_max_param_size>();
+  device_prop.max_compute_units = device.get_info<dpcpp_dev_max_compute_units>();
+  device_prop.max_work_item_dims = device.get_info<dpcpp_dev_max_work_item_dims>();
+  device_prop.max_work_group_size = device.get_info<dpcpp_dev_max_work_group_size>();
+  device_prop.max_num_subgroup = device.get_info<dpcpp_dev_max_num_subgroup>();
+  device_prop.subgroup_sizes = device.get_info<dpcpp_dev_subgroup_sizes>();
+  device_prop.max_clock_freq = device.get_info<dpcpp_dev_max_clock_freq>();
+  device_prop.address_bits = device.get_info<dpcpp_dev_address_bits>();
+  device_prop.max_mem_alloc_size = device.get_info<dpcpp_dev_max_alloc_size>();
+  device_prop.base_addr_align = device.get_info<dpcpp_dev_mem_base_addr_align>();
+  device_prop.half_fp_config = device.get_info<dpcpp_dev_half_fp_config>();
+  device_prop.single_fp_config = device.get_info<dpcpp_dev_single_fp_config>();
+  device_prop.double_fp_config = device.get_info<dpcpp_dev_double_fp_config>();
+  device_prop.global_mem_size = device.get_info<dpcpp_dev_global_mem_size>();
+  device_prop.global_mem_cache_type = device.get_info<dpcpp_dev_global_mem_cache_type>();
+  device_prop.global_mem_cache_size = device.get_info<dpcpp_dev_global_mem_cache_size>();
+  device_prop.global_mem_cache_line_size = device.get_info<dpcpp_dev_global_mem_cache_line_size>();
+  device_prop.local_mem_type = device.get_info<dpcpp_dev_local_mem_type>();
+  device_prop.local_mem_size = device.get_info<dpcpp_dev_local_mem_size>();
+  device_prop.max_sub_devices = device.get_info<dpcpp_dev_max_sub_devices>();
+  device_prop.profiling_resolution = device.get_info<dpcpp_dev_profiling_resolution>();
+
   device_properties[device_id] = device_prop;
 }
 

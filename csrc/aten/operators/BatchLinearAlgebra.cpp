@@ -174,7 +174,7 @@ static void apply_lu_solve_dpcpp_(
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(b_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -231,7 +231,7 @@ static void apply_inverse_dpcpp_(
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -277,7 +277,7 @@ static void apply_geqrf_dpcpp_(
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -325,7 +325,7 @@ static void apply_orgqr_dpcpp_(
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -548,7 +548,7 @@ static void apply_cholesky_solve_dpcpp_(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   oneapi::mkl::uplo uplo = upper_ ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   int64_t batch_size = native::batchCount(b_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)

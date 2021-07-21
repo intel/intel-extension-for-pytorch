@@ -85,7 +85,7 @@ void ClassNLLCriterion_updateOutput(
     auto& queue = dpcppGetCurrentQueue();
     int64_t local_size =
         queue.get_device()
-            .template get_info<dpcpp_dev_max_wgroup_size>();
+            .template get_info<dpcpp_dev_max_work_group_size>();
     bool has_weights = weights.defined()
         ? true
         : false; // dpcpp kernel can not accept host pointer
@@ -188,7 +188,7 @@ void ClassNLLCriterion_updateOutput(
     int n_target = input.size(1);
     int64_t local_size =
         queue.get_device()
-            .template get_info<dpcpp_dev_max_wgroup_size>();
+            .template get_info<dpcpp_dev_max_work_group_size>();
 
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto input_data = _input_data;
@@ -294,7 +294,7 @@ void ClassNLLCriterion_updateGradInput(
     auto& queue = dpcppGetCurrentQueue();
     int64_t local_size =
         queue.get_device()
-            .template get_info<dpcpp_dev_max_wgroup_size>();
+            .template get_info<dpcpp_dev_max_work_group_size>();
     int64_t global_size =
         ((batch_size + local_size - 1) / local_size) * local_size;
     bool has_weights = weights.defined() ? true : false;

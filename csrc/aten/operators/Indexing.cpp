@@ -92,7 +92,7 @@ void indexSelect(
   // work item number.
   // Make the work balance based on the MCU number.
   // auto __mcu = dpcpp_queue.get_device().template
-  // get_info<dpcpp_dev_max_units>();
+  // get_info<dpcpp_dev_max_compute_units>();
   uint64_t num_slices = indices.numel();
 
   auto slice_size = dst_num_elem / num_slices;
@@ -100,7 +100,7 @@ void indexSelect(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
 
@@ -374,7 +374,7 @@ void indexAdd(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
@@ -477,7 +477,7 @@ void indexFill(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
@@ -578,7 +578,7 @@ void indexCopy(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;

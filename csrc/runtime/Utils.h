@@ -10,11 +10,15 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
-
 static inline bool dpcppIsAvailable() {
   int count;
   dpcppGetDeviceCount(&count);
   return count > 0;
+}
+
+static inline bool dpcppIsDeviceAvailable(DeviceId dev_id) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->is_available;
 }
 
 static inline DPCPP::queue& dpcppGetCurrentQueue() {
@@ -22,7 +26,7 @@ static inline DPCPP::queue& dpcppGetCurrentQueue() {
 }
 
 static inline int64_t dpcppMaxWorkGroupSize(DPCPP::queue& queue) {
-  return queue.get_device().get_info<dpcpp_dev_max_wgroup_size>();
+  return queue.get_device().get_info<dpcpp_dev_max_work_group_size>();
 }
 
 static inline int64_t dpcppMaxWorkGroupSize() {
@@ -32,7 +36,7 @@ static inline int64_t dpcppMaxWorkGroupSize() {
 
 static inline int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue) {
   return queue.get_device()
-      .template get_info<dpcpp_dev_max_units>();
+      .template get_info<dpcpp_dev_max_compute_units>();
 }
 
 static inline int64_t dpcppMaxComputeUnitSize() {

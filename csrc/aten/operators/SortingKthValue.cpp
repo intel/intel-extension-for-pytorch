@@ -44,7 +44,7 @@ void gatherKthValue(
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t local_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = input.data;

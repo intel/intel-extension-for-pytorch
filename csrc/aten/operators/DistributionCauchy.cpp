@@ -35,6 +35,7 @@ void cauchy_kernel(TensorIterator& iter, double median_, double sigma_, c10::opt
   });
 }
 
+#ifdef USE_ONEMKL
 template<typename scalar_t, typename accscalar_t>
 void cauchy_mkl_kernel(Tensor& self,
     int64_t numel,
@@ -59,6 +60,7 @@ void cauchy_mkl_kernel(Tensor& self,
   oneapi::mkl::rng::cauchy<scalar_t> distr(median, sigma);
   oneapi::mkl::rng::generate(distr, engine, numel, self_ptr);
 }
+#endif
 
 Tensor & cauchy_(Tensor & self, double median, double sigma, c10::optional<Generator> generator){
   #ifdef USE_ONEMKL

@@ -242,21 +242,21 @@ static void register_xpu_device_properties(PyObject* module) {
   // Add _DeviceProperties class to torch_ipex._C
   auto m = py::handle(module).cast<py::module>();
   py::class_<DeviceProp>(m, "_DeviceProperties")
-    .def_readonly("name", &DeviceProp::name)
+    .def_readonly("name", &DeviceProp::dev_name)
     .def_readonly("platform_name", &DeviceProp::platform_name)
-    .def_readonly("total_global_memory", &DeviceProp::total_global_mem)
+    .def_readonly("global_memory_size", &DeviceProp::global_mem_size)
     .def_readonly("max_compute_units", &DeviceProp::max_compute_units)
-    .def_readonly("sub_devices_number", &DeviceProp::sub_devices_number)
+    .def_readonly("max_sub_devices", &DeviceProp::max_sub_devices)
     .def_property_readonly("dev_type", [](const DeviceProp &prop) {
       return get_dev_type(prop);
     })
     .def("__repr__", [](const DeviceProp &prop) {
       std::ostringstream stream;
-      stream << "_DeviceProperties(name='" << prop.name
+      stream << "_DeviceProperties(name='" << prop.dev_name
              << "', platform_name='" << prop.platform_name
              << "', dev_type='" << get_dev_type(prop)
-             << "', sub_devices_number=" << prop.sub_devices_number
-             << ", total_global_memory=" << prop.total_global_mem / (1024 * 1024)
+             << "', max_sub_devices=" << prop.max_sub_devices
+             << ", global_memory_size=" << prop.global_mem_size / (1024 * 1024)
              << "MB, max_compute_units=" << prop.max_compute_units << ")";
       return stream.str();
     });
