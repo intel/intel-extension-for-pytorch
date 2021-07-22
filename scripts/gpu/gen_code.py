@@ -444,6 +444,14 @@ lazy_reorder_block_list = set([
     'upsample_nearest1d',
     'upsample_nearest1d_backward_out',
     'upsample_nearest1d_backward',
+    'q_zero_point',
+    'q_scale',
+    'qscheme',
+    'q_per_channel_scales',
+    'q_per_channel_zero_points',
+    'q_per_channel_axis',
+    'set_quantizer_',
+    'quantized_max_pool2d'
 ])
 
 
