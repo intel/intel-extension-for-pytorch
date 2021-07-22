@@ -183,7 +183,7 @@ void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
       update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
     } else {
       auto dpcppDev = dpcppGetRawDevice(curDevID);
-      size_t device_total = dpcppDev.get_info<dpcpp_dev_global_mem_size>();
+      size_t device_total = dpcppGlobalMemSize(curDevID);
       stats.num_ooms += 1;
 
       AT_ERROR("DPCPP out of memory. Tried to allocate ", format_size(alloc_size),
@@ -394,8 +394,7 @@ void CachingDeviceAllocator::process_events() {
     auto event = e.first;
     Block* block = e.second;
     bool event_completed = 
-      event.get_info<DPCPP::info::event::command_execution_status>() == 
-      DPCPP::info::event_command_status::complete;
+      event.get_info<dpcpp_event_exec_stat>() == dpcpp_event_cmd_stat_complete;
     if (!event_completed) {
       break;
     }
@@ -617,7 +616,7 @@ std::vector<SegmentInfo> CachingDeviceAllocator::snapshot() const {
 void CachingDeviceAllocator::dumpMemoryStatus(DeviceId deviceIndex) {
   DeviceStats& stats = get_stats_for_device(deviceIndex);
   auto dpcppDev = dpcppGetRawDevice(deviceIndex);
-  size_t device_total = dpcppDev.get_info<dpcpp_dev_global_mem_size>();
+  size_t device_total = dpcppGlobalMemSize(deviceIndex);
   TORCH_WARN("GPU", deviceIndex, " memory status:");
   TORCH_WARN("Total capacity: ", format_size(device_total));
   TORCH_WARN("Allocated: ",

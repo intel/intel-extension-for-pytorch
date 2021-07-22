@@ -91,17 +91,14 @@ void indexSelect(
   // TODO: if the slice number is to large. Need to balance the work group and
   // work item number.
   // Make the work balance based on the MCU number.
-  // auto __mcu = dpcpp_queue.get_device().template
-  // get_info<dpcpp_dev_max_compute_units>();
+  // auto __mcu = dpcppMaxComputeUnitSize(dev_id);
   uint64_t num_slices = indices.numel();
 
   auto slice_size = dst_num_elem / num_slices;
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
-
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
 
   auto n_work_item_iter = (slice_size + wgroup_size - 1) / wgroup_size;
@@ -372,10 +369,8 @@ void indexAdd(
   src_info.reduceDim(src_add_dim);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
-
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
@@ -475,12 +470,9 @@ void indexFill(
   dst_info.reduceDim(dst_fill_dim);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
-
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
-
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
@@ -576,10 +568,8 @@ void indexCopy(
   dst_info.reduceDim(dst_fill_dim);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto wgroup_size =
-      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
-
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 

@@ -34,7 +34,7 @@ void error_handle(std::vector<int64_t>& infos, oneapi::mkl::lapack::batch_error&
     } catch (oneapi::mkl::lapack::exception e) {
       std::cout << "Cathed lapack exception:" << "\nWhat: " << e.what() << "\nInfo: " << e.info() << "\nDetail: " << e.detail() << std::endl;
       infos[i] = e.info();
-    } catch (cl::sycl::exception e) {
+    } catch (DPCPP::exception e) {
       std::cout << "Catched SYCL exception:" << "\nWhat: " << e.what() << "\nInfo: -1" << std::endl;
       infos[i] = -1;
     }
@@ -49,8 +49,9 @@ void apply_triu_tril(
     const Tensor& self,
     const int64_t k) {
   auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto N = self.numel();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto num_groups = CeilDiv(N, group_size);
   auto total_items = num_groups * group_size;
   IndexType stride0 = (IndexType)self.size(-2);
@@ -173,8 +174,9 @@ static void apply_lu_solve_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t batch_size = native::batchCount(b_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -230,8 +232,9 @@ static void apply_inverse_dpcpp_(
 
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -276,8 +279,9 @@ static void apply_geqrf_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -324,8 +328,9 @@ static void apply_orgqr_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)
@@ -546,9 +551,10 @@ static void apply_cholesky_solve_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   oneapi::mkl::uplo uplo = upper_ ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   int64_t batch_size = native::batchCount(b_);
-  int64_t local_size = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t group_count = (batch_size + local_size - 1) / local_size;
   int64_t* group_sizes = new int64_t[group_count];
   for (auto i = 0; i < group_count; i++)

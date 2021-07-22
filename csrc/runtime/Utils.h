@@ -25,26 +25,29 @@ static inline DPCPP::queue& dpcppGetCurrentQueue() {
   return getCurrentQueue()->getDpcppQueue();
 }
 
-static inline int64_t dpcppMaxWorkGroupSize(DPCPP::queue& queue) {
-  return queue.get_device().get_info<dpcpp_dev_max_work_group_size>();
+static inline DeviceId dpcppGetDeviceIdOfCurrentQueue() {
+  return getDeviceIdOfCurrentQueue();
+}
+
+static inline int64_t dpcppMaxWorkGroupSize(DeviceId dev_id) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->max_work_group_size;
 }
 
 static inline int64_t dpcppMaxWorkGroupSize() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppMaxWorkGroupSize(queue);
+  return dpcppMaxWorkGroupSize(getDeviceIdOfCurrentQueue());
 }
 
-static inline int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue) {
-  return queue.get_device()
-      .template get_info<dpcpp_dev_max_compute_units>();
+static inline int64_t dpcppMaxComputeUnitSize(DeviceId dev_id) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->max_compute_units;
 }
 
 static inline int64_t dpcppMaxComputeUnitSize() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppMaxComputeUnitSize(queue);
+  return dpcppMaxComputeUnitSize(getDeviceIdOfCurrentQueue());
 }
 
-static inline int64_t dpcppMaxDSSNum(DPCPP::queue& queue) {
+static inline int64_t dpcppMaxDSSNum(DeviceId dev_id) {
   // TODO: We need to got this info from DPC++ Runtime
   // Hardcode to 32 for ATS
   int64_t dss_num = 32;
@@ -52,19 +55,27 @@ static inline int64_t dpcppMaxDSSNum(DPCPP::queue& queue) {
 }
 
 static inline int64_t dpcppMaxDSSNum() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppMaxDSSNum(queue);
+  return dpcppMaxDSSNum(getDeviceIdOfCurrentQueue());
 }
 
-static inline int64_t dpcppLocalMemSize(DPCPP::queue& queue) {
-  return queue.get_device()
-      .template get_info<dpcpp_dev_local_mem_size>();
+static inline size_t dpcppGlobalMemSize(DeviceId dev_id) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->global_mem_size;
+}
+
+static inline size_t dpcppGlobalMemSize() {
+  return dpcppGlobalMemSize(getDeviceIdOfCurrentQueue());
+}
+
+static inline int64_t dpcppLocalMemSize(DeviceId dev_id) {
+  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  return dev_prop->local_mem_size;
 }
 
 static inline int64_t dpcppLocalMemSize() {
-  auto& queue = dpcppGetCurrentQueue();
-  return dpcppLocalMemSize(queue);
+  return dpcppLocalMemSize(getDeviceIdOfCurrentQueue());
 }
+
 
 } // namespace dpcpp
 } // namespace xpu

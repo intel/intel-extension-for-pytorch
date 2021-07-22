@@ -164,7 +164,8 @@ void THSyclTensor_scatterKernel(
     const int dim,
     const IndexType totalElements) {
   auto& queue = dpcppGetCurrentQueue();
-  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(dev_id);
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
 
@@ -220,7 +221,8 @@ void THSyclTensor_scatterAddKernel(
     const int dim,
     const IndexType totalElements) {
   auto& queue = dpcppGetCurrentQueue();
-  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(dev_id);
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
 
@@ -276,7 +278,8 @@ void THSyclTensor_scatterFillKernel(
     const int dim,
     const IndexType totalElements) {
   auto& queue = dpcppGetCurrentQueue();
-  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(dev_id);
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
 

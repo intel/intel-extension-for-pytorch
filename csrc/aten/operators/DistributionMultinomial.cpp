@@ -64,7 +64,8 @@ void sample_multinomial_with_replacement(
   at::Tensor& norm_dist) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
-  size_t work_group_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  size_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
   // Each work item in a work group will generate a sample from one
   // distribution concurrently
   work_group_size = std::min(work_group_size, (size_t)num_samples);
@@ -125,7 +126,8 @@ void sample_multinomial_without_replacement(
   at::Tensor& norm_dist) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
-  size_t work_group_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  size_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
   // Each work item in a work group will generate a sample from one
   // distribution concurrently
   work_group_size = std::min(work_group_size, (size_t)num_samples);

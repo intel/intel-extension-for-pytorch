@@ -442,9 +442,8 @@ void gatherTopK(
     TensorInfo<int64_t, IndexType> indices,
     IndexType indicesWithinSliceStride) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t local_size =
-      queue.get_device()
-          .template get_info<dpcpp_dev_max_work_group_size>();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = input.data;
     auto topk_data = topK.data;

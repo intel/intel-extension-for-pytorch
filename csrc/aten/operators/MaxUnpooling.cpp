@@ -31,7 +31,8 @@ void max_unpooling2d_forward_kernel(
     const int64_t outputWidth,
     scalar_t* output) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t num_groups = CeilDiv(numInputElements, group_size);
   int64_t total_items = num_groups * group_size;
 
@@ -131,7 +132,8 @@ void max_unpooling2d_backward_kernel(
     const int64_t outputWidth,
     scalar_t* output) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t num_groups = CeilDiv(numInputElements, group_size);
   int64_t total_items = num_groups * group_size;
 

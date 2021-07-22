@@ -92,7 +92,8 @@ void SpatialSoftMaxForward(
     size_t dim_size,
     size_t dim_stride) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  size_t local_size = dpcppMaxWorkGroupSize(dev_id);
   local_size = std::min(local_size, dim_size);
   size_t global_size = outer_size * local_size;
 

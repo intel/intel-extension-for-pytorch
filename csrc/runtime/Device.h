@@ -22,7 +22,7 @@ DPCPP::device dpcppGetRawDevice(DeviceId device_id);
 
 DeviceProp* dpcppGetCurrentDeviceProperties();
 
-DeviceProp* dpcppGetDeviceProperties(DeviceId device_id);
+DeviceProp* dpcppGetDeviceProperties(DeviceId device_id = -1);
 
 } // namespace dpcpp
 } // namespace at

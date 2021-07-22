@@ -78,7 +78,8 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     std::pair<K, Index> init,
     BinaryFunction binary_op) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto totalElements = src.numel();
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
@@ -147,7 +148,8 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
     std::pair<K, Index> init,
     BinaryFunction binary_op) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto totalElements = src.numel();
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;

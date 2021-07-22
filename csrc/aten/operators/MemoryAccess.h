@@ -161,7 +161,7 @@ struct aligned_element<8> {
 template<typename scalar_t, int vec_size>
 struct aligned_vector {
   using element_type = typename aligned_element<sizeof(scalar_t)>::element_type;
-  using type = cl::sycl::vec<element_type , vec_size>;
+  using type = DPCPP::vec<element_type , vec_size>;
 };
 
 template <typename TO, typename FROM>

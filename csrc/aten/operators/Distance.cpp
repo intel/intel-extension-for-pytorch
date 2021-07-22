@@ -193,7 +193,8 @@ static void pdist_kernel_impl(
     const double n2_squared_minus_1) {
   const auto ngroups = result.numel();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
 
   // TODO: this is not optimized if the m is smaller than 256. The work item is
   // wasted (m-256).
@@ -258,7 +259,8 @@ static void pdist_backward_kernel_impl(
     const double n2,
     const double n2_squared_minus_1) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
 
   // TODO: this is not optimized if the m is smaller than 256. The work item is
   // wasted (m-256).
@@ -468,7 +470,8 @@ static void cdist_forward_kernel_impl(
     const int64_t l2_size) {
   const auto ngroups = result.numel();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
 
   auto out_ptr = result.data_ptr<scalar_t>();
   auto x1_ptr = x1.data_ptr<scalar_t>();
@@ -594,7 +597,8 @@ static void cdist_backward_kernel_impl(
     const int64_t l2_size) {
   auto batch = (x1.dim() > 2) ? x1.size(0) : 1;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t m_round = ((r_size*batch + wgroup_size - 1) / (wgroup_size));
   DPCPP::range<2> global_range(
       /**wgroup_size*/ wgroup_size, m_round * wgroup_size);

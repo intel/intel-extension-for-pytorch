@@ -84,7 +84,8 @@ template <typename dst_dt, typename src_dt>
 static inline DPCPP_HOST void
 dtype_convert_by_scalar(dst_dt* dst, const src_dt* src, size_t n_elements) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto total_threads = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto total_threads = dpcppMaxWorkGroupSize(dev_id);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for<DPCPP_K(data_type_convert, dst_dt, src_dt)>(

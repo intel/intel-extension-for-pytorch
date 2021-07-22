@@ -46,10 +46,9 @@ static inline int64_t get_target_prime(
 }
 
 std::tuple<DPCPP::range<2>, DPCPP::range<2>> get_work_range(
-    DPCPP::queue& sycl_queue,
+    size_t work_group_size,
     int64_t work_in_batch_size,
     int64_t batch_size) {
-  size_t work_group_size = dpcppMaxWorkGroupSize(sycl_queue);
   int intra_batch_size = work_group_size;
   while (intra_batch_size / 2 >= work_in_batch_size && intra_batch_size > 1) {
     intra_batch_size /= 2;
@@ -94,9 +93,12 @@ void ctc_loss_log_alpha_kernel(
   int64_t __la_target_stride = log_alpha.stride(2);
 
   auto& sycl_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
+      get_work_range(work_group_size, 2 * __max_input_length + 1, __batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto log_alpha_data =
@@ -318,9 +320,12 @@ void ctc_loss_backward_log_beta_kernel(
   int64_t __lb_target_stride = log_beta.stride(2);
 
   auto& sycl_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
+      get_work_range(work_group_size, 2 * __max_input_length + 1, __batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto log_beta_data = log_beta.data_ptr<scalar_t>();
@@ -537,9 +542,12 @@ void ctc_loss_backward_collect_nonblank_kernel(
   int64_t lb_target_stride = log_beta.stride(2);
 
   auto& sycl_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      get_work_range(sycl_queue, max_target_length, batch_size);
+      get_work_range(work_group_size, max_target_length, batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();
@@ -664,9 +672,12 @@ void ctc_loss_backward_collect_kernel(
   int64_t lb_target_stride = log_beta.stride(2);
 
   auto& sycl_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
+
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      get_work_range(sycl_queue, log_probs.size(0), batch_size);
+      get_work_range(work_group_size, log_probs.size(0), batch_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();
     auto grad_out_data = grad_out.data_ptr<scalar_t>();
@@ -780,10 +791,12 @@ void ctc_loss_zero_padded_gradients(
     int64_t batch_size, /* B */
     int64_t num_labels /* D */) {
   auto& sycl_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto work_group_size = dpcppMaxWorkGroupSize(dev_id);
 
   DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
-      get_work_range(sycl_queue, max_input_length, batch_size);
+      get_work_range(work_group_size, max_input_length, batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();

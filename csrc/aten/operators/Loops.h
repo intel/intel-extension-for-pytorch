@@ -456,7 +456,8 @@ void dpcpp_small_index_kernel_impl(
   auto numel = iter.numel();
   auto indices_size = iter.tensor(2).size(-1);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t max_group_num = dpcppMaxDSSNum(dpcpp_queue) * OVER_SUBSCRIBE_DSS_FACTOR;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_group_num = dpcppMaxDSSNum(dev_id) * OVER_SUBSCRIBE_DSS_FACTOR;
 
   auto total_index_iter = numel / indices_size;
   max_group_num = std::min(int64_t(total_index_iter / 2), max_group_num);
@@ -468,7 +469,7 @@ void dpcpp_small_index_kernel_impl(
   auto group_numel = group_index_iter * indices_size;
   auto group_numel_tail = (group_index_iter - 1) * indices_size;
 
-  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   wgroup_size = std::min(decltype(wgroup_size)(group_numel), wgroup_size);
   auto global_size = max_group_num * wgroup_size;
  
@@ -660,14 +661,15 @@ void dpcpp_index_kernel(
   }
   if (small_index) {
     auto& dpcpp_queue = dpcppGetCurrentQueue();
-    int64_t max_group_num = dpcppMaxDSSNum(dpcpp_queue);
-    auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    int64_t max_group_num = dpcppMaxDSSNum(dev_id);
+    auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
     auto indices_size = iter.tensor(2).size(-1);
     auto total_index_iter = numel / indices_size;
     auto local_index = numel / max_group_num;
 
     // the max_local_mem_size = 65536B (64KB)
-    auto max_local_mem_size = dpcppLocalMemSize(dpcpp_queue);
+    auto max_local_mem_size = dpcppLocalMemSize(dev_id);
     auto indice_table_size = indices_size * sizeof(int64_t);
 
     // check whether the current case satisfying conditions 2,3,4

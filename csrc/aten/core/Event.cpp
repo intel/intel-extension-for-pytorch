@@ -60,8 +60,8 @@ bool DPCPPEvent::query() const {
   }
 
   for (auto& event : events_) {
-    auto ret = event.get_info<DPCPP::info::event::command_execution_status>();
-    if (ret != DPCPP::info::event_command_status::complete) {
+    auto ret = event.get_info<dpcpp_event_exec_stat>();
+    if (ret != dpcpp_event_cmd_stat_complete) {
       return false;
     }
   }
@@ -111,10 +111,8 @@ float DPCPPEvent::elapsed_time(const DPCPPEvent& other) const {
   float time_ms = 0;
   auto self_last = *events_.rbegin();
   auto other_last = *other.events_.rbegin();
-  auto self_end = self_last.template get_profiling_info<
-          cl::sycl::info::event_profiling::command_end>();
-  auto other_end = other_last.template get_profiling_info<
-          cl::sycl::info::event_profiling::command_end>();
+  auto self_end = self_last.template get_profiling_info<dpcpp_event_profiling_end>();
+  auto other_end = other_last.template get_profiling_info<dpcpp_event_profiling_end>();
   if (other_end <= self_end) {
     // nanoseconds to milliseconds
     time_ms = (self_end - other_end) / (1000.0 * 1000.0);

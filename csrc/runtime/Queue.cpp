@@ -181,6 +181,9 @@ Queue* getQueueOnDevice(DeviceId device_id, QueueId queue_id) {
   return reserved_queues[device_id][queue_id - 1].get();
 }
 
+DeviceId getDeviceIdOfCurrentQueue() {
+  return getCurrentQueue()->getDeviceId();
+}
 
 } // namespace dpcpp
 } // namespace at

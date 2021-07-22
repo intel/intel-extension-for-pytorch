@@ -28,8 +28,8 @@ void CachingHostAllocator::BlockState::insertEvent(DPCPP::event& e) {
 void CachingHostAllocator::BlockState::processEvents() {
   while (hasEvent()) {
     auto& e = mEvents.front();
-    bool completed = e.get_info<DPCPP::info::event::command_execution_status>()
-      == DPCPP::info::event_command_status::complete;
+    bool completed =
+      e.get_info<dpcpp_event_exec_stat>() == dpcpp_event_cmd_stat_complete;
     if (!completed) {
       return;
     }

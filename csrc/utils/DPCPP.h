@@ -97,6 +97,7 @@ namespace DPCPP = cl::sycl;
 #define THREAD_WORK_SIZE 4
 #define BLOCK_WORK_SIZE (THREAD_WORK_SIZE * NUM_THREADS)
 
+// info value type
 template<typename T, T v>
 using dpcpp_info_t = typename DPCPP::info::param_traits<T, v>::return_type;
 
@@ -170,6 +171,18 @@ static constexpr auto dpcpp_dev_max_sub_devices = DPCPP::info::device::partition
 // Returns the resolution of device timer in nanoseconds.
 static constexpr auto dpcpp_dev_profiling_resolution = DPCPP::info::device::profiling_timer_resolution;
 
+// dpcpp event info
+static constexpr auto dpcpp_event_exec_stat = DPCPP::info::event::command_execution_status;
+// dpcpp event command status
+static constexpr auto dpcpp_event_cmd_stat_submitted = DPCPP::info::event_command_status::submitted;
+static constexpr auto dpcpp_event_cmd_stat_running = DPCPP::info::event_command_status::running;
+static constexpr auto dpcpp_event_cmd_stat_complete = DPCPP::info::event_command_status::complete;
+
+// dpcpp event profiling info
+static constexpr auto dpcpp_event_profiling_submit = DPCPP::info::event_profiling::command_submit;
+static constexpr auto dpcpp_event_profiling_start = DPCPP::info::event_profiling::command_start;
+static constexpr auto dpcpp_event_profiling_end = DPCPP::info::event_profiling::command_end;
+
 // dpcpp access mode
 static constexpr auto dpcpp_r_mode = DPCPP::access::mode::read;
 static constexpr auto dpcpp_w_mode = DPCPP::access::mode::write;
@@ -179,22 +192,15 @@ static constexpr auto dpcpp_discard_w_mode = DPCPP::access::mode::discard_write;
 static constexpr auto dpcpp_discard_rw_mode = DPCPP::access::mode::discard_read_write;
 
 // dpcpp access address space
-static constexpr auto dpcpp_priv_space =
-    DPCPP::access::address_space::private_space;
-static constexpr auto dpcpp_const_space =
-    DPCPP::access::address_space::constant_space;
-static constexpr auto dpcpp_local_space =
-    DPCPP::access::address_space::local_space;
-static constexpr auto dpcpp_global_space =
-    DPCPP::access::address_space::global_space;
+static constexpr auto dpcpp_priv_space = DPCPP::access::address_space::private_space;
+static constexpr auto dpcpp_const_space = DPCPP::access::address_space::constant_space;
+static constexpr auto dpcpp_local_space = DPCPP::access::address_space::local_space;
+static constexpr auto dpcpp_global_space = DPCPP::access::address_space::global_space;
 
 // dpcpp access fence space
-static constexpr auto dpcpp_local_fence =
-    DPCPP::access::fence_space::local_space;
-static constexpr auto dpcpp_global_fence =
-    DPCPP::access::fence_space::global_space;
-static constexpr auto dpcpp_global_and_local_fence =
-    DPCPP::access::fence_space::global_and_local;
+static constexpr auto dpcpp_local_fence = DPCPP::access::fence_space::local_space;
+static constexpr auto dpcpp_global_fence = DPCPP::access::fence_space::global_space;
+static constexpr auto dpcpp_global_and_local_fence = DPCPP::access::fence_space::global_and_local;
 
 // dpcpp access target
 static constexpr auto dpcpp_host_buf = DPCPP::access::target::host_buffer;

@@ -1,6 +1,7 @@
 #include <torch/csrc/autograd/profiler.h>
 #include <torch/csrc/autograd/profiler.h>
 #include <c10/core/Allocator.h>
+#include <utils/DPCPP.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
 #include <runtime/Utils.h>
@@ -15,8 +16,8 @@ using namespace torch::autograd::profiler;
 struct DPCPPEventStubImpl : public XPUEventStubBase {
  public:
   DPCPPEventStubImpl() = delete;
-  DPCPPEventStubImpl(cl::sycl::event event) : event_(std::move(event)), is_onednn_kernel(false) {};
-  DPCPPEventStubImpl(cl::sycl::event start_evt, cl::sycl::event end_evt)
+  DPCPPEventStubImpl(DPCPP::event event) : event_(std::move(event)), is_onednn_kernel(false) {};
+  DPCPPEventStubImpl(DPCPP::event start_evt, DPCPP::event end_evt)
     : event_(std::move(start_evt)), event_end_(std::move(end_evt)), is_onednn_kernel(true) {};
   float elapsed();
   float elapsed(DPCPPEventStubImpl& event);
@@ -26,13 +27,13 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
   virtual ~DPCPPEventStubImpl() = default;
 
  private:
-  cl::sycl::event event_;
-  cl::sycl::event event_end_;
+  DPCPP::event event_;
+  DPCPP::event event_end_;
   bool is_onednn_kernel; // True for onednn kernel
 };
 
-static inline cl::sycl::event submit_barrier(cl::sycl::queue& Q) {
-  cl::sycl::event e;
+static inline DPCPP::event submit_barrier(DPCPP::queue& Q) {
+  DPCPP::event e;
   if (is_profiler_enabled()) {
     e = Q.submit_barrier();
   }
@@ -85,17 +86,13 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
 float DPCPPEventStubImpl::elapsed() {
   float us;
   event_.wait();
-  auto start = event_.template get_profiling_info<
-      cl::sycl::info::event_profiling::command_start>();
-  auto end = event_.template get_profiling_info<
-      cl::sycl::info::event_profiling::command_end>();
+  auto start = event_.template get_profiling_info<dpcpp_event_profiling_start>();
+  auto end = event_.template get_profiling_info<dpcpp_event_profiling_end>();
 
   if (is_onednn_kernel) {
     event_end_.wait();
-    auto start_2 = event_end_.template get_profiling_info<
-      cl::sycl::info::event_profiling::command_start>();
-    auto end_2 = event_end_.template get_profiling_info<
-      cl::sycl::info::event_profiling::command_end>();
+    auto start_2 = event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
+    auto end_2 = event_end_.template get_profiling_info<dpcpp_event_profiling_end>();
     if (start_2 < end) {
       std::stringstream ss;
       ss << __BASE_FILE__ << ":" << __LINE__
@@ -120,29 +117,24 @@ float DPCPPEventStubImpl::elapsed() {
 
 uint64_t DPCPPEventStubImpl::getSubmitTime() {
   event_.wait();
-  return event_.template get_profiling_info<
-          cl::sycl::info::event_profiling::command_submit>();
+  return event_.template get_profiling_info<dpcpp_event_profiling_submit>();
 }
 
 uint64_t DPCPPEventStubImpl::getStartTime() {
   event_.wait();
   if (is_onednn_kernel) {
-    return event_.template get_profiling_info<
-            cl::sycl::info::event_profiling::command_end>();
+    return event_.template get_profiling_info<dpcpp_event_profiling_end>();
   }
-  return event_.template get_profiling_info<
-          cl::sycl::info::event_profiling::command_start>();
+  return event_.template get_profiling_info<dpcpp_event_profiling_start>();
 }
 
 uint64_t DPCPPEventStubImpl::getEndTime() {
   event_.wait();
   if (is_onednn_kernel) {
     event_end_.wait();
-    return event_end_.template get_profiling_info<
-            cl::sycl::info::event_profiling::command_start>();
+    return event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
   }
-  return event_.template get_profiling_info<
-          cl::sycl::info::event_profiling::command_end>();
+  return event_.template get_profiling_info<dpcpp_event_profiling_end>();
 }
 
 float DPCPPEventStubImpl::elapsed(DPCPPEventStubImpl& other) {
@@ -166,25 +158,25 @@ bool is_profiler_enabled() {
   return (xpu::dpcpp::Settings::I().is_event_profiling_enabled() && profilerEnabled());
 }
 
-void dpcpp_mark(std::string name, cl::sycl::event& event) {
+void dpcpp_mark(std::string name, DPCPP::event& event) {
   XPUEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
   mark_xpu(std::move(name), dpcpp_evt_stub);
 }
 
-void dpcpp_mark(std::string name, cl::sycl::event& start_event, cl::sycl::event& end_event) {
+void dpcpp_mark(std::string name, DPCPP::event& start_event, DPCPP::event& end_event) {
   XPUEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
   mark_xpu(std::move(name), dpcpp_evt_stub);
 }
 
-void dpcpp_log(std::string name, cl::sycl::event& event) {
+void dpcpp_log(std::string name, DPCPP::event& event) {
   if (is_profiler_enabled()) {
     dpcpp_mark(name, event);
   }
 }
 
-void dpcpp_log(std::string name, cl::sycl::event& start_event, cl::sycl::event& end_event) {
+void dpcpp_log(std::string name, DPCPP::event& start_event, DPCPP::event& end_event) {
   if (is_profiler_enabled()) {
     dpcpp_mark(name, start_event, end_event);
   }

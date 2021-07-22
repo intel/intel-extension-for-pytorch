@@ -83,9 +83,8 @@ void ClassNLLCriterion_updateOutput(
     auto weights_cont = weights.defined() ? weights.contiguous() : weights;
 
     auto& queue = dpcppGetCurrentQueue();
-    int64_t local_size =
-        queue.get_device()
-            .template get_info<dpcpp_dev_max_work_group_size>();
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
     bool has_weights = weights.defined()
         ? true
         : false; // dpcpp kernel can not accept host pointer
@@ -186,9 +185,8 @@ void ClassNLLCriterion_updateOutput(
   } else if (input.dim() == 2) {
     int64_t batch_size = input.size(0);
     int n_target = input.size(1);
-    int64_t local_size =
-        queue.get_device()
-            .template get_info<dpcpp_dev_max_work_group_size>();
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
 
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto input_data = _input_data;
@@ -292,9 +290,8 @@ void ClassNLLCriterion_updateGradInput(
     auto weights_cont = weights.defined() ? weights.contiguous() : weights;
 
     auto& queue = dpcppGetCurrentQueue();
-    int64_t local_size =
-        queue.get_device()
-            .template get_info<dpcpp_dev_max_work_group_size>();
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
     int64_t global_size =
         ((batch_size + local_size - 1) / local_size) * local_size;
     bool has_weights = weights.defined() ? true : false;
@@ -556,8 +553,9 @@ void spatial_class_nll_criterion_update_output_kernel(
   int64_t ignore_index) {
   auto numel = target.numel();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dpcpp_queue);
-  auto cu_num = dpcppMaxComputeUnitSize(dpcpp_queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  auto cu_num = dpcppMaxComputeUnitSize(dev_id);
   auto num_groups = (numel - 1) / wgroup_size + 1;
   num_groups = std::min(decltype(num_groups)(cu_num), num_groups);
 

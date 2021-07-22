@@ -133,10 +133,11 @@ void compute_grad_weight_bags(
     int64_t num_of_segments,
     const Tensor& grad_weight_per_segment) {
   auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
-  int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
-  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(dev_id));
   auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
   auto total_items = num_groups * group_size;
 
@@ -225,10 +226,11 @@ void compute_grad_weight(
     int64_t num_of_segments,
     const Tensor& grad_weight_per_segment) {
   auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
-  int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
-  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(dev_id));
   auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
   auto total_items = num_groups * group_size;
 
@@ -294,10 +296,11 @@ void sum_and_scatter(
     int64_t num_of_partial_segments,
     const int64_t padding_idx) {
   auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
-  int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
-  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(dev_id));
   auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
   auto total_items = num_groups * group_size;
 

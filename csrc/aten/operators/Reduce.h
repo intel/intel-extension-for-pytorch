@@ -657,7 +657,8 @@ inline void dpcpp_reduce_kernel(
   }
 
   auto& queue = dpcppGetCurrentQueue();
-  int64_t wg_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t wg_size = dpcppMaxWorkGroupSize(dev_id);
   // firstly hardcoded; to be replaced with get_sub_group_max_size
   int sg_size = DPCPP_SUB_GROUP_SIZE;
   int sgs_per_wg = wg_size / sg_size;

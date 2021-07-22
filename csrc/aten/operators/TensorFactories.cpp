@@ -222,7 +222,8 @@ void triu_indices_dpcpp_kernel(
     int64_t rectangle_size,
     int64_t triu_size) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto totalElements = triu_size;
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
@@ -270,7 +271,8 @@ void tril_indices_dpcpp_kernel(
     int64_t trapezoid_size,
     int64_t tril_size) {
   auto& queue = dpcppGetCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(queue);
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto totalElements = tril_size;
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;

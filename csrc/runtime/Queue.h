@@ -68,5 +68,7 @@ Queue* getQueueOnDevice(DeviceId device_id, QueueId queue_id);
 
 QueueId getQueueId(const Queue* ptr);
 
+DeviceId getDeviceIdOfCurrentQueue();
+
 } // namespace dpcpp
 } // namespace xpu
