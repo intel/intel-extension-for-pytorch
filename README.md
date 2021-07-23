@@ -45,7 +45,7 @@ python -m pip install torch_ipex==1.8.0 -f https://software.intel.com/ipex-whl-s
 
 | IPEX Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
 | :--: | :--: | :--: | :--: | :--: |
-| 1.8.0 |  | ✔ | :heavy_check_mark: | |
+| 1.8.0 |  | :heavy_check_mark: | | |
 
 **Note**: Currently we only provide wheel file for Python 3.7. For other Python versions, please follow instructions in the following section to compile from source.
 
