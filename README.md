@@ -1,6 +1,6 @@
 # Intel® Extension for PyTorch
 
-Intel Extension for PyTorch is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
+Intel® Extension for PyTorch (IPEX) is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
 
  - [Installation](#installation)
      - [Install PyTorch](#install-pytorch)
@@ -17,7 +17,7 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
 
 ## Installation
 
-### Install PyTorch
+### Install PyTorch (Optional)
  |IPEX Version|PyTorch Version|
  |--|--|
  |[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|
@@ -32,6 +32,24 @@ For IPEX version earlier than 1.8.0, a patch has to be manually applied to PyTor
 From IPEX 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
 
 **Note:** Compiling with gcc 7 on some environments, like CentOS 7, may fail. Please use GCC >= 8 to compile.
+
+**Note:** Installing IPEX will automatically invoke installation of the corresponding version of PyTorch.
+
+### Install IPEX via wheel file
+
+```
+python -m pip install torch_ipex==1.8.0 -f https://software.intel.com/ipex-whl-stable
+```
+
+:information_source: Wheel files availability for Python versions
+
+| IPEX Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
+| :--: | :--: | :--: | :--: | :--: |
+| 1.8.0 |  | :heavy_check_mark: | | |
+
+**Note**: Currently we only provide wheel file for Python 3.7. For other Python versions, please follow instructions in the following section to compile from source.
+
+### Install IPEX by compiling from source
 
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
