@@ -85,15 +85,21 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
-    def test_tensor_convert(self):
-        tensor = torch.randn(100, 100)
-        bf16_tensor = tensor.bfloat16()
+    def _test_tensor_convert(self, tensor, bf16_tensor):
         top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(tensor)
         # truncated top half should equal with convert fp32 to bf16 by ".bfloat()"
         self.assertEqual(bf16_tensor, top_half)
         # recovery float tensor with top half and bottom half
         float_tensor = torch.ops.torch_ipex.cat_bfloat16_float(top_half, bot_half)
         self.assertEqual(tensor, float_tensor)
-  
+
+    def test_tensor_convert(self):
+        # contiguous case
+        tensor = torch.rand(100, 100)
+        self._test_tensor_convert(tensor, tensor.bfloat16())
+        # transposed case
+        self._test_tensor_convert(tensor.t(), tensor.bfloat16().t())
+        # sliced-out case
+        self._test_tensor_convert(tensor[2:5, 2:5], tensor.bfloat16()[2:5, 2:5])
 if __name__ == '__main__':
     test = unittest.main()

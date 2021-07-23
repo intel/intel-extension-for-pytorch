@@ -111,26 +111,49 @@ class TestOptimizer(TestCase):
         self.assertEqual(param, param2.float(), rtol=1e-4, atol=1e-1)
         self.assertEqual(state_sum, state_sum2.float(), rtol=1e-4, atol=1e-1)
 
-    def test_split_sgd(self):
+    def _test_split_sgd(self, param, grad, param2, trail, grad2):
         packed_add = torch.ops.torch_ipex.packed_add
         non_fused = self.non_fused_adagrad
-
-        # fp32 args
-        param = torch.randn(80, 100)
-        grad = torch.randn(80, 100)
-        trail = torch.Tensor()
-
-        # bf16 args
-        param2, trail = torch.ops.torch_ipex.split_float_bfloat16(param)
-        grad2 = grad.bfloat16()
 
         learning_rate = 0.1
 
         param.add_(grad, alpha=-learning_rate)
         packed_add(param2, trail, grad2, alpha=-learning_rate)
 
-        # compare fp32 vs bf16  fused
+        # compare fp32 vs bf16 fused
         self.assertEqual(param, param2.float(), rtol=1e-4, atol=1e-1)
+
+    def test_split_sgd(self):
+        # contiguous case
+        # fp32 args
+        param = torch.randn(80, 100)
+        grad = torch.randn(80, 100)
+        # bf16 args
+        param2, trail = torch.ops.torch_ipex.split_float_bfloat16(param)
+        grad2 = grad.bfloat16()
+        self._test_split_sgd(param, grad, param2, trail, grad2)
+
+        # transposed case
+        # fp32 args
+        param = torch.randn(80, 100).t().contiguous().t()
+        grad = torch.randn(80, 100).t().contiguous().t()
+        # bf16 args
+        param2, trail = torch.ops.torch_ipex.split_float_bfloat16(param)
+        grad2 = grad.bfloat16().t().contiguous().t()
+        self._test_split_sgd(param, grad, param2, trail, grad2)
+
+        # sliced-out case
+        # fp32 args
+        base_param = torch.randn(80, 100)
+        base_grad = torch.randn(80, 100)
+        param = base_param[10:20, 10:20]
+        grad = base_grad[10:20, 10:20]
+        # bf16 args
+        param2, trail = torch.ops.torch_ipex.split_float_bfloat16(base_param)
+        param2 = param2[10:20, 10:20]
+        trail = trail[10:20, 10:20]
+        grad2 = base_grad.bfloat16()[10:20, 10:20]
+        self._test_split_sgd(param, grad, param2, trail, grad2)
 
 if __name__ == '__main__':
     test = unittest.main()

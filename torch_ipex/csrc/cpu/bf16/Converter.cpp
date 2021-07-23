@@ -1,4 +1,5 @@
 #include "Converter.h"
+#include "utils.h"
 #include "vec/vec_type_cvt.h"
 #include <ATen/Parallel.h>
 #include <torch/extension.h>
@@ -24,10 +25,15 @@ void fp32_to_bf16(void *dst, const void *src, int len) {
   FP32_2_BF16((at::BFloat16 *)dst, (float *)src, len);
 }
 
-at::Tensor cat_bfloat16_float(const at::Tensor top_half, const at::Tensor bottom_half){
-  TORCH_CHECK(top_half.scalar_type() == at::kBFloat16 && bottom_half.scalar_type() == at::kBFloat16, 
-      "pack_bfloat16_float: expect both args to be at::BFloat16");
-  at::Tensor output = at::empty(top_half.sizes(), top_half.options().dtype(at::kFloat));
+at::Tensor cat_bfloat16_float(const at::Tensor top_half_,
+                              const at::Tensor bottom_half_) {
+  TORCH_CHECK(top_half_.scalar_type() == at::kBFloat16 &&
+                  bottom_half_.scalar_type() == at::kBFloat16,
+              "pack_bfloat16_float: expect both args to be at::BFloat16");
+  at::Tensor top_half = top_half_.contiguous();
+  at::Tensor bottom_half = bottom_half_.contiguous();
+  at::Tensor output =
+      at::empty(top_half.sizes(), top_half.options().dtype(at::kFloat));
   using bVec = at::vec::Vectorized<at::BFloat16>;
   using fVec = at::vec::Vectorized<float>;
   at::BFloat16* top_half_data = top_half.data_ptr<at::BFloat16>();
@@ -53,14 +59,25 @@ at::Tensor cat_bfloat16_float(const at::Tensor top_half, const at::Tensor bottom
       output_ptr[d] =  bf16::pack_bfloat16_float(top_half_ptr[d], bottom_half_ptr[d]);
     }
   });
+  if (!top_half_.is_contiguous()) {
+    output = at::empty_strided(top_half_.sizes(), top_half_.strides(),
+                               top_half_.options().dtype(at::kFloat))
+                 .copy_(output);
+  }
   return output;
 }
 
-std::tuple<at::Tensor, at::Tensor> split_float_bfloat16(const at::Tensor tensor){
-  TORCH_CHECK(tensor.scalar_type() == at::kFloat, 
-      "pack_bfloat16_float: expect both tensor to be at::kFloat");
-  at::Tensor top_half = at::empty(tensor.sizes(), tensor.options().dtype(at::kBFloat16));
-  at::Tensor bottom_half = at::empty(tensor.sizes(), tensor.options().dtype(at::kBFloat16));
+std::tuple<at::Tensor, at::Tensor>
+split_float_bfloat16(const at::Tensor tensor_) {
+  TORCH_CHECK(tensor_.scalar_type() == at::kFloat,
+              "pack_bfloat16_float: expect both tensor to be at::kFloat");
+
+  auto tensor = tensor_.contiguous();
+  at::Tensor top_half =
+      at::empty(tensor.sizes(), tensor.options().dtype(at::kBFloat16));
+  at::Tensor bottom_half =
+      at::empty(tensor.sizes(), tensor.options().dtype(at::kBFloat16));
+
   using bVec = at::vec::Vectorized<at::BFloat16>;
   using fVec = at::vec::Vectorized<float>;
   at::BFloat16* top_half_data = top_half.data_ptr<at::BFloat16>();
@@ -90,6 +107,14 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16(const at::Tensor tensor)
       bottom_half_ptr[d] = bottom_half_val;
     }
   });
+  if (!tensor_.is_contiguous()) {
+    top_half = at::empty_strided(tensor_.sizes(), tensor_.strides(),
+                                 tensor_.options().dtype(at::kBFloat16))
+                   .copy_(top_half);
+    bottom_half = at::empty_strided(tensor_.sizes(), tensor_.strides(),
+                                    tensor_.options().dtype(at::kBFloat16))
+                      .copy_(bottom_half);
+  }
   return std::tie(top_half, bottom_half);
 }
 

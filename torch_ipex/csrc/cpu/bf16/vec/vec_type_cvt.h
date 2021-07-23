@@ -1,3 +1,4 @@
+#include <ATen/ATen.h>
 #if defined(AVX512)
 #include <immintrin.h>
 // Conversion from BF16 to FP32

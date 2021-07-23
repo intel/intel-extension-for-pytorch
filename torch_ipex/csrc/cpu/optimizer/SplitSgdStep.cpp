@@ -1,5 +1,5 @@
-#include "optimizer.h"
 #include "cpu/bf16/vec/bf16_vec_kernel.h"
+#include "optimizer.h"
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
@@ -7,16 +7,19 @@
 namespace torch_ipex {
 namespace cpu {
 
-void packed_add(at::Tensor &top_half, at::Tensor &bot_half, const at::Tensor &grad, double alpha) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.scalar_type() ==
+void packed_add(at::Tensor &top_half_, at::Tensor &bot_half_,
+                const at::Tensor &grad_, double alpha) {
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_.scalar_type() ==
                                    at::ScalarType::BFloat16);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.scalar_type() ==
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half_.scalar_type() ==
                                    at::ScalarType::BFloat16);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.scalar_type() ==  
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half_.scalar_type() ==
                                    at::ScalarType::BFloat16);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.sizes() == bot_half.sizes());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.is_contiguous());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half_.sizes() == bot_half_.sizes());
+
+  at::Tensor top_half = top_half_.contiguous();
+  at::Tensor bot_half = bot_half_.contiguous();
+  at::Tensor grad = grad_.is_sparse() ? grad_ : grad_.contiguous();
 
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({}));
@@ -81,7 +84,6 @@ void packed_add(at::Tensor &top_half, at::Tensor &bot_half, const at::Tensor &gr
       }
     });
   } else {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.is_contiguous());
     // TODO: vector implementation basing on vector size
     union packed_bf16 {
       unsigned short s[2];
@@ -123,6 +125,13 @@ void packed_add(at::Tensor &top_half, at::Tensor &bot_half, const at::Tensor &gr
         top_half_ptr[i] = p16.s[1];
       }
     });
+  }
+
+  if (!top_half_.is_contiguous()) {
+    top_half_.copy_(top_half);
+  }
+  if (!bot_half_.is_contiguous()) {
+    bot_half_.copy_(bot_half);
   }
 }
 
