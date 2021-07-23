@@ -2,6 +2,7 @@
 
 #include "WeightPrepack.h"
 #include "mkldnn/MKLDNNCommon.h"
+#include "torch_ipex/csrc/rw_lock.h"
 #include "torch_ipex/csrc/utils.h"
 
 namespace torch_ipex {
@@ -11,7 +12,30 @@ namespace {
 
 using weakref_type = c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
 using val_blocked = std::tuple<weakref_type, ideep::tensor>;
-thread_local std::unordered_map<c10::TensorImpl *, val_blocked> cached_weights;
+std::unordered_map<c10::TensorImpl *, val_blocked> cached_weights;
+
+using map_iter =
+    std::unordered_map<c10::TensorImpl *, val_blocked>::const_iterator;
+
+torch_ipex::ReadWriteMutex rwmutex;
+
+ideep::tensor read_cached_weights(const at::Tensor &weight) {
+  torch_ipex::UniqueReadLock<torch_ipex::ReadWriteMutex> lock(rwmutex);
+  ideep::tensor cached_weight;
+  auto it = cached_weights.find(weight.unsafeGetTensorImpl());
+  if (it != cached_weights.end()) {
+    cached_weight = std::get<1>(it->second);
+  }
+  return cached_weight;
+}
+
+void write_cached_weights(const at::Tensor &weight, ideep::tensor &result) {
+  torch_ipex::UniqueWriteLock<torch_ipex::ReadWriteMutex> lock(rwmutex);
+  cached_weights.emplace(
+      weight.unsafeGetTensorImpl(),
+      val_blocked{weakref_type(weight.getIntrusivePtr()), result});
+}
+
 }  // namespace
 
 ideep::tensor get_conv_prepacked_weight(
@@ -23,10 +47,8 @@ ideep::tensor get_conv_prepacked_weight(
     int64_t groups,
     const ideep::attr_t& attr,
     const at::MemoryFormat& mkldnn_memory_format) {
-  auto it = cached_weights.find(weight.unsafeGetTensorImpl());
-  if (it != cached_weights.end()) {
-    return std::get<1>(it->second);
-  } else { 
+  ideep::tensor cached_weight = read_cached_weights(weight);
+  if (cached_weight.is_empty()) {
     auto weight_ = weight.contiguous(mkldnn_memory_format);
     ideep::tensor w = itensor_view_from_dense(weight_);
     // TODO: 3d check
@@ -61,14 +83,11 @@ ideep::tensor get_conv_prepacked_weight(
         input.sizes().vec(),
         attr);
     }
-    ideep::tensor result;
-    result.init(packed_desc);
-    result.feed_from(w);
-    cached_weights.emplace(
-        weight.unsafeGetTensorImpl(),
-        val_blocked{weakref_type(weight.getIntrusivePtr()), result});
-    return result;
+    cached_weight.init(packed_desc);
+    cached_weight.feed_from(w);
+    write_cached_weights(weight, cached_weight);
   }
+  return cached_weight;
 }
 
 ideep::tensor get_conv_prepacked_weight(
@@ -274,28 +293,21 @@ ideep::tensor get_linear_prepacked_weight(
     const at::Tensor& weight,
     const int64_t batch_size,
     const at::ScalarType src_dtype) {
-  auto it = cached_weights.find(weight.unsafeGetTensorImpl());
-  if (it != cached_weights.end()) {
-    return std::get<1>(it->second);
-  } else {
+  ideep::tensor cached_weight = read_cached_weights(weight);
+  if (cached_weight.is_empty()) {
     auto weight_ = weight.is_contiguous() ? weight : weight.contiguous();
     ideep::tensor w = itensor_view_from_dense(weight_);
     auto out_features = weight_.size(0);
     auto in_features = weight_.size(1);
     ideep::dims input_dims({batch_size, weight.size(1)});
     auto packed_desc = ideep::inner_product_forward::expected_weights_desc(
-      {weight.sizes().cbegin(), weight.sizes().cend()},
-      input_dims,
-      w.get_data_type(),
-      get_mkldnn_dtype(src_dtype)); 
-    ideep::tensor result;
-    result.init(packed_desc);
-    result.feed_from(w);
-    cached_weights.emplace(
-        weight.unsafeGetTensorImpl(),
-        val_blocked{weakref_type(weight.getIntrusivePtr()), result});
-    return result;
+        {weight.sizes().cbegin(), weight.sizes().cend()}, input_dims,
+        w.get_data_type(), get_mkldnn_dtype(src_dtype));
+    cached_weight.init(packed_desc);
+    cached_weight.feed_from(w);
+    write_cached_weights(weight, cached_weight);
   }
+  return cached_weight;
 }
 
 // Create mkldnn memory view from ATen tensor
@@ -318,8 +330,8 @@ inline ideep::tensor get_mkldnn_tensor_view(
 }
 
 bool is_prepacked(const at::Tensor& weight) {
-  auto it = cached_weights.find(weight.unsafeGetTensorImpl());
-  return it == cached_weights.end() ? false : true;
+  auto cached_weight = read_cached_weights(weight);
+  return cached_weight.is_empty();
 }
 
 std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
@@ -334,18 +346,14 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
     const ideep::tensor& src_iter_c,
     const ideep::tensor& bias,
     const bool reverse) {
-  auto it_i = cached_weights.find(weight_ih.unsafeGetTensorImpl());
-  auto it_h = cached_weights.find(weight_hh.unsafeGetTensorImpl());
-
-  bool all_in_cache = it_i != cached_weights.end() && it_h != cached_weights.end();
-  bool all_miss = it_i == cached_weights.end() && it_h == cached_weights.end();
+  auto cached_weight_ih = read_cached_weights(weight_ih);
+  auto cached_weight_hh = read_cached_weights(weight_hh);
+  bool all_in_cache =
+      !cached_weight_ih.is_empty() && !cached_weight_hh.is_empty();
+  bool all_miss = cached_weight_ih.is_empty() && cached_weight_hh.is_empty();
   TORCH_CHECK(all_in_cache || all_miss, "both of the weights of LSTM should be cached or neither should be cached");
 
-  if (it_i != cached_weights.end()) {
-    ideep::tensor w_ih = std::get<1>(it_i->second);
-    ideep::tensor w_hh = std::get<1>(it_h->second);
-    return std::make_tuple(w_ih, w_hh);
-  } else {
+  if (cached_weight_ih.is_empty()) {
     auto w1 = get_mkldnn_tensor_view(weight_ih, {{1, 1, input_size, num_gates, hidden_size}, get_mkldnn_dtype(weight_ih.scalar_type()), ideep::format_tag::ldgoi});
     auto w2 = get_mkldnn_tensor_view(weight_hh, {{1, 1, hidden_size, num_gates, hidden_size}, get_mkldnn_dtype(weight_hh.scalar_type()), ideep::format_tag::ldgoi});
   
@@ -369,23 +377,16 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
     if (packed_desc_ih.is_rnn_packed() || packed_desc_hh.is_rnn_packed()) {
       return std::make_tuple(w1, w2);
     }
+    cached_weight_ih.init(packed_desc_ih);
+    cached_weight_hh.init(packed_desc_hh);
 
-    ideep::tensor packed_ih {packed_desc_ih}; 
-    ideep::tensor packed_hh {packed_desc_hh};
+    cached_weight_ih.feed_from(w1);
+    cached_weight_hh.feed_from(w2);
 
-    packed_ih.feed_from(w1);
-    packed_hh.feed_from(w2);
-
-    cached_weights.emplace(
-        weight_ih.unsafeGetTensorImpl(),
-        val_blocked{weakref_type(weight_ih.getIntrusivePtr()), packed_ih});
-    
-    cached_weights.emplace(
-        weight_hh.unsafeGetTensorImpl(),
-        val_blocked{weakref_type(weight_hh.getIntrusivePtr()), packed_hh});
-
-    return std::make_tuple(packed_ih, packed_hh);
+    write_cached_weights(weight_ih, cached_weight_ih);
+    write_cached_weights(weight_hh, cached_weight_hh);
   }
+  return std::make_tuple(cached_weight_ih, cached_weight_hh);
 }
 
 at::Tensor linear_weight_prepack(
