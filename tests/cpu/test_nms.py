@@ -137,7 +137,63 @@ class TestNMS(TestCase):
             bbox = bbox.squeeze(0)
             prob = prob.squeeze(0)
             output.append(self.decode_single(bbox, prob, criteria, max_output))
-        output2 = batch_score_nms(bboxes_clone, probs_clone, criteria, max_output)
+        output2_raw = batch_score_nms(bboxes_clone, probs_clone, criteria, max_output)
+
+        # Re-assembly the result
+        output2 = []
+        idx = 0
+        for i in range(output2_raw[3].size(0)):
+            output2.append((output2_raw[0][idx:idx+output2_raw[3][i]],
+                            output2_raw[1][idx:idx+output2_raw[3][i]],
+                            output2_raw[2][idx:idx+output2_raw[3][i]]))
+            idx += output2_raw[3][i]
+
+        for i in range(batch_size):
+            loc, label, prob = [r for r in output[i]]
+            loc2, label2, prob2 = [r for r in output2[i]]
+            self.assertTrue(torch.allclose(loc, loc2, rtol=1e-4, atol=1e-4))
+            self.assertEqual(label, label2)
+            self.assertTrue(torch.allclose(prob, prob2, rtol=1e-4, atol=1e-4))
+
+    def test_jit_trace_batch_nms(self):
+        class Batch_NMS(nn.Module):
+            def __init__(self, criteria, max_output):
+                super(Batch_NMS, self).__init__()
+                self.criteria = criteria
+                self.max_output = max_output
+            def forward(self, bboxes_clone, probs_clone):
+                return batch_score_nms(bboxes_clone, probs_clone, self.criteria, self.max_output)
+        batch_size = 1
+        number_boxes = 15130
+        scale_xy = 0.1
+        scale_wh = 0.2
+        criteria = 0.50
+        max_output = 200
+        predicted_loc = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_ploc.pt")) # sizes: [1, 15130, 4]
+        predicted_score = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_plabel.pt")) # sizes: [1, 15130, 81]
+        dboxes_xywh = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_dboxes_xywh.pt"))
+        bboxes, probs = parallel_scale_back_batch(predicted_loc, predicted_score, dboxes_xywh, scale_xy, scale_wh)
+        bboxes_clone = bboxes.clone()
+        probs_clone = probs.clone()
+
+        output = []
+        for bbox, prob in zip(bboxes.split(1, 0), probs.split(1, 0)):
+            bbox = bbox.squeeze(0)
+            prob = prob.squeeze(0)
+            output.append(self.decode_single(bbox, prob, criteria, max_output))
+
+        batch_score_nms_module = Batch_NMS(criteria, max_output)
+        model_decode = torch.jit.trace(batch_score_nms_module, (bboxes_clone, probs_clone))
+        output2_raw = model_decode(bboxes_clone, probs_clone)
+
+        # Re-assembly the result
+        output2 = []
+        idx = 0
+        for i in range(output2_raw[3].size(0)):
+            output2.append((output2_raw[0][idx:idx+output2_raw[3][i]],
+                            output2_raw[1][idx:idx+output2_raw[3][i]],
+                            output2_raw[2][idx:idx+output2_raw[3][i]]))
+            idx += output2_raw[3][i]
 
         for i in range(batch_size):
             loc, label, prob = [r for r in output[i]]

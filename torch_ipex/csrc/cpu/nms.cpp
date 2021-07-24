@@ -292,9 +292,10 @@ std::vector<at::Tensor> remove_empty(std::vector<at::Tensor>& candidate, int64_t
 }
 
 template <typename scalar_t>
-std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kernel(const at::Tensor& batch_dets,
-                          const at::Tensor& batch_scores,
-                          const float threshold, const int max_output=200) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+batch_score_nms_kernel(const at::Tensor &batch_dets,
+                       const at::Tensor &batch_scores, const float threshold,
+                       const int max_output = 200) {
   // Reference to: https://github.com/mlcommons/inference/blob/0f096a18083c3fd529c1fbf97ebda7bc3f1fda70/others/cloud/single_stage_detector/pytorch/utils.py#L163
   // batch_dets: (batchsize, num_bbox, 4) For example: batch_dets: (1, 15130, 4)
   // batch_scores: (batchsize, num_bbox, label_num) For example: batch_scores: (1, 15130, 81)
@@ -351,7 +352,10 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
     labels_out[index] = at::empty({keep.sizes()}).fill_(i);
   }
 
-  std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> output(nbatch);
+  std::vector<at::Tensor> output_bboxes_(nbatch);
+  std::vector<at::Tensor> output_labels_(nbatch);
+  std::vector<at::Tensor> output_scores_(nbatch);
+  std::vector<at::Tensor> output_length_(nbatch);
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 # pragma omp parallel for simd schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
@@ -372,11 +376,14 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
     std::tuple<at::Tensor, at::Tensor> sort_result = scores_out_.sort(0);
     at::Tensor max_ids = std::get<1>(sort_result);
     max_ids = max_ids.slice(/*dim*/0, /*start*/std::max(max_ids.size(0) - max_output, static_cast<int64_t>(0)), /*end*/max_ids.size(0));
-    output[bs] = std::tuple<at::Tensor, at::Tensor, at::Tensor>(bboxes_out_.index_select(/*dim*/0, /*index*/max_ids),
-                                                                labels_out_.index_select(/*dim*/0, /*index*/max_ids),
-                                                                scores_out_.index_select(/*dim*/0, /*index*/max_ids));
+    output_bboxes_[bs] = bboxes_out_.index_select(/*dim*/ 0, /*index*/ max_ids);
+    output_labels_[bs] = labels_out_.index_select(/*dim*/ 0, /*index*/ max_ids);
+    output_scores_[bs] = scores_out_.index_select(/*dim*/ 0, /*index*/ max_ids);
+    output_length_[bs] = torch::tensor(max_ids.size(0), {torch::kInt32});
   }
-  return output;
+  return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(
+      at::cat(output_bboxes_), at::cat(output_labels_), at::cat(output_scores_),
+      at::stack(output_length_));
 }
 
 template <typename scalar_t>
@@ -526,11 +533,10 @@ at::Tensor nms_cpu(const at::Tensor& dets,
   return result;
 }
 
-std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_cpu(const at::Tensor& dets,
-               const at::Tensor& scores,
-               const float threshold,
-               const int max_output) {
-  std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> result;
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+batch_score_nms_cpu(const at::Tensor &dets, const at::Tensor &scores,
+                    const float threshold, const int max_output) {
+  std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> result;
   AT_DISPATCH_FLOATING_TYPES(dets.scalar_type(), "batch_score_nms", [&] {
     result = batch_score_nms_kernel<scalar_t>(dets, scores, threshold, max_output);
   });
@@ -581,10 +587,11 @@ at::Tensor AtenIpexTypeExt::nms(const at::Tensor& dets,
   return result;
 }
 
-std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> AtenIpexTypeExt::batch_score_nms(const at::Tensor& dets,
-               const at::Tensor& scores,
-               const double threshold,
-               const int64_t max_output) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+AtenIpexTypeExt::batch_score_nms(const at::Tensor &dets,
+                                 const at::Tensor &scores,
+                                 const double threshold,
+                                 const int64_t max_output) {
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::batch_score_nms\n");
 #endif
@@ -758,10 +765,9 @@ at::Tensor nms(const at::Tensor& dets,
   return op.call(cpu_cached_cast(at::kFloat, dets), cpu_cached_cast(at::kFloat, scores), threshold, sorted);
 }
 
-std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(const at::Tensor& dets,
-                           const at::Tensor& scores,
-                           const double threshold,
-                           const int64_t max_output) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+batch_score_nms(const at::Tensor &dets, const at::Tensor &scores,
+                const double threshold, const int64_t max_output) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
     .findSchemaOrThrow("torch_ipex::batch_score_nms", "")

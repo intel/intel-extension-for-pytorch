@@ -62,21 +62,25 @@ class AtenIpexTypeExt {
   /// \brief Perform batch non-maximum suppression.
   ///
   /// C++ version of Encoder::decode_single.
-  /// Refer to https://github.com/mlcommons/inference/blob/v0.7/others/cloud/single_stage_detector/pytorch/utils.py.
+  /// Refer to
+  /// https://github.com/mlcommons/inference/blob/v0.7/others/cloud/single_stage_detector/pytorch/utils.py.
   ///
-  /// \param dets: predicted loc in ltrb format, size [BS, number_boxes, 4], for example: [1, 15130, 4].
-  /// \param scores: predicted score, size [BS, number_boxes, class_number], for example: [1, 15130, 81].
-  /// \param threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val larger than the threshold.
-  /// \param max_output: the max number of output bbox.
+  /// \param dets: predicted loc in ltrb format, size [BS, number_boxes, 4], for
+  /// example: [1, 15130, 4]. \param scores: predicted score, size [BS,
+  /// number_boxes, class_number], for example: [1, 15130, 81]. \param
+  /// threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val
+  /// larger than the threshold. \param max_output: the max number of output
+  /// bbox.
   ///
-  /// \return result is a list of tuple. In each tuple, there are 3 tensors:
+  /// \return result is a list of tensors, each 4 continuous tensors
+  /// corresponding the decode results of one image
   ///   bboxes_out_: the selected out bboxes coordinate, size [max_output, 4].
   ///   labels_out_: the label of each selected out bboxes, size [max_output].
   ///   scores_out_: the score of each selected out bboxes, size [max_output].
-  static std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(const at::Tensor& dets,
-                        const at::Tensor& scores,
-                        const double threshold,
-                        const int64_t max_output);
+  ///   length_out_: the number of detection bboxs [1].
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+  batch_score_nms(const at::Tensor &dets, const at::Tensor &scores,
+                  const double threshold, const int64_t max_output);
 
   /// \brief Perform batch non-maximum suppression (NMS) for MaskRCNN RPN part.
   ///
