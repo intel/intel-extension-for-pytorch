@@ -90,7 +90,6 @@ namespace torch_ipex {
                       -1, -1, -1, -1, -1, -1, -1, -1,
                       -1, -1, -1, -1, -1, -1, -1, -1,
                       -1, -1, -1};
-		  __m512 scale_m512[4];
                   for (int i = start; i < end; ++i) {
                     const int8_t* input0_ptr = densex + i * Dim;
                     int8_t* output0_ptr = res + i * ROW;
@@ -130,19 +129,13 @@ namespace torch_ipex {
                     int8_t* outp = output0_ptr + Dim;
                     //Do reduce add with scale
                     size_t off = 0;
-                    for (; off < total_off - 63 ; off += 64) {
-		      scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
-		      scale_m512[1] = _mm512_load_ps((const void *)(scales + off + 16));
-		      scale_m512[2] = _mm512_load_ps((const void *)(scales + off + 32));
-		      scale_m512[3] = _mm512_load_ps((const void *)(scales + off + 48));
-                      reduce_add_s32x16x16x4_with_scales(outp + off, cat_buf + off, scale_m512);
+                    for (; off < total_off - 15 ; off += 16) {
+                      __m512 scale_m512 = _mm512_load_ps((const void *)(scales + off));
+                      reduce_add_s32x16x16_with_scales(outp + off, cat_buf + off, scale_m512);
                     }
 
-		    scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
-                    reduce_add_s32x16x16_with_scales(outp + off, cat_buf + off, scale_m512[0]);
-                    off += 16;
-		    scale_m512[0] = _mm512_load_ps((const void *)(scales + off));
-                    reduce_add_s32x16x16_with_scales_and_mask_store(outp + off, 0x7fff, cat_buf + off, scale_m512[0]);
+                    __m512 scale_m512 = _mm512_load_ps((const void *)(scales + off));
+                    reduce_add_s32x16x16_with_scales_and_mask_store(outp + off, 0x7fff, cat_buf + off, scale_m512);
                   }
 		});
                 return output;

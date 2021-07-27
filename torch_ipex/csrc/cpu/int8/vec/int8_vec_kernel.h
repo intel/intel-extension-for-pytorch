@@ -440,8 +440,8 @@ void mul_and_sum_s16x128_to_s32x16(__m512i& out, const __m512i *a16x4, const __m
   a_0_i = _mm512_dpwssd_epi32(a_0_i, a16x4[1], b16x4[1]);
   a_2_i = _mm512_dpwssd_epi32(a_2_i, a16x4[3], b16x4[3]);
 #else
-  a_1_i = _mm512_madd_epi16(a16x4[1], b16x4[1]);
-  a_3_i = _mm512_madd_epi16(a16x4[3], b16x4[3]);
+  auto a_1_i = _mm512_madd_epi16(a16x4[1], b16x4[1]);
+  auto a_3_i = _mm512_madd_epi16(a16x4[3], b16x4[3]);
   a_0_i = _mm512_add_epi32(a_0_i, a_1_i);
   a_2_i = _mm512_add_epi32(a_2_i, a_3_i);
 #endif
@@ -518,10 +518,10 @@ void mul_and_sum_s16x128x2_to_s32x16x2(__m512i& out0, __m512i& out1,
   a0_2_i = _mm512_dpwssd_epi32(a0_2_i, a0_16x4[3], b0_16x4[3]);
   a1_2_i = _mm512_dpwssd_epi32(a1_2_i, a1_16x4[3], b1_16x4[3]);
 #else
-  a0_1_i = _mm512_madd_epi16(a0_16x4[1], b0_16x4[1]);
-  a0_3_i = _mm512_madd_epi16(a0_16x4[3], b0_16x4[3]);
-  a1_1_i = _mm512_madd_epi16(a1_16x4[1], b1_16x4[1]);
-  a1_3_i = _mm512_madd_epi16(a1_16x4[3], b1_16x4[3]);
+  auto a0_1_i = _mm512_madd_epi16(a0_16x4[1], b0_16x4[1]);
+  auto a0_3_i = _mm512_madd_epi16(a0_16x4[3], b0_16x4[3]);
+  auto a1_1_i = _mm512_madd_epi16(a1_16x4[1], b1_16x4[1]);
+  auto a1_3_i = _mm512_madd_epi16(a1_16x4[3], b1_16x4[3]);
   a0_0_i = _mm512_add_epi32(a0_0_i, a0_1_i);
   a0_2_i = _mm512_add_epi32(a0_2_i, a0_3_i);
   a1_0_i = _mm512_add_epi32(a1_0_i, a1_1_i);
@@ -531,8 +531,7 @@ void mul_and_sum_s16x128x2_to_s32x16x2(__m512i& out0, __m512i& out1,
   out1 = _mm512_add_epi32(a1_0_i, a1_2_i);
 }
 
-static inline __attribute__((always_inline))
-int32_t reduce_add_s32x16(__m512i& acc_sum) {
+static inline int32_t reduce_add_s32x16(__m512i& acc_sum) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
   ab_256_low = _mm256_add_epi32(ab_256_low, ab_256_high);
@@ -548,8 +547,8 @@ int32_t reduce_add_s32x16(__m512i& acc_sum) {
   return _mm_cvtsi128_si32(ab_128_low);
 }
 
-static inline __attribute__((always_inline))
-int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float& scale) {
+#if 0
+static inline int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float& scale) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto s_simd = _mm_set1_ps(scale);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
@@ -570,6 +569,7 @@ int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float& scale) {
   sum_vec = _mm_cvtsepi32_epi8(sum_vec);
   return (int8_t)_mm_cvtsi128_si32(sum_vec);
 }
+#endif
 
 static inline __attribute__((always_inline))
 __m512i reduce_add_s32x16x16(__m512i* acc_sums) {
