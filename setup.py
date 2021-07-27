@@ -29,8 +29,6 @@ import setuptools.command.install
 from distutils.spawn import find_executable
 
 import distutils.command.clean
-import multiprocessing
-import multiprocessing.pool
 import os
 import pathlib
 import platform
@@ -145,7 +143,8 @@ class DPCPPBuild(BuildExtension, object):
             raise RuntimeError("Does not support windows")
 
         shutil.copy("README.md", "torch_ipex/README.md")
-        shutil.copy("requirements.txt", "torch_ipex/requirements.txt")
+        if os.path.exists("requirements.txt"):
+            shutil.copy("requirements.txt", "torch_ipex/requirements.txt")
 
         dpcpp_exts = [ext for ext in self.extensions if isinstance(ext, DPCPPExt)]
         for ext in dpcpp_exts:
@@ -192,7 +191,7 @@ class DPCPPBuild(BuildExtension, object):
                 cmake_prefix_path = torch.utils.cmake_prefix_path
             else:
                 cmake_prefix_path = ';'.join([torch.utils.cmake_prefix_path, pybind11.get_cmake_dir()])
-                
+
             build_options = {
                 # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
                 # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
@@ -229,7 +228,7 @@ class DPCPPBuild(BuildExtension, object):
             check_call(command, cwd=ext.build_dir, env=env)
 
         env = os.environ.copy()
-        build_args = ['-j', str(multiprocessing.cpu_count()), 'install']
+        build_args = ['-j', str(os.cpu_count()), 'install']
         # build_args += ['VERBOSE=1']
 
         gen_exec = 'make'
