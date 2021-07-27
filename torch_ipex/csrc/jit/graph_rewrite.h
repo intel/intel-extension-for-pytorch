@@ -22,6 +22,7 @@ c10::optional<IValue> getIValue(
 void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
 void replaceAtenConvolutionWithIpexConv(std::shared_ptr<Graph>& graph);
 void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph);
+void FuseConvolutionWithEltwiseNDWeight(std::shared_ptr<Graph> &graph);
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
 void replaceAtenLinearWithIpexLinear(std::shared_ptr<Graph>& graph);

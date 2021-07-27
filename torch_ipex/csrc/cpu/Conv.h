@@ -36,7 +36,24 @@ void convolution_inplace_impl(
     int64_t groups,
     const ideep::attr_t& attr);
 
-// IPEX customized linear OP with n-D packed weight
+at::Tensor
+convolution_forward_impl(const at::Tensor &input, const at::Tensor &weight,
+                         const c10::optional<at::Tensor> &bias_opt,
+                         at::IntArrayRef stride, at::IntArrayRef padding,
+                         at::IntArrayRef dilation, at::IntArrayRef kernel_size,
+                         int64_t groups, int64_t output_channel,
+                         bool weight_channels_last, bool weight_prepacked,
+                         const ideep::attr_t &attr);
+
+void convolution_forward_inplace_impl(
+    const at::Tensor &input, const at::Tensor &weight,
+    const c10::optional<at::Tensor> &bias_opt, at::Tensor &output,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
+    at::IntArrayRef kernel_size, int64_t groups, int64_t output_channel,
+    bool weight_channels_last, bool weight_prepacked,
+    const ideep::attr_t &attr);
+
+// IPEX customized convolution OP with n-D packed weight
 class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
 public:
   // forward function without autograd overhead, will go this way when only do forward

@@ -27,74 +27,81 @@ std::vector<int64_t> calc_conv_output_size(
   return output_size;
 }
 
-at::Tensor convolution_kernel(
-    const at::Tensor& input,
-    const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    const ideep::attr_t& attr) {
+void convolution_kernel_output(const at::Tensor &input,
+                               const ideep::tensor &mkldnn_weight,
+                               const c10::optional<at::Tensor> &bias_opt,
+                               at::Tensor &output, at::IntArrayRef stride,
+                               at::IntArrayRef padding,
+                               at::IntArrayRef dilation, int64_t groups,
+                               const ideep::attr_t &attr) {
+  // Convolution output kernel, assuming the output always has same format with
+  // input, so this function will not change input and output's format, making
+  // sure you has made pre-process for input and output to make them have same
+  // format before call this function.
+  TORCH_CHECK(
+      input.suggest_memory_format() == output.suggest_memory_format(),
+      "input and output need has same format for convolution_kernel_output");
+  TORCH_CHECK((IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
+              "input and output are need contiguous tensor for "
+              "convolution_kernel_output");
   c10::MaybeOwned<at::Tensor> bias_maybe_owned = at::borrow_from_optional_tensor(bias_opt);
   const at::Tensor& bias = *bias_maybe_owned;
-  // TODO: the input will be actively converted to channels last format
-  // after the 5-D tensor supports channels last format.
   const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
-  auto kernel_size = mkldnn_weight.get_dims();
-  std::vector<int64_t> input_size = mkldnn_input.get_dims();
-  std::vector<int64_t> output_sizes =
-      calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
+  auto output_sizes = output.sizes();
 
   bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  auto output = at::empty(output_sizes, input.options().memory_format(input.suggest_memory_format()));
-  ideep::tensor mkldnn_output;
-  if (is_channels_last) {
-    mkldnn_output = itensor_view_from_dense(output);
-  }
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
   if (bias.defined()) {
     auto bias_ = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
     const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
     ideep::convolution_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        mkldnn_bias,
-        {output_sizes.cbegin(), output_sizes.cend()},
-        mkldnn_output,
-        {stride.begin(), stride.end()},
-        {dilation.begin(), dilation.end()},
-        {padding.begin(), padding.end()},
-        {padding.begin(), padding.end()},
-        groups,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
+        mkldnn_input, mkldnn_weight, mkldnn_bias,
+        {output_sizes.begin(), output_sizes.end()}, mkldnn_output,
+        {stride.begin(), stride.end()}, {dilation.begin(), dilation.end()},
+        {padding.begin(), padding.end()}, {padding.begin(), padding.end()},
+        groups, ideep::scale_t(), ideep::scale_t(), ideep::scale_t(), attr);
   } else {
     ideep::convolution_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        {output_sizes.cbegin(), output_sizes.cend()},
-        mkldnn_output,
-        {stride.begin(), stride.end()},
-        {dilation.begin(), dilation.end()},
-        {padding.begin(), padding.end()},
-        {padding.begin(), padding.end()},
-        groups,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
+        mkldnn_input, mkldnn_weight, {output_sizes.begin(), output_sizes.end()},
+        mkldnn_output, {stride.begin(), stride.end()},
+        {dilation.begin(), dilation.end()}, {padding.begin(), padding.end()},
+        {padding.begin(), padding.end()}, groups, ideep::scale_t(),
+        ideep::scale_t(), ideep::scale_t(), attr);
   }
 
-  if (is_channels_last) {
-    return output;
-  } else {
-    return mkldnn_to_dense(
-        new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
-                                input.options().device_opt()));
+  if (!is_channels_last) {
+    output = mkldnn_to_dense(new_with_itensor_mkldnn(
+        std::move(mkldnn_output),
+        optTypeMetaToScalarType(input.options().dtype_opt()),
+        input.options().device_opt()));
   }
+}
+
+at::Tensor convolution_kernel(const at::Tensor &input,
+                              const ideep::tensor &mkldnn_weight,
+                              const c10::optional<at::Tensor> &bias_opt,
+                              at::IntArrayRef stride, at::IntArrayRef padding,
+                              at::IntArrayRef dilation, int64_t groups,
+                              const ideep::attr_t &attr) {
+  // Base convolution kernel, this base kernel will not change input's format,
+  // so make sure you has make process the input's format before call this
+  // function, the output wil has same format with input.
+  // TODO: the input will be actively converted to channels last format
+  // after the 5-D tensor supports channels last format.
+  TORCH_CHECK(IS_CONTIGUOUS_ANY(input),
+              "input is need to a contiguous tensor for convolution_kernel");
+  auto kernel_size = mkldnn_weight.get_dims();
+  auto input_size = input.sizes();
+  std::vector<int64_t> output_sizes =
+      calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
+
+  auto output =
+      at::empty(output_sizes,
+                input.options().memory_format(input.suggest_memory_format()));
+  convolution_kernel_output(input, mkldnn_weight, bias_opt, output, stride,
+                            padding, dilation, groups, attr);
+  return output;
 }
 
 at::Tensor convolution_impl(
@@ -125,8 +132,6 @@ void convolution_inplace_impl(
     at::IntArrayRef dilation,
     int64_t groups,
     const ideep::attr_t& attr) {
-  c10::MaybeOwned<at::Tensor> bias_maybe_owned = at::borrow_from_optional_tensor(bias_opt);
-  const at::Tensor& bias = *bias_maybe_owned;
 // TODO: the input will be actively converted to channels last format
 // after the 5-D tensor supports channels last format.
   bool use_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
@@ -134,72 +139,67 @@ void convolution_inplace_impl(
   auto mkldnn_memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
                                                 : at::MemoryFormat::Contiguous;
   auto input_ = input.contiguous(mkldnn_memory_format);
-  const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
-  ideep::tensor mkldnn_weight = get_conv_prepacked_weight(input, weight, stride, padding, dilation, groups, attr, mkldnn_memory_format);
-  auto kernel_size = mkldnn_weight.get_dims();
-  std::vector<int64_t> input_size = mkldnn_input.get_dims();
-  std::vector<int64_t> output_sizes =
-      calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
-
-  bool is_channels_last = input_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
+  ideep::tensor mkldnn_weight =
+      get_conv_prepacked_weight(input_, weight, stride, padding, dilation,
+                                groups, attr, mkldnn_memory_format);
   output = IS_CONTIGUOUS_ANY(output) ? output : output.contiguous(output.suggest_memory_format());
   output = output.to(input_.suggest_memory_format());
-  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
-
-  if (bias.defined()) {
-    auto bias_ = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
-    const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
-    ideep::convolution_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        mkldnn_bias,
-        {output_sizes.cbegin(), output_sizes.cend()},
-        mkldnn_output,
-        {stride.begin(), stride.end()},
-        {dilation.begin(), dilation.end()},
-        {padding.begin(), padding.end()},
-        {padding.begin(), padding.end()},
-        groups,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
-  } else {
-    ideep::convolution_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        {output_sizes.cbegin(), output_sizes.cend()},
-        mkldnn_output,
-        {stride.begin(), stride.end()},
-        {dilation.begin(), dilation.end()},
-        {padding.begin(), padding.end()},
-        {padding.begin(), padding.end()},
-        groups,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
-  }
-
-  if (!is_channels_last) {
-    output = mkldnn_to_dense(
-        new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
-                                            input.options().device_opt()));
-  }
+  convolution_kernel_output(input_, mkldnn_weight, bias_opt, output, stride,
+                            padding, dilation, groups, attr);
 }
 
-at::Tensor convolution_forward_impl(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
-    int64_t groups,
-    int64_t output_channel,
-    bool weight_channels_last,
-    bool weight_prepacked) {
+at::Tensor
+convolution_forward_impl(const at::Tensor &input, const at::Tensor &weight,
+                         const c10::optional<at::Tensor> &bias_opt,
+                         at::IntArrayRef stride, at::IntArrayRef padding,
+                         at::IntArrayRef dilation, at::IntArrayRef kernel_size,
+                         int64_t groups, int64_t output_channel,
+                         bool weight_channels_last, bool weight_prepacked,
+                         const ideep::attr_t &attr) {
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::convolution_forward\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("torch_ipex::convolution_forward",
+                  std::vector<c10::IValue>({}));
+#endif
+  TORCH_CHECK(weight.scalar_type() == input.scalar_type(),
+              "the input and weight need have same data type");
+  TORCH_CHECK(input.dim() == 4,
+              "Only support 2d convolution for convolution_forward_impl");
+  // TODO: add bias dtype check
+  // case 1: weight is not prepacked, check weight.suggest_memory_format()
+  // case 2: weight is prepacked or use user's setting, weight_channels_last.
+  bool weight_use_channels_last =
+      weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      weight_channels_last;
+  bool use_channels_last =
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      weight_use_channels_last;
+  auto mkldnn_memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
+                                                : at::MemoryFormat::Contiguous;
+  auto input_ = input.contiguous(mkldnn_memory_format);
+  at::Tensor weight_ = weight;
+  // if weight is not prepacked, convert format, and weight will has same format
+  // with input.
+  if (!weight_prepacked) {
+    weight_ = weight_.contiguous(mkldnn_memory_format);
+  }
+  ideep::tensor mkldnn_weight = get_conv_prepacked_weight(
+      weight_, stride, padding, dilation, kernel_size, groups, output_channel,
+      /* input_channel */ input_.size(1), weight_use_channels_last,
+      weight_prepacked);
+  return convolution_kernel(input_, mkldnn_weight, bias_opt, stride, padding,
+                            dilation, groups, attr);
+}
+
+void convolution_forward_inplace_impl(
+    const at::Tensor &input, const at::Tensor &weight,
+    const c10::optional<at::Tensor> &bias_opt, at::Tensor &output,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
+    at::IntArrayRef kernel_size, int64_t groups, int64_t output_channel,
+    bool weight_channels_last, bool weight_prepacked,
+    const ideep::attr_t &attr) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward\n");
 #endif
@@ -207,6 +207,9 @@ at::Tensor convolution_forward_impl(
   RECORD_FUNCTION("torch_ipex::convolution_forward", std::vector<c10::IValue>({}));
 #endif
   TORCH_CHECK(weight.scalar_type() == input.scalar_type(), "the input and weight need have same data type");
+  TORCH_CHECK(
+      input.dim() == 4,
+      "Only support 2d convolution for convolution_forward_inplace_impl");
   // TODO: add bias dtype check
   // case 1: weight is not prepacked, check weight.suggest_memory_format()
   // case 2: weight is prepacked or use user's setting, weight_channels_last.
@@ -224,7 +227,12 @@ at::Tensor convolution_forward_impl(
   }
   ideep::tensor mkldnn_weight = get_conv_prepacked_weight(weight_, stride, padding, dilation, kernel_size,
       groups, output_channel, /* input_channel */ input_.size(1), weight_use_channels_last, weight_prepacked);
-  return convolution_kernel(input_, mkldnn_weight, bias_opt, stride, padding, dilation, groups, ideep::attr_t());
+  output = IS_CONTIGUOUS_ANY(output)
+               ? output
+               : output.contiguous(output.suggest_memory_format());
+  output = output.to(input_.suggest_memory_format());
+  convolution_kernel_output(input_, mkldnn_weight, bias_opt, output, stride,
+                            padding, dilation, groups, attr);
 }
 
 at::Tensor convolution_backward_input(
@@ -256,10 +264,10 @@ at::Tensor convolution_backward_input(
   if (is_channels_last) {
     return grad_input;
   } else {
-    return mkldnn_to_dense(
-        new_with_itensor_mkldnn(std::move(mkldnn_grad_input),
-                                            optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-                                            grad_output.options().device_opt()));
+    return mkldnn_to_dense(new_with_itensor_mkldnn(
+        std::move(mkldnn_grad_input),
+        optTypeMetaToScalarType(grad_output.options().dtype_opt()),
+        grad_output.options().device_opt()));
   }
 }
 
@@ -390,8 +398,9 @@ at::Tensor IPEXConvolutionOp::_forward(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("IPEXConvolutionOp::_forward", std::vector<c10::IValue>({}));
 #endif
-  return convolution_forward_impl(input, weight, bias_opt, stride, padding, dilation, kernel_size,
-      groups, output_channel, weight_channels_last, weight_prepacked);
+  return convolution_forward_impl(
+      input, weight, bias_opt, stride, padding, dilation, kernel_size, groups,
+      output_channel, weight_channels_last, weight_prepacked, ideep::attr_t());
 }
 
 at::Tensor IPEXConvolutionOp::forward(
@@ -422,8 +431,9 @@ at::Tensor IPEXConvolutionOp::forward(
   ctx->saved_data["bias_requires_grad"] = bias_opt.has_value() && bias_opt.value().requires_grad() ? true: false;
   ctx->save_for_backward({input, weight});
 
-  return convolution_forward_impl(input, weight, bias_opt, stride, padding, dilation, kernel_size,
-      groups, output_channel, weight_channels_last, weight_prepacked);
+  return convolution_forward_impl(
+      input, weight, bias_opt, stride, padding, dilation, kernel_size, groups,
+      output_channel, weight_channels_last, weight_prepacked, ideep::attr_t());
 }
 
 torch::autograd::variable_list IPEXConvolutionOp::backward(

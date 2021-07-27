@@ -282,27 +282,36 @@ public:
 
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
-  {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
-  {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
-  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
-  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
-  {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
-  {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_sum_relu},
+    {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
+    {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
+    {{aten::conv2d, aten::add}, ipex::conv2d_sum},
+    {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
+    {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
+    {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")},
+     ipex::conv2d_sum_relu},
 
-  {{aten::linear, aten::add}, ipex::linear_add},
-  {{aten::linear, aten::relu}, ipex::linear_relu},
-  {{aten::linear, aten::gelu}, ipex::linear_gelu},
-  {{aten::linear, Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},
-  {{aten::matmul, aten::div}, ipex::matmul_div},
-  // 3d ops
-  {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
-  {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
-  {{aten::conv3d, aten::add}, ipex::conv3d_sum},
-  {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
-  {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
-  {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_sum_relu},
+    {{aten::linear, aten::add}, ipex::linear_add},
+    {{aten::linear, aten::relu}, ipex::linear_relu},
+    {{aten::linear, aten::gelu}, ipex::linear_gelu},
+    {{aten::linear, Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},
+    {{aten::matmul, aten::div}, ipex::matmul_div},
+    // 3d ops
+    {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
+    {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
+    {{aten::conv3d, aten::add}, ipex::conv3d_sum},
+    {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
+    {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
+    {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")},
+     ipex::conv3d_sum_relu},
+    //
+    //
+    // for n-dims weight case.
+    {{ipex::convolution_nd_weight_base, aten::relu}, ipex::conv2d_relu},
+    {{ipex::convolution_nd_weight_base, Symbol::fromQualString("aten::relu_")},
+     ipex::conv2d_relu},
+    {{ipex::convolution_nd_weight_base, aten::add}, ipex::conv2d_sum},
+    {{ipex::convolution_nd_weight_base, aten::add_}, ipex::conv2d_sum},
 
-  //{{dnnl::conv2d_relu, aten::add}, dnnl::conv2d_relu_sum}
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
@@ -313,6 +322,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
 
   // Fuse conv with eltwise operator
   graph_rewrite::FuseConvolutionWithEltwise(graph);
+
+  // Fuse conv with eltwise operator: n-D weight case.
+  graph_rewrite::FuseConvolutionWithEltwiseNDWeight(graph);
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);

@@ -333,9 +333,7 @@ class TestPrepackCases(TestCase):
                 conf = ipex.AmpConf(dtype)
                 ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
-                # for bf16 inference case, weight is casted by under auto-mix context
-                self.assertEqual(ipex_model.linear.weight.dtype, torch.float)
-                ipex_model = ipex_model.eval()
+                self.assertEqual(ipex_model.linear.weight.dtype, dtype)
                 with ipex.amp.autocast(enabled=True, configure=conf):
                     # original path
                     y1 = origin_model(x1)

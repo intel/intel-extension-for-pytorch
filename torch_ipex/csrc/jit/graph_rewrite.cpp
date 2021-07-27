@@ -215,6 +215,131 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
         %s = aten::elu(%r, %alpha, %scale, %input_scale)
         return (%s) )";
 
+  auto filter_conv2d_elu =
+      [](const Match &match,
+         const std::unordered_map<std::string, Value *> &vmap) {
+        const auto &match_vmap = match.values_map;
+        auto input_scale_value =
+            getIValue("input_scale", match_vmap, vmap).value();
+        bool no_input_scale = input_scale_value.isDouble()
+                                  ? (input_scale_value.toDouble() == 1.0)
+                                  : (input_scale_value.toInt() == 1);
+        return no_input_scale;
+      };
+
+  // Fuse conv2d + swish
+  SubgraphRewriter rewriter_conv_swish_outplace;
+  rewriter_conv_swish_outplace.RegisterRewritePattern(
+      conv2d_sigmoid_mul_outplace, conv2d_swish_fusion);
+  rewriter_conv_swish_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_swish_inplace;
+  rewriter_conv_swish_inplace.RegisterRewritePattern(conv2d_sigmoid_mul_inplace,
+                                                     conv2d_swish_fusion);
+  rewriter_conv_swish_inplace.runOnGraph(graph);
+
+  // Fuse conv2d + sigmoid
+  SubgraphRewriter rewriter_conv_sigmoid_outplace;
+  rewriter_conv_sigmoid_outplace.RegisterRewritePattern(conv2d_sigmoid_outplace,
+                                                        conv2d_sigmoid_fusion);
+  rewriter_conv_sigmoid_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_sigmoid_inplace;
+  rewriter_conv_sigmoid_inplace.RegisterRewritePattern(conv2d_sigmoid_inplace,
+                                                       conv2d_sigmoid_fusion);
+  rewriter_conv_sigmoid_inplace.runOnGraph(graph);
+
+  // Fuse conv2d + hardtanh
+  SubgraphRewriter rewriter_conv_hardtanh_outplace;
+  rewriter_conv_hardtanh_outplace.RegisterRewritePattern(
+      conv2d_hardtanh_outplace, conv2d_hardtanh_fusion);
+  rewriter_conv_hardtanh_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_hardtanh_inplace;
+  rewriter_conv_hardtanh_inplace.RegisterRewritePattern(conv2d_hardtanh_inplace,
+                                                        conv2d_hardtanh_fusion);
+  rewriter_conv_hardtanh_inplace.runOnGraph(graph);
+
+  // Fuse conv2d + elu
+  SubgraphRewriter rewriter_conv_elu_outplace;
+  rewriter_conv_elu_outplace.RegisterRewritePattern(conv2d_elu_outplace,
+                                                    conv2d_elu_fusion);
+  rewriter_conv_elu_outplace.runOnGraph(graph, filter_conv2d_elu);
+  SubgraphRewriter rewriter_conv_elu_inplace;
+  rewriter_conv_elu_inplace.RegisterRewritePattern(conv2d_elu_inplace,
+                                                   conv2d_elu_fusion);
+  rewriter_conv_elu_inplace.runOnGraph(graph, filter_conv2d_elu);
+}
+
+// for n-D weight case;.
+void FuseConvolutionWithEltwiseNDWeight(std::shared_ptr<Graph> &graph) {
+  std::string conv2d_swish_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool):
+        %r = ipex::conv2d_swish(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        return (%r) )";
+
+  std::string conv2d_sigmoid_mul_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::sigmoid(%r)
+        %t = aten::mul(%r, %s)
+        return (%t) )";
+
+  std::string conv2d_sigmoid_mul_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::sigmoid(%r)
+        %t = aten::mul_(%r, %s)
+        return (%t) )";
+
+  std::string conv2d_sigmoid_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool):
+        %r = ipex::conv2d_sigmoid(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        return (%r) )";
+
+  std::string conv2d_sigmoid_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::sigmoid(%r)
+        return (%s) )";
+
+  std::string conv2d_sigmoid_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::sigmoid_(%r)
+        return (%s) )";
+
+  std::string conv2d_hardtanh_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool, %min:float, %max:float):
+        %r = ipex::conv2d_clamp(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked, %min, %max)
+        return (%r) )";
+
+  std::string conv2d_hardtanh_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool, %min, %max):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::hardtanh_(%r, %min, %max)
+        return (%s) )";
+
+  std::string conv2d_hardtanh_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool, %min, %max):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::hardtanh(%r, %min, %max)
+        return (%s) )";
+
+  std::string conv2d_elu_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool, %alpha:float, %scale, %input_scale):
+        %r = ipex::conv2d_elu(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked, %alpha, %scale, %input_scale)
+        return (%r) )";
+
+  std::string conv2d_elu_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool, %alpha:float, %scale, %input_scale):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::elu_(%r, %alpha, %scale, %input_scale)
+        return (%s) )";
+
+  std::string conv2d_elu_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_channels_last:bool, %weight_prepacked:bool, %alpha:float, %scale, %input_scale):
+        %r = torch_ipex::convolution_forward(%a, %w, %b, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_channels_last, %weight_prepacked)
+        %s = aten::elu(%r, %alpha, %scale, %input_scale)
+        return (%s) )";
+
   auto filter_conv2d_elu = [] (
       const Match& match,
       const std::unordered_map<std::string, Value*>& vmap) {

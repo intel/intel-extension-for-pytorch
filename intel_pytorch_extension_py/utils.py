@@ -76,25 +76,17 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=Fa
         optimized_optimizer = optimizer
     else:
         optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
+    if not model.training:
+        try:
+            optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
+        except:
+            warnings.warn("Conv BN folding failed during the optimize process.")
+        # do weight data type convert for inference model.
+        if dtype == torch.bfloat16:
+            optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
     if level == 'O0':
-        # will be removed after customer op can be traced with autocast,
-        # see https://github.com/pytorch/pytorch/pull/60251.
-        # after removed, will directly return original model and optimizer.
-        if not model.training:
-            try:
-                optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
-            except:
-                warnings.warn("Conv BN folding failed during the optimize process.")
-            # do weight data type convert for inference model.
-            if dtype == torch.bfloat16:
-                optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
+        pass
     elif level == 'O1':
-        if not model.training:
-            try:
-                optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
-            except:
-                warnings.warn("Conv BN folding failed during the optimize process.")
-
         # Do weight prepack, and convert optimizer for training case.
         optimized_model, optimized_optimizer, weight_params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, dtype)
         if dtype == torch.bfloat16 and model.training and optimizer is not None:
