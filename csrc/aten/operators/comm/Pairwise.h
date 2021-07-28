@@ -148,7 +148,7 @@ struct TensorTriOp {
 
   int mask(T& out, int64_t offset) const {
     if (offset < 1) {
-      DPCPP_PRINT("offset is %ld, mask is not supported!\n", offset);
+      DPCPP_K_PRINT("offset is %ld, mask is not supported!\n", offset);
     }
 
     ptrdiff_t n = offset - 1;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #ifdef _WIN32
 #if defined(IPEX_BUILD_SHARED_LIBS)
 #define IPEX_EXPORT __declspec(dllexport)
@@ -31,3 +33,21 @@ enum DPCPP_STATUS {
   DPCPP_SUCCESS = 0,
   DPCPP_FAILURE = 1,
 };
+
+// Host side print utils
+template<typename T>
+void ipex_host_print(T &t) {
+  std::cout<<t;
+}
+
+template<typename T, typename ...Ts>
+void ipex_host_print(T &t, Ts&&... args) {
+  std::cout<<t;
+  ipex_host_print(std::forward<Ts>(args)...);
+}
+
+#define IPEX_H_PRINT(...)         \
+  {                               \
+    ipex_host_print(__VA_ARGS__); \
+    std::cout<<std::endl;         \
+  }

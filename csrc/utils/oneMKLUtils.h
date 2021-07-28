@@ -1,47 +1,10 @@
 #pragma once
 #include <utils/DPCPP.h>
 
-#ifdef BUILD_INTERNAL_DEBUG
-#define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \
-  {                                                                           \
-    static auto verbose = Settings::I().get_verbose_level();                  \
-    if (verbose) {                                                            \
-      IPEX_TIMER(t, verbose, __func__);                                       \
-      auto e = routine(__VA_ARGS__);                                          \
-      t.now("oneMKL submit");                                                 \
-      e.wait_and_throw();                                                     \
-      t.now("oneMKL event wait");                                             \
-      DPCPP_Q_FORCE_SYNC(q);                                                  \
-      t.now("oneMKL queue wait");                                             \
-      dpcpp_log("onemkl_kernel", e);                                          \
-    } else {                                                                  \
-      auto e = routine(__VA_ARGS__);                                          \
-      dpcpp_log("onemkl_kernel", e);                                          \
-      e.wait_and_throw();                                                     \
-      DPCPP_Q_FORCE_SYNC(q);                                                  \
-    }                                                                         \
+#define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                      \
+  {                                                               \
+    DPCPP_EXT_SUBMIT((q), "onemkl_kernel", routine(__VA_ARGS__)); \
   }
-#else
-#define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \
-  {                                                                           \
-    static auto verbose = Settings::I().get_verbose_level();                  \
-    if (verbose) {                                                            \
-      IPEX_TIMER(t, verbose, __func__);                                       \
-      auto e = routine(__VA_ARGS__);                                          \
-      t.now("oneMKL submit");                                                 \
-      (q).throw_asynchronous();                                               \
-      t.now("oneMKL throw asynchronous");                                     \
-      DPCPP_Q_FORCE_SYNC(q);                                                  \
-      t.now("oneMKL queue wait");                                             \
-      dpcpp_log("onemkl_kernel", e);                                          \
-    } else {                                                                  \
-      auto e = routine(__VA_ARGS__);                                          \
-      (q).throw_asynchronous();                                               \
-      dpcpp_log("onemkl_kernel", e);                                          \
-      DPCPP_Q_FORCE_SYNC(q);                                                  \
-    }                                                                         \
-  }
-#endif
 
 namespace xpu {
 namespace oneMKL {

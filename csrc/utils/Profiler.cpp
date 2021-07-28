@@ -16,9 +16,9 @@ using namespace torch::autograd::profiler;
 struct DPCPPEventStubImpl : public XPUEventStubBase {
  public:
   DPCPPEventStubImpl() = delete;
-  DPCPPEventStubImpl(DPCPP::event event) : event_(std::move(event)), is_onednn_kernel(false) {};
+  DPCPPEventStubImpl(DPCPP::event event) : event_(std::move(event)), is_ext_mark(false) {};
   DPCPPEventStubImpl(DPCPP::event start_evt, DPCPP::event end_evt)
-    : event_(std::move(start_evt)), event_end_(std::move(end_evt)), is_onednn_kernel(true) {};
+    : event_(std::move(start_evt)), event_end_(std::move(end_evt)), is_ext_mark(true) {};
   float elapsed();
   float elapsed(DPCPPEventStubImpl& event);
   uint64_t getSubmitTime();
@@ -29,7 +29,7 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
  private:
   DPCPP::event event_;
   DPCPP::event event_end_;
-  bool is_onednn_kernel; // True for onednn kernel
+  bool is_ext_mark; // True to mark the external lib kernels
 };
 
 static inline DPCPP::event submit_barrier(DPCPP::queue& Q) {
@@ -89,7 +89,7 @@ float DPCPPEventStubImpl::elapsed() {
   auto start = event_.template get_profiling_info<dpcpp_event_profiling_start>();
   auto end = event_.template get_profiling_info<dpcpp_event_profiling_end>();
 
-  if (is_onednn_kernel) {
+  if (is_ext_mark) {
     event_end_.wait();
     auto start_2 = event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
     auto end_2 = event_end_.template get_profiling_info<dpcpp_event_profiling_end>();
@@ -122,7 +122,7 @@ uint64_t DPCPPEventStubImpl::getSubmitTime() {
 
 uint64_t DPCPPEventStubImpl::getStartTime() {
   event_.wait();
-  if (is_onednn_kernel) {
+  if (is_ext_mark) {
     return event_.template get_profiling_info<dpcpp_event_profiling_end>();
   }
   return event_.template get_profiling_info<dpcpp_event_profiling_start>();
@@ -130,7 +130,7 @@ uint64_t DPCPPEventStubImpl::getStartTime() {
 
 uint64_t DPCPPEventStubImpl::getEndTime() {
   event_.wait();
-  if (is_onednn_kernel) {
+  if (is_ext_mark) {
     event_end_.wait();
     return event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
   }

@@ -523,7 +523,7 @@ void dpcpp_small_index_kernel_impl(
             }
             offset += index * strides[i];
           //} else {
-          //  DPCPP_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i])
+          //  DPCPP_K_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i]);
           //}
         }
         local_offset[local_index] = offset;
@@ -608,7 +608,7 @@ void dpcpp_index_kernel_impl(
           }
           offset += index * strides[i];
         } else {
-          DPCPP_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i]);
+          DPCPP_K_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i]);
         }
       }
       f(out_ptr, in_ptr, offset);

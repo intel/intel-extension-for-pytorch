@@ -17,33 +17,11 @@
 using namespace dnnl;
 using namespace xpu::dpcpp;
 
-#define DPCPP_ONEDNN_FORCE_SYNC(stream)                           \
-  {                                                               \
-    static auto force_sync = Settings::I().is_force_sync_exec();  \
-    if (force_sync) {                                             \
-        (stream).wait();                                          \
-    }                                                             \
-  }
-
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                        \
-  {                                                                                 \
-    static auto verbose = Settings::I().get_verbose_level();                        \
-    auto q = dnnl::sycl_interop::get_queue((stream));                               \
-    if (verbose) {                                                                  \
-      IPEX_TIMER(t, verbose, __func__);                                             \
-      DPCPP_BAR_LOG(q, "onednn_kernel",                                             \
-          dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__));            \
-      t.now("oneDNN execute in sycl_interop");                                      \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                                              \
-      t.now("oneDNN stream wait");                                                  \
-      q.throw_asynchronous();                                                       \
-      t.now("oneDNN throw asynchronous");                                           \
-    } else {                                                                        \
-      DPCPP_BAR_LOG(q, "onednn_kernel",                                             \
-          dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__));            \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                                              \
-      q.throw_asynchronous();                                                       \
-    }                                                                               \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                            \
+  {                                                                     \
+    auto q = dnnl::sycl_interop::get_queue((stream));                   \
+    DPCPP_EXT_SUBMIT((q), "onednn_kernel",                              \
+        dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__));  \
   }
 
 namespace xpu {

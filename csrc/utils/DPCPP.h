@@ -4,6 +4,7 @@
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
 #include <utils/Settings.h>
+#include <utils/Macros.h>
 
 #include <c10/macros/Macros.h>
 #include <c10/util/Exception.h>
@@ -11,83 +12,141 @@
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;
 
-// macros for dpcpp command queue and kernel function
+// Kernel inside print utils
+#if defined(__SYCL_DEVICE_ONLY__)
+#define DPCPP_CONSTANT __attribute__((opencl_constant))
+#else
+#define DPCPP_CONSTANT
+#endif
+
+#define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
+
+#if (__SYCL_COMPILER_VERSION >= 20200930)
+  #define DPCPP_KER_PRINTF DPCPP::ONEAPI::experimental::printf
+#else
+  #define DPCPP_KER_PRINTF DPCPP::intel::experimental::printf
+#endif
+
+#define DPCPP_K_PRINT(fmt_str, ...)             \
+  {                                           \
+    DPCPP_KER_STRING(fmt_var, fmt_str);       \
+    DPCPP_KER_PRINTF(fmt_var, ##__VA_ARGS__); \
+  }
+
+// macro-s for dpcpp command queue and kernel function
+// Kernel name format
 #define DPCPP_K_NAME(x) __##x##_dpcpp_kernel
+
+// Kernel instance in parallel_for invocation
 #define DPCPP_K(k, ...) DPCPP_K_NAME(k)<char, ##__VA_ARGS__>
+
+// Global unique kernel declaration with variable arguments
+// Full list of type arguments is NOT needed
 #define DPCPP_DEF_K1(k)                                   \
   template <typename __dummy_typename_dpcpp, typename...> \
   class DPCPP_K_NAME(k) {}
+
+// Global unique kernel declaration with variable arguments and constant specialization
+// Full list type arguments is MUST due to constant specialization in class template
 #define DPCPP_DEF_K2(k, ...)                                \
   template <typename __dummy_typename_dpcpp, ##__VA_ARGS__> \
   class DPCPP_K_NAME(k) {}
 
+// Kernel function implementation
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
+
+// Command group function implementation
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
 
-#define DPCPP_BAR_LOG(q, str, ker_submit)                 \
-    {                                                     \
-      if (is_profiler_enabled()) {                        \
-        auto start_evt = (q).submit_barrier();            \
-        (ker_submit);                                     \
-        auto end_evt = (q).submit_barrier();              \
-        dpcpp_mark((str), start_evt, end_evt);            \
-      } else {                                            \
-        (ker_submit);                                     \
-      }                                                   \
-    }
+#define DPCPP_E_FORCE_SYNC(e)                                     \
+  {                                                               \
+    static auto force_sync = Settings::I().is_force_sync_exec();  \
+    if (force_sync) {                                             \
+      (e).wait_and_throw();                                       \
+    }                                                             \
+  }
 
-#define DPCPP_Q_FORCE_SYNC(q)                                           \
-    {                                                                   \
-        static auto force_sync = Settings::I().is_force_sync_exec();    \
-        if (force_sync) {                                               \
-            (q).wait_and_throw();                                       \
-        }                                                               \
-    }
 
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                            \
-    {                                                               \
-        static auto verbose = Settings::I().get_verbose_level();    \
-        if (verbose) {                                              \
-            IPEX_TIMER(t, verbose, __func__);                       \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
-            t.now("submit");                                        \
-            e.wait_and_throw();                                     \
-            t.now("event wait");                                    \
-            DPCPP_Q_FORCE_SYNC(q);                                  \
-            t.now("queue wait");                                    \
-            dpcpp_log("dpcpp_kernel", e);                           \
-        } else {                                                    \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
-            dpcpp_log("dpcpp_kernel", e);                           \
-            e.wait_and_throw();                                     \
-            DPCPP_Q_FORCE_SYNC(q);                                  \
-        }                                                           \
-    }
+#define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                                \
+  {                                                                                         \
+    static auto verbose = Settings::I().get_verbose_level();                                \
+    if (verbose) {                                                                          \
+      IPEX_TIMER(t, verbose, __func__);                                                     \
+      auto start_evt = (q).submit_barrier();                                                \
+      t.now("start barrier");                                                               \
+      auto e = (ker_submit);                                                                \
+      t.now("submit");                                                                      \
+      auto end_evt = (q).submit_barrier();                                                  \
+      t.now("end barrier");                                                                 \
+      e.wait_and_throw();                                                                   \
+      t.now("event wait");                                                                  \
+      dpcpp_log((str), start_evt, end_evt);                                                 \
+      static auto event_prof_enabled = Settings::I().is_event_profiling_enabled();          \
+      if (event_prof_enabled) {                                                             \
+        start_evt.wait_and_throw();                                                         \
+        end_evt.wait_and_throw();                                                           \
+        auto se_end = start_evt.template get_profiling_info<dpcpp_event_profiling_end>();   \
+        auto ee_start = end_evt.template get_profiling_info<dpcpp_event_profiling_start>(); \
+        t.event_duration((ee_start - se_end) / 1000.0);                                     \
+      }                                                                                     \
+    } else if (is_profiler_enabled()) {                                                     \
+      auto start_evt = (q).submit_barrier();                                                \
+      auto e = (ker_submit);                                                                \
+      auto end_evt = (q).submit_barrier();                                                  \
+      dpcpp_mark((str), start_evt, end_evt);                                                \
+      DPCPP_E_FORCE_SYNC(e);                                                                \
+    } else {                                                                                \
+      auto e = (ker_submit);                                                                \
+      DPCPP_E_FORCE_SYNC(e);                                                                \
+    }                                                                                       \
+    (q).throw_asynchronous();                                                               \
+  }
+
+#define DPCPP_Q_SYNC_SUBMIT_VERBOSE(q, cgf, ...)                                    \
+  {                                                                                 \
+    IPEX_TIMER(t, verbose, __func__);                                               \
+    auto e = (q).submit((cgf), ##__VA_ARGS__);                                      \
+    t.now("submit");                                                                \
+    e.wait_and_throw();                                                             \
+    t.now("event wait");                                                            \
+    dpcpp_log("dpcpp_kernel", e);                                                   \
+    static auto event_prof_enabled = Settings::I().is_event_profiling_enabled();    \
+    if (event_prof_enabled) {                                                       \
+      auto e_start = e.template get_profiling_info<dpcpp_event_profiling_start>();  \
+      auto e_end = e.template get_profiling_info<dpcpp_event_profiling_end>();      \
+      t.event_duration((e_end - e_start) / 1000.0);                                 \
+    }                                                                               \
+  }
+
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                      \
+  {                                                           \
+    static auto verbose = Settings::I().get_verbose_level();  \
+    if (verbose) {                                            \
+      DPCPP_Q_SYNC_SUBMIT_VERBOSE((q), (cgf), ##__VA_ARGS__); \
+    } else {                                                  \
+      auto e = (q).submit((cgf), ##__VA_ARGS__);              \
+      dpcpp_log("dpcpp_kernel", e);                           \
+      e.wait_and_throw();                                     \
+    }                                                         \
+  }
 
 #define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)                           \
-    {                                                               \
-        static auto verbose = Settings::I().get_verbose_level();    \
-        if (verbose) {                                              \
-            IPEX_TIMER(t, verbose, __func__);                       \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
-            t.now("submit");                                        \
-            (q).throw_asynchronous();                               \
-            t.now("DPCPP throw asynchronous");                      \
-            DPCPP_Q_FORCE_SYNC(q);                                  \
-            t.now("queue wait");                                    \
-            dpcpp_log("dpcpp_kernel", e);                           \
-        } else {                                                    \
-            auto e = (q).submit((cgf), ##__VA_ARGS__);              \
-            (q).throw_asynchronous();                               \
-            dpcpp_log("dpcpp_kernel", e);                           \
-            DPCPP_Q_FORCE_SYNC(q);                                  \
-        }                                                           \
-    }
+  {                                                                 \
+    static auto verbose = Settings::I().get_verbose_level();        \
+    if (verbose) {                                                  \
+      DPCPP_Q_SYNC_SUBMIT_VERBOSE((q), (cgf), ##__VA_ARGS__);       \
+    } else {                                                        \
+      auto e = (q).submit((cgf), ##__VA_ARGS__);                    \
+      (q).throw_asynchronous();                                     \
+      dpcpp_log("dpcpp_kernel", e);                                 \
+      DPCPP_E_FORCE_SYNC(e);                                        \
+    }                                                               \
+  }
 
 // the descriptor as entity attribute
-#define DPCPP_HOST // for host only
-#define DPCPP_DEVICE // for device only
-#define DPCPP_BOTH // for both host and device
+#define DPCPP_HOST    // for host only
+#define DPCPP_DEVICE  // for device only
+#define DPCPP_BOTH    // for both host and device
 
 // dpcpp device configuration
 // TODO: set subgourp size with api get_max_sub_group_size
@@ -117,7 +176,7 @@ static constexpr auto dpcpp_dev_vendor = DPCPP::info::device::vendor;
 static constexpr auto dpcpp_dev_driver_version = DPCPP::info::device::driver_version;
 // Returns the SYCL version as a std::string in the form: <major_version>.<minor_version>
 static constexpr auto dpcpp_dev_version = DPCPP::info::device::version;
-// Returns a string describing the version of the SYCL backend associated with the device. 
+// Returns a string describing the version of the SYCL backend associated with the device.
 // static constexpr auto dpcpp_dev_backend_version = DPCPP::info::device::backend_version;
 // Returns true if the SYCL device is available and returns false if the device is not available.
 static constexpr auto dpcpp_dev_is_available = DPCPP::info::device::is_available;
@@ -126,7 +185,7 @@ static constexpr auto dpcpp_dev_max_param_size = DPCPP::info::device::max_parame
 // Returns the number of parallel compute units available to the device.
 static constexpr auto dpcpp_dev_max_compute_units = DPCPP::info::device::max_compute_units;
 // Returns the maximum dimensions that specify the global and local work-item IDs used
-// by the data parallel execution model. 
+// by the data parallel execution model.
 static constexpr auto dpcpp_dev_max_work_item_dims = DPCPP::info::device::max_work_item_dimensions;
 // Returns the maximum number of workitems that are permitted in a work-group
 // executing a kernel on a single compute unit.
@@ -164,7 +223,7 @@ static constexpr auto dpcpp_dev_global_mem_cache_size = DPCPP::info::device::glo
 static constexpr auto dpcpp_dev_global_mem_cache_line_size = DPCPP::info::device::global_mem_cache_line_size;
 // Returns the type of local memory supported.
 static constexpr auto dpcpp_dev_local_mem_type = DPCPP::info::device::local_mem_type;
-// Returns the size of local memory arena in bytes. 
+// Returns the size of local memory arena in bytes.
 static constexpr auto dpcpp_dev_local_mem_size = DPCPP::info::device::local_mem_size;
 // Returns the maximum number of sub-devices that can be created when this SYCL device is partitioned.
 static constexpr auto dpcpp_dev_max_sub_devices = DPCPP::info::device::partition_max_sub_devices;
@@ -327,24 +386,3 @@ template <
     int Dims = 1>
 DPCPP_HOST using dpcpp_host_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
-
-// printf utils
-#if defined(__SYCL_DEVICE_ONLY__)
-#define DPCPP_CONSTANT __attribute__((opencl_constant))
-#else
-#define DPCPP_CONSTANT
-#endif
-
-#define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
-
-#if (__SYCL_COMPILER_VERSION >= 20200930)
-  #define DPCPP_KER_PRINTF DPCPP::ONEAPI::experimental::printf
-#else
-  #define DPCPP_KER_PRINTF DPCPP::intel::experimental::printf
-#endif
-
-#define DPCPP_PRINT(fmt_str, ...)             \
-  {                                           \
-    DPCPP_KER_STRING(fmt_var, fmt_str);       \
-    DPCPP_KER_PRINTF(fmt_var, ##__VA_ARGS__); \
-  }

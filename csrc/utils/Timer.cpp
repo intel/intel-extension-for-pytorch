@@ -15,6 +15,10 @@ void ipex_timer::now(std::string sstamp) {
   }
 }
 
+void ipex_timer::event_duration(uint64_t us) {
+  event_duration_.push_back(us);
+}
+
 ipex_timer::~ipex_timer() {
   if (vlevel_ >= 1) {
     auto pre = start_;
@@ -25,6 +29,10 @@ ipex_timer::~ipex_timer() {
       std::cout << " " << sstamp << "(" <<
           duration_cast<microseconds>(stamp - pre).count() << "us)";
       pre = stamp;
+    }
+    for (int j = 0; j < event_duration_.size(); j++) {
+      std::cout << " event_duration_" << j << "(" <<
+        event_duration_.at(j) << "us)";
     }
     std::cout << " total(" <<
         duration_cast<microseconds>(stamp_.back() - start_).count() <<
