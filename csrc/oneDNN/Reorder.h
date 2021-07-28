@@ -66,8 +66,10 @@ static inline void reorder(const Tensor& src, Tensor& dst,
           return memory::desc(get_onednn_dims(src),
                               get_onednn_dtype(src),
                               get_onednn_strides(src));
-        } else if ((src.ndimension() == dst.ndimension() - 1) &&
-                   (src.size(0) == dst.size(0) * dst.size(1))) {
+        } else if (((src.ndimension() == dst.ndimension() - 1) &&
+                   (src.size(0) == dst.size(0) * dst.size(1))) ||
+                   ((src.ndimension() == dst.ndimension() + 1) &&
+                   (dst.size(0) == src.size(0) * src.size(1)))) {
           // group tensor
           return memory::desc(get_onednn_dims(dst),
                               get_onednn_dtype(src),
