@@ -551,6 +551,22 @@ void replaceAtenLinearWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
   rewriter_aten.runOnGraph(graph);
 
 }
+// replace aten::layer_norm with ipex::layer_norm during jit pass
+// this is a just workaround for layernorm performance reggression
+void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph> &graph) {
+  std::string aten_layernorm = R"(
+      graph(%a, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
+        %r = aten::layer_norm(%a, %shape, %w, %b, %eps, %cudnn_enable)
+        return (%r) )";
+  std::string ipex_layernorm = R"(
+      graph(%a, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
+        %r = ipex::layernorm(%a, %shape, %w, %b, %eps, %cudnn_enable)
+        return (%r) )";
+  SubgraphRewriter rewriter_aten;
+  rewriter_aten.RegisterRewritePattern(aten_layernorm, ipex_layernorm);
+  rewriter_aten.runOnGraph(graph);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

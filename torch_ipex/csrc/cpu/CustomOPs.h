@@ -31,6 +31,7 @@ namespace ipex {
 
   static auto max_pool2d = Symbol::fromQualString("ipex::max_pool2d");
   static auto softmax = Symbol::fromQualString("ipex::softmax");
+  static auto layernorm = Symbol::fromQualString("ipex::layernorm");
 
   // n-dims tensor op.
   static auto convolution_nd_weight_base =
@@ -186,6 +187,11 @@ class AtenIpexJITDev {
        at::IntArrayRef kernel_size, int64_t groups, int64_t output_channel,
        bool weight_channels_last, bool weight_prepacked, at::Tensor &accumu,
        at::Scalar alpha);
+   static at::Tensor dil_layernorm(const at::Tensor &input,
+                                   at::IntArrayRef normalized_shape,
+                                   const c10::optional<at::Tensor> &weight_opt,
+                                   const c10::optional<at::Tensor> &bias_opt,
+                                   float eps, bool cudnn_enable);
 };
 
 }  // namespace cpu

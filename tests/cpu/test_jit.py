@@ -436,6 +436,14 @@ class AtenSoftmaxRepalce(nn.Module):
     def forward(self, x):
         return self.softmax(x)
 
+class IPEXLayerNorm(torch.nn.Module):
+    def __init__(self):
+        super(IPEXLayerNorm, self).__init__()
+        self.layernorm = torch.nn.LayerNorm(4)
+    def forward(self, x):
+        return self.layernorm(x)
+
+
 
 class Tester(TestCase):
 
@@ -947,6 +955,17 @@ class Tester(TestCase):
             torch.rand(3, 4, 4, dtype=torch.bfloat16),
             kind_in_graph="ipex::softmax",
             prec=5e-3)
+    def test_ipex_layernorm(self):
+        self._test_output(
+            IPEXLayerNorm(),
+            torch.rand(8, 3, 4),
+            kind_in_graph="ipex::layernorm")
+        self._test_output_bf16(
+             IPEXLayerNorm(),
+             torch.rand(8, 3, 4, dtype=torch.bfloat16),
+             kind_in_graph="ipex::layernorm",
+             prec=5e-2)
+
 
 if __name__ == '__main__':
     torch.manual_seed(2020)
