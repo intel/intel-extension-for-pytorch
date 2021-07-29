@@ -7,7 +7,7 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 
-#if defined(AVX512)
+#if defined(CPU_AVX512)
 #include "vec/vec512/update_batch.h"
 #else
 #warning "IPEX RNN-T custom kernel requires AVX512"

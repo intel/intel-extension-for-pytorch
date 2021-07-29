@@ -89,7 +89,7 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   return at::nonzero(suppressed_t == 0).squeeze(1);
 }
 
-#ifdef AVX512
+#ifdef CPU_AVX512
 // Optimized nms_cpu_kernel specialized for data type: float32 and sorted_score
 template <>
 at::Tensor nms_cpu_kernel</*scalar_t*/float, /*sorted*/true>(const at::Tensor& dets,

@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#if defined(AVX512)
+#if defined(CPU_AVX512)
 #include <immintrin.h>
 // Conversion from BF16 to FP32
 inline __m512 cvt_bf16_to_fp32(const __m256i src) {
