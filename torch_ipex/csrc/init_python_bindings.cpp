@@ -82,8 +82,14 @@ void InitIpexModuleBindings(py::module m) {
   m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });
   m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
   m.def("get_int8_calibration",
-        []() { AutoOptConfig::singleton().get_int8_calibration(); });
+        []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { Int8OptConfig::calibration_reset(); });
+  m.def("set_int8_qscheme", [](const int &scheme) {
+    AutoOptConfig::singleton().set_int8_qscheme(scheme);
+  });
+  m.def("get_int8_qscheme", []() {
+    return static_cast<int>(AutoOptConfig::singleton().get_int8_qscheme());
+  });
 
   m.def("add_indicators",
         []() { Int8OptConfig::get_config().add_indicators(); });

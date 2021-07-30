@@ -1,13 +1,46 @@
-#include "torch_ipex/csrc/utils.h"
-
 #include <ATen/NativeFunctions.h>
+#include <ATen/native/quantized/cpu/quant_utils.h>
 #include <torch/csrc/autograd/function.h>
 
+#include "torch_ipex/csrc/auto_opt_config.hpp"
+#include "torch_ipex/csrc/utils.h"
+
 #include "Config.hpp"
-// #include "Observer.hpp"
 
 namespace torch_ipex {
 using namespace int8;
+
+std::vector<quant_utils::TensorQuantizationParams>
+ComputeQuantizationParams(const std::vector<std::vector<float>> &min_max_values,
+                          const std::vector<std::string> &quantized_types,
+                          bool preserve_sparsity, int precision) {
+  std::vector<quant_utils::TensorQuantizationParams> QParams;
+  for (auto j = 0; j < min_max_values.size(); j++) {
+    bool is_signed = quantized_types[j] == "int8" ? true : false;
+    quant_utils::TensorQuantizationParams qparams{};
+    if (preserve_sparsity) {
+      auto max_value =
+          std::max(std::abs(min_max_values[j][0]), min_max_values[j][1]);
+      qparams = quant_utils::ChooseQuantizationParams(
+          /*min*/ -max_value,
+          /*max*/ max_value,
+          /*q_min*/ is_signed ? -(1 << (precision - 1)) : 0,
+          /*q_max*/
+          is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1,
+          /*preserve_sparsity=*/true);
+    } else {
+      qparams = quant_utils::ChooseQuantizationParams(
+          /*min*/ min_max_values[j][0],
+          /*max*/ min_max_values[j][1],
+          /*q_min*/ is_signed ? -(1 << (precision - 1)) : 0,
+          /*q_max*/
+          is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1,
+          /*preserve_sparsity=*/false);
+    }
+    QParams.push_back(qparams);
+  }
+  return QParams;
+}
 
 void Int8OptConfig::insert_or_updata_observer(
     std::string op_name, std::vector<std::vector<float>> i_min_max_values,
@@ -24,6 +57,18 @@ void Int8OptConfig::insert_or_updata_observer(
     const int nums_output = o_min_max_values.size();
     std::vector<std::string> input_quantized_dtypes(nums_input, "uint8");
     std::vector<std::string> output_quantized_dtypes(nums_output, "uint8");
+
+    auto qscheme = AutoOptConfig::singleton().get_int8_qscheme();
+    TORCH_CHECK(qscheme == at::QScheme::PER_TENSOR_AFFINE ||
+                    qscheme == at::QScheme::PER_TENSOR_SYMMETRIC,
+                "Activation is only support per-tensor quantization");
+    if (qscheme == at::QScheme::PER_TENSOR_SYMMETRIC) {
+      // for symmetrice quantization, quantized's dtype is always int8.
+      std::fill(input_quantized_dtypes.begin(), input_quantized_dtypes.end(),
+                "int8");
+      std::fill(output_quantized_dtypes.begin(), output_quantized_dtypes.end(),
+                "int8");
+    }
     const auto num_inputs = i_min_max_values.size();
     std::vector<bool> inputs_quantized(num_inputs, true);
     const auto num_outputs = o_min_max_values.size();
@@ -101,46 +146,42 @@ void Int8OptConfig::add_indicators() {
     std::vector<quant_utils::TensorQuantizationParams> input_params, output_params;
     std::vector<std::vector<float>> weights_scales;
 
-    std::vector<std::vector<float>> input_values = observers_[i].inputs_min_max_values;
-    std::vector<std::vector<float>> output_values = observers_[i].outputs_min_max_values;
-    std::vector<std::vector<std::vector<float>>> weights_values = observers_[i].weights_min_max_values;
-    std::vector<std::string> x_quantized_types = observers_[i].input_quantized_dtypes;
-    std::vector<std::string> y_quantized_types = observers_[i].output_quantized_dtypes;
+    auto input_values = observers_[i].inputs_min_max_values;
+    auto output_values = observers_[i].outputs_min_max_values;
+    auto weights_values = observers_[i].weights_min_max_values;
+    auto x_quantized_types = observers_[i].input_quantized_dtypes;
+    auto y_quantized_types = observers_[i].output_quantized_dtypes;
     // for symmetric: s = 2max(|x_min|, x_max) / (Q_max - Q_min),
     // z = 0 for qint8 and z = 128 for quint8;
     // otherwise: s = (x_max - x_min) / (Q_max - Q_min),
     // z = Q_min - round(x_min / s).
-    for (auto j = 0; j < input_values.size(); j++) {
-      bool is_signed = x_quantized_types[j] == "int8" ? true : false;
-      auto qparams = quant_utils::ChooseQuantizationParams(
-          /*min*/ input_values[j][0],
-          /*max*/ input_values[j][1],
-          /*q_min*/ is_signed ? -(1 << (precision - 1)) : 0,
-          /*q_max*/ is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1
-      );
-      input_params.push_back(qparams);
+    auto qscheme = AutoOptConfig::singleton().get_int8_qscheme();
+    TORCH_CHECK(qscheme == at::QScheme::PER_TENSOR_AFFINE ||
+                    qscheme == at::QScheme::PER_TENSOR_SYMMETRIC,
+                "Activation is only support per-tensor quantization");
+    // Note: preserve_sparsity here means symmetric quantization.
+    bool preserve_sparsity = false;
+    if (qscheme == at::QScheme::PER_TENSOR_SYMMETRIC) {
+      preserve_sparsity = true;
     }
-    for (auto k = 0; k < output_values.size(); k++) {
-      bool is_signed = y_quantized_types[k] == "int8" ? true : false;
-      auto qparams = quant_utils::ChooseQuantizationParams(
-          /*min*/ output_values[k][0],
-          /*max*/ output_values[k][1],
-          /*q_min*/ is_signed ? -(1 << (precision - 1)) : 0,
-          /*q_max*/ is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1);
-      output_params.push_back(qparams);
-    }
+    input_params = ComputeQuantizationParams(input_values, x_quantized_types,
+                                             preserve_sparsity, precision);
+    output_params = ComputeQuantizationParams(output_values, y_quantized_types,
+                                              preserve_sparsity, precision);
     // for weight, always using symetric quantization, quantized to int8 dtype.
     // is_signed = true;
     for (auto m = 0; m < weights_values.size(); m++) {
       auto w = weights_values[m];
       std::vector<float> w_scales;
       for (auto n = 0; n < w.size(); n++) {
-        auto max_value = std::max(std::abs(weights_values[m][n][0]), weights_values[m][n][1]);
+        auto w_max_value = std::max(std::abs(weights_values[m][n][0]),
+                                    weights_values[m][n][1]);
         auto qparams = quant_utils::ChooseQuantizationParams(
-            /*min*/ -max_value,
-            /*max*/ max_value,
+            /*min*/ -w_max_value,
+            /*max*/ w_max_value,
             /*q_min*/ -(1 << (precision - 1)),
-            /*q_max*/ ((1 << (precision - 1)) - 1));
+            /*q_max*/ ((1 << (precision - 1)) - 1),
+            /*preserve_sparsity=*/true);
         w_scales.push_back(qparams.scale);
       }
       weights_scales.push_back(w_scales);

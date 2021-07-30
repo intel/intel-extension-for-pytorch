@@ -73,24 +73,24 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name=""):
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             # fold conv bn
-            if folding:  
+            if folding:
                 model = ipex.fx.conv_bn_fuse(model)
 
             if remove_dropout:
                 ipex.utils._replace_dropout_with_identity(model)
 
             # do calibration
-            conf = ipex.AmpConf(torch.int8)
+            conf = ipex.AmpConf(torch.int8, qscheme=qscheme)
             with ipex.amp.calibrate():
                 y = model(*x)
 
             with tempfile.TemporaryDirectory() as tmp:
                 path = os.path.join(tmp, 'configure_%s.json' % config_name)
-                
+
                 # TODO: remove the serialization and test it in another separate UT once IPEX supported
                 # directly using the conf for int8 path
                 conf.save(path)

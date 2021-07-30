@@ -6,6 +6,7 @@
 namespace torch_ipex {
 
 bool check_int8_calibration();
+
 void insert_or_updata_observer(const at::TensorList &inputs,
                                const at::TensorList &ouputs,
                                std::string op_name,

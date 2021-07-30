@@ -3,13 +3,24 @@ import json
 import torch
 import _torch_ipex as core
 
+
+qscheme_dict ={torch.per_tensor_affine:0,
+               torch.per_channel_affine:1,
+               torch.per_tensor_symmetric:2,
+               torch.per_channel_symmetric:3,
+               torch.torch.per_channel_affine_float_qparams:4}
+
 class AmpConf(object):
-    def __init__(self, mixed_dtype = torch.bfloat16, configure_file = None):
+    def __init__(self, mixed_dtype=torch.bfloat16, configure_file=None, qscheme=torch.per_tensor_affine):
         self.dtype = mixed_dtype
         self.configure_file = configure_file
 
         if self.dtype == torch.int8:
             core.clear_indicators()
+            assert qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric], \
+                "qscheme is only support torch.per_tensor_affine and torch.per_tensor_symmetric now"
+            core.set_int8_qscheme(qscheme_dict[qscheme])
+
         # for int8 path, if user give a exited configure file, load it.
         if self.configure_file != None and self.dtype == torch.int8:
             if os.path.exists(self.configure_file) and os.stat(self.configure_file).st_size != 0:
