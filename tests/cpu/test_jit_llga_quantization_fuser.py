@@ -31,13 +31,15 @@ def get_eltwise_fn(name):
 def llga_test_env(func):
     @wraps(func)
     def wrapTheFunction(*args):
-        torch._C._jit_set_profiling_mode(False)
-        torch._C._jit_set_profiling_executor(False)
+        # make sure that the profiling mode is turned on
+        torch._C._jit_set_profiling_mode(True)
+        torch._C._jit_set_profiling_executor(True)
+        
+        ipex.core._jit_set_llga_enabled(True)
         ipex.core.disable_jit_opt()
         func(*args)
         ipex.core.enable_jit_opt()
-        torch._C._jit_set_profiling_mode(True)
-        torch._C._jit_set_profiling_executor(True)
+        ipex.core._jit_set_llga_enabled(False)
     return wrapTheFunction
 
 class TestOp(JitLlgaTestCase):
@@ -79,7 +81,7 @@ class TestOp(JitLlgaTestCase):
             ]
             #TODO: enable torch.per_tensor_symmetric case.
             for qscheme in [torch.per_tensor_affine]:
-                graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="conv2d", qscheme=qscheme)
+                graph = self.checkQuantizeTrace(m, [x], x_var=[torch.rand(5, in_channels * g, spatial, spatial, requires_grad=False)], atol=2e-1, config_name="conv2d", qscheme=qscheme)
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
                 self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_tensor', 'aten::quantize_per_channel'])
                 self.checkPatterns(graph, patterns)
@@ -308,7 +310,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 ["aten::dequantize"]
             ]
             for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-                graph = self.checkQuantizeTrace(m, [x], atol=1e-1, config_name="linear_eltwise", qscheme=qscheme)
+                graph = self.checkQuantizeTrace(m, [x], x_var=[torch.rand(2, 28, requires_grad=False)], atol=1e-1, config_name="linear_eltwise", qscheme=qscheme)
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
                 self.assertFused(graph, ['aten::' + eltwise])
                 self.checkPatterns(graph, patterns)
@@ -422,6 +424,55 @@ class TestFusionPattern(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
             self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
             self.checkPatterns(graph, patterns)
+
+class TestShapeFallback(JitLlgaTestCase):
+    @unittest.skipIf(True, 'Size peephole optimization not enabled yet')
+    @llga_test_env
+    def test_view_permute(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                new_x_shape = x.size()[:-1] + (3, 5)
+                x = x.view(*new_x_shape)
+                return x.permute(0, 2, 1, 3)
+        
+        x = torch.randn(5, 10, 15)
+        m = M()
+
+        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+            graph = self.checkQuantizeTrace(m, [x], config_name="view_permute", qscheme=qscheme)
+            self.assertGraphContainsExactly(graph, "aten::size", 0)
+            self.assertGraphContainsExactly(graph, "prim::ListConstruct", 0)
+
+            # change the size of the input
+            x2 = torch.randn(6, 4, 15)
+            # Bailout get triggered here
+            y2 = m(x2)
+
+    @llga_test_env
+    def test_conv_reshape(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(4, 4, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(4, 32, 3, padding=1, bias=True)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.conv2(x).reshape(x.size(0), 4, -1)
+                return x
+        
+        x = torch.randn(15, 4, 28, 28)
+        # change the size of the input, check the fallback
+        x_var = torch.randn(7, 4, 16, 16)
+        m = M()
+        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+            graph = self.checkQuantizeTrace(m, [x], x_var = [x_var], atol=2e-1, config_name="conv_reshape", qscheme=qscheme)
+
+            # TODO: enable this check when size peephole optimization is enabled
+            # self.assertGraphContainsExactly(graph, "aten::size", 0)
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision

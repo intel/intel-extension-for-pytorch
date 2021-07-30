@@ -73,7 +73,30 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine):
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", x_var=None, qscheme=torch.per_tensor_affine):
+        graph, model, fp32_model_with_quant_dequant = self.prepareModel(model, x, folding, remove_dropout, config_name, qscheme)
+        with torch.no_grad():
+            # calculate after getting the graph
+            y_llga = model(*x)
+
+            # disable llga for fp32 path
+            ipex.core._jit_set_llga_enabled(False)
+            y = fp32_model_with_quant_dequant(*x)
+            # test Fallback when input shape changes:
+            if x_var:
+                y_var = fp32_model_with_quant_dequant(*x_var)
+            ipex.core._jit_set_llga_enabled(True)
+
+            self.assertEqual(y, y_llga, atol=atol, rtol=rtol)
+
+            # test Fallback when input shape changes:
+            if x_var:
+                y_var_llga = model(*x_var)
+                self.assertEqual(y_var, y_var_llga, atol=atol, rtol=rtol)
+
+            return graph
+
+    def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             # fold conv bn
@@ -105,14 +128,13 @@ class JitLlgaTestCase(JitTestCase):
             # freeze the module
             model = freeze(model)
 
-            # apply llga optimization pass
-            ipex.core._jit_llga_fuser(model.graph)
+            # warm up run
+            y0 = model(*x)
 
-            y = fp32_model_with_quant_dequant(*x)
-            y_llga = model(*x)
-
-            self.assertEqual(y, y_llga, atol=atol, rtol=rtol)
-            return model.graph
+            # get the graph at the second run after freezing
+            graph = model.graph_for(*x)
+            
+            return graph, model, fp32_model_with_quant_dequant
 
     def checkPatterns(self, graph, patterns):
         fusion_groups = findFusionGroups(graph)
