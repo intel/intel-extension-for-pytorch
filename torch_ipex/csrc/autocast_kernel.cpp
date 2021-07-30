@@ -1,6 +1,7 @@
-#include "autocast_mode.h"
 #include "autocast_kernel.hpp"
+#include "autocast_mode.h"
 #include "autocast_verbose.h"
+#include "cpu/BatchNorm.h"
 #include "quantization/AutoCast.hpp"
 
 namespace torch_ipex {
@@ -104,12 +105,12 @@ at::Tensor batch_norm(const at::Tensor& input, const c10::optional<at::Tensor>& 
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("batch_norm");
 #endif
-  return at::batch_norm(cpu_cached_cast(at::kFloat, input),
-                        cpu_cached_cast(at::kFloat, weight),
-                        cpu_cached_cast(at::kFloat, bias),
-                        cpu_cached_cast(at::kFloat, running_mean),
-                        cpu_cached_cast(at::kFloat, running_var),
-                        training, momentum, eps, cudnn_enabled);
+  // This is temporary solution before the bn supports mixed precision in the
+  // stock pytorch, i.e. input can be bf16 or fp32, but for weight and bias,
+  // they are always fp32.
+  return torch_ipex::cpu::batch_norm(input, weight, bias, running_mean,
+                                     running_var, training, momentum, eps,
+                                     cudnn_enabled);
 }
 
 at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
@@ -225,9 +226,10 @@ at::Tensor gelu(const at::Tensor& input) {
   return at::gelu(input);
 }
 
-std::tuple<Tensor, Tensor, Tensor> lstm_aten(
-    const Tensor& _input, TensorList hx, TensorList _params, bool has_biases,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor>
+lstm_aten(const at::Tensor &_input, at::TensorList hx, at::TensorList _params,
+          bool has_biases, int64_t num_layers, double dropout_p, bool train,
+          bool bidirectional, bool batch_first) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   auto target_type = get_autocast_dtype();
   // not support projection case, for projection case, make fall through.
