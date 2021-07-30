@@ -44,6 +44,7 @@ static inline void gru_forward(
   int32_t num_bias_gate = 4;
 
   auto data_t = get_onednn_dtype(src_layer);
+  auto bias_data_t = get_onednn_dtype(bias);
   auto format_any = memory::format_tag::any;
   auto format_tnc = memory::format_tag::tnc;
   auto format_ldnc = memory::format_tag::ldnc;
@@ -70,7 +71,7 @@ static inline void gru_forward(
   auto weights_iter_md = memory::desc(
           {weights_iter_dims}, data_t, format_any);
   auto bias_md
-          = memory::desc({bias_dims}, data_t, format_any);
+          = memory::desc({bias_dims}, bias_data_t, format_any);
   auto src_iter_md
           = memory::desc({src_iter_dims}, data_t, format_any);
   auto dst_layer_md

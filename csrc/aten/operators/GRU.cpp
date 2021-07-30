@@ -49,6 +49,10 @@ std::tuple<Tensor, Tensor, Tensor> gru_forward_layer(
   } else {
     bias = at::zeros({num_bias_gate*hidden_size}, weight1.options());
   }
+  // fit Bias's dtype to which oneDNN allowed
+  if (weight1.scalar_type() != ScalarType::Half)
+    bias = bias.to(at::kFloat);
+
   xpu::oneDNN::gru_forward(input, hx, weight_ih, weight_hh, bias, y, hy, workspace_t, reverse, hidden_size, has_biases, train, bidirectional);
   auto hy_ = hy.reshape(hx.sizes());
   return std::make_tuple(std::move(y), std::move(hy_), std::move(workspace_t));
