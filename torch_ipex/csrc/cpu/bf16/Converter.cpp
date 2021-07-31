@@ -32,19 +32,20 @@ at::Tensor cat_bfloat16_float(const at::Tensor top_half_,
               "pack_bfloat16_float: expect both args to be at::BFloat16");
   at::Tensor top_half = top_half_.contiguous();
   at::Tensor bottom_half = bottom_half_.contiguous();
-  at::Tensor output =
-      at::empty(top_half.sizes(), top_half.options().dtype(at::kFloat));
+  at::Tensor output = at::empty_strided(top_half_.sizes(), top_half_.strides(),
+                                        top_half_.options().dtype(at::kFloat));
+  at::Tensor output_contiguous = output.contiguous();
   using bVec = at::vec::Vectorized<at::BFloat16>;
   using fVec = at::vec::Vectorized<float>;
-  at::BFloat16* top_half_data = top_half.data_ptr<at::BFloat16>();
-  at::BFloat16* bottom_half_data = bottom_half.data_ptr<at::BFloat16>();
-  float* output_data = output.data_ptr<float>();
+  at::BFloat16 *top_half_data = top_half.data_ptr<at::BFloat16>();
+  at::BFloat16 *bottom_half_data = bottom_half.data_ptr<at::BFloat16>();
+  float *output_data = output_contiguous.data_ptr<float>();
   int64_t grain_size = 512;
   at::parallel_for(0, top_half.numel(), grain_size, [&](int64_t begin, int64_t end) {
     // local pointers
-    at::BFloat16* top_half_ptr = top_half_data + begin;
-    at::BFloat16* bottom_half_ptr = bottom_half_data + begin;
-    float* output_ptr = output_data + begin;
+    at::BFloat16 *top_half_ptr = top_half_data + begin;
+    at::BFloat16 *bottom_half_ptr = bottom_half_data + begin;
+    float *output_ptr = output_data + begin;
     const int64_t size = end - begin;
     int64_t d = 0;
     for (; d < size - (size % bVec::size()); d += bVec::size()) {
@@ -59,10 +60,8 @@ at::Tensor cat_bfloat16_float(const at::Tensor top_half_,
       output_ptr[d] =  bf16::pack_bfloat16_float(top_half_ptr[d], bottom_half_ptr[d]);
     }
   });
-  if (!top_half_.is_contiguous()) {
-    output = at::empty_strided(top_half_.sizes(), top_half_.strides(),
-                               top_half_.options().dtype(at::kFloat))
-                 .copy_(output);
+  if (!output.is_contiguous()) {
+    output.copy_(output_contiguous);
   }
   return output;
 }
@@ -73,22 +72,24 @@ split_float_bfloat16(const at::Tensor tensor_) {
               "pack_bfloat16_float: expect both tensor to be at::kFloat");
 
   auto tensor = tensor_.contiguous();
-  at::Tensor top_half =
-      at::empty(tensor.sizes(), tensor.options().dtype(at::kBFloat16));
-  at::Tensor bottom_half =
-      at::empty(tensor.sizes(), tensor.options().dtype(at::kBFloat16));
-
+  auto top_half = at::empty_strided(tensor_.sizes(), tensor_.strides(),
+                                    tensor_.options().dtype(at::kBFloat16));
+  auto top_half_contiguous = top_half.contiguous();
+  auto bottom_half = at::empty_strided(tensor_.sizes(), tensor_.strides(),
+                                       tensor_.options().dtype(at::kBFloat16));
+  auto bottom_half_contiguous = bottom_half.contiguous();
   using bVec = at::vec::Vectorized<at::BFloat16>;
   using fVec = at::vec::Vectorized<float>;
-  at::BFloat16* top_half_data = top_half.data_ptr<at::BFloat16>();
-  at::BFloat16* bottom_half_data = bottom_half.data_ptr<at::BFloat16>();
-  float* tensor_data = tensor.data_ptr<float>();
+  at::BFloat16 *top_half_data = top_half_contiguous.data_ptr<at::BFloat16>();
+  at::BFloat16 *bottom_half_data =
+      bottom_half_contiguous.data_ptr<at::BFloat16>();
+  float *tensor_data = tensor.data_ptr<float>();
   int64_t grain_size = 512;
   at::parallel_for(0, top_half.numel(), grain_size, [&](int64_t begin, int64_t end) {
     // local pointers
-    at::BFloat16* top_half_ptr = top_half_data + begin;
-    at::BFloat16* bottom_half_ptr = bottom_half_data + begin;
-    float* tensor_ptr = tensor_data + begin;
+    at::BFloat16 *top_half_ptr = top_half_data + begin;
+    at::BFloat16 *bottom_half_ptr = bottom_half_data + begin;
+    float *tensor_ptr = tensor_data + begin;
     const int64_t size = end - begin;
     int64_t d = 0;
     for (; d < size - (size % bVec::size()); d += bVec::size()) {
@@ -107,13 +108,9 @@ split_float_bfloat16(const at::Tensor tensor_) {
       bottom_half_ptr[d] = bottom_half_val;
     }
   });
-  if (!tensor_.is_contiguous()) {
-    top_half = at::empty_strided(tensor_.sizes(), tensor_.strides(),
-                                 tensor_.options().dtype(at::kBFloat16))
-                   .copy_(top_half);
-    bottom_half = at::empty_strided(tensor_.sizes(), tensor_.strides(),
-                                    tensor_.options().dtype(at::kBFloat16))
-                      .copy_(bottom_half);
+  if (!top_half.is_contiguous()) {
+    top_half.copy_(top_half_contiguous);
+    bottom_half.copy_(bottom_half_contiguous);
   }
   return std::tie(top_half, bottom_half);
 }

@@ -92,6 +92,8 @@ class TestOptimizeCases(TestCase):
         # recovery float tensor with top half and bottom half
         float_tensor = torch.ops.torch_ipex.cat_bfloat16_float(top_half, bot_half)
         self.assertEqual(tensor, float_tensor)
+        self.assertEqual(tensor.stride(), top_half.stride())
+        self.assertEqual(tensor.stride(), float_tensor.stride())
 
     def test_tensor_convert(self):
         # contiguous case
@@ -101,5 +103,8 @@ class TestOptimizeCases(TestCase):
         self._test_tensor_convert(tensor.t(), tensor.bfloat16().t())
         # sliced-out case
         self._test_tensor_convert(tensor[2:5, 2:5], tensor.bfloat16()[2:5, 2:5])
+        # nc11 channel-last case
+        tensor = torch.rand(128, 256, 1, 1).to(memory_format=torch.channels_last)
+        self._test_tensor_convert(tensor, tensor.bfloat16())
 if __name__ == '__main__':
     test = unittest.main()
