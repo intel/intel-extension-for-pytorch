@@ -80,8 +80,8 @@ class TestPrepackCases(TestCase):
                 self.assertEqual(x1.grad, x2.grad, rtol=1e-4, atol=5e-02)
                 self.assertEqual(x1.grad, x3.grad, rtol=1e-4, atol=5e-02)
                 if bias:
-                    self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad)
-                    self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad)
+                    self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad.float())
+                    self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad.float())
 
                 # compare origin_model parameters with origin_model parameters after grad updata
                 origin_model_state = origin_model1.state_dict()
@@ -382,7 +382,7 @@ class TestPrepackCases(TestCase):
                 self.assertEqual(loss1, loss2)
                 self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-1)
                 if bias:
-                    self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad)
+                    self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad.float())
                 # compare origin_model parameters with origin_model parameters after grad updata
                 origin_model_state = origin_model.state_dict()
                 ipex_model_state = ipex_model.state_dict()

@@ -81,25 +81,48 @@ def sgd(params: List[Tensor],
 
     for i, param in enumerate(params):
 
+
         d_p = d_p_list[i]
+        float_d_p, float_param = None, None
+        if d_p.dtype == torch.bfloat16:
+            assert param in attr, "split sgd requires record 'trail' part of params in attr"
+            trail = attr[param]['trail']
+
+        if weight_decay != 0 or momentum != 0:
+            float_d_p = d_p.float()
+            if  d_p.dtype == torch.bfloat16:
+                float_d_p = d_p.float()
+                float_param =  torch.ops.torch_ipex.cat_bfloat16_float(param, trail)
+            else:
+                float_param =  param
+                float_d_p = d_p
+
         if weight_decay != 0:
-            d_p = d_p.add(param, alpha=weight_decay)
+            float_d_p = float_d_p.add(float_param, alpha=weight_decay)
 
         if momentum != 0:
             buf = momentum_buffer_list[i]
-
             if buf is None:
-                buf = torch.clone(d_p).detach()
+                buf = torch.clone(float_d_p).detach()
                 momentum_buffer_list[i] = buf
             else:
-                buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+                buf.mul_(momentum).add_(float_d_p, alpha=1 - dampening)
 
             if nesterov:
-                d_p = d_p.add(buf, alpha=momentum)
+                float_d_p = d_p.add(buf, alpha=momentum)
             else:
-                d_p = buf
-        if param.dtype == torch.bfloat16 and param in attr:
-            trail = attr[param]['trail']
-            torch.ops.torch_ipex.packed_add(param, trail, d_p, alpha=-lr)
+                float_d_p = buf
+
+        if param.dtype is torch.bfloat16:
+            if float_d_p is not None and float_param is not None:
+                float_param.add_(float_d_p, alpha=-lr)
+                top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(float_param)
+                param.copy_(top_half)
+                trail.copy_(bot_half)
+            else:
+                torch.ops.torch_ipex.packed_add(param, trail, d_p, alpha=-lr)
         else:
-            param.add_(d_p, alpha=-lr)
+            if float_d_p is not None:
+                param.add_(float_d_p, alpha=-lr)
+            else:
+                param.add_(d_p, alpha=-lr)

@@ -55,6 +55,15 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
+              if level == "O1":
+                  self.assertTrue(M.linear.weight.dtype, torch.float)
+                  self.assertTrue(M.conv.weight.dtype, torch.float)
+                  self.assertTrue(M.embeddingbag.weight.dtype, torch.float)
+                  self.assertTrue(M.bn.weight.dtype, torch.float)
+                  self.assertTrue(opt_M.linear.weight.dtype, dtype)
+                  self.assertTrue(opt_M.conv.weight.dtype, dtype)
+                  self.assertTrue(opt_M.embeddingbag.weight.dtype, dtype)
+                  self.assertTrue(opt_M.bn.weight.dtype, torch.float)
 
               # inplace
               M = copy.deepcopy(M_ori).train()
@@ -64,6 +73,11 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
               self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
+              if level == "O1":
+                  self.assertTrue(M.linear.weight.dtype, dtype)
+                  self.assertTrue(M.conv.weight.dtype, dtype)
+                  self.assertTrue(M.embeddingbag.weight.dtype, dtype)
+                  self.assertTrue(M.bn.weight.dtype, torch.float)
 
     def test_optimize_inplace_behavior_training_mode_with_optimizer(self):
           M_ori = TestModule()
@@ -76,7 +90,16 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
               self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
-              
+              if level == "O1":
+                  self.assertEqual(M.linear.weight.dtype, torch.float)
+                  self.assertEqual(M.conv.weight.dtype, torch.float)
+                  self.assertEqual(M.embeddingbag.weight.dtype, torch.float)
+                  self.assertEqual(M.bn.weight.dtype, torch.float)
+                  self.assertEqual(opt_M.linear.weight.dtype, dtype)
+                  self.assertEqual(opt_M.conv.weight.dtype, dtype)
+                  self.assertEqual(opt_M.embeddingbag.weight.dtype, dtype)
+                  self.assertEqual(opt_M.bn.weight.dtype, torch.float)
+
               # inplace
               M = copy.deepcopy(M_ori).train()
               sgd = torch.optim.SGD(M.parameters(), lr=0.1)
@@ -84,7 +107,12 @@ class TestOptimizeCases(TestCase):
               self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
               self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
               self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
-
+              if level == "O1":
+                  self.assertEqual(M.linear.weight.dtype, dtype)
+                  self.assertEqual(M.conv.weight.dtype, dtype)
+                  self.assertEqual(M.embeddingbag.weight.dtype, dtype)
+                  self.assertEqual(M.bn.weight.dtype, torch.float)
+  
     def _test_tensor_convert(self, tensor, bf16_tensor):
         top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(tensor)
         # truncated top half should equal with convert fp32 to bf16 by ".bfloat()"

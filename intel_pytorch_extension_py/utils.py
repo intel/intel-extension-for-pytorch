@@ -88,12 +88,10 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=Fa
         pass
     elif level == 'O1':
         # Do weight prepack, and convert optimizer for training case.
-        optimized_model, optimized_optimizer, weight_params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, dtype)
-        if dtype == torch.bfloat16 and model.training and optimizer is not None:
-            optimized_model, optimized_optimizer, weight_params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, weight_params_attr)
-        if optimizer is not None:
-            assert model.training, "please call model.train() if you want to convert the optimizer to ipex optimizer."
-            optimized_optimizer = _ipex_optimizer(optimized_optimizer, weight_params_attr, dtype)
+        params_attr = {}
+        if dtype == torch.bfloat16 and model.training:
+            optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, params_attr)
+        optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, params_attr)
     else:
         assert False, "Only support level O0 and O1 now for optimize"
 

@@ -14,75 +14,27 @@ class _ipex_optimizer(torch.optim.Optimizer):
 
     Args:
         optimizer: optimized optimizer, contains optimized model's paramerter setting.
-        weight_params_attr: the prepacked parameters' attrs, to do prepack for corresponding
-            momentum_buffer or other state according those attrs.
-        dtype: can be torch.bfloat16 or torch.float32(torch.float), determin doing bfloat16 training
-            or float training.
+        params_attr: the  parameters' attrs, to cat top_half and bottom(trail) half back to fp32
+
     """
 
-    def __init__(self, optimizer, weight_params_attr, dtype):
-        if type(optimizer) in IPEX_OPTIMIZER_MAPPING and dtype == torch.bfloat16:
-            self.optimizer = IPEX_OPTIMIZER_MAPPING[type(optimizer)] (optimizer, weight_params_attr)
+    def __init__(self, optimizer, params_attr):
+        if type(optimizer) in IPEX_OPTIMIZER_MAPPING:
+            self.optimizer = IPEX_OPTIMIZER_MAPPING[type(optimizer)] (optimizer, params_attr)
             self.master_weight_split  = True
         else:
             self.optimizer = optimizer
             self.master_weight_split  = False
-        self.weight_params_attr = weight_params_attr
+        self.params_attr = params_attr
         self.param_groups = self.optimizer.param_groups
-        self.dtype = dtype
-
-    def state_dict(self):
-        optimizer_temp = copy.deepcopy(self.optimizer)
-        weight_params_attr_ = {}
-        # For bf16 path, the optimizer's params are master weight,
-        # but self.weight_params_attr's keys are bf16 weight, it hard to
-        # query the weight's attr, so recreate a dic which using master weight
-        # as key for easily to query.
-        if self.dtype == torch.bfloat16 and not self.master_weight_split:
-           for _, values in self.weight_params_attr.items():
-                master_weight = values['master_weight']
-                weight_params_attr_[master_weight] = values
-        else:
-            weight_params_attr_ = self.weight_params_attr
-
-        for (k1, _), (_, v2) in zip(self.optimizer.state.items(), optimizer_temp.state.items()):
-            # unpack tensor state using weight's attr.
-            if k1 in weight_params_attr_:
-                weight_attr = weight_params_attr_[k1]
-                for state_key, state_value in v2.items():
-                    if isinstance(state_value, torch.Tensor):
-                        # It covers both conv and linear now. TODO: LSTM or other ops.
-                        if weight_attr['op'] is torch.nn.Conv2d:
-                            if self.master_weight_split and state_value.dtype == torch.bfloat16:
-                                state_value = torch.ops.torch_ipex.cat_bfloat16_float(state_value, weight_attr['trail'])
-                            v2[state_key] = torch.ops.torch_ipex.conv2d_weight_unpack(
-                                state_value,
-                                weight_attr['padding'],
-                                weight_attr['stride'],
-                                weight_attr['dilation'],
-                                weight_attr['kernel_size'],
-                                weight_attr['groups'],
-                                weight_attr['out_channels'],
-                                weight_attr['in_channels'],
-                                weight_attr['weight_channels_last'],
-                                weight_attr['dtype'])
-                        elif weight_attr['op'] is torch.nn.Linear:
-                            if self.master_weight_split and state_value.dtype == torch.bfloat16:
-                                state_value = torch.ops.torch_ipex.cat_bfloat16_float(state_value, weight_attr['trail'])
-                            v2[state_key] = torch.ops.torch_ipex.linear_weight_unpack(
-                                state_value,
-                                weight_attr['out_features'],
-                                weight_attr['in_features'],
-                                weight_attr['weight_transposed'],
-                                weight_attr['dtype'])
-        return optimizer_temp.state_dict()
+        self.state = self.optimizer.state
 
     def load_state_dict(self, state_dict):
         assert False, "_ipex_optimizer does not suppory load_state_dict"
 
     def zero_grad(self, set_to_none: bool = False):
-        if self.dtype == torch.bfloat16:
-            for p in self.weight_params_attr:
+        if not self.master_weight_split:
+            for p in self.params_attr:
                 if p.grad is not None:
                     if set_to_none:
                         p.grad = None
@@ -96,14 +48,14 @@ class _ipex_optimizer(torch.optim.Optimizer):
         self.optimizer.zero_grad(set_to_none)
 
     def step(self, closure=None):
-        if self.dtype == torch.bfloat16 and not self.master_weight_split:
+        if not self.master_weight_split:
             # convert bf16 weight'grad to float.
-            for k, value in self.weight_params_attr.items():
-                value["master_weight"].grad = k.grad.detach().to(torch.float)
+            for k, value in self.params_attr.items():
+                value["master_param"].grad = k.grad.detach().to(torch.float)
         loss = self.optimizer.step(closure)
         # sync mater weight to model's paramerter
-        if self.dtype == torch.bfloat16 and not self.master_weight_split:
-            for k, value in self.weight_params_attr.items():
-                torch.ops.torch_ipex.sync_master_weight_to_bf16(value["master_weight"], k)
+        if not self.master_weight_split:
+            for k, value in self.params_attr.items():
+                torch.ops.torch_ipex.sync_master_weight_to_bf16(value["master_param"], k)
         return loss
 
