@@ -12,6 +12,13 @@ list(APPEND TORCH_IPEX_SRCS ${IPEX_COMMON_SRCS} ${IPEX_GPU_SRCS})
 append_sycl_flag(TORCH_IPEX_SRCS "-fsized-deallocation")
 add_library(ipex_python SHARED ${TORCH_IPEX_SRCS})
 
+include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
+if(CLANG_FORMAT)
+  file(GLOB_RECURSE ALL_IPEX_CSRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/**.[ch] ${CMAKE_CURRENT_SOURCE_DIR}/**.[ch]pp)
+  add_custom_target(CL_FORMAT_IPEX_CSRC COMMAND clang-format -i -style=file ${ALL_IPEX_CSRC_FILES})
+  add_dependencies(ipex_python CL_FORMAT_IPEX_CSRC)
+endif()
+
 find_package(pybind11)
 if(NOT pybind11_FOUND)
     find_package(pybind11 CONFIG)

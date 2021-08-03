@@ -17,6 +17,7 @@
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
 # BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)
+# BUILD_NO_CLANGFORMAT  - to build without force clang-format
 #
 ##############################################################
 

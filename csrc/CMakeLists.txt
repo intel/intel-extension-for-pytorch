@@ -32,14 +32,16 @@ if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
 
-set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
+set(IPEX_INCLUDE_DIRS
+        ${PYTHON_INCLUDE_DIR}
         ${TORCH_INCLUDE_DIRS}
         ${SYCL_INCLUDE_DIR}
         ${IPEX_GPU_ROOT}
         ${IPEX_GPU_ATEN_SRC_DIR}
         ${IPEX_GPU_ATEN_GENERATED})
 
-set(IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS}
+set(IPEX_GPU_CORE_SRC
+        ${IPEX_ATEN_OPS_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
@@ -56,7 +58,15 @@ add_library(ipex_gpu SHARED ${IPEX_GPU_SRC})
 target_include_directories(ipex_gpu_core PUBLIC ${IPEX_INCLUDE_DIRS})
 target_include_directories(ipex_gpu PUBLIC ${IPEX_INCLUDE_DIRS})
 
+include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
+if(CLANG_FORMAT)
+  file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_GPU_ROOT}/**.[ch] ${IPEX_GPU_ROOT}/**.[ch]pp)
+  add_custom_target(CL_FORMAT_NATIVE_CSRC COMMAND clang-format -i -style=file ${ALL_NATIVE_CSRC_FILES})
+  add_dependencies(ipex_gpu_core CL_FORMAT_NATIVE_CSRC)
+endif()
+
 add_dependencies(ipex_gpu_core IPEX_GPU_GEN_TARGET)
+
 target_link_libraries(ipex_gpu_core PUBLIC ${TORCH_LIBRARIES})
 target_link_libraries(ipex_gpu PUBLIC ${TORCH_LIBRARIES})
 
