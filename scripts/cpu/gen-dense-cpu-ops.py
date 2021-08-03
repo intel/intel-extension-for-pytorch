@@ -158,6 +158,11 @@ _FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     "aten::nll_loss.out(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100, *, Tensor(a!) out) -> Tensor(a!)",
     "aten::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> Tensor",
     "aten::_batch_norm_impl_index(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> (Tensor, Tensor, Tensor, Tensor, int)",
+    "aten::reshape(Tensor(a) self, int[] shape) -> Tensor(a)",
+    "aten::where.self(Tensor condition, Tensor self, Tensor other) -> Tensor",
+    "aten::where.ScalarSelf(Tensor condition, Scalar self, Tensor other) -> Tensor",
+    "aten::where.ScalarOther(Tensor condition, Tensor self, Scalar other) -> Tensor",
+    "aten::where.Scalar(Tensor condition, Scalar self, Scalar other) -> Tensor",
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
