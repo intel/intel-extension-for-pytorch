@@ -102,6 +102,10 @@ struct LlgaTensorDesc {
     return ret;
   }
 
+  LlgaTensorDesc update_desc(const desc &t) const {
+    return LlgaTensorDesc(t).set_quantizer(quantizer_);
+  }
+
   QuantizerPtr get_quantizer() {
     return quantizer_;
   }

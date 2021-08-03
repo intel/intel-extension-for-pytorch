@@ -172,7 +172,8 @@ compiled_partition LlgaKernel::compile(const partition &partition) {
   // we need to query them out from compilation and update outputSpecs
   for (size_t i = 0; i < nOutputs_; i++) {
     auto tid = outputSpecs_[i].tid();
-    outputSpecs_[i] = compilation.query_logical_tensor(tid);
+    outputSpecs_[i] =
+        outputSpecs_[i].update_desc(compilation.query_logical_tensor(tid));
   }
 
   // Build static mapping from output id to input offset
