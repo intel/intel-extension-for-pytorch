@@ -163,6 +163,7 @@ _FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     "aten::where.ScalarSelf(Tensor condition, Scalar self, Tensor other) -> Tensor",
     "aten::where.ScalarOther(Tensor condition, Tensor self, Scalar other) -> Tensor",
     "aten::where.Scalar(Tensor condition, Scalar self, Scalar other) -> Tensor",
+    "aten::nll_loss2d(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
