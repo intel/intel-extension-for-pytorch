@@ -473,6 +473,10 @@ static Tensor reflection_pad1d(const Tensor & self, IntArrayRef padding); // ate
 static Tensor reflection_pad1d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d_backward(Tensor grad_output, Tensor self, int[2] padding) -> Tensor
 static Tensor & reflection_pad1d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d_backward.grad_input(Tensor grad_output, Tensor self, int[2] padding, *, Tensor(a!) grad_input) -> Tensor(a!)
 static Tensor & reflection_pad1d_out(Tensor & out, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d.out(Tensor self, int[2] padding, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor & replication_pad2d_out(Tensor & out, const Tensor & self, IntArrayRef padding); // {"schema": "aten::replication_pad2d.out(Tensor self, int[4] padding, *, Tensor(a!) out) -> Tensor(a!)", "dispatch": "True", "math": "False"}
+static Tensor replication_pad2d(const Tensor & self, IntArrayRef padding); // {"schema": "aten::replication_pad2d(Tensor self, int[4] padding) -> Tensor", "dispatch": "True", "math": "False"}
+static Tensor & replication_pad2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // {"schema": "aten::replication_pad2d_backward.grad_input(Tensor grad_output, Tensor self, int[4] padding, *, Tensor(a!) grad_input) -> Tensor(a!)", "dispatch": "True", "math": "False"}
+static Tensor replication_pad2d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // {"schema": "aten::replication_pad2d_backward(Tensor grad_output, Tensor self, int[4] padding) -> Tensor", "dispatch": "True", "math": "False"}
 static Tensor relu(const Tensor & self); // aten::relu(Tensor self) -> Tensor
 static Tensor & relu_(Tensor & self); // aten::relu_(Tensor(a!) self) -> Tensor(a!)
 static Tensor remainder(const Tensor & self, Scalar other); // aten::remainder.Scalar(Tensor self, Scalar other) -> Tensor
