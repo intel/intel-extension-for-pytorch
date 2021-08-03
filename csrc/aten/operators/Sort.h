@@ -2,11 +2,11 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/Utils.h>
-#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 
 using namespace at;
@@ -370,4 +370,5 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
 #undef HANDLE_A_CASE
 }
 
-}} // namespace at::AtenIpexTypeXPU
+} // namespace AtenIpexTypeXPU
+} // namespace at

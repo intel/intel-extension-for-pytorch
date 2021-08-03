@@ -51,4 +51,5 @@ struct SegmentInfo {
   std::vector<BlockInfo> blocks;
 };
 
-}} // namespace xpu::dpcpp
+} // namespace dpcpp
+} // namespace xpu

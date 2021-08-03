@@ -22,7 +22,7 @@ static inline T powi(T a, T b) {
   return result;
 }
 
-template<typename T>
+template <typename T>
 static inline T sgni(T z) {
   if (z == (T)(0)) {
     return (T)(0);

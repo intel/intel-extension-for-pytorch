@@ -1,11 +1,10 @@
 #include <ATen/ATen.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
+#include <runtime/Utils.h>
+#include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -229,8 +228,8 @@ void reflection_pad1d_backward_out_template(
       output_w,
       ", Got: ",
       grad_output.size(dim_w));
-      IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(grad_input.scalar_type(),
-        "reflection_pad1d_backward_out_template", [&] {
+  IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(
+      grad_input.scalar_type(), "reflection_pad1d_backward_out_template", [&] {
         reflection_pad1d_backward_out_kernel<scalar_t>(
             grad_input.data_ptr<scalar_t>(),
             grad_output.data_ptr<scalar_t>(),

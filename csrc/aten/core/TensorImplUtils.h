@@ -1,10 +1,10 @@
 #pragma once
 
 #include <ATen/TensorUtils.h>
-#include <core/Device.h>
+#include <c10/core/DeviceType.h>
 #include <c10/core/StorageImpl.h>
 #include <c10/core/TensorImpl.h>
-#include <c10/core/DeviceType.h>
+#include <core/Device.h>
 
 using namespace at;
 
@@ -13,7 +13,7 @@ namespace dpcpp {
 
 #define DPCPP_DESC_BUFF_LEN 64
 
-using DPCPPDescBuff = struct DPCPPDescBuff {char str[DPCPP_DESC_BUFF_LEN];};
+using DPCPPDescBuff = struct DPCPPDescBuff { char str[DPCPP_DESC_BUFF_LEN]; };
 
 TensorImpl* TensorImpl_new(bool is_quantized);
 at::Tensor TensorImpl_wrap(TensorImpl* tensor);
@@ -94,8 +94,7 @@ static inline void IsOnSameDevice(
     at::CheckedFrom c,
     const at::TensorArg& t1,
     const at::TensorArg& t2) {
-  if ((t1->device().type() != at::kXPU) ||
-      (t2->device().type() != at::kXPU)) {
+  if ((t1->device().type() != at::kXPU) || (t2->device().type() != at::kXPU)) {
     std::ostringstream oss;
     if (t1->device().type() != at::kXPU) {
       oss << "Tensor for " << t1 << " is not on DPCPP, ";
@@ -132,7 +131,8 @@ static inline bool IsOnSameDevice(const at::TensorList& tensor_list) {
   }
   Device curDevice = Device(kXPU, current_device());
   for (const Tensor& t : tensor_list) {
-    if (t.device() != curDevice) return false;
+    if (t.device() != curDevice)
+      return false;
   }
   return true;
 }

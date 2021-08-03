@@ -25,4 +25,4 @@ DeviceProp* dpcppGetCurrentDeviceProperties();
 DeviceProp* dpcppGetDeviceProperties(DeviceId device_id = -1);
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

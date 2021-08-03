@@ -1,26 +1,25 @@
 #include <ATen/ATen.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/InitialTensorOptions.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorFactories.h>
-#include <c10/util/Exception.h>
 #include <ATen/quantized/Quantizer.h>
-#include <ATen/AtenIpexTypeXPU.h>
+#include <c10/util/Exception.h>
 
-#include <runtime/Utils.h>
 #include <core/Allocator.h>
-#include <core/TensorImplUtils.h>
 #include <core/Generator.h>
+#include <core/TensorImplUtils.h>
+#include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/numeric>
 #include <oneapi/dpl/iterator>
+#include <oneapi/dpl/numeric>
 #endif
-
 
 DPCPP_DEF_K1(intrepr);
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
@@ -32,11 +31,12 @@ namespace at {
 namespace impl {
 
 Tensor empty_dpcpp(
-  IntArrayRef size,
-  const TensorOptions& options,
-  c10::optional<MemoryFormat> optional_memory_format) {
-  TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::XPU
-                        || options.backend() == at::Backend::QuantizedXPU);
+    IntArrayRef size,
+    const TensorOptions& options,
+    c10::optional<MemoryFormat> optional_memory_format) {
+  TORCH_INTERNAL_ASSERT(
+      options.backend() == at::Backend::XPU ||
+      options.backend() == at::Backend::QuantizedXPU);
   // TORCH_INTERNAL_ASSERT(!options.is_variable()); // is_variable should have
   // been
   // "unpacked"
@@ -46,13 +46,13 @@ Tensor empty_dpcpp(
   auto dtype = options.dtype();
   int64_t size_bytes = nelements * dtype.itemsize();
   auto storage_impl = c10::make_intrusive<StorageImpl>(
-    StorageImpl::use_byte_size_t(),
-    size_bytes,
-    allocator->allocate(size_bytes),
-    allocator,
-    /*resizeable=*/true);
+      StorageImpl::use_byte_size_t(),
+      size_bytes,
+      allocator->allocate(size_bytes),
+      allocator,
+      /*resizeable=*/true);
   auto tensor = detail::make_tensor<TensorImpl>(
-    storage_impl, options.computeDispatchKey(), dtype);
+      storage_impl, options.computeDispatchKey(), dtype);
   // Default TensorImpl has size [0]
   if (size.size() != 1 || size[0] != 0) {
     tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
@@ -128,18 +128,19 @@ Tensor randperm_dpcpp(
   std::copy(policy, count_begin, count_begin + n, shuffled_data);
   auto zipped_begin = oneapi::dpl::make_zip_iterator(keys_data, shuffled_data);
   std::stable_sort(
-    policy, zipped_begin, zipped_begin + n, 
-    [](auto lhs, auto rhs) {
-      using std::get;
-      return get<0>(lhs) < get<0>(rhs);
-    });
-  
+      policy, zipped_begin, zipped_begin + n, [](auto lhs, auto rhs) {
+        using std::get;
+        return get<0>(lhs) < get<0>(rhs);
+      });
+
   if (!result.is_contiguous()) {
     result.copy_(shuffled);
   }
   return result;
 #else
-  AT_ERROR("Without ONEDPL support, randperm is not implemented for backend: ", result.device());
+  AT_ERROR(
+      "Without ONEDPL support, randperm is not implemented for backend: ",
+      result.device());
 #endif
 }
 
@@ -175,8 +176,8 @@ inline int64_t resolve_root_int(
   // have to cast double to int64_t, otherwise it would only compare up to the
   // precision of a double variable, ignoring the precision loss
   if (bXb_cX4 != (int64_t)(sr * sr)) {
-    // TODO:PyTorch uses ::__double2ll_rd && ::__double2ll_ru. No corresponding API
-    // in DPCPP.
+    // TODO:PyTorch uses ::__double2ll_rd && ::__double2ll_ru. No corresponding
+    // API in DPCPP.
   }
 
   return res;
@@ -416,13 +417,17 @@ Tensor& eye_out(Tensor& out, int64_t n, int64_t m) {
   return out;
 }
 
-Tensor& randperm_out(Tensor& result, int64_t n, c10::optional<Generator> generator) {
+Tensor& randperm_out(
+    Tensor& result,
+    int64_t n,
+    c10::optional<Generator> generator) {
   TORCH_CHECK(n >= 0, "n must be non-negative, got", n);
   check_supported_max_int_with_precision(n, result);
   result.resize_({n});
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
-    impl::randperm_dpcpp<scalar_t>(result, n, generator);
-  });
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
+        impl::randperm_dpcpp<scalar_t>(result, n, generator);
+      });
 
   return result;
 }
@@ -431,7 +436,10 @@ Tensor& randperm_out(Tensor& result, int64_t n) {
   return at::AtenIpexTypeXPU::randperm_out(result, n, c10::nullopt);
 }
 
-Tensor randperm(int64_t n, c10::optional<Generator> generator, const TensorOptions& options) {
+Tensor randperm(
+    int64_t n,
+    c10::optional<Generator> generator,
+    const TensorOptions& options) {
   auto tensor = at::empty(n, options);
   return at::AtenIpexTypeXPU::randperm_out(tensor, n, generator);
 }
@@ -550,12 +558,11 @@ std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
 
 } // namespace AtenIpexTypeXPU
 
-
 namespace AtenIpexTypeQuantizedXPU {
 Tensor empty(
-  IntArrayRef size,
-  const TensorOptions& options,
-  c10::optional<MemoryFormat> optional_memory_format) {
+    IntArrayRef size,
+    const TensorOptions& options,
+    c10::optional<MemoryFormat> optional_memory_format) {
   return impl::empty_dpcpp(size, options, optional_memory_format);
 }
 Tensor empty_strided(
@@ -567,4 +574,3 @@ Tensor empty_strided(
 } // namespace AtenIpexTypeQuantizedXPU
 
 } // namespace at
-

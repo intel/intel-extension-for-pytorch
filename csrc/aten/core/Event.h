@@ -1,23 +1,23 @@
 #pragma once
 
 #include <c10/util/Optional.h>
-#include <utils/DPCPP.h>
 #include <core/Stream.h>
+#include <utils/DPCPP.h>
 
 namespace xpu {
 namespace dpcpp {
 
 /*
-* DPCPPEvents are movable not copyable wrappers around SYCL's events.
-*
-* DPCPPEvents are constructed lazily when first recorded unless it is
-* reconstructed from a IpcEventHandle_t. The event has a device, and this
-* device is acquired from the first recording stream. However, if reconstructed
-* from a handle, the device should be explicitly specified; or if ipc_handle() is
-* called before the event is ever recorded, it will use the current device.
-* Later streams that record the event must match this device.
-*/
-struct  DPCPPEvent {
+ * DPCPPEvents are movable not copyable wrappers around SYCL's events.
+ *
+ * DPCPPEvents are constructed lazily when first recorded unless it is
+ * reconstructed from a IpcEventHandle_t. The event has a device, and this
+ * device is acquired from the first recording stream. However, if reconstructed
+ * from a handle, the device should be explicitly specified; or if ipc_handle()
+ * is called before the event is ever recorded, it will use the current device.
+ * Later streams that record the event must match this device.
+ */
+struct DPCPPEvent {
   // Constructors
   DPCPPEvent() {}
 
@@ -52,9 +52,9 @@ struct  DPCPPEvent {
 
   float elapsed_time(const DPCPPEvent& other) const;
 
-  void ipc_handle(void * handle);
+  void ipc_handle(void* handle);
 
-private:
+ private:
   DeviceIndex device_index_ = -1;
   std::vector<DPCPP::event> events_;
 

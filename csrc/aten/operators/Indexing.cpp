@@ -1,20 +1,20 @@
 #include <ATen/ATen.h>
-#include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
+#include <ATen/native/TensorIterator.h>
 
-#include <runtime/Utils.h>
-#include <utils/DPCPP.h>
-#include <utils/Helpers.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
+#include <utils/Helpers.h>
+#include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 
 #include "IndexingUtils.h"
 #include "Loops.h"
@@ -23,10 +23,9 @@
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/numeric>
 #include <oneapi/dpl/iterator>
+#include <oneapi/dpl/numeric>
 #endif
-
 
 using namespace xpu::dpcpp;
 
@@ -109,9 +108,9 @@ void indexSelect(
     auto idx_data = indices.data_ptr<int64_t>();
 
     __cgh.parallel_for<DPCPP_K(index_select_ker, scalar_t)>(
-      DPCPP::nd_range</*dim=*/1>(
-        DPCPP::range</*dim=*/1>(num_slices*wgroup_size),
-        DPCPP::range</*dim=*/1>(wgroup_size)),
+        DPCPP::nd_range</*dim=*/1>(
+            DPCPP::range</*dim=*/1>(num_slices * wgroup_size),
+            DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
           auto src_ptr = src_data;
           auto dst_ptr = dst_data;
@@ -171,50 +170,48 @@ struct NonZeroOp {
 #ifdef USE_ONEDPL
 template <typename Iterator>
 class strided_range {
-public:
-  using difference_type = typename std::iterator_traits<Iterator>::difference_type;
+ public:
+  using difference_type =
+      typename std::iterator_traits<Iterator>::difference_type;
 
-  struct stride_functor
-  {
+  struct stride_functor {
     using reference = typename std::iterator_traits<Iterator>::reference;
     difference_type stride;
     Iterator base;
 
     stride_functor(difference_type stride, Iterator begin)
-      : stride(stride), base(begin) {}
+        : stride(stride), base(begin) {}
 
-    reference operator()(const difference_type& i) const
-    {
+    reference operator()(const difference_type& i) const {
       return base[stride * i];
     }
   };
 
-  using CountingIterator = typename oneapi::dpl::counting_iterator<difference_type>;
+  using CountingIterator =
+      typename oneapi::dpl::counting_iterator<difference_type>;
   // type of the strided_range iterator
-  using TransformIterator = typename oneapi::dpl::transform_iterator<CountingIterator, stride_functor>;
+  using TransformIterator = typename oneapi::dpl::
+      transform_iterator<CountingIterator, stride_functor>;
 
   // construct strided_range for the range [first,last)
   strided_range(Iterator first, Iterator last, difference_type stride)
-    : first(first), last(last), stride(stride) {}
+      : first(first), last(last), stride(stride) {}
 
-  TransformIterator begin(void) const
-  {
-    return TransformIterator(CountingIterator(0),
-                             stride_functor(stride, first));
+  TransformIterator begin(void) const {
+    return TransformIterator(
+        CountingIterator(0), stride_functor(stride, first));
   }
 
-  TransformIterator end(void) const
-  {
+  TransformIterator end(void) const {
     return begin() + ((last - first) + (stride - 1)) / stride;
   }
 
-protected:
+ protected:
   Iterator first;
   Iterator last;
   difference_type stride;
 };
 #endif
-
 
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
@@ -233,13 +230,18 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     auto tensor_begin = tensor.data_ptr<long>();
     auto self_begin = self.data_ptr<scalar_t>();
-    strided_range<decltype(tensor_begin)> strided_tensor(tensor_begin, tensor_begin + N*num_dim, num_dim);
+    strided_range<decltype(tensor_begin)> strided_tensor(
+        tensor_begin, tensor_begin + N * num_dim, num_dim);
     oneapi::dpl::counting_iterator<int64_t> idxfirst(0);
     auto start = oneapi::dpl::make_zip_iterator(idxfirst, self_begin);
-    auto dend =
-      std::copy_if(policy, start, start + N,
-        oneapi::dpl::make_transform_iterator(strided_tensor.begin(), [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
-        [](auto h){
+    auto dend = std::copy_if(
+        policy,
+        start,
+        start + N,
+        oneapi::dpl::make_transform_iterator(
+            strided_tensor.begin(),
+            [](auto& x) { return std::forward_as_tuple(x, std::ignore); }),
+        [](auto h) {
           using std::get;
           return NonZeroOp<scalar_t>{}(get<1>(h));
         });
@@ -249,24 +251,23 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     if (num_nonzeros > 0 && num_dim > 0) {
       int64_t div = 1;
       for (int dim = num_dim - 1; dim >= 0; dim--) {
-        strided_range<decltype(tensor_begin)> stride_dim(tensor_begin + dim,
-                                                         tensor_begin + N * num_dim, num_dim);
+        strided_range<decltype(tensor_begin)> stride_dim(
+            tensor_begin + dim, tensor_begin + N * num_dim, num_dim);
         auto dim_size = self.size(dim);
-        std::transform(policy,
-                       strided_tensor.begin(),
-                       strided_tensor.begin() + num_nonzeros,
-                       stride_dim.begin(),
-                       [=](long linear_id) {
-                         return (linear_id / div) % dim_size;
-                       });
+        std::transform(
+            policy,
+            strided_tensor.begin(),
+            strided_tensor.begin() + num_nonzeros,
+            stride_dim.begin(),
+            [=](long linear_id) { return (linear_id / div) % dim_size; });
         div *= dim_size;
       }
     }
-  tensor.resize_({num_nonzeros, num_dim});
+    tensor.resize_({num_nonzeros, num_dim});
 #else
-    throw std::runtime_error("no oneDPL found when compile. USM nonzero not supported");
+    throw std::runtime_error(
+        "no oneDPL found when compile. USM nonzero not supported");
 #endif
-
   }
 }
 
@@ -381,9 +382,9 @@ void indexAdd(
     auto idx_data = indices.data_ptr<long>();
 
     __cgh.parallel_for<DPCPP_K(index_add_ker, scalar_t)>(
-      DPCPP::nd_range</*dim=*/1>(
-        DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
-        DPCPP::range</*dim=*/1>(wgroup_size)),
+        DPCPP::nd_range</*dim=*/1>(
+            DPCPP::range</*dim=*/1>(numIndices * wgroup_size),
+            DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
           auto src_ptr = src_data;
           auto dst_ptr = dst_data;
@@ -476,14 +477,13 @@ void indexFill(
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto dst_data =
-        dst.data_ptr<scalar_t>();
+    auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = indices.data_ptr<long>();
 
     __cgh.parallel_for<DPCPP_K(index_fill_ker, scalar_t)>(
-      DPCPP::nd_range</*dim=*/1>(
-        DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
-        DPCPP::range</*dim=*/1>(wgroup_size)),
+        DPCPP::nd_range</*dim=*/1>(
+            DPCPP::range</*dim=*/1>(numIndices * wgroup_size),
+            DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
           auto dst_ptr = dst_data;
           auto idx_ptr = idx_data;
@@ -511,13 +511,12 @@ void indexFill(
 
               g_dst_ptr[dst_offset_] = val;
             }
-            }
+          }
         });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
 
 DPCPP_DEF_K1(index_copy_ker);
 template <typename scalar_t>
@@ -579,38 +578,42 @@ void indexCopy(
     auto idx_data = indices.data_ptr<long>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-        auto dst_ptr = dst_data;
-        auto src_ptr = src_data;
-        auto idx_ptr = idx_data;
+      auto dst_ptr = dst_data;
+      auto src_ptr = src_data;
+      auto idx_ptr = idx_data;
 
-        auto dst_slice_id = item_id.get_group(0);
-        auto g_idx_ptr = idx_ptr;
-        auto g_dst_ptr = dst_ptr + g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
-        auto g_src_ptr = src_ptr + dst_slice_id * src_info.strides[src_dim];
+      auto dst_slice_id = item_id.get_group(0);
+      auto g_idx_ptr = idx_ptr;
+      auto g_dst_ptr =
+          dst_ptr + g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
+      auto g_src_ptr = src_ptr + dst_slice_id * src_info.strides[src_dim];
 
-        auto ii_ = item_id.get_local_id(0);
-        auto dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-        auto src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-        g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
+      auto ii_ = item_id.get_local_id(0);
+      auto dst_offset_ =
+          IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+      auto src_offset_ =
+          IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+      g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
 
-        for (int iter = 1; iter < n_work_item_iter; iter++) {
-          auto idx_offset_ =
-              IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-          auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
+      for (int iter = 1; iter < n_work_item_iter; iter++) {
+        auto idx_offset_ =
+            IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
+        auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
 
-          if (__inner_idx < dstTotalSize) {
-            dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                __inner_idx, dst_info);
+        if (__inner_idx < dstTotalSize) {
+          dst_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
 
-            g_dst_ptr[dst_offset_] = src_ptr[ii_];
-          }
+          g_dst_ptr[dst_offset_] = src_ptr[ii_];
         }
-
+      }
     };
 
-    cgh.parallel_for<DPCPP_K(
-      index_copy_ker, scalar_t)>(
-      DPCPP::nd_range<1>(DPCPP::range<1>(numIndices * wgroup_size), DPCPP::range<1>(wgroup_size)), kfn);
+    cgh.parallel_for<DPCPP_K(index_copy_ker, scalar_t)>(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(numIndices * wgroup_size),
+            DPCPP::range<1>(wgroup_size)),
+        kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -785,13 +788,10 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // command group function
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
-    auto acc_src_data =
-        contigSrc.data_ptr<scalar_t>();
+    auto acc_src_data = contigSrc.data_ptr<scalar_t>();
     auto acc_mask_data = mask.data_ptr<bool>();
-    auto acc_maskPrefixSum_data =
-        maskPrefixSum.data_ptr<int64_t>();
-    auto acc_tensor_data =
-        tensor.data_ptr<scalar_t>();
+    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
+    auto acc_tensor_data = tensor.data_ptr<scalar_t>();
 
     // kernel function
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
@@ -856,8 +856,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong_data =
-        maskLong.data_ptr<int64_t>();
+    auto acc_maskLong_data = maskLong.data_ptr<int64_t>();
     auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
 
     // kernel function per work-item
@@ -1008,9 +1007,7 @@ void index(
             index_stride,
             non_index_size,
             non_index_stride,
-            [](char *out_data,
-               char *in_data,
-               int64_t offset) {
+            [](char* out_data, char* in_data, int64_t offset) {
               *(dtype*)out_data = *(dtype*)(in_data + offset);
             });
       });
@@ -1033,9 +1030,7 @@ void index_put(
           index_stride,
           IntArrayRef{},
           IntArrayRef{},
-          [](char *out_data,
-             char *in_data,
-             int64_t offset) {
+          [](char* out_data, char* in_data, int64_t offset) {
             dpcpp_global_ptr_pt<scalar_t> out_ptr =
                 (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
             auto in = *(scalar_t*)in_data;
@@ -1044,25 +1039,23 @@ void index_put(
     });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND3(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      iter.dtype(),
-      "index_put",
-      [&] {
-        using dtype = OpaqueType<sizeof(scalar_t)>;
-        dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(
-            iter,
-            index_size,
-            index_stride,
-            IntArrayRef{},
-            IntArrayRef{},
-            [](char *out_data,
-               char *in_data,
-               int64_t offset) {
-              *(dtype*)(out_data + offset) = *(dtype*)in_data;
-            });
-      });
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        iter.dtype(),
+        "index_put",
+        [&] {
+          using dtype = OpaqueType<sizeof(scalar_t)>;
+          dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(
+              iter,
+              index_size,
+              index_stride,
+              IntArrayRef{},
+              IntArrayRef{},
+              [](char* out_data, char* in_data, int64_t offset) {
+                *(dtype*)(out_data + offset) = *(dtype*)in_data;
+              });
+        });
   }
 }
 
@@ -1158,19 +1151,39 @@ Tensor& index_add_(
   return self;
 }
 
-Tensor& index_copy_(Tensor& self, int64_t dim, const Tensor& index, const Tensor& source) {
+Tensor& index_copy_(
+    Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& source) {
   dim = maybe_wrap_dim(dim, self.dim());
-  TORCH_CHECK_INDEX(index.dim() < 2, "index_copy_(): Index should have dimension 1 or 0 (got ", index.dim(), ")");
+  TORCH_CHECK_INDEX(
+      index.dim() < 2,
+      "index_copy_(): Index should have dimension 1 or 0 (got ",
+      index.dim(),
+      ")");
 
   int64_t numIndices = index.numel();
   if (source.dim() == 0 && numIndices != 1) {
-    TORCH_CHECK_INDEX(false, "index_copy_(): When source is scalar, index should have one element (got ", numIndices, ")");
-  } else if ((source.dim() != self.dim()) && (source.dim() != 0 && self.dim() != 0)) {
-    TORCH_CHECK_INDEX(false, "index_copy_(): When source and destination are not scalars, their dimensionality must match. Source dimensionality (",
-                   source.dim(), "), destination dimensionality (", self.dim(), ")");
+    TORCH_CHECK_INDEX(
+        false,
+        "index_copy_(): When source is scalar, index should have one element (got ",
+        numIndices,
+        ")");
+  } else if (
+      (source.dim() != self.dim()) && (source.dim() != 0 && self.dim() != 0)) {
+    TORCH_CHECK_INDEX(
+        false,
+        "index_copy_(): When source and destination are not scalars, their dimensionality must match. Source dimensionality (",
+        source.dim(),
+        "), destination dimensionality (",
+        self.dim(),
+        ")");
   }
 
-  TORCH_CHECK_INDEX(index.scalar_type() == ScalarType::Long, "index_copy_(): Expected LongTensor for index");
+  TORCH_CHECK_INDEX(
+      index.scalar_type() == ScalarType::Long,
+      "index_copy_(): Expected LongTensor for index");
   // Check that source and destination slices have the same size
   auto selfSlicedSizes = self.sizes().vec();
   if (selfSlicedSizes.size() > 0) {
@@ -1181,16 +1194,25 @@ Tensor& index_copy_(Tensor& self, int64_t dim, const Tensor& index, const Tensor
     sourceSlicedSizes.erase(sourceSlicedSizes.begin() + dim);
   }
   if (selfSlicedSizes.size() != sourceSlicedSizes.size() ||
-      !std::equal(selfSlicedSizes.begin(), selfSlicedSizes.end(),
-                  sourceSlicedSizes.begin())) {
+      !std::equal(
+          selfSlicedSizes.begin(),
+          selfSlicedSizes.end(),
+          sourceSlicedSizes.begin())) {
     std::stringstream ss;
     ss << "index_copy_(): Source/destination tensor must have same slice shapes. ";
-    ss << "Destination slice shape: " << selfSlicedSizes << " at dimension " << dim;
-    ss << " and source slice shape: " << sourceSlicedSizes << " at dimension 0.";
+    ss << "Destination slice shape: " << selfSlicedSizes << " at dimension "
+       << dim;
+    ss << " and source slice shape: " << sourceSlicedSizes
+       << " at dimension 0.";
     TORCH_CHECK(false, ss.str());
   }
-  TORCH_CHECK_INDEX(source.dim() == 0 || numIndices == source.size(dim),
-          "index_copy_(): Number of indices (", numIndices, ") should be equal to source.size(dim) (", source.size(dim), ")");
+  TORCH_CHECK_INDEX(
+      source.dim() == 0 || numIndices == source.size(dim),
+      "index_copy_(): Number of indices (",
+      numIndices,
+      ") should be equal to source.size(dim) (",
+      source.size(dim),
+      ")");
 
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
@@ -1347,9 +1369,7 @@ Tensor& put_(
           self,
           index,
           source,
-          [](char* out_data,
-             char* in_data,
-             uint64_t offset) {
+          [](char* out_data, char* in_data, uint64_t offset) {
             dpcpp_global_ptr_pt<scalar_t> out_ptr =
                 (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
             auto in = *(scalar_t*)in_data;
@@ -1358,23 +1378,21 @@ Tensor& put_(
     });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND3(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      self.scalar_type(),
-      "put_",
-      [&] {
-        using dtype = impl::OpaqueType<sizeof(scalar_t)>;
-        impl::put<scalar_t, DPCPP_K(dpcpp_put_kernel, scalar_t)>(
-            self,
-            index,
-            source,
-            [](char* out_data,
-               char* in_data,
-               uint64_t offset) {
-              *(dtype*)(out_data + offset) = *(dtype*)in_data;
-            });
-      });
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        self.scalar_type(),
+        "put_",
+        [&] {
+          using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+          impl::put<scalar_t, DPCPP_K(dpcpp_put_kernel, scalar_t)>(
+              self,
+              index,
+              source,
+              [](char* out_data, char* in_data, uint64_t offset) {
+                *(dtype*)(out_data + offset) = *(dtype*)in_data;
+              });
+        });
   }
 
   return self;
@@ -1391,8 +1409,12 @@ Tensor index(const Tensor& self, TensorList indices) {
 
   auto info = make_info(self, indices);
   auto iter = make_index_iterator(info);
-  impl::index(iter, info.indexed_sizes, info.indexed_strides,
-      info.non_indexed_sizes, info.non_indexed_strides);
+  impl::index(
+      iter,
+      info.indexed_sizes,
+      info.indexed_strides,
+      info.non_indexed_sizes,
+      info.non_indexed_strides);
   return iter.output();
 }
 

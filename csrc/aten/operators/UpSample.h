@@ -7,12 +7,11 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 
-#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
+#include <runtime/Utils.h>
 
 #include "comm/Atomics.h"
 #include "comm/ParamUtils.h"
-
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -116,8 +115,9 @@ static scalar_t upsample_get_value_bounded(
     int y) {
   int access_x = max(min(x, width - 1), static_cast<int>(0));
   int access_y = max(min(y, height - 1), static_cast<int>(0));
-  return data[batch * height * width * channel + channel * height * width +
-              access_y * width + access_x];
+  return data
+      [batch * height * width * channel + channel * height * width +
+       access_y * width + access_x];
 }
 
 template <typename scalar_t>
@@ -132,9 +132,10 @@ static void upsample_increment_value_bounded(
     scalar_t value) {
   int64_t access_x = max(min(x, width - 1), static_cast<int>(0));
   int64_t access_y = max(min(y, height - 1), static_cast<int>(0));
-  atomicAdd((dpcpp_global_ptr_pt<scalar_t>)
-      &data[batch * height * width * channel + channel * height * width +
-            access_y * width + access_x],
+  atomicAdd(
+      (dpcpp_global_ptr_pt<scalar_t>)&data
+          [batch * height * width * channel + channel * height * width +
+           access_y * width + access_x],
       value);
 }
 

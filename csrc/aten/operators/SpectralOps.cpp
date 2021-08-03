@@ -1,10 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/detail/TensorInfo.h>
-#include "comm/ATDispatch.h"
 #include <runtime/Utils.h>
-#include "comm/Numerics.h"
 #include "MemoryHelpers.h"
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
@@ -191,9 +191,10 @@ void _mkl_dft(
         output, signal_ndim, size_last_signal_dim, start_slice);
   }
 
-  // wait for the queue.  For MKL this is a must, as it can have allocated some USM internally, and
-  // that will be freed when the destructor is called.  So, before that is legal, anything submitted to
-  // the queue that is using this USM must have finished.
+  // wait for the queue.  For MKL this is a must, as it can have allocated some
+  // USM internally, and that will be freed when the destructor is called.  So,
+  // before that is legal, anything submitted to the queue that is using this
+  // USM must have finished.
   dpcpp_queue.wait();
 }
 #endif

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "Numerics.h"
 #include "Scalar.h"
 
@@ -29,7 +29,7 @@ static inline DPCPP_DEVICE void atomicAdd(
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<double>& address,
     double val) {
-  unsigned long long * address_as_ull = (unsigned long long *)address;
+  unsigned long long* address_as_ull = (unsigned long long*)address;
   unsigned long long assumed = *address_as_ull;
   unsigned long long newval;
 
@@ -60,7 +60,7 @@ static inline DPCPP_DEVICE void atomicAdd(
     hsum.x = (size_t)address & 2 ? (newval >> 16) : (newval & 0xffff);
     hsum = Numerics<at::Half>::add(hsum, val);
     newval = (size_t)address & 2 ? (newval & 0xffff) | (hsum.x << 16)
-                              : (newval & 0xffff0000) | hsum.x;
+                                 : (newval & 0xffff0000) | hsum.x;
   } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 
@@ -82,7 +82,7 @@ static inline DPCPP_DEVICE void atomicAdd(
     hsum.x = (size_t)address & 2 ? (newval >> 16) : (newval & 0xffff);
     hsum = Numerics<at::BFloat16>::add(hsum, val);
     newval = (size_t)address & 2 ? (newval & 0xffff) | (hsum.x << 16)
-                              : (newval & 0xffff0000) | hsum.x;
+                                 : (newval & 0xffff0000) | hsum.x;
   } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 
@@ -95,14 +95,15 @@ static inline DPCPP_DEVICE void atomicAdd(
 }
 
 static inline DPCPP_DEVICE void atomicAdd(
-        const dpcpp_global_ptr_pt<long>& address,
-        int val) {
+    const dpcpp_global_ptr_pt<long>& address,
+    int val) {
   dpcpp_multi_ptr<long, dpcpp_global_space> address_multi_ptr(address);
   DPCPP::atomic<long> address_var(address_multi_ptr);
   address_var.fetch_add(val);
 }
 
-}} // at::AtenIpexTypeXPU
+} // namespace AtenIpexTypeXPU
+} // namespace at
 
 // (TODO) add support for atomicAdd
 // dpcpp_global_ptr_pt<uint8_t *>

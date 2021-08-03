@@ -1,8 +1,8 @@
 #pragma once
 
 #include <c10/util/ArrayRef.h>
-#include "General.h"
 #include <vector>
+#include "General.h"
 
 namespace at {
 namespace native {

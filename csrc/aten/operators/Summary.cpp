@@ -1,14 +1,13 @@
 #include <ATen/Context.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <core/detail/IndexUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
-#include <core/detail/IndexUtils.h>
 
-#include "comm/Atomics.h"
-#include "comm/ATDispatch.h"
 #include "Loops.h"
-
+#include "comm/ATDispatch.h"
+#include "comm/Atomics.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -79,9 +78,10 @@ void kernelHistogram1D(
         const IndexType bin =
             getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
         const IndexType aOffset =
-            IndexToOffset<output_t, IndexType, ADims>::get(
-                bin, a);
-        atomicAdd((dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset], getOp(weight_ptr, linearIndex));
+            IndexToOffset<output_t, IndexType, ADims>::get(bin, a);
+        atomicAdd(
+            (dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset],
+            getOp(weight_ptr, linearIndex));
       }
     };
 
@@ -123,20 +123,17 @@ bool dpcpp_tensor_histogram(
   auto bInfo = getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
     auto cInfo = getTensorInfo<output_t, IndexType>(c);
-    const auto getWeightsOp =
-        [cInfo](output_t* cPtr, IndexType cIndex) {
-          const IndexType cOffset =
-              IndexToOffset<output_t, IndexType, 1>::get(
-                  cIndex, cInfo);
-          return cPtr[cOffset];
-        };
+    const auto getWeightsOp = [cInfo](output_t* cPtr, IndexType cIndex) {
+      const IndexType cOffset =
+          IndexToOffset<output_t, IndexType, 1>::get(cIndex, cInfo);
+      return cPtr[cOffset];
+    };
     HANDLE_CASE(getWeightsOp, true);
   } else {
     TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
-    static const auto getDummyOp = [](output_t*,
-                                      IndexType) {
+    static const auto getDummyOp = [](output_t*, IndexType) {
       return static_cast<output_t>(1);
     };
     HANDLE_CASE(getDummyOp, false);
@@ -179,8 +176,10 @@ Tensor bincount_template(
         output, self, weights, nbins, minvalue, maxvalue);
   } else {
     output = native::zeros({nbins}, device(DeviceType::XPU).dtype(kLong));
-    auto ret = dpcpp_tensor_histogram<typename c10::impl::ScalarTypeToCPPType<kLong>::type, input_t, false>(
-        output, self, weights, nbins, minvalue, maxvalue);
+    auto ret = dpcpp_tensor_histogram<
+        typename c10::impl::ScalarTypeToCPPType<kLong>::type,
+        input_t,
+        false>(output, self, weights, nbins, minvalue, maxvalue);
   }
   return output;
 }
@@ -204,34 +203,46 @@ Tensor histc_template(
   TORCH_CHECK(
       !(std::isinf(minvalue) || std::isinf(maxvalue) || std::isnan(minvalue) ||
         std::isnan(maxvalue)),
-      "range of [", minvalue, ", ", maxvalue, "] is not finite");
+      "range of [",
+      minvalue,
+      ", ",
+      maxvalue,
+      "] is not finite");
   TORCH_CHECK(minvalue < maxvalue, "max must be larger than min");
-  Tensor output = at::zeros({nbins},self.options());
+  Tensor output = at::zeros({nbins}, self.options());
   auto ret = dpcpp_tensor_histogram<scalar_t, input_t, false>(
-    output, self, Tensor(), nbins, minvalue, maxvalue);
+      output, self, Tensor(), nbins, minvalue, maxvalue);
   return output;
 }
 
 } // namespace impl
 
 Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
-  return IPEX_DISPATCH_INTEGRAL_TYPES(self.scalar_type(), "bincount_dpcpp", [&] {
-    const auto scalar = weights.scalar_type();
-    if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
-      return impl::bincount_template<scalar_t, float>(self, weights, minlength);
-    return impl::bincount_template<scalar_t, double>(
+  return IPEX_DISPATCH_INTEGRAL_TYPES(
+      self.scalar_type(), "bincount_dpcpp", [&] {
+        const auto scalar = weights.scalar_type();
+        if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
+          return impl::bincount_template<scalar_t, float>(
+              self, weights, minlength);
+        return impl::bincount_template<scalar_t, double>(
             self, weights.to(kDouble), minlength);
-  });
+      });
 }
 
-Tensor histc(const Tensor & self, int64_t bins, Scalar min, Scalar max) {
+Tensor histc(const Tensor& self, int64_t bins, Scalar min, Scalar max) {
   TORCH_CHECK(bins > 0, "bins should be > 0, but is ", bins, " instead");
   return IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "histc", [&] {
-    return impl::histc_template<scalar_t>(self, bins, min.to<scalar_t>(), max.to<scalar_t>());
+    return impl::histc_template<scalar_t>(
+        self, bins, min.to<scalar_t>(), max.to<scalar_t>());
   });
 }
 
-Tensor& histc_out(Tensor & out, const Tensor & self, int64_t bins, Scalar min, Scalar max) {
+Tensor& histc_out(
+    Tensor& out,
+    const Tensor& self,
+    int64_t bins,
+    Scalar min,
+    Scalar max) {
   Tensor out_tmp = at::AtenIpexTypeXPU::histc(self, bins, min, max);
   out.resize_as_(out_tmp).copy_(out_tmp);
   return out;

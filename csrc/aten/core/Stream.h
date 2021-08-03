@@ -58,7 +58,6 @@ IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
 } // namespace dpcpp
 } // namespace xpu
 
-
 using namespace xpu::dpcpp;
 
 namespace std {

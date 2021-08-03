@@ -15,5 +15,5 @@ Tensor clone(const Tensor& self, c10::optional<MemoryFormat> memory_format) {
   return at::native::quantized_clone(self, memory_format);
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

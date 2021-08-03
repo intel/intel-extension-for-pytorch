@@ -2,16 +2,15 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
+#include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
-#include <core/Memory.h>
+#include "comm/ATDispatch.h"
 #include "comm/Algorithm.h"
 #include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 
 #include <cmath>
 #include <limits>
-
 
 using namespace xpu::dpcpp;
 
@@ -76,8 +75,7 @@ Tensor& linspace_dpcpp_out(
       LinspaceOp<scalar_t> linspace_method(scalar_start, step);
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto r_data =
-            r.data_ptr<scalar_t>();
+        auto r_data = r.data_ptr<scalar_t>();
         // kernel function per work-item
         auto kfn = DPCPP_Q_KFN() {
           auto ptr = r_data;
@@ -127,8 +125,7 @@ Tensor& logspace_dpcpp_out(
       LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto r_data =
-            r.data_ptr<scalar_t>();
+        auto r_data = r.data_ptr<scalar_t>();
         // kernel function per work-item
         auto kfn = DPCPP_Q_KFN() {
           auto ptr = r_data;
@@ -256,8 +253,7 @@ Tensor& arange_dpcpp_out(
 
         // command group functions
         auto cgf = DPCPP_Q_CGF(cgh) {
-          auto acc =
-              result.data_ptr<scalar_t>();
+          auto acc = result.data_ptr<scalar_t>();
 
           // kernel function per work-item
           auto kfn = DPCPP_Q_KFN() {
@@ -277,7 +273,11 @@ Tensor& arange_dpcpp_out(
 
 } // namespace impl
 
-Tensor& linspace_out(Tensor& out, Scalar start, Scalar end, c10::optional<int64_t> steps) {
+Tensor& linspace_out(
+    Tensor& out,
+    Scalar start,
+    Scalar end,
+    c10::optional<int64_t> steps) {
   impl::linspace_dpcpp_out(out, start, end, steps);
   return out;
 }

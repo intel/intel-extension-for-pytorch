@@ -1,6 +1,6 @@
 #include <core/Stream.h>
-#include <runtime/Queue.h>
 #include <runtime/Device.h>
+#include <runtime/Queue.h>
 
 #include <c10/core/DeviceGuard.h>
 #include <c10/util/Exception.h>
@@ -69,10 +69,9 @@ Device DPCPPStream::device() const {
   return Device(DeviceType::XPU, device_index());
 }
 
-
 StreamId DPCPPStream::id() const {
   return stream_.id();
-  }
+}
 
 void DPCPPStream::synchronize() const {
   DeviceGuard guard{stream_.device()};
@@ -95,7 +94,10 @@ DPCPP::queue& DPCPPStream::dpcpp_queue() const {
 static DPCPPStream QueueToDPCPPStream(const Queue* ptr) {
   return DPCPPStream(
       DPCPPStream::UNCHECKED,
-      Stream(Stream::UNSAFE, c10::Device(DeviceType::XPU, ptr->getDeviceId()), getQueueId(ptr)));
+      Stream(
+          Stream::UNSAFE,
+          c10::Device(DeviceType::XPU, ptr->getDeviceId()),
+          getQueueId(ptr)));
 }
 
 DPCPPStream getDPCPPStreamFromPool(bool is_default, DeviceIndex device_index) {

@@ -1,9 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include "comm/ATDispatch.h"
-#include <runtime/Utils.h>
 #include <core/Memory.h>
-
+#include <runtime/Utils.h>
+#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp;
 

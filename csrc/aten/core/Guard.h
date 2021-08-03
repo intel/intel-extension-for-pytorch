@@ -8,7 +8,6 @@
 #include <utils/Macros.h>
 #include <cstddef>
 
-
 namespace xpu {
 namespace dpcpp {
 
@@ -173,5 +172,5 @@ struct OptionalDPCPPStreamGuard {
  private:
   c10::impl::InlineOptionalStreamGuard<impl::DPCPPGuardImpl> guard_;
 };
-}
-}
+} // namespace dpcpp
+} // namespace xpu

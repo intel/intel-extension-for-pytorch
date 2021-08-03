@@ -1,19 +1,18 @@
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Context.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/native/ReduceOps.h>
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/AtenIpexTypeXPU.h>
 
 #include <c10/core/ScalarType.h>
-#include "comm/Numerics.h"
-#include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
+#include "comm/Numerics.h"
 
 #include "Loops.h"
 #include "Reduce.h"
-
 
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -115,14 +114,16 @@ static TensorIterator make_reduction(
     bool keepdim,
     ScalarType out_dtype) {
   /* FIXME:
-   * According to below comments, this check is only for mixed precision enabling,
+   * According to below comments, this check is only for mixed precision
+  enabling,
    * which can handle the case while in_dtype == kHalf and out_dtype == kFloat.
    * When IPEX has this feature, we can enable below check, as well.
-  // special case for type promotion in mixed precision, improves computational efficiency.
+  // special case for type promotion in mixed precision, improves computational
+  efficiency.
   // not generalize this to common mismatched input/output types to avoid cross
   // product of templated kernel launches.
-  const bool gpu_f16_to_f32 = (self.scalar_type() == kHalf && out_dtype == kFloat);
-  auto in_dtype = gpu_f16_to_f32 ? self.scalar_type() : out_dtype;
+  const bool gpu_f16_to_f32 = (self.scalar_type() == kHalf && out_dtype ==
+  kFloat); auto in_dtype = gpu_f16_to_f32 ? self.scalar_type() : out_dtype;
   return make_reduction(name, result, self, dim, keepdim, in_dtype, out_dtype);
   */
   return make_reduction(name, result, self, dim, keepdim, out_dtype, out_dtype);
@@ -165,7 +166,7 @@ static TensorIterator make_reduction(
    * This check is only for mixed precision enabling,
    * which can handle the case while in_dtype == kHalf and out_dtype == kFloat.
    * When IPEX has this feature, we can enable below check, as well.
-  */
+   */
   if (self.scalar_type() == dtype
       /*|| (self.scalar_type() == kHalf && dtype == kFloat)*/) {
     return TensorIterator::reduce_op(viewed_result1, viewed_result2, self);
@@ -236,10 +237,11 @@ struct WelfordOps {
     acc_scalar_t delta = b.mean - a.mean;
     combine_t new_count = a.nf + b.nf;
     acc_scalar_t nb_over_n = b.nf / new_count;
-    return {a.mean + delta * nb_over_n,
-            a.m2 + b.m2 + delta * delta * a.nf * nb_over_n,
-            -1,
-            new_count};
+    return {
+        a.mean + delta * nb_over_n,
+        a.m2 + b.m2 + delta * delta * a.nf * nb_over_n,
+        -1,
+        new_count};
   }
   inline DPCPP_DEVICE res_t project(acc_t acc) const {
     auto mean = acc.mean;
@@ -444,8 +446,13 @@ struct MinMaxOps {
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
-    auto min_val = (Numerics<acc_scalar_t>::isnan(a.first) || a.first < b.first) ? a.first : b.first;
-    auto max_val = (Numerics<acc_scalar_t>::isnan(a.second) || a.second > b.second) ? a.second : b.second;
+    auto min_val = (Numerics<acc_scalar_t>::isnan(a.first) || a.first < b.first)
+        ? a.first
+        : b.first;
+    auto max_val =
+        (Numerics<acc_scalar_t>::isnan(a.second) || a.second > b.second)
+        ? a.second
+        : b.second;
 
     return {min_val, max_val};
   }
@@ -585,7 +592,8 @@ static void sum_kernel(TensorIterator& iter) {
       "sum",
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
-        sum_kernel_impl<scalar_t, accscalar_t>(iter); });
+        sum_kernel_impl<scalar_t, accscalar_t>(iter);
+      });
 }
 
 static void prod_kernel(TensorIterator& iter) {
@@ -601,7 +609,8 @@ static void mean_kernel(TensorIterator& iter) {
       "mean",
       [&]() {
         using accscalar_t = acc_type<scalar_t>;
-        mean_kernel_impl<scalar_t, accscalar_t>(iter); });
+        mean_kernel_impl<scalar_t, accscalar_t>(iter);
+      });
 }
 
 static void min_kernel(TensorIterator& iter) {
@@ -650,16 +659,20 @@ void or_kernel(TensorIterator& iter) {
 template <typename scalar_t>
 void _min_max_values_kernel_dpcpp_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, scalar_t>(
-    iter, MinMaxOps<scalar_t, scalar_t, int32_t>{}, std::pair<scalar_t, scalar_t>(
-      at::numeric_limits<scalar_t>::upper_bound(),
-      at::numeric_limits<scalar_t>::lower_bound()
-  ));
+      iter,
+      MinMaxOps<scalar_t, scalar_t, int32_t>{},
+      std::pair<scalar_t, scalar_t>(
+          at::numeric_limits<scalar_t>::upper_bound(),
+          at::numeric_limits<scalar_t>::lower_bound()));
 }
 
 void aminmax_kernel(TensorIterator& iter) {
-    IPEX_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "aminmax_elementwise_dpcpp", [&]() {
-       _min_max_values_kernel_dpcpp_impl<scalar_t>(iter);
-    });
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "aminmax_elementwise_dpcpp",
+      [&]() { _min_max_values_kernel_dpcpp_impl<scalar_t>(iter); });
 }
 
 } // namespace impl
@@ -798,17 +811,21 @@ Tensor& amax_out(
     const Tensor& self,
     IntArrayRef dim,
     bool keepdim) {
-  TORCH_CHECK(self.scalar_type() == result.scalar_type(), "Illegal dtype for self, and out:", self.scalar_type(), result.scalar_type());
-  auto iter = impl::make_reduction("amax", result, self, dim, keepdim, self.scalar_type());
+  TORCH_CHECK(
+      self.scalar_type() == result.scalar_type(),
+      "Illegal dtype for self, and out:",
+      self.scalar_type(),
+      result.scalar_type());
+  auto iter = impl::make_reduction(
+      "amax", result, self, dim, keepdim, self.scalar_type());
   TORCH_CHECK(iter.numel() > 0, "operation does not have an identity");
   impl::max_kernel(iter);
   return result;
 }
 
-Tensor amax(const Tensor & self, IntArrayRef dim, bool keepdim) {
+Tensor amax(const Tensor& self, IntArrayRef dim, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::amax_out(
-          result, self, dim, keepdim);
+  return at::AtenIpexTypeXPU::amax_out(result, self, dim, keepdim);
 }
 
 Tensor max(const Tensor& self) {
@@ -1029,10 +1046,10 @@ Tensor& renorm_out(
       c10::nullopt);
 
   auto iter = TensorIteratorConfig()
-  .add_output(norm)
-  .add_input(norm)
-  .set_check_mem_overlap(true)
-  .build();
+                  .add_output(norm)
+                  .add_input(norm)
+                  .set_check_mem_overlap(true)
+                  .build();
   float maxnorm_ = maxnorm.toFloat();
   dpcpp_kernel_for_tensor_iter<OpRenorm>(iter, [=](float norm) -> float {
     if (norm > maxnorm_)
@@ -1231,12 +1248,21 @@ Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
 }
 
 void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
-  auto iter = impl::make_reduction("aminmax", min_result, max_result, self, std::vector<int64_t>{}, false, self.scalar_type());//TensorIterator::binary_op(min_result, max_result, self);
+  auto iter = impl::make_reduction(
+      "aminmax",
+      min_result,
+      max_result,
+      self,
+      std::vector<int64_t>{},
+      false,
+      self.scalar_type()); // TensorIterator::binary_op(min_result, max_result,
+                           // self);
   impl::aminmax_kernel(iter);
 }
 
 std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
-  TORCH_CHECK(!self.is_complex(), "max is not yet implemented for complex tensors.");
+  TORCH_CHECK(
+      !self.is_complex(), "max is not yet implemented for complex tensors.");
   TORCH_CHECK(self.numel() > 0, "operation does not have an identity.");
   Tensor min_result = at::empty_like(self);
   Tensor max_result = at::empty_like(self);

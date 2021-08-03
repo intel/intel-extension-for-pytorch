@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 using namespace xpu::dpcpp;
 
@@ -27,8 +27,7 @@ static inline DPCPP_HOST void dpcppMemoryScale(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
           auto idx = item.get_id(0);
           dst[idx] = src[idx] * alpha;
-        }
-    );
+        });
   };
 
   // launch kernel
@@ -49,8 +48,7 @@ static inline DPCPP_HOST void dpcppMemoryScale1(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
           auto idx = item.get_id(0);
           dst[idx] = src[idx] * eps + dst[idx] * (1 - eps);
-        }
-    );
+        });
   };
 
   // launch kernel
@@ -72,8 +70,7 @@ static inline DPCPP_HOST void dpcppMemoryScale2(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
           auto idx = item.get_id(0);
           dst[idx] = src[idx] * alpha * eps + dst[idx] * (1 - eps);
-        }
-    );
+        });
   };
 
   // launch kernel
@@ -81,21 +78,23 @@ static inline DPCPP_HOST void dpcppMemoryScale2(
 }
 
 template <typename dst_dt, typename src_dt>
-static inline DPCPP_HOST void
-dtype_convert_by_scalar(dst_dt* dst, const src_dt* src, size_t n_elements) {
+static inline DPCPP_HOST void dtype_convert_by_scalar(
+    dst_dt* dst,
+    const src_dt* src,
+    size_t n_elements) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto total_threads = dpcppMaxWorkGroupSize(dev_id);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for<DPCPP_K(data_type_convert, dst_dt, src_dt)>(
-      DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-        auto in_ptr = src;
-        auto out_ptr = dst;
-        auto id = itemId.get_id(0);
-        for (auto i = id; i < n_elements; i += itemId.get_range()[0])
-          out_ptr[i] = (dst_dt)in_ptr[i];
-      });
+        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
+          auto in_ptr = src;
+          auto out_ptr = dst;
+          auto id = itemId.get_id(0);
+          for (auto i = id; i < n_elements; i += itemId.get_range()[0])
+            out_ptr[i] = (dst_dt)in_ptr[i];
+        });
   };
 
   // launch kernel

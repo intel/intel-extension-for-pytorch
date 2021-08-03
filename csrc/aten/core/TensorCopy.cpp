@@ -1,10 +1,9 @@
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/core/Tensor.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/TensorCopy.h>
 #include <core/TensorImplUtils.h>
-
 
 namespace xpu {
 namespace dpcpp {
@@ -61,4 +60,4 @@ void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src) {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

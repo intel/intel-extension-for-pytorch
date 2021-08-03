@@ -5,10 +5,8 @@
 
 #include <oneDNN/oneDNN.h>
 #include "comm/ATDispatch.h"
-#include <oneDNN/oneDNN.h>
 
 #include <vector>
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -127,14 +125,18 @@ void max_pool3d_with_indices_out_template(
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      output.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast);
-      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      indices.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast);
     } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      output.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
-      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      indices.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
@@ -175,7 +177,6 @@ Tensor& max_pool3d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-
   Tensor gradOutput;
   /* resize */
   if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {

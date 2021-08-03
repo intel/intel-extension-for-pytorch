@@ -1,14 +1,14 @@
-#include <utils/DPCPP.h>
-#include <runtime/Device.h>
-#include <utils/Macros.h>
-#include <runtime/Exception.h>
-#include <utils/Settings.h>
 #include <runtime/Context.h>
+#include <runtime/Device.h>
+#include <runtime/Exception.h>
+#include <utils/DPCPP.h>
+#include <utils/Macros.h>
+#include <utils/Settings.h>
 
 #include <cmath>
+#include <deque>
 #include <mutex>
 #include <vector>
-#include <deque>
 
 namespace xpu {
 namespace dpcpp {
@@ -62,24 +62,29 @@ static void initGlobalDevicePoolState() {
   }
 
   // Mapping framework device to physical tile by default.
-  // If IPEX_DISABLE_TILE_PARTITION enabled, mapping framework device to physical device.
+  // If IPEX_DISABLE_TILE_PARTITION enabled, mapping framework device to
+  // physical device.
   if (Settings::I().is_tile_partition_enabled()) {
     constexpr DPCPP::info::partition_property partition_by_affinity =
-      DPCPP::info::partition_property::partition_by_affinity_domain;
+        DPCPP::info::partition_property::partition_by_affinity_domain;
     constexpr DPCPP::info::partition_affinity_domain next_partitionable =
-      DPCPP::info::partition_affinity_domain::next_partitionable;
-    for (const auto &root_device : root_devices) {
+        DPCPP::info::partition_affinity_domain::next_partitionable;
+    for (const auto& root_device : root_devices) {
       std::vector<DPCPP::device> sub_devices;
       try {
-        sub_devices = root_device.create_sub_devices<partition_by_affinity>(next_partitionable);
-        gDevPool.devices.insert(gDevPool.devices.end(), sub_devices.begin(), sub_devices.end());
-      } catch (DPCPP::feature_not_supported &e) {
-        TORCH_WARN("Tile partition is not supported on this device: ", root_device.get_info<dpcpp_dev_name>());
+        sub_devices = root_device.create_sub_devices<partition_by_affinity>(
+            next_partitionable);
+        gDevPool.devices.insert(
+            gDevPool.devices.end(), sub_devices.begin(), sub_devices.end());
+      } catch (DPCPP::feature_not_supported& e) {
+        TORCH_WARN(
+            "Tile partition is not supported on this device: ",
+            root_device.get_info<dpcpp_dev_name>());
         gDevPool.devices.push_back(root_device);
       }
     }
   } else {
-      gDevPool.devices = std::move(root_devices);
+    gDevPool.devices = std::move(root_devices);
   }
 
   auto device_count = gDevPool.devices.size();
@@ -161,33 +166,42 @@ static void initDeviceProperty(DeviceId device_id) {
 
   device_prop.dev_name = device.get_info<dpcpp_dev_name>();
   device_prop.dev_type = device.get_info<dpcpp_dev_type>();
-  device_prop.platform_name = device.get_info<dpcpp_dev_platform>().get_info<dpcpp_platform_name>();
+  device_prop.platform_name =
+      device.get_info<dpcpp_dev_platform>().get_info<dpcpp_platform_name>();
   device_prop.vendor = device.get_info<dpcpp_dev_vendor>();
   device_prop.driver_version = device.get_info<dpcpp_dev_driver_version>();
   device_prop.version = device.get_info<dpcpp_dev_version>();
   // device_prop.backend_version = device.get_info<dpcpp_dev_backend_version>();
   device_prop.is_available = device.get_info<dpcpp_dev_is_available>();
   device_prop.max_param_size = device.get_info<dpcpp_dev_max_param_size>();
-  device_prop.max_compute_units = device.get_info<dpcpp_dev_max_compute_units>();
-  device_prop.max_work_item_dims = device.get_info<dpcpp_dev_max_work_item_dims>();
-  device_prop.max_work_group_size = device.get_info<dpcpp_dev_max_work_group_size>();
+  device_prop.max_compute_units =
+      device.get_info<dpcpp_dev_max_compute_units>();
+  device_prop.max_work_item_dims =
+      device.get_info<dpcpp_dev_max_work_item_dims>();
+  device_prop.max_work_group_size =
+      device.get_info<dpcpp_dev_max_work_group_size>();
   device_prop.max_num_subgroup = device.get_info<dpcpp_dev_max_num_subgroup>();
   device_prop.subgroup_sizes = device.get_info<dpcpp_dev_subgroup_sizes>();
   device_prop.max_clock_freq = device.get_info<dpcpp_dev_max_clock_freq>();
   device_prop.address_bits = device.get_info<dpcpp_dev_address_bits>();
   device_prop.max_mem_alloc_size = device.get_info<dpcpp_dev_max_alloc_size>();
-  device_prop.base_addr_align = device.get_info<dpcpp_dev_mem_base_addr_align>();
+  device_prop.base_addr_align =
+      device.get_info<dpcpp_dev_mem_base_addr_align>();
   device_prop.half_fp_config = device.get_info<dpcpp_dev_half_fp_config>();
   device_prop.single_fp_config = device.get_info<dpcpp_dev_single_fp_config>();
   device_prop.double_fp_config = device.get_info<dpcpp_dev_double_fp_config>();
   device_prop.global_mem_size = device.get_info<dpcpp_dev_global_mem_size>();
-  device_prop.global_mem_cache_type = device.get_info<dpcpp_dev_global_mem_cache_type>();
-  device_prop.global_mem_cache_size = device.get_info<dpcpp_dev_global_mem_cache_size>();
-  device_prop.global_mem_cache_line_size = device.get_info<dpcpp_dev_global_mem_cache_line_size>();
+  device_prop.global_mem_cache_type =
+      device.get_info<dpcpp_dev_global_mem_cache_type>();
+  device_prop.global_mem_cache_size =
+      device.get_info<dpcpp_dev_global_mem_cache_size>();
+  device_prop.global_mem_cache_line_size =
+      device.get_info<dpcpp_dev_global_mem_cache_line_size>();
   device_prop.local_mem_type = device.get_info<dpcpp_dev_local_mem_type>();
   device_prop.local_mem_size = device.get_info<dpcpp_dev_local_mem_size>();
   device_prop.max_sub_devices = device.get_info<dpcpp_dev_max_sub_devices>();
-  device_prop.profiling_resolution = device.get_info<dpcpp_dev_profiling_resolution>();
+  device_prop.profiling_resolution =
+      device.get_info<dpcpp_dev_profiling_resolution>();
 
   device_properties[device_id] = device_prop;
 }
@@ -212,4 +226,4 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

@@ -1,14 +1,14 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
-#include <ATen/AtenIpexTypeXPU.h>
 
-#include "comm/zmath.h"
 #include "Loops.h"
+#include "comm/zmath.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -71,11 +71,13 @@ Tensor& sign_(Tensor& self) {
 class SyclOpConj {};
 Tensor& conj_out(Tensor& out, const Tensor& self) {
   auto iter = TensorIterator::unary_op(out, self);
-  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(kBFloat16, kHalf, iter.dtype(), "conj_xpu", [&]() {
-  IPEX_DISPATCH_ALL_TYPES_AND2(kBFloat16, kHalf, iter.dtype(), "conj_xpu", [&]() {
-      dpcpp_kernel_for_tensor_iter<SyclOpConj>(
-          iter, [=](scalar_t a) -> scalar_t { return conj_impl(a); });
-  });
+  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(kBFloat16, kHalf, iter.dtype(),
+  // "conj_xpu", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      kBFloat16, kHalf, iter.dtype(), "conj_xpu", [&]() {
+        dpcpp_kernel_for_tensor_iter<SyclOpConj>(
+            iter, [=](scalar_t a) -> scalar_t { return conj_impl(a); });
+      });
 
   return out;
 }

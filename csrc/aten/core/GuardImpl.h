@@ -37,4 +37,4 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
 };
 } // namespace impl
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

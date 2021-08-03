@@ -1,7 +1,7 @@
 #include <utils/Timer.h>
 
-ipex_timer::ipex_timer(int verbose_level, std::string tag) :
-    vlevel_(verbose_level) {
+ipex_timer::ipex_timer(int verbose_level, std::string tag)
+    : vlevel_(verbose_level) {
   if (verbose_level >= 1) {
     start_ = high_resolution_clock::now();
     tag_ = tag;
@@ -26,16 +26,16 @@ ipex_timer::~ipex_timer() {
     for (int i = 0; i < stamp_.size(); i++) {
       auto stamp = stamp_.at(i);
       auto sstamp = sstamp_.at(i);
-      std::cout << " " << sstamp << "(" <<
-          duration_cast<microseconds>(stamp - pre).count() << "us)";
+      std::cout << " " << sstamp << "("
+                << duration_cast<microseconds>(stamp - pre).count() << "us)";
       pre = stamp;
     }
     for (int j = 0; j < event_duration_.size(); j++) {
-      std::cout << " event_duration_" << j << "(" <<
-        event_duration_.at(j) << "us)";
+      std::cout << " event_duration_" << j << "(" << event_duration_.at(j)
+                << "us)";
     }
-    std::cout << " total(" <<
-        duration_cast<microseconds>(stamp_.back() - start_).count() <<
-        "us)" << std::endl;
+    std::cout << " total("
+              << duration_cast<microseconds>(stamp_.back() - start_).count()
+              << "us)" << std::endl;
   }
 }

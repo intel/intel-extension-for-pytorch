@@ -17,7 +17,7 @@ void inner_product(
     const at::Tensor& weight,
     Tensor bias,
     bool use_bias) {
-  Tensor input = input_.is_quantized()? at::dequantize(input_) : input_;
+  Tensor input = input_.is_quantized() ? at::dequantize(input_) : input_;
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -39,7 +39,8 @@ void inner_product(
   auto input_md = memory::desc(input_tz, data_t, format_any);
   auto weight_md = memory::desc(weight_tz, data_t, format_any);
   auto output_md = memory::desc(output_tz, data_t, format_any);
-  auto bias_md = use_bias ? memory::desc(bias_tz, data_t, format_any) : memory::desc();
+  auto bias_md =
+      use_bias ? memory::desc(bias_tz, data_t, format_any) : memory::desc();
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -47,19 +48,25 @@ void inner_product(
 #endif
   auto ipFwd_desc = inner_product_forward::desc(
       prop_kind::forward_inference, input_md, weight_md, bias_md, output_md);
-  auto ip_forward_pd = inner_product_forward::primitive_desc(ipFwd_desc, engine);
+  auto ip_forward_pd =
+      inner_product_forward::primitive_desc(ipFwd_desc, engine);
 
-  auto input_memory = dpcpp_onednn_memory({input_tz, data_t, format_nc}, engine, input.data_ptr());
-  auto weight_memory = dpcpp_onednn_memory({weight_tz, data_t, format_oi}, engine, weight.data_ptr());
-  auto output_memory = dpcpp_onednn_memory({output_tz, data_t, format_nc}, engine, output.data_ptr());
+  auto input_memory = dpcpp_onednn_memory(
+      {input_tz, data_t, format_nc}, engine, input.data_ptr());
+  auto weight_memory = dpcpp_onednn_memory(
+      {weight_tz, data_t, format_oi}, engine, weight.data_ptr());
+  auto output_memory = dpcpp_onednn_memory(
+      {output_tz, data_t, format_nc}, engine, output.data_ptr());
 
   memory bias_memory = memory({{}, data_t, format_x}, engine);
   if (use_bias) {
-    bias_memory = dpcpp_onednn_memory({bias_tz, data_t, format_x}, engine, bias.data_ptr());
+    bias_memory = dpcpp_onednn_memory(
+        {bias_tz, data_t, format_x}, engine, bias.data_ptr());
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto ip_forward = fetch_or_create_m<inner_product_forward>(key, ip_forward_pd);
+  auto ip_forward =
+      fetch_or_create_m<inner_product_forward>(key, ip_forward_pd);
 #else
   auto ip_forward = inner_product_forward(ip_forward_pd);
 #endif

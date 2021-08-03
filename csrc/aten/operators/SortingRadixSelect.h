@@ -264,7 +264,8 @@ scalar_t findPattern(
     bitwise_t desiredMask,
     DPCPP::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
-  auto smem_ptr = static_cast<scalar_t*>(static_cast<void*>(smem.get_pointer().get()));
+  auto smem_ptr =
+      static_cast<scalar_t*>(static_cast<void*>(smem.get_pointer().get()));
   if (local_id < RADIX_SIZE) {
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, scalar_t>::to(0);
   }

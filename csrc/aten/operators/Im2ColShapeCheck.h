@@ -5,11 +5,11 @@
 #include <ATen/TensorUtils.h>
 #include <ATen/core/Reduction.h>
 
-#include "comm/ApplyUtils.h"
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
+#include "comm/ApplyUtils.h"
 
 using namespace at;
 using namespace DPCPP;

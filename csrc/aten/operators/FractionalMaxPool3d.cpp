@@ -1,11 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
-#include "comm/NumericLimits.h"
+#include <runtime/Utils.h>
+#include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
-#include "comm/ATDispatch.h"
+#include "comm/NumericLimits.h"
 
 using namespace xpu::dpcpp;
 
@@ -207,7 +207,7 @@ void fractional_max_pool3d_backward_out_frame(
         int64_t inputT = index / (gradInputSizeH * gradInputSizeW);
 
         atomicAdd(
-          (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr
+            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr
                 [batch * numPlane * gradInputSizeT * gradInputSizeH *
                      gradInputSizeW +
                  plane * gradInputSizeT * gradInputSizeH * gradInputSizeW +

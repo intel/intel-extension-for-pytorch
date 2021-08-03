@@ -1,10 +1,9 @@
 #include <runtime/CachingDeviceAllocator.h>
-#include <utils/Profiler.h>
 #include <runtime/Context.h>
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
-
+#include <utils/Profiler.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -45,7 +44,8 @@ static inline void assertValidDevice(DeviceId di) {
 static void update_stat(Stat& stat, int64_t amount) {
   stat.current += amount;
 
-  TORCH_INTERNAL_ASSERT(stat.current >= 0,
+  TORCH_INTERNAL_ASSERT(
+      stat.current >= 0,
       "Negative tracked stat in DPCPP Caching allocator (likely logic error).");
 
   stat.peak = std::max(stat.current, stat.peak);
@@ -62,7 +62,10 @@ CachingDeviceAllocator::~CachingDeviceAllocator() {
   emptyCache();
 }
 
-void CachingDeviceAllocator::update_stat_array(StatArray& stat_array, int64_t amount, const StatTypes& stat_types) {
+void CachingDeviceAllocator::update_stat_array(
+    StatArray& stat_array,
+    int64_t amount,
+    const StatTypes& stat_types) {
   for (size_t stat_type = 0; stat_type < stat_types.size(); ++stat_type) {
     if (stat_types[stat_type]) {
       update_stat(stat_array[stat_type], amount);
@@ -70,21 +73,38 @@ void CachingDeviceAllocator::update_stat_array(StatArray& stat_array, int64_t am
   }
 }
 
-CachingDeviceAllocator::Block::Block(DeviceId device, Queue *queue, size_t size)
-  : m_device(device), m_queue(queue), m_queue_uses(), m_size(size),
-    m_pool_type(PoolType::UNDEF), m_buffer(nullptr), m_allocated(0),
-    m_prev(nullptr), m_next(nullptr), m_event_cnt(0) {
-      auto device_cnt = 0;
-      AT_DPCPP_CHECK(dpcppGetDeviceCount(&device_cnt));
-      std::vector<DeviceStats> dev_stats;
-    }
+CachingDeviceAllocator::Block::Block(DeviceId device, Queue* queue, size_t size)
+    : m_device(device),
+      m_queue(queue),
+      m_queue_uses(),
+      m_size(size),
+      m_pool_type(PoolType::UNDEF),
+      m_buffer(nullptr),
+      m_allocated(0),
+      m_prev(nullptr),
+      m_next(nullptr),
+      m_event_cnt(0) {
+  auto device_cnt = 0;
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&device_cnt));
+  std::vector<DeviceStats> dev_stats;
+}
 
 CachingDeviceAllocator::Block::Block(
-    DeviceId device, Queue *queue, size_t size, PoolType pool_type, void* buffer)
-  : m_device(device), m_queue(queue), m_queue_uses(), m_size(size),
-    m_pool_type(pool_type), m_buffer(buffer), m_allocated(false),
-    m_prev(nullptr), m_next(nullptr), m_event_cnt(0) { }
-
+    DeviceId device,
+    Queue* queue,
+    size_t size,
+    PoolType pool_type,
+    void* buffer)
+    : m_device(device),
+      m_queue(queue),
+      m_queue_uses(),
+      m_size(size),
+      m_pool_type(pool_type),
+      m_buffer(buffer),
+      m_allocated(false),
+      m_prev(nullptr),
+      m_next(nullptr),
+      m_event_cnt(0) {}
 
 bool CachingDeviceAllocator::Block::is_split() const {
   return (m_prev != nullptr) || (m_next != nullptr);
@@ -102,23 +122,27 @@ bool CachingDeviceAllocator::Block::should_split(size_t size) {
 }
 
 CachingDeviceAllocator::CachingDeviceAllocator()
-  : large_blocks(Block::Comparator),
-    small_blocks(Block::Comparator) {}
+    : large_blocks(Block::Comparator), small_blocks(Block::Comparator) {}
 
 std::mutex* CachingDeviceAllocator::getDPCPPFreeMutex() const {
   return &free_mutex;
 }
 
-int CachingDeviceAllocator::malloc_with_retry(DeviceId di, void** devPtr, size_t size) {
+int CachingDeviceAllocator::malloc_with_retry(
+    DeviceId di,
+    void** devPtr,
+    size_t size) {
   auto syclDev = dpcppGetRawDevice(di);
   // Our minimum allocated memory is 512. Thus we set mem align to 512.
-  *devPtr = DPCPP::aligned_alloc_device(kDevAlignment, size, syclDev, getDeviceContext(di));
+  *devPtr = DPCPP::aligned_alloc_device(
+      kDevAlignment, size, syclDev, getDeviceContext(di));
 
   if (*devPtr == NULL) {
     DeviceStats& stats = get_stats_for_device(di);
     stats.num_alloc_retries += 1;
     free_cached_blocks(di);
-    *devPtr = DPCPP::aligned_alloc_device(kDevAlignment, size, syclDev, getDeviceContext(di));
+    *devPtr = DPCPP::aligned_alloc_device(
+        kDevAlignment, size, syclDev, getDeviceContext(di));
     if (*devPtr == NULL) {
       return DPCPP_FAILURE;
     }
@@ -127,7 +151,7 @@ int CachingDeviceAllocator::malloc_with_retry(DeviceId di, void** devPtr, size_t
   return DPCPP_SUCCESS;
 }
 
-void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
+void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue* queue) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
 
   DeviceId curDevID;
@@ -135,8 +159,8 @@ void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
   process_events();
 
   auto size = (asize < kMinBlockSize)
-    ? kMinBlockSize
-    : (kMinBlockSize * ((asize + kMinBlockSize - 1) / kMinBlockSize));
+      ? kMinBlockSize
+      : (kMinBlockSize * ((asize + kMinBlockSize - 1) / kMinBlockSize));
 
   BlockPool* pool = nullptr;
   PoolType pool_type = PoolType::UNDEF;
@@ -151,9 +175,8 @@ void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
   Block search_key(curDevID, queue, size);
   auto find_free_block = [&]() -> Block* {
     auto it = pool->lower_bound(&search_key);
-    if (it != pool->end()
-        && (*it)->m_device == curDevID
-        && (*it)->m_queue == queue) {
+    if (it != pool->end() && (*it)->m_device == curDevID &&
+        (*it)->m_queue == queue) {
       Block* block = *it;
       pool->erase(it);
       return block;
@@ -170,10 +193,10 @@ void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
   if (block == nullptr) {
     void* buffer;
     size_t alloc_size = (size <= kSmallSize)
-      ? kSmallBuffer
-      : ((size < kMinLargeAlloc)
-          ? kLargeBuffer
-          : (kRoundLarge * ((size + kRoundLarge - 1) / kRoundLarge)));
+        ? kSmallBuffer
+        : ((size < kMinLargeAlloc)
+               ? kLargeBuffer
+               : (kRoundLarge * ((size + kRoundLarge - 1) / kRoundLarge)));
 
     int err = malloc_with_retry(curDevID, &buffer, alloc_size);
 
@@ -186,13 +209,22 @@ void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
       size_t device_total = dpcppGlobalMemSize(curDevID);
       stats.num_ooms += 1;
 
-      AT_ERROR("DPCPP out of memory. Tried to allocate ", format_size(alloc_size),
-        " (GPU ", curDevID, "; ",
-        format_size(device_total), " total capacity; ",
-        format_size(stats.allocated_bytes[static_cast<size_t>(StatType::AGGREGATE)].current),
-        " already allocated; ",
-        format_size(stats.reserved_bytes[static_cast<size_t>(StatType::AGGREGATE)].current),
-        " reserved in total by PyTorch)");
+      AT_ERROR(
+          "DPCPP out of memory. Tried to allocate ",
+          format_size(alloc_size),
+          " (GPU ",
+          curDevID,
+          "; ",
+          format_size(device_total),
+          " total capacity; ",
+          format_size(
+              stats.allocated_bytes[static_cast<size_t>(StatType::AGGREGATE)]
+                  .current),
+          " already allocated; ",
+          format_size(
+              stats.reserved_bytes[static_cast<size_t>(StatType::AGGREGATE)]
+                  .current),
+          " reserved in total by PyTorch)");
     }
   }
 
@@ -218,7 +250,8 @@ void CachingDeviceAllocator::malloc(void** devPtr, size_t asize, Queue *queue) {
     if (already_split) {
       update_stat_array(stats.inactive_split_bytes, -block->m_size, stat_types);
     } else {
-      update_stat_array(stats.inactive_split_bytes, remaining->m_size, stat_types);
+      update_stat_array(
+          stats.inactive_split_bytes, remaining->m_size, stat_types);
       update_stat_array(stats.inactive_split, 1, stat_types);
     }
   } else if (already_split) {
@@ -257,7 +290,8 @@ void CachingDeviceAllocator::free(void* buffer) {
   DeviceStats& stats = get_stats_for_device(block->m_device);
   StatTypes stat_types;
   stat_types[static_cast<size_t>(StatType::AGGREGATE)] = true;
-  stat_types[static_cast<size_t>(get_stat_type_for_pool(block->m_pool_type))] = true;
+  stat_types[static_cast<size_t>(get_stat_type_for_pool(block->m_pool_type))] =
+      true;
   update_stat_array(stats.allocation, -1, {stat_types});
   update_stat_array(stats.allocated_bytes, -block->m_size, {stat_types});
 
@@ -277,7 +311,7 @@ void* CachingDeviceAllocator::getBaseAllocation(void* buffer, size_t* outSize) {
   while (block->m_prev) {
     block = block->m_prev;
   }
-  void *basePtr = block->m_buffer;
+  void* basePtr = block->m_buffer;
   if (outSize) {
     size_t size = 0;
     while (block) {
@@ -307,7 +341,8 @@ void CachingDeviceAllocator::emptyCache() {
   free_blocks(small_blocks, small_blocks.begin(), small_blocks.end());
 }
 
-StatType CachingDeviceAllocator::get_stat_type_for_pool(const PoolType pool_type) {
+StatType CachingDeviceAllocator::get_stat_type_for_pool(
+    const PoolType pool_type) {
   if (pool_type == PoolType::SMALL_POOL) {
     return StatType::SMALL_POOL;
   } else if (pool_type == PoolType::LARGE_POOL) {
@@ -317,7 +352,8 @@ StatType CachingDeviceAllocator::get_stat_type_for_pool(const PoolType pool_type
   }
 }
 
-CachingDeviceAllocator::Block* CachingDeviceAllocator::find_allocated_block(void *buffer) {
+CachingDeviceAllocator::Block* CachingDeviceAllocator::find_allocated_block(
+    void* buffer) {
   auto it = allocated_blocks.find(buffer);
   if (it == allocated_blocks.end()) {
     return nullptr;
@@ -332,7 +368,7 @@ void CachingDeviceAllocator::free_block(Block* block) {
 
   reportMemoryUsage(block, -block->m_size, block->m_device);
 
-  BlockPool *pool = nullptr;
+  BlockPool* pool = nullptr;
   if (block->m_pool_type == PoolType::LARGE_POOL) {
     pool = &large_blocks;
   } else if (block->m_pool_type == PoolType::SMALL_POOL) {
@@ -344,7 +380,8 @@ void CachingDeviceAllocator::free_block(Block* block) {
 
   const std::array<Block*, 2> merge_candidates = {block->m_prev, block->m_next};
   for (Block* merge_candidate : merge_candidates) {
-    const int64_t subsumed_size = try_merge_blocks(block, merge_candidate, pool);
+    const int64_t subsumed_size =
+        try_merge_blocks(block, merge_candidate, pool);
     if (subsumed_size > 0) {
       net_change_inactive_split_blocks -= 1;
       net_change_inactive_split_size -= subsumed_size;
@@ -361,14 +398,18 @@ void CachingDeviceAllocator::free_block(Block* block) {
   DeviceStats& stats = get_stats_for_device(block->m_device);
   StatTypes stat_types;
   stat_types[static_cast<size_t>(StatType::AGGREGATE)] = true;
-  stat_types[static_cast<size_t>(get_stat_type_for_pool(block->m_pool_type))] = true;
-  update_stat_array(stats.inactive_split, net_change_inactive_split_blocks, stat_types);
-  update_stat_array(stats.inactive_split_bytes, net_change_inactive_split_size, stat_types);
+  stat_types[static_cast<size_t>(get_stat_type_for_pool(block->m_pool_type))] =
+      true;
+  update_stat_array(
+      stats.inactive_split, net_change_inactive_split_blocks, stat_types);
+  update_stat_array(
+      stats.inactive_split_bytes, net_change_inactive_split_size, stat_types);
   update_stat_array(stats.active, -1, stat_types);
   update_stat_array(stats.active_bytes, -original_block_size, stat_types);
 }
 
-std::vector<const CachingDeviceAllocator::Block*> CachingDeviceAllocator::get_all_blocks() const {
+std::vector<const CachingDeviceAllocator::Block*> CachingDeviceAllocator::
+    get_all_blocks() const {
   std::vector<const Block*> blocks;
   blocks.insert(blocks.end(), small_blocks.begin(), small_blocks.end());
   blocks.insert(blocks.end(), large_blocks.begin(), large_blocks.end());
@@ -393,8 +434,8 @@ void CachingDeviceAllocator::process_events() {
     auto& e = dpcpp_events.front();
     auto event = e.first;
     Block* block = e.second;
-    bool event_completed = 
-      event.get_info<dpcpp_event_exec_stat>() == dpcpp_event_cmd_stat_complete;
+    bool event_completed = event.get_info<dpcpp_event_exec_stat>() ==
+        dpcpp_event_cmd_stat_complete;
     if (!event_completed) {
       break;
     }
@@ -408,14 +449,17 @@ void CachingDeviceAllocator::process_events() {
 
 DeviceStats& CachingDeviceAllocator::get_stats_for_device(DeviceId device) {
   TORCH_CHECK(device >= 0);
-  if ((size_t) device >= device_stats.size()) {
+  if ((size_t)device >= device_stats.size()) {
     device_stats.resize(device + 1);
   }
   return device_stats.at(device);
 }
 
 void CachingDeviceAllocator::cache_info_aux(
-    BlockPool& blocks, DeviceId di, size_t* total, size_t* largest) {
+    BlockPool& blocks,
+    DeviceId di,
+    size_t* total,
+    size_t* largest) {
   Block search_key(di, 0, 0);
   auto it = blocks.lower_bound(&search_key);
   for (; it != blocks.end() && *it && (*it)->m_device == di; ++it) {
@@ -427,7 +471,10 @@ void CachingDeviceAllocator::cache_info_aux(
   }
 }
 
-size_t CachingDeviceAllocator::try_merge_blocks(Block* dst, Block* src, BlockPool* pool) {
+size_t CachingDeviceAllocator::try_merge_blocks(
+    Block* dst,
+    Block* src,
+    BlockPool* pool) {
   if (!src || src->m_allocated || src->m_event_cnt > 0) {
     return 0;
   }
@@ -456,7 +503,9 @@ size_t CachingDeviceAllocator::try_merge_blocks(Block* dst, Block* src, BlockPoo
 }
 
 void CachingDeviceAllocator::free_blocks(
-    BlockPool& blocks, BlockPool::iterator it, BlockPool::iterator end) {
+    BlockPool& blocks,
+    BlockPool::iterator it,
+    BlockPool::iterator end) {
   while (it != end) {
     Block* block = *it;
     if (!block->m_prev && !block->m_next) {
@@ -465,7 +514,8 @@ void CachingDeviceAllocator::free_blocks(
       DeviceStats& stats = get_stats_for_device(block->m_device);
       StatTypes stat_types;
       stat_types[static_cast<size_t>(StatType::AGGREGATE)] = true;
-      stat_types[static_cast<size_t>(get_stat_type_for_pool(block->m_pool_type))] = true;
+      stat_types[static_cast<size_t>(
+          get_stat_type_for_pool(block->m_pool_type))] = true;
       update_stat_array(stats.segment, -1, stat_types);
       update_stat_array(stats.reserved_bytes, -block->m_size, stat_types);
 
@@ -495,7 +545,8 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
       small_blocks.lower_bound(&upper_bound));
 }
 
-void CachingDeviceAllocator::synchronize_and_free_events(std::optional<DeviceId> di) {
+void CachingDeviceAllocator::synchronize_and_free_events(
+    std::optional<DeviceId> di) {
   auto remaining_events = decltype(dpcpp_events)();
 
   for (auto& e : dpcpp_events) {
@@ -515,7 +566,10 @@ void CachingDeviceAllocator::synchronize_and_free_events(std::optional<DeviceId>
   std::swap(dpcpp_events, remaining_events);
 }
 
-void CachingDeviceAllocator::cacheInfo(DeviceId di, size_t* total, size_t* largest) {
+void CachingDeviceAllocator::cacheInfo(
+    DeviceId di,
+    size_t* total,
+    size_t* largest) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
   cache_info_aux(large_blocks, di, total, largest);
   cache_info_aux(small_blocks, di, total, largest);
@@ -532,8 +586,12 @@ void CachingDeviceAllocator::resetAccumulatedStats(DeviceId di) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
   DeviceStats& stats = get_stats_for_device(di);
 
-  auto reset_accumulated_stat = [](Stat& stat) {stat.allocated = 0; stat.freed = 0;};
-  for (size_t statType = 0; statType < static_cast<size_t>(StatType::NUM_TYPES); ++statType) {
+  auto reset_accumulated_stat = [](Stat& stat) {
+    stat.allocated = 0;
+    stat.freed = 0;
+  };
+  for (size_t statType = 0; statType < static_cast<size_t>(StatType::NUM_TYPES);
+       ++statType) {
     reset_accumulated_stat(stats.allocation[statType]);
     reset_accumulated_stat(stats.segment[statType]);
     reset_accumulated_stat(stats.active[statType]);
@@ -553,8 +611,9 @@ void CachingDeviceAllocator::resetPeakStats(DeviceId di) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
   DeviceStats& stats = get_stats_for_device(di);
 
-  auto reset_peak_stat = [](Stat& stat) {stat.peak = stat.current;};
-  for (size_t statType = 0; statType < static_cast<size_t>(StatType::NUM_TYPES); ++statType) {
+  auto reset_peak_stat = [](Stat& stat) { stat.peak = stat.current; };
+  for (size_t statType = 0; statType < static_cast<size_t>(StatType::NUM_TYPES);
+       ++statType) {
     reset_peak_stat(stats.allocation[statType]);
     reset_peak_stat(stats.segment[statType]);
     reset_peak_stat(stats.active[statType]);
@@ -603,12 +662,15 @@ std::vector<SegmentInfo> CachingDeviceAllocator::snapshot() const {
     }
   }
 
-  std::sort(result.begin(), result.end(), [](const SegmentInfo& a, const SegmentInfo& b) {
-    if (a.device != b.device) {
-      return a.device < b.device;
-    }
-    return a.address < b.address;
-  });
+  std::sort(
+      result.begin(),
+      result.end(),
+      [](const SegmentInfo& a, const SegmentInfo& b) {
+        if (a.device != b.device) {
+          return a.device < b.device;
+        }
+        return a.address < b.address;
+      });
 
   return result;
 }
@@ -619,11 +681,16 @@ void CachingDeviceAllocator::dumpMemoryStatus(DeviceId deviceIndex) {
   size_t device_total = dpcppGlobalMemSize(deviceIndex);
   TORCH_WARN("GPU", deviceIndex, " memory status:");
   TORCH_WARN("Total capacity: ", format_size(device_total));
-  TORCH_WARN("Allocated: ",
-            format_size(stats.allocated_bytes[static_cast<size_t>(StatType::AGGREGATE)].current));
-  TORCH_WARN("Reserved: ",
-            format_size(stats.reserved_bytes[static_cast<size_t>(StatType::AGGREGATE)].current));
+  TORCH_WARN(
+      "Allocated: ",
+      format_size(
+          stats.allocated_bytes[static_cast<size_t>(StatType::AGGREGATE)]
+              .current));
+  TORCH_WARN(
+      "Reserved: ",
+      format_size(stats.reserved_bytes[static_cast<size_t>(StatType::AGGREGATE)]
+                      .current));
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

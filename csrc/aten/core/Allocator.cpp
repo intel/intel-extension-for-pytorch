@@ -1,9 +1,9 @@
-#include <runtime/CachingDeviceAllocator.h>
-#include <runtime/CachingHostAllocator.h>
-#include <runtime/Queue.h>
-#include <runtime/Exception.h>
 #include <core/Allocator.h>
 #include <core/Stream.h>
+#include <runtime/CachingDeviceAllocator.h>
+#include <runtime/CachingHostAllocator.h>
+#include <runtime/Exception.h>
+#include <runtime/Queue.h>
 #include <tensor/Context.h>
 
 namespace xpu {
@@ -11,7 +11,7 @@ namespace dpcpp {
 
 /// Device Allocator
 class DeviceAllocator final : public at::Allocator {
-public:
+ public:
   static DeviceAllocator* Instance() {
     static DeviceAllocator myInstance;
     return &myInstance;
@@ -44,11 +44,14 @@ public:
     alloc()->emptyCache();
   }
 
-  void cacheInfo(DeviceId deviceIndex, size_t* cachedAndFree, size_t* largestBlock) {
+  void cacheInfo(
+      DeviceId deviceIndex,
+      size_t* cachedAndFree,
+      size_t* largestBlock) {
     alloc()->cacheInfo(deviceIndex, cachedAndFree, largestBlock);
   }
 
-  void* getBaseAllocation(void *ptr, size_t *size) {
+  void* getBaseAllocation(void* ptr, size_t* size) {
     return alloc()->getBaseAllocation(ptr, size);
   }
 
@@ -88,7 +91,7 @@ public:
     return alloc()->snapshot();
   }
 
-private:
+ private:
   DeviceAllocator() {}
 
   Queue* DPCPPStreamToQueue(DPCPPStream stream) const {
@@ -118,11 +121,15 @@ void emptyCacheInDevAlloc() {
   DeviceAllocator::Instance()->emptyCache();
 }
 
-void cacheInfoFromDevAlloc(DeviceIndex deviceIndex, size_t* cachedAndFree, size_t* largestBlock) {
-  DeviceAllocator::Instance()->cacheInfo(deviceIndex, cachedAndFree, largestBlock);
+void cacheInfoFromDevAlloc(
+    DeviceIndex deviceIndex,
+    size_t* cachedAndFree,
+    size_t* largestBlock) {
+  DeviceAllocator::Instance()->cacheInfo(
+      deviceIndex, cachedAndFree, largestBlock);
 }
 
-void* getBaseAllocationFromDevAlloc(void *ptr, size_t *size) {
+void* getBaseAllocationFromDevAlloc(void* ptr, size_t* size) {
   return DeviceAllocator::Instance()->getBaseAllocation(ptr, size);
 }
 
@@ -156,7 +163,7 @@ std::mutex* getFreeMutexOfDevAlloc() {
 
 /// Host Allocator
 class HostAllocator final : public at::Allocator {
-public:
+ public:
   static HostAllocator* Instance() {
     static HostAllocator myInstance;
     return &myInstance;
@@ -167,7 +174,7 @@ public:
   }
 
   at::DataPtr allocate(size_t size) const override {
-    void *ptr = nullptr;
+    void* ptr = nullptr;
     Instance()->alloc()->malloc(&ptr, size);
     return {ptr, ptr, &deleter, at::DeviceType::CPU};
   }
@@ -188,7 +195,7 @@ public:
     alloc()->recordEvent(ptr, e);
   }
 
-private:
+ private:
   CachingHostAllocator* alloc() {
     return CachingHostAllocator::Instance();
   }

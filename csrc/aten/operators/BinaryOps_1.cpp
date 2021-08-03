@@ -3,14 +3,13 @@
 #include <ATen/native/TensorIterator.h>
 #include <intrinsic/ipex_intrinsic.h>
 
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
 #include "comm/ScalarOps.h"
-#include <oneDNN/oneDNN.h>
 
-#include "Loops.h"
 #include "EltwiseNaiveKer.h"
-
+#include "Loops.h"
 
 using namespace xpu::dpcpp;
 
@@ -29,7 +28,7 @@ static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       "add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
-          dpcpp_kernel_with_scalars<SyclOpAdd>(
+        dpcpp_kernel_with_scalars<SyclOpAdd>(
             iter,
             [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
       });
@@ -67,15 +66,16 @@ static inline void sub_check(const Tensor& self, const Tensor& other) {
 
 namespace AtenIpexTypeXPU {
 
-template <class T> class AddNaiveOp {
-public:
+template <class T>
+class AddNaiveOp {
+ public:
   AddNaiveOp(T alpha) : alpha_(alpha) {}
 
   void operator()(T* res, T* op1, T* op2) const {
     *res = *op1 + alpha_ * (*op2);
   }
 
-private:
+ private:
   T alpha_;
 };
 
@@ -85,13 +85,12 @@ Tensor& add_out(
     const Tensor& _other,
     Scalar alpha) {
   Tensor self = _self, other = _other;
-  if (_self.is_xpu() && _other.is_xpu() &&
-      1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
+  if (_self.is_xpu() && _other.is_xpu() && 1.0 == alpha.to<float>() &&
+      _self.defined() && _other.defined() &&
       _self.scalar_type() == _other.scalar_type() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
-      _self.dim() > 0 && _other.dim() > 0 &&
-      _self.dim() == _other.dim() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.dim() > 0 &&
+      _other.dim() > 0 && _self.dim() == _other.dim() &&
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
         _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
@@ -99,16 +98,16 @@ Tensor& add_out(
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+        !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
-  } else if (_self.is_xpu() && _other.is_xpu() &&
-             _self.sizes() == _other.sizes() &&
-             ((_self.is_contiguous() && _other.is_contiguous()) ||
-              (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
-               _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
-             _self.scalar_type() == _other.scalar_type()) {
+  } else if (
+      _self.is_xpu() && _other.is_xpu() && _self.sizes() == _other.sizes() &&
+      ((_self.is_contiguous() && _other.is_contiguous()) ||
+       (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
+        _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
+      _self.scalar_type() == _other.scalar_type()) {
     // propogate block format in case: alpha != 1
     if (!DPCPPTensorContext::is_plain(result) ||
         !DPCPPTensorContext::is_plain(_self) ||
@@ -120,9 +119,9 @@ Tensor& add_out(
       auto s_md = s_ctx.meta();
       auto o_md = o_ctx.meta();
 
-      auto tar_ctx = !r_ctx.is_plain() ? r_ctx :
-                     (!s_ctx.is_plain() ? s_ctx :
-                     (!o_ctx.is_plain() ? o_ctx : s_ctx));
+      auto tar_ctx = !r_ctx.is_plain()
+          ? r_ctx
+          : (!s_ctx.is_plain() ? s_ctx : (!o_ctx.is_plain() ? o_ctx : s_ctx));
       auto tar_md = tar_ctx.meta();
 
       if (r_md != tar_md) {
@@ -154,20 +153,21 @@ Tensor& add_out(
     IPEX_DISPATCH_ALL_TYPES_AND3(
         at::ScalarType::BFloat16,
         at::ScalarType::Bool,
-	at::ScalarType::Half,
+        at::ScalarType::Half,
         result.scalar_type(),
         "eltwise_binary_naive::add",
         [&]() {
           const auto op = AddNaiveOp<scalar_t>(alpha.to<scalar_t>());
-          int nelem = !DPCPPTensorContext::is_plain(result) ?
-                      DPCPPTensorContext::get_tensor_ctx(result).padded_size() :
-                      prod_intlist(result.sizes());
-          eltwise_binary_naive_kernel(result.data_ptr<scalar_t>(),
-                                      self.data_ptr<scalar_t>(),
-                                      other.data_ptr<scalar_t>(),
-                                      nelem, op);
-        }
-    );
+          int nelem = !DPCPPTensorContext::is_plain(result)
+              ? DPCPPTensorContext::get_tensor_ctx(result).padded_size()
+              : prod_intlist(result.sizes());
+          eltwise_binary_naive_kernel(
+              result.data_ptr<scalar_t>(),
+              self.data_ptr<scalar_t>(),
+              other.data_ptr<scalar_t>(),
+              nelem,
+              op);
+        });
     return result;
   } else {
     // loops
@@ -189,15 +189,14 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   Tensor result, self, other;
   if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
-      _self.dim() > 0 && _other.dim() > 0 &&
-      _self.dim() == _other.dim() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.dim() > 0 &&
+      _other.dim() > 0 && _self.dim() == _other.dim() &&
       _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+        !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
@@ -217,13 +216,11 @@ Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
 }
 
 Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::add(
-      self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeXPU::add(self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::add_(
-      self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeXPU::add_(self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_out(
@@ -232,10 +229,7 @@ Tensor& sub_out(
     const Tensor& other,
     Scalar alpha) {
   impl::sub_check(self, other);
-  auto iter = TensorIterator::binary_op(
-      result,
-      self,
-      other);
+  auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
   impl::sub_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
@@ -260,18 +254,15 @@ Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
 }
 
 Tensor sub(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::sub(
-      self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeXPU::sub(self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_(Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::sub_(
-      self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeXPU::sub_(self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::rsub(
-      self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeXPU::rsub(self, wrapped_scalar_tensor(other), alpha);
 }
 
 } // namespace AtenIpexTypeXPU
@@ -280,30 +271,28 @@ namespace AtenIpexTypeQuantizedXPU {
 
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   Tensor result, self, other;
-  if (1.0 == alpha.to<float>() &&
-      _self.defined() &&
-      _other.defined() &&
-      _self.sizes() == _other.sizes() &&
-      !is_wrapped_number(_self) &&
+  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
+      _self.sizes() == _other.sizes() && !is_wrapped_number(_self) &&
       !is_wrapped_number(_other) &&
       (!DPCPPTensorContext::is_plain(_self) ||
        !DPCPPTensorContext::is_plain(_other))) {
-    xpu::oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    xpu::oneDNN::sum(
+        result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
     return result;
-  } else if ( _self.is_quantized() &&
-      _self.defined() &&
-      _other.defined() &&
-      _self.sizes() == _other.sizes() &&
-      !is_wrapped_number(_self) &&
-      !is_wrapped_number(_other)) {// &&
+  } else if (
+      _self.is_quantized() && _self.defined() && _other.defined() &&
+      _self.sizes() == _other.sizes() && !is_wrapped_number(_self) &&
+      !is_wrapped_number(_other)) { // &&
     Tensor _post = at::empty({1}, _self.options().dtype(at::kFloat));
-    _post.fill_(1/alpha.to<float>());
-    result = at::_empty_affine_quantized(_self.sizes(),
-                   _self.options(),
-                   alpha.to<float>(),
-                   0,
-                   MemoryFormat::Contiguous);
-    xpu::oneDNN::bin<dnnl::algorithm::binary_add, dnnl::algorithm::binary_mul>(result, _self, _other, _post);
+    _post.fill_(1 / alpha.to<float>());
+    result = at::_empty_affine_quantized(
+        _self.sizes(),
+        _self.options(),
+        alpha.to<float>(),
+        0,
+        MemoryFormat::Contiguous);
+    xpu::oneDNN::bin<dnnl::algorithm::binary_add, dnnl::algorithm::binary_mul>(
+        result, _self, _other, _post);
     return result;
   } else {
     self = to_plain_if_needed(_self);

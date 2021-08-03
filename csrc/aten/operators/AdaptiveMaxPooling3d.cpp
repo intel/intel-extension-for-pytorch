@@ -3,11 +3,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ATDispatch.h"
 
 #include <vector>
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -82,9 +81,11 @@ void adaptive_max_pool3d_out_template(
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      output.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
-      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      indices.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});

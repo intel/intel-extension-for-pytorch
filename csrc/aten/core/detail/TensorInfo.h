@@ -3,7 +3,6 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
 
-
 namespace xpu {
 namespace dpcpp {
 namespace detail {
@@ -198,6 +197,6 @@ TensorInfo<scalar, IndexType> getTensorInfo(const at::Tensor& t) {
   return TensorInfo<scalar, IndexType>(t.data_ptr<scalar>(), dims, sz, st);
 }
 
-} // detail
-} // dpcpp
-} // at
+} // namespace detail
+} // namespace dpcpp
+} // namespace xpu

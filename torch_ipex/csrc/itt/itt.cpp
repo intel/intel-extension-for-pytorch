@@ -1,5 +1,5 @@
-#include <torch/csrc/utils/pybind.h>
 #include <itt/itt_wrapper.h>
+#include <torch/csrc/utils/pybind.h>
 
 void IttBindings_init(PyObject* module) {
   auto m = py::handle(module).cast<py::module>();

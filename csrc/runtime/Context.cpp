@@ -1,5 +1,5 @@
-#include <runtime/Device.h>
 #include <runtime/Context.h>
+#include <runtime/Device.h>
 #include <runtime/Exception.h>
 
 namespace xpu {
@@ -41,7 +41,7 @@ void clearDeviceContext() {
 }
 #else
 void clearDeviceContext() {
-  for (auto &ctx: gCtxPool) {
+  for (auto& ctx : gCtxPool) {
     ctx.reset(NULL);
   }
 }

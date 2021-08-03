@@ -2,17 +2,16 @@
 
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
-#include <utils/DPCPP.h>
 #include <core/Device.h>
-
+#include <utils/DPCPP.h>
 
 namespace xpu {
 namespace dpcpp {
 
 class CachingHostAllocator final {
-private:
+ private:
   class Block {
-  public:
+   public:
     Block(size_t size, void* ptr = nullptr) : mSize(size), mPtr(ptr) {}
 
     static bool Comparator(const Block& ablock, const Block& bblock) {
@@ -24,15 +23,15 @@ private:
 
     void* getPtr() const;
 
-  private:
-    size_t  mSize;
-    void*   mPtr;
+   private:
+    size_t mSize;
+    void* mPtr;
   };
 
   class BlockState : public Block {
-  public:
+   public:
     BlockState(size_t size, void* ptr, bool allocated = false)
-      : Block(size, ptr), mAllocated(allocated), mEvents() {}
+        : Block(size, ptr), mAllocated(allocated), mEvents() {}
 
     bool hasEvent();
 
@@ -44,8 +43,8 @@ private:
 
     void setAllocated(bool alloc);
 
-  private:
-    bool    mAllocated;
+   private:
+    bool mAllocated;
     std::deque<DPCPP::event> mEvents;
   };
 
@@ -59,7 +58,7 @@ private:
   std::unordered_map<void*, BlockState> mBlocks;
   std::set<Block, decltype(Block::Comparator)*> mAvailable;
 
-public:
+ public:
   static CachingHostAllocator* Instance() {
     static CachingHostAllocator myInstance;
     return &myInstance;
@@ -76,4 +75,5 @@ public:
   void release(void* ptr);
 };
 
-}} // namespace xpu::dpcpp
+} // namespace dpcpp
+} // namespace xpu

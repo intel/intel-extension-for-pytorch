@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
 
-#include <utils/DPCPP.h>
 #include <oneDNN/oneDNN.h>
+#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 
 #include "Loops.h"
@@ -101,7 +101,8 @@ Tensor leaky_relu_backward(
               self.sizes(), self.options(), at::MemoryFormat::ChannelsLast)
         : at::empty(
               self.sizes(), self.options(), at::MemoryFormat::ChannelsLast3d);
-    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(grad_input, self, grad_output, alpha, 0.0f);
+    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(
+        grad_input, self, grad_output, alpha, 0.0f);
     return grad_input;
   } else {
     grad_input = at::empty({0}, grad_output.options());
@@ -129,8 +130,7 @@ Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
 namespace AtenIpexTypeQuantizedXPU {
 Tensor& q_leaky_relu(Tensor& out, const Tensor& self, Scalar negative_slope) {
   float alpha = negative_slope.to<float>();
-  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
-      out, self, alpha, 0.0f);
+  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(out, self, alpha, 0.0f);
   return out;
 }
 

@@ -1,7 +1,7 @@
 #include <core/Device.h>
 #include <core/Stream.h>
-#include <runtime/Utils.h>
 #include <runtime/Exception.h>
+#include <runtime/Utils.h>
 
 #include <utils/Helpers.h>
 #include <utils/Settings.h>
@@ -148,4 +148,4 @@ void parallel_for_setup(
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

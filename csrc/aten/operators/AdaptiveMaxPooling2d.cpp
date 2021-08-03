@@ -3,11 +3,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ATDispatch.h"
 
 #include <vector>
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -45,9 +44,9 @@ void adaptive_max_pool2d_out_template(
   int64_t outputHeight = output_size[0];
   int64_t outputWidth = output_size[1];
 
-  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                  input :
-                  input.contiguous();
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? input
+      : input.contiguous();
   int64_t nbatch = input_.size(0);
   int64_t nInputPlane = input_.size(1);
   int64_t inputHeight = input_.size(2);
@@ -67,9 +66,11 @@ void adaptive_max_pool2d_out_template(
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
   if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+    output.resize_(
+        {nbatch, nInputPlane, outputHeight, outputWidth},
         at::MemoryFormat::ChannelsLast);
-    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+    indices.resize_(
+        {nbatch, nInputPlane, outputHeight, outputWidth},
         at::MemoryFormat::ChannelsLast);
   } else {
     output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});

@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Distance.h>
 
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
-#include "comm/Numerics.h"
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 #include <torch/custom_class.h>
 
@@ -491,7 +491,7 @@ static void cdist_forward_kernel_impl(
       const int64_t j = k % r2;
       const size_t stride = item_id.get_local_range().size();
 
-      scalar_t* start = x1_ptr +l * l1_size + i * m;
+      scalar_t* start = x1_ptr + l * l1_size + i * m;
       scalar_t* end = start + m;
       scalar_t* a = start + local_id;
       scalar_t* b = x2_ptr + l * l2_size + j * m + local_id;
@@ -507,7 +507,7 @@ static void cdist_forward_kernel_impl(
       agg = reduce_agg<scalar_t, F>(agg, item_id, shared);
       if (local_id == 0) {
         out_ptr[group_id] = F::finish(agg, p);
-      }   
+      }
     };
 
     __cgh.parallel_for<DPCPPOpCdist<p_type, scalar_t>>(
@@ -517,22 +517,31 @@ static void cdist_forward_kernel_impl(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-static Tensor cdist_forward(const Tensor& x1, const Tensor& x2, const double p, c10::optional<int64_t> compute_mode) {
+static Tensor cdist_forward(
+    const Tensor& x1,
+    const Tensor& x2,
+    const double p,
+    c10::optional<int64_t> compute_mode) {
   int64_t mode = compute_mode.value_or(0);
   int64_t r1 = x1.size(-2);
   int64_t r2 = x2.size(-2);
-  int64_t m  = x1.size(-1);
+  int64_t m = x1.size(-1);
   int64_t dim1 = x1.dim();
   int64_t dim2 = x2.dim();
   IntArrayRef batchsize1(x1.sizes().data(), dim1 - 2);
   IntArrayRef batchsize2(x2.sizes().data(), dim2 - 2);
-  std::vector<int64_t> expand_batchsize = at::infer_size(batchsize1, batchsize2);
+  std::vector<int64_t> expand_batchsize =
+      at::infer_size(batchsize1, batchsize2);
   std::vector<int64_t> x1_expand_size(expand_batchsize);
   x1_expand_size.insert(x1_expand_size.end(), {r1, m});
   std::vector<int64_t> x2_expand_size(expand_batchsize);
   x2_expand_size.insert(x2_expand_size.end(), {r2, m});
 
-  int expand_batch_product = std::accumulate(expand_batchsize.begin(), expand_batchsize.end(), 1, std::multiplies<int64_t>());
+  int expand_batch_product = std::accumulate(
+      expand_batchsize.begin(),
+      expand_batchsize.end(),
+      1,
+      std::multiplies<int64_t>());
   std::vector<int64_t> x1_view{expand_batch_product, r1, m};
   std::vector<int64_t> x2_view{expand_batch_product, r2, m};
 
@@ -548,28 +557,78 @@ static Tensor cdist_forward(const Tensor& x1, const Tensor& x2, const double p, 
   } else if (m == 0) {
     result = at::zeros(output_shape, x1.options());
   } else if (p == 2 && (mode == 1 || (mode == 0 && (r1 > 25 || r2 > 25)))) {
-    Tensor dist = (expand_batch_product == 1) ? impl::_euclidean_dist(x1, x2)
-                                              : impl::_euclidean_dist(x1_expanded, x2_expanded);
+    Tensor dist = (expand_batch_product == 1)
+        ? impl::_euclidean_dist(x1, x2)
+        : impl::_euclidean_dist(x1_expanded, x2_expanded);
     result = dist.view(output_shape);
   } else {
     result = at::empty(output_shape, x1.options());
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half, at::ScalarType::BFloat16, x1.scalar_type(), "cdist_forward_dpcpp", [&] {
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        x1.scalar_type(),
+        "cdist_forward_dpcpp",
+        [&] {
           if (p == 0.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
-                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+                result,
+                x1_expanded,
+                x2_expanded,
+                p,
+                r1,
+                r2,
+                m,
+                r1 * r2,
+                r1 * m,
+                r2 * m);
           } else if (p == 1.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
-                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+                result,
+                x1_expanded,
+                x2_expanded,
+                p,
+                r1,
+                r2,
+                m,
+                r1 * r2,
+                r1 * m,
+                r2 * m);
           } else if (p == 2.0) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
-                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+                result,
+                x1_expanded,
+                x2_expanded,
+                p,
+                r1,
+                r2,
+                m,
+                r1 * r2,
+                r1 * m,
+                r2 * m);
           } else if (std::isinf(p)) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
-                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+                result,
+                x1_expanded,
+                x2_expanded,
+                p,
+                r1,
+                r2,
+                m,
+                r1 * r2,
+                r1 * m,
+                r2 * m);
           } else {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
-                result, x1_expanded, x2_expanded, p, r1, r2, m, r1*r2, r1*m, r2*m);
+                result,
+                x1_expanded,
+                x2_expanded,
+                p,
+                r1,
+                r2,
+                m,
+                r1 * r2,
+                r1 * m,
+                r2 * m);
           }
         });
   }
@@ -599,7 +658,7 @@ static void cdist_backward_kernel_impl(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t m_round = ((r_size*batch + wgroup_size - 1) / (wgroup_size));
+  int64_t m_round = ((r_size * batch + wgroup_size - 1) / (wgroup_size));
   DPCPP::range<2> global_range(
       /**wgroup_size*/ wgroup_size, m_round * wgroup_size);
   DPCPP::range<2> local_range(/*wgroup_size*/ 1, wgroup_size);
@@ -625,18 +684,19 @@ static void cdist_backward_kernel_impl(
 
       int64_t i = k / r2;
       int64_t j = k % r2;
-      
+
       const scalar_t grad_k = grad_ptr[y];
       const scalar_t dist_k = dist_ptr[y];
 
-      const scalar_t* start = x1_ptr +l * l1_size + i * m;
+      const scalar_t* start = x1_ptr + l * l1_size + i * m;
       const scalar_t* end = start + m;
       const scalar_t* self_i = start + init;
       const scalar_t* self_j = x2_ptr + l * l2_size + j * m + init;
 
       scalar_t* buff_i = buff_ptr + l * l_size + (r1 * j + i) * m + init;
 
-      for (; self_i < end; self_i += stride, self_j += stride, buff_i += stride) {
+      for (; self_i < end;
+           self_i += stride, self_j += stride, buff_i += stride) {
         const scalar_t res = F::backward(
             static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j),
             grad_k,
@@ -652,37 +712,109 @@ static void cdist_backward_kernel_impl(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-static Tensor cdist_backward(const Tensor& grad, const Tensor& x1, const Tensor& x2, const double p, const Tensor& cdist) {
+static Tensor cdist_backward(
+    const Tensor& grad,
+    const Tensor& x1,
+    const Tensor& x2,
+    const double p,
+    const Tensor& cdist) {
   const int64_t r1 = x1.size(-2);
   const int64_t r2 = x2.size(-2);
-  const int64_t m  = x1.size(-1);
+  const int64_t m = x1.size(-1);
   const int64_t count = cdist.numel();
   const int64_t gs = 1;
   const int64_t batch = (x1.dim() > 2) ? x1.size(0) : 1;
-  Tensor result = at::empty_like(x1, x1.options(), LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor result =
+      at::empty_like(x1, x1.options(), LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   if (p == 0.0 || grad.numel() == 0 || x1.numel() == 0 || x2.numel() == 0) {
     result.fill_(0);
     return result;
   }
-  Tensor buffer = (x1.dim() > 2) ? at::empty({batch, r2, r1, m}, result.options())
-                                 : at::empty({r2, r1, m}, result.options());
+  Tensor buffer = (x1.dim() > 2)
+      ? at::empty({batch, r2, r1, m}, result.options())
+      : at::empty({r2, r1, m}, result.options());
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, x1.scalar_type(), "cdist_backward_dpcpp", [&] {
         if (p == 1.0) {
           cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(
-              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+              buffer,
+              grad,
+              x1,
+              x2,
+              cdist,
+              gs,
+              p,
+              r1,
+              r2,
+              m,
+              count,
+              r1 * r2,
+              r1 * m,
+              r2 * m);
         } else if (p < 2.0) {
           cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::lt_two, 1>(
-              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+              buffer,
+              grad,
+              x1,
+              x2,
+              cdist,
+              gs,
+              p,
+              r1,
+              r2,
+              m,
+              count,
+              r1 * r2,
+              r1 * m,
+              r2 * m);
         } else if (p == 2.0) {
           cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
-              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+              buffer,
+              grad,
+              x1,
+              x2,
+              cdist,
+              gs,
+              p,
+              r1,
+              r2,
+              m,
+              count,
+              r1 * r2,
+              r1 * m,
+              r2 * m);
         } else if (std::isinf(p)) {
           cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
-              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+              buffer,
+              grad,
+              x1,
+              x2,
+              cdist,
+              gs,
+              p,
+              r1,
+              r2,
+              m,
+              count,
+              r1 * r2,
+              r1 * m,
+              r2 * m);
         } else {
           cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
-              buffer, grad, x1, x2, cdist, gs, p, r1, r2, m, count, r1*r2, r1*m, r2*m);
+              buffer,
+              grad,
+              x1,
+              x2,
+              cdist,
+              gs,
+              p,
+              r1,
+              r2,
+              m,
+              count,
+              r1 * r2,
+              r1 * m,
+              r2 * m);
         }
       });
   if (x1.dim() > 2) {
@@ -729,29 +861,84 @@ Tensor _pdist_backward(
   return result;
 }
 
-Tensor _cdist_forward(const Tensor& x1, const Tensor& x2, double p, c10::optional<int64_t> compute_mode) {
-  TORCH_CHECK(x1.dim() >= 2, "cdist only supports at least 2D tensors, X1 got: ", x1.dim(), "D");
-  TORCH_CHECK(x2.dim() >= 2, "cdist only supports at least 2D tensors, X2 got: ", x2.dim(), "D");
-  TORCH_CHECK(x1.size(-1) == x2.size(-1), "X1 and X2 must have the same number of columns. X1: ", x1.size(-1), " X2: ", x2.size(-1));
-  TORCH_CHECK(at::isFloatingType(x1.scalar_type()), "cdist only supports floating-point dtypes, but X1 got: ", x1.scalar_type());
-  TORCH_CHECK(at::isFloatingType(x2.scalar_type()), "cdist only supports floating-point dtypes, but X2 got: ", x2.scalar_type());
+Tensor _cdist_forward(
+    const Tensor& x1,
+    const Tensor& x2,
+    double p,
+    c10::optional<int64_t> compute_mode) {
+  TORCH_CHECK(
+      x1.dim() >= 2,
+      "cdist only supports at least 2D tensors, X1 got: ",
+      x1.dim(),
+      "D");
+  TORCH_CHECK(
+      x2.dim() >= 2,
+      "cdist only supports at least 2D tensors, X2 got: ",
+      x2.dim(),
+      "D");
+  TORCH_CHECK(
+      x1.size(-1) == x2.size(-1),
+      "X1 and X2 must have the same number of columns. X1: ",
+      x1.size(-1),
+      " X2: ",
+      x2.size(-1));
+  TORCH_CHECK(
+      at::isFloatingType(x1.scalar_type()),
+      "cdist only supports floating-point dtypes, but X1 got: ",
+      x1.scalar_type());
+  TORCH_CHECK(
+      at::isFloatingType(x2.scalar_type()),
+      "cdist only supports floating-point dtypes, but X2 got: ",
+      x2.scalar_type());
   TORCH_CHECK(p >= 0, "cdist only supports non-negative p values");
-  TORCH_CHECK(!x1.is_xpu() || x1.get_device() == x2.get_device(), "device of X1 (", x1.get_device(), ") must match device of X2 (", x2.get_device(), ")");
+  TORCH_CHECK(
+      !x1.is_xpu() || x1.get_device() == x2.get_device(),
+      "device of X1 (",
+      x1.get_device(),
+      ") must match device of X2 (",
+      x2.get_device(),
+      ")");
   return impl::cdist_forward(x1, x2, p, compute_mode);
 }
 
-Tensor _cdist_backward(const Tensor& grad, const Tensor& x1, const Tensor& x2, double p, const Tensor& cdist) {
-  TORCH_CHECK(x1.is_contiguous(), "_cdist_backward requires X1 to be contiguous");
-  TORCH_CHECK(x2.is_contiguous(), "_cdist_backward requires X2 to be contiguous");
-  TORCH_CHECK(cdist.is_contiguous(), "_cdist_backward requires dist to be contiguous");
-  TORCH_CHECK(grad.is_contiguous(), "_cdist_backward requires grad to be contiguous");
+Tensor _cdist_backward(
+    const Tensor& grad,
+    const Tensor& x1,
+    const Tensor& x2,
+    double p,
+    const Tensor& cdist) {
+  TORCH_CHECK(
+      x1.is_contiguous(), "_cdist_backward requires X1 to be contiguous");
+  TORCH_CHECK(
+      x2.is_contiguous(), "_cdist_backward requires X2 to be contiguous");
+  TORCH_CHECK(
+      cdist.is_contiguous(), "_cdist_backward requires dist to be contiguous");
+  TORCH_CHECK(
+      grad.is_contiguous(), "_cdist_backward requires grad to be contiguous");
   return impl::cdist_backward(grad, x1, x2, p, cdist);
 }
 
-Tensor cdist(const Tensor& x1, const Tensor& x2, double p, c10::optional<int64_t> compute_mode) {
-  TORCH_CHECK(x1.dim() >= 2, "cdist only supports at least 2D tensors, X1 got: ", x1.dim(), "D");
-  TORCH_CHECK(x2.dim() >= 2, "cdist only supports at least 2D tensors, X2 got: ", x2.dim(), "D");
-  TORCH_CHECK(x1.size(-1) == x2.size(-1), "X1 and X2 must have the same number of columns. X1: ", x1.size(-1), " X2: ", x2.size(-1));
+Tensor cdist(
+    const Tensor& x1,
+    const Tensor& x2,
+    double p,
+    c10::optional<int64_t> compute_mode) {
+  TORCH_CHECK(
+      x1.dim() >= 2,
+      "cdist only supports at least 2D tensors, X1 got: ",
+      x1.dim(),
+      "D");
+  TORCH_CHECK(
+      x2.dim() >= 2,
+      "cdist only supports at least 2D tensors, X2 got: ",
+      x2.dim(),
+      "D");
+  TORCH_CHECK(
+      x1.size(-1) == x2.size(-1),
+      "X1 and X2 must have the same number of columns. X1: ",
+      x1.size(-1),
+      " X2: ",
+      x2.size(-1));
   int64_t r1 = x1.size(-2);
   int64_t r2 = x2.size(-2);
   int64_t mode = compute_mode.value_or(0);
@@ -759,10 +946,11 @@ Tensor cdist(const Tensor& x1, const Tensor& x2, double p, c10::optional<int64_t
 }
 
 TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl("cdist",
-  torch::dispatch(c10::DispatchKey::AutogradXPU,
-  torch::CppFunction::makeUnboxedOnly(&AtenIpexTypeXPU::cdist))
-  );
+  m.impl(
+      "cdist",
+      torch::dispatch(
+          c10::DispatchKey::AutogradXPU,
+          torch::CppFunction::makeUnboxedOnly(&AtenIpexTypeXPU::cdist)));
 }
 
 } // namespace AtenIpexTypeXPU

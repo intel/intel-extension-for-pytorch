@@ -1,19 +1,18 @@
 #include <ATen/ATen.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/div_rtn.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/AtenIpexTypeXPU.h>
 
-#include "comm/ApplyUtils.h"
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/ApplyUtils.h"
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"
-
 
 using namespace dnnl;
 using namespace at::native;
@@ -85,10 +84,14 @@ static void im2col_out_template(
   auto input_height = input.size(2);
   auto input_width = input.size(3);
 
-  auto output_height = (input_height + 2 * pad_height
-      - (dilation_height * (kernel_height - 1) + 1)) / stride_height + 1;
-  auto output_width = (input_width + 2 * pad_width
-      - (dilation_width * (kernel_width - 1) + 1)) / stride_width + 1;
+  auto output_height = (input_height + 2 * pad_height -
+                        (dilation_height * (kernel_height - 1) + 1)) /
+          stride_height +
+      1;
+  auto output_width = (input_width + 2 * pad_width -
+                       (dilation_width * (kernel_width - 1) + 1)) /
+          stride_width +
+      1;
   auto n_output_plane = n_input_plane * kernel_width * kernel_height;
   auto output_length = output_height * output_width;
 
@@ -170,7 +173,8 @@ Tensor im2col(
     IntArrayRef padding,
     IntArrayRef stride) {
   Tensor output = at::empty_like(self);
-  impl::im2col_out_template(output, self, kernel_size, dilation, padding, stride);
+  impl::im2col_out_template(
+      output, self, kernel_size, dilation, padding, stride);
   return output;
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -16,19 +16,21 @@ union f32_to_u32 {
   uint32_t out;
 };
 
-union double_to_ull{
+union double_to_ull {
   double in;
   unsigned long long out;
 };
 
-union ull_to_double{
+union ull_to_double {
   unsigned long long in;
   double out;
 };
 
-union double_to_u32{
+union double_to_u32 {
   double in;
-  struct { uint32_t high, low;};
+  struct {
+    uint32_t high, low;
+  };
 };
 
 static inline DPCPP_DEVICE uint32_t __float_as_int(float val) {
@@ -43,13 +45,15 @@ static inline DPCPP_DEVICE float __int_as_float(uint32_t val) {
   return cn.out;
 }
 
-static inline DPCPP_DEVICE unsigned long long __double_as_long_long(double val) {
+static inline DPCPP_DEVICE unsigned long long __double_as_long_long(
+    double val) {
   double_to_ull cn;
   cn.in = val;
   return cn.out;
 }
 
-static inline DPCPP_DEVICE double __long_long_as_double(unsigned long long val) {
+static inline DPCPP_DEVICE double __long_long_as_double(
+    unsigned long long val) {
   ull_to_double cn;
   cn.in = val;
   return cn.out;
@@ -65,4 +69,5 @@ static inline DPCPP_DEVICE float __int_as_double(uint32_t val) {
   return (double)val;
 }
 
-}} // at::AtenIpexTypeXPU
+} // namespace AtenIpexTypeXPU
+} // namespace at

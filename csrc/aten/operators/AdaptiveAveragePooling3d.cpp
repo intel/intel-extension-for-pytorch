@@ -3,11 +3,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ATDispatch.h"
 
 #include <vector>
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -75,7 +74,8 @@ void adaptive_avg_pool3d_out_template(
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      output.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
@@ -149,7 +149,8 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
-  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+  ::xpu::oneDNN::pooling_backward<
+      ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
       nbatch,
@@ -185,14 +186,16 @@ Tensor& adaptive_avg_pool3d_out(
 
 Tensor adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
   auto output = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::adaptive_avg_pool3d_out(output, self, output_size);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool3d_out(
+      output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool3d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self) {
-  impl::adaptive_avg_pool3d_backward_out_template(grad_input, grad_output, self);
+  impl::adaptive_avg_pool3d_backward_out_template(
+      grad_input, grad_output, self);
   return grad_input;
 }
 

@@ -2,13 +2,14 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/Utils.h>
-#include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
+#include <oneDNN/Runtime.h>
 #include <quantized/Quantizer.h>
+#include <runtime/Utils.h>
 #include <tensor/Context.h>
-#include "Utils.h"
 #include "Reorder.h"
+#include "Types.h"
+#include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
 
@@ -27,7 +28,11 @@ struct ConvAttr {
 
   ConvAttr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
   ConvAttr(float scale, float alpha, float beta, float oscale, int64_t attr)
-      : scale_(scale), alpha_(alpha), beta_(beta), oscale_(oscale), attr_(attr) {}
+      : scale_(scale),
+        alpha_(alpha),
+        beta_(beta),
+        oscale_(oscale),
+        attr_(attr) {}
 
   bool with_relu() {
     return attr_ & kind_with_relu;
@@ -84,7 +89,7 @@ static inline memory::dims conv_dst_tz(
   return dst_tz;
 }
 
-static inline memory::dims compatible_dilation(IntArrayRef &dilation) {
+static inline memory::dims compatible_dilation(IntArrayRef& dilation) {
   memory::dims ret = dilation.vec();
   for (auto it = ret.begin(); it != ret.end(); it++) {
     *it -= 1;
@@ -92,45 +97,58 @@ static inline memory::dims compatible_dilation(IntArrayRef &dilation) {
   return ret;
 }
 
-static inline memory::format_tag
-conv_src_fmt(int64_t ndim, bool is_channels_last = false) {
+static inline memory::format_tag conv_src_fmt(
+    int64_t ndim,
+    bool is_channels_last = false) {
   if (!is_channels_last) {
-    return (ndim == 4) ? memory::format_tag::nchw :
-                         ((ndim == 5) ? memory::format_tag::ncdhw :
-                                        memory::format_tag::undef);
+    return (ndim == 4)
+        ? memory::format_tag::nchw
+        : ((ndim == 5) ? memory::format_tag::ncdhw : memory::format_tag::undef);
   } else {
-    return (ndim == 4) ? memory::format_tag::nhwc :
-                         ((ndim == 5) ? memory::format_tag::ndhwc :
-                                        memory::format_tag::undef);
+    return (ndim == 4)
+        ? memory::format_tag::nhwc
+        : ((ndim == 5) ? memory::format_tag::ndhwc : memory::format_tag::undef);
   }
 }
 
-static inline memory::format_tag
-conv_wgh_fmt(int64_t ndim, bool grouped = false, bool is_channels_last = false) {
+static inline memory::format_tag conv_wgh_fmt(
+    int64_t ndim,
+    bool grouped = false,
+    bool is_channels_last = false) {
   if (!is_channels_last) {
-    return (ndim == 4) ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw) :
-                         ((ndim == 5) ? (grouped ? memory::format_tag::goidhw : memory::format_tag::oidhw) :
-                         memory::format_tag::undef);
+    return (ndim == 4)
+        ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw)
+        : ((ndim == 5) ? (grouped ? memory::format_tag::goidhw
+                                  : memory::format_tag::oidhw)
+                       : memory::format_tag::undef);
   } else {
-    return (ndim == 4) ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi) :
-                         ((ndim == 5) ? (grouped ? memory::format_tag::godhwi : memory::format_tag::odhwi) :
-                         memory::format_tag::undef);
+    return (ndim == 4)
+        ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi)
+        : ((ndim == 5) ? (grouped ? memory::format_tag::godhwi
+                                  : memory::format_tag::odhwi)
+                       : memory::format_tag::undef);
   }
 }
 
 static inline memory::dims compatible_wgh_dims(
-    int64_t ndim, int64_t groups, int64_t oc, int64_t ic, IntArrayRef wsizes) {
+    int64_t ndim,
+    int64_t groups,
+    int64_t oc,
+    int64_t ic,
+    IntArrayRef wsizes) {
   if (ndim == 4) {
     auto kh = wsizes[2];
     auto kw = wsizes[3];
-    return (groups != 1) ? memory::dims({groups, oc / groups, ic / groups, kh, kw})
-      : memory::dims({oc, ic, kh, kw});
+    return (groups != 1)
+        ? memory::dims({groups, oc / groups, ic / groups, kh, kw})
+        : memory::dims({oc, ic, kh, kw});
   } else if (ndim == 5) {
     auto kd = wsizes[2];
     auto kh = wsizes[3];
     auto kw = wsizes[4];
-    return (groups != 1) ? memory::dims({groups, oc / groups, ic / groups, kd, kh, kw})
-      : memory::dims({oc, ic, kd, kh, kw});
+    return (groups != 1)
+        ? memory::dims({groups, oc / groups, ic / groups, kd, kh, kw})
+        : memory::dims({oc, ic, kd, kh, kw});
   }
 
   return {};
@@ -146,18 +164,18 @@ static at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     ConvAttr attr) {
-  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine =
+      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
   auto ndim = src.ndimension();
 
-  auto dst_tz = conv_dst_tz(
-      ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
+  auto dst_tz =
+      conv_dst_tz(ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
   if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
-      dst_opt = attr.with_relu() ?
-                device(kXPU).dtype(kQUInt8) :
-                device(kXPU).dtype(kQInt8);
+      dst_opt = attr.with_relu() ? device(kXPU).dtype(kQUInt8)
+                                 : device(kXPU).dtype(kQInt8);
     }
     if (src.is_contiguous(at::MemoryFormat::ChannelsLast)) {
       dst_opt = dst_opt.memory_format(at::MemoryFormat::ChannelsLast);
@@ -168,9 +186,8 @@ static at::Tensor convolution(
 
   auto src_data_t = get_onednn_dtype(src);
   auto wei_usr_data_t = get_onednn_dtype(wgh);
-  auto wei_data_t = src.is_quantized() ?
-                    memory::data_type::s8 :
-                    get_onednn_dtype(wgh);
+  auto wei_data_t =
+      src.is_quantized() ? memory::data_type::s8 : get_onednn_dtype(wgh);
   auto dst_data_t = dst.defined() ? get_onednn_dtype(dst) : src_data_t;
   auto bia_data_t = memory::data_type::f32;
   auto usr_bia_data_t = memory::data_type::f32;
@@ -178,7 +195,7 @@ static at::Tensor convolution(
   if (bia.defined()) {
     bia_data_t = get_onednn_dtype(bia);
   }
- 
+
   // master wgh
   if (src_data_t == memory::data_type::bf16) {
     wei_data_t = memory::data_type::bf16;
@@ -192,16 +209,24 @@ static at::Tensor convolution(
   auto fmt_any = memory::format_tag::any;
   // 4D: n/c/h/w (n/h/w/c)
   // 5D: n/c/d/h/w (n/d/h/w/c)
-  auto fmt_src = conv_src_fmt(ndim,
-      ndim == 4 ?
-      (!src.is_contiguous() && src.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-      (!src.is_contiguous() && src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto fmt_src = conv_src_fmt(
+      ndim,
+      ndim == 4 ? (!src.is_contiguous() &&
+                   src.is_contiguous(at::MemoryFormat::ChannelsLast))
+                : (!src.is_contiguous() &&
+                   src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
   // 4D: (g)o/i/h/w ((g)o/h/w/i)
   // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
-  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, wgh.size(1) == 1 ? false :
-      (wgh.ndimension() == 4 ?
-      (!wgh.is_contiguous() && wgh.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-      (!wgh.is_contiguous() && wgh.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
+  auto fmt_wgh = conv_wgh_fmt(
+      ndim,
+      groups != 1,
+      wgh.size(1) == 1
+          ? false
+          : (wgh.ndimension() == 4
+                 ? (!wgh.is_contiguous() &&
+                    wgh.is_contiguous(at::MemoryFormat::ChannelsLast))
+                 : (!wgh.is_contiguous() &&
+                    wgh.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
   auto fmt_bia = memory::format_tag::x;
 
   memory::dims src_tz = src.sizes().vec();
@@ -213,11 +238,12 @@ static at::Tensor convolution(
 
   // plain combination
   auto src_md = memory::desc(src_tz, src_data_t, fmt_src);
-  auto wgh_md = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                memory::desc(wgh_tz, wei_data_t, fmt_any) :
-                memory::desc(wgh_tz, wei_data_t, fmt_wgh);
+  auto wgh_md = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? memory::desc(wgh_tz, wei_data_t, fmt_any)
+      : memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_src);
-  auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia) : memory::desc();
+  auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia)
+                              : memory::desc();
 
   // block combination
   if (Settings::I().is_onednn_layout_enabled()) {
@@ -226,17 +252,17 @@ static at::Tensor convolution(
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
   }
 
-  auto conv_forward_desc =
-      convolution_forward::desc(prop_kind::forward,
-                                algorithm::convolution_direct,
-                                src_md,
-                                wgh_md,
-                                bia_md,
-                                dst_md,
-                                _stride,
-                                _dilation,
-                                _padding,
-                                _padding);
+  auto conv_forward_desc = convolution_forward::desc(
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
+      _stride,
+      _dilation,
+      _padding,
+      _padding);
 
   float src_scale;
   std::vector<float> wgh_scales, conv_scale = {1};
@@ -272,8 +298,19 @@ static at::Tensor convolution(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key_pd;
-  create_key(key_pd, src_md, wgh_md, bia.defined(), dst_data_t,
-      _stride, _dilation, _padding, _padding, attr, conv_scale, conv_zero_point);
+  create_key(
+      key_pd,
+      src_md,
+      wgh_md,
+      bia.defined(),
+      dst_data_t,
+      _stride,
+      _dilation,
+      _padding,
+      _padding,
+      attr,
+      conv_scale,
+      conv_zero_point);
 #endif
 
   post_ops po;
@@ -283,7 +320,8 @@ static at::Tensor convolution(
   if (attr.with_relu()) {
     po.append_eltwise(1.0, algorithm::eltwise_relu, attr.alpha_, attr.beta_);
   } else if (attr.with_sigmoid()) {
-    po.append_eltwise(1.0, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
+    po.append_eltwise(
+        1.0, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
   }
   pattr.set_post_ops(po);
 
@@ -307,9 +345,8 @@ static at::Tensor convolution(
     dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   } else {
     auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-    src_usr_md = src_ctx.is_plain()
-        ? memory::desc(src_tz, src_data_t, fmt_src)
-        : src_ctx.meta();
+    src_usr_md = src_ctx.is_plain() ? memory::desc(src_tz, src_data_t, fmt_src)
+                                    : src_ctx.meta();
 
     if (dst.defined()) {
       auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
@@ -319,9 +356,9 @@ static at::Tensor convolution(
     } else {
       auto expected_dst_md = conv_forward_pd.dst_desc();
       auto plain_dst_md = memory::desc({dst_tz}, dst_data_t, fmt_src);
-      auto dst_opt = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                     src.options().memory_format(at::MemoryFormat::ChannelsLast) :
-                     src.options();
+      auto dst_opt = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+          ? src.options().memory_format(at::MemoryFormat::ChannelsLast)
+          : src.options();
       if (expected_dst_md != plain_dst_md) {
         dst = empty_opaque_tensor(expected_dst_md, dst_opt, c10::nullopt);
       } else {
@@ -352,27 +389,29 @@ static at::Tensor convolution(
     onoff |= src.is_contiguous(at::MemoryFormat::ChannelsLast);
     onoff &= !wgh.requires_grad();
     return onoff;
-  } ();
+  }();
 
   auto expected_wgh_md = conv_forward_pd.weights_desc();
   auto wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
   if (wgh_usr_md != expected_wgh_md) {
     if (weight_cache_optimization && src.is_quantized()) {
-        QuantizerPtr quantizer;
+      QuantizerPtr quantizer;
 
-        if (wgh.is_quantized() && wgh.qscheme() == kPerChannelAffine) {
-          quantizer = dpcpp_make_per_channel_affine_quantizer(
-              wgh.q_per_channel_scales(),
-              wgh.q_per_channel_zero_points(),
-              0,
-              kQInt8);
-        } else {
-          quantizer = dpcpp_make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
-        }
-        wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
+      if (wgh.is_quantized() && wgh.qscheme() == kPerChannelAffine) {
+        quantizer = dpcpp_make_per_channel_affine_quantizer(
+            wgh.q_per_channel_scales(),
+            wgh.q_per_channel_zero_points(),
+            0,
+            kQInt8);
+      } else {
+        quantizer =
+            dpcpp_make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
+      }
+      wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
     } else {
       auto wgh_opt = wgh.options();
-      wgh_opt = src_data_t == memory::data_type::bf16 ? wgh_opt.dtype(kBFloat16) : wgh_opt;
+      wgh_opt = src_data_t == memory::data_type::bf16 ? wgh_opt.dtype(kBFloat16)
+                                                      : wgh_opt;
       wgh_ = empty_opaque_tensor(expected_wgh_md, wgh_opt, c10::nullopt);
     }
 
@@ -390,8 +429,9 @@ static at::Tensor convolution(
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
     if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
-      auto quantizer =
-        dpcpp_make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
+      auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
+          dst.q_scale(),
+          dst.q_zero_point(),
           typeMetaToScalarType(dst.options().dtype()));
       dst_ = empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
     } else {
@@ -443,36 +483,39 @@ static at::Tensor convolution(
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto conv_forward = fetch_or_create_m<convolution_forward>(key_pd, conv_forward_pd);
+  auto conv_forward =
+      fetch_or_create_m<convolution_forward>(key_pd, conv_forward_pd);
 #else
   auto conv_forward = convolution_forward(conv_forward_pd);
 #endif
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_forward_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
-  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src.options(), c10::nullopt);
-  auto scratchpad_memory = dpcpp_onednn_memory(conv_forward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  int scratchpad_size =
+      conv_forward_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, src.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(
+      conv_forward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   DPCPP_ONEDNN_EXEC(
       conv_forward,
       strm,
-      {{DNNL_ARG_SRC,       src_m},
-       {DNNL_ARG_WEIGHTS,   wgh_m},
-       {DNNL_ARG_BIAS,      bia_m},
-       {DNNL_ARG_DST,       dst_m},
-       {DNNL_ARG_SCRATCHPAD, scratchpad_memory}}
-  );
+      {{DNNL_ARG_SRC, src_m},
+       {DNNL_ARG_WEIGHTS, wgh_m},
+       {DNNL_ARG_BIAS, bia_m},
+       {DNNL_ARG_DST, dst_m},
+       {DNNL_ARG_SCRATCHPAD, scratchpad_memory}});
 #else
   DPCPP_ONEDNN_EXEC(
       conv_forward,
       strm,
-      {{DNNL_ARG_SRC,       src_m},
-       {DNNL_ARG_WEIGHTS,   wgh_m},
-       {DNNL_ARG_BIAS,      bia_m},
-       {DNNL_ARG_DST,       dst_m}}
-  );
+      {{DNNL_ARG_SRC, src_m},
+       {DNNL_ARG_WEIGHTS, wgh_m},
+       {DNNL_ARG_BIAS, bia_m},
+       {DNNL_ARG_DST, dst_m}});
 #endif
 
-  if (Settings::I().is_onednn_layout_enabled() && dst_.data_ptr() != dst.data_ptr()) {
+  if (Settings::I().is_onednn_layout_enabled() &&
+      dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }
@@ -480,4 +523,5 @@ static at::Tensor convolution(
   return dst;
 }
 
-}}
+} // namespace oneDNN
+} // namespace xpu

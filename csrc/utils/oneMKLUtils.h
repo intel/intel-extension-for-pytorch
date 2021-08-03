@@ -1,17 +1,15 @@
 #pragma once
 #include <utils/DPCPP.h>
 
-#define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                      \
-  {                                                               \
-    DPCPP_EXT_SUBMIT((q), "onemkl_kernel", routine(__VA_ARGS__)); \
-  }
+#define DPCPP_ONEMKL_SUBMIT(q, routine, ...) \
+  { DPCPP_EXT_SUBMIT((q), "onemkl_kernel", routine(__VA_ARGS__)); }
 
 namespace xpu {
 namespace oneMKL {
 
-//OneMklExInfoManager singleton
+// OneMklExInfoManager singleton
 class OneMklExInfoManager {
-public:
+ public:
   static OneMklExInfoManager& Instance() {
     static thread_local OneMklExInfoManager myInstance;
     return myInstance;
@@ -25,17 +23,18 @@ public:
     accessLastInfo(true, info);
   }
 
-private:
+ private:
   int64_t onemkl_last_info;
   int64_t accessLastInfo(bool write = false, const int64_t info = 0) {
     if (true == write) {
       onemkl_last_info = info;
-      return onemkl_last_info;;
+      return onemkl_last_info;
+      ;
     }
     return onemkl_last_info;
   }
 
-protected:
+ protected:
   OneMklExInfoManager() {
     onemkl_last_info = 0;
   }
@@ -44,4 +43,3 @@ protected:
 
 } // namespace oneMKL
 } // namespace xpu
-

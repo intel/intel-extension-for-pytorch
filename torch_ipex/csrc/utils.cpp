@@ -1,7 +1,8 @@
 #include "utils.h"
 
-void module_add_py_defs(std::vector<PyMethodDef>& vector, PyMethodDef* methods)
-{
+void module_add_py_defs(
+    std::vector<PyMethodDef>& vector,
+    PyMethodDef* methods) {
   if (!vector.empty()) {
     // remove nullptr terminator
     vector.pop_back();

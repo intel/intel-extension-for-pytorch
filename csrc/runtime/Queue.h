@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <utility>
 
-#include <utils/DPCPP.h>
 #include <runtime/Device.h>
-#include <utils/Macros.h>
 #include <runtime/Exception.h>
+#include <utils/DPCPP.h>
+#include <utils/Macros.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -20,18 +20,20 @@ enum class QueueType : uint8_t {
 
 class Queue {
  public:
-  Queue(
-      DeviceId di,
-      DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
+  Queue(DeviceId di, DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
       : queue_([&]() -> DPCPP::queue {
-              return Settings::I().is_event_profiling_enabled() ?
-                  DPCPP::queue(dpcppGetRawDevice(di), asyncHandler,
-                   {DPCPP::property::queue::in_order(),
-                    DPCPP::property::queue::enable_profiling()})
-                  : DPCPP::queue(dpcppGetRawDevice(di), asyncHandler,
-                      {DPCPP::property::queue::in_order()});
-            } ()
-        ), device_id_(di) {}
+          return Settings::I().is_event_profiling_enabled()
+              ? DPCPP::queue(
+                    dpcppGetRawDevice(di),
+                    asyncHandler,
+                    {DPCPP::property::queue::in_order(),
+                     DPCPP::property::queue::enable_profiling()})
+              : DPCPP::queue(
+                    dpcppGetRawDevice(di),
+                    asyncHandler,
+                    {DPCPP::property::queue::in_order()});
+        }()),
+        device_id_(di) {}
 
   DeviceId getDeviceId() const {
     return device_id_;

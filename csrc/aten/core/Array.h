@@ -2,7 +2,6 @@
 
 #include <c10/macros/Macros.h>
 
-
 // A fixed-size array type usable from DPCPP kernels.
 
 namespace xpu {

@@ -1,10 +1,9 @@
-#include <torch/csrc/autograd/profiler.h>
-#include <torch/csrc/autograd/profiler.h>
 #include <c10/core/Allocator.h>
+#include <runtime/Utils.h>
+#include <torch/csrc/autograd/profiler.h>
 #include <utils/DPCPP.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
-#include <runtime/Utils.h>
 #include <sstream>
 
 #if defined(USE_ITT)
@@ -16,9 +15,12 @@ using namespace torch::autograd::profiler;
 struct DPCPPEventStubImpl : public XPUEventStubBase {
  public:
   DPCPPEventStubImpl() = delete;
-  DPCPPEventStubImpl(DPCPP::event event) : event_(std::move(event)), is_ext_mark(false) {};
+  DPCPPEventStubImpl(DPCPP::event event)
+      : event_(std::move(event)), is_ext_mark(false){};
   DPCPPEventStubImpl(DPCPP::event start_evt, DPCPP::event end_evt)
-    : event_(std::move(start_evt)), event_end_(std::move(end_evt)), is_ext_mark(true) {};
+      : event_(std::move(start_evt)),
+        event_end_(std::move(end_evt)),
+        is_ext_mark(true){};
   float elapsed();
   float elapsed(DPCPPEventStubImpl& event);
   uint64_t getSubmitTime();
@@ -48,13 +50,16 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
   }
 
   float elapsed(XPUEventStub event, XPUEventStub event2) override {
-    DPCPPEventStubImpl* dpcpp_event = dynamic_cast<DPCPPEventStubImpl*>(event.get());
-    DPCPPEventStubImpl* dpcpp_event2 = dynamic_cast<DPCPPEventStubImpl*>(event2.get());
+    DPCPPEventStubImpl* dpcpp_event =
+        dynamic_cast<DPCPPEventStubImpl*>(event.get());
+    DPCPPEventStubImpl* dpcpp_event2 =
+        dynamic_cast<DPCPPEventStubImpl*>(event2.get());
     return dpcpp_event->elapsed(*dpcpp_event2);
   }
 
   float elapsed(XPUEventStub event) override {
-    DPCPPEventStubImpl* dpcpp_event = dynamic_cast<DPCPPEventStubImpl*>(event.get());
+    DPCPPEventStubImpl* dpcpp_event =
+        dynamic_cast<DPCPPEventStubImpl*>(event.get());
     return dpcpp_event->elapsed();
   }
   bool enabled() override {
@@ -86,13 +91,16 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
 float DPCPPEventStubImpl::elapsed() {
   float us;
   event_.wait();
-  auto start = event_.template get_profiling_info<dpcpp_event_profiling_start>();
+  auto start =
+      event_.template get_profiling_info<dpcpp_event_profiling_start>();
   auto end = event_.template get_profiling_info<dpcpp_event_profiling_end>();
 
   if (is_ext_mark) {
     event_end_.wait();
-    auto start_2 = event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
-    auto end_2 = event_end_.template get_profiling_info<dpcpp_event_profiling_end>();
+    auto start_2 =
+        event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
+    auto end_2 =
+        event_end_.template get_profiling_info<dpcpp_event_profiling_end>();
     if (start_2 < end) {
       std::stringstream ss;
       ss << __BASE_FILE__ << ":" << __LINE__
@@ -132,7 +140,8 @@ uint64_t DPCPPEventStubImpl::getEndTime() {
   event_.wait();
   if (is_ext_mark) {
     event_end_.wait();
-    return event_end_.template get_profiling_info<dpcpp_event_profiling_start>();
+    return event_end_
+        .template get_profiling_info<dpcpp_event_profiling_start>();
   }
   return event_.template get_profiling_info<dpcpp_event_profiling_end>();
 }
@@ -155,7 +164,9 @@ struct RegisterDPCPPMethods {
 static RegisterDPCPPMethods reg;
 
 bool is_profiler_enabled() {
-  return (xpu::dpcpp::Settings::I().is_event_profiling_enabled() && profilerEnabled());
+  return (
+      xpu::dpcpp::Settings::I().is_event_profiling_enabled() &&
+      profilerEnabled());
 }
 
 void dpcpp_mark(std::string name, DPCPP::event& event) {
@@ -164,7 +175,10 @@ void dpcpp_mark(std::string name, DPCPP::event& event) {
   mark_xpu(std::move(name), dpcpp_evt_stub);
 }
 
-void dpcpp_mark(std::string name, DPCPP::event& start_event, DPCPP::event& end_event) {
+void dpcpp_mark(
+    std::string name,
+    DPCPP::event& start_event,
+    DPCPP::event& end_event) {
   XPUEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
   mark_xpu(std::move(name), dpcpp_evt_stub);
@@ -176,12 +190,19 @@ void dpcpp_log(std::string name, DPCPP::event& event) {
   }
 }
 
-void dpcpp_log(std::string name, DPCPP::event& start_event, DPCPP::event& end_event) {
+void dpcpp_log(
+    std::string name,
+    DPCPP::event& start_event,
+    DPCPP::event& end_event) {
   if (is_profiler_enabled()) {
     dpcpp_mark(name, start_event, end_event);
   }
 }
 
-void reportMemoryUsage(void* ptr, int64_t alloc_size, at::DeviceIndex device_id) {
-  c10::reportMemoryUsageToProfiler(ptr, alloc_size, c10::Device(c10::DeviceType::XPU, device_id));
+void reportMemoryUsage(
+    void* ptr,
+    int64_t alloc_size,
+    at::DeviceIndex device_id) {
+  c10::reportMemoryUsageToProfiler(
+      ptr, alloc_size, c10::Device(c10::DeviceType::XPU, device_id));
 }

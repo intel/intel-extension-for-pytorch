@@ -2,13 +2,13 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/Utils.h>
-#include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
-#include <tensor/Context.h>
+#include <oneDNN/Runtime.h>
 #include <operators/comm/Scalar.h>
-#include "Utils.h"
+#include <runtime/Utils.h>
+#include <tensor/Context.h>
 #include "Reorder.h"
+#include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
 
@@ -62,18 +62,18 @@ static at::Tensor pooling(
   memory::format_tag format_any = memory::format_tag::any;
 
   if (srcDepth == 0) {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-             memory::format_tag::nhwc :
-             memory::format_tag::nchw;
+    format = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? memory::format_tag::nhwc
+        : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast3d) ?
-             memory::format_tag::ndhwc :
-             memory::format_tag::ncdhw;
+    format = src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+        ? memory::format_tag::ndhwc
+        : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
     kernel = {kD, kH, kW};
@@ -87,14 +87,14 @@ static at::Tensor pooling(
 
   if (Settings::I().is_onednn_layout_enabled()) {
     auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
-    src_md = src_ctx.is_plain() ?
-             memory::desc({src_tz}, data_t, format) :
-             src_ctx.meta();
+    src_md = src_ctx.is_plain() ? memory::desc({src_tz}, data_t, format)
+                                : src_ctx.meta();
   }
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
+  create_key(
+      key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
@@ -106,7 +106,8 @@ static at::Tensor pooling(
       padding,
       padding);
 
-  auto pooling_fwd_pd = pooling_forward::primitive_desc(pooling_fwd_desc, engine);
+  auto pooling_fwd_pd =
+      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
 
   memory src_m, dst_m;
   if (!Settings::I().is_onednn_layout_enabled() ||
@@ -142,9 +143,7 @@ static at::Tensor pooling(
 #endif
 
   DPCPP_ONEDNN_EXEC(
-      pooling_fwd,
-      strm,
-      {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
+      pooling_fwd, strm, {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
 
   return dst;
 }
@@ -190,18 +189,18 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   memory::dims padding;
 
   if (srcDepth == 0) {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-             memory::format_tag::nhwc :
-             memory::format_tag::nchw;
+    format = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? memory::format_tag::nhwc
+        : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast3d) ?
-             memory::format_tag::ndhwc :
-             memory::format_tag::ncdhw;
+    format = src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+        ? memory::format_tag::ndhwc
+        : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
     kernel = {kD, kH, kW};
@@ -222,20 +221,22 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-    lru_key_t key;
-    create_key(key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
+  lru_key_t key;
+  create_key(
+      key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
 #endif
-    auto pooling_fwd_desc = pooling_forward::desc(
-        prop_kind,
-        alg_kind,
-        src_md,
-        dst_md_any,
-        stride,
-        kernel,
-        padding,
-        padding);
+  auto pooling_fwd_desc = pooling_forward::desc(
+      prop_kind,
+      alg_kind,
+      src_md,
+      dst_md_any,
+      stride,
+      kernel,
+      padding,
+      padding);
 
-  auto pooling_fwd_pd = pooling_forward::primitive_desc(pooling_fwd_desc, engine);
+  auto pooling_fwd_pd =
+      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
 
   auto expected_dst_md = pooling_fwd_pd.dst_desc();
 
@@ -279,7 +280,9 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     } else {
       auto expected_idx_md = pooling_fwd_pd.workspace_desc();
       idx_ = empty_opaque_tensor(
-          expected_idx_md, at::TensorOptions(at::kXPU).dtype(at::kInt), c10::nullopt);
+          expected_idx_md,
+          at::TensorOptions(at::kXPU).dtype(at::kInt),
+          c10::nullopt);
       idx_m = dpcpp_onednn_memory(expected_idx_md, engine, idx_.data_ptr());
     }
 
@@ -299,7 +302,8 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     if (!Settings::I().is_onednn_layout_enabled() ||
         src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
         src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-      dtype_convert_by_scalar(idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
+      dtype_convert_by_scalar(
+          idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
     } else {
       // reorder if materialized
       auto idx_internal_ctx = DPCPPTensorContext::release_tensor_ctx(idx_);
@@ -313,9 +317,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     auto pooling_fwd = pooling_forward(pooling_fwd_pd);
 #endif
     DPCPP_ONEDNN_EXEC(
-        pooling_fwd,
-        strm,
-        {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
+        pooling_fwd, strm, {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
   }
 
   return {dst, idx};
@@ -362,9 +364,9 @@ static at::Tensor pooling_backward(
   memory::format_tag format_any = memory::format_tag::any;
 
   if (diff_src_depth == 0) {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-             memory::format_tag::nhwc :
-             memory::format_tag::nchw;
+    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? memory::format_tag::nhwc
+        : memory::format_tag::nchw;
 
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
@@ -372,20 +374,14 @@ static at::Tensor pooling_backward(
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d) ?
-             memory::format_tag::ndhwc :
-             memory::format_tag::ncdhw;
+    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+        ? memory::format_tag::ndhwc
+        : memory::format_tag::ncdhw;
 
-    diff_src_tz = {nbatch,
-                   nInputPlane,
-                   diff_src_depth,
-                   diff_src_height,
-                   diff_src_width};
-    diff_dst_tz = {nbatch,
-                   nInputPlane,
-                   diff_dst_depth,
-                   diff_dst_height,
-                   diff_dst_width};
+    diff_src_tz = {
+        nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
+    diff_dst_tz = {
+        nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
     kernel = {kD, kH, kW};
     stride = {dD, dH, dW};
     padding = {padD, padH, padW};
@@ -396,33 +392,52 @@ static at::Tensor pooling_backward(
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
 
   if (Settings::I().is_onednn_layout_enabled()) {
-    auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
-    diff_dst_md = diff_dst_ctx.is_plain()? diff_dst_md : diff_dst_ctx.meta();
+    auto diff_dst_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
+    diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
   }
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding, alg_kind);
+  create_key(
+      key,
+      diff_src_md_any,
+      diff_dst_md,
+      stride,
+      kernel,
+      padding,
+      padding,
+      alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
-      prop_kind, alg_kind, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding);
+      prop_kind,
+      alg_kind,
+      diff_src_md_any,
+      diff_dst_md,
+      stride,
+      kernel,
+      padding,
+      padding);
 
-  auto pooling_fwd_pd = pooling_forward::primitive_desc(pooling_fwd_desc, engine);
+  auto pooling_fwd_pd =
+      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
   auto pooling_bwd_desc = dnnl::pooling_backward::desc(
       alg_kind, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding);
 
-  auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(pooling_bwd_desc, engine, pooling_fwd_pd);
+  auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
+      pooling_bwd_desc, engine, pooling_fwd_pd);
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto pooling_bwd = fetch_or_create_m<dnnl::pooling_backward>(key, pooling_bwd_pd);
+  auto pooling_bwd =
+      fetch_or_create_m<dnnl::pooling_backward>(key, pooling_bwd_pd);
 #else
   auto pooling_bwd = dnnl::pooling_backward(pooling_bwd_pd);
 #endif
 
   memory diff_src_m, diff_dst_m;
-  if (!Settings::I().is_onednn_layout_enabled()
-      || diff_src.is_contiguous(at::MemoryFormat::ChannelsLast)
-      || diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+  if (!Settings::I().is_onednn_layout_enabled() ||
+      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     diff_dst_m = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
 
     diff_src_m = dpcpp_onednn_memory(diff_src_md, engine, diff_src.data_ptr());
@@ -432,18 +447,20 @@ static at::Tensor pooling_backward(
     auto plain_diff_src_md = diff_src_md;
     auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
     if (expected_diff_src_md != plain_diff_src_md) {
-      diff_src = empty_opaque_tensor(expected_diff_src_md, diff_dst.options(), c10::nullopt);
-      diff_src_m = dpcpp_onednn_memory(expected_diff_src_md, engine, diff_src.data_ptr());
+      diff_src = empty_opaque_tensor(
+          expected_diff_src_md, diff_dst.options(), c10::nullopt);
+      diff_src_m = dpcpp_onednn_memory(
+          expected_diff_src_md, engine, diff_src.data_ptr());
     } else {
-      diff_src_m = dpcpp_onednn_memory(plain_diff_src_md, engine, diff_src.data_ptr());
+      diff_src_m =
+          dpcpp_onednn_memory(plain_diff_src_md, engine, diff_src.data_ptr());
     }
   }
 
   DPCPP_ONEDNN_EXEC(
       pooling_bwd,
       strm,
-      {{DNNL_ARG_DIFF_DST, diff_dst_m},
-       {DNNL_ARG_DIFF_SRC, diff_src_m}});
+      {{DNNL_ARG_DIFF_DST, diff_dst_m}, {DNNL_ARG_DIFF_SRC, diff_src_m}});
 
   return diff_src;
 }
@@ -488,9 +505,9 @@ static at::Tensor pooling_backward(
   memory::dims padding;
 
   if (diff_src_depth == 0) {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-             memory::format_tag::nhwc :
-             memory::format_tag::nchw;
+    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? memory::format_tag::nhwc
+        : memory::format_tag::nchw;
 
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
@@ -498,11 +515,13 @@ static at::Tensor pooling_backward(
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d) ?
-             memory::format_tag::ndhwc :
-             memory::format_tag::ncdhw;
-    diff_src_tz = {nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
-    diff_dst_tz = {nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
+    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+        ? memory::format_tag::ndhwc
+        : memory::format_tag::ncdhw;
+    diff_src_tz = {
+        nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
+    diff_dst_tz = {
+        nbatch, nInputPlane, diff_dst_depth, diff_dst_height, diff_dst_width};
     kernel = {kD, kH, kW};
     stride = {dD, dH, dW};
     padding = {padD, padH, padW};
@@ -513,29 +532,45 @@ static at::Tensor pooling_backward(
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
   auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format_any);
   if (Settings::I().is_onednn_layout_enabled()) {
-    auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
+    auto diff_dst_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
     diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-    lru_key_t key;
-    create_key(key, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding, alg_kind);
+  lru_key_t key;
+  create_key(
+      key,
+      diff_src_md_any,
+      diff_dst_md,
+      stride,
+      kernel,
+      padding,
+      padding,
+      alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
-      prop_kind, alg_kind, diff_src_md_any, diff_dst_md,
-      stride, kernel, padding, padding);
+      prop_kind,
+      alg_kind,
+      diff_src_md_any,
+      diff_dst_md,
+      stride,
+      kernel,
+      padding,
+      padding);
   auto pooling_bwd_desc = dnnl::pooling_backward::desc(
       alg_kind, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding);
 
-  auto pooling_fwd_pd = pooling_forward::primitive_desc(pooling_fwd_desc, engine);
+  auto pooling_fwd_pd =
+      pooling_forward::primitive_desc(pooling_fwd_desc, engine);
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
       pooling_bwd_desc, engine, pooling_fwd_pd);
 
   auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
   memory diff_src_usr_m, diff_dst_usr_m, idx_usr_m;
-  if (!Settings::I().is_onednn_layout_enabled()
-      || diff_src.is_contiguous(at::MemoryFormat::ChannelsLast)
-      || diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+  if (!Settings::I().is_onednn_layout_enabled() ||
+      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     diff_dst_usr_m = dpcpp_onednn_memory(
         {diff_dst_tz, data_t, format}, engine, diff_dst.data_ptr());
 
@@ -547,10 +582,13 @@ static at::Tensor pooling_backward(
     auto plain_diff_src_md = diff_src_md;
 
     if (expected_diff_src_md != plain_diff_src_md) {
-      diff_src = empty_opaque_tensor(expected_diff_src_md, diff_dst.options(), c10::nullopt);
-      diff_src_usr_m = dpcpp_onednn_memory(expected_diff_src_md, engine, diff_src.data_ptr());
+      diff_src = empty_opaque_tensor(
+          expected_diff_src_md, diff_dst.options(), c10::nullopt);
+      diff_src_usr_m = dpcpp_onednn_memory(
+          expected_diff_src_md, engine, diff_src.data_ptr());
     } else {
-      diff_src_usr_m = dpcpp_onednn_memory(diff_src_md, engine, diff_src.data_ptr());
+      diff_src_usr_m =
+          dpcpp_onednn_memory(diff_src_md, engine, diff_src.data_ptr());
     }
   }
 
@@ -561,12 +599,17 @@ static at::Tensor pooling_backward(
   auto idx_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(idx);
   at::Tensor idx_usr = idx;
   if (idx_ctx.is_plain()) {
-    idx_usr = at::empty({diff_dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
-    dtype_convert_by_scalar(idx_usr.data_ptr<int32_t>(), idx.data_ptr<int64_t>(), idx_usr.numel());
+    idx_usr =
+        at::empty({diff_dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
+    dtype_convert_by_scalar(
+        idx_usr.data_ptr<int32_t>(), idx.data_ptr<int64_t>(), idx_usr.numel());
 
     idx_usr_m = dpcpp_onednn_memory(
-        {diff_dst_tz, (memory::data_type)expexted_idx_md.data.data_type, format},
-        engine, idx_usr.data_ptr());
+        {diff_dst_tz,
+         (memory::data_type)expexted_idx_md.data.data_type,
+         format},
+        engine,
+        idx_usr.data_ptr());
   } else {
     idx_usr_m = dpcpp_onednn_memory(idx_ctx.meta(), engine, idx.data_ptr());
   }
@@ -576,7 +619,9 @@ static at::Tensor pooling_backward(
   if (Settings::I().is_onednn_layout_enabled()) {
     if (idx_usr_m.get_desc() != expexted_idx_md) {
       idx_opt = empty_opaque_tensor(
-          expexted_idx_md, at::TensorOptions(at::kXPU).dtype(at::kInt), c10::nullopt);
+          expexted_idx_md,
+          at::TensorOptions(at::kXPU).dtype(at::kInt),
+          c10::nullopt);
       idx_m = dpcpp_onednn_memory(expexted_idx_md, engine, idx_opt.data_ptr());
       xpu::oneDNN::reorder(idx_usr, idx_opt);
     }
@@ -593,4 +638,5 @@ static at::Tensor pooling_backward(
   return diff_src;
 }
 
-}}
+} // namespace oneDNN
+} // namespace xpu

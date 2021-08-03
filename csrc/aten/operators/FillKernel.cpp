@@ -3,11 +3,10 @@
 #include <core/detail/IndexUtils.h>
 
 #include <runtime/Utils.h>
-#include "comm/ApplyUtils.h"
 #include "comm/ATDispatch.h"
+#include "comm/ApplyUtils.h"
 
 #include "Loops.h"
-
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;

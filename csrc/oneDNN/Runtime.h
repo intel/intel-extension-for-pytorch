@@ -2,10 +2,10 @@
 
 #include <ATen/Config.h>
 
-#include <runtime/Context.h>
-#include <runtime/Utils.h>
 #include <core/Device.h>
 #include <core/Memory.h>
+#include <runtime/Context.h>
+#include <runtime/Utils.h>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
 
@@ -13,22 +13,25 @@
 #include <oneapi/dnnl/dnnl_sycl.hpp>
 #include <vector>
 
-
 using namespace dnnl;
 using namespace xpu::dpcpp;
 
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                            \
-  {                                                                     \
-    auto q = dnnl::sycl_interop::get_queue((stream));                   \
-    DPCPP_EXT_SUBMIT((q), "onednn_kernel",                              \
-        dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__));  \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                           \
+  {                                                                    \
+    auto q = dnnl::sycl_interop::get_queue((stream));                  \
+    DPCPP_EXT_SUBMIT(                                                  \
+        (q),                                                           \
+        "onednn_kernel",                                               \
+        dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__)); \
   }
 
 namespace xpu {
 namespace oneDNN {
 
 static inline dnnl::memory dpcpp_onednn_memory(
-    dnnl::memory::desc md, dnnl::engine& engine, void* ptr) {
+    dnnl::memory::desc md,
+    dnnl::engine& engine,
+    void* ptr) {
   return dnnl::memory(md, engine, ptr);
 }
 
@@ -53,8 +56,9 @@ struct GpuEngineManager {
     int device_count = (int)xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
-      engine_pool.push_back(std::make_shared<dnnl::engine>(
-          dnnl::sycl_interop::make_engine(dpcppGetRawDevice(i), getDeviceContext(i))));
+      engine_pool.push_back(
+          std::make_shared<dnnl::engine>(dnnl::sycl_interop::make_engine(
+              dpcppGetRawDevice(i), getDeviceContext(i))));
     }
   }
   ~GpuEngineManager() {}
@@ -95,8 +99,8 @@ struct GpuStreamManager {
     int deviceCount = xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
     for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
-      stream_pool.push_back(std::make_shared<dnnl::stream>(
-            dnnl::sycl_interop::make_stream(
+      stream_pool.push_back(
+          std::make_shared<dnnl::stream>(dnnl::sycl_interop::make_stream(
               GpuEngineManager::Instance().get_engine({kXPU, dev}),
               getDefaultDPCPPStream(dev).dpcpp_queue())));
     }
@@ -110,5 +114,5 @@ struct GpuStreamManager {
 #endif
 };
 
-} // namespace dpcpp
+} // namespace oneDNN
 } // namespace xpu

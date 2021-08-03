@@ -7,10 +7,9 @@
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 
-#include <runtime/Utils.h>
 #include <core/Memory.h>
+#include <runtime/Utils.h>
 #include "MemoryAccess.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -19,7 +18,8 @@ namespace AtenIpexTypeXPU {
 
 #define MAX_INPUT_TENSOR_NUM 3
 #define MAX_TOTAL_TENSOR_NUM 4
-// DPCPP suggest: it’s possible (and even desirable) to oversubscribe tasks to device;
+// DPCPP suggest: it’s possible (and even desirable) to oversubscribe tasks to
+// device;
 constexpr int OVER_SUBSCRIBE_DSS_FACTOR = 16;
 
 // Work around for passing the offsets to the dpcpp kernel instead of using
@@ -74,8 +74,9 @@ static OffsetCalculator<N> make_offset_calculator(const TensorIterator& iter) {
   return OffsetCalculator<N>(iter.ndim(), iter.shape().data(), strides.data());
 }
 
-template<int N>
-static OffsetCalculator<N> make_input_offset_calculator(const TensorIterator& iter) {
+template <int N>
+static OffsetCalculator<N> make_input_offset_calculator(
+    const TensorIterator& iter) {
   // array size can not be 0, this happens when N == 0
   constexpr int array_size = std::max<int>(N, 1);
   TORCH_INTERNAL_ASSERT(N == iter.ntensors() - iter.noutputs());
@@ -85,11 +86,13 @@ static OffsetCalculator<N> make_input_offset_calculator(const TensorIterator& it
     strides[i] = iter.strides(i + iter.noutputs()).data();
     element_sizes[i] = iter.element_size(i + iter.noutputs());
   }
-  return OffsetCalculator<N>(iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
+  return OffsetCalculator<N>(
+      iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
 template <int num_outputs = 1>
-static OffsetCalculator<num_outputs> make_output_offset_calculator(const TensorIterator& iter) {
+static OffsetCalculator<num_outputs> make_output_offset_calculator(
+    const TensorIterator& iter) {
   TORCH_INTERNAL_ASSERT(num_outputs == iter.noutputs());
   std::array<const int64_t*, num_outputs> strides;
   int64_t element_sizes[num_outputs];
@@ -97,7 +100,8 @@ static OffsetCalculator<num_outputs> make_output_offset_calculator(const TensorI
     strides[i] = iter.strides(i).data();
     element_sizes[i] = iter.element_size(i);
   }
-  return OffsetCalculator<num_outputs>(iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
+  return OffsetCalculator<num_outputs>(
+      iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
 template <typename traits, typename ptr_t, std::size_t... INDEX>
@@ -192,7 +196,7 @@ typename traits::ArgsTuple dereference(
 
 #define REPEAT_PATTERN(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f)
 
-template<typename func_t, typename policy_t>
+template <typename func_t, typename policy_t>
 inline void elementwise_kernel_helper(func_t f, policy_t policy) {
   using traits = function_traits<func_t>;
   using return_t = typename traits::result_type;
@@ -215,102 +219,149 @@ inline void elementwise_kernel_helper(func_t f, policy_t policy) {
   policy.store(results);
 }
 
-template<typename func_t, typename array_t, typename inp_calc_t, typename out_calc_t, typename loader_t, typename storer_t>
-void unrolled_elementwise_kernel(DPCPP::item<1> item_id, int N, func_t f, array_t data,
-                                            inp_calc_t ic, out_calc_t oc, loader_t l, storer_t s)
-{
+template <
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename out_calc_t,
+    typename loader_t,
+    typename storer_t>
+void unrolled_elementwise_kernel(
+    DPCPP::item<1> item_id,
+    int N,
+    func_t f,
+    array_t data,
+    inp_calc_t ic,
+    out_calc_t oc,
+    loader_t l,
+    storer_t s) {
   int thread_idx = item_id.get_linear_id();
   int remaining = N - thread_idx * THREAD_WORK_SIZE;
-  auto policy = at::native::Memory::policies::unroll<array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(data, remaining, ic, oc, l, s,
-                                                                                                          thread_idx);
+  auto policy = at::native::Memory::policies::
+      unroll<array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
+          data, remaining, ic, oc, l, s, thread_idx);
   elementwise_kernel_helper(f, policy);
 }
 
 DPCPP_DEF_K1(launch_unrolled_kernel_impl);
-template<typename func_t, typename array_t, typename inp_calc_t, typename out_calc_t, typename loader_t, typename storer_t>
-static inline void launch_unrolled_kernel(int64_t N, const func_t& f, array_t data,
-                                          inp_calc_t ic, out_calc_t oc, loader_t l, storer_t s)
-{
+template <
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename out_calc_t,
+    typename loader_t,
+    typename storer_t>
+static inline void launch_unrolled_kernel(
+    int64_t N,
+    const func_t& f,
+    array_t data,
+    inp_calc_t ic,
+    out_calc_t oc,
+    loader_t l,
+    storer_t s) {
   using traits = function_traits<func_t>;
   using ret_t = typename traits::result_type;
 
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int thread_num = (N + THREAD_WORK_SIZE - 1)/THREAD_WORK_SIZE;
+  int thread_num = (N + THREAD_WORK_SIZE - 1) / THREAD_WORK_SIZE;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      unrolled_elementwise_kernel(item_id, N, f, data, ic, oc, l, s);
+    };
 
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-          unrolled_elementwise_kernel(item_id, N, f, data, ic, oc, l, s);
-      };
-
-      __cgh.parallel_for<DPCPP_K(launch_unrolled_kernel_impl, func_t, inp_calc_t, out_calc_t, loader_t, storer_t, ret_t)>(
-              DPCPP::range</*dim=*/1>(thread_num), kfn);
+    __cgh.parallel_for<DPCPP_K(
+        launch_unrolled_kernel_impl,
+        func_t,
+        inp_calc_t,
+        out_calc_t,
+        loader_t,
+        storer_t,
+        ret_t)>(DPCPP::range</*dim=*/1>(thread_num), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 #if 1
-template<int vec_size, typename func_t, typename array_t>
-void vectorized_elementwise_kernel(DPCPP::item<1> item_id, int N, func_t f, array_t data) {
+template <int vec_size, typename func_t, typename array_t>
+void vectorized_elementwise_kernel(
+    DPCPP::item<1> item_id,
+    int N,
+    func_t f,
+    array_t data) {
   using traits = function_traits<func_t>;
   int thread_idx = item_id.get_linear_id();
   int remaining = N - vec_size * thread_idx;
 
-  if (remaining < vec_size) {  // if this thread handles the reminder, just do a naive unrolled loop
+  if (remaining < vec_size) { // if this thread handles the reminder, just do a
+                              // naive unrolled loop
     auto input_calc = TrivialOffsetCalculator<traits::arity>();
     auto output_calc = TrivialOffsetCalculator<1>();
     auto loader = at::native::Memory::LoadWithoutCast();
     auto storer = at::native::Memory::StoreWithoutCast();
-    auto policy = at::native::Memory::policies::unroll<array_t, decltype(input_calc), decltype(output_calc),
-            at::native::Memory::LoadWithoutCast, at::native::Memory::StoreWithoutCast>(
-            data, remaining, input_calc, output_calc, loader, storer, thread_idx);
+    auto policy = at::native::Memory::policies::unroll<
+        array_t,
+        decltype(input_calc),
+        decltype(output_calc),
+        at::native::Memory::LoadWithoutCast,
+        at::native::Memory::StoreWithoutCast>(
+        data, remaining, input_calc, output_calc, loader, storer, thread_idx);
     elementwise_kernel_helper(f, policy);
-  } else {  // if this block has a full `block_work_size` data to handle, use vectorized memory access
-    elementwise_kernel_helper(f, at::native::Memory::policies::vectorized<vec_size, array_t>(data, thread_idx));
+  } else { // if this block has a full `block_work_size` data to handle, use
+           // vectorized memory access
+    elementwise_kernel_helper(
+        f,
+        at::native::Memory::policies::vectorized<vec_size, array_t>(
+            data, thread_idx));
   }
 }
 
 DPCPP_DEF_K1(launch_vectorized_kernel_impl);
 // this function assume trivial 1d and no dynamic casting
-template<typename func_t, typename array_t>
-static inline void launch_vectorized_kernel(int64_t N, const func_t& f, array_t data) {
+template <typename func_t, typename array_t>
+static inline void launch_vectorized_kernel(
+    int64_t N,
+    const func_t& f,
+    array_t data) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int vec_size = at::native::Memory::can_vectorize_up_to<func_t>(data);
-  int thread_num = (N + vec_size - 1)/vec_size;
+  int thread_num = (N + vec_size - 1) / vec_size;
 
   switch (vec_size) {
     case 4: {
-        auto cgf = DPCPP_Q_CGF(__cgh) {
-            auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-                vectorized_elementwise_kernel<4>(item_id, N, f, data);
-            };
-            __cgh.parallel_for<DPCPP_K(launch_vectorized_kernel_impl, func_t, int)>(
-                    DPCPP::range</*dim=*/1>(thread_num), kfn);
+      auto cgf = DPCPP_Q_CGF(__cgh) {
+        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+          vectorized_elementwise_kernel<4>(item_id, N, f, data);
         };
-        DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-        break;
-      }
+        __cgh.parallel_for<DPCPP_K(launch_vectorized_kernel_impl, func_t, int)>(
+            DPCPP::range</*dim=*/1>(thread_num), kfn);
+      };
+      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      break;
+    }
     case 2: {
-        auto cgf = DPCPP_Q_CGF(__cgh) {
-            auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-                vectorized_elementwise_kernel<2>(item_id, N, f, data);
-            };
-            __cgh.parallel_for<DPCPP_K(launch_vectorized_kernel_impl, func_t, float)>(
-                    DPCPP::range</*dim=*/1>(thread_num), kfn);
+      auto cgf = DPCPP_Q_CGF(__cgh) {
+        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+          vectorized_elementwise_kernel<2>(item_id, N, f, data);
         };
-        DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-        break;
-      }
+        __cgh.parallel_for<DPCPP_K(
+            launch_vectorized_kernel_impl, func_t, float)>(
+            DPCPP::range</*dim=*/1>(thread_num), kfn);
+      };
+      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      break;
+    }
     case 1: {
       auto input_calc = TrivialOffsetCalculator<traits::arity>();
       auto output_calc = TrivialOffsetCalculator<1>();
       auto loader = at::native::Memory::LoadWithoutCast();
       auto storer = at::native::Memory::StoreWithoutCast();
-      launch_unrolled_kernel(N, f, data, input_calc, output_calc, loader, storer);
+      launch_unrolled_kernel(
+          N, f, data, input_calc, output_calc, loader, storer);
       break;
     }
     default:
@@ -343,11 +394,19 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
     if (contiguous) {
       launch_vectorized_kernel(numel, f, data);
     } else {
-      auto input_offset_calculator = make_input_offset_calculator<traits::arity>(iter);
+      auto input_offset_calculator =
+          make_input_offset_calculator<traits::arity>(iter);
       auto output_offset_calculator = make_output_offset_calculator(iter);
       auto loader = at::native::Memory::LoadWithoutCast();
       auto storer = at::native::Memory::StoreWithoutCast();
-      launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
+      launch_unrolled_kernel(
+          numel,
+          f,
+          data,
+          input_offset_calculator,
+          output_offset_calculator,
+          loader,
+          storer);
     }
   } else {
     at::detail::Array<ScalarType, traits::arity> dtypes;
@@ -355,16 +414,32 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
       dtypes[i] = iter.tensor(i + 1).scalar_type();
     }
     auto loader = at::native::Memory::LoadWithCast<traits::arity>(dtypes);
-    auto storer = at::native::Memory::StoreWithCast(iter.tensor(0).scalar_type());
+    auto storer =
+        at::native::Memory::StoreWithCast(iter.tensor(0).scalar_type());
 
     if (contiguous) {
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
       auto output_offset_calculator = TrivialOffsetCalculator<1>();
-      launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
+      launch_unrolled_kernel(
+          numel,
+          f,
+          data,
+          input_offset_calculator,
+          output_offset_calculator,
+          loader,
+          storer);
     } else {
-      auto input_offset_calculator = make_input_offset_calculator<traits::arity>(iter);
+      auto input_offset_calculator =
+          make_input_offset_calculator<traits::arity>(iter);
       auto output_offset_calculator = make_output_offset_calculator(iter);
-      launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
+      launch_unrolled_kernel(
+          numel,
+          f,
+          data,
+          input_offset_calculator,
+          output_offset_calculator,
+          loader,
+          storer);
     }
   }
 }
@@ -389,7 +464,7 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   new_dpcpp_loops_kernel_impl(iter, f);
 }
 
-template<typename func_t>
+template <typename func_t>
 struct AUnaryFunctor {
   using traits = function_traits<func_t>;
   using arg1_t = typename traits::template arg<0>::type;
@@ -398,13 +473,14 @@ struct AUnaryFunctor {
   return_t operator()(arg2_t b) const {
     return f(a, b);
   }
-  AUnaryFunctor(func_t f_, arg1_t a_): f(f_), a(a_) {}
-private:
+  AUnaryFunctor(func_t f_, arg1_t a_) : f(f_), a(a_) {}
+
+ private:
   func_t f;
   arg1_t a;
 };
 
-template<typename func_t>
+template <typename func_t>
 struct BUnaryFunctor {
   using traits = function_traits<func_t>;
   using arg1_t = typename traits::template arg<0>::type;
@@ -413,8 +489,9 @@ struct BUnaryFunctor {
   return_t operator()(arg1_t a) const {
     return f(a, b);
   }
-  BUnaryFunctor(func_t f_, arg2_t b_): f(f_), b(b_) {}
-private:
+  BUnaryFunctor(func_t f_, arg2_t b_) : f(f_), b(b_) {}
+
+ private:
   func_t f;
   arg2_t b;
 };
@@ -425,8 +502,8 @@ void dpcpp_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
 
   using traits = function_traits<func_t>;
   static_assert(
-          traits::arity == 2,
-          "dpcpp_kernel_with_scalars only supports two input arguments");
+      traits::arity == 2,
+      "dpcpp_kernel_with_scalars only supports two input arguments");
 
   using arg1_t = typename traits::template arg<0>::type;
   using arg2_t = typename traits::template arg<1>::type;
@@ -463,7 +540,8 @@ void dpcpp_small_index_kernel_impl(
   max_group_num = std::min(int64_t(total_index_iter / 2), max_group_num);
 
   // process the tail
-  auto group_index_iter = (total_index_iter + max_group_num - 1) / max_group_num;
+  auto group_index_iter =
+      (total_index_iter + max_group_num - 1) / max_group_num;
   auto group_num_tail = group_index_iter * max_group_num - total_index_iter;
   auto group_num = max_group_num - group_num_tail;
   auto group_numel = group_index_iter * indices_size;
@@ -472,7 +550,7 @@ void dpcpp_small_index_kernel_impl(
   auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   wgroup_size = std::min(decltype(wgroup_size)(group_numel), wgroup_size);
   auto global_size = max_group_num * wgroup_size;
- 
+
   size_t num_non_indices = non_index_size.size();
   at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> src_sizes(0);
   at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> src_strides(0);
@@ -480,7 +558,7 @@ void dpcpp_small_index_kernel_impl(
     src_sizes[i] = non_index_size[i];
     src_strides[i] = non_index_stride[i];
   }
-  auto src_strides0 = non_index_stride[0]; 
+  auto src_strides0 = non_index_stride[0];
 
   size_t num_indices = index_size.size();
   at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> sizes(0);
@@ -502,10 +580,10 @@ void dpcpp_small_index_kernel_impl(
     }
 
     using local_accessor_t = DPCPP::accessor<
-       int64_t,
-       1,
-       DPCPP::access::mode::read_write,
-       DPCPP::access::target::local>;
+        int64_t,
+        1,
+        DPCPP::access::mode::read_write,
+        DPCPP::access::target::local>;
     auto local_offset = local_accessor_t(indices_size, __cgh);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
@@ -513,17 +591,20 @@ void dpcpp_small_index_kernel_impl(
       auto group_id = item_id.get_group(0);
 
       // construct a indices_size table on SLM
-      for (int64_t local_index = local_id; local_index < indices_size; local_index += wgroup_size) {
+      for (int64_t local_index = local_id; local_index < indices_size;
+           local_index += wgroup_size) {
         int64_t offset = 0;
         for (size_t i = 0; i < num_indices; i++) {
-          int64_t index = *(int64_t*)(index_ptrs[i] + local_index * indice_size_bytes);
-          //if (index >= -sizes[i] && index < sizes[i]) {
-            if (index < 0) {
-              index += sizes[i];
-            }
-            offset += index * strides[i];
+          int64_t index =
+              *(int64_t*)(index_ptrs[i] + local_index * indice_size_bytes);
+          // if (index >= -sizes[i] && index < sizes[i]) {
+          if (index < 0) {
+            index += sizes[i];
+          }
+          offset += index * strides[i];
           //} else {
-          //  DPCPP_K_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i]);
+          //  DPCPP_K_PRINT("index %ld out of bounds, expected [%ld, %ld)\n",
+          //  index, -sizes[i], sizes[i]);
           //}
         }
         local_offset[local_index] = offset;
@@ -533,7 +614,8 @@ void dpcpp_small_index_kernel_impl(
       auto group_linear_id = group_id * group_numel;
       auto group_numel_range = group_numel;
       if (group_num_tail && group_id >= group_num) {
-        group_linear_id = group_num * group_numel + (group_id - group_num) * group_numel_tail;
+        group_linear_id =
+            group_num * group_numel + (group_id - group_num) * group_numel_tail;
         group_numel_range = group_numel_tail;
       }
       auto out_ptr = out_data;
@@ -541,13 +623,14 @@ void dpcpp_small_index_kernel_impl(
       item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // compute the in/out/indices offsets and perform memory copy
-      for (int64_t local_index = local_id; local_index < group_numel_range; local_index += wgroup_size) {
+      for (int64_t local_index = local_id; local_index < group_numel_range;
+           local_index += wgroup_size) {
         auto linear_id = group_linear_id + local_index;
         auto out_offset = linear_id * element_size_bytes;
-        auto src_linear_id = linear_id / indices_size; 
+        auto src_linear_id = linear_id / indices_size;
         int64_t in_offset = 0;
         for (int i = num_non_indices - 1; i > 0; --i) {
-          in_offset += (src_linear_id % src_sizes[i]) *  src_strides[i];
+          in_offset += (src_linear_id % src_sizes[i]) * src_strides[i];
           src_linear_id /= src_sizes[i];
         }
         in_offset += src_linear_id * src_strides0;
@@ -564,14 +647,13 @@ void dpcpp_small_index_kernel_impl(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-
 DPCPP_DEF_K1(dpcpp_index_kernel);
 template <typename kernel_name, typename func_t>
 void dpcpp_index_kernel_impl(
-  TensorIterator& iter,
-  IntArrayRef index_size,
-  IntArrayRef index_stride,
-  const func_t f) {
+    TensorIterator& iter,
+    IntArrayRef index_size,
+    IntArrayRef index_stride,
+    const func_t f) {
   size_t num_indices = index_size.size();
   auto numel = iter.numel();
   at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> sizes(0);
@@ -595,10 +677,10 @@ void dpcpp_index_kernel_impl(
     auto offset_calc = make_offset_calculator<3>(iter);
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto linear_idx = item_id.get_linear_id();
-      auto offsets    = offset_calc.get(linear_idx);
+      auto offsets = offset_calc.get(linear_idx);
       auto out_ptr = out_data + offsets[0];
       auto in_ptr = in_data + offsets[1];
-      int64_t offset  = 0;
+      int64_t offset = 0;
       //#pragma unroll
       for (size_t i = 0; i < num_indices; i++) {
         int64_t index = *(int64_t*)(index_ptrs[i] + offsets[2]);
@@ -608,13 +690,17 @@ void dpcpp_index_kernel_impl(
           }
           offset += index * strides[i];
         } else {
-          DPCPP_K_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i]);
+          DPCPP_K_PRINT(
+              "index %ld out of bounds, expected [%ld, %ld)\n",
+              index,
+              -sizes[i],
+              sizes[i]);
         }
       }
       f(out_ptr, in_ptr, offset);
     };
     __cgh.parallel_for<DPCPP_K(dpcpp_index_kernel, kernel_name)>(
-      DPCPP::range</*dim=*/1>(numel), kfn);
+        DPCPP::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
@@ -636,25 +722,30 @@ void dpcpp_index_kernel(
   size_t num_indices = index_size.size();
   TORCH_INTERNAL_ASSERT(num_indices == index_stride.size());
   TORCH_INTERNAL_ASSERT(
-    num_indices == static_cast<size_t>(iter.ntensors()) - 2);
+      num_indices == static_cast<size_t>(iter.ntensors()) - 2);
   TORCH_INTERNAL_ASSERT(num_indices <= MAX_TENSORINFO_DIMS);
 
-  // the dpcpp_small_index_kernel_impl is applied for last several successive dims indexing of an input tensor
-  // Taking 3-dims tensor input (input.shape=[x,y,z]) for example: input[:,:,idx] or input[:,idx1,idx2]
-  // when input tensor satisfies the following conditions, the small_index_kernel path will be selected:
-  // 1.there are common indices such as input[:,:,idx] and input[:,idx1,idx2] instead of 
-  //   input[idx0,idx1,idx2], input[idx0,idx1,:], input[idx0,:,idx2], input[idx0,:,:], input[:,idx1,:]
-  // 2.the common indices numel should larger than 2 times of the dpcppMaxComputeUnitSize (then we can get memory access benifit)
-  // 3.the workloads in each group should larger than the maximum number of workitem (ensure all the workitem activate)
-  // 4.the indices_table size should satisfied the SLM limit condition
+  // the dpcpp_small_index_kernel_impl is applied for last several successive
+  // dims indexing of an input tensor Taking 3-dims tensor input
+  // (input.shape=[x,y,z]) for example: input[:,:,idx] or input[:,idx1,idx2]
+  // when input tensor satisfies the following conditions, the
+  // small_index_kernel path will be selected: 1.there are common indices such
+  // as input[:,:,idx] and input[:,idx1,idx2] instead of
+  //   input[idx0,idx1,idx2], input[idx0,idx1,:], input[idx0,:,idx2],
+  //   input[idx0,:,:], input[:,idx1,:]
+  // 2.the common indices numel should larger than 2 times of the
+  // dpcppMaxComputeUnitSize (then we can get memory access benifit) 3.the
+  // workloads in each group should larger than the maximum number of workitem
+  // (ensure all the workitem activate) 4.the indices_table size should
+  // satisfied the SLM limit condition
 
   // check whether the current case satisfying the condition 1
-  // Taking input[idx0,:,idx2] for example, the indices_sizes=[sz,1,sz] 
-  // While the satified case is input[:,idx1,idx2], indices_sizes=[1,sz,sz] 
+  // Taking input[idx0,:,idx2] for example, the indices_sizes=[sz,1,sz]
+  // While the satified case is input[:,idx1,idx2], indices_sizes=[1,sz,sz]
   bool small_index = non_index_size.size() != 0;
   auto indices_sizes = iter.tensor(2).sizes();
   for (size_t i = 1; i < num_indices; ++i) {
-    if (indices_sizes[i-1] > indices_sizes[i]){
+    if (indices_sizes[i - 1] > indices_sizes[i]) {
       small_index = false;
       break;
     }
@@ -673,23 +764,26 @@ void dpcpp_index_kernel(
     auto indice_table_size = indices_size * sizeof(int64_t);
 
     // check whether the current case satisfying conditions 2,3,4
-    small_index = (total_index_iter > 2 * max_group_num && local_index > wgroup_size
-        && indice_table_size < max_local_mem_size * 0.5);
+    small_index =
+        (total_index_iter > 2 * max_group_num && local_index > wgroup_size &&
+         indice_table_size < max_local_mem_size * 0.5);
     if (small_index) {
-      dpcpp_small_index_kernel_impl<kernel_name, func_t>(iter, index_size, index_stride,
-          non_index_size, non_index_stride, f);
+      dpcpp_small_index_kernel_impl<kernel_name, func_t>(
+          iter, index_size, index_stride, non_index_size, non_index_stride, f);
       return;
     }
   }
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_index_kernel<kernel_name>(sub_iter, index_size, index_stride, IntArrayRef{}, IntArrayRef{}, f);
+      dpcpp_index_kernel<kernel_name>(
+          sub_iter, index_size, index_stride, IntArrayRef{}, IntArrayRef{}, f);
     }
     return;
   }
 
-  dpcpp_index_kernel_impl<kernel_name, func_t>(iter, index_size, index_stride, f);
+  dpcpp_index_kernel_impl<kernel_name, func_t>(
+      iter, index_size, index_stride, f);
 }
 
 } // namespace AtenIpexTypeXPU

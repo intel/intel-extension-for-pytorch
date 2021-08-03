@@ -3,12 +3,11 @@
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 #include "comm/ParamUtils.h"
 
-#include <runtime/Utils.h>
-#include <quantized/Quantizer.h>
 #include <oneDNN/oneDNN.h>
+#include <quantized/Quantizer.h>
+#include <runtime/Utils.h>
 
 #include <quantized/QUtil.h>
-
 
 using namespace dnnl;
 using namespace at::native;
@@ -36,9 +35,9 @@ at::Tensor q_conv2d(
 
   ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
 
-  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-              at::MemoryFormat::ChannelsLast :
-              at::MemoryFormat::Contiguous;
+  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
 
   Tensor output = _empty_affine_quantized(
       conv_dst_tz(
@@ -83,11 +82,16 @@ at::Tensor q_conv2d_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), ConvAttr::kind_with_relu};
+  ConvAttr attr = {
+      1.f,
+      0.f,
+      0.f,
+      static_cast<float>(output_scale),
+      ConvAttr::kind_with_relu};
 
-  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-              at::MemoryFormat::ChannelsLast :
-              at::MemoryFormat::Contiguous;
+  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
 
   Tensor output = _empty_affine_quantized(
       conv_dst_tz(
@@ -117,7 +121,7 @@ at::Tensor q_conv2d_relu(
 }
 
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
-  m.impl("quantized::conv2d.new",      q_conv2d);
+  m.impl("quantized::conv2d.new", q_conv2d);
   m.impl("quantized::conv2d_relu.new", q_conv2d_relu);
 }
 
@@ -132,7 +136,9 @@ at::Tensor q_conv2d_sum_relu(
     int64_t conv_zero_point,
     double sum_scale,
     int64_t sum_zero_point) {
-  auto pack_ptr = dynamic_cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP*>(packed_weight.get());
+  auto pack_ptr =
+      dynamic_cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP*>(
+          packed_weight.get());
 
   at::Tensor weight = pack_ptr->weight;
   at::Tensor bias;
@@ -143,22 +149,26 @@ at::Tensor q_conv2d_sum_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {static_cast<float>(accumu.q_scale() / sum_scale), 0.f, 0.f,
-      static_cast<float>(sum_scale), ConvAttr::kind_with_relu | ConvAttr::kind_with_sum};
+  ConvAttr attr = {
+      static_cast<float>(accumu.q_scale() / sum_scale),
+      0.f,
+      0.f,
+      static_cast<float>(sum_scale),
+      ConvAttr::kind_with_relu | ConvAttr::kind_with_sum};
 
   convolution(
-    accumu,
-    input,
-    weight,
-    bias,
-    padding.vec(),
-    stride.vec(),
-    dilation.vec(),
-    groups,
-    attr);
+      accumu,
+      input,
+      weight,
+      bias,
+      padding.vec(),
+      stride.vec(),
+      dilation.vec(),
+      groups,
+      attr);
 
-  accumu.set_quantizer_(
-    dpcpp_make_per_tensor_affine_quantizer(sum_scale, sum_zero_point, accumu.scalar_type()));
+  accumu.set_quantizer_(dpcpp_make_per_tensor_affine_quantizer(
+      sum_scale, sum_zero_point, accumu.scalar_type()));
 
   return accumu;
 }

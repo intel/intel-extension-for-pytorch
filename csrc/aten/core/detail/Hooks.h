@@ -1,8 +1,7 @@
 #pragma once
 
-#include <ATen/detail/XPUHooksInterface.h>
 #include <ATen/Generator.h>
-
+#include <ATen/detail/XPUHooksInterface.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -21,7 +20,10 @@ struct XPUHooks : public at::XPUHooksInterface {
   Device getDeviceFromPtr(void* data) const override;
   bool isPinnedPtr(void* data) const override;
   Allocator* getPinnedMemoryAllocator() const override;
-  const Generator& getDefaultXPUGenerator(DeviceIndex device_index = -1) const override;
+  const Generator& getDefaultXPUGenerator(
+      DeviceIndex device_index = -1) const override;
 };
 
-}}} // xpu::dpcpp::detail
+} // namespace detail
+} // namespace dpcpp
+} // namespace xpu

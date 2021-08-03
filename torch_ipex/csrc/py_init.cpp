@@ -8,20 +8,16 @@
 
 namespace py = pybind11;
 
-
 static std::vector<PyMethodDef> methods;
 
-
-void torch_ipex_init(pybind11::module &m) {
+void torch_ipex_init(pybind11::module& m) {
   m.doc() = "PyTorch Extension for Intel XPU";
   init_module(m);
 
 #if defined(USE_ITT)
-  m.def("_itt_is_enabled",
-        []() {return true;});
+  m.def("_itt_is_enabled", []() { return true; });
 #else
-  m.def("_itt_is_enabled",
-        []() {return false;});
+  m.def("_itt_is_enabled", []() { return false; });
 #endif
 
 #ifdef USE_ITT

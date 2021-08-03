@@ -1,16 +1,16 @@
+#include <runtime/Queue.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
-#include <runtime/Queue.h>
 #include <utils/Settings.h>
 
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstdlib>
 #include <deque>
 #include <memory>
 #include <mutex>
 #include <vector>
-#include <cstdlib>
 
 namespace xpu {
 namespace dpcpp {
@@ -21,7 +21,8 @@ static constexpr int QueuePerPool = 32;
 static int dpcpp_num_devices;
 static std::once_flag init_flag;
 static std::vector<std::shared_ptr<Queue>> default_queues;
-static std::vector<std::array<std::shared_ptr<Queue>, QueuePerPool>> reserved_queues;
+static std::vector<std::array<std::shared_ptr<Queue>, QueuePerPool>>
+    reserved_queues;
 static std::deque<std::atomic<uint32_t>> reserve_counters;
 
 QueueType queueType(QueueId s) {
@@ -186,4 +187,4 @@ DeviceId getDeviceIdOfCurrentQueue() {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

@@ -3,7 +3,6 @@
 #include <core/Allocator.h>
 #include <tensor/Context.h>
 
-
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -23,7 +22,7 @@ Tensor empty_opaque_tensor(
       /*resizeable=*/true);
 
   auto tensor = detail::make_tensor<TensorImpl>(
-      storage_impl, c10::DispatchKey::XPU,dtype);
+      storage_impl, c10::DispatchKey::XPU, dtype);
   // should not work for an opaque tensor
   if (meta.dims().size() != 1 || meta.dims().at(0) != 0) {
     tensor.unsafeGetTensorImpl()->set_sizes_contiguous(meta.dims());
@@ -43,38 +42,38 @@ Tensor empty_opaque_tensor(
 }
 
 Tensor empty_opaque_qtensor(
-  DPCPPTensorContext::Meta meta,
-  c10::optional<MemoryFormat> optional_memory_format,
-  QuantizerPtr quantizer) {
+    DPCPPTensorContext::Meta meta,
+    c10::optional<MemoryFormat> optional_memory_format,
+    QuantizerPtr quantizer) {
   auto* allocator = xpu::dpcpp::getDeviceAllocator();
   int64_t nelements = DPCPPTensorContext(nullptr, meta).padded_size();
   auto dtype = scalarTypeToTypeMeta(quantizer->scalar_type());
   int64_t size_bytes = nelements * dtype.itemsize();
   auto storage_impl = c10::make_intrusive<StorageImpl>(
-    StorageImpl::use_byte_size_t(),
-    size_bytes,
-    allocator->allocate(nelements * dtype.itemsize()),
-    allocator,
-    /*resizeable=*/true);
+      StorageImpl::use_byte_size_t(),
+      size_bytes,
+      allocator->allocate(nelements * dtype.itemsize()),
+      allocator,
+      /*resizeable=*/true);
 
   Tensor tensor;
   at::DispatchKey tensorDispatchKey = c10::DispatchKey::QuantizedXPU;
   tensor = detail::make_tensor<QTensorImpl>(
-    storage_impl, at::DispatchKeySet(tensorDispatchKey), dtype, quantizer);
+      storage_impl, at::DispatchKeySet(tensorDispatchKey), dtype, quantizer);
   // should not work for an opaque tensor
   if (meta.dims().size() != 1 || meta.dims().at(0) != 0) {
     tensor.unsafeGetTensorImpl()->set_sizes_contiguous(meta.dims());
   }
 
   auto memory_format =
-    optional_memory_format.value_or(MemoryFormat::Contiguous);
+      optional_memory_format.value_or(MemoryFormat::Contiguous);
   tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
 
   auto ctx = (DPCPPTensorContext*)tensor.unsafeGetTensorImpl()
-    ->storage()
-    .unsafeGetStorageImpl()
-    ->data_ptr()
-    .get_context();
+                 ->storage()
+                 .unsafeGetStorageImpl()
+                 ->data_ptr()
+                 .get_context();
   ctx->set_meta(meta);
 
   std::vector<float> scales;
@@ -98,7 +97,7 @@ inline bool need_to_plain(const Tensor& tensor) {
     return false;
 
   if ((tensor.options().backend() != at::Backend::XPU &&
-        tensor.options().backend() != at::Backend::QuantizedXPU) ||
+       tensor.options().backend() != at::Backend::QuantizedXPU) ||
       !DPCPPTensorConvertor::is_opaque_tensor(tensor))
     return false;
 
@@ -145,5 +144,5 @@ std::vector<Tensor> to_plain_if_needed(TensorList tensors) {
 namespace AtenIpexTypeQuantizedXPU {
 using AtenIpexTypeXPU::DPCPPTensorContext;
 using AtenIpexTypeXPU::DPCPPTensorConvertor;
-}//AtenIpexTypeQuantizedXPU
-}// namespace at
+} // namespace AtenIpexTypeQuantizedXPU
+} // namespace at

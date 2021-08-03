@@ -1,19 +1,18 @@
 #include <ATen/ATen.h>
 #include <ATen/quantized/Quantizer.h>
 
-#include <ATen/native/TensorIterator.h>
-#include <ATen/native/TensorFactories.h>
 #include <ATen/InitialTensorOptions.h>
+#include <ATen/native/TensorFactories.h>
+#include <ATen/native/TensorIterator.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <intrinsic/ipex_intrinsic.h>
 
-#include "comm/ATDispatch.h"
 #include <core/Allocator.h>
 #include <core/TensorImplUtils.h>
 #include <utils/DPCPP.h>
+#include "comm/ATDispatch.h"
 
 #include "Loops.h"
-
 
 DPCPP_DEF_K1(intrepr);
 
@@ -59,10 +58,10 @@ Tensor int_repr(const Tensor& self) {
         self.options().dtype(UNDERLYING_TYPE),
         self.suggest_memory_format());
     auto iter = TensorIteratorConfig()
-    .add_output(dst)
-    .add_input(self)
-    .check_all_same_dtype(false)
-    .build();
+                    .add_output(dst)
+                    .add_input(self)
+                    .check_all_same_dtype(false)
+                    .build();
     AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter<DPCPP_K(intrepr)>(
         iter, [=](scalar_t value) -> underlying_t { return value.val_; });
   });
@@ -71,38 +70,38 @@ Tensor int_repr(const Tensor& self) {
 
 } // namespace AtenIpexTypeQuantizedXPU
 
-
 namespace AtenIpexTypeXPU {
 Tensor new_qtensor(
-  IntArrayRef sizes,
-  const TensorOptions &options,
-  QuantizerPtr quantizer) {
+    IntArrayRef sizes,
+    const TensorOptions& options,
+    QuantizerPtr quantizer) {
   auto memory_format =
-    options.memory_format_opt().value_or(MemoryFormat::Contiguous);
+      options.memory_format_opt().value_or(MemoryFormat::Contiguous);
 
-  at::Allocator *allocator = xpu::dpcpp::getDeviceAllocator();
+  at::Allocator* allocator = xpu::dpcpp::getDeviceAllocator();
 
   at::DispatchKey tensorDispatchKey = options.computeDispatchKey();
   native::check_size_nonnegative(sizes);
   int64_t nelements = at::prod_intlist(sizes);
   auto dtype = options.dtype();
   TORCH_CHECK(
-    isQIntType(typeMetaToScalarType(dtype)),
-    dtype, " is not supported in new_qtensor on xpu device.");
+      isQIntType(typeMetaToScalarType(dtype)),
+      dtype,
+      " is not supported in new_qtensor on xpu device.");
   int64_t size_bytes = nelements * dtype.itemsize();
   auto storage = c10::make_intrusive<StorageImpl>(
-    StorageImpl::use_byte_size_t(),
-    size_bytes,
-    allocator->allocate(size_bytes),
-    allocator,
-    /*resizable=*/true);
+      StorageImpl::use_byte_size_t(),
+      size_bytes,
+      allocator->allocate(size_bytes),
+      allocator,
+      /*resizable=*/true);
   auto tensor = detail::make_tensor<QTensorImpl>(
-    storage, at::DispatchKeySet(tensorDispatchKey), dtype, quantizer);
+      storage, at::DispatchKeySet(tensorDispatchKey), dtype, quantizer);
 
   at::get_qtensorimpl(tensor)->set_sizes_contiguous(sizes);
   at::get_qtensorimpl(tensor)->empty_tensor_restride(memory_format);
 
   return tensor;
 }
-}
+} // namespace AtenIpexTypeXPU
 } // namespace at

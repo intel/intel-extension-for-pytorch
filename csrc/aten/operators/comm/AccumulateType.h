@@ -53,4 +53,5 @@ struct AccumulateType<int64_t> {
 template <typename T>
 using acc_type = typename AccumulateType<T>::type;
 
-}} // namespace at::AtenIpexTypeXPU
+} // namespace AtenIpexTypeXPU
+} // namespace at

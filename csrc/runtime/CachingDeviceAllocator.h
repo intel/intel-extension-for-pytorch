@@ -1,24 +1,24 @@
 #pragma once
 
+#include <runtime/Context.h>
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
-#include <runtime/Context.h>
 #include <utils/DPCPP.h>
 
 #include <core/AllocationInfo.h>
 
-#include <mutex>
-#include <iterator>
-#include <set>
-#include <optional>
 #include <algorithm>
 #include <bitset>
-#include <vector>
 #include <deque>
+#include <iterator>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace xpu {
 namespace dpcpp {
@@ -26,15 +26,20 @@ namespace dpcpp {
 class CachingDeviceAllocator final {
  private:
   enum class PoolType {
-   UNDEF = 0,
-   LARGE_POOL = 1,
-   SMALL_POOL = 2,
+    UNDEF = 0,
+    LARGE_POOL = 1,
+    SMALL_POOL = 2,
   };
 
   struct Block {
-    Block(DeviceId device, Queue *queue, size_t size);
+    Block(DeviceId device, Queue* queue, size_t size);
 
-    Block(DeviceId device, Queue *queue, size_t size, PoolType pool_type, void* buffer);
+    Block(
+        DeviceId device,
+        Queue* queue,
+        size_t size,
+        PoolType pool_type,
+        void* buffer);
 
     bool is_split() const;
 
@@ -53,16 +58,16 @@ class CachingDeviceAllocator final {
       return (uintptr_t)a->m_buffer < (uintptr_t)b->m_buffer;
     }
 
-    DeviceId    m_device;
-    Queue*      m_queue;
+    DeviceId m_device;
+    Queue* m_queue;
     std::unordered_set<Queue*> m_queue_uses;
-    size_t      m_size;
-    PoolType    m_pool_type;
-    void*       m_buffer;
-    bool        m_allocated;
-    Block*      m_prev;
-    Block*      m_next;
-    int         m_event_cnt;
+    size_t m_size;
+    PoolType m_pool_type;
+    void* m_buffer;
+    bool m_allocated;
+    Block* m_prev;
+    Block* m_next;
+    int m_event_cnt;
   };
 
   using BlockPool = std::set<Block*, decltype(Block::Comparator)*>;
@@ -82,7 +87,10 @@ class CachingDeviceAllocator final {
 
   DeviceStats& get_stats_for_device(DeviceId device);
 
-  void update_stat_array(StatArray& stat_array, int64_t amount, const StatTypes& stat_types);
+  void update_stat_array(
+      StatArray& stat_array,
+      int64_t amount,
+      const StatTypes& stat_types);
 
   int malloc_with_retry(DeviceId di, void** devPtr, size_t size);
 
@@ -90,15 +98,18 @@ class CachingDeviceAllocator final {
 
   void free_block(Block* block);
 
-  void free_blocks(BlockPool& blocks, BlockPool::iterator it, BlockPool::iterator end);
+  void free_blocks(
+      BlockPool& blocks,
+      BlockPool::iterator it,
+      BlockPool::iterator end);
 
   void free_cached_blocks(DeviceId di);
 
-  size_t try_merge_blocks(Block* dst, Block* src, BlockPool *pool);
+  size_t try_merge_blocks(Block* dst, Block* src, BlockPool* pool);
 
   StatType get_stat_type_for_pool(const PoolType pool_type);
 
-  Block* find_allocated_block(void *buffer);
+  Block* find_allocated_block(void* buffer);
 
   void insert_events(Block* block);
 
@@ -106,7 +117,11 @@ class CachingDeviceAllocator final {
 
   void synchronize_and_free_events(std::optional<DeviceId> di);
 
-  void cache_info_aux(BlockPool& blocks, DeviceId di, size_t* total, size_t* largest);
+  void cache_info_aux(
+      BlockPool& blocks,
+      DeviceId di,
+      size_t* total,
+      size_t* largest);
 
  public:
   static CachingDeviceAllocator* Instance() {
@@ -116,7 +131,7 @@ class CachingDeviceAllocator final {
 
   std::mutex* getDPCPPFreeMutex() const;
 
-  void malloc(void** devPtr, size_t size, Queue *queue);
+  void malloc(void** devPtr, size_t size, Queue* queue);
 
   void free(void* buffer);
 
@@ -139,4 +154,5 @@ class CachingDeviceAllocator final {
   void dumpMemoryStatus(DeviceId deviceIndex);
 };
 
-}} // namespace xpu::dpcpp
+} // namespace dpcpp
+} // namespace xpu

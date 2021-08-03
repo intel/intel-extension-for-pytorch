@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include <runtime/Device.h>
+#include <utils/DPCPP.h>
 
 namespace xpu {
 namespace dpcpp {

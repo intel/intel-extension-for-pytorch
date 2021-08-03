@@ -1,24 +1,23 @@
 #include <ATen/ATen.h>
 
-#include <ATen/native/TensorIterator.h>
 #include <ATen/core/TensorBody.h>
-#include <ATen/quantized/Quantizer.h>
+#include <ATen/native/TensorIterator.h>
 #include <ATen/quantized/QTensorImpl.h>
+#include <ATen/quantized/Quantizer.h>
 
-#include <runtime/Exception.h>
-#include <runtime/Utils.h>
+#include <ATen/native/Resize.h>
+#include <c10/core/ScalarType.h>
+#include <core/Event.h>
 #include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
-#include <core/Event.h>
-#include <c10/core/ScalarType.h>
-#include <ATen/native/Resize.h>
+#include <runtime/Exception.h>
+#include <runtime/Utils.h>
 
 #include "comm/ATDispatch.h"
 
-#include "Loops.h"
 #include <oneDNN/oneDNN.h>
-
+#include "Loops.h"
 
 using namespace at;
 using namespace xpu::dpcpp;
@@ -26,15 +25,15 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace impl {
 
-#define BUILD_TENSOR_ITER(dst, src, iter) \
-  auto iter = TensorIteratorConfig()      \
-    .set_check_mem_overlap(true)          \
-    .add_output(self)                     \
-    .add_input(src)                       \
-    .resize_outputs(false)                \
-    .check_all_same_dtype(false)          \
-    .check_all_same_device(false)         \
-    .build();
+#define BUILD_TENSOR_ITER(dst, src, iter)       \
+  auto iter = TensorIteratorConfig()            \
+                  .set_check_mem_overlap(true)  \
+                  .add_output(self)             \
+                  .add_input(src)               \
+                  .resize_outputs(false)        \
+                  .check_all_same_dtype(false)  \
+                  .check_all_same_device(false) \
+                  .build();
 
 static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
   Device dst_device = iter.device(0);
@@ -42,8 +41,9 @@ static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
 
   if (dst_device == src_device) {
     // We never require temporaries for copies on the same GPU.
-    TORCH_INTERNAL_ASSERT(dst_device.type() == c10::DeviceType::XPU &&
-      src_device.type() == c10::DeviceType::XPU );
+    TORCH_INTERNAL_ASSERT(
+        dst_device.type() == c10::DeviceType::XPU &&
+        src_device.type() == c10::DeviceType::XPU);
     return false;
   }
 
@@ -51,8 +51,9 @@ static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
   if (same_dtype && iter.is_contiguous()) {
     // Contiguous same-dtype copies can always use sycl copy
     return false;
-  } else if (dst_device.type() == c10::DeviceType::XPU &&
-             src_device.type() == c10::DeviceType::XPU ) {
+  } else if (
+      dst_device.type() == c10::DeviceType::XPU &&
+      src_device.type() == c10::DeviceType::XPU) {
     // Copies between GPUs can use the copy kernel if P2P is supported
     return !p2p_enabled;
   } else {
@@ -87,7 +88,6 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
 
-
   // We always perform the copy on the source device, using the current stream
   // on the source device, and we fully synchronize on both src and dst's
   // current streams for completion of the copy.
@@ -114,25 +114,26 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
         DeviceToDevice);
   } else {
     ScalarType dtype = iter.dtype(0);
-    if(!isQIntType(dtype)){
+    if (!isQIntType(dtype)) {
       IPEX_DISPATCH_ALL_TYPES_AND3(
           kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
             using src_t = scalar_t;
             IPEX_DISPATCH_ALL_TYPES_AND3(
                 kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
-                  dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy1, scalar_t, src_t)>(
+                  dpcpp_kernel_for_tensor_iter<DPCPP_K(
+                      SyclOpElwCopy1, scalar_t, src_t)>(
                       iter, [=](src_t src_val) -> scalar_t {
-                          return static_cast<scalar_t>(src_val);
+                        return static_cast<scalar_t>(src_val);
+                      });
                 });
           });
-      });
     } else {
       IPEX_DISPATCH_QINT_TYPES(iter.dtype(1), "copy_", [&] {
         using src_t = scalar_t;
-          dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy2, scalar_t, src_t)>(
-              iter, [=](src_t src_val) -> scalar_t {
-                  return static_cast<scalar_t>(src_val);
-               });
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy2, scalar_t, src_t)>(
+            iter, [=](src_t src_val) -> scalar_t {
+              return static_cast<scalar_t>(src_val);
+            });
       });
     }
   }
@@ -148,7 +149,10 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   }
 }
 
-Tensor as_strided_quantized_dpcpp(const Tensor& self, IntArrayRef size, IntArrayRef stride) {
+Tensor as_strided_quantized_dpcpp(
+    const Tensor& self,
+    IntArrayRef size,
+    IntArrayRef stride) {
   auto storage_offset = self.storage_offset();
   auto quantizer = at::get_qtensorimpl(self)->quantizer();
   auto result = detail::make_tensor<QTensorImpl>(
@@ -159,17 +163,28 @@ Tensor as_strided_quantized_dpcpp(const Tensor& self, IntArrayRef size, IntArray
 
 Tensor expand_as_quantized_dpcpp(const Tensor& self, const Tensor& other) {
   auto size = other.sizes();
-  TORCH_CHECK(size.size() >= (size_t)self.dim(),
-           "expand(", self.toString(), "{", self.sizes(), "}, size=", size,
-           "): the number of sizes provided (", size.size(), ") ",
-           "must be greater or equal to the number of dimensions in the tensor (",
-           self.dim(), ")");
+  TORCH_CHECK(
+      size.size() >= (size_t)self.dim(),
+      "expand(",
+      self.toString(),
+      "{",
+      self.sizes(),
+      "}, size=",
+      size,
+      "): the number of sizes provided (",
+      size.size(),
+      ") ",
+      "must be greater or equal to the number of dimensions in the tensor (",
+      self.dim(),
+      ")");
 
   std::vector<int64_t> expandedSizes;
   std::vector<int64_t> expandedStrides;
-  std::tie(expandedSizes, expandedStrides) = inferExpandGeometry(self.sizes(), self.strides(), size);
+  std::tie(expandedSizes, expandedStrides) =
+      inferExpandGeometry(self.sizes(), self.strides(), size);
 
-  auto result = as_strided_quantized_dpcpp(self, expandedSizes, expandedStrides);
+  auto result =
+      as_strided_quantized_dpcpp(self, expandedSizes, expandedStrides);
 #ifdef BUILD_NAMEDTENSOR
   namedinference::propagate_names_for_expand(result, self);
 #endif
@@ -196,14 +211,19 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     // the src device for GPU-GPU copies.
     if (iter.device_type(0) == kXPU) {
       dst_contig = dst.is_contiguous() ? dst : at::empty_like(dst);
-      if(dst.is_quantized()){
-        src_contig = expand_as_quantized_dpcpp(iter.tensor(1).to(iter.dtype(0)), dst).contiguous();
+      if (dst.is_quantized()) {
+        src_contig =
+            expand_as_quantized_dpcpp(iter.tensor(1).to(iter.dtype(0)), dst)
+                .contiguous();
       } else {
-        src_contig = iter.tensor(1).to(iter.dtype(0)).expand_as(dst).contiguous();
+        src_contig =
+            iter.tensor(1).to(iter.dtype(0)).expand_as(dst).contiguous();
       }
     } else {
       bool same_type = iter.dtype(0) == iter.dtype(1);
-      dst_contig = (dst.is_contiguous() && same_type) ? dst : at::empty_like(dst, iter.dtype(1));
+      dst_contig = (dst.is_contiguous() && same_type)
+          ? dst
+          : at::empty_like(dst, iter.dtype(1));
       src_contig = iter.tensor(1).expand_as(dst).contiguous();
     }
 
@@ -230,12 +250,10 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   // Copy between CPU and GPU
   OptionalDPCPPGuard device_guard;
   dpcppMemcpyKind kind;
-  if (dst_device.type() == c10::DeviceType::XPU &&
-      src_device.is_cpu()) {
+  if (dst_device.type() == c10::DeviceType::XPU && src_device.is_cpu()) {
     device_guard.set_device(dst_device);
     kind = HostToDevice;
-  } else if (dst_device.is_cpu() &&
-             src_device.type() == c10::DeviceType::XPU) {
+  } else if (dst_device.is_cpu() && src_device.type() == c10::DeviceType::XPU) {
     device_guard.set_device(src_device);
     kind = DeviceToHost;
   } else {
@@ -253,8 +271,9 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     dpcppMemcpyAsync(dst, src, nbytes, kind);
   } else {
     dpcppMemcpy(dst, src, nbytes, kind);
-    // FIXME: Without queue wait, resource exhaustion occurs due to never release kernel events.
-    // Need to confirm with compiler team the root cause here.
+    // FIXME: Without queue wait, resource exhaustion occurs due to never
+    // release kernel events. Need to confirm with compiler team the root cause
+    // here.
     auto& queue = dpcppGetCurrentQueue();
     queue.wait();
   }
@@ -263,14 +282,11 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
   if (self.is_quantized() && src.is_quantized()) {
-    auto mfmt = self.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                at::MemoryFormat::ChannelsLast :
-                at::MemoryFormat::Contiguous;
-    self = _empty_affine_quantized(self.sizes(),
-                                   self.options(),
-                                   1.f,
-                                   static_cast<int>(0),
-                                   mfmt);
+    auto mfmt = self.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? at::MemoryFormat::ChannelsLast
+        : at::MemoryFormat::Contiguous;
+    self = _empty_affine_quantized(
+        self.sizes(), self.options(), 1.f, static_cast<int>(0), mfmt);
     self.set_quantizer_(src.quantizer());
   }
 
@@ -280,14 +296,13 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
     return self;
   }
 
-  at::Device src_device =  src.device();
-  at::Device dst_device =  self.device();
+  at::Device src_device = src.device();
+  at::Device dst_device = self.device();
 
-  bool same_device = src_device.type() == c10::DeviceType::XPU && src_device == dst_device;
-  bool has_sz_st = src.sizes().size() != 0 &&
-                   src.strides().size() != 0 &&
-                   self.sizes().size() != 0 &&
-                   self.strides().size() != 0;
+  bool same_device =
+      src_device.type() == c10::DeviceType::XPU && src_device == dst_device;
+  bool has_sz_st = src.sizes().size() != 0 && src.strides().size() != 0 &&
+      self.sizes().size() != 0 && self.strides().size() != 0;
   if (same_device && has_sz_st &&
       xpu::oneDNN::is_supported_onednn_dtype(self) &&
       xpu::oneDNN::is_supported_onednn_dtype(src)) {

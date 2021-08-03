@@ -1,18 +1,18 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <oneDNN/Utils.h>
-#include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
+#include <oneDNN/Runtime.h>
+#include <oneDNN/Utils.h>
 
-#include "Types.h"
-#include "Sum.h"
+#include "BatchNorm.h"
 #include "Binary.h"
+#include "Conv.h"
 #include "Eltwise.h"
-#include "Reorder.h"
+#include "GRU.h"
 #include "LayerNorm.h"
 #include "Matmul.h"
-#include "Conv.h"
 #include "Pooling.h"
-#include "BatchNorm.h"
-#include "GRU.h"
+#include "Reorder.h"
+#include "Sum.h"
+#include "Types.h"

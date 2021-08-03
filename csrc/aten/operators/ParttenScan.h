@@ -1,7 +1,6 @@
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
-
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -273,7 +272,7 @@ struct create_mask {
     // 1. apply __pred
     auto __temp = __pred(__input[__idx]);
     // 2. initialize mask
-//    __input[__idx] = __temp;
+    //    __input[__idx] = __temp;
     return _Tp(__temp);
   }
 };

@@ -1,14 +1,14 @@
 #pragma once
 
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <chrono>
 
 using namespace std::chrono;
 
 struct ipex_timer {
-public:
+ public:
   ipex_timer(int verbose_level, std::string tag);
 
   void now(std::string sstamp);
@@ -17,7 +17,7 @@ public:
 
   ~ipex_timer();
 
-private:
+ private:
   int vlevel_;
   std::string tag_;
   time_point<high_resolution_clock> start_;

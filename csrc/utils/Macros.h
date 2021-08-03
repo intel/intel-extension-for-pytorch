@@ -25,8 +25,8 @@
 #define IPEX_API IPEX_IMPORT
 #endif
 
-#define IPEX_DISABLE_COPY_AND_ASSIGN(classname)   \
-  classname(const classname&) = delete;           \
+#define IPEX_DISABLE_COPY_AND_ASSIGN(classname) \
+  classname(const classname&) = delete;         \
   classname& operator=(const classname&) = delete
 
 enum DPCPP_STATUS {
@@ -35,19 +35,19 @@ enum DPCPP_STATUS {
 };
 
 // Host side print utils
-template<typename T>
-void ipex_host_print(T &t) {
-  std::cout<<t;
+template <typename T>
+void ipex_host_print(T& t) {
+  std::cout << t;
 }
 
-template<typename T, typename ...Ts>
-void ipex_host_print(T &t, Ts&&... args) {
-  std::cout<<t;
+template <typename T, typename... Ts>
+void ipex_host_print(T& t, Ts&&... args) {
+  std::cout << t;
   ipex_host_print(std::forward<Ts>(args)...);
 }
 
 #define IPEX_H_PRINT(...)         \
   {                               \
     ipex_host_print(__VA_ARGS__); \
-    std::cout<<std::endl;         \
+    std::cout << std::endl;       \
   }

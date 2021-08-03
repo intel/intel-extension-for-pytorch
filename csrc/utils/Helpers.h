@@ -34,7 +34,7 @@ void parallel_for_setup(
     int64_t& rng2,
     int64_t& GRange0,
     int64_t& GRange1,
-    int64_t& GRange2); 
+    int64_t& GRange2);
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

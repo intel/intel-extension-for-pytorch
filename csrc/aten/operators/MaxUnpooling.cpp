@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 #include <ATen/NativeFunctions.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
-#include "comm/NumericLimits.h"
-#include "comm/Atomics.h"
-#include "comm/Numerics.h"
+#include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
+#include "comm/Atomics.h"
+#include "comm/NumericLimits.h"
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
 
@@ -502,14 +502,16 @@ Tensor& max_unpooling3d_forward_template(
 
   // Collapse batch and feature dimensions if needed
   if (self.ndimension() == 5) {
-    self = self.reshape({self.size(0) * self.size(1),
-                         self.size(2),
-                         self.size(3),
-                         self.size(4)});
-    indices = indices.reshape({indices.size(0) * indices.size(1),
-                               indices.size(2),
-                               indices.size(3),
-                               indices.size(4)});
+    self = self.reshape(
+        {self.size(0) * self.size(1),
+         self.size(2),
+         self.size(3),
+         self.size(4)});
+    indices = indices.reshape(
+        {indices.size(0) * indices.size(1),
+         indices.size(2),
+         indices.size(3),
+         indices.size(4)});
   }
 
   int totalZ = inputTime * inputSlices * batchSize;
@@ -587,16 +589,17 @@ Tensor& max_unpooling3d_backward_template(
   // Collapse batch and feature dimensions if needed
   auto grad_input_reshaped = grad_input;
   if (grad_input.ndimension() == 5) {
-    grad_input_reshaped =
-        grad_input.reshape({grad_input.size(0) * grad_input.size(1),
-                            grad_input.size(2),
-                            grad_input.size(3),
-                            grad_input.size(4)});
+    grad_input_reshaped = grad_input.reshape(
+        {grad_input.size(0) * grad_input.size(1),
+         grad_input.size(2),
+         grad_input.size(3),
+         grad_input.size(4)});
 
-    indices = indices.reshape({indices.size(0) * indices.size(1),
-                               indices.size(2),
-                               indices.size(3),
-                               indices.size(4)});
+    indices = indices.reshape(
+        {indices.size(0) * indices.size(1),
+         indices.size(2),
+         indices.size(3),
+         indices.size(4)});
   }
 
   int totalZ = inputTime * inputSlices * batchSize;

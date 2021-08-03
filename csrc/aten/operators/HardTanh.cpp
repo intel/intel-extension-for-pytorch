@@ -3,8 +3,8 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
-#include "comm/ATDispatch.h"
 #include "Loops.h"
+#include "comm/ATDispatch.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -18,10 +18,10 @@ Tensor& hardtanh_out(
   checkBackend("hardtanh", out, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(out)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(out)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -67,11 +67,11 @@ Tensor& hardtanh_backward_out(
       "hardtanh_backward", {grad_input, grad_output}, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(grad_input)
-  .add_input(grad_output)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(grad_input)
+                  .add_input(grad_output)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "hardtanh_backward", [&]() {

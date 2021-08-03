@@ -2,12 +2,11 @@
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 
-#include <utils/DPCPP.h>
 #include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
-#include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
-
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
 

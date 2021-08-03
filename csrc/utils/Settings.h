@@ -5,15 +5,10 @@
 namespace xpu {
 namespace dpcpp {
 
-enum IPEX_API XPU_BACKEND {
-  XB_GPU = 0,
-  XB_CPU = 1,
-  XB_AUTO = 2,
-  XB_MAX = 3
-};
+enum IPEX_API XPU_BACKEND { XB_GPU = 0, XB_CPU = 1, XB_AUTO = 2, XB_MAX = 3 };
 
 class IPEX_API Settings final {
-public:
+ public:
   static Settings& I() {
     static Settings mySettings;
     return mySettings;
@@ -48,16 +43,16 @@ public:
   void enable_tf32_mode();
   void disable_tf32_mode();
 
-private:
-  Settings() :
-    verbose_level(0),
-    warning_level(0),
-    xpu_backend(XPU_BACKEND::XB_GPU),
-    force_sync_exec_enabled(false),
-    event_profiling_enabled(true),
-    tile_partition_enabled(true),
-    onednn_layout_enabled(false),
-    tf32_mode_enabled(false) {}
+ private:
+  Settings()
+      : verbose_level(0),
+        warning_level(0),
+        xpu_backend(XPU_BACKEND::XB_GPU),
+        force_sync_exec_enabled(false),
+        event_profiling_enabled(true),
+        tile_partition_enabled(true),
+        onednn_layout_enabled(false),
+        tf32_mode_enabled(false) {}
 
   int verbose_level;
   int warning_level;

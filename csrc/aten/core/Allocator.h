@@ -1,11 +1,11 @@
 #pragma once
 
-#include <c10/core/Device.h>
 #include <c10/core/Allocator.h>
+#include <c10/core/Device.h>
 
-#include <utils/Macros.h>
-#include <core/Stream.h>
 #include <core/AllocationInfo.h>
+#include <core/Stream.h>
+#include <utils/Macros.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -23,9 +23,12 @@ IPEX_API std::vector<SegmentInfo> snapshotOfDevAlloc();
 
 at::Allocator* getDeviceAllocator();
 
-void cacheInfoFromDevAlloc(DeviceIndex deviceIndex, size_t* cachedAndFree, size_t* largestBlock);
+void cacheInfoFromDevAlloc(
+    DeviceIndex deviceIndex,
+    size_t* cachedAndFree,
+    size_t* largestBlock);
 
-void* getBaseAllocationFromDevAlloc(void *ptr, size_t *size);
+void* getBaseAllocationFromDevAlloc(void* ptr, size_t* size);
 
 void recordStreamInDevAlloc(const DataPtr& ptr, DPCPPStream stream);
 

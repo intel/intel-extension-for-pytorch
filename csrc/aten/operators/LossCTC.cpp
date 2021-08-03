@@ -1,13 +1,12 @@
 #include <ATen/ATen.h>
 
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
-#include "comm/AccumulateType.h"
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp;
 
@@ -101,19 +100,13 @@ void ctc_loss_log_alpha_kernel(
       get_work_range(work_group_size, 2 * __max_input_length + 1, __batch_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto log_alpha_data =
-        log_alpha.data_ptr<scalar_t>();
-    auto log_probs_data =
-        log_probs.data_ptr<scalar_t>();
-    auto input_lengths_data =
-        input_lengths.data_ptr<int64_t>();
+    auto log_alpha_data = log_alpha.data_ptr<scalar_t>();
+    auto log_probs_data = log_probs.data_ptr<scalar_t>();
+    auto input_lengths_data = input_lengths.data_ptr<int64_t>();
     auto targets_data = targets.data_ptr<target_t>();
-    auto target_lengths_data =
-        target_lengths.data_ptr<int64_t>();
-    auto neg_log_likelihood_data =
-        neg_log_likelihood.data_ptr<scalar_t>();
-    auto tg_batch_offsets_data =
-        tg_batch_offsets.data_ptr<int64_t>();
+    auto target_lengths_data = target_lengths.data_ptr<int64_t>();
+    auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
+    auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       size_t intra_batch_id = item_id.get_local_id(0);
       size_t intra_batch_size = item_id.get_local_range(0);
@@ -329,15 +322,11 @@ void ctc_loss_backward_log_beta_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto log_beta_data = log_beta.data_ptr<scalar_t>();
-    auto log_probs_data =
-        log_probs.data_ptr<scalar_t>();
-    auto input_lengths_data =
-        input_lengths.data_ptr<int64_t>();
+    auto log_probs_data = log_probs.data_ptr<scalar_t>();
+    auto input_lengths_data = input_lengths.data_ptr<int64_t>();
     auto targets_data = targets.data_ptr<target_t>();
-    auto target_lengths_data =
-        target_lengths.data_ptr<int64_t>();
-    auto tg_batch_offsets_data =
-        tg_batch_offsets.data_ptr<int64_t>();
+    auto target_lengths_data = target_lengths.data_ptr<int64_t>();
+    auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       size_t intra_batch_id = item_id.get_local_id(0);
       size_t intra_batch_size = item_id.get_local_range(0);
@@ -552,20 +541,14 @@ void ctc_loss_backward_collect_nonblank_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();
     auto grad_out_data = grad_out.data_ptr<scalar_t>();
-    auto log_alpha_data =
-        log_alpha.data_ptr<scalar_t>();
+    auto log_alpha_data = log_alpha.data_ptr<scalar_t>();
     auto log_beta_data = log_beta.data_ptr<scalar_t>();
-    auto log_probs_data =
-        log_probs.data_ptr<scalar_t>();
-    auto input_lengths_data =
-        input_lengths.data_ptr<int64_t>();
+    auto log_probs_data = log_probs.data_ptr<scalar_t>();
+    auto input_lengths_data = input_lengths.data_ptr<int64_t>();
     auto targets_data = targets.data_ptr<target_t>();
-    auto target_lengths_data =
-        target_lengths.data_ptr<int64_t>();
-    auto neg_log_likelihood_data =
-        neg_log_likelihood.data_ptr<scalar_t>();
-    auto tg_batch_offsets_data =
-        tg_batch_offsets.data_ptr<int64_t>();
+    auto target_lengths_data = target_lengths.data_ptr<int64_t>();
+    auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
+    auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       auto* gradient_ptr = gradient_data;
       scalar_t* grad_out_ptr = grad_out_data;
@@ -609,7 +592,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
         scalar_t lp = log_probs_ptr
             [lp_batch_offset + t * lp_input_stride + lp_char_stride * target];
         atomicAdd(
-          (dpcpp_global_ptr_pt<scalar_t>)&gradient_ptr
+            (dpcpp_global_ptr_pt<scalar_t>)&gradient_ptr
                 [gr_batch_offset + t * gr_input_stride +
                  gr_char_stride * target],
             -Numerics<scalar_t>::exp(
@@ -681,20 +664,14 @@ void ctc_loss_backward_collect_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();
     auto grad_out_data = grad_out.data_ptr<scalar_t>();
-    auto log_alpha_data =
-        log_alpha.data_ptr<scalar_t>();
+    auto log_alpha_data = log_alpha.data_ptr<scalar_t>();
     auto log_beta_data = log_beta.data_ptr<scalar_t>();
-    auto log_probs_data =
-        log_probs.data_ptr<scalar_t>();
-    auto input_lengths_data =
-        input_lengths.data_ptr<int64_t>();
+    auto log_probs_data = log_probs.data_ptr<scalar_t>();
+    auto input_lengths_data = input_lengths.data_ptr<int64_t>();
     auto targets_data = targets.data_ptr<target_t>();
-    auto target_lengths_data =
-        target_lengths.data_ptr<int64_t>();
-    auto neg_log_likelihood_data =
-        neg_log_likelihood.data_ptr<scalar_t>();
-    auto tg_batch_offsets_data =
-        tg_batch_offsets.data_ptr<int64_t>();
+    auto target_lengths_data = target_lengths.data_ptr<int64_t>();
+    auto neg_log_likelihood_data = neg_log_likelihood.data_ptr<scalar_t>();
+    auto tg_batch_offsets_data = tg_batch_offsets.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       scalar_t* gradient_ptr = gradient_data;
       scalar_t* grad_out_ptr = grad_out_data;
@@ -800,8 +777,7 @@ void ctc_loss_zero_padded_gradients(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradient_data = gradient.data_ptr<scalar_t>();
-    auto input_lengths_data =
-        input_lengths.data_ptr<int64_t>();
+    auto input_lengths_data = input_lengths.data_ptr<int64_t>();
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       scalar_t* gradient_ptr = gradient_data;
       int64_t* input_lengths_ptr = input_lengths_data;

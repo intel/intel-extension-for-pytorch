@@ -6,7 +6,6 @@
 
 #include <oneDNN/oneDNN.h>
 
-
 using namespace dnnl;
 using namespace at::native;
 using namespace at::AtenIpexTypeXPU;
@@ -24,7 +23,6 @@ static void upsample_linear_out_dpcpp_kernel(
     const double& scales_w = 0.0,
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
-
   auto strm = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kXPU, current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
@@ -48,9 +46,12 @@ static void upsample_linear_out_dpcpp_kernel(
       scales_d);
 
   Tensor input = input_;
-  if (!input_.is_contiguous() && input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (!input_.is_contiguous() &&
+      input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
     output.resize_(dst_dims, at::MemoryFormat::ChannelsLast);
-  } else if (!input_.is_contiguous() && input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+  } else if (
+      !input_.is_contiguous() &&
+      input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     output.resize_(dst_dims, at::MemoryFormat::ChannelsLast3d);
   } else {
     input = input_.contiguous(input_.suggest_memory_format());
@@ -70,8 +71,9 @@ static void upsample_linear_out_dpcpp_kernel(
     dst_md.reset(new memory::desc(dst_dims, data_type, format_any));
 
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
-  auto src_md = src_ctx.is_plain() ? memory::desc(src_dims, data_type, data_format) :
-      src_ctx.meta();
+  auto src_md = src_ctx.is_plain()
+      ? memory::desc(src_dims, data_type, data_format)
+      : src_ctx.meta();
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -91,18 +93,25 @@ static void upsample_linear_out_dpcpp_kernel(
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto resample_forward = fetch_or_create_m<resampling_forward>(key, resampling_pd);
+  auto resample_forward =
+      fetch_or_create_m<resampling_forward>(key, resampling_pd);
 #else
   auto resample_forward = resampling_forward(resampling_pd);
 #endif
 
   if (!src_ctx.is_plain()) {
-    output = empty_opaque_tensor(resampling_pd.dst_desc(), input.options(), c10::nullopt);
+    output = empty_opaque_tensor(
+        resampling_pd.dst_desc(), input.options(), c10::nullopt);
   }
-  memory src_memory = dpcpp_onednn_memory(resampling_pd.src_desc(), eng, input.data_ptr());
-  memory dst_memory = dpcpp_onednn_memory(resampling_pd.dst_desc(), eng, output.data_ptr());
+  memory src_memory =
+      dpcpp_onednn_memory(resampling_pd.src_desc(), eng, input.data_ptr());
+  memory dst_memory =
+      dpcpp_onednn_memory(resampling_pd.dst_desc(), eng, output.data_ptr());
 
-  DPCPP_ONEDNN_EXEC(resample_forward, strm, {{DNNL_ARG_SRC, src_memory}, {DNNL_ARG_DST, dst_memory}});
+  DPCPP_ONEDNN_EXEC(
+      resample_forward,
+      strm,
+      {{DNNL_ARG_SRC, src_memory}, {DNNL_ARG_DST, dst_memory}});
 }
 
 static void upsample_linear_backward_out_dpcpp_kernel(
@@ -113,7 +122,6 @@ static void upsample_linear_backward_out_dpcpp_kernel(
     const double& scales_w = 0.0,
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
-
   auto strm = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kXPU, current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
@@ -136,10 +144,13 @@ static void upsample_linear_backward_out_dpcpp_kernel(
       scales_d);
 
   Tensor grad_output;
-  if (!grad_output_.is_contiguous() && grad_output_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (!grad_output_.is_contiguous() &&
+      grad_output_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
     grad_input.resize_(src_dims, at::MemoryFormat::ChannelsLast);
     grad_output = grad_output_.contiguous(at::MemoryFormat::ChannelsLast);
-  } else if (!grad_output_.is_contiguous() && grad_output_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+  } else if (
+      !grad_output_.is_contiguous() &&
+      grad_output_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     grad_input.resize_(src_dims, at::MemoryFormat::ChannelsLast3d);
     grad_output = grad_output_.contiguous(at::MemoryFormat::ChannelsLast3d);
   } else {
@@ -169,40 +180,58 @@ static void upsample_linear_backward_out_dpcpp_kernel(
       *dst_md);
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
 
-  auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
-  auto diff_dst_md = diff_dst_ctx.is_plain() ? resampling_pd.dst_desc() :
-      diff_dst_ctx.meta();
+  auto diff_dst_ctx =
+      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
+  auto diff_dst_md =
+      diff_dst_ctx.is_plain() ? resampling_pd.dst_desc() : diff_dst_ctx.meta();
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   if (!is_customer_scales) {
-    create_key(key, algorithm::resampling_linear, factors, src_md, *dst_md, diff_src_md, diff_dst_md);
+    create_key(
+        key,
+        algorithm::resampling_linear,
+        factors,
+        src_md,
+        *dst_md,
+        diff_src_md,
+        diff_dst_md);
   } else {
-    create_key(key, algorithm::resampling_linear, factors, src_md, diff_src_md, diff_dst_md);
+    create_key(
+        key,
+        algorithm::resampling_linear,
+        factors,
+        src_md,
+        diff_src_md,
+        diff_dst_md);
   }
 #endif
 
   auto resampling_bwd_desc = resampling_backward::desc(
-      algorithm::resampling_linear,
-      factors,
-      diff_src_md,
-      diff_dst_md);
-  auto resampling_bwd_pd = resampling_backward::primitive_desc(resampling_bwd_desc, eng, resampling_pd);
+      algorithm::resampling_linear, factors, diff_src_md, diff_dst_md);
+  auto resampling_bwd_pd = resampling_backward::primitive_desc(
+      resampling_bwd_desc, eng, resampling_pd);
 #ifdef USE_PRIMITIVE_CACHE
-  auto resampling_bwd = fetch_or_create_m<resampling_backward>(key, resampling_bwd_pd);
+  auto resampling_bwd =
+      fetch_or_create_m<resampling_backward>(key, resampling_bwd_pd);
 #else
   auto resampling_bwd = resampling_backward(resampling_bwd_pd);
 #endif
 
   if (!diff_dst_ctx.is_plain()) {
-    grad_input = empty_opaque_tensor(resampling_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
+    grad_input = empty_opaque_tensor(
+        resampling_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
   }
   memory diff_src_memory = dpcpp_onednn_memory(
       resampling_bwd_pd.diff_src_desc(), eng, grad_input.data_ptr());
   memory diff_dst_memory = dpcpp_onednn_memory(
       resampling_bwd_pd.diff_dst_desc(), eng, grad_output.data_ptr());
 
-  DPCPP_ONEDNN_EXEC(resampling_bwd, strm, {{DNNL_ARG_DIFF_SRC, diff_src_memory}, {DNNL_ARG_DIFF_DST, diff_dst_memory}});
+  DPCPP_ONEDNN_EXEC(
+      resampling_bwd,
+      strm,
+      {{DNNL_ARG_DIFF_SRC, diff_src_memory},
+       {DNNL_ARG_DIFF_DST, diff_dst_memory}});
 }
 
 } // namespace impl
@@ -269,16 +298,16 @@ Tensor upsample_trilinear3d(
   auto scale_w = get_scale_value(scale_factors, 2);
   if (align_corners)
     printf(
-            "we don't support this path by currently as oneDNN don't support this "
-            "algorithm!\n");
+        "we don't support this path by currently as oneDNN don't support this "
+        "algorithm!\n");
   else
     upsample_linear_out_dpcpp_kernel(
-            output,
-            input,
-            osize,
-            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-            scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+        output,
+        input,
+        osize,
+        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+        scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+        scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
   return output;
 }
 
@@ -319,19 +348,19 @@ Tensor upsample_trilinear3d_backward(
   Tensor grad_input;
   if (4 == ndim) {
     grad_input = (!grad_output.is_contiguous() &&
-        grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
         ? at::empty(
               input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
         : at::empty(input_size, grad_output.options());
-  }
-  else if (5 == ndim) { //5 == ndim
+  } else if (5 == ndim) { // 5 == ndim
     grad_input = (!grad_output.is_contiguous() &&
-        grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))
+                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))
         ? at::empty(
-              input_size, grad_output.options(), at::MemoryFormat::ChannelsLast3d)
+              input_size,
+              grad_output.options(),
+              at::MemoryFormat::ChannelsLast3d)
         : at::empty(input_size, grad_output.options());
-  }
-  else {
+  } else {
     grad_input = at::empty(input_size, grad_output.options());
   }
 
@@ -352,11 +381,11 @@ Tensor upsample_trilinear3d_backward(
 }
 
 Tensor upsample_trilinear3d_backward(
-        const Tensor& grad_output,
-        c10::optional<IntArrayRef> output_size,
-        IntArrayRef input_size,
-        bool align_corners,
-        c10::optional<ArrayRef<double>> scale_factors) {
+    const Tensor& grad_output,
+    c10::optional<IntArrayRef> output_size,
+    IntArrayRef input_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_d = get_scale_value(scale_factors, 0);
   auto scale_h = get_scale_value(scale_factors, 1);
@@ -365,36 +394,36 @@ Tensor upsample_trilinear3d_backward(
 
   Tensor grad_input;
   if (4 == ndim) {
-    grad_input = (!grad_output.is_contiguous() && 
-        grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+    grad_input = (!grad_output.is_contiguous() &&
+                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
         ? at::empty(
               input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
         : at::empty(input_size, grad_output.options());
-  }
-  else if (5 == ndim) { //5 == ndim
+  } else if (5 == ndim) { // 5 == ndim
     grad_input = (!grad_output.is_contiguous() &&
-        grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))
+                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))
         ? at::empty(
-              input_size, grad_output.options(), at::MemoryFormat::ChannelsLast3d)
+              input_size,
+              grad_output.options(),
+              at::MemoryFormat::ChannelsLast3d)
         : at::empty(input_size, grad_output.options());
-  }
-  else {
+  } else {
     grad_input = at::empty(input_size, grad_output.options());
   }
 
   if (align_corners)
     printf(
-            "we don't support this path by currently as oneDNN don't support this "
-            "algorithm!\n");
+        "we don't support this path by currently as oneDNN don't support this "
+        "algorithm!\n");
   else
     upsample_linear_backward_out_dpcpp_kernel(
-            grad_input,
-            grad_output,
-            osize,
-            input_size,
-            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
-            scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+        grad_input,
+        grad_output,
+        osize,
+        input_size,
+        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+        scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+        scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
   return grad_input;
 }
 
@@ -441,25 +470,25 @@ Tensor upsample_bilinear2d(
 }
 
 Tensor upsample_bilinear2d(
-        const Tensor& input,
-        c10::optional<IntArrayRef> output_size,
-        bool align_corners,
-        c10::optional<ArrayRef<double>> scale_factors) {
+    const Tensor& input,
+    c10::optional<IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
   auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
   auto scale_h = get_scale_value(scale_factors, 0);
   auto scale_w = get_scale_value(scale_factors, 1);
   if (align_corners)
     printf(
-            "we don't support this path by currently as oneDNN don't support this "
-            "algorithm!\n");
+        "we don't support this path by currently as oneDNN don't support this "
+        "algorithm!\n");
   else
     upsample_linear_out_dpcpp_kernel(
-            output,
-            input,
-            osize,
-            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
+        output,
+        input,
+        osize,
+        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+        scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
   return output;
 }
 
@@ -493,8 +522,9 @@ Tensor upsample_bilinear2d_backward(
     bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  Tensor grad_input = (!grad_output.is_contiguous() &&
-      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+  Tensor grad_input =
+      (!grad_output.is_contiguous() &&
+       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
       ? at::empty(
             input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
       : at::empty(input_size, grad_output.options());
@@ -514,31 +544,32 @@ Tensor upsample_bilinear2d_backward(
 }
 
 Tensor upsample_bilinear2d_backward(
-        const Tensor& grad_output,
-        c10::optional<IntArrayRef> output_size,
-        IntArrayRef input_size,
-        bool align_corners,
-        c10::optional<ArrayRef<double>> scale_factors) {
+    const Tensor& grad_output,
+    c10::optional<IntArrayRef> output_size,
+    IntArrayRef input_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_h = get_scale_value(scale_factors, 0);
   auto scale_w = get_scale_value(scale_factors, 1);
-  Tensor grad_input = (!grad_output.is_contiguous() &&
-      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+  Tensor grad_input =
+      (!grad_output.is_contiguous() &&
+       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
       ? at::empty(
             input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
       : at::empty(input_size, grad_output.options());
   if (align_corners)
     printf(
-            "we don't support this path by currently as oneDNN don't support this "
-            "algorithm!\n");
+        "we don't support this path by currently as oneDNN don't support this "
+        "algorithm!\n");
   else
     upsample_linear_backward_out_dpcpp_kernel(
-            grad_input,
-            grad_output,
-            osize,
-            input_size,
-            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
-            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
+        grad_input,
+        grad_output,
+        osize,
+        input_size,
+        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+        scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
   return grad_input;
 }
 
@@ -590,14 +621,14 @@ Tensor upsample_linear1d(
   auto scale_w = get_scale_value(scale_factors, 0);
   if (align_corners)
     printf(
-            "we don't support this path by currently as oneDNN don't support this "
-            "algorithm!\n");
+        "we don't support this path by currently as oneDNN don't support this "
+        "algorithm!\n");
   else
     impl::upsample_linear_out_dpcpp_kernel(
-            output,
-            input,
-            osize,
-            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
+        output,
+        input,
+        osize,
+        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return output;
 }
 
@@ -628,8 +659,9 @@ Tensor upsample_linear1d_backward(
     IntArrayRef input_size,
     bool align_corners,
     c10::optional<double> scales) {
-  Tensor grad_input = (!grad_output.is_contiguous() &&
-      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+  Tensor grad_input =
+      (!grad_output.is_contiguous() &&
+       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
       ? at::empty(
             input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
       : at::empty(input_size, grad_output.options());
@@ -648,29 +680,30 @@ Tensor upsample_linear1d_backward(
 }
 
 Tensor upsample_linear1d_backward(
-        const Tensor& grad_output,
-        c10::optional<IntArrayRef> output_size,
-        IntArrayRef input_size,
-        bool align_corners,
-        c10::optional<ArrayRef<double>> scale_factors) {
+    const Tensor& grad_output,
+    c10::optional<IntArrayRef> output_size,
+    IntArrayRef input_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_w = get_scale_value(scale_factors, 0);
-  Tensor grad_input = (!grad_output.is_contiguous() &&
-      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+  Tensor grad_input =
+      (!grad_output.is_contiguous() &&
+       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
       ? at::empty(
             input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
       : at::empty(input_size, grad_output.options());
   if (align_corners)
     printf(
-            "we don't support this path by currently as oneDNN don't support this "
-            "algorithm!\n");
+        "we don't support this path by currently as oneDNN don't support this "
+        "algorithm!\n");
   else
     upsample_linear_backward_out_dpcpp_kernel(
-            grad_input,
-            grad_output,
-            osize,
-            input_size,
-            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
+        grad_input,
+        grad_output,
+        osize,
+        input_size,
+        scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return grad_input;
 }
 

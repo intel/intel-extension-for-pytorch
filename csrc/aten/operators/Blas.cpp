@@ -1,15 +1,15 @@
 #include <ATen/ATen.h>
+#include <ATen/CPUApplyUtils.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/record_function.h>
-#include <ATen/CPUApplyUtils.h>
 #include <core/TensorImplUtils.h>
 
-#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
+#include <runtime/Utils.h>
 #include <vector>
 
-#include "comm/ATDispatch.h"
 #include <quantized/QUtil.h>
+#include "comm/ATDispatch.h"
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
@@ -19,7 +19,6 @@
 
 #include <c10/util/typeid.h>
 
-
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
@@ -27,7 +26,7 @@ using namespace xpu::oneDNN;
 namespace at {
 namespace impl {
 
-bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
+bool check_broadcast(const Tensor& src, const IntArrayRef& shape) {
   auto src_dim = src.dim();
   auto tgt_dim = shape.size();
   if (src_dim == 0 || src_dim > tgt_dim)
@@ -38,36 +37,44 @@ bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
     auto size = src.size(src_dim);
     if (size != 1 && size != shape[tgt_dim])
       return false;
-  } while(src_dim);
+  } while (src_dim);
   return true;
 }
 
-void gemm_broadcast(Tensor& result,
-                    const Tensor& m1,
-                    const Tensor& m2,
-                    MatmulAttr attr,
-                    const Tensor bias = at::Tensor()) {
+void gemm_broadcast(
+    Tensor& result,
+    const Tensor& m1,
+    const Tensor& m2,
+    MatmulAttr attr,
+    const Tensor bias = at::Tensor()) {
   std::vector<int64_t> result_shape;
   auto dim = m1.dim();
 
-  if(m1.is_quantized()){
-    if(m2.sizes()[1] == m1.sizes()[1]){
-      m2.transpose_(0,1);
+  if (m1.is_quantized()) {
+    if (m2.sizes()[1] == m1.sizes()[1]) {
+      m2.transpose_(0, 1);
     }
   }
 
   if (dim == 2) {
-    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m2.size(1)} :
-    std::vector<int64_t>{m1.size(0), m2.size(0)};
+    result_shape = attr.m2_trans_
+        ? std::vector<int64_t>{m1.size(0), m2.size(1)}
+        : std::vector<int64_t>{m1.size(0), m2.size(0)};
   } else {
-    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)} :
-    std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
+    result_shape = attr.m2_trans_
+        ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)}
+        : std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
   }
 
   Tensor bc_bias = bias;
-  if (bias.defined() && attr.beta_ && (attr.beta_ != 1.f || m1.is_quantized())) {
-    TORCH_CHECK(check_broadcast(bias, result_shape),
-                "bias ", bias.sizes(), " cannot broadcast to ", result_shape);
+  if (bias.defined() && attr.beta_ &&
+      (attr.beta_ != 1.f || m1.is_quantized())) {
+    TORCH_CHECK(
+        check_broadcast(bias, result_shape),
+        "bias ",
+        bias.sizes(),
+        " cannot broadcast to ",
+        result_shape);
     std::tie(bc_bias) = expand_size(bias, result_shape, "gemm_broadcast");
     if (!result.is_same(bc_bias))
       result.resize_(bc_bias.sizes()).copy_(bc_bias);
@@ -75,45 +82,76 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  if(result.scalar_type() == ScalarType::Double ||
+  if (result.scalar_type() == ScalarType::Double ||
       m1.scalar_type() == ScalarType::Double ||
-      m2.scalar_type() == ScalarType::Double){
+      m2.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
     Tensor _result;
-    if(result.is_contiguous() && result.scalar_type() == ScalarType::Double){
+    if (result.is_contiguous() && result.scalar_type() == ScalarType::Double) {
       _result = result;
-    } else{
-      _result = at::empty_like(result, result.options().dtype(ScalarType::Double));
+    } else {
+      _result =
+          at::empty_like(result, result.options().dtype(ScalarType::Double));
     }
     Tensor _m1 = m1.contiguous().to(ScalarType::Double);
     Tensor _m2 = m2.contiguous().to(ScalarType::Double);
     size_t dims = _result.dim();
-    TORCH_CHECK(dims == 2 || dims == 3, "oneMKL matmul only works with 2D or 3D, got ", dims);
-    TORCH_CHECK(dims == _m1.dim() && dims == _m2.dim(), "oneMKL input matrixes must have the same ranks");
+    TORCH_CHECK(
+        dims == 2 || dims == 3,
+        "oneMKL matmul only works with 2D or 3D, got ",
+        dims);
+    TORCH_CHECK(
+        dims == _m1.dim() && dims == _m2.dim(),
+        "oneMKL input matrixes must have the same ranks");
 
     int64_t m = _result.size(-2);
     int64_t k = _m1.size(-1);
     int64_t n = _result.size(-1);
-    int64_t stridea = m*k;
-    int64_t strideb = k*n;
-    int64_t stridec = m*n;
+    int64_t stridea = m * k;
+    int64_t strideb = k * n;
+    int64_t stridec = m * n;
     int64_t mb = 1;
 
     if (dims == 3) {
       mb = _result.size(0);
-      TORCH_CHECK(mb == _m1.size(0) && mb == _m2.size(0), "batch size mismatch, result mb: ",\
-          mb, "m1 mb", _m1.size(0), " m2 mb: ", _m2.size(0));
+      TORCH_CHECK(
+          mb == _m1.size(0) && mb == _m2.size(0),
+          "batch size mismatch, result mb: ",
+          mb,
+          "m1 mb",
+          _m1.size(0),
+          " m2 mb: ",
+          _m2.size(0));
     }
 
     auto& dpcpp_queue = dpcppGetCurrentQueue();
     DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::blas::row_major::gemm_batch, dpcpp_queue, oneapi::mkl::transpose::N, oneapi::mkl::transpose::N, m, n, k, attr.alpha_, (double *)_m1.data_ptr(), m, stridea, (double *)_m2.data_ptr(), k, strideb, attr.beta_, (double *)_result.data_ptr(), m, stridec, mb);
-    if(!_result.is_same(result)){
+        dpcpp_queue,
+        oneapi::mkl::blas::row_major::gemm_batch,
+        dpcpp_queue,
+        oneapi::mkl::transpose::N,
+        oneapi::mkl::transpose::N,
+        m,
+        n,
+        k,
+        attr.alpha_,
+        (double*)_m1.data_ptr(),
+        m,
+        stridea,
+        (double*)_m2.data_ptr(),
+        k,
+        strideb,
+        attr.beta_,
+        (double*)_result.data_ptr(),
+        m,
+        stridec,
+        mb);
+    if (!_result.is_same(result)) {
       result.copy_(_result);
     }
 #else
-    AT_ERROR("Double datatype matmul is not supported. Include oneMKL library in compilation");
+    AT_ERROR(
+        "Double datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   } else {
     xpu::oneDNN::matmul(result, m1, m2, bc_bias, attr);
@@ -121,23 +159,18 @@ void gemm_broadcast(Tensor& result,
 }
 } // namespace impl
 
-
 namespace AtenIpexTypeXPU {
 
 using namespace impl;
 
 Tensor& addmm_out(
-        Tensor &result,
-        const Tensor& self,
-        const Tensor& m1,
-        const Tensor& m2,
-        Scalar beta,
-        Scalar alpha) {
-  MatmulAttr attr(
-          alpha.to<float>(),
-          beta.to<float>(),
-          0,
-          true);
+    Tensor& result,
+    const Tensor& self,
+    const Tensor& m1,
+    const Tensor& m2,
+    Scalar beta,
+    Scalar alpha) {
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, true);
   checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
@@ -145,9 +178,12 @@ Tensor& addmm_out(
   impl::gemm_broadcast(
       result,
       m1,
-      m2.scalar_type() == m1.scalar_type() ? m2 :
-                          (m1.scalar_type() == ScalarType::BFloat16 || m2.scalar_type() == ScalarType::BFloat16) ? m2 :
-                          m2.to(m1.scalar_type()),
+      m2.scalar_type() == m1.scalar_type()
+          ? m2
+          : (m1.scalar_type() == ScalarType::BFloat16 ||
+             m2.scalar_type() == ScalarType::BFloat16)
+              ? m2
+              : m2.to(m1.scalar_type()),
       attr,
       self);
 
@@ -161,8 +197,14 @@ Tensor& addmm_(
     Scalar beta,
     Scalar alpha) {
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
-              "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
+  TORCH_CHECK(
+      self.size(0) == m1.size(0) && self.size(1) == m2.size(1),
+      "size mismatch input ",
+      self.sizes(),
+      " m1 ",
+      m1.sizes(),
+      " m2 ",
+      m2.sizes());
   Tensor bias = at::empty_like(self).copy_(self);
   // oneDNN cannot support result/bias (write/read) use the same memory.
   // we will remove copy to keep performance once matmul refactor done.
@@ -177,7 +219,7 @@ Tensor addmm(
     Scalar beta,
     Scalar alpha) {
   Tensor result;
-  if (m1.scalar_type() == at::ScalarType::BFloat16){
+  if (m1.scalar_type() == at::ScalarType::BFloat16) {
     // align with bf16 input
     result = at::empty({0}, m1.options());
   } else {
@@ -199,12 +241,20 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
   auto mat2_dt = mat2.scalar_type();
 
   impl::gemm_broadcast(
-  result,
-  (self_dt == result_dt ||
-   ((self_dt == ScalarType::BFloat16 && result_dt != ScalarType::BFloat16) || (result_dt == ScalarType::BFloat16 && self_dt != ScalarType::BFloat16))) ? self : self.to(result_dt),
-  (mat2_dt == result_dt || 
-   ((mat2_dt == ScalarType::BFloat16 && result_dt != ScalarType::BFloat16) || (result_dt == ScalarType::BFloat16 && mat2_dt != ScalarType::BFloat16))) ? mat2 : mat2.to(result_dt),
-  attr);
+      result,
+      (self_dt == result_dt ||
+       ((self_dt == ScalarType::BFloat16 &&
+         result_dt != ScalarType::BFloat16) ||
+        (result_dt == ScalarType::BFloat16 && self_dt != ScalarType::BFloat16)))
+          ? self
+          : self.to(result_dt),
+      (mat2_dt == result_dt ||
+       ((mat2_dt == ScalarType::BFloat16 &&
+         result_dt != ScalarType::BFloat16) ||
+        (result_dt == ScalarType::BFloat16 && mat2_dt != ScalarType::BFloat16)))
+          ? mat2
+          : mat2.to(result_dt),
+      attr);
 
   return result;
 }
@@ -216,25 +266,25 @@ Tensor mm(const Tensor& self, const Tensor& mat2) {
 }
 
 Tensor& baddbmm_(
-  Tensor& self,
-  const Tensor& batch1,
-  const Tensor& batch2,
-  Scalar beta,
-  Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      true);
+    Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, true);
   checkBackend("baddbmm_", {self, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
-  TORCH_CHECK(self.size(0) == batch1.size(0) && \
-              self.size(1) == batch1.size(1) && \
-              self.size(2) == batch2.size(2),
-              "size mismatch input ", self.sizes(),
-              " batch1 ", batch1.sizes(), " batch2 ", batch2.sizes());
+  TORCH_CHECK(
+      self.size(0) == batch1.size(0) && self.size(1) == batch1.size(1) &&
+          self.size(2) == batch2.size(2),
+      "size mismatch input ",
+      self.sizes(),
+      " batch1 ",
+      batch1.sizes(),
+      " batch2 ",
+      batch2.sizes());
   impl::gemm_broadcast(self, batch1, batch2, attr, self);
 
   return self;
@@ -247,11 +297,7 @@ Tensor& baddbmm_out(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      true);
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, true);
   checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
@@ -279,7 +325,6 @@ Tensor& addbmm_out(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-
   checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
@@ -336,14 +381,16 @@ Tensor bmm(const Tensor& self, const Tensor& batch2) {
 }
 
 // FIXME: should not be here
-Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & bias, Scalar beta, Scalar alpha) {
+Tensor linear_relu(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar beta,
+    Scalar alpha) {
   MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      MatmulAttr::kind_with_relu,
-      false);
-  RECORD_FUNCTION("linear_relu",
-                  std::vector<c10::IValue>({input, weight, bias}));
+      alpha.to<float>(), beta.to<float>(), MatmulAttr::kind_with_relu, false);
+  RECORD_FUNCTION(
+      "linear_relu", std::vector<c10::IValue>({input, weight, bias}));
   if (input.dim() == 2 && bias.defined()) {
     // Fused op is marginally faster.
     checkBackend("linear_relu", {input, weight, bias}, Backend::XPU);
@@ -364,14 +411,19 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
   return at::relu(output);
 }
 
-Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor & bias, Scalar beta, Scalar alpha) {
+Tensor linear_sigmoid(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    Scalar beta,
+    Scalar alpha) {
   MatmulAttr attr(
       alpha.to<float>(),
       beta.to<float>(),
       MatmulAttr::kind_with_sigmoid,
       false);
-  RECORD_FUNCTION("linear_sigmoid",
-                  std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION(
+      "linear_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
   if (input.dim() == 2 && bias.defined()) {
     // Fused op is marginally faster.
     checkBackend("linear_sigmoid", {input, weight, bias}, Backend::XPU);
@@ -388,7 +440,6 @@ Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor 
     output.add_(bias);
   }
   return at::sigmoid(output);
-
 }
 
 Tensor trans_linear(
@@ -397,11 +448,7 @@ Tensor trans_linear(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      false);
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, false);
 
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
@@ -409,7 +456,7 @@ Tensor trans_linear(
   checkBackend("addmm", {input, m1, m2}, Backend::XPU);
 
   Tensor result;
-  if (m1.scalar_type() == at::ScalarType::BFloat16){
+  if (m1.scalar_type() == at::ScalarType::BFloat16) {
     // align with bf16 input
     result = at::empty({0}, m1.options());
   } else {
@@ -419,10 +466,12 @@ Tensor trans_linear(
   impl::gemm_broadcast(
       result,
       m1,
-      m2.scalar_type() == m1.scalar_type() ? m2 :
-                         (m1.scalar_type() == ScalarType::BFloat16 ||
-                          m2.scalar_type() == ScalarType::BFloat16) ? m2 :
-                          m2.to(m1.scalar_type()),
+      m2.scalar_type() == m1.scalar_type()
+          ? m2
+          : (m1.scalar_type() == ScalarType::BFloat16 ||
+             m2.scalar_type() == ScalarType::BFloat16)
+              ? m2
+              : m2.to(m1.scalar_type()),
       attr,
       input);
 
@@ -430,15 +479,15 @@ Tensor trans_linear(
 }
 
 Tensor addmv(
-    const Tensor & self,
-    const Tensor & mat,
-    const Tensor & vec,
+    const Tensor& self,
+    const Tensor& mat,
+    const Tensor& vec,
     at::Scalar beta,
     at::Scalar alpha) {
   TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
   TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(vec.dim() == 1, "expected 1D tensor");
-  TORCH_CHECK(mat.size(1) ==  vec.size(0));
+  TORCH_CHECK(mat.size(1) == vec.size(0));
 
   Tensor vec_v = vec.view({vec.size(0), 1});
   Tensor self_v = self.view({self.size(0), 1});
@@ -447,15 +496,15 @@ Tensor addmv(
 }
 
 Tensor& addmv_(
-    Tensor & self,
-    const Tensor & mat,
-    const Tensor & vec,
+    Tensor& self,
+    const Tensor& mat,
+    const Tensor& vec,
     at::Scalar beta,
     at::Scalar alpha) {
   TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
   TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(vec.dim() == 1, "expected 1D tensor");
-  TORCH_CHECK(mat.size(1) ==  vec.size(0));
+  TORCH_CHECK(mat.size(1) == vec.size(0));
 
   Tensor vec_v = vec.view({vec.size(0), 1});
   Tensor self_v = self.view({self.size(0), 1});
@@ -476,8 +525,8 @@ Tensor matmul_sum(
       result = at::empty({0}, m1.options());
       bias = accumu;
     } else {
-      std::tie(result) = expand_size(
-          accumu, m1.dim() == 2 ? m1.sizes() : m2.sizes());
+      std::tie(result) =
+          expand_size(accumu, m1.dim() == 2 ? m1.sizes() : m2.sizes());
     }
   } else {
     result = accumu;
@@ -500,11 +549,7 @@ Tensor matmul_sum(
     m1.resize_({sizes.data()[0], sizes.data()[1]});
   }
 
-  MatmulAttr attr(
-      1.f,
-      beta.to<float>(),
-      0,
-      true);
+  MatmulAttr attr(1.f, beta.to<float>(), 0, true);
 
   impl::gemm_broadcast(
       result,
@@ -528,11 +573,7 @@ Tensor& trans_baddbmm_out(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      false);
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, false);
   checkBackend("trans_baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
@@ -546,27 +587,24 @@ Tensor& trans_baddbmm_out(
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor addmm(
-  const Tensor& input,
-  const Tensor& m1,
-  const Tensor& m2,
-  Scalar beta,
-  Scalar alpha) {
-  MatmulAttr attr(
-          alpha.to<float>(),
-          beta.to<float>(),
-          0,
-          true);
+    const Tensor& input,
+    const Tensor& m1,
+    const Tensor& m2,
+    Scalar beta,
+    Scalar alpha) {
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, true);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 
   checkBackend("addmm", m1, Backend::QuantizedXPU);
 
   Tensor result;
-  if(input.is_quantized()){
-    result = _empty_affine_quantized({0},
-                                     device(kXPU).dtype(input.scalar_type()),
-                                     1.f,
-                                     static_cast<int>(0),
-                                     MemoryFormat::Contiguous);
+  if (input.is_quantized()) {
+    result = _empty_affine_quantized(
+        {0},
+        device(kXPU).dtype(input.scalar_type()),
+        1.f,
+        static_cast<int>(0),
+        MemoryFormat::Contiguous);
   } else {
     result = at::empty({0}, input.options());
   }
@@ -582,17 +620,13 @@ Tensor trans_linear(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  MatmulAttr attr(
-      alpha.to<float>(),
-      beta.to<float>(),
-      0,
-      false);
+  MatmulAttr attr(alpha.to<float>(), beta.to<float>(), 0, false);
 
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
 
   Tensor result;
-  if (m1.scalar_type() == at::ScalarType::BFloat16){
+  if (m1.scalar_type() == at::ScalarType::BFloat16) {
     // align with bf16 input
     result = at::empty({0}, m1.options());
   } else {

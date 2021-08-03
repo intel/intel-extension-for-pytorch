@@ -3,19 +3,20 @@
 #include <ATen/quantized/Quantizer.h>
 #include <intrinsic/ipex_intrinsic.h>
 
-
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
 struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
-  explicit DPCPPPerTensorAffineQuantizer(ScalarType scalar_type, double scale, int64_t zero_point)
-    : AffineQuantizer(scalar_type),
-        scale_(scale),
-        zero_point_(zero_point) {}
+  explicit DPCPPPerTensorAffineQuantizer(
+      ScalarType scalar_type,
+      double scale,
+      int64_t zero_point)
+      : AffineQuantizer(scalar_type), scale_(scale), zero_point_(zero_point) {}
 
   Tensor quantize(Tensor rtensor) override {
     TORCH_CHECK(
-        rtensor.scalar_type() == kFloat, "quantize only works on Float Tensor.");
+        rtensor.scalar_type() == kFloat,
+        "quantize only works on Float Tensor.");
     Tensor qtensor = AtenIpexTypeXPU::new_qtensor(
         rtensor.sizes(),
         rtensor.options().dtype(scalar_type_),
@@ -98,7 +99,8 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
 
   Tensor quantize(Tensor rtensor) override {
     TORCH_CHECK(
-        rtensor.scalar_type() == kFloat, "quantize only works on Float Tensor.");
+        rtensor.scalar_type() == kFloat,
+        "quantize only works on Float Tensor.");
 
     Tensor qtensor = AtenIpexTypeXPU::new_qtensor(
         rtensor.sizes(),
@@ -170,4 +172,5 @@ static inline QuantizerPtr dpcpp_make_per_channel_affine_quantizer(
       scalar_type, scales_double, zero_points_int64, axis);
 }
 
-}} // at::AtenIpexTypeQuantizedXPU
+} // namespace AtenIpexTypeQuantizedXPU
+} // namespace at

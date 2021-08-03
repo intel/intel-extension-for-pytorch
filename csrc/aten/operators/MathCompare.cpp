@@ -1,16 +1,15 @@
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/Functions.h>
 #include <ATen/ScalarOps.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/quantized/QTensorImpl.h>
 
-#include "comm/ApplyUtils.h"
-#include <core/TensorImplUtils.h>
-#include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 #include <ATen/native/TensorIterator.h>
+#include <core/TensorImplUtils.h>
 #include "Loops.h"
-
+#include "comm/ATDispatch.h"
+#include "comm/ApplyUtils.h"
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
 
@@ -93,11 +92,12 @@ void logicalTensor(
     Op op) {
   auto iter = TensorIterator::comparison_op(self_, src1, src2);
 
-  dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_forward, Op)>(iter, [=](ScalarType src1, ScalarType src2){
-    ScalarTypeOut ret;
-    op(ret, src1, src2);
-    return ret;
-  });
+  dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_forward, Op)>(
+      iter, [=](ScalarType src1, ScalarType src2) {
+        ScalarTypeOut ret;
+        op(ret, src1, src2);
+        return ret;
+      });
 }
 
 template <typename scalar_t>

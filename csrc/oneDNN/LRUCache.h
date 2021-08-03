@@ -2,12 +2,11 @@
 
 #ifdef USE_PRIMITIVE_CACHE
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <list>
 #include <oneapi/dnnl/dnnl.hpp>
-
+#include <list>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace xpu {
 namespace oneDNN {
@@ -15,10 +14,12 @@ namespace oneDNN {
 using bytestring = std::string;
 using lru_key_t = bytestring;
 
-template <class key_t, class value_t,
-         template <typename ...> class map = std::unordered_map>
+template <
+    class key_t,
+    class value_t,
+    template <typename...> class map = std::unordered_map>
 class lru_cache {
-public:
+ public:
   class node_t;
 
   using value_type = typename std::pair<key_t, value_t>;
@@ -32,26 +33,30 @@ public:
 
   // Only class possible, we can't use typedef or using. Or can we?
   class node_t : public std::pair<map_it, value_t> {
-  public:
-    node_t (const std::pair<map_it, value_t> &l) :
-      std::pair<map_it, value_t>(l) {}
-    node_t (std::pair<map_it, value_t> &&l) :
-      std::pair<map_it, value_t>(std::move(l)) {}
+   public:
+    node_t(const std::pair<map_it, value_t>& l)
+        : std::pair<map_it, value_t>(l) {}
+    node_t(std::pair<map_it, value_t>&& l)
+        : std::pair<map_it, value_t>(std::move(l)) {}
   };
 
   using size_type = typename std::list<node_t>::size_type;
 
   lru_cache(size_type capacity) : capacity_(capacity) {}
 
-  size_type size() const { map_.size(); }
-  size_type max_size() const { return capacity_; }
+  size_type size() const {
+    map_.size();
+  }
+  size_type max_size() const {
+    return capacity_;
+  }
   void resize(size_type new_capacity) {
     capacity_ = new_capacity;
 
     // Trim cache
     while (map_.size() > capacity_) {
       auto last = vlist_.end();
-      last --;
+      last--;
       map_.erase(last->first);
       vlist_.pop_back();
     }
@@ -78,7 +83,7 @@ public:
     return vlist_.end();
   }
 
-  iterator find(const key_t &key) {
+  iterator find(const key_t& key) {
     auto it = map_.find(key);
     if (it == map_.end()) {
       return end();
@@ -89,7 +94,7 @@ public:
   }
 
   // Is this feasible?
-  const_iterator find(const key_t &key) const {
+  const_iterator find(const key_t& key) const {
     const auto it = map_.find(key);
     if (it == map_.end()) {
       return end();
@@ -128,7 +133,7 @@ public:
     // Trim cache
     while (map_.size() > capacity_) {
       auto last = vlist_.end();
-      last --;
+      last--;
       map_.erase(last->first);
       vlist_.pop_back();
     }
@@ -143,13 +148,13 @@ public:
   }
 
   // Warning: carefully check iterator validity
-  void swap(lru_cache & other) {
+  void swap(lru_cache& other) {
     std::swap(vlist_, other.vlist_);
     std::swap(map_, other.map_);
     std::swap(capacity_, other.capacity_);
   }
 
-private:
+ private:
   std::list<node_t> vlist_;
   map<key_t, iterator> map_;
   size_type capacity_;
@@ -157,14 +162,14 @@ private:
 
 template <class value_t, size_t capacity = 128, class key_t = std::string>
 class computation_cache {
-public:
+ public:
   using iterator = typename lru_cache<key_t, value_t>::iterator;
 
-protected:
-  template <typename ...Ts>
+ protected:
+  template <typename... Ts>
   static inline iterator create(const key_t& key, Ts&&... args) {
     auto it = t_store().insert(
-        std::make_pair(key,value_t(std::forward<Ts>(args)...)));
+        std::make_pair(key, value_t(std::forward<Ts>(args)...)));
     return it.first;
   }
 
@@ -172,7 +177,7 @@ protected:
     return it->second;
   }
 
-  static inline void update(value_t &val, iterator it) {
+  static inline void update(value_t& val, iterator it) {
     it->second = val;
   }
 
@@ -184,8 +189,8 @@ protected:
     return t_store().end();
   }
 
-public:
-  template <typename ...Ts>
+ public:
+  template <typename... Ts>
   static inline value_t& fetch_or_create(const key_t& key, Ts&&... args) {
     return fetch(create(key, std::forward<Ts>(args)...));
   }
@@ -198,7 +203,7 @@ public:
     // Empty
   }
 
-  static inline lru_cache<key_t, value_t> &t_store() {
+  static inline lru_cache<key_t, value_t>& t_store() {
     static thread_local lru_cache<key_t, value_t> t_store_(capacity);
     return t_store_;
   }
@@ -206,29 +211,31 @@ public:
 
 template <class value_t, class key_t>
 struct lru_cache_standalone : public computation_cache<value_t, 128, key_t> {
-public:
+ public:
   using cache = computation_cache<value_t, 128, key_t>;
 
-  template <typename ...Ts>
+  template <typename... Ts>
   inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
     auto it = cache::find(key);
-    auto op = it == cache::end() ?
-              cache::fetch(cache::create(key, std::forward<Ts>(args)...)) :
-              cache::fetch(it);
+    auto op = it == cache::end()
+        ? cache::fetch(cache::create(key, std::forward<Ts>(args)...))
+        : cache::fetch(it);
     return op;
   }
 };
 
-template <class value_t, class key_t, typename ...Ts>
+template <class value_t, class key_t, typename... Ts>
 inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
-  return lru_cache_standalone<value_t, key_t>().
-      fetch_or_create_m(key, std::forward<Ts>(args)...);
+  return lru_cache_standalone<value_t, key_t>().fetch_or_create_m(
+      key, std::forward<Ts>(args)...);
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_integral<T>::value, void>::type
-to_bytes(bytestring& bytes, T arg) {
-  if (arg == 0) return;
+inline typename std::enable_if<std::is_integral<T>::value, void>::type to_bytes(
+    bytestring& bytes,
+    T arg) {
+  if (arg == 0)
+    return;
   auto len = sizeof(T) - (__builtin_clz(arg) / 8);
   auto as_cstring = reinterpret_cast<char*>(&arg);
   bytes.append(as_cstring, len);
@@ -242,14 +249,16 @@ to_bytes(bytestring& bytes, T arg) {
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_enum<T>::value, void>::type
-to_bytes(bytestring& bytes, T arg) {
+inline typename std::enable_if<std::is_enum<T>::value, void>::type to_bytes(
+    bytestring& bytes,
+    T arg) {
   to_bytes(bytes, static_cast<int>(arg));
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_class<T>::value, void>::type
-to_bytes(bytestring& bytes, T& arg) {
+inline typename std::enable_if<std::is_class<T>::value, void>::type to_bytes(
+    bytestring& bytes,
+    T& arg) {
   arg.to_bytes(bytes);
 }
 
@@ -266,7 +275,7 @@ inline void to_bytes(bytestring& bytes, std::vector<T>& arg) {
   }
 }
 
-template<>
+template <>
 inline void to_bytes(bytestring& bytes, dnnl::memory::desc& adesc) {
   auto desc = adesc.data;
   for (int i = 0; i < desc.ndims; i++) {
@@ -286,24 +295,25 @@ inline void to_bytes(bytestring& bytes, dnnl::memory::desc& adesc) {
   to_bytes(bytes, desc.format_kind);
 }
 
-template<>
+template <>
 inline void to_bytes(bytestring& bytes, bool arg) {
   to_bytes(bytes, arg ? 1 : 0);
   bytes.append(1, 'b');
 }
 
-template <typename T, typename ...Ts>
+template <typename T, typename... Ts>
 inline void to_bytes(bytestring& bytes, T&& arg, Ts&&... args) {
   to_bytes(bytes, std::forward<T>(arg));
   bytes.append(1, '*');
   to_bytes(bytes, std::forward<Ts>(args)...);
 }
 
-template <typename ...Ts>
+template <typename... Ts>
 inline void create_key(bytestring& key_to_create, Ts&&... args) {
   to_bytes(key_to_create, std::forward<Ts>(args)...);
 }
 
-}}
+} // namespace oneDNN
+} // namespace xpu
 
 #endif // USE_PRIMITIVE_CACHE

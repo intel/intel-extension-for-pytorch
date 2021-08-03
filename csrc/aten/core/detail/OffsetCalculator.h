@@ -1,12 +1,11 @@
 #pragma once
 
+#include <c10/macros/Macros.h>
 #include <array>
 #include <cstdint>
-#include <c10/macros/Macros.h>
 
 #include <core/Array.h>
 #include <core/IntegerDivider.h>
-
 
 /// OffsetCalculator calculates the offset in bytes of a linear index for NARGS
 /// operands that share the same shape, but may have different strides.
@@ -20,19 +19,22 @@ struct OffsetCalculator {
 
   // This is a workaround for the compute cpp.
   // An issue was found that if the tailing member data is the two dim array
-  // and the column number is larger than 1, the dpcpp kernel may write the memory
-  // unexpectedly, memory leakage happened.
-  // These test cases have been tried.
-  // index_t strides_[MAX_DIMS][NARGS]; Error
-  // index_t strides_[2][2]; Error
-  // index_t strides_[2][1]; Ok
-  // index_t strides_[MAX_DIMS*NARGS][1]; Ok
-  // The reduce and sum kernel access the strides_[0][0]. So the workaround is as it is.
+  // and the column number is larger than 1, the dpcpp kernel may write the
+  // memory unexpectedly, memory leakage happened. These test cases have been
+  // tried. index_t strides_[MAX_DIMS][NARGS]; Error index_t strides_[2][2];
+  // Error index_t strides_[2][1]; Ok index_t strides_[MAX_DIMS*NARGS][1]; Ok
+  // The reduce and sum kernel access the strides_[0][0]. So the workaround is
+  // as it is.
   static inline int __wa(int dim, int arg) {
     return NARGS * dim + arg;
   }
 
-  OffsetCalculator(int dims, const int64_t* sizes, const int64_t* const* strides, const int64_t* element_sizes=nullptr) : dims(dims) {
+  OffsetCalculator(
+      int dims,
+      const int64_t* sizes,
+      const int64_t* const* strides,
+      const int64_t* element_sizes = nullptr)
+      : dims(dims) {
     TORCH_CHECK(dims <= MAX_DIMS, "tensor has too many (>25) dims");
     for (int i = 0; i < MAX_DIMS; ++i) {
       if (i < dims) {
@@ -41,8 +43,10 @@ struct OffsetCalculator {
         sizes_[i] = IntDivider<index_t>(1);
       }
       for (int arg = 0; arg < NARGS; arg++) {
-        int64_t element_size = (element_sizes == nullptr ? 1LL : element_sizes[arg]);
-        strides_[__wa(i, arg)][0] = i < dims ? strides[arg][i] / element_size : 0;
+        int64_t element_size =
+            (element_sizes == nullptr ? 1LL : element_sizes[arg]);
+        strides_[__wa(i, arg)][0] =
+            i < dims ? strides[arg][i] / element_size : 0;
       }
     }
   }
@@ -66,14 +70,13 @@ struct OffsetCalculator {
       for (int arg = 0; arg < NARGS; arg++) {
         offsets[arg] += divmod.mod * strides_[__wa(dim, arg)][0];
       }
-
     }
     return offsets;
   }
 
   int dims;
   IntDivider<index_t> sizes_[MAX_DIMS];
-  index_t strides_[MAX_DIMS*NARGS][1];
+  index_t strides_[MAX_DIMS * NARGS][1];
 };
 
 template <int NARGS, typename index_t = uint32_t>

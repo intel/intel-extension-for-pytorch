@@ -1,14 +1,13 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
-#include <ATen/AtenIpexTypeXPU.h>
 
 #include "Loops.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -48,9 +47,10 @@ template <typename...>
 class frac_kernel_class {};
 void frac_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(at::kHalf, iter.dtype(), "frac_xpu", [&]() {
-      dpcpp_kernel_for_tensor_iter<frac_kernel_class<scalar_t>>(iter, [](scalar_t a) -> scalar_t {
+    dpcpp_kernel_for_tensor_iter<frac_kernel_class<scalar_t>>(
+        iter, [](scalar_t a) -> scalar_t {
           return a - Numerics<scalar_t>::trunc(a);
-  });
+        });
   });
 }
 
@@ -66,9 +66,7 @@ Tensor& bitwise_not_(Tensor& self) {
 }
 
 Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
-  auto iter = TensorIterator::unary_op(
-      out,
-      self);
+  auto iter = TensorIterator::unary_op(out, self);
   impl::bitwise_not_kernel_dpcpp(iter);
 #ifdef BUILD_NAMEDTENSOR
   at::namedinference::propagate_names(out, self);
@@ -87,11 +85,11 @@ Tensor& logical_not_(Tensor& self) {
 
 Tensor& logical_not_out(Tensor& result, const Tensor& self) {
   TensorIterator iter = TensorIteratorConfig()
-  .check_all_same_dtype(false)
-  .set_check_mem_overlap(true)
-  .add_output(result)
-  .add_input(self)
-  .build();
+                            .check_all_same_dtype(false)
+                            .set_check_mem_overlap(true)
+                            .add_output(result)
+                            .add_input(self)
+                            .build();
   impl::logical_not_kernel(iter);
   return result;
 }

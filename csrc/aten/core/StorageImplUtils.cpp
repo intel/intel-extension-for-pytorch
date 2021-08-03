@@ -1,11 +1,10 @@
 #include <c10/util/intrusive_ptr.h>
 
-#include <runtime/Utils.h>
-#include <runtime/Exception.h>
 #include <core/Allocator.h>
-#include <core/StorageImplUtils.h>
 #include <core/Memory.h>
-
+#include <core/StorageImplUtils.h>
+#include <runtime/Exception.h>
+#include <runtime/Utils.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -46,13 +45,10 @@ int StorageImpl_getDevice(const at::StorageImpl* storage) {
 at::StorageImpl* StorageImpl_new() {
   at::StorageImpl* storage =
       c10::make_intrusive<at::StorageImpl>(
-        c10::StorageImpl::use_byte_size_t(),
-        0,
-        getDeviceAllocator(),
-        true)
+          c10::StorageImpl::use_byte_size_t(), 0, getDeviceAllocator(), true)
           .release();
   return storage;
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

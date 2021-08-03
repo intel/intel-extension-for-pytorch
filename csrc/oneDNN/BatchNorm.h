@@ -2,18 +2,17 @@
 
 #include <ATen/ATen.h>
 
-#include <runtime/Utils.h>
-#include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
-#include <quantized/Quantizer.h>
-#include <tensor/Context.h>
+#include <oneDNN/Runtime.h>
 #include <operators/MemoryHelpers.h>
 #include <operators/comm/ATDispatch.h>
-#include "Utils.h"
+#include <quantized/Quantizer.h>
+#include <runtime/Utils.h>
+#include <tensor/Context.h>
 #include "Reorder.h"
+#include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -28,17 +27,13 @@ static inline memory::format_tag bn_src_format(const at::Tensor& t) {
   if (ndim == 2) {
     return memory::format_tag::nc;
   } else if (ndim == 3) {
-    return is_channels_last ?
-           memory::format_tag::nwc :
-           memory::format_tag::ncw;
+    return is_channels_last ? memory::format_tag::nwc : memory::format_tag::ncw;
   } else if (ndim == 4) {
-    return is_channels_last ?
-           memory::format_tag::nhwc :
-           memory::format_tag::nchw;
+    return is_channels_last ? memory::format_tag::nhwc
+                            : memory::format_tag::nchw;
   } else if (ndim == 5) {
-    return is_channels_last ?
-           memory::format_tag::ndhwc :
-           memory::format_tag::ncdhw;
+    return is_channels_last ? memory::format_tag::ndhwc
+                            : memory::format_tag::ncdhw;
   } else {
     std::stringstream ss;
     ss << "SYCL batch_norm backend got shape=" << t.sizes()
@@ -48,8 +43,7 @@ static inline memory::format_tag bn_src_format(const at::Tensor& t) {
   }
 }
 
-static std::tuple<at::Tensor, at::Tensor, at::Tensor>
-batch_normalization(
+static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_normalization(
     const at::Tensor& src,
     const at::Tensor& wgh_option,
     const at::Tensor& bia_option,
@@ -58,7 +52,8 @@ batch_normalization(
     bool training,
     double momentum,
     double epsilon) {
-  auto engine = GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
+  auto engine =
+      GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   at::Tensor wgh = wgh_option;
@@ -66,11 +61,9 @@ batch_normalization(
   at::Tensor running_mean = running_mean_option;
   at::Tensor running_var = running_var_option;
 
-  auto prop = training ?
-              prop_kind::forward_training :
-              prop_kind::forward_inference;
-  auto flag = normalization_flags::use_scale |
-              normalization_flags::use_shift;
+  auto prop =
+      training ? prop_kind::forward_training : prop_kind::forward_inference;
+  auto flag = normalization_flags::use_scale | normalization_flags::use_shift;
 
   auto feature_num = src.size(1);
   auto feature_size = src.numel() / feature_num;
@@ -89,9 +82,8 @@ batch_normalization(
   auto src_fmt = bn_src_format(src);
 
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto src_md = src_ctx.is_plain() ?
-                memory::desc({src_tz}, src_dt, src_fmt) :
-                src_ctx.meta();
+  auto src_md = src_ctx.is_plain() ? memory::desc({src_tz}, src_dt, src_fmt)
+                                   : src_ctx.meta();
   auto scl_md = memory::desc(
       {feature_num}, memory::data_type::f32, memory::format_tag::a);
   auto sft_md = memory::desc(
@@ -118,14 +110,14 @@ batch_normalization(
   at::Tensor dst;
   auto dst_md = bn_fwd_pd.dst_desc();
   if (!src_ctx.is_plain()) {
-    dst = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-          empty_opaque_tensor(dst_md, src.options(),
-                              at::MemoryFormat::ChannelsLast) :
-          empty_opaque_tensor(dst_md, src.options(), c10::nullopt);
+    dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? empty_opaque_tensor(
+              dst_md, src.options(), at::MemoryFormat::ChannelsLast)
+        : empty_opaque_tensor(dst_md, src.options(), c10::nullopt);
   } else {
-    dst = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-          at::empty_like(src, src.options(), at::MemoryFormat::ChannelsLast) :
-          at::empty_like(src);
+    dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+        ? at::empty_like(src, src.options(), at::MemoryFormat::ChannelsLast)
+        : at::empty_like(src);
   }
 
   auto src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
@@ -157,7 +149,8 @@ batch_normalization(
   args.insert({DNNL_ARG_SCALE, scl_m});
   args.insert({DNNL_ARG_SHIFT, sft_m});
 
-  at::Tensor save_mean = at::empty(feature_num, wgh.options().dtype(at::kFloat));
+  at::Tensor save_mean =
+      at::empty(feature_num, wgh.options().dtype(at::kFloat));
   at::Tensor save_var = at::empty(feature_num, wgh.options().dtype(at::kFloat));
 
   void* mean_data = nullptr;
@@ -185,9 +178,12 @@ batch_normalization(
   args.insert({DNNL_ARG_VARIANCE, var_m});
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = bn_fwd_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
-  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, src.options(), c10::nullopt);
-  auto scratchpad_memory = dpcpp_onednn_memory(bn_fwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  int scratchpad_size =
+      bn_fwd_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, src.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(
+      bn_fwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
 #endif
 
@@ -195,29 +191,33 @@ batch_normalization(
 
   if (training && running_mean.defined() && running_var.defined()) {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half, at::ScalarType::BFloat16,
-        running_mean.scalar_type(), "mScale1", [&]() {
-            dpcppMemoryScale1(
-                running_mean.data_ptr<scalar_t>(),
-                save_mean.data_ptr<float>(),
-                feature_num,
-                momentum);
-        }
-    );
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        running_mean.scalar_type(),
+        "mScale1",
+        [&]() {
+          dpcppMemoryScale1(
+              running_mean.data_ptr<scalar_t>(),
+              save_mean.data_ptr<float>(),
+              feature_num,
+              momentum);
+        });
     size_t orig_size = feature_size;
     size_t adjust_size = orig_size - 1;
     float adjust_factor = (static_cast<float>(orig_size)) / adjust_size;
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half, at::ScalarType::BFloat16,
-        running_var.scalar_type(), "mScale2", [&]() {
-            dpcppMemoryScale2(
-                running_var.data_ptr<scalar_t>(),
-                save_var.data_ptr<float>(),
-                feature_num,
-                adjust_factor,
-                momentum);
-        }
-    );
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        running_var.scalar_type(),
+        "mScale2",
+        [&]() {
+          dpcppMemoryScale2(
+              running_var.data_ptr<scalar_t>(),
+              save_var.data_ptr<float>(),
+              feature_num,
+              adjust_factor,
+              momentum);
+        });
   }
 
   return {dst, save_mean, save_var};
@@ -235,7 +235,8 @@ batch_normalization_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> diff_src_mask) {
-  auto engine = GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
+  auto engine =
+      GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   at::Tensor diff_src, diff_wgh, diff_bia;
@@ -256,29 +257,30 @@ batch_normalization_backward(
   auto src_fmt = bn_src_format(src);
 
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto src_md = src_ctx.is_plain() ?
-                memory::desc({src_tz}, src_dt, src_fmt) :
-                src_ctx.meta();
+  auto src_md = src_ctx.is_plain() ? memory::desc({src_tz}, src_dt, src_fmt)
+                                   : src_ctx.meta();
   auto src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
 
   auto diff_dst_ctx = DPCPPTensorContext::get_tensor_ctx(diff_dst);
-  auto diff_dst_md = diff_dst_ctx.is_plain() ?
-                     memory::desc({src_tz}, src_dt, src_fmt) :
-                     diff_dst_ctx.meta();
-  auto diff_dst_usr_m = dpcpp_onednn_memory(	
-      diff_dst_md, engine, diff_dst.data_ptr());
+  auto diff_dst_md = diff_dst_ctx.is_plain()
+      ? memory::desc({src_tz}, src_dt, src_fmt)
+      : diff_dst_ctx.meta();
+  auto diff_dst_usr_m =
+      dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
 
   batch_normalization_forward::desc bn_fwd_desc(
       prop_kind::forward_training, src_md, epsilon, flags);
-  auto bn_fwd_pd = batch_normalization_forward::primitive_desc(
-      bn_fwd_desc, engine);
+  auto bn_fwd_pd =
+      batch_normalization_forward::primitive_desc(bn_fwd_desc, engine);
 
   at::Tensor diff_dst_;
   auto diff_dst_m = diff_dst_usr_m;
   if (diff_dst_ctx.is_plain() && (!src_ctx.is_plain())) {
     auto expected_dst_md = bn_fwd_pd.dst_desc();
-    diff_dst_ = empty_opaque_tensor(expected_dst_md, src.options(), c10::nullopt);
-    diff_dst_m = dpcpp_onednn_memory(expected_dst_md, engine, diff_dst_.data_ptr());
+    diff_dst_ =
+        empty_opaque_tensor(expected_dst_md, src.options(), c10::nullopt);
+    diff_dst_m =
+        dpcpp_onednn_memory(expected_dst_md, engine, diff_dst_.data_ptr());
     diff_dst_md = expected_dst_md;
     xpu::oneDNN::reorder(diff_dst, diff_dst_);
   }
@@ -298,8 +300,8 @@ batch_normalization_backward(
   auto bwd_desc = batch_normalization_backward::desc(
       p_kind, diff_dst_md, src_md, epsilon, flags);
 
-  auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
-      bwd_desc, engine, bn_fwd_pd);
+  auto bn_bwd_pd =
+      batch_normalization_backward::primitive_desc(bwd_desc, engine, bn_fwd_pd);
 
   memory mean_m, var_m;
   if (training) {
@@ -320,22 +322,22 @@ batch_normalization_backward(
     diff_src = empty_opaque_tensor(
         expected_diff_src_md, diff_dst.options(), c10::nullopt);
   }
-  auto diff_src_m = dpcpp_onednn_memory(
-      expected_diff_src_md, engine, diff_src.data_ptr());
+  auto diff_src_m =
+      dpcpp_onednn_memory(expected_diff_src_md, engine, diff_src.data_ptr());
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto bn_bwd = fetch_or_create_m<
-      dnnl::batch_normalization_backward>(key, bn_bwd_pd);
+  auto bn_bwd =
+      fetch_or_create_m<dnnl::batch_normalization_backward>(key, bn_bwd_pd);
 #else
   auto bn_bwd = dnnl::batch_normalization_backward(bn_bwd_pd);
 #endif
 
   std::unordered_map<int, memory> args = {
-      {DNNL_ARG_SRC,        src_m       },
-      {DNNL_ARG_DIFF_DST,   diff_dst_m  },
-      {DNNL_ARG_MEAN,       mean_m      },
-      {DNNL_ARG_VARIANCE,   var_m       },
-      {DNNL_ARG_DIFF_SRC,   diff_src_m  },
+      {DNNL_ARG_SRC, src_m},
+      {DNNL_ARG_DIFF_DST, diff_dst_m},
+      {DNNL_ARG_MEAN, mean_m},
+      {DNNL_ARG_VARIANCE, var_m},
+      {DNNL_ARG_DIFF_SRC, diff_src_m},
   };
 
   size_t feature_num = src.size(1);
@@ -347,19 +349,15 @@ batch_normalization_backward(
         bn_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
     if (wgh.scalar_type() == ScalarType::BFloat16) {
       dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(),
-          wgh.data_ptr<at::BFloat16>(),
-          feature_num);
+          wgh_bia.data_ptr<float>(), wgh.data_ptr<at::BFloat16>(), feature_num);
     } else {
       dtype_convert_by_scalar(
-          wgh_bia.data_ptr<float>(),
-          wgh.data_ptr<float>(),
-          feature_num);
+          wgh_bia.data_ptr<float>(), wgh.data_ptr<float>(), feature_num);
     }
     dpcppMemsetAsync(
-      static_cast<uint8_t*>(wgh_bia.data_ptr()) + feature_num * sizeof(float),
-      0,
-      feature_num * sizeof(float));
+        static_cast<uint8_t*>(wgh_bia.data_ptr()) + feature_num * sizeof(float),
+        0,
+        feature_num * sizeof(float));
     diff_wgh_bia = at::empty(2 * feature_num, wgh.options().dtype(at::kFloat));
     auto diff_wgh_bia_m = dpcpp_onednn_memory(
         bn_bwd_pd.diff_weights_desc(), engine, diff_wgh_bia.data_ptr());
@@ -395,4 +393,5 @@ batch_normalization_backward(
   return {diff_src, diff_wgh, diff_bia};
 }
 
-}}
+} // namespace oneDNN
+} // namespace xpu

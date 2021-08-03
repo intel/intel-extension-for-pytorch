@@ -219,7 +219,7 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
   this->dims_before = dims_before;
   this->dims_after = dims_after;
   this->src = restride_src(src, dims_before, dims_indexed, replacement_shape);
-  
+
   for (auto& index : indices_list) {
     if (index.defined()) {
       indices.push_back(reshape_indexer(index, dims_before, dims_after));
@@ -263,13 +263,24 @@ static AdvancedIndex make_info(Tensor self, TensorList orig) {
   return AdvancedIndex(self, indices);
 }
 
-static TensorIterator make_index_put_iterator(const AdvancedIndex& info, const Tensor& value) {
-  TORCH_CHECK(is_expandable_to(value.sizes(), info.src.sizes()), "shape mismatch: value tensor of shape ", value.sizes(),
-              " cannot be broadcast to indexing result of shape ", info.src.sizes());
-  TORCH_CHECK(value.scalar_type() == info.src.scalar_type(),
-              "Index put requires the source and destination dtypes match, "
-              "got ", info.src.scalar_type(), " for the destination "
-                                              "and ", value.scalar_type(), " for the source.");
+static TensorIterator make_index_put_iterator(
+    const AdvancedIndex& info,
+    const Tensor& value) {
+  TORCH_CHECK(
+      is_expandable_to(value.sizes(), info.src.sizes()),
+      "shape mismatch: value tensor of shape ",
+      value.sizes(),
+      " cannot be broadcast to indexing result of shape ",
+      info.src.sizes());
+  TORCH_CHECK(
+      value.scalar_type() == info.src.scalar_type(),
+      "Index put requires the source and destination dtypes match, "
+      "got ",
+      info.src.scalar_type(),
+      " for the destination "
+      "and ",
+      value.scalar_type(),
+      " for the source.");
   TensorIteratorConfig config;
   // info.src is restrided by restride_src with 0 strided dimensions
   config.set_check_mem_overlap(false);
@@ -286,9 +297,10 @@ static TensorIterator make_index_put_iterator(const AdvancedIndex& info, const T
 static TensorIterator make_index_iterator(const AdvancedIndex& info) {
   TensorIteratorConfig config;
   config.check_all_same_dtype(false)
-  .declare_static_dtype_and_device(info.src.scalar_type(), info.src.device())
-  .add_output(Tensor())
-  .add_input(info.src);
+      .declare_static_dtype_and_device(
+          info.src.scalar_type(), info.src.device())
+      .add_output(Tensor())
+      .add_input(info.src);
   for (auto& index : info.indices) {
     config.add_input(index);
   }

@@ -1,18 +1,17 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include <ATen/native/TensorTransformations.h>
 #include <ATen/WrapDimUtilsMulti.h>
-#include "comm/AccumulateType.h"
+#include <ATen/native/TensorTransformations.h>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 
-#include <utils/Helpers.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
+#include <runtime/Utils.h>
+#include <utils/Helpers.h>
 
 #include <cstddef>
 #include <vector>
-
 
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -38,12 +37,15 @@ void flip_dpcpp_kernel(
   const std::vector<int64_t>& sizes_v = in_tensor.sizes().vec();
   const std::vector<int64_t>& strides_v = in_tensor.strides().vec();
 
-  Tensor stride_contiguous_t =
-    at::empty({static_cast<int64_t>(stride_contiguous_v.size())}, in_tensor.options().dtype(at::ScalarType::Long));
-  Tensor sizes_t =
-    at::empty({static_cast<int64_t>(sizes_v.size())}, in_tensor.options().dtype(at::ScalarType::Long));
-  Tensor strides_t =
-    at::empty({static_cast<int64_t>(strides_v.size())}, in_tensor.options().dtype(at::ScalarType::Long));
+  Tensor stride_contiguous_t = at::empty(
+      {static_cast<int64_t>(stride_contiguous_v.size())},
+      in_tensor.options().dtype(at::ScalarType::Long));
+  Tensor sizes_t = at::empty(
+      {static_cast<int64_t>(sizes_v.size())},
+      in_tensor.options().dtype(at::ScalarType::Long));
+  Tensor strides_t = at::empty(
+      {static_cast<int64_t>(strides_v.size())},
+      in_tensor.options().dtype(at::ScalarType::Long));
 
   for (int64_t i = 0; i < stride_contiguous_v.size(); i++)
     stride_contiguous_t[i] = stride_contiguous_v[i];
@@ -83,7 +85,8 @@ void flip_dpcpp_kernel(
         cur_indices = cur_indices / stride_contiguous_ptr[d];
         rem = temp - cur_indices * stride_contiguous_ptr[d];
         dst_offset += flip_dims_b[d]
-          ? (sizes_ptr[d] - 1 - cur_indices) * strides_ptr[d] : cur_indices * strides_ptr[d];
+            ? (sizes_ptr[d] - 1 - cur_indices) * strides_ptr[d]
+            : cur_indices * strides_ptr[d];
         cur_indices = rem;
       }
       out_tensor_ptr[linear_index] = in_tensor_ptr[dst_offset];
@@ -99,7 +102,8 @@ Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
   auto in_tensor = self;
   const int64_t total_dims = in_tensor.dim();
   auto flip_dims_b = at::dim_list_to_bitset(dims, total_dims);
-  Tensor out_tensor = at::empty_like(in_tensor, in_tensor.contiguous().options());
+  Tensor out_tensor =
+      at::empty_like(in_tensor, in_tensor.contiguous().options());
 
   // create contiguous strides for input tensor
   auto stride_contiguous_v = std::vector<int64_t>(total_dims);
@@ -107,18 +111,19 @@ Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
     if (i == total_dims - 1)
       stride_contiguous_v[i] = 1;
     else
-      stride_contiguous_v[i] = Max<int64_t>(in_tensor.size(i + 1), 1) * stride_contiguous_v[i + 1];
+      stride_contiguous_v[i] =
+          Max<int64_t>(in_tensor.size(i + 1), 1) * stride_contiguous_v[i + 1];
   }
 
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, in_tensor.scalar_type(), "flip_dpcpp", [&] {
-      flip_dpcpp_kernel<scalar_t>(
-          in_tensor,
-          out_tensor,
-          total_dims,
-          stride_contiguous_v,
-          flip_dims_b
-      );
-  });
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Bool, in_tensor.scalar_type(), "flip_dpcpp", [&] {
+        flip_dpcpp_kernel<scalar_t>(
+            in_tensor,
+            out_tensor,
+            total_dims,
+            stride_contiguous_v,
+            flip_dims_b);
+      });
 
   return out_tensor;
 }
@@ -142,8 +147,7 @@ void roll_dpcpp_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = in_tensor.data_ptr<scalar_t>();
-    auto out_data =
-        out_tensor.data_ptr<scalar_t>();
+    auto out_data = out_tensor.data_ptr<scalar_t>();
     cgh.parallel_for<roll_dpcpp_ker<scalar_t>>(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
@@ -189,19 +193,17 @@ Tensor roll_dpcpp(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
 
   auto total_dims = in_tensor.dim();
   IPEX_DISPATCH_FLOATING_TYPES_AND(
-		  at::ScalarType::BFloat16,
-		  in_tensor.scalar_type(),
-		  "roll_dpcpp", [&] {
-    roll_dpcpp_kernel<scalar_t>(
-        in_tensor,
-        out_tensor,
-        N,
-        dim,
-        start,
-        size,
-        in_tensor.stride(dim),
-        total_dims);
-  });
+      at::ScalarType::BFloat16, in_tensor.scalar_type(), "roll_dpcpp", [&] {
+        roll_dpcpp_kernel<scalar_t>(
+            in_tensor,
+            out_tensor,
+            N,
+            dim,
+            start,
+            size,
+            in_tensor.stride(dim),
+            total_dims);
+      });
   return out_tensor;
 }
 
@@ -218,27 +220,39 @@ Tensor roll(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
 Tensor rot90(const Tensor& self, int64_t k, IntArrayRef dims) {
   const int64_t total_dims = self.dim(), total_rot_dims = dims.size();
 
-  TORCH_CHECK(total_rot_dims == 2,
-      "expected total rotation dims == 2, but got dims = ", total_rot_dims);
+  TORCH_CHECK(
+      total_rot_dims == 2,
+      "expected total rotation dims == 2, but got dims = ",
+      total_rot_dims);
 
-  TORCH_CHECK(total_dims >= 2,
-      "expected total dims >= 2, but got total dims = ", total_dims);
+  TORCH_CHECK(
+      total_dims >= 2,
+      "expected total dims >= 2, but got total dims = ",
+      total_dims);
 
-  TORCH_CHECK(dims[0] != dims[1] && Numerics<int64_t>::abs(dims[0] - dims[1]) != total_dims,
-      "expected rotation dims to be different, but got dim0 = ", dims[0],
-      " and dim1 = ", dims[1]);
+  TORCH_CHECK(
+      dims[0] != dims[1] &&
+          Numerics<int64_t>::abs(dims[0] - dims[1]) != total_dims,
+      "expected rotation dims to be different, but got dim0 = ",
+      dims[0],
+      " and dim1 = ",
+      dims[1]);
 
   // check range of dims
-  TORCH_CHECK(dims[0] < total_dims && dims[0] >= -total_dims,
-      "Rotation dim0 out of range, dim0 = ", dims[0]);
+  TORCH_CHECK(
+      dims[0] < total_dims && dims[0] >= -total_dims,
+      "Rotation dim0 out of range, dim0 = ",
+      dims[0]);
 
-  TORCH_CHECK(dims[1] < total_dims && dims[1] >= -total_dims,
-      "Rotation dim0 out of range, dim0 = ", dims[1]);
+  TORCH_CHECK(
+      dims[1] < total_dims && dims[1] >= -total_dims,
+      "Rotation dim0 out of range, dim0 = ",
+      dims[1]);
 
   // handle modulo with negative k
   k = (4 + (k % 4)) % 4;
 
-  switch(k) {
+  switch (k) {
     case 1:
       return self.flip({dims[1]}).transpose_(dims[0], dims[1]);
     case 2:

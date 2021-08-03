@@ -2,11 +2,10 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 
-#include <runtime/Utils.h>
 #include <oneDNN/oneDNN.h>
+#include <runtime/Utils.h>
 
 #include "comm/ParamUtils.h"
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;

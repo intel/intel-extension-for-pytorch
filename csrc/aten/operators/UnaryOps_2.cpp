@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
-#include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
+#include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
@@ -9,7 +9,6 @@
 
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -46,11 +45,14 @@ IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(sgn, Numerics<scalar_t>::sgn, Real);
 
 Tensor& sqrt_out(Tensor& result, const Tensor& self) {
   checkBackend("sqrt_out", {self}, Backend::XPU);
-  TORCH_CHECK(at::isFloatingType(self.scalar_type()),
-    "unsupported dtype for self:", self.scalar_type());
+  TORCH_CHECK(
+      at::isFloatingType(self.scalar_type()),
+      "unsupported dtype for self:",
+      self.scalar_type());
   result = at::empty_like(self);
   if (self.dim() > 0 && self.scalar_type() != ScalarType::Double) {
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_sqrt>(result, self, 0.0f, 0.0f);
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_sqrt>(
+        result, self, 0.0f, 0.0f);
   } else {
     ipex_sqrt_out(result, self);
   }

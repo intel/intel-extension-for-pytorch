@@ -1,10 +1,14 @@
-#include <runtime/Memory.h>
 #include <core/Memory.h>
+#include <runtime/Memory.h>
 
 namespace xpu {
 namespace dpcpp {
 
-void dpcppMemcpy(void* dst, const void* src, size_t n_bytes, dpcppMemcpyKind kind) {
+void dpcppMemcpy(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    dpcppMemcpyKind kind) {
   switch (kind) {
     case HostToDevice:
       memcpyHostToDevice(dst, src, n_bytes, false);
@@ -20,7 +24,11 @@ void dpcppMemcpy(void* dst, const void* src, size_t n_bytes, dpcppMemcpyKind kin
   }
 }
 
-void dpcppMemcpyAsync(void* dst, const void* src, size_t n_bytes, dpcppMemcpyKind kind) {
+void dpcppMemcpyAsync(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    dpcppMemcpyKind kind) {
   switch (kind) {
     case HostToDevice:
       memcpyHostToDevice(dst, src, n_bytes, true);

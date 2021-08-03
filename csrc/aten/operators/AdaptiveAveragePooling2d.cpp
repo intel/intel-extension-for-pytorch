@@ -3,11 +3,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ATDispatch.h"
 
 #include <vector>
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
@@ -20,7 +19,8 @@ void adaptive_avg_pool2d_out_template(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size) {
-  TORCH_CHECK((input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(
+      (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
 
   // bool ceil_mode = false;
   auto nOutputCols = output_size[1];
@@ -47,7 +47,8 @@ void adaptive_avg_pool2d_out_template(
 
   Tensor input_ = input;
   if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols},
+    output.resize_(
+        {batchSize, nInputPlane, nOutputRows, nOutputCols},
         at::MemoryFormat::ChannelsLast);
   } else {
     input_ = input.contiguous();
@@ -80,8 +81,8 @@ void adaptive_avg_pool2d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput_,
     const Tensor& input) {
-
-  TORCH_CHECK((input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(
+      (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
   Tensor gradOutput;
   /* resize */
   if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
@@ -117,7 +118,8 @@ void adaptive_avg_pool2d_backward_out_template(
 
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
 
-  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+  ::xpu::oneDNN::pooling_backward<
+      ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
       batchSize,
@@ -151,32 +153,36 @@ Tensor& adaptive_avg_pool2d_out(
 
 Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
-  if(self.is_quantized()) {
-    output = _empty_affine_quantized({0},
-                self.options(),
-                self.q_scale(),
-                self.q_zero_point(),
-                MemoryFormat::Contiguous);
+  if (self.is_quantized()) {
+    output = _empty_affine_quantized(
+        {0},
+        self.options(),
+        self.q_scale(),
+        self.q_zero_point(),
+        MemoryFormat::Contiguous);
   } else {
     output = at::empty({0}, self.options());
   }
 
-  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(output, self, output_size);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
+      output, self, output_size);
 }
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
-  if(self.is_quantized()) {
-    output = _empty_affine_quantized({0},
-                self.options(),
-                self.q_scale(),
-                self.q_zero_point(),
-                MemoryFormat::Contiguous);
+  if (self.is_quantized()) {
+    output = _empty_affine_quantized(
+        {0},
+        self.options(),
+        self.q_scale(),
+        self.q_zero_point(),
+        MemoryFormat::Contiguous);
   } else {
     output = at::empty({0}, self.options());
   }
 
-  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(output, self, output_size);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
+      output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
@@ -193,7 +199,8 @@ Tensor _adaptive_avg_pool2d_backward(
   Tensor grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
       ? at::empty_like(self, at::MemoryFormat::ChannelsLast)
       : at::empty_like(self, MemoryFormat::Contiguous);
-  impl::adaptive_avg_pool2d_backward_out_template(grad_input, grad_output, self);
+  impl::adaptive_avg_pool2d_backward_out_template(
+      grad_input, grad_output, self);
   return grad_input;
 }
 
@@ -202,33 +209,36 @@ Tensor _adaptive_avg_pool2d_backward(
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor& adaptive_avg_pool2d_out(
-  Tensor& out,
-  const Tensor& self,
-  IntArrayRef output_size) {
-  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(out, self, output_size);
+    Tensor& out,
+    const Tensor& self,
+    IntArrayRef output_size) {
+  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(
+      out, self, output_size);
   return out;
 }
 
 Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
-  output = _empty_affine_quantized({0},
-    self.options(),
-    self.q_scale(),
-    self.q_zero_point(),
-    MemoryFormat::Contiguous);
+  output = _empty_affine_quantized(
+      {0},
+      self.options(),
+      self.q_scale(),
+      self.q_zero_point(),
+      MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
-    output, self, output_size);
+      output, self, output_size);
 }
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
-  output = _empty_affine_quantized({0},
-    self.options(),
-    self.q_scale(),
-    self.q_zero_point(),
-    MemoryFormat::Contiguous);
+  output = _empty_affine_quantized(
+      {0},
+      self.options(),
+      self.q_scale(),
+      self.q_zero_point(),
+      MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
-    output, self, output_size);
+      output, self, output_size);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU

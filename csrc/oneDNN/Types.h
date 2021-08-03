@@ -11,4 +11,5 @@ enum post_attr {
   with_sigmoid = 0b100,
 };
 
-}}
+}
+} // namespace xpu

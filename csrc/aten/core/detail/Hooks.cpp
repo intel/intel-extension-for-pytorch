@@ -2,16 +2,15 @@
 #include <ATen/Context.h>
 #include <c10/util/Exception.h>
 
-#include <runtime/Exception.h>
+#include <core/Allocator.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>
-#include <core/Allocator.h>
+#include <runtime/Exception.h>
 
 #include <cstddef>
 #include <functional>
 #include <memory>
-
 
 namespace xpu {
 namespace dpcpp {
@@ -62,13 +61,13 @@ at::Allocator* XPUHooks::getPinnedMemoryAllocator() const {
   return getHostAllocator();
 }
 
-const Generator&
-XPUHooks::getDefaultXPUGenerator(DeviceIndex device_index) const {
+const Generator& XPUHooks::getDefaultXPUGenerator(
+    DeviceIndex device_index) const {
   return xpu::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
 }
 
 REGISTER_XPU_HOOKS(XPUHooks);
 
-} // detail
-} // dpcpp
-} // namespace
+} // namespace detail
+} // namespace dpcpp
+} // namespace xpu

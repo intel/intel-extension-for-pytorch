@@ -5,8 +5,8 @@
 #include <utils/Macros.h>
 
 #ifdef USE_ONEMKL
-#include <oneapi/mkl.hpp>
 #include <mkl.h>
+#include <oneapi/mkl.hpp>
 #include <utils/oneMKLUtils.h>
 #endif
 
@@ -15,50 +15,50 @@ namespace dpcpp {
 
 #define AT_DPCPP_TRY try {
 #ifdef USE_ONEMKL
-#define AT_DPCPP_CATCH_RETHROW(filename, lineno) \
-  }                                              \
-  catch (oneapi::mkl::lapack::exception & e) {   \
+#define AT_DPCPP_CATCH_RETHROW(filename, lineno)                        \
+  }                                                                     \
+  catch (oneapi::mkl::lapack::exception & e) {                          \
     xpu::oneMKL::OneMklExInfoManager::Instance().setLastInfo(e.info()); \
-    TORCH_WARN(                                  \
-        "ONEMKL Exception:",                     \
-        e.info(),                                \
-        "file = ",                               \
-        filename,                                \
-        "line = ",                               \
-        lineno);                                 \
-    throw;                                       \
-  }                                              \
-  catch (DPCPP::exception & e) {                 \
-    TORCH_WARN(                                  \
-        "DPCPP Exception: ",                     \
-        e.what(),                                \
-        "file = ",                               \
-        filename,                                \
-        "line = ",                               \
-        lineno);                                 \
-    throw;                                       \
+    TORCH_WARN(                                                         \
+        "ONEMKL Exception:",                                            \
+        e.info(),                                                       \
+        "file = ",                                                      \
+        filename,                                                       \
+        "line = ",                                                      \
+        lineno);                                                        \
+    throw;                                                              \
+  }                                                                     \
+  catch (DPCPP::exception & e) {                                        \
+    TORCH_WARN(                                                         \
+        "DPCPP Exception: ",                                            \
+        e.what(),                                                       \
+        "file = ",                                                      \
+        filename,                                                       \
+        "line = ",                                                      \
+        lineno);                                                        \
+    throw;                                                              \
   }
 
-#define AT_DPCPP_CATCH_NOTHROW(filename, lineno) \
-  }                                              \
-  catch (oneapi::mkl::lapack::exception & e) {   \
+#define AT_DPCPP_CATCH_NOTHROW(filename, lineno)                        \
+  }                                                                     \
+  catch (oneapi::mkl::lapack::exception & e) {                          \
     xpu::oneMKL::OneMklExInfoManager::Instance().setLastInfo(e.info()); \
-    TORCH_WARN(                                  \
-        "ONEMKL Exception:",                     \
-        e.info(),                                \
-        "file = ",                               \
-        filename,                                \
-        "line = ",                               \
-        lineno);                                 \
-  }                                              \
-  catch (DPCPP::exception & e) {                 \
-    TORCH_WARN(                                  \
-        "DPCPP Exception: ",                     \
-        e.what(),                                \
-        "file = ",                               \
-        filename,                                \
-        "line = ",                               \
-        lineno);                                 \
+    TORCH_WARN(                                                         \
+        "ONEMKL Exception:",                                            \
+        e.info(),                                                       \
+        "file = ",                                                      \
+        filename,                                                       \
+        "line = ",                                                      \
+        lineno);                                                        \
+  }                                                                     \
+  catch (DPCPP::exception & e) {                                        \
+    TORCH_WARN(                                                         \
+        "DPCPP Exception: ",                                            \
+        e.what(),                                                       \
+        "file = ",                                                      \
+        filename,                                                       \
+        "line = ",                                                      \
+        lineno);                                                        \
   }
 #else
 #define AT_DPCPP_CATCH_RETHROW(filename, lineno) \

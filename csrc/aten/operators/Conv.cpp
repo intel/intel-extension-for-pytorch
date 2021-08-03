@@ -1,13 +1,13 @@
 #include <ATen/quantized/QTensorImpl.h>
-#include <intrinsic/ipex_intrinsic.h>
 #include <ATen/quantized/Quantizer.h>
-#include <runtime/Utils.h>
-#include <quantized/Quantizer.h>
 #include <core/TensorImplUtils.h>
+#include <intrinsic/ipex_intrinsic.h>
+#include <quantized/Quantizer.h>
+#include <runtime/Utils.h>
 #include <tensor/Context.h>
 
-#include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ParamUtils.h"
 
 #include "ConvTranspose.h"
 
@@ -29,7 +29,8 @@ Tensor dpcpp_convolution_backward_input(
     IntArrayRef dilation,
     int64_t groups,
     bool bias_defined) {
-  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine =
+      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto grad_input = at::empty(input_size, grad_output.options());
@@ -47,17 +48,27 @@ Tensor dpcpp_convolution_backward_input(
   auto bias_t = dnnl::memory::data_type::f32;
   auto weight_usr_t = weight_t;
   auto format_any = memory::format_tag::any;
-  auto format_input = conv_src_fmt(ndim,
-                      ndim == 4 ?
-                      (!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-                      (!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
-  auto format_weight = conv_wgh_fmt(ndim, groups != 1, weight.size(1) == 1 ? false :
-                       (weight.ndimension() == 4 ?
-                       (!weight.is_contiguous() && weight.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-                       (!weight.is_contiguous() && weight.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
+  auto format_input = conv_src_fmt(
+      ndim,
+      ndim == 4
+          ? (!grad_output.is_contiguous() &&
+             grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+          : (!grad_output.is_contiguous() &&
+             grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto format_weight = conv_wgh_fmt(
+      ndim,
+      groups != 1,
+      weight.size(1) == 1
+          ? false
+          : (weight.ndimension() == 4
+                 ? (!weight.is_contiguous() &&
+                    weight.is_contiguous(at::MemoryFormat::ChannelsLast))
+                 : (!weight.is_contiguous() &&
+                    weight.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
 
   memory::dims input_tz = grad_input.sizes().vec();
-  memory::dims weight_tz = compatible_wgh_dims(ndim, groups, oc, ic, weight.sizes());
+  memory::dims weight_tz =
+      compatible_wgh_dims(ndim, groups, oc, ic, weight.sizes());
   memory::dims bias_tz = {oc};
   memory::dims output_tz = grad_output.sizes().vec();
   output_tz[0] = grad_input.size(0); // set n
@@ -66,34 +77,51 @@ Tensor dpcpp_convolution_backward_input(
   memory::dims _padding = padding.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
-  //Master weight
+  // Master weight
   if (data_grad == dnnl::memory::data_type::bf16) {
     weight_t = dnnl::memory::data_type::bf16;
     bias_t = dnnl::memory::data_type::bf16;
   }
 
-  auto input_md = Settings::I().is_onednn_layout_enabled() ?
-                  memory::desc(input_tz, data_grad, format_any) :
-                  memory::desc(input_tz, data_grad, format_input);
-  auto weight_md = ((!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) || Settings::I().is_onednn_layout_enabled()) ?
-                   memory::desc(weight_tz, weight_t, format_any) :
-                   memory::desc(weight_tz, weight_t, format_weight);
-  auto output_md = Settings::I().is_onednn_layout_enabled() ?
-                   memory::desc(output_tz, data_grad, format_any) :
-                   memory::desc(output_tz, data_grad, format_input);
-  auto bias_md = bias_defined ? memory::desc(bias_tz, bias_t, format_any) : memory::desc();
+  auto input_md = Settings::I().is_onednn_layout_enabled()
+      ? memory::desc(input_tz, data_grad, format_any)
+      : memory::desc(input_tz, data_grad, format_input);
+  auto weight_md =
+      ((!grad_output.is_contiguous() &&
+        grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) ||
+       Settings::I().is_onednn_layout_enabled())
+      ? memory::desc(weight_tz, weight_t, format_any)
+      : memory::desc(weight_tz, weight_t, format_weight);
+  auto output_md = Settings::I().is_onednn_layout_enabled()
+      ? memory::desc(output_tz, data_grad, format_any)
+      : memory::desc(output_tz, data_grad, format_input);
+  auto bias_md =
+      bias_defined ? memory::desc(bias_tz, bias_t, format_any) : memory::desc();
 
   auto conv_forward_desc = convolution_forward::desc(
-      prop_kind::forward, algorithm::convolution_direct,
-      input_md, weight_md, bias_md, output_md,
-      _stride, _dilation, _padding, _padding);
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      input_md,
+      weight_md,
+      bias_md,
+      output_md,
+      _stride,
+      _dilation,
+      _padding,
+      _padding);
 
-  auto conv_forward_pd = convolution_forward::primitive_desc(conv_forward_desc, engine);
+  auto conv_forward_pd =
+      convolution_forward::primitive_desc(conv_forward_desc, engine);
 
   auto conv_backward_data_desc = convolution_backward_data::desc(
       algorithm::convolution_direct,
-      input_md, weight_md, output_md,
-      _stride, _dilation, _padding, _padding);
+      input_md,
+      weight_md,
+      output_md,
+      _stride,
+      _dilation,
+      _padding,
+      _padding);
 
 #ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
@@ -108,36 +136,52 @@ Tensor dpcpp_convolution_backward_input(
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
   if (!Settings::I().is_onednn_layout_enabled()) {
     grad_output_usr_memory = dpcpp_onednn_memory(
-      {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
+        {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
     weight_usr_memory = dpcpp_onednn_memory(
-      {weight_tz, weight_usr_t, format_weight}, engine, weight.data_ptr());
+        {weight_tz, weight_usr_t, format_weight}, engine, weight.data_ptr());
 
     grad_input_usr_memory = dpcpp_onednn_memory(
-      {input_tz, data_grad, format_input}, engine, grad_input.data_ptr());
+        {input_tz, data_grad, format_input}, engine, grad_input.data_ptr());
   } else {
-    auto grad_output_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
+    auto grad_output_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
     grad_output_usr_memory = grad_output_ctx.is_plain()
-        ? dpcpp_onednn_memory({output_tz, data_grad, format_input}, engine, grad_output.data_ptr())
-        : dpcpp_onednn_memory({grad_output_ctx.meta()}, engine, grad_output.data_ptr());
+        ? dpcpp_onednn_memory(
+              {output_tz, data_grad, format_input},
+              engine,
+              grad_output.data_ptr())
+        : dpcpp_onednn_memory(
+              {grad_output_ctx.meta()}, engine, grad_output.data_ptr());
 
-    auto weight_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(weight);
+    auto weight_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(weight);
     weight_usr_memory = weight_ctx.is_plain()
-        ? dpcpp_onednn_memory({weight_tz, weight_usr_t, format_weight}, engine, weight.data_ptr())
+        ? dpcpp_onednn_memory(
+              {weight_tz, weight_usr_t, format_weight},
+              engine,
+              weight.data_ptr())
         : dpcpp_onednn_memory({weight_ctx.meta()}, engine, weight.data_ptr());
 
-    auto grad_input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_input);
+    auto grad_input_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_input);
     grad_input_usr_memory = grad_input_ctx.is_plain()
-        ? dpcpp_onednn_memory({output_tz, data_grad, format_input}, engine, grad_input.data_ptr())
-        : dpcpp_onednn_memory({grad_input_ctx.meta()}, engine, grad_input.data_ptr());
+        ? dpcpp_onednn_memory(
+              {output_tz, data_grad, format_input},
+              engine,
+              grad_input.data_ptr())
+        : dpcpp_onednn_memory(
+              {grad_input_ctx.meta()}, engine, grad_input.data_ptr());
   }
 
   Tensor grad_output_;
   auto expected_grad_output_md = conv_backward_data_pd.diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
   if (grad_output_usr_memory.get_desc() != expected_grad_output_md) {
-    grad_output_ = empty_opaque_tensor(expected_grad_output_md, grad_output.options(), c10::nullopt);
-    grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
+    grad_output_ = empty_opaque_tensor(
+        expected_grad_output_md, grad_output.options(), c10::nullopt);
+    grad_output_memory = dpcpp_onednn_memory(
+        expected_grad_output_md, engine, grad_output_.data_ptr());
     xpu::oneDNN::reorder(grad_output, grad_output_);
   }
 
@@ -145,8 +189,10 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_weight_md = conv_backward_data_pd.weights_desc();
   auto weight_memory = weight_usr_memory;
   if (weight_usr_memory.get_desc() != expected_weight_md) {
-    weight_ = empty_opaque_tensor(expected_weight_md, weight.options(), c10::nullopt);
-    weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
+    weight_ =
+        empty_opaque_tensor(expected_weight_md, weight.options(), c10::nullopt);
+    weight_memory =
+        dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
     xpu::oneDNN::reorder(weight, weight_);
   }
 
@@ -154,32 +200,41 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_grad_input_md = conv_backward_data_pd.diff_src_desc();
   auto grad_input_memory = grad_input_usr_memory;
   if (grad_input_memory.get_desc() != expected_grad_input_md) {
-    grad_input_ = empty_opaque_tensor(expected_grad_input_md, grad_input.options(), c10::nullopt);
-    grad_input_memory = dpcpp_onednn_memory(expected_grad_input_md, engine, grad_input_.data_ptr());
+    grad_input_ = empty_opaque_tensor(
+        expected_grad_input_md, grad_input.options(), c10::nullopt);
+    grad_input_memory = dpcpp_onednn_memory(
+        expected_grad_input_md, engine, grad_input_.data_ptr());
   }
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size() / grad_output.dtype().itemsize();
-  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, grad_output.options(), c10::nullopt);
-  auto scratchpad_memory = dpcpp_onednn_memory(conv_backward_data_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size() /
+      grad_output.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, grad_output.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(
+      conv_backward_data_pd.scratchpad_desc(),
+      engine,
+      scratchpad_tensor.data_ptr());
 #endif
 
   auto conv_backward_data = convolution_backward_data(conv_backward_data_pd);
   DPCPP_ONEDNN_EXEC(
       conv_backward_data,
       strm,
-      {{DNNL_ARG_DIFF_DST, grad_output_memory},
-      {DNNL_ARG_WEIGHTS, weight_memory},
-      {DNNL_ARG_DIFF_SRC, grad_input_memory},
+      {
+          {DNNL_ARG_DIFF_DST, grad_output_memory},
+          {DNNL_ARG_WEIGHTS, weight_memory},
+          {DNNL_ARG_DIFF_SRC, grad_input_memory},
 #ifdef USE_SCRATCHPAD_MODE
-      {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+          {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
 #endif
       });
 
   if (!Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     xpu::oneDNN::reorder(grad_input_, grad_input);
-  } else if (Settings::I().is_onednn_layout_enabled() &&
+  } else if (
+      Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
@@ -197,7 +252,8 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
     IntArrayRef dilation,
     int64_t groups,
     bool bias_defined) {
-  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine =
+      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   Tensor grad_bias;
@@ -219,22 +275,33 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto weight_t = data_grad;
   auto bias_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
-  auto format_input = conv_src_fmt(ndim,
-                      ndim == 4 ?
-                      (!input.is_contiguous() && input.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-                      (!input.is_contiguous() && input.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
-  auto format_weight = conv_wgh_fmt(ndim, groups != 1, grad_output.size(1) == 1 ? false :
-                       (grad_output.ndimension() == 4 ?
-                       (!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-                       (!grad_output.is_contiguous() && grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
+  auto format_input = conv_src_fmt(
+      ndim,
+      ndim == 4 ? (!input.is_contiguous() &&
+                   input.is_contiguous(at::MemoryFormat::ChannelsLast))
+                : (!input.is_contiguous() &&
+                   input.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto format_weight = conv_wgh_fmt(
+      ndim,
+      groups != 1,
+      grad_output.size(1) == 1
+          ? false
+          : (grad_output.ndimension() == 4
+                 ? (!grad_output.is_contiguous() &&
+                    grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
+                 : (!grad_output.is_contiguous() &&
+                    grad_output.is_contiguous(
+                        at::MemoryFormat::ChannelsLast3d))));
   auto format_bias = memory::format_tag::x;
 
-  // Naive Master weight - We keep BF16 gw and gb output, and reorder them to fp32 in SGD.
+  // Naive Master weight - We keep BF16 gw and gb output, and reorder them to
+  // fp32 in SGD.
   auto grad_weight_t = weight_t;
   auto grad_bias_t = weight_t;
 
   memory::dims input_tz = input.sizes().vec();
-  memory::dims weight_tz = compatible_wgh_dims(ndim, groups, oc, ic, grad_weight.sizes());
+  memory::dims weight_tz =
+      compatible_wgh_dims(ndim, groups, oc, ic, grad_weight.sizes());
   memory::dims bias_tz = {oc};
   memory::dims output_tz = grad_output.sizes().vec();
   output_tz[0] = input.size(0); // set n
@@ -243,37 +310,54 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   memory::dims _padding = padding.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
-  auto input_md = Settings::I().is_onednn_layout_enabled() ?
-                  memory::desc(input_tz, data_grad, format_any) :
-                  memory::desc(input_tz, data_grad, format_input);
-  // Master weight - for now, we want plain gw output and gb output because weight and bias in sgd is plain.
-  //                 while plain calculation in Conv3d cannot get the correct gw in PreCI.
-  //                 Thus, we still use format_any here and add one reorder in the end.
+  auto input_md = Settings::I().is_onednn_layout_enabled()
+      ? memory::desc(input_tz, data_grad, format_any)
+      : memory::desc(input_tz, data_grad, format_input);
+  // Master weight - for now, we want plain gw output and gb output because
+  // weight and bias in sgd is plain.
+  //                 while plain calculation in Conv3d cannot get the correct gw
+  //                 in PreCI. Thus, we still use format_any here and add one
+  //                 reorder in the end.
   auto weight_md = memory::desc(weight_tz, grad_weight_t, format_any);
-  auto bias_md = bias_defined ? memory::desc(bias_tz, grad_bias_t, format_any) : memory::desc();
-  auto output_md = Settings::I().is_onednn_layout_enabled() ?
-                  memory::desc(output_tz, weight_t, format_any) :
-                  memory::desc(output_tz, weight_t, format_input);
+  auto bias_md = bias_defined ? memory::desc(bias_tz, grad_bias_t, format_any)
+                              : memory::desc();
+  auto output_md = Settings::I().is_onednn_layout_enabled()
+      ? memory::desc(output_tz, weight_t, format_any)
+      : memory::desc(output_tz, weight_t, format_input);
   auto conv_forward_desc = convolution_forward::desc(
-      prop_kind::forward, algorithm::convolution_direct,
-      input_md, weight_md, bias_md, output_md,
-      _stride, _dilation, _padding, _padding);
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      input_md,
+      weight_md,
+      bias_md,
+      output_md,
+      _stride,
+      _dilation,
+      _padding,
+      _padding);
 
-  auto conv_forward_pd = convolution_forward::primitive_desc(conv_forward_desc, engine);
+  auto conv_forward_pd =
+      convolution_forward::primitive_desc(conv_forward_desc, engine);
 
   auto conv_backward_weight_desc = convolution_backward_weights::desc(
-          algorithm::convolution_direct,
-          input_md, weight_md, bias_md, output_md,
-          _stride, _dilation, _padding, _padding);
+      algorithm::convolution_direct,
+      input_md,
+      weight_md,
+      bias_md,
+      output_md,
+      _stride,
+      _dilation,
+      _padding,
+      _padding);
 
 #ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
   auto conv_backward_weight_pd = convolution_backward_weights::primitive_desc(
-          conv_backward_weight_desc, attr, engine, conv_forward_pd);
+      conv_backward_weight_desc, attr, engine, conv_forward_pd);
 #else
   auto conv_backward_weight_pd = convolution_backward_weights::primitive_desc(
-          conv_backward_weight_desc, engine, conv_forward_pd);
+      conv_backward_weight_desc, engine, conv_forward_pd);
 #endif
 
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
@@ -285,30 +369,46 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
         {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
     grad_weight_usr_memory = dpcpp_onednn_memory(
-        {weight_tz, grad_weight_t, format_weight}, engine, grad_weight.data_ptr());
+        {weight_tz, grad_weight_t, format_weight},
+        engine,
+        grad_weight.data_ptr());
   } else {
-    auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
+    auto input_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
     input_usr_memory = input_ctx.is_plain()
-        ? dpcpp_onednn_memory({input_tz, data_grad, format_input}, engine, input.data_ptr())
+        ? dpcpp_onednn_memory(
+              {input_tz, data_grad, format_input}, engine, input.data_ptr())
         : dpcpp_onednn_memory({input_ctx.meta()}, engine, input.data_ptr());
 
-    auto grad_output_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
+    auto grad_output_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
     grad_output_usr_memory = grad_output_ctx.is_plain()
-        ? dpcpp_onednn_memory({output_tz, data_grad, format_input}, engine, grad_output.data_ptr())
-        : dpcpp_onednn_memory({grad_output_ctx.meta()}, engine, grad_output.data_ptr());
+        ? dpcpp_onednn_memory(
+              {output_tz, data_grad, format_input},
+              engine,
+              grad_output.data_ptr())
+        : dpcpp_onednn_memory(
+              {grad_output_ctx.meta()}, engine, grad_output.data_ptr());
 
-    auto grad_weight_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_weight);
+    auto grad_weight_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_weight);
     grad_weight_usr_memory = grad_weight_ctx.is_plain()
-        ? dpcpp_onednn_memory({weight_tz, grad_weight_t, format_weight}, engine, grad_weight.data_ptr())
-        : dpcpp_onednn_memory({grad_weight_ctx.meta()}, engine, grad_weight.data_ptr());
+        ? dpcpp_onednn_memory(
+              {weight_tz, grad_weight_t, format_weight},
+              engine,
+              grad_weight.data_ptr())
+        : dpcpp_onednn_memory(
+              {grad_weight_ctx.meta()}, engine, grad_weight.data_ptr());
   }
 
   Tensor input_;
   auto expected_input_md = conv_backward_weight_pd.src_desc();
   auto input_memory = input_usr_memory;
   if (input_usr_memory.get_desc() != expected_input_md) {
-    input_ = empty_opaque_tensor(expected_input_md, input.options(), c10::nullopt);
-    input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
+    input_ =
+        empty_opaque_tensor(expected_input_md, input.options(), c10::nullopt);
+    input_memory =
+        dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
     xpu::oneDNN::reorder(input, input_);
   }
 
@@ -316,8 +416,10 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto expected_grad_output_md = conv_backward_weight_pd.diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
   if (grad_output_usr_memory.get_desc() != expected_grad_output_md) {
-    grad_output_ = empty_opaque_tensor(expected_grad_output_md, grad_output.options(), c10::nullopt);
-    grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
+    grad_output_ = empty_opaque_tensor(
+        expected_grad_output_md, grad_output.options(), c10::nullopt);
+    grad_output_memory = dpcpp_onednn_memory(
+        expected_grad_output_md, engine, grad_output_.data_ptr());
     xpu::oneDNN::reorder(grad_output, grad_output_);
   }
 
@@ -325,46 +427,61 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto expected_grad_weight_md = conv_backward_weight_pd.diff_weights_desc();
   auto grad_weight_memory = grad_weight_usr_memory;
   if (grad_weight_usr_memory.get_desc() != expected_grad_weight_md) {
-    grad_weight_ = empty_opaque_tensor(expected_grad_weight_md, grad_weight.options(), c10::nullopt);
-    grad_weight_memory = dpcpp_onednn_memory(expected_grad_weight_md, engine, grad_weight_.data_ptr());
+    grad_weight_ = empty_opaque_tensor(
+        expected_grad_weight_md, grad_weight.options(), c10::nullopt);
+    grad_weight_memory = dpcpp_onednn_memory(
+        expected_grad_weight_md, engine, grad_weight_.data_ptr());
   }
 
   memory grad_bias_memory = memory({{}, bias_t, format_bias}, engine);
   if (bias_defined) {
     if (!Settings::I().is_onednn_layout_enabled()) {
       grad_bias_memory = dpcpp_onednn_memory(
-        {bias_tz, bias_t, format_bias}, engine, grad_bias.data_ptr());
+          {bias_tz, bias_t, format_bias}, engine, grad_bias.data_ptr());
     } else {
-      auto grad_bias_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_bias);
+      auto grad_bias_ctx =
+          at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_bias);
       grad_bias_memory = grad_bias_ctx.is_plain()
-        ? dpcpp_onednn_memory({bias_tz, grad_bias_t, format_bias}, engine, grad_bias.data_ptr())
-        : dpcpp_onednn_memory({grad_bias_ctx.meta()}, engine, grad_bias.data_ptr());
+          ? dpcpp_onednn_memory(
+                {bias_tz, grad_bias_t, format_bias},
+                engine,
+                grad_bias.data_ptr())
+          : dpcpp_onednn_memory(
+                {grad_bias_ctx.meta()}, engine, grad_bias.data_ptr());
     }
   }
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_backward_weight_pd.scratchpad_desc().get_size() / grad_output.dtype().itemsize();
-  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, input.options(), c10::nullopt);
-  auto scratchpad_memory = dnnl::memory(conv_backward_weight_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  int scratchpad_size = conv_backward_weight_pd.scratchpad_desc().get_size() /
+      grad_output.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, input.options(), c10::nullopt);
+  auto scratchpad_memory = dnnl::memory(
+      conv_backward_weight_pd.scratchpad_desc(),
+      engine,
+      scratchpad_tensor.data_ptr());
 #endif
 
-  auto conv_backward_weight = convolution_backward_weights(conv_backward_weight_pd);
+  auto conv_backward_weight =
+      convolution_backward_weights(conv_backward_weight_pd);
   DPCPP_ONEDNN_EXEC(
       conv_backward_weight,
       strm,
-      {{DNNL_ARG_DIFF_DST, grad_output_memory},
-      {DNNL_ARG_SRC, input_memory},
-      {DNNL_ARG_DIFF_WEIGHTS, grad_weight_memory},
-      {DNNL_ARG_DIFF_BIAS, grad_bias_memory},
+      {
+          {DNNL_ARG_DIFF_DST, grad_output_memory},
+          {DNNL_ARG_SRC, input_memory},
+          {DNNL_ARG_DIFF_WEIGHTS, grad_weight_memory},
+          {DNNL_ARG_DIFF_BIAS, grad_bias_memory},
 #ifdef USE_SCRATCHPAD_MODE
-      {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
+          {DNNL_ARG_SCRATCHPAD, scratchpad_memory},
 #endif
       });
 
   if (grad_weight_memory.get_desc() != grad_weight_usr_memory.get_desc()) {
     // grad_weight_ contains the result of gw backward, while it is blk format.
-    // In training mode, plain gw output is expected for sgd update regardless of onednn_layout_enabled or not.
-    // Thus, we need one additional reorder here to make grad_weight plain.
+    // In training mode, plain gw output is expected for sgd update regardless
+    // of onednn_layout_enabled or not. Thus, we need one additional reorder
+    // here to make grad_weight plain.
     xpu::oneDNN::reorder(grad_weight_, grad_weight);
   }
 
@@ -479,7 +596,8 @@ bool ConvParams::use_cpu_depthwise3x3_winograd(
   return false;
 }
 
-bool ConvParams::is_depthwise(const at::Tensor& input, const at::Tensor& weight) const {
+bool ConvParams::is_depthwise(const at::Tensor& input, const at::Tensor& weight)
+    const {
   return !transposed && input.ndimension() == 4 && input.size(1) == groups &&
       groups > 1 && // no point if there is only a single group
       weight.size(0) % input.size(1) ==
@@ -678,11 +796,13 @@ Tensor _convolution_out(
     ConvAttr attr) {
   auto output = output_r;
   auto input = input_r.is_contiguous() ||
-               input_r.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-               input_r : input_r.contiguous();
+          input_r.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? input_r
+      : input_r.contiguous();
   auto weight = weight_r.is_contiguous() ||
-                weight_r.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                weight_r : weight_r.contiguous();
+          weight_r.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? weight_r
+      : weight_r.contiguous();
   auto bias = bias_r;
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
@@ -711,27 +831,27 @@ Tensor _convolution_out(
 
   Tensor output_;
 
-  if(transposed_) {
+  if (transposed_) {
     output_ = dpcpp_convolution_transpose(
-  input,
-  weight,
-  bias,
-  params.stride,
-  params.padding,
-  params.output_padding,
-  params.dilation,
-  params.groups);
+        input,
+        weight,
+        bias,
+        params.stride,
+        params.padding,
+        params.output_padding,
+        params.dilation,
+        params.groups);
   } else {
     output_ = convolution(
-  output,
-  input,
-  weight,
-  bias,
-  params.padding,
-  params.stride,
-  params.dilation,
-  params.groups,
-  attr);
+        output,
+        input,
+        weight,
+        bias,
+        params.padding,
+        params.stride,
+        params.dilation,
+        params.groups,
+        attr);
 
     if (k == 3) {
       output_ = view3d(output_);
@@ -933,73 +1053,75 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     IntArrayRef output_padding,
     int64_t groups,
     std::array<bool, 3> output_mask) {
-
-  //Tensor input_ = input;
+  // Tensor input_ = input;
   // oneDNN can revice non-contiguous input if we define the stride in input_md,
   // for now, we contiguous the input before oneDNN.
   auto input_ndim = input.ndimension();
-  Tensor input_ = 4 == input_ndim ? (input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                        input.contiguous(at::MemoryFormat::ChannelsLast):
-                        input.contiguous()) :
-                        (input.is_contiguous(at::MemoryFormat::ChannelsLast3d) ?
-                        input.contiguous(at::MemoryFormat::ChannelsLast3d):
-                        input.contiguous());
+  Tensor input_ = 4 == input_ndim
+      ? (input.is_contiguous(at::MemoryFormat::ChannelsLast)
+             ? input.contiguous(at::MemoryFormat::ChannelsLast)
+             : input.contiguous())
+      : (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+             ? input.contiguous(at::MemoryFormat::ChannelsLast3d)
+             : input.contiguous());
 
   auto ndim = grad_output.ndimension();
-  //grad_output_ should be polluted by input
-  Tensor grad_output_ = 4 == ndim ? (input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
-                        grad_output.contiguous(at::MemoryFormat::ChannelsLast):
-                        grad_output.contiguous()) :
-                        (input.is_contiguous(at::MemoryFormat::ChannelsLast3d) ?
-                        grad_output.contiguous(at::MemoryFormat::ChannelsLast3d):
-                        grad_output.contiguous());
+  // grad_output_ should be polluted by input
+  Tensor grad_output_ = 4 == ndim
+      ? (input.is_contiguous(at::MemoryFormat::ChannelsLast)
+             ? grad_output.contiguous(at::MemoryFormat::ChannelsLast)
+             : grad_output.contiguous())
+      : (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+             ? grad_output.contiguous(at::MemoryFormat::ChannelsLast3d)
+             : grad_output.contiguous());
 
   Tensor grad_input, grad_weight, grad_bias;
 
   if (output_mask[0]) {
-    if(transposed){
+    if (transposed) {
       grad_input = dpcpp_convolution_transpose_backward_input(
-    input,
-    weight,
-    grad_output,
-    stride,
-    padding,
-    dilation,
-    groups,
-    output_mask[2]);
+          input,
+          weight,
+          grad_output,
+          stride,
+          padding,
+          dilation,
+          groups,
+          output_mask[2]);
     } else {
       grad_input = dpcpp_convolution_backward_input(
-    input_.sizes(),
-    grad_output_,
-    weight,
-    padding,
-    stride,
-    dilation,
-    groups,
-    output_mask[2]);
+          input_.sizes(),
+          grad_output_,
+          weight,
+          padding,
+          stride,
+          dilation,
+          groups,
+          output_mask[2]);
     }
   }
   if (output_mask[1] || output_mask[2]) {
-    if(transposed){
-      std::tie(grad_weight, grad_bias) = dpcpp_convolution_transpose_backward_weights(
-    input,
-    weight,
-    grad_output,
-    stride,
-    padding,
-    dilation,
-    groups,
-    output_mask[2]);
+    if (transposed) {
+      std::tie(grad_weight, grad_bias) =
+          dpcpp_convolution_transpose_backward_weights(
+              input,
+              weight,
+              grad_output,
+              stride,
+              padding,
+              dilation,
+              groups,
+              output_mask[2]);
     } else {
       std::tie(grad_weight, grad_bias) = dpcpp_convolution_backward_weights(
-    weight.sizes(),
-    grad_output_,
-    input_,
-    padding,
-    stride,
-    dilation,
-    groups,
-    output_mask[2]);
+          weight.sizes(),
+          grad_output_,
+          input_,
+          padding,
+          stride,
+          dilation,
+          groups,
+          output_mask[2]);
     }
   }
 

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
-
+#include <utils/DPCPP.h>
 
 using namespace at;
 
@@ -75,7 +74,6 @@ static inline int64_t dpcppLocalMemSize(DeviceId dev_id) {
 static inline int64_t dpcppLocalMemSize() {
   return dpcppLocalMemSize(getDeviceIdOfCurrentQueue());
 }
-
 
 } // namespace dpcpp
 } // namespace xpu

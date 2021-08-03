@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 #include <ATen/native/quantized/cpu/packed_params.h>
-#include <ATen/cpp_custom_type_hack.h>
 
 #include <torch/custom_class.h>
 #include <utils/Macros.h>
@@ -11,7 +11,7 @@
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-struct PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
+struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<2> {
   PackedConvWeightQDPCPP(
       Tensor weight,
       c10::optional<at::Tensor> bias,
@@ -19,12 +19,12 @@ struct PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
       torch::List<int64_t> padding,
       torch::List<int64_t> dilation,
       int64_t groups)
-    : weight(std::move(weight)),
-    bias(std::move(bias)),
-    stride_(std::move(stride)),
-    padding_(std::move(padding)),
-    dilation_(std::move(dilation)),
-    groups_(groups) {}
+      : weight(std::move(weight)),
+        bias(std::move(bias)),
+        stride_(std::move(stride)),
+        padding_(std::move(padding)),
+        dilation_(std::move(dilation)),
+        groups_(groups) {}
 
   Tensor weight;
   c10::optional<Tensor> bias;
@@ -37,7 +37,7 @@ struct PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
       const at::Tensor& input,
       double output_scale,
       int64_t output_zero_point) override {
-    //This is just align with Pytorch INT8 designe.
+    // This is just align with Pytorch INT8 designe.
     Tensor output;
     return output;
   }
@@ -46,7 +46,7 @@ struct PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
       const at::Tensor& input,
       double output_scale,
       int64_t output_zero_point) override {
-    //This is just align with Pytorch INT8 designe.
+    // This is just align with Pytorch INT8 designe.
     Tensor output;
     return output;
   }
@@ -80,20 +80,17 @@ struct PackedConvWeightQDPCPP :  public ConvPackedParamsBase<2> {
   }
 
   static c10::intrusive_ptr<ConvPackedParamsBase<2>> prepack(
-    at::Tensor weight,
-    c10::optional<at::Tensor> bias,
-    torch::List<int64_t> stride,
-    torch::List<int64_t> padding,
-    torch::List<int64_t> dilation,
-    int64_t groups);
+      at::Tensor weight,
+      c10::optional<at::Tensor> bias,
+      torch::List<int64_t> stride,
+      torch::List<int64_t> padding,
+      torch::List<int64_t> dilation,
+      int64_t groups);
 };
 
 struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
-  PackedLinearWeightQDPCPP (
-      Tensor weight,
-      c10::optional<at::Tensor> bias)
-      : weight(std::move(weight)),
-        bias_(std::move(bias)){}
+  PackedLinearWeightQDPCPP(Tensor weight, c10::optional<at::Tensor> bias)
+      : weight(std::move(weight)), bias_(std::move(bias)) {}
   Tensor weight;
   c10::optional<at::Tensor> bias_;
 
@@ -101,7 +98,7 @@ struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
       at::Tensor input,
       double output_scale,
       int64_t output_zero_point) override {
-    //This is just align with Pytorch INT8 designe.
+    // This is just align with Pytorch INT8 designe.
     Tensor output;
     return output;
   }
@@ -109,16 +106,18 @@ struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
       at::Tensor input,
       double output_scale,
       int64_t output_zero_point) override {
-    //This is just align with Pytorch INT8 designe.
+    // This is just align with Pytorch INT8 designe.
     Tensor output;
     return output;
   }
 
-  at::Tensor apply_dynamic(at::Tensor input, bool reduce_range=false) override {
+  at::Tensor apply_dynamic(at::Tensor input, bool reduce_range = false)
+      override {
     Tensor output;
     return output;
   }
-  at::Tensor apply_dynamic_relu(at::Tensor input, bool reduce_range=false) override {
+  at::Tensor apply_dynamic_relu(at::Tensor input, bool reduce_range = false)
+      override {
     Tensor output;
     return output;
   }
@@ -134,7 +133,6 @@ struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
   static c10::intrusive_ptr<LinearPackedParamsBase> prepack(
       at::Tensor weight,
       c10::optional<at::Tensor> bias);
-
 };
 
 } // namespace AtenIpexTypeQuantizedXPU

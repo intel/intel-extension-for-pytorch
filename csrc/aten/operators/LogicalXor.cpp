@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
-#include "comm/ATDispatch.h"
 #include "Loops.h"
-
+#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp;
 
@@ -13,29 +12,36 @@ DPCPP_DEF_K1(logical_xor_bool);
 DPCPP_DEF_K1(logical_xor_scalar);
 static void logical_xor_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    IPEX_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.input_dtype(), "logical_xor_kernel", [&]() {
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor_bool, scalar_t)>(iter,
-                   [](scalar_t a, scalar_t b) -> bool {
-                       return bool(a) != bool(b);
-                   });
-    });
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        kBool, kHalf, iter.input_dtype(), "logical_xor_kernel", [&]() {
+          dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor_bool, scalar_t)>(
+              iter, [](scalar_t a, scalar_t b) -> bool {
+                return bool(a) != bool(b);
+              });
+        });
   } else {
-    IPEX_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(), "logical_xor_kernel", [&]() {
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor_scalar, scalar_t)>(iter,
-                   [](scalar_t a, scalar_t b) -> scalar_t {
-                       return static_cast<scalar_t>(bool(a) != bool(b));
-                   });
-    });
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        kBool, kHalf, iter.dtype(), "logical_xor_kernel", [&]() {
+          dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor_scalar, scalar_t)>(
+              iter, [](scalar_t a, scalar_t b) -> scalar_t {
+                return static_cast<scalar_t>(bool(a) != bool(b));
+              });
+        });
   }
 }
 
 } // namespace impl
 
 static void check_convert(Scalar scalar, ScalarType scalarType) {
-  // Validate that is possible to convert scalar to tensor dtype without overflow
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(at::ScalarType::Bool, at::ScalarType::BFloat16, at::ScalarType::Half, scalarType, "check_convert", [&]{
-      scalar.to<scalar_t>();
-  });
+  // Validate that is possible to convert scalar to tensor dtype without
+  // overflow
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      scalarType,
+      "check_convert",
+      [&] { scalar.to<scalar_t>(); });
 }
 
 Tensor& logical_xor_out(

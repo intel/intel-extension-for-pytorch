@@ -1,14 +1,13 @@
-#include <ATen/native/UpSample.h>
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/native/UpSample.h>
 
+#include <core/Memory.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
-#include <core/Memory.h>
 #include "comm/ATDispatch.h"
 
 #include "UpSample.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -28,7 +27,6 @@ static void upsample_bicubic2d_out_frame(
     int64_t channels,
     int64_t onum,
     bool align_corners) {
-
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
   parallel_for_setup(onum, tile_size, rng, grng);
@@ -48,10 +46,14 @@ static void upsample_bicubic2d_out_frame(
         if (input_height == output_height && input_width == output_width) {
           for (int n = 0; n < nbatch; n++) {
             for (int c = 0; c < channels; c++) {
-                auto val = in_ptr[n * input_height * input_width * channels +
-                                c * input_height * input_width + output_y * input_width + output_x];
-                out_ptr[n * output_height * output_width * channels +
-                    c * output_height * output_width + output_y * output_width + output_x] = val;
+              auto val = in_ptr
+                  [n * input_height * input_width * channels +
+                   c * input_height * input_width + output_y * input_width +
+                   output_x];
+              out_ptr
+                  [n * output_height * output_width * channels +
+                   c * output_height * output_width + output_y * output_width +
+                   output_x] = val;
             }
           }
           return;
@@ -74,35 +76,62 @@ static void upsample_bicubic2d_out_frame(
         int in_y = DPCPP::floor(real_y);
         scalar_t t_y = real_y - in_y;
         for (int n = 0; n < nbatch; n++) {
-            for (int c = 0; c < channels; c++) {
+          for (int c = 0; c < channels; c++) {
             scalar_t coefficients[4];
             for (int k = 0; k < 4; k++) {
-                coefficients[k] = cubic_interp1d(
-                    upsample_get_value_bounded<scalar_t>(
-                        in_ptr, n, c, input_width, input_height, in_x - 1, in_y - 1 + k),
-                    upsample_get_value_bounded<scalar_t>(
-                        in_ptr, n, c, input_width, input_height, in_x + 0, in_y - 1 + k),
-                    upsample_get_value_bounded<scalar_t>(
-                        in_ptr, n, c, input_width, input_height, in_x + 1, in_y - 1 + k),
-                    upsample_get_value_bounded<scalar_t>(
-                        in_ptr, n, c, input_width, input_height, in_x + 2, in_y - 1 + k),
-                    t_x);
+              coefficients[k] = cubic_interp1d(
+                  upsample_get_value_bounded<scalar_t>(
+                      in_ptr,
+                      n,
+                      c,
+                      input_width,
+                      input_height,
+                      in_x - 1,
+                      in_y - 1 + k),
+                  upsample_get_value_bounded<scalar_t>(
+                      in_ptr,
+                      n,
+                      c,
+                      input_width,
+                      input_height,
+                      in_x + 0,
+                      in_y - 1 + k),
+                  upsample_get_value_bounded<scalar_t>(
+                      in_ptr,
+                      n,
+                      c,
+                      input_width,
+                      input_height,
+                      in_x + 1,
+                      in_y - 1 + k),
+                  upsample_get_value_bounded<scalar_t>(
+                      in_ptr,
+                      n,
+                      c,
+                      input_width,
+                      input_height,
+                      in_x + 2,
+                      in_y - 1 + k),
+                  t_x);
             }
-          
-            out_ptr[n * output_height * output_width * channels +
-                    c * output_height * output_width + 
-                    output_y * output_width + output_x] = static_cast<scalar_t>(cubic_interp1d(
-                coefficients[0],
-                coefficients[1],
-                coefficients[2],
-                coefficients[3],
-                t_y));
-            }
+
+            out_ptr
+                [n * output_height * output_width * channels +
+                 c * output_height * output_width + output_y * output_width +
+                 output_x] =
+                    static_cast<scalar_t>(cubic_interp1d(
+                        coefficients[0],
+                        coefficients[1],
+                        coefficients[2],
+                        coefficients[3],
+                        t_y));
+          }
         }
       }
     };
     cgh.parallel_for<DPCPP_K(bicubic2d, scalar_t)>(
-      DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
+        kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
@@ -140,11 +169,14 @@ static void upsample_bicubic2d_backward_out_frame(
         if (input_height == output_height && input_width == output_width) {
           for (int n = 0; n < nbatch; n++) {
             for (int c = 0; c < channels; ++c) {
-                auto val = out_ptr[n * output_height * output_width * channels +
-                                   c * output_height * output_width + output_y * output_width + output_x];
-                in_ptr[n * input_height * input_width * channels +
-                       c * input_height * input_width + output_y * input_width + output_x] = val;
-
+              auto val = out_ptr
+                  [n * output_height * output_width * channels +
+                   c * output_height * output_width + output_y * output_width +
+                   output_x];
+              in_ptr
+                  [n * input_height * input_width * channels +
+                   c * input_height * input_width + output_y * input_width +
+                   output_x] = val;
             }
           }
           return;
@@ -173,9 +205,10 @@ static void upsample_bicubic2d_backward_out_frame(
 
         for (int n = 0; n < nbatch; n++) {
           for (int c = 0; c < channels; ++c) {
-            scalar_t out_value = out_ptr[n * output_height * output_width * channels +
-                                         c * output_height * output_width + 
-                                         output_y * output_width + output_x];
+            scalar_t out_value = out_ptr
+                [n * output_height * output_width * channels +
+                 c * output_height * output_width + output_y * output_width +
+                 output_x];
             for (int i = 0; i < 4; i++) {
               for (int j = 0; j < 4; j++) {
                 upsample_increment_value_bounded<scalar_t>(
@@ -194,7 +227,8 @@ static void upsample_bicubic2d_backward_out_frame(
       }
     };
     cgh.parallel_for<DPCPP_K(bicubic2d_bwd, scalar_t)>(
-      DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
+        kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
@@ -321,8 +355,7 @@ Tensor& upsample_bicubic2d_out(
     bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  impl::upsample_bicubic2d_out_template(
-      out, self, output_size, align_corners);
+  impl::upsample_bicubic2d_out_template(out, self, output_size, align_corners);
   return out;
 }
 
@@ -339,16 +372,15 @@ Tensor upsample_bicubic2d(
 }
 
 Tensor upsample_bicubic2d(
-        const Tensor& input,
-        c10::optional<IntArrayRef> output_size,
-        bool align_corners,
-        c10::optional<ArrayRef<double>> scale_factors) {
+    const Tensor& input,
+    c10::optional<IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
   auto output = at::empty({0}, input.options());
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
   auto scale_h = get_scale_value(scale_factors, 0);
   auto scale_w = get_scale_value(scale_factors, 1);
-  impl::upsample_bicubic2d_out_template(
-          output, input, osize, align_corners);
+  impl::upsample_bicubic2d_out_template(output, input, osize, align_corners);
   return output;
 }
 
@@ -389,7 +421,7 @@ Tensor upsample_bicubic2d_backward(
   auto scale_w = get_scale_value(scale_factors, 1);
   auto grad_input = at::zeros(input_size, grad_output.options());
   impl::upsample_bicubic2d_backward_out_template(
-          grad_input, grad_output, osize, input_size, align_corners);
+      grad_input, grad_output, osize, input_size, align_corners);
   return grad_input;
 }
 

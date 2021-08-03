@@ -1,24 +1,24 @@
 #include <ATen/ATen.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Context.h>
-#include <ATen/record_function.h>
+#include <ATen/SparseTensorUtils.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/SparseTensorUtils.h>
-#include <ATen/AtenIpexTypeXPU.h>
+#include <ATen/record_function.h>
 #include <oneDNN/oneDNN.h>
 
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
+#include "Loops.h"
 #include "comm/AccumulateType.h"
 #include "comm/Pointwise.h"
-#include "Loops.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/numeric>
 #include <oneapi/dpl/iterator>
+#include <oneapi/dpl/numeric>
 #endif
 
 using namespace xpu::dpcpp;
@@ -60,7 +60,7 @@ static inline void dim_check(
       "The dimensions of three inputs tensor not equal is not supported. ");
 }
 
-} // impl
+} // namespace impl
 
 Tensor mul_add(
     const Tensor& self,
@@ -100,8 +100,7 @@ Tensor mul_add(
     for (int i = 0; i < inputs.size(); ++i) {
       if (!tar.is_same(inputs[i])) {
         Tensor cur = inputs[i];
-        auto cur_ctx =
-            AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(cur);
+        auto cur_ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(cur);
         if (cur_ctx.meta() != tar_ctx.meta()) {
           cur = empty_opaque_tensor(
               tar_ctx.meta(), inputs[i].options(), c10::nullopt);
@@ -124,12 +123,12 @@ Tensor mul_add(
   }
 
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(result)
-  .add_input(_self)
-  .add_input(_other)
-  .add_input(_accumu)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(result)
+                  .add_input(_self)
+                  .add_input(_other)
+                  .add_input(_accumu)
+                  .build();
   impl::mul_add_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
   return result;
@@ -152,13 +151,12 @@ static inline void packed_add_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-      auto MSB_data = w_MSB;
-      auto LSB_data = w_LSB;
-      auto gw_data = gw;
+    auto MSB_data = w_MSB;
+    auto LSB_data = w_LSB;
+    auto gw_data = gw;
 
-      cgh.parallel_for<PackedAdd_ker<scalar_t>>(
+    cgh.parallel_for<PackedAdd_ker<scalar_t>>(
         DPCPP::range<1>(num_elem), [=](DPCPP::item<1> item) {
-
           int64_t gid = item.get_linear_id();
           auto MSB_p = MSB_data;
           auto LSB_p = LSB_data;
@@ -170,7 +168,7 @@ static inline void packed_add_kernel(
           p16.f += lr * (float)(gw_p[gid]);
           LSB_p[gid] = p16.s[0];
           MSB_p[gid] = p16.s[1];
-      });
+        });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
@@ -208,20 +206,24 @@ static inline void sparse_packed_add_kernel(
     std::copy(policy, countIterO, countIterO + nnz, uniqueOffsets);
 
     // auto indices1D_ptr = indices1D.data_ptr<int64_t>();
-    auto zipped_indices = oneapi::dpl::make_zip_iterator(indices1D, origIndices);
-    std::sort(policy, zipped_indices, zipped_indices + nnz,
-        [](auto lhs, auto rhs) {
+    auto zipped_indices =
+        oneapi::dpl::make_zip_iterator(indices1D, origIndices);
+    std::sort(
+        policy, zipped_indices, zipped_indices + nnz, [](auto lhs, auto rhs) {
           using std::get;
           return get<0>(lhs) < get<0>(rhs);
         });
-    auto zipped_uniqueOffsets = oneapi::dpl::make_zip_iterator(indices1D, uniqueOffsets);
-    auto newEnd = std::unique(policy, zipped_uniqueOffsets, zipped_uniqueOffsets + nnz,
-    [](auto lhs, auto rhs) {
-      using std::get;
-      return get<0>(lhs) == get<0>(rhs);
-    });
+    auto zipped_uniqueOffsets =
+        oneapi::dpl::make_zip_iterator(indices1D, uniqueOffsets);
+    auto newEnd = std::unique(
+        policy,
+        zipped_uniqueOffsets,
+        zipped_uniqueOffsets + nnz,
+        [](auto lhs, auto rhs) {
+          using std::get;
+          return get<0>(lhs) == get<0>(rhs);
+        });
     newNnz = std::distance(zipped_uniqueOffsets, newEnd);
-
   }
 
   const int num_group_0 = CeilDiv(newNnz, (int64_t)4);
@@ -248,7 +250,7 @@ static inline void sparse_packed_add_kernel(
 
         accscalar_t tmp = 0;
         for (int row = begin; row < end; row++) {
-          const int valueRow = ((int) origIndices_ptr[row]) * stride;
+          const int valueRow = ((int)origIndices_ptr[row]) * stride;
           if (featureDim < stride) {
             tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
           }
@@ -261,7 +263,8 @@ static inline void sparse_packed_add_kernel(
           p16.f += lr * (float)(tmp);
           LSB_p[weight_index] = p16.s[0];
           MSB_p[weight_index] = p16.s[1];
-          // newValues_ptr[newValueRow + featureDim] = static_cast<scalar_t>(tmp);
+          // newValues_ptr[newValueRow + featureDim] =
+          // static_cast<scalar_t>(tmp);
         }
       }
     };
@@ -269,7 +272,8 @@ static inline void sparse_packed_add_kernel(
     // kick off kernel
     cgh.parallel_for<DPCPP_K(SparsePackedAdd_ker, scalar_t)>(
         DPCPP::nd_range<2>(
-            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64), DPCPP::range<2>(4, 64)),
+            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64),
+            DPCPP::range<2>(4, 64)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -277,11 +281,12 @@ static inline void sparse_packed_add_kernel(
 }
 
 Tensor packed_add(
-    at::Tensor & top_half,
-    at::Tensor & bot_half,
-    const at::Tensor & grad,
+    at::Tensor& top_half,
+    at::Tensor& bot_half,
+    const at::Tensor& grad,
     float alpha) {
-  RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({top_half, bot_half, grad}));
+  RECORD_FUNCTION(
+      "packed_add", std::vector<c10::IValue>({top_half, bot_half, grad}));
   if (grad.is_sparse()) {
     Tensor values = grad._values();
     LongTensor indices = grad._indices();
@@ -311,8 +316,8 @@ Tensor packed_add(
         "sparse_packed_add_kernel",
         [&]() {
           sparse_packed_add_kernel<scalar_t>(
-              (unsigned short *)top_half.data_ptr<scalar_t>(),
-              (unsigned short *)bot_half.data_ptr<scalar_t>(),
+              (unsigned short*)top_half.data_ptr<scalar_t>(),
+              (unsigned short*)bot_half.data_ptr<scalar_t>(),
               values.data_ptr<at::BFloat16>(),
               indices1D.data_ptr<int64_t>(),
               origIndices.data_ptr<int64_t>(),
@@ -328,8 +333,8 @@ Tensor packed_add(
         "packed_add_kernel",
         [&]() {
           packed_add_kernel<scalar_t>(
-              (unsigned short *)top_half.data_ptr<scalar_t>(),
-              (unsigned short *)bot_half.data_ptr<scalar_t>(),
+              (unsigned short*)top_half.data_ptr<scalar_t>(),
+              (unsigned short*)bot_half.data_ptr<scalar_t>(),
               grad.data_ptr<at::BFloat16>(),
               top_half.numel(),
               static_cast<float>(alpha));
@@ -343,15 +348,14 @@ class FusionAmdd_ker {};
 
 template <typename scalar_t>
 static inline void fusion_amdd_kernel(
-  scalar_t* __restrict__ p,
-  scalar_t* __restrict__ d_p,
-  scalar_t* __restrict__ buf,
-  size_t num_element,
-  float weight_decay,
-  float momentum,
-  float dampening,
-  float lr) {
-
+    scalar_t* __restrict__ p,
+    scalar_t* __restrict__ d_p,
+    scalar_t* __restrict__ buf,
+    size_t num_element,
+    float weight_decay,
+    float momentum,
+    float dampening,
+    float lr) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -360,33 +364,28 @@ static inline void fusion_amdd_kernel(
     auto gw = d_p;
 
     cgh.parallel_for<FusionAmdd_ker<scalar_t>>(
-      DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {
-
-        auto id = item.get_linear_id();
-        gw[id] += w[id] * weight_decay;
-        m_buf[id] = m_buf[id] * momentum + gw[id];
-        w[id] += m_buf[id] * lr;
-
-    });
+        DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {
+          auto id = item.get_linear_id();
+          gw[id] += w[id] * weight_decay;
+          m_buf[id] = m_buf[id] * momentum + gw[id];
+          w[id] += m_buf[id] * lr;
+        });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 Tensor fusion_amdd(
-    at::Tensor & p,
-    at::Tensor & d_p,
-    at::Tensor & buf,
+    at::Tensor& p,
+    at::Tensor& d_p,
+    at::Tensor& buf,
     float weight_decay,
     float momentum,
     float dampening,
     float lr) {
-  // RECORD_FUNCTION("fusion_amdd", std::vector<c10::IValue>({top_half, bot_half, grad}));
-  // There is only for FP32 update
+  // RECORD_FUNCTION("fusion_amdd", std::vector<c10::IValue>({top_half,
+  // bot_half, grad})); There is only for FP32 update
   IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      d_p.scalar_type(),
-      "fusion_amdd_kernel",
-      [&]() {
+      at::ScalarType::BFloat16, d_p.scalar_type(), "fusion_amdd_kernel", [&]() {
         fusion_amdd_kernel<scalar_t>(
             p.data_ptr<scalar_t>(),
             d_p.data_ptr<scalar_t>(),

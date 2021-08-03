@@ -2,13 +2,12 @@
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
 #include "comm/ScalarOps.h"
-#include <oneDNN/oneDNN.h>
 
 #include "Loops.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -29,7 +28,7 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
       "mul",
       [&]() {
         dpcpp_kernel_with_scalars<SyclOpMul>(
-          iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
+            iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
       });
 }
 
@@ -37,7 +36,7 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div", [&] {
       dpcpp_kernel_with_scalars<SyclOpDiv>(
-        iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+          iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -47,7 +46,7 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
         "div",
         [&]() {
           dpcpp_kernel_with_scalars<SyclOpDiv>(
-            iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+              iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
         });
   }
 }
@@ -55,10 +54,7 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
 } // namespace impl
 
 Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
-  auto iter = TensorIterator::binary_op(
-      result,
-      self,
-      other);
+  auto iter = TensorIterator::binary_op(result, self, other);
   impl::mul_kernel_dpcpp(iter);
   return result;
 }
@@ -88,13 +84,13 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
       _other.dim() > 0 && _self.dim() == _other.dim() &&
       _self.scalar_type() == _other.scalar_type() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
-      _self.is_contiguous() && _other.is_contiguous() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.is_contiguous() &&
+      _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+        !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
   } else {
@@ -110,13 +106,13 @@ Tensor div(const Tensor& self, const Tensor& other) {
       _other.dim() > 0 && _self.dim() == _other.dim() &&
       _self.scalar_type() == _other.scalar_type() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
-      _self.is_contiguous() && _other.is_contiguous() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.is_contiguous() &&
+      _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+        !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
     return result;
@@ -135,10 +131,7 @@ Tensor& floor_divide_out(
     Tensor& result,
     const Tensor& self,
     const Tensor& other) {
-  auto iter = TensorIterator::binary_op(
-      result,
-      self,
-      other);
+  auto iter = TensorIterator::binary_op(result, self, other);
   impl::div_kernel_dpcpp(iter);
   if (result.is_floating_point()) {
     result.trunc_();

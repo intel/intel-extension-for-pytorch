@@ -1,6 +1,5 @@
-#include <core/TensorImplUtils.h>
 #include <ATen/core/TensorBody.h>
-
+#include <core/TensorImplUtils.h>
 
 using namespace xpu::dpcpp;
 
@@ -9,7 +8,7 @@ namespace AtenIpexTypeXPU {
 
 Tensor& set_(Tensor& self, Storage source) {
   int64_t new_size =
-    static_cast<int64_t>(source.nbytes() / self.dtype().itemsize());
+      static_cast<int64_t>(source.nbytes() / self.dtype().itemsize());
   TensorImpl_setStorage(
       TensorImpl_Unwrap(self),
       source.unsafeGetStorageImpl(),

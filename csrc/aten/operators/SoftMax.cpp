@@ -1,14 +1,14 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
 
-#include <intrinsic/ipex_intrinsic.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
-#include <runtime/Utils.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include <oneDNN/oneDNN.h>
+#include <runtime/Utils.h>
 
-#include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/SimpelReduce.h"
 
@@ -83,7 +83,8 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename outscalar_t,
-    template <typename, typename, typename> class Epilogue>
+    template <typename, typename, typename>
+    class Epilogue>
 void SpatialSoftMaxForward(
     outscalar_t* output,
     scalar_t* input,
@@ -111,10 +112,9 @@ void SpatialSoftMaxForward(
           size_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
           auto data_offset =
-              IndexToOffset<scalar_t, uint64_t>::get(
-                  group_id, outer_info);
+              IndexToOffset<scalar_t, uint64_t>::get(group_id, outer_info);
           auto in_ptr = in_data + data_offset;
-          auto out_ptr = out_data+ data_offset;
+          auto out_ptr = out_data + data_offset;
           // get max
           auto max_input = in_ptr[0];
           for (uint32_t i = local_id; i < dim_size; i += local_size) {
@@ -124,9 +124,10 @@ void SpatialSoftMaxForward(
           // to accscalar_t
           local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
 
-          simple_reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
-            return Numerics<accscalar_t>::max(a, b);
-          });
+          simple_reduce(
+              item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
+                return Numerics<accscalar_t>::max(a, b);
+              });
 
           // get sum
           auto sum_input = static_cast<accscalar_t>(0);
@@ -137,9 +138,10 @@ void SpatialSoftMaxForward(
           }
           local_acc_sum[local_id] = sum_input;
 
-          simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
-            return a + b;
-          });
+          simple_reduce(
+              item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+                return a + b;
+              });
 
           Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(
               local_acc_max[0], local_acc_sum[0]);
@@ -160,7 +162,8 @@ template <
     typename scalar_t,
     typename accscalar_t,
     typename outscalar_t,
-    template <typename, typename, typename> class Epilogue>
+    template <typename, typename, typename>
+    class Epilogue>
 void SpatialSoftMaxBackward(
     scalar_t* gradInput,
     const outscalar_t* output,
@@ -170,9 +173,11 @@ void SpatialSoftMaxBackward(
     size_t dim_size,
     size_t dim_stride) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  // Because of softmax backward using reduce, 512(max) WG size may cause much work-item waste(1/2 + 1/4 + 1/8) in tree reduction and is harmful to occupancy.
-  // Thus, 64 is chosen here to set as WG size. In addition, SLM has 65 banks in ATS and 64 here is extremely avoidable for bank conflict.
-  // 64 is both compatible for Gen9 and Gen12.
+  // Because of softmax backward using reduce, 512(max) WG size may cause much
+  // work-item waste(1/2 + 1/4 + 1/8) in tree reduction and is harmful to
+  // occupancy. Thus, 64 is chosen here to set as WG size. In addition, SLM has
+  // 65 banks in ATS and 64 here is extremely avoidable for bank conflict. 64 is
+  // both compatible for Gen9 and Gen12.
   size_t local_size = 64;
   local_size = std::min(local_size, dim_size);
   size_t global_size = outer_size * local_size;
@@ -193,8 +198,7 @@ void SpatialSoftMaxBackward(
           size_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
           auto data_offset =
-              IndexToOffset<outscalar_t, uint64_t>::get(
-                  group_id, outer_info);
+              IndexToOffset<outscalar_t, uint64_t>::get(group_id, outer_info);
           auto gradInput_ptr = gradInput_data + data_offset;
           auto output_ptr = output_data + data_offset;
           auto gradOutput_ptr = gradOutput_data + data_offset;
@@ -206,9 +210,10 @@ void SpatialSoftMaxBackward(
           }
           local_acc_sum[local_id] = thread_sum;
 
-          simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
-            return a + b;
-          });
+          simple_reduce(
+              item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+                return a + b;
+              });
 
           auto sum_k = local_acc_sum[0];
           Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(sum_k);
@@ -280,7 +285,8 @@ Tensor host_softmax_backward(
     const Tensor& output_,
     int64_t dim_,
     bool half_to_float) {
-  RECORD_FUNCTION("host_softmax_backward", std::vector<c10::IValue>({grad_, output_}));
+  RECORD_FUNCTION(
+      "host_softmax_backward", std::vector<c10::IValue>({grad_, output_}));
   AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
@@ -329,7 +335,6 @@ void get_dnnl_format(
     const Tensor& input,
     memory::format_tag& dnnl_format,
     memory::dims& input_tz) {
-
   auto input_sizes = input.sizes();
   auto input_ndim = input_sizes.size();
 
@@ -344,10 +349,11 @@ void get_dnnl_format(
     input_tz = {input.size(0), input.size(1), input.size(2)};
   } else if (input_ndim == 4) {
     dnnl_format = memory::format_tag::nchw;
-    input_tz = {/*n*/ input.size(0),
-                /*c*/ input.size(1),
-                /*h*/ input.size(2),
-                /*w*/ input.size(3)};
+    input_tz = {
+        /*n*/ input.size(0),
+        /*c*/ input.size(1),
+        /*h*/ input.size(2),
+        /*w*/ input.size(3)};
   } else {
     std::stringstream ss;
     ss << "DPCPP softmax backend got shape=" << input_sizes
@@ -360,8 +366,7 @@ Tensor _softmax_onednn(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
-
-  TORCH_CHECK(input.dim() <= 4 && input.dim() >=1, "Input Dims out of range");
+  TORCH_CHECK(input.dim() <= 4 && input.dim() >= 1, "Input Dims out of range");
 
   Device curDevice = Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -373,31 +378,38 @@ Tensor _softmax_onednn(
 
   auto data_t = get_onednn_dtype(input);
 
-  auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
-  auto input_md = input_ctx.is_plain()? memory::desc({input_tz}, data_t, dnnl_format) :
-      input_ctx.meta();
+  auto input_ctx =
+      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
+  auto input_md = input_ctx.is_plain()
+      ? memory::desc({input_tz}, data_t, dnnl_format)
+      : input_ctx.meta();
 
-  auto axis = dim < 0 ? dim + input.dim(): dim;
+  auto axis = dim < 0 ? dim + input.dim() : dim;
 
   // Create operation descriptor.
-  auto softmax_forward_desc = softmax_forward::desc(prop_kind::forward, input_md, axis);
+  auto softmax_forward_desc =
+      softmax_forward::desc(prop_kind::forward, input_md, axis);
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key (key, input_md, axis);
+  create_key(key, input_md, axis);
 #endif
 
   // Create primitive descriptor.
-  auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
+  auto softmax_forward_pd =
+      softmax_forward::primitive_desc(softmax_forward_desc, engine);
 
   Tensor output;
   if (input_ctx.is_plain()) {
     output = at::empty_like(input);
   } else {
-    output = empty_opaque_tensor(softmax_forward_pd.dst_desc(), input.options(), c10::nullopt);
+    output = empty_opaque_tensor(
+        softmax_forward_pd.dst_desc(), input.options(), c10::nullopt);
   }
-  auto input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
-  auto output_usr_memory = dpcpp_onednn_memory(softmax_forward_pd.dst_desc(), engine, output.data_ptr());
+  auto input_usr_memory =
+      dpcpp_onednn_memory(input_md, engine, input.data_ptr());
+  auto output_usr_memory = dpcpp_onednn_memory(
+      softmax_forward_pd.dst_desc(), engine, output.data_ptr());
 
   // Create the primitive.
 #ifdef USE_PRIMITIVE_CACHE
@@ -411,8 +423,7 @@ Tensor _softmax_onednn(
   DPCPP_ONEDNN_EXEC(
       softmax_onednn_forward,
       strm,
-      {{DNNL_ARG_SRC, input_usr_memory},
-       {DNNL_ARG_DST, output_usr_memory}});
+      {{DNNL_ARG_SRC, input_usr_memory}, {DNNL_ARG_DST, output_usr_memory}});
 
   return output;
 }
@@ -422,8 +433,7 @@ Tensor _softmax_backward_onednn(
     const Tensor& output,
     int64_t dim,
     bool half_to_float) {
-
-  TORCH_CHECK(grad.dim() <= 4 && grad.dim() >=1, "Input Dims out of range");
+  TORCH_CHECK(grad.dim() <= 4 && grad.dim() >= 1, "Input Dims out of range");
 
   Device curDevice = Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -440,38 +450,44 @@ Tensor _softmax_backward_onednn(
   auto output_t = get_onednn_dtype(output);
   auto grad_t = get_onednn_dtype(grad);
 
-  auto axis = dim < 0 ? dim + grad.dim(): dim;
+  auto axis = dim < 0 ? dim + grad.dim() : dim;
 
-  auto output_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(output);
-  auto output_md = output_ctx.is_plain() ? memory::desc({output_tz}, output_t, output_dnnl_format) :
-      output_ctx.meta();
-  auto output_memory = dpcpp_onednn_memory(output_md, engine, output.data_ptr());
+  auto output_ctx =
+      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(output);
+  auto output_md = output_ctx.is_plain()
+      ? memory::desc({output_tz}, output_t, output_dnnl_format)
+      : output_ctx.meta();
+  auto output_memory =
+      dpcpp_onednn_memory(output_md, engine, output.data_ptr());
 
   auto grad_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad);
-  auto grad_md = grad_ctx.is_plain() ? memory::desc({grad_tz, grad_t, grad_dnnl_format}) :
-      grad_ctx.meta();
+  auto grad_md = grad_ctx.is_plain()
+      ? memory::desc({grad_tz, grad_t, grad_dnnl_format})
+      : grad_ctx.meta();
   auto grad_usr_memory = dpcpp_onednn_memory(grad_md, engine, grad.data_ptr());
 
-  auto softmax_forward_desc = softmax_forward::desc(prop_kind::forward, output_md, axis);
-  auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
+  auto softmax_forward_desc =
+      softmax_forward::desc(prop_kind::forward, output_md, axis);
+  auto softmax_forward_pd =
+      softmax_forward::primitive_desc(softmax_forward_desc, engine);
 
   Tensor grad_opt;
   auto grad_memory = grad_usr_memory;
   if (grad_ctx.is_plain() && (!output_ctx.is_plain())) {
-    grad_opt = empty_opaque_tensor(softmax_forward_pd.dst_desc(), grad.options(), c10::nullopt);
-    grad_memory = dpcpp_onednn_memory(softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
+    grad_opt = empty_opaque_tensor(
+        softmax_forward_pd.dst_desc(), grad.options(), c10::nullopt);
+    grad_memory = dpcpp_onednn_memory(
+        softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
     grad_md = softmax_forward_pd.dst_desc();
     xpu::oneDNN::reorder(grad, grad_opt);
   }
 
   auto softmax_backward_desc = softmax_backward::desc(grad_md, output_md, axis);
   auto softmax_backward_pd = softmax_backward::primitive_desc(
-                                                 softmax_backward_desc,
-                                                 engine,
-                                                 softmax_forward_pd);
+      softmax_backward_desc, engine, softmax_forward_pd);
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key (key, grad_md, output_md, axis);
+  create_key(key, grad_md, output_md, axis);
 #endif
 
   auto plain_gi_md = memory::desc({grad_tz, grad_t, grad_dnnl_format});
@@ -494,8 +510,8 @@ Tensor _softmax_backward_onednn(
       softmax_onednn_backward,
       strm,
       {{DNNL_ARG_DST, output_memory},
-      {DNNL_ARG_DIFF_SRC, gi_memory},
-      {DNNL_ARG_DIFF_DST, grad_memory}});
+       {DNNL_ARG_DIFF_SRC, gi_memory},
+       {DNNL_ARG_DIFF_DST, grad_memory}});
 
   return gI;
 }
@@ -504,14 +520,14 @@ Tensor _softmax(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
-
   checkBackend("_softmax", {input}, Backend::XPU);
 
   if (input.scalar_type() != at::ScalarType::Float &&
       input.scalar_type() != at::ScalarType::Half &&
       input.scalar_type() != at::ScalarType::BFloat16) {
     // oneDNN does not support this type. Use native kernel instead.
-    return host_softmax<impl::SoftMaxForwardEpilogue>(input, dim, half_to_float);
+    return host_softmax<impl::SoftMaxForwardEpilogue>(
+        input, dim, half_to_float);
   } else {
     return _softmax_onednn(input, dim, half_to_float);
   }
@@ -529,18 +545,25 @@ Tensor _softmax_backward_data(
         "softmax backward with half to float "
         "conversion is not supported on DPCPP");
   }
-  // Skip oneDNN kernel due to its bad performance. 
-  /*if ((input.scalar_type() == at::ScalarType::Float ||
+
+#if 0
+  // Skip oneDNN kernel due to its bad performance.
+  if ((input.scalar_type() == at::ScalarType::Float ||
       input.scalar_type() == at::ScalarType::BFloat16) &&
       grad.is_contiguous() && output.is_contiguous()) {
     return _softmax_backward_onednn(grad, output, dim, half_to_float);
-  } else {*/
+  } else {
     // Use native kernel instead.
     Tensor tmp = grad * output;
     return host_softmax_backward<impl::SoftMaxBackwardEpilogue>(
       tmp, output, dim, half_to_float);
 
-  //}
+  }
+#endif
+
+  Tensor tmp = grad * output;
+  return host_softmax_backward<impl::SoftMaxBackwardEpilogue>(
+      tmp, output, dim, half_to_float);
 }
 
 Tensor _log_softmax(const Tensor& self, int64_t dim, bool half_to_float) {

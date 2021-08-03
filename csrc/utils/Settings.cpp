@@ -1,58 +1,64 @@
 #include <utils/Settings.h>
 
-#include <optional>
-#include <sstream>
 #include <iostream>
 #include <mutex>
+#include <optional>
+#include <sstream>
 
 namespace xpu {
 namespace dpcpp {
 
 /*
  * All available launch options for IPEX
- * IPEX_SHOW_OPTION:            Default = 0, Set 1 to show all launch option values
- * IPEX_VERBOSE:                Default = 0, Set verbose level with synchronization execution mode
- * IPEX_WARNING:                Default = 0, Set warning level for IPEX log lines
- * IPEX_XPU_BACKEND:            Default = 0 (XB_GPU), Set XPU_BACKEND as global IPEX backend
- * IPEX_FORCE_SYNC:             Default = 0, Set 1 to enforce synchronization execution mode
- * IPEX_DISABLE_PROFILING:      Default = 0, Set 1 to disable IPEX event profiling
- * IPEX_DISABLE_TILE_PARTITION: Default = 0, Set 1 to disable tile partition and map device per physical device.
- * IPEX_ONEDNN_LAYOUT:          Default = 0, Set 1 to enable onednn specific layouts
- * IPEX_TF32_MODE:              Default = 0, Set 1 to enable TF32 mode execution
+ * IPEX_SHOW_OPTION:            Default = 0, Set 1 to show all launch option
+ * values IPEX_VERBOSE:                Default = 0, Set verbose level with
+ * synchronization execution mode IPEX_WARNING:                Default = 0, Set
+ * warning level for IPEX log lines IPEX_XPU_BACKEND:            Default = 0
+ * (XB_GPU), Set XPU_BACKEND as global IPEX backend IPEX_FORCE_SYNC: Default =
+ * 0, Set 1 to enforce synchronization execution mode IPEX_DISABLE_PROFILING:
+ * Default = 0, Set 1 to disable IPEX event profiling
+ * IPEX_DISABLE_TILE_PARTITION: Default = 0, Set 1 to disable tile partition and
+ * map device per physical device. IPEX_ONEDNN_LAYOUT:          Default = 0, Set
+ * 1 to enable onednn specific layouts IPEX_TF32_MODE:              Default = 0,
+ * Set 1 to enable TF32 mode execution
  */
 
 static std::mutex s_mutex;
 static std::once_flag init_env_flag;
 
 static void init_dpcpp_env() {
-#define DPCPP_ENV_TYPE_DEF(type, var, show)       \
-    auto type = [&]() -> std::optional<int> {     \
-      auto env = std::getenv("IPEX_" #var);       \
-      std::optional<int> _##type;                 \
-      try {                                       \
-        _##type = std::stoi(env, 0, 10);          \
-      } catch (...) {                             \
-        _##type = std::nullopt;                   \
-      }                                           \
-      if (show) {                                 \
-        std::cerr << " ** IPEX_" << #var << ": "; \
-        if (_##type.has_value()) {                \
-          std::cerr << _##type.value();           \
-        } else {                                  \
-          std::cerr << "NIL";                     \
-        }                                         \
-        std::cerr << std::endl;                   \
-      }                                           \
-      return _##type;                             \
-    } ()
+#define DPCPP_ENV_TYPE_DEF(type, var, show)     \
+  auto type = [&]() -> std::optional<int> {     \
+    auto env = std::getenv("IPEX_" #var);       \
+    std::optional<int> _##type;                 \
+    try {                                       \
+      _##type = std::stoi(env, 0, 10);          \
+    } catch (...) {                             \
+      _##type = std::nullopt;                   \
+    }                                           \
+    if (show) {                                 \
+      std::cerr << " ** IPEX_" << #var << ": "; \
+      if (_##type.has_value()) {                \
+        std::cerr << _##type.value();           \
+      } else {                                  \
+        std::cerr << "NIL";                     \
+      }                                         \
+      std::cerr << std::endl;                   \
+    }                                           \
+    return _##type;                             \
+  }()
 
   DPCPP_ENV_TYPE_DEF(show_option, SHOW_OPTION, false);
-  bool show_opt = show_option.has_value() ? (show_option != 0 ? true : false) : false;
+  bool show_opt =
+      show_option.has_value() ? (show_option != 0 ? true : false) : false;
   if (show_opt) {
     std::cerr << std::endl
-      << " *********************************************************" << std::endl
-      << " ** The values of all available launch options for IPEX **" << std::endl
-      << " *********************************************************" << std::endl;
+              << " *********************************************************"
+              << std::endl
+              << " ** The values of all available launch options for IPEX **"
+              << std::endl
+              << " *********************************************************"
+              << std::endl;
   }
 
   DPCPP_ENV_TYPE_DEF(verbose_level, VERBOSE, show_opt);
@@ -122,7 +128,8 @@ static void init_dpcpp_env() {
   */
 
   if (show_opt) {
-    std::cerr << " *********************************************************" << std::endl;
+    std::cerr << " *********************************************************"
+              << std::endl;
   }
 }
 

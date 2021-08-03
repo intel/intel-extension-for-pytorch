@@ -2,11 +2,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ATDispatch.h"
 
 #include <tuple>
-
 
 using namespace dnnl;
 using namespace at::native;
@@ -30,31 +29,38 @@ void max_pool2d_with_indices_out_template(
       "max_pool2d: kernel_size must either be a single int, or a tuple "
       "of two ints")
   const int kH = safe_downcast<int, int64_t>(kernel_size[0]);
-  const int kW = kernel_size.size() == 1 ? kH : safe_downcast<int, int64_t>(kernel_size[1]);
+  const int kW = kernel_size.size() == 1
+      ? kH
+      : safe_downcast<int, int64_t>(kernel_size[1]);
 
   TORCH_CHECK(
       stride.size() == 0 || stride.size() == 1 || stride.size() == 2,
       "max_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints")
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty() ? kW
-    : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty()
+      ? kW
+      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
       "max_pool2d: padding must be either be a single int, or a tuple "
       "of two ints");
   const int padH = safe_downcast<int, int64_t>(padding[0]);
-  const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
+  const int padW =
+      padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
   TORCH_CHECK(
       dilation.size() == 1 || dilation.size() == 2,
       "max_pool2d: dilation must be either a single int, or a tuple of "
       "two ints");
   const int dilationH = safe_downcast<int, int64_t>(dilation[0]);
-  const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
+  const int dilationW = dilation.size() == 1
+      ? dilationH
+      : safe_downcast<int, int64_t>(dilation[1]);
 
-  TORCH_CHECK(input_.ndimension() == 4, "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(
+      input_.ndimension() == 4, "only support 4 dims on DPCPP device now!");
 
   /* sizes */
   const auto nbatch = input_.size(-4);
@@ -86,9 +92,11 @@ void max_pool2d_with_indices_out_template(
   /* get contiguous input */
   Tensor input = input_;
   if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+    output.resize_(
+        {nbatch, nInputPlane, outputHeight, outputWidth},
         at::MemoryFormat::ChannelsLast);
-    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+    indices.resize_(
+        {nbatch, nInputPlane, outputHeight, outputWidth},
         at::MemoryFormat::ChannelsLast);
   } else {
     input = input_.contiguous();
@@ -129,7 +137,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-
   Tensor gradOutput;
   /* resize */
   if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
@@ -145,31 +152,38 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       "max_pool2d: kernel_size must either be a single int, or a tuple "
       "of two ints")
   const int kH = safe_downcast<int, int64_t>(kernel_size[0]);
-  const int kW = kernel_size.size() == 1 ? kH : safe_downcast<int, int64_t>(kernel_size[1]);
+  const int kW = kernel_size.size() == 1
+      ? kH
+      : safe_downcast<int, int64_t>(kernel_size[1]);
 
   TORCH_CHECK(
       stride.size() == 0 || stride.size() == 1 || stride.size() == 2,
       "max_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints")
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty() ? kW
-    : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty()
+      ? kW
+      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
       "max_pool2d: padding must be either be a single int, or a tuple "
       "of two ints");
   const int padH = safe_downcast<int, int64_t>(padding[0]);
-  const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
+  const int padW =
+      padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
   TORCH_CHECK(
       dilation.size() == 1 || dilation.size() == 2,
       "max_pool2d: dilation must be either a single int, or a tuple of "
       "two ints");
   const int dilationH = safe_downcast<int, int64_t>(dilation[0]);
-  const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
+  const int dilationW = dilation.size() == 1
+      ? dilationH
+      : safe_downcast<int, int64_t>(dilation[1]);
 
-  TORCH_CHECK(input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(
+      input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
 
   /* sizes */
   const auto nbatch = input.size(-4);
@@ -323,33 +337,33 @@ Tensor max_pool2d_with_indices_backward(
 
 } // namespace AtenIpexTypeXPU
 
-
 namespace AtenIpexTypeQuantizedXPU {
 
 std::tuple<Tensor, Tensor> max_pool2d_with_indices(
-  const Tensor& input,
-  IntArrayRef kernel_size,
-  IntArrayRef stride,
-  IntArrayRef padding,
-  IntArrayRef dilation,
-  bool ceil_mode) {
+    const Tensor& input,
+    IntArrayRef kernel_size,
+    IntArrayRef stride,
+    IntArrayRef padding,
+    IntArrayRef dilation,
+    bool ceil_mode) {
   Tensor output, indices;
-  output = _empty_affine_quantized({0},
-    input.options(),
-    input.q_scale(),
-    input.q_zero_point(),
-    MemoryFormat::Contiguous); //Relu fusion?
+  output = _empty_affine_quantized(
+      {0},
+      input.options(),
+      input.q_scale(),
+      input.q_zero_point(),
+      MemoryFormat::Contiguous); // Relu fusion?
   indices = at::empty({0}, input.options().dtype(kLong));
 
   return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
-    output,
-    indices,
-    input,
-    kernel_size,
-    stride,
-    padding,
-    dilation,
-    ceil_mode);
+      output,
+      indices,
+      input,
+      kernel_size,
+      stride,
+      padding,
+      dilation,
+      ceil_mode);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

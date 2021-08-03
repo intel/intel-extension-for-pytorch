@@ -3,9 +3,9 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
-#include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 #include "Loops.h"
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
 
@@ -22,10 +22,10 @@ Tensor& softplus_out(
     Scalar threshold) {
   checkBackend("softplus_forward", {out}, self.options().backend());
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(out)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(out)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -65,11 +65,11 @@ Tensor& softplus_backward_out(
       {grad_input, grad_output, output},
       self.options().backend());
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(grad_input)
-  .add_input(grad_output)
-  .add_input(output)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(grad_input)
+                  .add_input(grad_output)
+                  .add_input(output)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "softplus_backward", [&]() {

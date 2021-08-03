@@ -1,14 +1,13 @@
-#include <string>
 #include "fusion_pass.h"
-#include "accelerated_ops.h"
 #include <c10/util/hash.h>
-#include <torch/csrc/jit/runtime/operator.h>
-#include <torch/csrc/jit/passes/subgraph_rewrite.h>
+#include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
-
+#include <torch/csrc/jit/passes/subgraph_rewrite.h>
+#include <torch/csrc/jit/runtime/operator.h>
+#include <string>
+#include "accelerated_ops.h"
 
 using namespace torch::jit;
 
@@ -17,14 +16,15 @@ namespace std {
 template <>
 struct hash<std::pair<Symbol, Symbol>> {
   size_t operator()(std::pair<Symbol, Symbol> pair) const {
-    return std::hash<uint64_t>() (
-        static_cast<uint64_t>(pair.first) << 32
-        | static_cast<uint64_t>(pair.second));
+    return std::hash<uint64_t>()(
+        static_cast<uint64_t>(pair.first) << 32 |
+        static_cast<uint64_t>(pair.second));
   }
 };
-}
+} // namespace std
 
-namespace torch_ipex { namespace jit {
+namespace torch_ipex {
+namespace jit {
 
 //
 // The main goal of MKL-DNN fusion is to limit bandwidth wasting.
@@ -40,9 +40,9 @@ class OpFuser {
   using Rule = RuleTab::iterator;
   static RuleTab dnnlRules;
 
-public:
+ public:
   OpFuser(Block* block, std::shared_ptr<Graph> graph)
-    : block_(block), graph_(std::move(graph)) {}
+      : block_(block), graph_(std::move(graph)) {}
 
   void run() {
     bool any_changed = true;
@@ -65,7 +65,7 @@ public:
     }
   }
 
-  c10::optional<Rule> isFusable(Node *curr, Node *prev) const {
+  c10::optional<Rule> isFusable(Node* curr, Node* prev) const {
     // Is it happening in our case ???
     if (curr->owningBlock() != block_)
       return c10::nullopt;
@@ -81,7 +81,7 @@ public:
     aliasDb_ = std::make_unique<AliasDb>(graph_);
   }
 
-  Node* fuseOpsWithNewKind(Node *curr, Value *v, Graph *g, NodeKind kind) {
+  Node* fuseOpsWithNewKind(Node* curr, Value* v, Graph* g, NodeKind kind) {
     auto newNode = g->create(kind);
     auto prev = v->node();
     newNode->insertBefore(prev);
@@ -111,17 +111,16 @@ public:
     return newNode;
   }
 
-  Node* fuseNodes(Node *curr, Value *path, Rule rule) {
+  Node* fuseNodes(Node* curr, Value* path, Rule rule) {
     return fuseOpsWithNewKind(curr, path, curr->owningGraph(), rule->second);
   }
 
   bool BatchNorm2dNode_hasConstantParams(Node* node) const {
-    bool has =
-            node->input(1)->node()->kind() == prim::Constant
-            && node->input(2)->node()->kind() == prim::Constant
-            && node->input(3)->node()->kind() == prim::Constant
-            && node->input(4)->node()->kind() == prim::Constant
-            && node->input(7)->node()->kind() == prim::Constant;
+    bool has = node->input(1)->node()->kind() == prim::Constant &&
+        node->input(2)->node()->kind() == prim::Constant &&
+        node->input(3)->node()->kind() == prim::Constant &&
+        node->input(4)->node()->kind() == prim::Constant &&
+        node->input(7)->node()->kind() == prim::Constant;
 
     // TODO: more check to make sure
 
@@ -141,21 +140,20 @@ public:
   // currently we only have to fold conv2d + batch_norm
   //
   bool isFoldable(Node* node, Node* prev) {
-    bool foldable = (node->kind() == aten::batch_norm
-        && prev->kind() == aten::conv2d);
+    bool foldable =
+        (node->kind() == aten::batch_norm && prev->kind() == aten::conv2d);
 
     //
     // Check whether all the sources are constant ???
     // Does performance improve no matter we do it pre-compiling or runtime?
     //
 
-    foldable = foldable
-      && Conv2dNode_hasConstantParams(prev)
-      && BatchNorm2dNode_hasConstantParams(node);
+    foldable = foldable && Conv2dNode_hasConstantParams(prev) &&
+        BatchNorm2dNode_hasConstantParams(node);
     return foldable;
   }
 
-  Node* foldNodes(Node *conv2d, Node *batch_norm) {
+  Node* foldNodes(Node* conv2d, Node* batch_norm) {
     // Change weight/bias source
     auto* fold_weight = createBatchNormFoldWeight(conv2d, batch_norm);
     fold_weight->insertBefore(conv2d);
@@ -170,13 +168,13 @@ public:
     return conv2d;
   }
 
-  Node* createBatchNormFoldWeight(Node *conv2d, Node *batch_norm) {
+  Node* createBatchNormFoldWeight(Node* conv2d, Node* batch_norm) {
     auto g = conv2d->owningGraph();
     auto newNode = g->create(dpcpp::fold_weight_sym);
     newNode->setScope(conv2d->scope());
 
     // We need following parameters
-    newNode->addInput(conv2d->input(1));  // Conv2d weights
+    newNode->addInput(conv2d->input(1)); // Conv2d weights
     newNode->addInput(batch_norm->input(1)); // Batch norm weights
     newNode->addInput(batch_norm->input(4)); // running_var (delta)
     newNode->addInput(batch_norm->input(7)); // eps
@@ -184,12 +182,13 @@ public:
     // We get meta and type from conv2d weight value
     newNode->output()->copyMetadata(conv2d->input(1));
     newNode->output()->setType(conv2d->input(1)->type());
-    newNode->output()->setDebugName(conv2d->input(1)->debugName() + ".bn_folded");
+    newNode->output()->setDebugName(
+        conv2d->input(1)->debugName() + ".bn_folded");
 
     return newNode;
   }
 
-  Node* createBatchNormFoldBias(Node *conv2d, Node *batch_norm) {
+  Node* createBatchNormFoldBias(Node* conv2d, Node* batch_norm) {
     auto g = conv2d->owningGraph();
     auto newNode = g->create(dpcpp::fold_bias_sym);
     newNode->setScope(conv2d->scope());
@@ -206,17 +205,18 @@ public:
     // We get meta and type from conv2d bias value
     newNode->output()->copyMetadata(conv2d->input(2));
     newNode->output()->setType(conv2d->input(2)->type());
-    newNode->output()->setDebugName(conv2d->input(2)->debugName() + ".bn_folded");
+    newNode->output()->setDebugName(
+        conv2d->input(2)->debugName() + ".bn_folded");
 
     return newNode;
   }
 
-  bool aliasIsSafeForSquashingValue(Node *node, Value *v) {
+  bool aliasIsSafeForSquashingValue(Node* node, Value* v) {
     bool safe = false;
     auto prev = v->node();
     if (aliasDb_->moveAfterTopologicallyValid(node, prev)) {
-      if (v->uses().size() == 1
-          || aliasDb_->mayAlias/* mustAlias */(v, node->output())) {
+      if (v->uses().size() == 1 ||
+          aliasDb_->mayAlias /* mustAlias */ (v, node->output())) {
         safe = true;
       }
     }
@@ -228,7 +228,7 @@ public:
   // Any use topologically after node will fail it.
   // XXX: haven't considered loop
   //
-  bool aliasIsSafeForInplaceValue(Node *node, Value *v) {
+  bool aliasIsSafeForInplaceValue(Node* node, Value* v) {
     for (auto use : v->uses())
       if (use.user->isAfter(node))
         return false;
@@ -236,15 +236,17 @@ public:
     return true;
   }
 
-  const FunctionSchema &matchSchemaForFusion(c10::Symbol symbol,
-      Node* prev, Node* node) {
+  const FunctionSchema& matchSchemaForFusion(
+      c10::Symbol symbol,
+      Node* prev,
+      Node* node) {
     auto ops = getAllOperatorsFor(symbol);
 
     for (auto& op : ops) {
       auto& schema = op->schema();
-      if (schema.arguments().size()
-          == prev->inputs().size() + node->inputs().size() -1
-          && schema.returns().size() == node->outputs().size())
+      if (schema.arguments().size() ==
+              prev->inputs().size() + node->inputs().size() - 1 &&
+          schema.returns().size() == node->outputs().size())
         return schema;
     }
 
@@ -266,9 +268,10 @@ public:
     throw er;
   }
 
-  bool aliasIsSafeForFusion(Node *node, Value *v, c10::optional<Rule> r) {
+  bool aliasIsSafeForFusion(Node* node, Value* v, c10::optional<Rule> r) {
     bool safe = false;
-    // Returns false if the two nodes to be fused do not have the same owning block
+    // Returns false if the two nodes to be fused do not have the same owning
+    // block
     if (node->owningBlock() != v->node()->owningBlock()) {
       return safe;
     }
@@ -282,12 +285,12 @@ public:
     // 2. If one of node's input and output are alias must (relu_?), we could
     // replace all uses of input to use output, which remove the use that might
     // clogging the fuse path which is to be squashed.
-    // 3. If there is no alias between input and output, we can only fuse the case
-    // when there is only use.
+    // 3. If there is no alias between input and output, we can only fuse the
+    // case when there is only use.
     //
     // Y-merge (conv-sum-relu?)
-    // 4. We aquire alias info from resulted op schema, check whether the fusion is
-    // not breaking any computational semantics.
+    // 4. We aquire alias info from resulted op schema, check whether the fusion
+    // is not breaking any computational semantics.
     //
     // A Y-merge fusion, like:
     //           conv2d_inputs | or | conv2d_inputs
@@ -306,10 +309,10 @@ public:
     //         |
     //       y(a!)
     //
-    // Which y is alias to x, we check whether later is equivalent to formal. The
-    // params convention when we do Y-merge: arguments from both ops comes to new
-    // op in topological order. So in the exmaple conv2d's inputs comes first then
-    // sum's inputs (without the input which is squashed).
+    // Which y is alias to x, we check whether later is equivalent to formal.
+    // The params convention when we do Y-merge: arguments from both ops comes
+    // to new op in topological order. So in the exmaple conv2d's inputs comes
+    // first then sum's inputs (without the input which is squashed).
     //
     safe = aliasIsSafeForSquashingValue(node, v);
 
@@ -324,10 +327,10 @@ public:
 
       auto pos = v->node()->inputs().size();
 
-      TORCH_INTERNAL_ASSERT(schema.arguments().size()
-          == pos + node->inputs().size() -1);
+      TORCH_INTERNAL_ASSERT(
+          schema.arguments().size() == pos + node->inputs().size() - 1);
 
-      for (int i = 0; i < node->inputs().size(); ++ i) {
+      for (int i = 0; i < node->inputs().size(); ++i) {
         if (node->input(i) != v) { /* avoid squashing path */
           auto aliasInfo = schema.arguments()[pos++].alias_info();
           if (!aliasInfo)
@@ -349,15 +352,14 @@ public:
     return safe;
   }
 
-  std::pair<graph_node_list::iterator, bool> processNode(Node *node) {
-
+  std::pair<graph_node_list::iterator, bool> processNode(Node* node) {
     Node* pos = node;
     bool changed = false;
 
     //
     // Check whether we could fuse to one certain value path
     //
-    for (auto *v : node->inputs()) {
+    for (auto* v : node->inputs()) {
       auto prev = v->node();
       auto fuseRule = isFusable(node, prev);
 
@@ -366,8 +368,8 @@ public:
         pos = fuseNodes(node, v, fuseRule.value());
         changed = true;
         break;
-      } else if (isFoldable(node, prev)
-          && aliasIsSafeForSquashingValue(node, v)) {
+      } else if (
+          isFoldable(node, prev) && aliasIsSafeForSquashingValue(node, v)) {
         pos = foldNodes(prev, node);
         changed = true;
         break;
@@ -375,33 +377,45 @@ public:
     }
     return std::make_pair(++pos->iterator(), changed);
   }
-
 };
 
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
-  {{aten::conv2d, aten::relu}, dpcpp::conv2d_relu_sym},
-  {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, dpcpp::conv2d_relu_sym},
-  {{dpcpp::conv2d_sum_sym, aten::relu}, dpcpp::conv2d_sum_relu_sym},
-  {{dpcpp::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")}, dpcpp::conv2d_sum_relu_sym},
-  {{aten::conv2d, aten::add}, dpcpp::conv2d_sum_sym},
-  {{aten::conv2d, aten::add_}, dpcpp::conv2d_sum_sym},
-  {{Symbol::fromQualString("aten::matmul"), aten::add_}, dpcpp::matmul_sum_sym},
-  {{Symbol::fromQualString("aten::transpose"), Symbol::fromQualString("aten::matmul")}, dpcpp::trans_matmul_sym},
-  {{dpcpp::trans_matmul_sym, Symbol::fromQualString("aten::div")}, dpcpp::trans_matmul_scale_sym},
-  {{dpcpp::trans_matmul_scale_sym, Symbol::fromQualString("aten::add")}, dpcpp::trans_matmul_scale_sum_sym},
-  {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")}, dpcpp::conv2d_sigmoid_sym},
-  {{aten::mul, aten::add_}, dpcpp::mul_add_sym},
-  {{Symbol::fromQualString("quantized::conv2d"), Symbol::fromQualString("quantized::add_relu")}, dpcpp::q_conv2d_sum_relu_sym},
-  {{aten::t, aten::addmm}, dpcpp::trans_addmm_sym},
-  {{dpcpp::trans_addmm_sym, aten::relu}, dpcpp::trans_addmm_relu_sym},
-  {{dpcpp::trans_addmm_sym, aten::sigmoid}, dpcpp::trans_addmm_sigmoid_sym},
-  {{Symbol::fromQualString("aten::dequantize"), aten::pixel_shuffle}, dpcpp::dequant_pixelshuffle_sym},
-  {{dpcpp::dequant_pixelshuffle_sym, Symbol::fromQualString("aten::quantize_per_tensor")}, dpcpp::dequant_pixelshuffle_quant_sym},
+    {{aten::conv2d, aten::relu}, dpcpp::conv2d_relu_sym},
+    {{aten::conv2d, Symbol::fromQualString("aten::relu_")},
+     dpcpp::conv2d_relu_sym},
+    {{dpcpp::conv2d_sum_sym, aten::relu}, dpcpp::conv2d_sum_relu_sym},
+    {{dpcpp::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")},
+     dpcpp::conv2d_sum_relu_sym},
+    {{aten::conv2d, aten::add}, dpcpp::conv2d_sum_sym},
+    {{aten::conv2d, aten::add_}, dpcpp::conv2d_sum_sym},
+    {{Symbol::fromQualString("aten::matmul"), aten::add_},
+     dpcpp::matmul_sum_sym},
+    {{Symbol::fromQualString("aten::transpose"),
+      Symbol::fromQualString("aten::matmul")},
+     dpcpp::trans_matmul_sym},
+    {{dpcpp::trans_matmul_sym, Symbol::fromQualString("aten::div")},
+     dpcpp::trans_matmul_scale_sym},
+    {{dpcpp::trans_matmul_scale_sym, Symbol::fromQualString("aten::add")},
+     dpcpp::trans_matmul_scale_sum_sym},
+    {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")},
+     dpcpp::conv2d_sigmoid_sym},
+    {{aten::mul, aten::add_}, dpcpp::mul_add_sym},
+    {{Symbol::fromQualString("quantized::conv2d"),
+      Symbol::fromQualString("quantized::add_relu")},
+     dpcpp::q_conv2d_sum_relu_sym},
+    {{aten::t, aten::addmm}, dpcpp::trans_addmm_sym},
+    {{dpcpp::trans_addmm_sym, aten::relu}, dpcpp::trans_addmm_relu_sym},
+    {{dpcpp::trans_addmm_sym, aten::sigmoid}, dpcpp::trans_addmm_sigmoid_sym},
+    {{Symbol::fromQualString("aten::dequantize"), aten::pixel_shuffle},
+     dpcpp::dequant_pixelshuffle_sym},
+    {{dpcpp::dequant_pixelshuffle_sym,
+      Symbol::fromQualString("aten::quantize_per_tensor")},
+     dpcpp::dequant_pixelshuffle_quant_sym},
 
 };
 
-void FusionPass(std::shared_ptr<Graph> &graph) {
+void FusionPass(std::shared_ptr<Graph>& graph) {
   // Pattern based fusion was lack of alias analysis
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);
@@ -411,18 +425,18 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   ConstantPropagation(graph);
 }
 
-
 void InitFusionPass() {
-  RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
-      torch_ipex::jit::FusionPass(g);
-  });
+  RegisterPreFusionPass pass_3(
+      [](std::shared_ptr<Graph>& g) { torch_ipex::jit::FusionPass(g); });
 }
 
-}} // namespace torch_ipex::jit
+} // namespace jit
+} // namespace torch_ipex
 
-
-namespace torch { namespace jit {
+namespace torch {
+namespace jit {
 RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
   registerPrePass(std::move(p));
 }
-}} // namespace torch::jit
+} // namespace jit
+} // namespace torch

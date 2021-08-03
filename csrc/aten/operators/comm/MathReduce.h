@@ -2,14 +2,13 @@
 
 #include <ATen/ATen.h>
 
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 #include "Algorithm.h"
 #include "Numerics.h"
-
 
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -67,8 +66,6 @@ DPCPP_DEVICE struct ReduceMax {
     return (Numerics<T>::gt(a, b) || Numerics<T>::isnan(a)) ? a : b;
   }
 };
-
-
 
 template <typename K, typename Index, class BinaryFunction>
 DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(

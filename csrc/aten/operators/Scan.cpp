@@ -1,13 +1,12 @@
 #include <ATen/ATen.h>
 
+#include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
-#include <core/Memory.h>
+#include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
-
 
 using namespace at::detail;
 using namespace xpu::dpcpp;

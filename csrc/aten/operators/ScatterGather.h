@@ -1,8 +1,8 @@
-#include <runtime/Utils.h>
-#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
@@ -256,7 +256,9 @@ void THSyclTensor_scatterAddKernel(
         // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
         tensorOffset += indexValue * tensor.strides[dim];
 
-        atomicAdd((dpcpp_global_ptr_pt<Real>)&tensor_ptr[tensorOffset], src_ptr[srcOffset]);
+        atomicAdd(
+            (dpcpp_global_ptr_pt<Real>)&tensor_ptr[tensorOffset],
+            src_ptr[srcOffset]);
       }
     };
 
@@ -316,4 +318,5 @@ void THSyclTensor_scatterFillKernel(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-}} // at::AtenIpexTypeXPU
+} // namespace AtenIpexTypeXPU
+} // namespace at

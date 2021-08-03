@@ -1,7 +1,6 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 
-
 namespace xpu {
 namespace dpcpp {
 namespace detail {
@@ -52,8 +51,9 @@ Generator createDPCPPGenerator(DeviceIndex device_index) {
 } // namespace detail
 
 DPCPPGeneratorImpl::DPCPPGeneratorImpl(DeviceIndex device_index)
-    : GeneratorImpl{Device(DeviceType::XPU, device_index),
-                DispatchKeySet(c10::DispatchKey::XPU)} {}
+    : GeneratorImpl{
+          Device(DeviceType::XPU, device_index),
+          DispatchKeySet(c10::DispatchKey::XPU)} {}
 
 void DPCPPGeneratorImpl::set_current_seed(uint64_t seed) {
   seed_ = seed;

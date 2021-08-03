@@ -1,14 +1,13 @@
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/AtenIpexTypeXPU.h>
 
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pointwise.h"
 
 #include "Loops.h"
-
 
 using namespace xpu::dpcpp;
 
@@ -21,11 +20,11 @@ Tensor& tanh_backward_out(
     const Tensor& grad_output,
     const Tensor& output) {
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(grad_input)
-  .add_input(grad_output)
-  .add_input(output)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(grad_input)
+                  .add_input(grad_output)
+                  .add_input(output)
+                  .build();
 
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {

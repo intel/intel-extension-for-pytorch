@@ -3,7 +3,6 @@
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
 
-
 using namespace xpu::dpcpp::detail;
 
 namespace xpu {
@@ -11,9 +10,9 @@ namespace dpcpp {
 
 TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta, bool is_quantized) {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
-             c10::intrusive_ptr<at::StorageImpl>::reclaim(
-                 StorageImpl_new()),
-             is_quantized? c10::DispatchKey::QuantizedXPU : c10::DispatchKey::XPU,
+             c10::intrusive_ptr<at::StorageImpl>::reclaim(StorageImpl_new()),
+             is_quantized ? c10::DispatchKey::QuantizedXPU
+                          : c10::DispatchKey::XPU,
              type_meta)
       .release();
 }
@@ -125,11 +124,9 @@ TensorImpl* TensorImpl_resizeImpl(
       TORCH_CHECK(0, "Tensor: invalid null storage");
     }
     int64_t new_size_bytes =
-      (storage_size + self->storage_offset()) * self->dtype().itemsize();
+        (storage_size + self->storage_offset()) * self->dtype().itemsize();
     if (new_size_bytes > self->storage().nbytes()) {
-      StorageImpl_resize(
-          TensorImpl_getStoragePtr(self),
-          new_size_bytes);
+      StorageImpl_resize(TensorImpl_getStoragePtr(self), new_size_bytes);
     }
   }
   return self;
@@ -426,8 +423,11 @@ bool TensorImpl_all32BitIndexable(at::TensorImpl** inputs, int numInputs) {
   return true;
 }
 
-void TensorImpl_preserveReduceDimSemantics(TensorImpl *tensor,
-                                          int in_dims, int64_t dimension, int keepdim) {
+void TensorImpl_preserveReduceDimSemantics(
+    TensorImpl* tensor,
+    int in_dims,
+    int64_t dimension,
+    int keepdim) {
   int out_dims = TensorImpl_nDimensionLegacyAll(tensor);
   if (out_dims > 0 && !keepdim && out_dims == in_dims - 1) {
     TensorImpl_unsqueeze1d(tensor, tensor, dimension);
@@ -516,4 +516,4 @@ at::TensorImpl* TensorImpl_Unwrap(const at::Tensor& tensor) {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

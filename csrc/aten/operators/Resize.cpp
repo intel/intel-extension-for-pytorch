@@ -8,15 +8,15 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-Tensor& resize_(Tensor& self,
-                IntArrayRef size,
-                c10::optional<MemoryFormat> optional_memory_format) {
+Tensor& resize_(
+    Tensor& self,
+    IntArrayRef size,
+    c10::optional<MemoryFormat> optional_memory_format) {
   auto* self_ = self.unsafeGetTensorImpl();
   TensorImpl_resizeImpl(self_, size, /*strides=*/c10::nullopt);
 
   if (optional_memory_format.has_value()) {
-    auto memory_format =
-        optional_memory_format.value();
+    auto memory_format = optional_memory_format.value();
     TORCH_CHECK(
         memory_format != MemoryFormat::Preserve,
         "Unsupported memory format",
@@ -50,12 +50,11 @@ Tensor& resize_as_(
 }
 } // namespace AtenIpexTypeXPU
 
-
 namespace AtenIpexTypeQuantizedXPU {
 Tensor& resize_(
-  Tensor& self,
-  IntArrayRef size,
-  c10::optional<MemoryFormat> memory_format) {
+    Tensor& self,
+    IntArrayRef size,
+    c10::optional<MemoryFormat> memory_format) {
   at::AtenIpexTypeXPU::impl::resize_(self, size, memory_format);
   return self;
 }

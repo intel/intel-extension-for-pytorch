@@ -1,10 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
 
-#include <utils/Helpers.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
-
+#include <runtime/Utils.h>
+#include <utils/Helpers.h>
 
 using namespace at::native;
 using namespace xpu::dpcpp;

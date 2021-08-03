@@ -1,10 +1,9 @@
-#include <intrinsic/ipex_intrinsic.h>
 #include <ATen/native/UpSample.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include <tensor/Context.h>
 #include "UpSample.h"
 
 #include <oneDNN/oneDNN.h>
-
 
 using namespace dnnl;
 using namespace at::native;

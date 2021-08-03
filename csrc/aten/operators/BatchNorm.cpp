@@ -61,7 +61,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     std::array<bool, 3> grad_input_mask) {
   checkBackend(
       "batch_norm",
-      {input, weight, grad_output, running_mean, running_var, save_mean, save_var},
+      {input,
+       weight,
+       grad_output,
+       running_mean,
+       running_var,
+       save_mean,
+       save_var},
       Backend::XPU);
 
   if (input.scalar_type() != at::ScalarType::Float &&

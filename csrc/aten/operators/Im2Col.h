@@ -7,7 +7,6 @@
 #include <utils/DPCPP.h>
 #include "UpSample.h"
 
-
 using namespace xpu::dpcpp;
 
 template <typename T>

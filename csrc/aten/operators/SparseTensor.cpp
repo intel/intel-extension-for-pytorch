@@ -1,17 +1,17 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/SparseTensorUtils.h>
-#include <runtime/Utils.h>
 #include <core/Memory.h>
+#include <runtime/Utils.h>
 
+#include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/numeric>
 #include <oneapi/dpl/iterator>
+#include <oneapi/dpl/numeric>
 #endif
 
 using namespace xpu::dpcpp;
@@ -25,9 +25,13 @@ DPCPP_DEF_K2(coalesce_values_kernel, typename scalar_t);
 
 template <typename scalar_t>
 void coalesce_values_kernel(
-  Tensor segment_offsets, Tensor value_indices,
-  Tensor values, Tensor newValues,
-  int64_t nnz, int64_t newNnz, int64_t stride) {
+    Tensor segment_offsets,
+    Tensor value_indices,
+    Tensor values,
+    Tensor newValues,
+    int64_t nnz,
+    int64_t newNnz,
+    int64_t stride) {
   using accscalar_t = AtenIpexTypeXPU::acc_type<scalar_t>;
 
   auto& queue = dpcppGetCurrentQueue();
@@ -46,16 +50,16 @@ void coalesce_values_kernel(
       auto newValues_ptr = newValues_data;
 
       int seg = item.get_global_id()[0];
-      
+
       if (seg < newNnz) {
         const int newValueRow = seg * stride;
         const int begin = segment_offsets_ptr[seg];
         const int end = (seg < newNnz - 1) ? segment_offsets_ptr[seg + 1] : nnz;
         const int featureDim = item.get_global_id()[1];
-        
+
         accscalar_t tmp = 0;
         for (int row = begin; row < end; row++) {
-          const int valueRow = ((int) value_indices_ptr[row]) * stride;
+          const int valueRow = ((int)value_indices_ptr[row]) * stride;
           if (featureDim < stride) {
             tmp += static_cast<accscalar_t>(values_ptr[valueRow + featureDim]);
           }
@@ -69,25 +73,29 @@ void coalesce_values_kernel(
     // kick off kernel
     cgh.parallel_for<DPCPP_K(coalesce_values_kernel, scalar_t)>(
         DPCPP::nd_range<2>(
-            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64), DPCPP::range<2>(4, 64)),
+            DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64),
+            DPCPP::range<2>(4, 64)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
-
 }
-} // impl
+} // namespace impl
 
 Tensor _sparse_coo_tensor_with_dims_and_tensors(
-  int64_t sparse_dim,
-  int64_t dense_dim,
-  IntArrayRef size,
-  const Tensor& indices,
-  const Tensor& values,
-  const TensorOptions& options) {
-  return at::native::new_with_dims_and_tensor_sparse(sparse_dim, dense_dim, size, indices, values, options);
+    int64_t sparse_dim,
+    int64_t dense_dim,
+    IntArrayRef size,
+    const Tensor& indices,
+    const Tensor& values,
+    const TensorOptions& options) {
+  return at::native::new_with_dims_and_tensor_sparse(
+      sparse_dim, dense_dim, size, indices, values, options);
 }
 
-Tensor empty(IntArrayRef size, const TensorOptions& options, c10::optional<MemoryFormat> memory_format) {
+Tensor empty(
+    IntArrayRef size,
+    const TensorOptions& options,
+    c10::optional<MemoryFormat> memory_format) {
   return at::native::empty_sparse(size, options, memory_format);
 }
 
@@ -99,7 +107,10 @@ Tensor _values(const Tensor& self) {
   return at::native::_values_sparse(self);
 }
 
-Tensor& copy_sparse_to_sparse_(Tensor& self, const Tensor& src, bool non_blocking) {
+Tensor& copy_sparse_to_sparse_(
+    Tensor& self,
+    const Tensor& src,
+    bool non_blocking) {
   return at::native::copy_sparse_(self, src, non_blocking);
 }
 
@@ -131,8 +142,9 @@ Tensor coalesce(const Tensor& self) {
   if (self.is_coalesced()) {
     return self;
   }
-  // NOTE: Since `coalesce` is not an in-place operation when `is_coalesced` is false,
-  // we should keep the original tensor intact and do coalesce on a copy of the tensor
+  // NOTE: Since `coalesce` is not an in-place operation when `is_coalesced` is
+  // false, we should keep the original tensor intact and do coalesce on a copy
+  // of the tensor
   if (nnz < 2) {
     SparseTensor dst = self.clone();
     dst._coalesced_(true);
@@ -165,18 +177,23 @@ Tensor coalesce(const Tensor& self) {
     std::copy(policy, countIterO, countIterO + nnz, uniqueOffsets_ptr);
 
     auto indices1D_ptr = indices1D.data_ptr<int64_t>();
-    auto zipped_indices = oneapi::dpl::make_zip_iterator(indices1D_ptr, origIndices_ptr);
-    std::sort(policy, zipped_indices, zipped_indices + nnz,
+    auto zipped_indices =
+        oneapi::dpl::make_zip_iterator(indices1D_ptr, origIndices_ptr);
+    std::sort(
+        policy, zipped_indices, zipped_indices + nnz, [](auto lhs, auto rhs) {
+          using std::get;
+          return get<0>(lhs) < get<0>(rhs);
+        });
+    auto zipped_uniqueOffsets =
+        oneapi::dpl::make_zip_iterator(indices1D_ptr, uniqueOffsets_ptr);
+    auto newEnd = std::unique(
+        policy,
+        zipped_uniqueOffsets,
+        zipped_uniqueOffsets + nnz,
         [](auto lhs, auto rhs) {
           using std::get;
-          return get<0>(lhs) < get<0>(rhs);          
+          return get<0>(lhs) == get<0>(rhs);
         });
-    auto zipped_uniqueOffsets = oneapi::dpl::make_zip_iterator(indices1D_ptr, uniqueOffsets_ptr);
-    auto newEnd = std::unique(policy, zipped_uniqueOffsets, zipped_uniqueOffsets + nnz, 
-    [](auto lhs, auto rhs) {
-      using std::get;
-      return get<0>(lhs) == get<0>(rhs);
-    });
     newNnz = std::distance(zipped_uniqueOffsets, newEnd);
   }
 
@@ -194,7 +211,14 @@ Tensor coalesce(const Tensor& self) {
         values.scalar_type(),
         "coalesce",
         [&]() {
-          impl::coalesce_values_kernel<scalar_t>(uniqueOffsets, origIndices, values, newValues, nnz, newNnz, stride);
+          impl::coalesce_values_kernel<scalar_t>(
+              uniqueOffsets,
+              origIndices,
+              values,
+              newValues,
+              nnz,
+              newNnz,
+              stride);
         });
   }
 
@@ -218,18 +242,24 @@ Tensor coalesce(const Tensor& self) {
   // We can use unsafe sparse tensor constructor because the indices do not
   // need to be revalidated as we do not add or change indices, just remove
   // duplicates.
-  SparseTensor dst = at::_sparse_coo_tensor_unsafe(newIndices, newValues, self.sizes())._coalesced_(true);
+  SparseTensor dst =
+      at::_sparse_coo_tensor_unsafe(newIndices, newValues, self.sizes())
+          ._coalesced_(true);
 
   return dst;
 
 #endif
 }
 
-Tensor sparse_mask(const Tensor & self, const Tensor & mask) {
+Tensor sparse_mask(const Tensor& self, const Tensor& mask) {
   SparseTensor r = at::empty({0}, self.options().layout(kSparse));
   TORCH_CHECK(mask.is_coalesced(), "sparse_mask: mask is uncoalesced");
-  TORCH_CHECK(mask.sizes().equals(self.sizes()), "sparse_mask: operands have incompatible sizes; self has size ",
-      self.sizes(), " but mask has size ", mask.sizes());
+  TORCH_CHECK(
+      mask.sizes().equals(self.sizes()),
+      "sparse_mask: operands have incompatible sizes; self has size ",
+      self.sizes(),
+      " but mask has size ",
+      mask.sizes());
   r.resize_as_(mask);
   if (mask._nnz() == 0) {
     return r.zero_();
@@ -237,9 +267,11 @@ Tensor sparse_mask(const Tensor & self, const Tensor & mask) {
   LongTensor mask_indices = mask._indices();
   Tensor mask_values = mask._values();
   Tensor r_values = at::empty(mask_values.sizes(), r._values().options());
-  alias_into_sparse(r, mask_indices.clone(at::MemoryFormat::Contiguous), r_values);
+  alias_into_sparse(
+      r, mask_indices.clone(at::MemoryFormat::Contiguous), r_values);
   r._coalesced_(mask.is_coalesced());
-  if (self.numel() == 0) {  // if t is an empty tensor, there is no need to mask its elements
+  if (self.numel() ==
+      0) { // if t is an empty tensor, there is no need to mask its elements
     return r;
   }
 
@@ -260,15 +292,14 @@ Tensor sparse_mask(const Tensor & self, const Tensor & mask) {
 
   Tensor self_view;
   if (self.is_contiguous())
-      self_view = self.view(view_size);
+    self_view = self.view(view_size);
   else
-      self_view = self.contiguous().view(view_size);
+    self_view = self.contiguous().view(view_size);
   // TODO: Re-audit this; it used to be an indexSelect directly into r_values
   at::index_select_out(r_values, self_view, 0, indices);
 
   return r;
-
 }
 
-} // AtenIpexTypeSparseXPU
-} // at
+} // namespace AtenIpexTypeSparseXPU
+} // namespace at

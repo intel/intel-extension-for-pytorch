@@ -7,11 +7,11 @@
 #include <ATen/native/TensorIterator.h>
 #include <assert.h>
 
-#include <core/Array.h>
 #include <core/Allocator.h>
-#include <utils/DPCPP.h>
+#include <core/Array.h>
 #include <core/Memory.h>
 #include <core/detail/OffsetCalculator.h>
+#include <utils/DPCPP.h>
 
 #include "Loops.h"
 
@@ -20,7 +20,6 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-
 
 using namespace xpu::dpcpp;
 using xpu::dpcpp::Array;
@@ -79,12 +78,12 @@ struct ReduceConfig {
   DPCPP::range<2> get_local_size() const {
     int sg_size =
         DPCPP_SUB_GROUP_SIZE; // to be replaced with real sub_group_size;
-    //return DPCPP::range<2>(sg_size, work_group_size / sg_size);
+    // return DPCPP::range<2>(sg_size, work_group_size / sg_size);
     return DPCPP::range<2>(work_group_size / sg_size, sg_size);
   }
 
   DPCPP::range<2> get_global_size() const {
-    //return DPCPP::range<2>(
+    // return DPCPP::range<2>(
     //    div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE,
     //    wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE);
     return DPCPP::range<2>(
@@ -219,7 +218,7 @@ void strided_iterate(func_t f, index_t begin, index_t end, index_t stride) {
 
 template <int vt, typename index_t, typename type_t, typename foo_t>
 Array<type_t, vt> load_memory(
-    const type_t *in,
+    const type_t* in,
     index_t begin,
     index_t end,
     index_t stride,
@@ -235,7 +234,7 @@ Array<type_t, vt> load_memory(
 
 template <int vt, typename index_t, typename type_t>
 Array<type_t, vt> load_memory(
-    const type_t *in,
+    const type_t* in,
     index_t begin,
     index_t end,
     index_t stride) {
@@ -320,9 +319,7 @@ struct ReduceOp {
         semaphores(semaphores),
         noutputs(noutputs) {}
 
-  Array<scalar_t, vt0> load_inputs(
-      const scalar_t *data,
-      index_t offset) const {
+  Array<scalar_t, vt0> load_inputs(const scalar_t* data, index_t offset) const {
     index_t end = config.num_inputs;
     index_t stride = input_calc.strides_[0][0] / sizeof(scalar_t);
     if (input_calc.dims == 1) {
@@ -338,9 +335,7 @@ struct ReduceOp {
     }
   }
 
-  arg_t thread_reduce_once(
-      const scalar_t *data,
-      index_t offset) const {
+  arg_t thread_reduce_once(const scalar_t* data, index_t offset) const {
     auto values = load_inputs(data, offset);
 
     arg_t value = ident;
@@ -353,9 +348,8 @@ struct ReduceOp {
     return value;
   }
 
-  arg_t thread_reduce(
-      const scalar_t *data,
-      const DPCPP::nd_item<2>& item_id) const {
+  arg_t thread_reduce(const scalar_t* data, const DPCPP::nd_item<2>& item_id)
+      const {
     arg_t value = ident;
     index_t idx = config.input_idx(item_id);
     while (idx < static_cast<index_t>(config.num_inputs)) {
@@ -395,11 +389,12 @@ struct ReduceOp {
 
   bool mark_block_finished(
       const dpcpp_local_ptr_pt<int>& last_wg_done_ptr,
-      int *smem,
+      int* smem,
       const DPCPP::nd_item<2>& item_id) const {
     item_id.barrier(dpcpp_global_and_local_fence);
     if (item_id.get_local_linear_id() == 0) {
-      dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr((dpcpp_global_ptr_pt<int>)smem);
+      dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr(
+          (dpcpp_global_ptr_pt<int>)smem);
       DPCPP::atomic<int> at_var(sema_multi_ptr + item_id.get_group(1));
       int prev_blocks_finished = at_var.fetch_add(1);
 
@@ -415,7 +410,7 @@ struct ReduceOp {
 
   template <bool can_acc>
   arg_t accumulate_in_output(
-      const out_scalar_t *out,
+      const out_scalar_t* out,
       arg_t value,
       typename std::enable_if<can_acc>::type* = nullptr) const {
     return ops.combine(*out, value);
@@ -426,7 +421,7 @@ struct ReduceOp {
   // when accumulation in the output is not possible.
   template <bool can_acc>
   arg_t accumulate_in_output(
-      out_scalar_t *out,
+      out_scalar_t* out,
       arg_t,
       typename std::enable_if<!can_acc>::type* = nullptr) const {
     // TODO: Replace following assert with dpcpp counterparts.
@@ -435,18 +430,15 @@ struct ReduceOp {
   }
 
   template <class T>
-  void set_results(
-      const T x,
-      out_scalar_t *out0,
-      out_scalar_t *out1) const {
+  void set_results(const T x, out_scalar_t* out0, out_scalar_t* out1) const {
     *out0 = x;
   }
 
   template <class T>
   void set_results(
       const std::pair<T, T> x,
-      out_scalar_t *out0,
-      out_scalar_t *out1) const {
+      out_scalar_t* out0,
+      out_scalar_t* out1) const {
     if (noutputs >= 1) {
       *out0 = x.first;
     }
@@ -457,18 +449,18 @@ struct ReduceOp {
 
   void set_results_to_output(
       arg_t value,
-      out_scalar_t *out0,
-      out_scalar_t *out1) const {
+      out_scalar_t* out0,
+      out_scalar_t* out1) const {
     set_results(ops.project(value), out0, out1);
   }
 
   arg_t global_reduce(
       arg_t value,
-      out_scalar_t *out0,
-      out_scalar_t *out1,
+      out_scalar_t* out0,
+      out_scalar_t* out1,
       const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      char *global_reduce_buf,
-      int  *smem,
+      char* global_reduce_buf,
+      int* smem,
       const DPCPP::nd_item<2>& item_id) const {
     arg_t* reduce_buffer = (arg_t*)global_reduce_buf;
     bool should_store =
@@ -521,12 +513,12 @@ struct ReduceOp {
   }
 
   void run(
-      const char *input,
-      char *output0,
-      char *output1,
+      const char* input,
+      char* output0,
+      char* output1,
       const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      char *global_reduce_buf,
-      int *smem,
+      char* global_reduce_buf,
+      int* smem,
       const DPCPP::nd_item<2>& item_id) const {
     index_t output_idx = config.output_idx(item_id);
     index_t input_idx = config.input_idx(item_id);
@@ -535,8 +527,7 @@ struct ReduceOp {
     if (output_idx < static_cast<index_t>(config.num_outputs) &&
         input_idx < static_cast<index_t>(config.num_inputs)) {
       auto input_slice = (char*)input + base_offsets[1];
-      value =
-          thread_reduce((scalar_t *)input_slice, item_id);
+      value = thread_reduce((scalar_t*)input_slice, item_id);
     }
     bool should_wg_reduce = config.should_wg_reduce();
     if (should_wg_reduce) {
@@ -563,10 +554,7 @@ struct ReduceOp {
         value = accumulate_in_output<can_accumulate_in_output>(
             (out_scalar_t*)out0, value);
       }
-      set_results_to_output(
-          value,
-          (out_scalar_t*)out0,
-          (out_scalar_t*)out1);
+      set_results_to_output(value, (out_scalar_t*)out0, (out_scalar_t*)out1);
     }
   }
 };
@@ -587,17 +575,18 @@ static void launch_reduce_kernel(
   }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_ptr = static_cast<const char *>(reduction.src);
-    auto out0_ptr = static_cast<char *>(reduction.dst0);
-    auto out1_ptr = reduction.noutputs <= 1
-        ? NULL
-        : static_cast<char *>(reduction.dst1);
+    auto in_ptr = static_cast<const char*>(reduction.src);
+    auto out0_ptr = static_cast<char*>(reduction.dst0);
+    auto out1_ptr =
+        reduction.noutputs <= 1 ? NULL : static_cast<char*>(reduction.dst1);
     auto local_acc = dpcpp_local_acc_t<acc_t>(config.work_group_size, cgh);
 
     auto global_reduce_ptr = config.should_global_reduce()
-        ? static_cast<char *>(reduction.buffer) : NULL;
+        ? static_cast<char*>(reduction.buffer)
+        : NULL;
     auto sema_ptr = config.should_global_reduce()
-        ? static_cast<int *>(reduction.semaphores) : NULL;
+        ? static_cast<int*>(reduction.semaphores)
+        : NULL;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       auto local_ptr = (dpcpp_local_ptr_pt<acc_t>)local_acc.get_pointer().get();

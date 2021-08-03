@@ -1,13 +1,12 @@
 #include <ATen/ATen.h>
 
-#include <utils/DPCPP.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <utils/DPCPP.h>
 
-#include "comm/ATDispatch.h"
 #include "ScatterGather.h"
-
+#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -326,7 +325,10 @@ void ScatterFill(
       tensorInfo, srcInfo, indexInfo, dim, (TYPE)totalElements);
 
 template <typename scalar_t>
-typename std::enable_if<IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) || IS_INT64(scalar_t), void>::type
+typename std::enable_if<
+    IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) ||
+        IS_INT64(scalar_t),
+    void>::type
 ScatterAdd(
     Tensor& tensor,
     int64_t dim,
@@ -433,7 +435,10 @@ ScatterAdd(
 }
 
 template <typename scalar_t>
-typename std::enable_if<!(IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) || IS_INT64(scalar_t)), void>::type
+typename std::enable_if<
+    !(IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) ||
+      IS_INT64(scalar_t)),
+    void>::type
 ScatterAdd(
     Tensor& tensor,
     int64_t dim,
@@ -452,17 +457,21 @@ Tensor& scatter_(
     const Tensor& index,
     const Tensor& src) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::BFloat16, at::ScalarType::Bool, self.scalar_type(), "Scatter", [&]() {
-        impl::Scatter<scalar_t>(self, dim, index, src);
-      });
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "Scatter",
+      [&]() { impl::Scatter<scalar_t>(self, dim, index, src); });
   return self;
 }
 
 Tensor& scatter_(Tensor& self, int64_t dim, const Tensor& index, Scalar value) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::BFloat16, at::ScalarType::Bool, self.scalar_type(), "ScatterFill", [&]() {
-        impl::ScatterFill<scalar_t>(self, dim, index, value);
-      });
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "ScatterFill",
+      [&]() { impl::ScatterFill<scalar_t>(self, dim, index, value); });
   return self;
 }
 
@@ -472,9 +481,11 @@ Tensor& scatter_add_(
     const Tensor& index,
     const Tensor& src) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::BFloat16, at::ScalarType::Bool, self.scalar_type(), "ScatterAdd", [&]() {
-        impl::ScatterAdd<scalar_t>(self, dim, index, src);
-      });
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "ScatterAdd",
+      [&]() { impl::ScatterAdd<scalar_t>(self, dim, index, src); });
   return self;
 }
 
@@ -486,9 +497,11 @@ Tensor& gather_out(
     bool sparse_grad) {
   out.resize_(index.sizes());
   IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::BFloat16, at::ScalarType::Bool, self.scalar_type(), "Gather", [&]() {
-        impl::Gather<scalar_t>(out, self, dim, index);
-      });
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "Gather",
+      [&]() { impl::Gather<scalar_t>(out, self, dim, index); });
   return out;
 }
 

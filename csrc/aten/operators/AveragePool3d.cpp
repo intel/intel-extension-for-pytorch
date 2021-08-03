@@ -3,11 +3,10 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include "comm/ATDispatch.h"
 #include <oneDNN/oneDNN.h>
+#include "comm/ATDispatch.h"
 
 #include <vector>
-
 
 using namespace dnnl;
 using namespace at::native;
@@ -115,7 +114,8 @@ void avg_pool3d_out_template(
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+      output.resize_(
+          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
     } else {
       output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
@@ -277,7 +277,8 @@ Tensor& avg_pool3d_backward_out_template(
       owidth);
 
   if (count_include_pad) {
-    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_include_padding>(
+    ::xpu::oneDNN::pooling_backward<
+        ::xpu::oneDNN::alg::pooling_avg_include_padding>(
         gradInput,
         gradOutput,
         nbatch,
@@ -298,7 +299,8 @@ Tensor& avg_pool3d_backward_out_template(
         padH,
         padW);
   } else {
-    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+    ::xpu::oneDNN::pooling_backward<
+        ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
         nbatch,

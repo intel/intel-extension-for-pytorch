@@ -8,7 +8,6 @@ constexpr DeviceType DPCPPGuardImpl::static_type;
 
 C10_REGISTER_GUARD_IMPL(XPU, DPCPPGuardImpl);
 
-
 DPCPPGuardImpl::DPCPPGuardImpl() {}
 
 DPCPPGuardImpl::DPCPPGuardImpl(DeviceType t) {

@@ -1,25 +1,25 @@
 #include <ATen/ATen.h>
 
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 
-#include "Random.h"
 #include "Distributions.h"
+#include "Random.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 int binary_search_for_multinomial(
-  DPCPP::global_ptr<scalar_t> cumdist,
-  DPCPP::global_ptr<scalar_t> dist,
-  int size,
-  scalar_t val) {
+    DPCPP::global_ptr<scalar_t> cumdist,
+    DPCPP::global_ptr<scalar_t> dist,
+    int size,
+    scalar_t val) {
   int start = 0;
   int end = size;
   // cumdist[size - 1] = 0 => all zero prob dist
@@ -55,13 +55,13 @@ DPCPP_DEF_K1(sample_multinomial_with_replacement_syck_ker);
 
 template <typename scalar_t>
 void sample_multinomial_with_replacement(
-  std::pair<uint64_t, uint64_t> seeds,
-  int num_samples,
-  int64_t distributions,
-  int categories,
-  at::Tensor& result,
-  at::Tensor& norm_dist_prefix_sum,
-  at::Tensor& norm_dist) {
+    std::pair<uint64_t, uint64_t> seeds,
+    int num_samples,
+    int64_t distributions,
+    int categories,
+    at::Tensor& result,
+    at::Tensor& norm_dist_prefix_sum,
+    at::Tensor& norm_dist) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -70,7 +70,7 @@ void sample_multinomial_with_replacement(
   // distribution concurrently
   work_group_size = std::min(work_group_size, (size_t)num_samples);
   DPCPP::range<2> global_range(distributions, work_group_size),
-    local_range(1, work_group_size);
+      local_range(1, work_group_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto result_data = result.data_ptr<long>();
@@ -85,7 +85,7 @@ void sample_multinomial_with_replacement(
       scalar_t* norm_dist_ptr = norm_dist_data;
 
       RandomState<Philox4_32_10> state(
-        seeds.first, global_linear_id, seeds.second);
+          seeds.first, global_linear_id, seeds.second);
 
       for (int sample = sample_id; sample < num_samples;
            sample += work_group_size) {
@@ -94,10 +94,10 @@ void sample_multinomial_with_replacement(
 
         // Find the bucket that a uniform sample lies in
         int choice = binary_search_for_multinomial<scalar_t>(
-          norm_dist_prefix_sum_ptr + dist_id * categories,
-          norm_dist_ptr + dist_id * categories,
-          categories,
-          r);
+            norm_dist_prefix_sum_ptr + dist_id * categories,
+            norm_dist_ptr + dist_id * categories,
+            categories,
+            r);
 
         // Torch indices are 1-based
         result_ptr[dist_id * num_samples + sample] = choice;
@@ -105,8 +105,8 @@ void sample_multinomial_with_replacement(
     };
 
     cgh.parallel_for<DPCPP_K(
-      sample_multinomial_with_replacement_syck_ker, scalar_t)>(
-      DPCPP::nd_range<2>(global_range, local_range), kfn);
+        sample_multinomial_with_replacement_syck_ker, scalar_t)>(
+        DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -116,14 +116,14 @@ DPCPP_DEF_K1(sample_multinomial_without_replacement_syck_ker);
 
 template <typename scalar_t>
 void sample_multinomial_without_replacement(
-  std::pair<uint64_t, uint64_t> seeds,
-  int num_samples,
-  int sample,
-  int64_t distributions,
-  int categories,
-  at::Tensor& result,
-  at::Tensor& norm_dist_prefix_sum,
-  at::Tensor& norm_dist) {
+    std::pair<uint64_t, uint64_t> seeds,
+    int num_samples,
+    int sample,
+    int64_t distributions,
+    int categories,
+    at::Tensor& result,
+    at::Tensor& norm_dist_prefix_sum,
+    at::Tensor& norm_dist) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -150,10 +150,10 @@ void sample_multinomial_without_replacement(
 
       // Find the bucket that a uniform sample lies in
       int choice = binary_search_for_multinomial<scalar_t>(
-        norm_dist_prefix_sum_ptr + dist_id * categories,
-        norm_dist_ptr + dist_id * categories,
-        categories,
-        r);
+          norm_dist_prefix_sum_ptr + dist_id * categories,
+          norm_dist_ptr + dist_id * categories,
+          categories,
+          r);
 
       // Torch indices are 1-based
       result_ptr[dist_id * num_samples + sample] = choice;
@@ -161,34 +161,34 @@ void sample_multinomial_without_replacement(
       // Without replacement, so update the original probability so it
       // is not considered a second time
       norm_dist_ptr[dist_id * categories + choice] =
-        ScalarConvert<int, scalar_t>::to(0);
+          ScalarConvert<int, scalar_t>::to(0);
     };
 
     cgh.parallel_for<DPCPP_K(
-      sample_multinomial_without_replacement_syck_ker, scalar_t)>(range, kfn);
+        sample_multinomial_without_replacement_syck_ker, scalar_t)>(range, kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 Tensor& multinomial_out(
-  Tensor& result,
-  const Tensor& self_,
-  int64_t num_samples,
-  bool replacement,
-  c10::optional<Generator> gen_) {
+    Tensor& result,
+    const Tensor& self_,
+    int64_t num_samples,
+    bool replacement,
+    c10::optional<Generator> gen_) {
   auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
-    gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   auto shape = self_.sizes();
   TORCH_CHECK(
-    shape.size() > 0 && shape.size() <= 2,
-    "prob_dist must be 1 or 2 dims. got ",
-    shape.size());
+      shape.size() > 0 && shape.size() <= 2,
+      "prob_dist must be 1 or 2 dims. got ",
+      shape.size());
   auto num_dists = shape.size() == 1 ? 1 : shape[0];
   auto num_categories = shape.size() == 1 ? shape[0] : shape[1];
   TORCH_CHECK(
-    num_samples <= num_categories || replacement,
-    "cannot sample n_sample > prob_dist size samples without replacement");
+      num_samples <= num_categories || replacement,
+      "cannot sample n_sample > prob_dist size samples without replacement");
   Tensor self = self_.contiguous();
   result.resize_({num_dists, num_samples});
 
@@ -218,13 +218,13 @@ Tensor& multinomial_out(
 
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
       sample_multinomial_with_replacement<scalar_t>(
-        rng_engine_inputs,
-        num_samples,
-        num_dists,
-        num_categories,
-        result,
-        prefix_sum,
-        norm_dist);
+          rng_engine_inputs,
+          num_samples,
+          num_dists,
+          num_categories,
+          result,
+          prefix_sum,
+          norm_dist);
     });
   } else {
     // Sample with replacement
@@ -253,14 +253,14 @@ Tensor& multinomial_out(
         // The kernel can only draw one sample before we have to
         // recalculate our distribution
         sample_multinomial_without_replacement<scalar_t>(
-          rng_engine_inputs,
-          num_samples,
-          sample,
-          num_dists,
-          num_categories,
-          result,
-          prefix_sum,
-          norm_dist);
+            rng_engine_inputs,
+            num_samples,
+            sample,
+            num_dists,
+            num_categories,
+            result,
+            prefix_sum,
+            norm_dist);
       });
     }
   }
@@ -274,24 +274,24 @@ Tensor& multinomial_out(
 }
 
 Tensor multinomial(
-  const Tensor& self,
-  int64_t num_samples,
-  bool replacement,
-  c10::optional<Generator> generator) {
+    const Tensor& self,
+    int64_t num_samples,
+    bool replacement,
+    c10::optional<Generator> generator) {
   auto shape = self.sizes();
   TORCH_CHECK(
-    shape.size() > 0 && shape.size() <= 2,
-    "prob_dist must be 1 or 2 dims. got ",
-    shape.size());
+      shape.size() > 0 && shape.size() <= 2,
+      "prob_dist must be 1 or 2 dims. got ",
+      shape.size());
   auto num_dists = shape.size() == 1 ? 1 : shape[1];
   auto num_categories = shape.size() == 1 ? shape[0] : shape[1];
   TORCH_CHECK(
-    num_samples <= num_categories || replacement,
-    "cannot sample n_sample > prob_dist size samples without replacement");
+      num_samples <= num_categories || replacement,
+      "cannot sample n_sample > prob_dist size samples without replacement");
 
   Tensor ret = at::empty({num_dists, num_samples}, self.options().dtype(kLong));
   at::AtenIpexTypeXPU::multinomial_out(
-    ret, self, num_samples, replacement, generator);
+      ret, self, num_samples, replacement, generator);
   return ret;
 }
 

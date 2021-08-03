@@ -1,10 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
-#include "comm/Numerics.h"
-#include "comm/ATDispatch.h"
 #include <utils/DPCPP.h>
 #include "Loops.h"
-
+#include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 DPCPP_DEF_K1(SyclOpElu);
 DPCPP_DEF_K1(SyclOpEluBackward);
@@ -21,10 +20,10 @@ Tensor& elu_out(
     Scalar scale,
     Scalar input_scale) {
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(out)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(out)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -62,11 +61,11 @@ Tensor& elu_backward_out(
     Scalar input_scale,
     const Tensor& output) {
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(grad_input)
-  .add_input(grad_output)
-  .add_input(output)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(grad_input)
+                  .add_input(grad_output)
+                  .add_input(output)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "elu_backward", [&]() {

@@ -6,10 +6,9 @@
 #include <c10/macros/Macros.h>
 #include <stdlib.h>
 
-#include "comm/ApplyUtils.h"
-#include <utils/DPCPP.h>
 #include <core/detail/TensorInfo.h>
-
+#include <utils/DPCPP.h>
+#include "comm/ApplyUtils.h"
 
 // Maximum size per grid dimension that we assume (compute capability >= 2.0)
 

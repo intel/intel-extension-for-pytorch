@@ -2,8 +2,8 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
-#include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 
 #include "Loops.h"
 
@@ -18,10 +18,10 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
   checkBackend("log_sigmoid_forward", output, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(output)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(output)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -62,11 +62,11 @@ Tensor& log_sigmoid_backward_out(
       self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(grad_input)
-  .add_input(grad_output)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(grad_input)
+                  .add_input(grad_output)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "log_sigmoid_backward", [&]() {

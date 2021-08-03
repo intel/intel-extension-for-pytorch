@@ -1,12 +1,12 @@
 #include <c10/util/Exception.h>
-#include <utils/Macros.h>
-#include <runtime/Context.h>
 #include <runtime/CachingHostAllocator.h>
+#include <runtime/Context.h>
+#include <utils/Macros.h>
 
 #include <deque>
 #include <mutex>
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
 
 namespace xpu {
 namespace dpcpp {
@@ -29,7 +29,7 @@ void CachingHostAllocator::BlockState::processEvents() {
   while (hasEvent()) {
     auto& e = mEvents.front();
     bool completed =
-      e.get_info<dpcpp_event_exec_stat>() == dpcpp_event_cmd_stat_complete;
+        e.get_info<dpcpp_event_exec_stat>() == dpcpp_event_cmd_stat_complete;
     if (!completed) {
       return;
     }
@@ -45,8 +45,7 @@ void CachingHostAllocator::BlockState::setAllocated(bool alloc) {
   mAllocated = alloc;
 }
 
-CachingHostAllocator::CachingHostAllocator()
-  : mAvailable(Block::Comparator) {}
+CachingHostAllocator::CachingHostAllocator() : mAvailable(Block::Comparator) {}
 
 CachingHostAllocator::~CachingHostAllocator() {
   emptyCache();
@@ -64,7 +63,7 @@ void CachingHostAllocator::processEvents() {
 
 bool CachingHostAllocator::isHostPtr(void* ptr) {
   return DPCPP::usm::alloc::host ==
-    DPCPP::get_pointer_type(ptr, getDeviceContext());
+      DPCPP::get_pointer_type(ptr, getDeviceContext());
 }
 
 void CachingHostAllocator::emptyCache() {
@@ -142,4 +141,5 @@ void CachingHostAllocator::release(void* ptr) {
   processEvents();
 }
 
-}} // namespace xpu::dpcpp
+} // namespace dpcpp
+} // namespace xpu

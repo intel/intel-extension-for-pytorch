@@ -1,11 +1,11 @@
 
-#include <utils/DPCPP.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include "comm/Numerics.h"
+#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
-#include <ATen/AtenIpexTypeXPU.h>
+#include "comm/Numerics.h"
 
 #include "Sort.h"
 
@@ -66,8 +66,7 @@ std::tuple<at::Tensor, at::Tensor> sort(
     bool descending) {
   auto sorted = at::empty_like(self);
   auto indices = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeXPU::sort_out(
-      sorted, indices, self, dim, descending);
+  return at::AtenIpexTypeXPU::sort_out(sorted, indices, self, dim, descending);
 }
 
 } // namespace AtenIpexTypeXPU

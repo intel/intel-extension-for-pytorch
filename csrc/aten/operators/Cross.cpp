@@ -3,7 +3,6 @@
 
 #include "comm/Pointwise.h"
 
-
 using namespace xpu::dpcpp;
 
 namespace at {

@@ -2,8 +2,8 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 
-#include <utils/DPCPP.h>
 #include <oneDNN/oneDNN.h>
+#include <utils/DPCPP.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {

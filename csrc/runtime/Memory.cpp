@@ -1,12 +1,16 @@
+#include <runtime/CachingHostAllocator.h>
 #include <runtime/Memory.h>
 #include <runtime/Queue.h>
-#include <runtime/CachingHostAllocator.h>
 #include <utils/Profiler.h>
 
 namespace xpu {
 namespace dpcpp {
 
-void memcpyHostToDevice(void* dst, const void* src, size_t n_bytes, bool async) {
+void memcpyHostToDevice(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async) {
   if (n_bytes == 0)
     return;
 
@@ -23,7 +27,11 @@ void memcpyHostToDevice(void* dst, const void* src, size_t n_bytes, bool async) 
   DPCPP_E_FORCE_SYNC(e);
 }
 
-void memcpyDeviceToHost(void* dst, const void* src, size_t n_bytes, bool async) {
+void memcpyDeviceToHost(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async) {
   if (n_bytes == 0)
     return;
 
@@ -40,7 +48,11 @@ void memcpyDeviceToHost(void* dst, const void* src, size_t n_bytes, bool async) 
   DPCPP_E_FORCE_SYNC(e);
 }
 
-void memcpyDeviceToDevice(void* dst, const void* src, size_t n_bytes, bool async) {
+void memcpyDeviceToDevice(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async) {
   if (n_bytes == 0)
     return;
 

@@ -1,23 +1,22 @@
 #include <ATen/ATen.h>
 #include <torch/torch.h>
 
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
-#include <core/TensorImplUtils.h>
 #include <core/Memory.h>
+#include <core/TensorImplUtils.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 
-#include "comm/Atomics.h"
-#include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
+#include "comm/Atomics.h"
+#include "comm/Numerics.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <oneapi/dpl/numeric>
 #include <oneapi/dpl/iterator>
+#include <oneapi/dpl/numeric>
 #endif
-
 
 using namespace xpu::dpcpp;
 
@@ -143,20 +142,24 @@ void compute_grad_weight_bags(
 
   bool per_sample_weight_defined = per_sample_weights.defined();
   bool count_defined = count.defined();
-  int64_t per_sample_weights_stride = per_sample_weights.defined() ? per_sample_weights.stride(0) : 0;
+  int64_t per_sample_weights_stride =
+      per_sample_weights.defined() ? per_sample_weights.stride(0) : 0;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_weight_per_segment_data = grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
+    auto grad_weight_per_segment_data =
+        grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
     auto indices_data = indices.data_ptr<int64_t>();
     auto gradOutput_data = gradOutput.data_ptr<scalar_t>();
     auto offset2bag_data = offset2bag.data_ptr<int64_t>();
     auto count_data = count_defined
         ? count.data_ptr<int64_t>()
-        : offset2bag_data; // use the offset2bag_data handler as the dummy buffer.
+        : offset2bag_data; // use the offset2bag_data handler as the dummy
+                           // buffer.
     auto bag_size_data = bag_size.data_ptr<int64_t>();
     auto per_sample_weights_data = per_sample_weight_defined
         ? per_sample_weights.data_ptr<scalar_t>()
-        : gradOutput_data; // ise the gradOutput_data handler as the dummy buffer.
+        : gradOutput_data; // ise the gradOutput_data handler as the dummy
+                           // buffer.
     auto segment_offsets_data = segment_offsets.data_ptr<int64_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
@@ -164,13 +167,10 @@ void compute_grad_weight_bags(
       auto indices_ptr = indices_data;
       auto gradOutput_ptr = gradOutput_data;
       auto offset2bag_ptr = offset2bag_data;
-      auto count_ptr = count_defined
-          ? count_data
-          : NULL;
+      auto count_ptr = count_defined ? count_data : NULL;
       auto bag_size_ptr = bag_size_data;
-      auto per_sample_weights_ptr = per_sample_weight_defined
-          ? per_sample_weights_data
-          : NULL;
+      auto per_sample_weights_ptr =
+          per_sample_weight_defined ? per_sample_weights_data : NULL;
       auto segment_offsets_ptr = segment_offsets_data;
 
       const int gid = item.get_global_linear_id();
@@ -184,7 +184,8 @@ void compute_grad_weight_bags(
       }
 
       const int idx_begin = segment_offsets_ptr[id];
-      const int idx_end = (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
+      const int idx_end =
+          (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
 
       acc_type<scalar_t> weight = 0;
       for (int idx = idx_begin; idx < idx_end; ++idx) {
@@ -197,7 +198,8 @@ void compute_grad_weight_bags(
           scale *= per_sample_weights_ptr[idx * per_sample_weights_stride];
         }
 
-        acc_type<scalar_t> gradient = gradOutput_ptr[grad_output_row + startFeature];
+        acc_type<scalar_t> gradient =
+            gradOutput_ptr[grad_output_row + startFeature];
         if (mode_mean) {
           gradient /= bag_size_ptr[seq_number];
         }
@@ -237,7 +239,8 @@ void compute_grad_weight(
   bool count_defined = count.defined();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_weight_per_segment_data = grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
+    auto grad_weight_per_segment_data =
+        grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
     auto indices_data = indices.data_ptr<int64_t>();
     auto grad_output_data = grad_output.data_ptr<scalar_t>();
     auto count_data = count_defined
@@ -249,9 +252,7 @@ void compute_grad_weight(
       auto grad_weight_per_segment_ptr = grad_weight_per_segment_data;
       auto indices_ptr = indices_data;
       auto grad_output_ptr = grad_output_data;
-      auto count_ptr = count_defined
-          ? count_data
-          : NULL;
+      auto count_ptr = count_defined ? count_data : NULL;
       auto segment_offsets_ptr = segment_offsets_data;
 
       const int gid = item.get_global_linear_id();
@@ -264,7 +265,8 @@ void compute_grad_weight(
         return;
       }
       const int idx_begin = segment_offsets_ptr[id];
-      const int idx_end = (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
+      const int idx_end =
+          (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
 
       acc_type<scalar_t> weight = 0;
       for (int idx = idx_begin; idx < idx_end; idx++) {
@@ -308,7 +310,8 @@ void sum_and_scatter(
     auto grad_weight_data = grad_weight.data_ptr<scalar_t>();
     auto input_data = input.data_ptr<int64_t>();
     auto segment_offsets_data = segment_offsets.data_ptr<int64_t>();
-    auto grad_weight_per_segment_data = grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
+    auto grad_weight_per_segment_data =
+        grad_weight_per_segment.data_ptr<acc_type<scalar_t>>();
     auto segment_sizes_offsets_data = segment_sizes_offsets.data_ptr<int64_t>();
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
@@ -353,19 +356,20 @@ void sum_and_scatter(
 }
 
 Tensor embedding_bag_backward_dpcpp_kernel(
-  const Tensor& grad,
-  const Tensor& orig_indices,
-  const Tensor& sorted_indices,
-  const Tensor& count,
-  int64_t num_weights,
-  int padding_idx,
-  bool scale_grad_by_freq,
-  bool mode_mean,
-  const Tensor& offset2bag,
-  const Tensor& bag_size,
-  const Tensor& per_sample_weights) {
+    const Tensor& grad,
+    const Tensor& orig_indices,
+    const Tensor& sorted_indices,
+    const Tensor& count,
+    int64_t num_weights,
+    int padding_idx,
+    bool scale_grad_by_freq,
+    bool mode_mean,
+    const Tensor& offset2bag,
+    const Tensor& bag_size,
+    const Tensor& per_sample_weights) {
 #ifndef USE_ONEDPL
-  throw std::runtime_error("no oneDPL found when compile. USM embedding not supported");
+  throw std::runtime_error(
+      "no oneDPL found when compile. USM embedding not supported");
 #else
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
@@ -382,110 +386,125 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     auto sorted_indices_begin = sorted_indices.data_ptr<int64_t>();
     auto dummy = at::empty_like(sorted_indices);
     auto dummy_begin = dummy.data_ptr<int64_t>();
-    std::adjacent_difference(policy, sorted_indices_begin, sorted_indices_begin + numel, dummy_begin,
-      [](auto lhs, auto rhs) -> bool {
-        if (lhs!= rhs) {
-          return true;
-        }
-        return false;
-      });
-    // For algorithm adjacent difference, for output, its first element is always 
-    // equal to source first element. We need to set it as 1 manually. 
+    std::adjacent_difference(
+        policy,
+        sorted_indices_begin,
+        sorted_indices_begin + numel,
+        dummy_begin,
+        [](auto lhs, auto rhs) -> bool {
+          if (lhs != rhs) {
+            return true;
+          }
+          return false;
+        });
+    // For algorithm adjacent difference, for output, its first element is
+    // always equal to source first element. We need to set it as 1 manually.
     dummy[0] = 1;
     auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
     auto copy_begin = oneapi::dpl::make_zip_iterator(count_begin, dummy_begin);
     auto segment_offsets_begin = segment_offsets.data_ptr<int64_t>();
-    auto ends = std::copy_if(policy, copy_begin, copy_begin + numel,
-        oneapi::dpl::make_transform_iterator(segment_offsets_begin, [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
-        [](auto h){
+    auto ends = std::copy_if(
+        policy,
+        copy_begin,
+        copy_begin + numel,
+        oneapi::dpl::make_transform_iterator(
+            segment_offsets_begin,
+            [](auto& x) { return std::forward_as_tuple(x, std::ignore); }),
+        [](auto h) {
           using std::get;
           return get<1>(h) != 0;
         });
     num_of_segments = std::distance(segment_offsets_begin, ends.base());
   }
 
-  auto partials_per_segment = at::empty({num_of_segments}, orig_indices.options());
+  auto partials_per_segment =
+      at::empty({num_of_segments}, orig_indices.options());
 
   krn_partials_per_segment(
-    partials_per_segment.data_ptr<int64_t>(),
-    segment_offsets.data_ptr<int64_t>(),
-    num_of_segments,
-    numel);
+      partials_per_segment.data_ptr<int64_t>(),
+      segment_offsets.data_ptr<int64_t>(),
+      num_of_segments,
+      numel);
 
   // In order to compute `partial_segment_offset`, which is the start index
   // of each partial-segment in `sorted_indices`, we need to compute the
   // start position of each _segment_ in `partial_segment_offset`.
   // Unit: index in `partial_segment_offset`
-  auto partials_per_segment_offset = at::empty({num_of_segments}, orig_indices.options());
+  auto partials_per_segment_offset =
+      at::empty({num_of_segments}, orig_indices.options());
   std::exclusive_scan(
-          policy,
-          partials_per_segment.data_ptr<int64_t>(),
-          partials_per_segment.data_ptr<int64_t>()+num_of_segments,
-          partials_per_segment_offset.data_ptr<int64_t>(),
-          0);
+      policy,
+      partials_per_segment.data_ptr<int64_t>(),
+      partials_per_segment.data_ptr<int64_t>() + num_of_segments,
+      partials_per_segment_offset.data_ptr<int64_t>(),
+      0);
 
-  // The total number of partial-segments is the sum of `partials_per_segment_offset`
-  const int num_of_partial_segments = partials_per_segment[num_of_segments-1].item<int64_t>() +
-          partials_per_segment_offset[num_of_segments-1].item<int64_t>();
+  // The total number of partial-segments is the sum of
+  // `partials_per_segment_offset`
+  const int num_of_partial_segments =
+      partials_per_segment[num_of_segments - 1].item<int64_t>() +
+      partials_per_segment_offset[num_of_segments - 1].item<int64_t>();
 
-  auto partial_segment_offset = at::empty({num_of_partial_segments}, orig_indices.options());
+  auto partial_segment_offset =
+      at::empty({num_of_partial_segments}, orig_indices.options());
   krn_partial_segment_offset(
-    partial_segment_offset.data_ptr<int64_t>(),
-    partials_per_segment.data_ptr<int64_t>(),
-    partials_per_segment_offset.data_ptr<int64_t>(),
-    segment_offsets.data_ptr<int64_t>(),
-    num_of_segments);
+      partial_segment_offset.data_ptr<int64_t>(),
+      partials_per_segment.data_ptr<int64_t>(),
+      partials_per_segment_offset.data_ptr<int64_t>(),
+      segment_offsets.data_ptr<int64_t>(),
+      num_of_segments);
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
-    at::ScalarType::BFloat16,
-    grad.scalar_type(),
-    "embedding_bag_backward_dpcpp_compute_grad_weight",
-    [&] {
-      TensorOptions op;
-      if (grad.dtype() == at::kBFloat16) {
-        op = grad.options().dtype(at::kFloat);
-      } else {
-        op = grad.options();
-      }
-      auto grad_weight_per_segment = at::empty({num_of_partial_segments, stride}, op);
-      // Compute the sum of each partial-segment and handle bags
-      if (offset2bag.defined()) {
-        compute_grad_weight_bags<scalar_t>(
-          orig_indices,
-          grad,
-          offset2bag,
-          count,
-          numel,
-          stride,
-          mode_mean,
-          bag_size,
-          per_sample_weights,
-          partial_segment_offset,
-          num_of_partial_segments,
-          grad_weight_per_segment);
-      } else {
-        compute_grad_weight<scalar_t>(
-          orig_indices,
-          grad,
-          count,
-          numel,
-          stride,
-          partial_segment_offset,
-          num_of_partial_segments,
-          grad_weight_per_segment);
-      }
+      at::ScalarType::BFloat16,
+      grad.scalar_type(),
+      "embedding_bag_backward_dpcpp_compute_grad_weight",
+      [&] {
+        TensorOptions op;
+        if (grad.dtype() == at::kBFloat16) {
+          op = grad.options().dtype(at::kFloat);
+        } else {
+          op = grad.options();
+        }
+        auto grad_weight_per_segment =
+            at::empty({num_of_partial_segments, stride}, op);
+        // Compute the sum of each partial-segment and handle bags
+        if (offset2bag.defined()) {
+          compute_grad_weight_bags<scalar_t>(
+              orig_indices,
+              grad,
+              offset2bag,
+              count,
+              numel,
+              stride,
+              mode_mean,
+              bag_size,
+              per_sample_weights,
+              partial_segment_offset,
+              num_of_partial_segments,
+              grad_weight_per_segment);
+        } else {
+          compute_grad_weight<scalar_t>(
+              orig_indices,
+              grad,
+              count,
+              numel,
+              stride,
+              partial_segment_offset,
+              num_of_partial_segments,
+              grad_weight_per_segment);
+        }
 
-      sum_and_scatter<scalar_t>(
-        sorted_indices,
-        grad_weight,
-        stride,
-        segment_offsets,
-        num_of_segments,
-        grad_weight_per_segment,
-        partials_per_segment_offset,
-        num_of_partial_segments,
-        padding_idx);
-    });
+        sum_and_scatter<scalar_t>(
+            sorted_indices,
+            grad_weight,
+            stride,
+            segment_offsets,
+            num_of_segments,
+            grad_weight_per_segment,
+            partials_per_segment_offset,
+            num_of_partial_segments,
+            padding_idx);
+      });
 
   return grad_weight;
 #endif
@@ -514,7 +533,7 @@ void EmbeddingBag_updateOutputKernel(
 
   using accscalar_t = acc_type<scalar_t>;
   auto& queue = dpcppGetCurrentQueue();
-  auto workersPerChunk = [featureSize] () -> int64_t {
+  auto workersPerChunk = [featureSize]() -> int64_t {
     int64_t _workersPerChunk = 64;
     if (featureSize < 64 && featureSize >= 32) {
       _workersPerChunk = 32;
@@ -522,7 +541,7 @@ void EmbeddingBag_updateOutputKernel(
       _workersPerChunk = 16;
     }
     return _workersPerChunk;
-  } ();
+  }();
   int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)workersPerChunk);
   int64_t numChunks = numBags * chunksPerBag;
   int64_t kernel_range = 1024 * workersPerChunk;
@@ -533,25 +552,24 @@ void EmbeddingBag_updateOutputKernel(
     auto input_data = input;
     auto offsets_data = offsets;
     auto weight_data = weight;
-    auto output_data= output;
+    auto output_data = output;
     auto offset2bag_data = offset2bag;
     auto bag_size_data = bag_size;
     // use the weight handler as the dummy handler.
-    // The kernel would not access the data thru the per_sample_weights_ptr in false case
-    auto per_sample_weights_data = per_sample_weights_defined
-                                  ? per_sample_weights
-                                  : weight_data;
+    // The kernel would not access the data thru the per_sample_weights_ptr in
+    // false case
+    auto per_sample_weights_data =
+        per_sample_weights_defined ? per_sample_weights : weight_data;
     // use the offset2bag handler as the dummy handler.
-    // The kernel would not access the data thru the max_indices_ptr in false case
-    auto max_indices_data = mode == MODE_MAX
-                           ? max_indices
-                           : offset2bag_data;
+    // The kernel would not access the data thru the max_indices_ptr in false
+    // case
+    auto max_indices_data = mode == MODE_MAX ? max_indices : offset2bag_data;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
       auto input_ptr = input_data;
       auto offsets_ptr = offsets_data;
       auto weight_ptr = weight_data;
-      auto output_ptr= output_data;
+      auto output_ptr = output_data;
       auto offset2bag_ptr = offset2bag_data;
       auto bag_size_ptr = bag_size_data;
       auto per_sample_weights_ptr = per_sample_weights_data;
@@ -636,7 +654,6 @@ void EmbeddingBag_updateOutputKernel(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-
 Tensor embedding_bag_backward_dpcpp_sum_avg(
     const Tensor& grad,
     const Tensor& indices,
@@ -648,7 +665,8 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     int64_t mode,
     const Tensor& per_sample_weights) {
 #ifndef USE_ONEDPL
-  throw std::runtime_error("no oneDPL found when compile. USM embedding not supported");
+  throw std::runtime_error(
+      "no oneDPL found when compile. USM embedding not supported");
 #else
   auto grad_weight = at::zeros({num_weights, grad.size(1)}, grad.options());
 
@@ -675,9 +693,10 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     std::copy(policy, count_begin, count_begin + numel, orig_begin);
 
     auto sorted_begin = sorted_indices.data_ptr<int64_t>();
-    auto zipped_begin = oneapi::dpl::make_zip_iterator(sorted_begin, orig_begin);
-    std::sort(policy, zipped_begin, zipped_begin + numel,
-        [](auto lhs, auto rhs){
+    auto zipped_begin =
+        oneapi::dpl::make_zip_iterator(sorted_begin, orig_begin);
+    std::sort(
+        policy, zipped_begin, zipped_begin + numel, [](auto lhs, auto rhs) {
           using std::get;
           return get<0>(lhs) < get<0>(rhs);
         });
@@ -693,9 +712,8 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     //  count: 1 1 2 3 1 2 1 1 2
     auto sorted_begin = sorted_indices.data_ptr<int64_t>();
     auto count_begin = count.data_ptr<int64_t>();
-    oneapi::dpl::inclusive_scan_by_segment(policy, sorted_begin, sorted_begin + numel,
-                                  count_begin,
-                                  count_begin);
+    oneapi::dpl::inclusive_scan_by_segment(
+        policy, sorted_begin, sorted_begin + numel, count_begin, count_begin);
 
     // Take the maximum of each count per unique key in reverse:
     // sorted: 2 5 5 5 7 7 8 9 9
@@ -703,11 +721,13 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     auto revers_sorted_begin = std::make_reverse_iterator(sorted_begin + numel);
     auto revers_count_begin = std::make_reverse_iterator(count_begin + numel);
     oneapi::dpl::inclusive_scan_by_segment(
-        policy, revers_sorted_begin,
+        policy,
+        revers_sorted_begin,
         revers_sorted_begin + numel,
         revers_count_begin,
         revers_count_begin,
-        std::equal_to<int64_t>(), oneapi::dpl::maximum<int64_t>());
+        std::equal_to<int64_t>(),
+        oneapi::dpl::maximum<int64_t>());
   }
 
   return embedding_bag_backward_dpcpp_kernel(
@@ -761,7 +781,8 @@ void EmbeddingBag_accGradParametersKernel_max(
           if (word_idx >= 0) {
             // If bag is empty, we have max_indices[idx] set to -1 in forward.
             atomicAdd(
-              (dpcpp_global_ptr_pt<scalar_t>)&(gradWeight_ptr[word_idx * stride + featureDim]),
+                (dpcpp_global_ptr_pt<scalar_t>)&(
+                    gradWeight_ptr[word_idx * stride + featureDim]),
                 gradOutput_ptr[bag * stride + featureDim]);
           }
         }

@@ -1,16 +1,16 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#include <utils/DPCPP.h>
-#include <runtime/Utils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 
 #include <core/Memory.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include <oneDNN/oneDNN.h>
 #include <tensor/Context.h>
-#include <intrinsic/ipex_intrinsic.h>
 
 #include "Cat.h"
 
@@ -63,7 +63,7 @@ struct CatArrInputTensor {
   IndexType nElements;
 };
 
-template<typename IndexType, unsigned int MaxDims>
+template <typename IndexType, unsigned int MaxDims>
 struct OutputTensorSizeStride {
   IndexType outputSize[MaxDims];
   IndexType outputStride[MaxDims];
@@ -71,19 +71,19 @@ struct OutputTensorSizeStride {
 
 DPCPP_DEF_K2(CatArrayBatchKer, typename T, typename IndexType, int Dims);
 /**
-  * Kernel used to concatenated grimDim.y tensors into an output tensor. Uses a
-  * grid-stride loop based off of the blockIdx.x, threadIdx.x for each input to
-  * copy each element from each input tensor into the output.
-  *
-  * output: base pointer to the storage associated with the output tensor
-  * inputs: GPU-allocated array of input metadata for each input to concatenate
-  *         in the kernel
-  * os: the size/stride vectors for the output tensor
-  * concatDim: dimension along which we are concatenating
-  * dimStride: the stride of the output tensor at the concatDim
-  *
-  * The most important assumption made is that the input tensors are contiguous.
-  */
+ * Kernel used to concatenated grimDim.y tensors into an output tensor. Uses a
+ * grid-stride loop based off of the blockIdx.x, threadIdx.x for each input to
+ * copy each element from each input tensor into the output.
+ *
+ * output: base pointer to the storage associated with the output tensor
+ * inputs: GPU-allocated array of input metadata for each input to concatenate
+ *         in the kernel
+ * os: the size/stride vectors for the output tensor
+ * concatDim: dimension along which we are concatenating
+ * dimStride: the stride of the output tensor at the concatDim
+ *
+ * The most important assumption made is that the input tensors are contiguous.
+ */
 template <typename T, typename IndexType, int Dims>
 void CatArrayBatchedCopy(
     T* output,
@@ -92,13 +92,12 @@ void CatArrayBatchedCopy(
     const int concatDim,
     IndexType dimStride,
     int batchCounter) {
-
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
 
-  //Get grid where x dim fills half gpu and y dim is number of tensors.
-  //This will have cating two tensors fill the entire grid, but prevent
-  //many threads from needlessly load meta data if their sizes is small.
+  // Get grid where x dim fills half gpu and y dim is number of tensors.
+  // This will have cating two tensors fill the entire grid, but prevent
+  // many threads from needlessly load meta data if their sizes is small.
 
   auto numCU = dpcppMaxComputeUnitSize(dev_id);
   auto numWI = dpcppMaxWorkGroupSize(dev_id);
@@ -115,7 +114,8 @@ void CatArrayBatchedCopy(
 
       IndexType nElements = inputs[in].nElements;
 
-      if(tid >= nElements) return;
+      if (tid >= nElements)
+        return;
 
       T* data = inputs[in].input;
       IndexType offset = inputs[in].offset;
@@ -126,7 +126,7 @@ void CatArrayBatchedCopy(
 
       while (tid < nElements) {
         IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
-                      os.outputSize, os.outputStride, dimSize, concatDim, tid);
+            os.outputSize, os.outputStride, dimSize, concatDim, tid);
         output[dataOffset + elementOffset] = data[tid];
 
         tid += stride;
@@ -139,19 +139,22 @@ void CatArrayBatchedCopy(
 }
 
 template <typename scalar_t>
-void parallel_cat(Tensor &out, const TensorList &inputs,
-                  int64_t dimension, int nDims) {
+void parallel_cat(
+    Tensor& out,
+    const TensorList& inputs,
+    int64_t dimension,
+    int nDims) {
   // First, let's set up our kernel parameters. We start with a raw pointer to
   // the storage for the output Tensor.
-  scalar_t *data = out.data_ptr<scalar_t>();
+  scalar_t* data = out.data_ptr<scalar_t>();
 
   // Kernel Parameter
   long tensorMetadataSize =
-    sizeof(CatArrInputTensor<scalar_t, unsigned int>) * CAT_ARRAY_BATCH_SIZE;
-  auto d_inputs_storage = at::empty(
-    {tensorMetadataSize}, out.options().dtype(at::kByte));
-  auto d_inputs = static_cast<CatArrInputTensor<scalar_t, unsigned int> *>(
-    d_inputs_storage.data_ptr());
+      sizeof(CatArrInputTensor<scalar_t, unsigned int>) * CAT_ARRAY_BATCH_SIZE;
+  auto d_inputs_storage =
+      at::empty({tensorMetadataSize}, out.options().dtype(at::kByte));
+  auto d_inputs = static_cast<CatArrInputTensor<scalar_t, unsigned int>*>(
+      d_inputs_storage.data_ptr());
 
   OutputTensorSizeStride<unsigned int, CAT_ARRAY_MAX_INPUT_DIMS> param;
 
@@ -164,25 +167,25 @@ void parallel_cat(Tensor &out, const TensorList &inputs,
   // Now we loop
   int batchCounter = 0;
   int64_t offset = 0;
-  for (int i = 0; i < inputs.size() ; i += CAT_ARRAY_BATCH_SIZE) {
+  for (int i = 0; i < inputs.size(); i += CAT_ARRAY_BATCH_SIZE) {
     // Re-allocate stackInputs every iteration to avoid read-after-write hazard
     {
-      auto stackInputs_storage = at::empty({tensorMetadataSize},
+      auto stackInputs_storage = at::empty(
+          {tensorMetadataSize},
           out.options().dtype(at::kByte).device(at::kCPU));
       auto stackInputs =
-        static_cast<CatArrInputTensor<scalar_t, unsigned int> *>(
-          stackInputs_storage.data_ptr());
-      for (batchCounter = 0;
-           batchCounter < CAT_ARRAY_BATCH_SIZE &&
-             (i+batchCounter) < inputs.size();
+          static_cast<CatArrInputTensor<scalar_t, unsigned int>*>(
+              stackInputs_storage.data_ptr());
+      for (batchCounter = 0; batchCounter < CAT_ARRAY_BATCH_SIZE &&
+           (i + batchCounter) < inputs.size();
            ++batchCounter) {
-        int64_t dimSize = at::native::size(inputs[i+batchCounter], dimension);
+        int64_t dimSize = at::native::size(inputs[i + batchCounter], dimension);
 
         stackInputs[batchCounter].input =
-          inputs[i+batchCounter].data_ptr<scalar_t>();
+            inputs[i + batchCounter].data_ptr<scalar_t>();
         stackInputs[batchCounter].offset = offset;
         stackInputs[batchCounter].dimSize = dimSize;
-        stackInputs[batchCounter].nElements = inputs[i+batchCounter].numel();
+        stackInputs[batchCounter].nElements = inputs[i + batchCounter].numel();
 
         // update offset
         offset += dimSize;
@@ -190,10 +193,14 @@ void parallel_cat(Tensor &out, const TensorList &inputs,
       d_inputs_storage.copy_(stackInputs_storage);
     }
 
-#define HANDLE_CASE(DIMS) \
-    CatArrayBatchedCopy<scalar_t, unsigned int, DIMS>(\
-            data, d_inputs, param, dimension, param.outputStride[dimension],\
-            batchCounter);
+#define HANDLE_CASE(DIMS)                            \
+  CatArrayBatchedCopy<scalar_t, unsigned int, DIMS>( \
+      data,                                          \
+      d_inputs,                                      \
+      param,                                         \
+      dimension,                                     \
+      param.outputStride[dimension],                 \
+      batchCounter);
     switch (nDims) {
       case 1:
         HANDLE_CASE(1);
@@ -212,12 +219,16 @@ void parallel_cat(Tensor &out, const TensorList &inputs,
 }
 
 template <typename scalar_t>
-void single_parallel_cat(Tensor &out, const TensorList &inputs, int numInputs) {
+void single_parallel_cat(Tensor& out, const TensorList& inputs, int numInputs) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  scalar_t *output = out.data_ptr<scalar_t>();
+  scalar_t* output = out.data_ptr<scalar_t>();
   for (int i = 0; i < numInputs; ++i) {
-    scalar_t *input = inputs[i].data_ptr<scalar_t>();
-    dpcppMemcpy(output + static_cast<uint64_t>(i), input, 1 * sizeof(scalar_t), DeviceToDevice);
+    scalar_t* input = inputs[i].data_ptr<scalar_t>();
+    dpcppMemcpy(
+        output + static_cast<uint64_t>(i),
+        input,
+        1 * sizeof(scalar_t),
+        DeviceToDevice);
   }
 }
 
@@ -290,26 +301,26 @@ static void cat(
   }
   result.resize_(size);
 
-  const bool all32BitIndexable = std::all_of(inputs.begin(), inputs.end(),
-    [] (const Tensor& t) {
-      return xpu::dpcpp::detail::canUse32BitIndexMath(t);
-    });
-  const bool allContiguous = std::all_of(inputs.begin(), inputs.end(),
-    [](const Tensor& t) {
-      return !t.defined() || t.is_contiguous();
-    });
+  const bool all32BitIndexable =
+      std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
+        return xpu::dpcpp::detail::canUse32BitIndexMath(t);
+      });
+  const bool allContiguous =
+      std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
+        return !t.defined() || t.is_contiguous();
+      });
 
-  if (inputs.size() > 1 &&
-      !hasSkippedInput &&
+  if (inputs.size() > 1 && !hasSkippedInput &&
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
-      xpu::dpcpp::detail::canUse32BitIndexMath(result) &&
-      allContiguous &&
+      xpu::dpcpp::detail::canUse32BitIndexMath(result) && allContiguous &&
       all32BitIndexable) {
     IPEX_DISPATCH_ALL_TYPES_AND3(
-        at::ScalarType::Half, at::ScalarType::Bool, at::ScalarType::BFloat16,
-        result.scalar_type(), "cat_dpcpp", [&]() {
-      parallel_cat<scalar_t>(result, inputs, dimension, nDims);
-    });
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        at::ScalarType::BFloat16,
+        result.scalar_type(),
+        "cat_dpcpp",
+        [&]() { parallel_cat<scalar_t>(result, inputs, dimension, nDims); });
   } else {
     offset = 0;
     for (j = 0; j < numInputs; j++) {
@@ -323,30 +334,28 @@ static void cat(
   }
 }
 
-// For one-element tensors specific, like Bert, 394 tensors are all 1 element tensor and cat be cat together.
+// For one-element tensors specific, like Bert, 394 tensors are all 1 element
+// tensor and cat be cat together.
 static void single_cat(
     Tensor& result,
     TensorList inputs,
     int numInputs,
     int dimension) {
-
   std::vector<int64_t> size(1);
   size[0] = numInputs;
 
   result.resize_(size);
 
   IPEX_DISPATCH_ALL_TYPES_AND3(
-    at::ScalarType::Half, at::ScalarType::Bool, at::ScalarType::BFloat16,
-    result.scalar_type(), "simple_cat_dpcpp", [&]() {
-    single_parallel_cat<scalar_t>(result, inputs, numInputs);
-  });
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      result.scalar_type(),
+      "simple_cat_dpcpp",
+      [&]() { single_parallel_cat<scalar_t>(result, inputs, numInputs); });
 }
 
-void dnnl_cat(
-    Tensor& output,
-    TensorList inputs,
-    int numInputs,
-    int dimension) {
+void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
   int i, j;
   int64_t offset;
   bool hasSkippedInput = false;
@@ -354,7 +363,7 @@ void dnnl_cat(
   auto should_skip = [](const Tensor& t) {
     return !t.defined() && t.dim() == 1;
   };
-  
+
   int nDims = 0;
   for (i = 0; i < numInputs; i++) {
     if (should_skip(inputs[i])) {
@@ -377,12 +386,14 @@ void dnnl_cat(
   Tensor first_tensor = inputs[0];
   auto ft_ndim = first_tensor.ndimension();
   if (4 == ft_ndim || 5 == ft_ndim) {
-    first_tensor_is_channel_last = (4 == ft_ndim) ?
-                                   (!first_tensor.is_contiguous() && first_tensor.is_contiguous(at::MemoryFormat::ChannelsLast)) :
-                                   (!first_tensor.is_contiguous() && first_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d));
+    first_tensor_is_channel_last = (4 == ft_ndim)
+        ? (!first_tensor.is_contiguous() &&
+           first_tensor.is_contiguous(at::MemoryFormat::ChannelsLast))
+        : (!first_tensor.is_contiguous() &&
+           first_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d));
   }
 
-  std::vector<Tensor> cat_tensors; 
+  std::vector<Tensor> cat_tensors;
   int64_t cat_dim_size = 0;
   for (int i = 0; i < numInputs; i++) {
     Tensor tensor = inputs[i];
@@ -393,15 +404,16 @@ void dnnl_cat(
     cat_dim_size += tensor.size(dimension);
     auto ndim = tensor.ndimension();
     if (true == first_tensor_is_channel_last) {
-      //Now only support ndim == 4 or 5
+      // Now only support ndim == 4 or 5
       TORCH_CHECK(4 == ndim || 5 == ndim, "ndim must be 4 or 5");
-      Tensor cl_tensor = (4 == ndim) ? tensor.contiguous(at::MemoryFormat::ChannelsLast):
-                         tensor.contiguous(at::MemoryFormat::ChannelsLast3d);
+      Tensor cl_tensor = (4 == ndim)
+          ? tensor.contiguous(at::MemoryFormat::ChannelsLast)
+          : tensor.contiguous(at::MemoryFormat::ChannelsLast3d);
       cat_tensors.push_back(cl_tensor);
-    }
-    else {
-      //only support ndim == 1, 2, 3, 6 for nchw format
-      //if first tensor is plain format, convert all the following tensors to nchw format to algin pytorch behavior
+    } else {
+      // only support ndim == 1, 2, 3, 6 for nchw format
+      // if first tensor is plain format, convert all the following tensors to
+      // nchw format to algin pytorch behavior
       Tensor nchw_tensor = tensor.contiguous();
       cat_tensors.push_back(nchw_tensor);
     }
@@ -418,11 +430,13 @@ void dnnl_cat(
   memory::dims output_dims = size;
   output.resize_(size);
 
-  if (4 == ft_ndim && cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (4 == ft_ndim &&
+      cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast)) {
     output = output.contiguous(at::MemoryFormat::ChannelsLast);
   }
 
-  if (5 == ft_ndim && cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+  if (5 == ft_ndim &&
+      cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     output = output.contiguous(at::MemoryFormat::ChannelsLast3d);
   }
 
@@ -442,8 +456,9 @@ void dnnl_cat(
     auto ndim = cat_tensors[i].ndimension();
     bool is_channels_last = false;
     if (4 == ndim || 5 == ndim) {
-      is_channels_last = (4 == ndim) ? cat_tensors[i].is_contiguous(at::MemoryFormat::ChannelsLast):
-                         cat_tensors[i].is_contiguous(at::MemoryFormat::ChannelsLast3d);
+      is_channels_last = (4 == ndim)
+          ? cat_tensors[i].is_contiguous(at::MemoryFormat::ChannelsLast)
+          : cat_tensors[i].is_contiguous(at::MemoryFormat::ChannelsLast3d);
     }
     auto format_plain = get_dnnl_default_format(ndim, is_channels_last);
 
@@ -451,24 +466,25 @@ void dnnl_cat(
     if (!Settings::I().is_onednn_layout_enabled()) {
       tensor_md = memory::desc({input_tz}, data_t, format_plain);
     } else {
-      auto input_ctx =
-          at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(cat_tensors[i]);
-      tensor_md = input_ctx.is_plain() ?
-          memory::desc({input_tz}, data_t, format_plain) :
-          input_ctx.meta();
+      auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(
+          cat_tensors[i]);
+      tensor_md = input_ctx.is_plain()
+          ? memory::desc({input_tz}, data_t, format_plain)
+          : input_ctx.meta();
     }
     cat_tensors_md.push_back(tensor_md);
 
-    auto input_usr_memory = dpcpp_onednn_memory(
-        tensor_md, engine, cat_tensors[i].data_ptr());
+    auto input_usr_memory =
+        dpcpp_onednn_memory(tensor_md, engine, cat_tensors[i].data_ptr());
     cat_tensors_mem.push_back(input_usr_memory);
   }
 
   auto data_t = get_onednn_dtype(cat_tensors[0]);
   bool ft_is_channels_last = false;
   if (4 == ft_ndim || 5 == ft_ndim) {
-    ft_is_channels_last = (4 == ft_ndim) ? cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast):
-                          cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast3d);
+    ft_is_channels_last = (4 == ft_ndim)
+        ? cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast)
+        : cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast3d);
   }
   auto format_plain = get_dnnl_default_format(ft_ndim, ft_is_channels_last);
   auto output_md = memory::desc(output_dims, data_t, format_plain);
@@ -480,22 +496,22 @@ void dnnl_cat(
   create_key(key, output_dims, static_cast<int>(dimension), cat_tensors_md);
 #endif
 
-  //Tensor output;
+  // Tensor output;
   memory output_usr_memory;
   if (!Settings::I().is_onednn_layout_enabled()) {
-    output_usr_memory = dpcpp_onednn_memory(
-        output_md, engine, output.data_ptr());
+    output_usr_memory =
+        dpcpp_onednn_memory(output_md, engine, output.data_ptr());
   } else {
     auto expected_output_md = concat_pd.dst_desc();
     if (output_md != expected_output_md) {
       // reallocate memory for some blk fmt
       output = at::AtenIpexTypeXPU::empty_opaque_tensor(
           expected_output_md, cat_tensors[0].options(), c10::nullopt);
-      output_usr_memory = dpcpp_onednn_memory(
-          expected_output_md, engine, output.data_ptr());
+      output_usr_memory =
+          dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
-      output_usr_memory = dpcpp_onednn_memory(
-          output_md, engine, output.data_ptr());
+      output_usr_memory =
+          dpcpp_onednn_memory(output_md, engine, output.data_ptr());
     }
   }
 
@@ -524,7 +540,7 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   for (int i = 0; i < tensors.size(); i++) {
     Tensor tensor = tensors[i];
     if (tensor.defined()) {
-      if (tensor.scalar_type() == ScalarType::Double || 
+      if (tensor.scalar_type() == ScalarType::Double ||
           tensor.scalar_type() == ScalarType::Long) {
         skip_dnnl_cat = true;
       }
@@ -532,7 +548,8 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
     }
   }
 
-  // If tensors in TensorList are all one-element tensor, single_cat is called to cat them together by queue.memcpy.
+  // If tensors in TensorList are all one-element tensor, single_cat is called
+  // to cat them together by queue.memcpy.
   // TODO: Laterly it can be extended: one-dim tensor can be cat together.
   bool use_single_cat = true;
   for (int i = 0; i < tensors.size(); i++) {

@@ -2,11 +2,11 @@
 
 #include <ATen/TensorUtils.h>
 
-#include <utils/Helpers.h>
-#include <runtime/Utils.h>
 #include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <runtime/Utils.h>
+#include <utils/Helpers.h>
 
 #include <math.h>
 
@@ -150,7 +150,7 @@ struct ApplyOp1 {
   inline static void apply(
       const TensorInfo<scalar, IndexType>& a,
       const Op& op,
-      void *a_pointer,
+      void* a_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets) {
@@ -184,11 +184,11 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
   inline static void apply(
       const TensorInfo<scalar, IndexType>& a,
       const Op& op,
-      void *a_pointer,
+      void* a_pointer,
       int n,
       IndexType linearIndex,
       Offset aOffset) {
-    auto a_ptr = (scalar *)a_pointer;
+    auto a_ptr = (scalar*)a_pointer;
     op(a_ptr[aOffset]);
   }
 };
@@ -205,11 +205,11 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   inline static void apply(
       const TensorInfo<scalar, IndexType>& a,
       const Op& op,
-      void *a_pointer,
+      void* a_pointer,
       int n,
       IndexType linearIndex,
       Offset aOffset) {
-    auto a_ptr = (scalar *)a_pointer;
+    auto a_ptr = (scalar*)a_pointer;
     op(a_ptr[aOffset], (int64_t)linearIndex);
   }
 };
@@ -225,11 +225,11 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
   inline static void apply(
       const TensorInfo<scalar, IndexType>& a,
       const Op& op,
-      void *a_pointer,
+      void* a_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets) {
-    auto a_ptr = (scalar *)a_pointer;
+    auto a_ptr = (scalar*)a_pointer;
     op(n, a_ptr[aOffsets]...);
   }
 };
@@ -250,7 +250,7 @@ void kernelPointwiseApply1(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    void *a_pointer = a.data;
+    void* a_pointer = a.data;
     cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims, step>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
@@ -287,8 +287,8 @@ struct ApplyOp2 {
       const TensorInfo<scalar1, IndexType>& a,
       const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
+      void* a_pointer,
+      void* b_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -351,14 +351,14 @@ struct ApplyOp2<
       const TensorInfo<scalar1, IndexType>& a,
       const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
+      void* a_pointer,
+      void* b_pointer,
       int n,
       IndexType linearIndex,
       Offset aOffset,
       Offset bOffset) {
-    auto a_ptr = (scalar1 *)a_pointer;
-    auto b_ptr = (scalar2 *)b_pointer;
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
     op(a_ptr[aOffset], b_ptr[bOffset]);
   }
 };
@@ -387,14 +387,14 @@ struct ApplyOp2<
       const TensorInfo<scalar1, IndexType>& a,
       const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
+      void* a_pointer,
+      void* b_pointer,
       int n,
       IndexType linearIndex,
       Offset aOffset,
       Offset bOffset) {
-    auto a_ptr = (scalar1 *)a_pointer;
-    auto b_ptr = (scalar2 *)b_pointer;
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
     op(a_ptr[aOffset], b_ptr[bOffset], (int64_t)linearIndex);
   }
 };
@@ -422,14 +422,14 @@ struct ApplyOp2<
       const TensorInfo<scalar1, IndexType>& a,
       const TensorInfo<scalar2, IndexType>& b,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
+      void* a_pointer,
+      void* b_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
       Offsets... bOffsets) {
-    auto a_ptr = (scalar1 *)a_pointer;
-    auto b_ptr = (scalar2 *)b_pointer;
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
     op(n, a_ptr[aOffsets]..., b_ptr[bOffsets]...);
   }
 };
@@ -454,8 +454,8 @@ void kernelPointwiseApply2(
 
   // 1. Initialize temp buffer
   auto cgf = DPCPP_Q_CGF(cgh) {
-    void *in_ptr = input.data;
-    void *out_ptr = output.data;
+    void* in_ptr = input.data;
+    void* out_ptr = output.data;
     cgh.parallel_for<
         PointwiseApply2<Op, scalar1, scalar2, IndexType, ADims, BDims, step>>(
         DPCPP::nd_range<1>(
@@ -507,9 +507,9 @@ struct ApplyOp3 {
       const TensorInfo<scalar2, IndexType>& b,
       const TensorInfo<scalar3, IndexType>& c,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
-      void *c_pointer,
+      void* a_pointer,
+      void* b_pointer,
+      void* c_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -589,9 +589,9 @@ struct ApplyOp3<
       const TensorInfo<scalar2, IndexType>& b,
       const TensorInfo<scalar3, IndexType>& c,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
-      void *c_pointer,
+      void* a_pointer,
+      void* b_pointer,
+      void* c_pointer,
       int n,
       IndexType linearIndex,
       Offset aOffset,
@@ -630,9 +630,9 @@ struct ApplyOp3<
       const TensorInfo<scalar2, IndexType>& b,
       const TensorInfo<scalar3, IndexType>& c,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
-      void *c_pointer,
+      void* a_pointer,
+      void* b_pointer,
+      void* c_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -666,9 +666,9 @@ void kernelPointwiseApply3(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    void *in1_ptr = input1.data;
-    void *in2_ptr = input2.data;
-    void *out_ptr = output.data;
+    void* in1_ptr = input1.data;
+    void* in2_ptr = input2.data;
+    void* out_ptr = output.data;
     cgh.parallel_for<PointwiseApply3<
         Op,
         scalar1,
@@ -734,10 +734,10 @@ struct ApplyOp4 {
       const TensorInfo<scalar3, IndexType>& c,
       const TensorInfo<scalar3, IndexType>& d,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
-      void *c_pointer,
-      void *d_pointer,
+      void* a_pointer,
+      void* b_pointer,
+      void* c_pointer,
+      void* d_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -829,10 +829,10 @@ struct ApplyOp4<
       const TensorInfo<scalar3, IndexType>& c,
       const TensorInfo<scalar3, IndexType>& d,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
-      void *c_pointer,
-      void *d_pointer,
+      void* a_pointer,
+      void* b_pointer,
+      void* c_pointer,
+      void* d_pointer,
       int n,
       IndexType linearIndex,
       Offset aOffset,
@@ -878,10 +878,10 @@ struct ApplyOp4<
       const TensorInfo<scalar3, IndexType>& c,
       const TensorInfo<scalar3, IndexType>& d,
       const Op& op,
-      void *a_pointer,
-      void *b_pointer,
-      void *c_pointer,
-      void *d_pointer,
+      void* a_pointer,
+      void* b_pointer,
+      void* c_pointer,
+      void* d_pointer,
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -938,10 +938,10 @@ void kernelPointwiseApply4(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    void *in1_ptr = input1.data;
-    void *in2_ptr = input2.data;
-    void *in3_ptr = input3.data;
-    void *out_ptr = output.data;
+    void* in1_ptr = input1.data;
+    void* in2_ptr = input2.data;
+    void* in3_ptr = input3.data;
+    void* out_ptr = output.data;
     cgh.parallel_for<PointwiseApply4<
         Op,
         scalar1,
@@ -1062,8 +1062,7 @@ inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
     aInfo.collapseDims();
     HANDLE_A_CASE(unsigned int, aInfo.dims);
   } else {
-    TensorInfo<scalar, uint64_t> aInfo =
-        getTensorInfo<scalar, uint64_t>(a);
+    TensorInfo<scalar, uint64_t> aInfo = getTensorInfo<scalar, uint64_t>(a);
     rearrangeDims(&aInfo);
     aInfo.collapseDims();
 
@@ -1095,10 +1094,10 @@ template <
     typename Op,
     bool with_offset = false>
 inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
-  if(src.is_quantized())
-      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::QuantizedXPU);
+  if (src.is_quantized())
+    checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::QuantizedXPU);
   else
-      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::XPU);
+    checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::XPU);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(
@@ -1485,8 +1484,7 @@ inline void DPCPP_tensor_apply4(
   }
 
   if (canUse32BitIndexMath(dst) && canUse32BitIndexMath(src1) &&
-      canUse32BitIndexMath(src2) &&
-      canUse32BitIndexMath(src3)) {
+      canUse32BitIndexMath(src2) && canUse32BitIndexMath(src3)) {
     TensorInfo<scalar1, unsigned int> dstInfo =
         getTensorInfo<scalar1, unsigned int>(dst);
 
