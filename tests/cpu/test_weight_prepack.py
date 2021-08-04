@@ -294,7 +294,7 @@ class TestPrepackCases(TestCase):
                     loss2.backward()
                     ipex_optimizer2.step()
             self.assertEqual(y, y1)
-            self.assertEqual(y1, y2, rtol=1e-5, atol=1e-3)
+            self.assertEqual(y1, y2, rtol=1e-4, atol=1e-3)
             self.assertEqual(loss, loss1)
             self.assertEqual(loss1, loss2, rtol=1e-5, atol=1e-3)
 
