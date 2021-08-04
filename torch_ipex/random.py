@@ -84,7 +84,7 @@ def manual_seed(seed: int) -> None:
         to get determinism.  To seed all GPUs, use :func:`manual_seed_all`.
     """
     seed = int(seed)
-    
+
     idx = current_device()
     default_generator = torch.xpu.default_generators[idx]
     default_generator.manual_seed(seed)
@@ -146,4 +146,3 @@ def initial_seed() -> int:
     idx = current_device()
     default_generator = torch.xpu.default_generators[idx]
     return default_generator.initial_seed()
-

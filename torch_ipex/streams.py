@@ -73,4 +73,3 @@ class Event(torch_ipex._C._XPUEventBase):
             return '<torch.xpu.Event {0:#x}>'.format(self._as_parameter_.value)
         else:
             return '<torch.xpu.Event uninitialized>'
-

@@ -332,4 +332,3 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
     for k, v in stats.items():
         fmt_dict[k.replace(".", "-")] = v
     return "|" + "|\n|".join(lines).format(**fmt_dict) + "|\n"
-

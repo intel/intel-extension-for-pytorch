@@ -78,7 +78,7 @@ def _get_env_backend():
 
 def get_git_head_sha(base_dir):
     ipex_git_sha = subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'], cwd=base_dir).decode('ascii').strip()[:7]
+        ['git', 'rev-parse', 'HEAD'], cwd=base_dir).decode('ascii').strip()[:7]
     torch_version, torch_git_sha = torch.__version__.split("+")
     return ipex_git_sha, torch_version, torch_git_sha
 
@@ -195,7 +195,7 @@ class DPCPPBuild(BuildExtension, object):
                     return final_str
                 try:
                     return converttostr(paths, ";")
-                except:
+                except BaseException:
                     return paths
 
             def defines(args, **kwargs):
@@ -222,7 +222,6 @@ class DPCPPBuild(BuildExtension, object):
                 'CMAKE_PROJECT_VERSION': version,
                 'PYTHON_EXECUTABLE': sys.executable,
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
-                'PYTHON_EXECUTABLE': sys.executable,
                 'LIB_NAME': ext.name,
             }
 
@@ -286,9 +285,10 @@ def get_c_module():
     ]
 
     def make_relative_rpath(path):
-            return '-Wl,-rpath,$ORIGIN/' + path
+        return '-Wl,-rpath,$ORIGIN/' + path
 
-    include_dirs=include_paths()
+    include_dirs = include_paths()
+
     try:
         import pybind11
     except ImportError as e:
@@ -296,14 +296,15 @@ def get_c_module():
     else:
         include_dirs.append(pybind11.get_include())
 
-    C_ext = CppExtension("torch_ipex._C",
-                  libraries=main_libraries,
-                  sources=main_sources,
-                  language='c',
-                  extra_compile_args=main_compile_args + extra_compile_args,
-                  include_dirs=include_dirs,
-                  library_dirs=library_dirs,
-                  extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+    C_ext = CppExtension(
+        "torch_ipex._C",
+        libraries=main_libraries,
+        sources=main_sources,
+        language='c',
+        extra_compile_args=main_compile_args + extra_compile_args,
+        include_dirs=include_dirs,
+        library_dirs=library_dirs,
+        extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
     return C_ext
 
 
@@ -319,7 +320,7 @@ setup(
     # Exclude the build files.
     packages=['torch_ipex', 'torch_ipex.optim'],
     package_data={
-        'torch_ipex':[
+        'torch_ipex': [
             'README.md',
             'requirements.txt',
             '*.py',
@@ -327,7 +328,7 @@ setup(
             'include/*.h',
             'include/core/*.h',
             'include/utils/*.h']
-        },
+    },
     long_description=long_description,
     long_description_content_type='test/markdown',
     zip_safe=False,

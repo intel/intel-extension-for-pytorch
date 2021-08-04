@@ -9,7 +9,7 @@ from torch.nn import Parameter
 from torch.nn import init
 from torch.optim.optimizer import Optimizer, required
 from torch import device as _device
-from ._utils import _get_device_index #, _dummy_type
+from ._utils import _get_device_index  # , _dummy_type
 from typing import List, Optional, Tuple, Union
 from . import _C
 from .version import __version__, __ipex_gitrev__
@@ -133,7 +133,7 @@ class SplitSGD(Optimizer):
                     param_state = self.state[p]
                     if 'bottom_half' not in param_state:
                         b_d = param_state['bottom_half'] = torch.zeros_like(
-                                p.data, dtype=torch.bfloat16, device=p.device)
+                            p.data, dtype=torch.bfloat16, device=p.device)
                     else:
                         b_d = param_state['bottom_half']
 
@@ -184,7 +184,7 @@ class FusionSGD(Optimizer):
             weight_decay = group['weight_decay']
             momentum = group['momentum']
             dampening = group['dampening']
-            
+
             for p in group['params']:
                 if p.grad is None:
                     continue
@@ -574,4 +574,3 @@ torch.runtime.register_runtime('xpu', current_module)
 
 
 _C._postInitExtension()
-
