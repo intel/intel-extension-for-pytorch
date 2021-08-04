@@ -63,6 +63,8 @@ class LlgaGraphHelper {
  private:
   size_t countSupportedOps(const std::shared_ptr<Graph>& graph) const;
 
+  bool isSingleQuantDequant(Node *node);
+
   OpPartitionMap opToOwningPartition_;
   std::vector<dnnl::graph::partition> partitions_;
 };

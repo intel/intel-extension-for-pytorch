@@ -488,12 +488,56 @@ bool isViewOp(Node* n) {
   return false;
 }
 
+void checkAndRemoveAttr(Node *n, std::string attr) {
+  TORCH_CHECK(n->hasAttributeS(attr),
+              "dequant node with numAttributes != 0 must have attr: ", attr);
+  n->removeAttributeS(attr);
+}
+
+void removeAttrOfDequant(Node *n) {
+  if (n->kind() == Symbol::aten("dequantize")) {
+    if (n->numAttributes() == 0)
+      return;
+    std::vector<std::string> common_attrs{"zps", "scales", "in_type"};
+    for (const auto &attr : common_attrs) {
+      checkAndRemoveAttr(n, attr);
+    }
+
+    if (n->s(Symbol::attr("qtype")) == std::string("per_channel")) {
+      checkAndRemoveAttr(n, std::string("axis"));
+    }
+    checkAndRemoveAttr(n, std::string("qtype"));
+  }
+}
+
+bool LlgaGraphHelper::isSingleQuantDequant(Node *n) {
+  if (n->kind() != Symbol::aten("quantize_per_tensor") &&
+      n->kind() != Symbol::aten("quantize_per_channel") &&
+      n->kind() != Symbol::aten("dequantize"))
+    return false;
+  if (!opToOwningPartition_.has(n))
+    return false;
+
+  auto partitionId = opToOwningPartition_.get(n);
+  auto OpNum = partitions_[partitionId].get_ops_num();
+  return OpNum == 1;
+}
+
 bool LlgaGraphHelper::shouldConsiderForMerge(Node* node) {
   // if we're already in the process of merging
   if (isLlgaSubgraph(node)) {
     return true;
   }
   if (isViewOp(node)) {
+    return false;
+  }
+  // For a partition composed of 1 single quant or 1 single dequant,
+  // do not rewrite it in the bridge, so that the FWK may have chances
+  // to optimize single int8 op that LLGA does not support
+  if (isSingleQuantDequant(node)) {
+    // We have added attr on dequant node to create LLGA dequant op.
+    // If we won't rewrite it with LLGA op, remove the attr here.
+    removeAttrOfDequant(node);
     return false;
   }
   return opToOwningPartition_.has(node);
