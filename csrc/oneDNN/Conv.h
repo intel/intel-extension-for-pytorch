@@ -175,6 +175,10 @@ static at::Tensor convolution(
   auto bia_data_t = memory::data_type::f32;
   auto usr_bia_data_t = memory::data_type::f32;
 
+  if (bia.defined()) {
+    bia_data_t = get_onednn_dtype(bia);
+  }
+ 
   // master wgh
   if (src_data_t == memory::data_type::bf16) {
     wei_data_t = memory::data_type::bf16;
