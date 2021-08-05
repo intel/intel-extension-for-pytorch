@@ -7,6 +7,8 @@
 #include "jit/codegen/onednn/layout_propagation.h"
 #include "jit/codegen/onednn/prepare_binary.h"
 #include "jit/codegen/onednn/prepare_dequant.h"
+#include "jit/codegen/onednn/quantization_patterns.h"
+
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/common_subexpression_elimination.h>
 #include <torch/csrc/jit/passes/decompose_ops.h>
@@ -76,8 +78,10 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
                g);
     RemoveTensorTypeSpecializations(g);
     GRAPH_DUMP(
-        "After RemoveTensorTypeSpecializations. End of LLGA optimization pass",
+        "After RemoveTensorTypeSpecializations. Before IPEX optimization pass",
         g);
+    IpexQuantFusion(g);
+    GRAPH_DUMP("After IpexQuantFusion. End of IPEX optimization pass", g);
   }
 }
 

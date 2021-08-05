@@ -242,5 +242,16 @@ lstm_aten(const at::Tensor &_input, at::TensorList hx, at::TensorList _params,
   return at::lstm(_input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
 }
 
+at::Tensor flatten(const at::Tensor &input, int64_t start_dim,
+                   int64_t end_dim) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::flatten(input, start_dim, end_dim);
+  }
+  // Fall Through.
+  return at::flatten(input, start_dim, end_dim);
+}
+
 } // autocast
 } // torch_ipex

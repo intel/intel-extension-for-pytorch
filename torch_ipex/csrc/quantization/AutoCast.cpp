@@ -757,6 +757,56 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
   return std::make_tuple(output, hy, cy);
 }
 
+at::Tensor flatten(const at::Tensor &input, int64_t start_dim,
+                   int64_t end_dim) {
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (check_int8_calibration()) {
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "flatten." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+
+    auto output = at::flatten(input, start_dim, end_dim);
+    std::string op_output = "flatten." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(
+        output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer({input}, {output}, "flatten", op_id,
+                                          op_inputs, op_outputs);
+    return output;
+  }
+
+  auto qparams = torch_ipex::get_int8_scales(op_id);
+  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
+  std::tie(input_quantized_dtypes, output_quantized_dtypes) =
+      torch_ipex::get_int8_quantized_dtypes(op_id);
+  std::vector<bool> inputs_quantized, outputs_quantized;
+  std::tie(inputs_quantized, outputs_quantized) =
+      torch_ipex::get_int8_insert_quantized_status(op_id);
+  auto flatten_x = input;
+  if (inputs_quantized[0]) {
+    // add quantize and dequantize for input.
+    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
+                                           qparams[0][0].zero_point,
+                                           input_quantized_dtypes[0]);
+    flatten_x = input_q.dequantize();
+  }
+  auto output = at::flatten(flatten_x, start_dim, end_dim);
+  // add quantize and dequantize output.
+  if (outputs_quantized[0]) {
+    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
+                                            qparams[1][0].zero_point,
+                                            output_quantized_dtypes[0]);
+    return output_q.dequantize();
+  }
+  return output;
+}
+
 } // namespace autocast
 } // namespace cpu
 } // namespace torch_ipex

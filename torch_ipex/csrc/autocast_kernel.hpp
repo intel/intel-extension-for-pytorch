@@ -54,5 +54,7 @@ lstm_aten(const at::Tensor &_input, at::TensorList hx, at::TensorList _params,
           bool has_biases, int64_t num_layers, double dropout_p, bool train,
           bool bidirectional, bool batch_first);
 
+at::Tensor flatten(const at::Tensor &input, int64_t start_dim, int64_t end_dim);
+
 } // autocast
 } // torch_ipex

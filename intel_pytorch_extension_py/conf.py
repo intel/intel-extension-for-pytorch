@@ -42,6 +42,7 @@ class AmpConf(object):
     def get_default_recipe(self, configures):
         elt_wise = ['relu', 'sigmoid', 'gelu']
         inplace_ops = ['relu_', 'add_']
+        shape_ops = ['flatten']
         # get default recipe,
         # q+dq+conv+q+dq+relu => q+dq+conv+relu
         # q+dq+op1+q+dq+q+dq+op2+q+dq => q+dq+op1+q+dq+op2+q+dq
@@ -75,6 +76,19 @@ class AmpConf(object):
                                 default_configures[cur_id]['inputs_quantized'][i_num] = False
                             if cur_op == 'add':
                                 pre_ops[i_num] = pre_op
+                            if cur_op in shape_ops:
+                                # for pooling case, the input and output always has same scale and zero point,
+                                # if the pooling's post ops is flatten, need sync flatten's input and output's
+                                # scale and zero point to pooling.
+                                if pre_op in ['max_pool2d', 'adaptive_avg_pool2d']:
+                                    default_configures[cur_id]['input_scales'][i_num] = default_configures[pre_id]['output_scales'][o_num]
+                                    default_configures[cur_id]['input_zero_points'][i_num] = default_configures[pre_id]['output_zero_points'][o_num]
+                                    default_configures[cur_id]['output_scales'][i_num] = default_configures[pre_id]['output_scales'][o_num]
+                                    default_configures[cur_id]['output_zero_points'][i_num] = default_configures[pre_id]['output_zero_points'][o_num]
+                            if pre_op in shape_ops:
+                                # if pre op is flatten, sync the input's scale and zero point to flatten.
+                                default_configures[cur_id]['input_scales'][i_num] = default_configures[pre_id]['output_scales'][o_num]
+                                default_configures[cur_id]['input_zero_points'][i_num] = default_configures[pre_id]['output_zero_points'][o_num]
             # conv            op        conv         op
             #    \            /          \           /
             #     q          q            \         q
@@ -98,10 +112,17 @@ class AmpConf(object):
         # post process for add, linear, if cur op hasn't post quantized op, i.e. 'outputs_quantized' is True,
         # for good perfromance, the default recipe:
         # int8_input -> op -> q -> dq will converted to int8_input -> op.
-        post_process_ops = ['add', 'linear', 'conv2d']
+        ops_remove_q_dq_after = ['add', 'linear', 'conv2d']
+        # post process for flatten, if flatten's pre-pop and post op are fp32 op, don't need add q and dq
+        # before and after it.
+        ops_remove_q_dq_before_after = ['flatten']
         for cur_id in range(num_ops):
             cur_op = default_configures[cur_id]['name']
-            if cur_op in post_process_ops and default_configures[cur_id]['outputs_quantized'][0]:
+            if cur_op in ops_remove_q_dq_after and default_configures[cur_id]['outputs_quantized'][0]:
+                default_configures[cur_id]['outputs_quantized'][0] = False
+            if cur_op in ops_remove_q_dq_before_after and default_configures[cur_id]['inputs_quantized'][0] \
+                    and default_configures[cur_id]['outputs_quantized'][0]:
+                default_configures[cur_id]['inputs_quantized'][0] = False
                 default_configures[cur_id]['outputs_quantized'][0] = False
 
         return default_configures

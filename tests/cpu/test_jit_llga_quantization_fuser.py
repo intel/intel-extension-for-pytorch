@@ -1,11 +1,9 @@
 import unittest
 import itertools
-from functools import wraps
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_test_env
 from torch.testing._internal.common_utils import TEST_SCIPY
 
 import intel_pytorch_extension as ipex
@@ -26,21 +24,6 @@ def get_eltwise_fn(name):
         return getattr(F, name)
     else:
         raise NameError('Eltwise function %s not found' % name)
-
-# For LLGA UT, disable the PyTorch profiling executor and the IPEX JIT opt
-def llga_test_env(func):
-    @wraps(func)
-    def wrapTheFunction(*args):
-        # make sure that the profiling mode is turned on
-        torch._C._jit_set_profiling_mode(True)
-        torch._C._jit_set_profiling_executor(True)
-        
-        ipex.core._jit_set_llga_enabled(True)
-        ipex.core.disable_jit_opt()
-        func(*args)
-        ipex.core.enable_jit_opt()
-        ipex.core._jit_set_llga_enabled(False)
-    return wrapTheFunction
 
 class TestOp(JitLlgaTestCase):
     @llga_test_env
@@ -161,25 +144,6 @@ class TestOp(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
                 self.assertFused(graph, ['aten::max_pool2d'])
                 self.checkPatterns(graph, patterns)
-
-    @llga_test_env
-    @unittest.skipIf(True, 'int8 adaptive_avg_pool2d is not supported in the backend')
-    def test_adaptive_avg_pool2d(self):
-        m = nn.AdaptiveAvgPool2d((1, 1))
-        N = torch.randint(3, 10, (1,)).item()
-        C = torch.randint(3, 10, (1,)).item()
-        x = torch.randn(N, C, 224, 224, dtype=torch.float32) * 100
-
-        patterns = [
-            ["aten::quantize_per_tensor"],
-            ["aten::dequantize", "aten::adaptive_avg_pool2d", "aten::quantize_per_tensor"],
-            ["aten::dequantize"]
-        ]
-        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, [x], atol=1e-1, config_name="adaptive_avg_pool2d", qscheme=qscheme)
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
-            self.assertFused(graph, ['aten::adaptive_avg_pool2d', 'aten::quantize_per_tensor', 'aten::dequantize'])
-            self.checkPatterns(graph, patterns)
 
 class TestFusionPattern(JitLlgaTestCase):
     @llga_test_env
@@ -408,7 +372,7 @@ class TestShapeFallback(JitLlgaTestCase):
                 new_x_shape = x.size()[:-1] + (3, 5)
                 x = x.view(*new_x_shape)
                 return x.permute(0, 2, 1, 3)
-        
+
         x = torch.randn(5, 10, 15)
         m = M()
 
@@ -434,7 +398,7 @@ class TestShapeFallback(JitLlgaTestCase):
                 x = self.conv1(x)
                 x = self.conv2(x).reshape(x.size(0), 4, -1)
                 return x
-        
+
         x = torch.randn(15, 4, 28, 28)
         # change the size of the input, check the fallback
         x_var = torch.randn(7, 4, 16, 16)

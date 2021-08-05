@@ -772,6 +772,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
          TORCH_FN((&torch_ipex::autocast::gelu)));
   m.impl(TORCH_SELECTIVE_NAME("aten::lstm.input"),
          TORCH_FN((&torch_ipex::autocast::lstm_aten)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::flatten.using_ints"),
+         TORCH_FN((&torch_ipex::autocast::flatten)));
 }
 
 } // namespace autocast
