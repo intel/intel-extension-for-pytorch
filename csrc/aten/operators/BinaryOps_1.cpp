@@ -186,11 +186,30 @@ Tensor& add_out(
 }
 
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
-  // find a correct output shape by TensorIterator
-  Tensor result;
-  auto _iter = TensorIterator::binary_op(result, _self, _other);
-  result = _iter.output();
-  return at::AtenIpexTypeXPU::add_out(result, _self, _other, alpha);
+  Tensor result, self, other;
+  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_self) &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
+      _self.dim() > 0 && _other.dim() > 0 &&
+      _self.dim() == _other.dim() &&
+      _self.is_contiguous() && _other.is_contiguous() &&
+      !(DPCPPTensorContext::is_plain(_self) &&
+        !DPCPPTensorContext::is_plain(_other) &&
+        _self.sizes() != _other.sizes()) &&
+      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
+      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
+    xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
+    return result;
+  } else {
+    self = to_plain_if_needed(_self);
+    other = to_plain_if_needed(_other);
+  }
+
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::alpha_check(iter, alpha);
+  impl::add_kernel_dpcpp(iter, alpha);
+  return iter.output();
 }
 
 Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
