@@ -280,7 +280,7 @@ Tensor host_softmax_backward(
     const Tensor& output_,
     int64_t dim_,
     bool half_to_float) {
-  RECORD_FUNCTION("host_softmax_backward", {});
+  RECORD_FUNCTION("host_softmax_backward", std::vector<c10::IValue>({grad_, output_}));
   AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
@@ -529,17 +529,18 @@ Tensor _softmax_backward_data(
         "softmax backward with half to float "
         "conversion is not supported on DPCPP");
   }
-  if ((input.scalar_type() == at::ScalarType::Float ||
+  // Skip oneDNN kernel due to its bad performance. 
+  /*if ((input.scalar_type() == at::ScalarType::Float ||
       input.scalar_type() == at::ScalarType::BFloat16) &&
       grad.is_contiguous() && output.is_contiguous()) {
     return _softmax_backward_onednn(grad, output, dim, half_to_float);
-  } else {
-    // oneDNN does not support this type. Use native kernel instead.
+  } else {*/
+    // Use native kernel instead.
     Tensor tmp = grad * output;
     return host_softmax_backward<impl::SoftMaxBackwardEpilogue>(
       tmp, output, dim, half_to_float);
 
-  }
+  //}
 }
 
 Tensor _log_softmax(const Tensor& self, int64_t dim, bool half_to_float) {
