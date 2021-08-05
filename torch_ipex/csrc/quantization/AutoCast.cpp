@@ -7,6 +7,7 @@
 #include "Common.hpp"
 #include "Config.hpp"
 #include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/cpu/ExtendOPs.h"
 
 namespace torch_ipex {
 namespace autocast {
@@ -797,6 +798,120 @@ at::Tensor flatten(const at::Tensor &input, int64_t start_dim,
     flatten_x = input_q.dequantize();
   }
   auto output = at::flatten(flatten_x, start_dim, end_dim);
+  // add quantize and dequantize output.
+  if (outputs_quantized[0]) {
+    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
+                                            qparams[1][0].zero_point,
+                                            output_quantized_dtypes[0]);
+    return output_q.dequantize();
+  }
+  return output;
+}
+
+at::Tensor embedding_bag(const at::Tensor &weight, const at::Tensor &indices,
+                         const at::Tensor &offsets, bool sparse,
+                         bool include_last_offset) {
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::embedding_bag", "")
+                       .typed<decltype(embedding_bag)>();
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (torch_ipex::check_int8_calibration()) {
+    std::vector<std::string> op_outputs;
+    auto output =
+        op.call(weight, indices, offsets, sparse, include_last_offset);
+    std::string op_output =
+        "embedding_bag." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(
+        output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer(/*inputs=*/{}, {output}, {weight},
+                                          "embedding_bag", op_id,
+                                          /*op_inputs*/ {}, op_outputs);
+    return output;
+  }
+
+  auto qparams = torch_ipex::get_int8_scales(op_id);
+  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
+  std::tie(input_quantized_dtypes, output_quantized_dtypes) =
+      torch_ipex::get_int8_quantized_dtypes(op_id);
+  std::vector<bool> inputs_quantized, outputs_quantized;
+  std::tie(inputs_quantized, outputs_quantized) =
+      torch_ipex::get_int8_insert_quantized_status(op_id);
+  auto emb_w = weight;
+  std::vector<float> w_scale;
+
+  // For now embeddingbag will always quantized.
+  // Input is "Long" type will not be quantzied, if next op support int8. Output
+  // will not be quantized by default recipe.
+  // TODO: How to indicate whether quantize embeddingbag ?
+  TORCH_CHECK(torch_ipex::get_int8_weight_granularity(op_id) == "per_tensor");
+  w_scale = torch_ipex::get_int8_weight_scale(op_id);
+  auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
+  emb_w = weight_q.dequantize();
+
+  auto output = op.call(emb_w, indices, offsets, sparse, include_last_offset);
+  // add quantize and dequantize output.
+  if (outputs_quantized[0]) {
+    auto output_q = at::quantize_per_tensor(output, w_scale[0], 0, at::kQInt8);
+    return output_q.dequantize();
+  }
+  return output;
+}
+
+at::Tensor interaction_forward(const std::vector<at::Tensor> &input) {
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::interaction_forward", "")
+                       .typed<decltype(interaction_forward)>();
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (torch_ipex::check_int8_calibration()) {
+    std::vector<std::string> op_inputs, op_outputs;
+    for (int i = 0; i < input.size(); i++) {
+      auto it = tensors_flow.find(input[i].unsafeGetTensorImpl());
+      if (it == tensors_flow.end()) {
+        std::string op_input = "interaction." + std::to_string(op_id) +
+                               ".input" + std::to_string(i);
+        op_inputs.push_back(op_input);
+      } else {
+        op_inputs.push_back(std::get<1>(it->second));
+      }
+    }
+    auto output = op.call(input);
+    std::string op_output = "interaction." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(
+        output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer(input, {output}, "interaction", op_id,
+                                          op_inputs, op_outputs);
+    return output;
+  }
+
+  auto qparams = torch_ipex::get_int8_scales(op_id);
+  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
+  std::tie(input_quantized_dtypes, output_quantized_dtypes) =
+      torch_ipex::get_int8_quantized_dtypes(op_id);
+  std::vector<bool> inputs_quantized, outputs_quantized;
+  std::tie(inputs_quantized, outputs_quantized) =
+      torch_ipex::get_int8_insert_quantized_status(op_id);
+  auto x = input;
+  for (int i = 0; i < input.size(); i++) {
+    if (inputs_quantized[i]) {
+      // add quantize and dequantize for input and weight.
+      auto input_q = at::quantize_per_tensor(input[i], qparams[0][i].scale,
+                                             qparams[0][i].zero_point,
+                                             input_quantized_dtypes[i]);
+      x[i] = input_q;
+    }
+  }
+
+  for (int i = 0; i < input.size(); i++) {
+    if (inputs_quantized[i]) {
+      x[i] = x[i].dequantize();
+    }
+  }
+
+  auto output = op.call(x);
   // add quantize and dequantize output.
   if (outputs_quantized[0]) {
     auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,

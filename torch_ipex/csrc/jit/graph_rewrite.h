@@ -28,6 +28,8 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
 void replaceAtenLinearWithIpexLinear(std::shared_ptr<Graph>& graph);
 void replaceAtenLinearWithIpexSoftmax(std::shared_ptr<Graph>& graph);
 void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph> &graph);
+void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph> &graph);
+void replaceInteractionWithQInteraction(std::shared_ptr<Graph> &graph);
 } // namespace graph_rewrite_helper
 } // namespace jit
 } // namespace torch

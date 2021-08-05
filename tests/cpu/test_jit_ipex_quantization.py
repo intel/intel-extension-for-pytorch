@@ -79,7 +79,33 @@ class TestIpexOps(JitLlgaTestCase):
                 .check("aten::flatten") \
                 .run(graph)
 
+    @llga_test_env
+    def test_embeddingbag_int8(self):
+        m = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
+        input = torch.LongTensor([1,2,4,5,4,3,2,9])
+        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+            graph = self.checkQuantizeTrace(m, [input, offsets], config_name="emb", qscheme=qscheme)
+            self.assertGraphContainsExactly(graph, 'ipex::qembedding_bag', 1)
 
+    @llga_test_env
+    def test_interaction_int8(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.f = ipex.interaction
+
+            def forward(self, *x):
+                x = self.f(*x)
+                return x
+
+        m = M()
+        inputs = []
+        for i in range(0, 27):
+            inputs.append(torch.randn([128, 128]))
+        for qscheme in [torch.per_tensor_symmetric]:
+            graph = self.checkQuantizeTrace(m, inputs, config_name="interaction", qscheme=qscheme)
+            self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
 
 if __name__ == '__main__':
     run_tests()

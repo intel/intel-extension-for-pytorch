@@ -53,6 +53,9 @@ void Int8OptConfig::insert_or_updata_observer(
     std::string observer_algorithm = "min_max";
     float averaging_constant = 0.01; // will be enabled for moving_averager_min_max
     std::string weight_granularity = "per_channel";
+    if (op_name == "embedding_bag") {
+      weight_granularity = "per_tensor";
+    }
     const int nums_input = i_min_max_values.size();
     const int nums_output = o_min_max_values.size();
     std::vector<std::string> input_quantized_dtypes(nums_input, "uint8");

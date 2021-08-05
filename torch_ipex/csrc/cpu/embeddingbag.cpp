@@ -1,17 +1,21 @@
-#include <torch/csrc/autograd/function.h>
+#include "ExtendOPs.h"
+#include "cpu/bf16/vec/bf16_vec_kernel.h"
+#include "cpu/int8/vec/int8_vec_kernel.h"
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/cpu/CustomOPs.h"
+#include "torch_ipex/csrc/quantization/AutoCast.hpp"
+#include "torch_ipex/csrc/rw_lock.h"
 #include <ATen/Parallel.h>
 #include <ATen/Tensor.h>
+#include <ATen/quantized/Quantizer.h>
+#include <algorithm>
+#include <c10/util/Exception.h>
 #include <c10/util/Optional.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/csrc/autograd/function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
-#include <c10/util/Exception.h>
-#include <algorithm>
-#include "cpu/bf16/vec/bf16_vec_kernel.h"
-#include "ExtendOPs.h"
-#include "torch_ipex/csrc/autocast_mode.h"
-#include "torch_ipex/csrc/autocast_verbose.h"
 
 namespace torch_ipex {
 
@@ -40,9 +44,10 @@ bool AtenIpexTypeExt::embedding_bag_fast_path_sum(const at::Tensor weight, const
   return true;
 }
 
-template<typename T>
-static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor select_indices,
-    const at::Tensor src, const at::Tensor offsets,  bool include_last_offset) {
+template <typename T>
+static inline at::Tensor _embedding_bag_index_add_select_fast(
+    const at::Tensor indices, const at::Tensor src, const at::Tensor offsets,
+    bool include_last_offset) {
   int64_t ddim = src.size(1);
   auto* src_data = src.data_ptr<T>();
   int64_t output_size = offsets.numel() - 1;
@@ -66,13 +71,13 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
     if (left_size > 0) {
       move_ker(&offsets_include_last_data[align32_size], &offsets_data[align32_size], left_size);
     }
-    offsets_include_last[output_size] = select_indices.numel();
+    offsets_include_last[output_size] = indices.numel();
     offsets_data = offsets_include_last.data();
   }
 
   at::Tensor output = at::empty({output_size, src.size(1)}, src.options());
   auto* output_data = output.data_ptr<T>();
-  auto indices_accessor = select_indices.accessor<int64_t, 1>();
+  auto indices_accessor = indices.accessor<int64_t, 1>();
   at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
     for (int64_t i = start; i < end; i++) {
       auto* out_data_ptr = &output_data[i * ddim];
@@ -380,6 +385,112 @@ at::Tensor AtenIpexTypeExt::embedding_bag(
   return NewEmbeddingBagOp::_forward(weight, indices, offsets, sparse, include_last_offset);
 }
 
+namespace cpu {
+using weakref_type =
+    c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
+using val_type = std::tuple<weakref_type, at::Tensor>;
+std::unordered_map<c10::TensorImpl *, val_type> cached_qweight;
+torch_ipex::ReadWriteMutex rwmutex;
+
+at::Tensor embedding_bag_int8_impl(const at::Tensor &qweight,
+                                   const at::Tensor &indices,
+                                   const at::Tensor &offsets,
+                                   bool include_last_offset) {
+  int64_t ddim = qweight.size(1);
+  double scale = at::native::q_scale_quant(qweight);
+  int8_t *qweight_data =
+      reinterpret_cast<int8_t *>(qweight.data_ptr<at::qint8>());
+  int64_t output_size = offsets.numel() - 1;
+  int64_t *offsets_data = offsets.data_ptr<int64_t>();
+  std::vector<int64_t> offsets_include_last;
+  if (!include_last_offset) {
+    output_size = offsets.numel();
+    offsets_include_last.resize(output_size + 1);
+    int64_t *offsets_include_last_data = offsets_include_last.data();
+    int64_t iter_time = (output_size >> 5);
+    int64_t align32_size = (iter_time << 5);
+    int64_t left_size = output_size - align32_size;
+    at::parallel_for(0, iter_time, 16, [&](int64_t start, int64_t end) {
+      for (int64_t i = start; i < end; i += 1) {
+        auto start_offset = i << 5;
+        move_ker(&offsets_include_last_data[start_offset],
+                 &offsets_data[start_offset], 32);
+      }
+    });
+    if (left_size > 0) {
+      move_ker(&offsets_include_last_data[align32_size],
+               &offsets_data[align32_size], left_size);
+    }
+    offsets_include_last[output_size] = indices.numel();
+    offsets_data = offsets_include_last.data();
+  }
+  // init output tensor
+  at::QuantizerPtr output_quantizer =
+      at::make_per_tensor_affine_quantizer(scale, /*zp=*/0, at::kQInt8);
+  at::Tensor output = at::new_qtensor(/*sizes=*/{output_size, qweight.size(1)},
+                                      qweight.options(), output_quantizer);
+  int8_t *output_data =
+      reinterpret_cast<int8_t *>(output.data_ptr<at::qint8>());
+  auto indices_accessor = indices.accessor<int64_t, 1>();
+  at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
+    for (int64_t i = start; i < end; i++) {
+      int8_t *out_data_ptr = &output_data[i * ddim];
+      auto inputs_start = offsets_data[i];
+      auto inputs_end = offsets_data[i + 1];
+      if (inputs_start >= inputs_end) {
+        zero_ker(out_data_ptr, ddim);
+      } else {
+        int8_t *select_data_ptr =
+            &qweight_data[indices_accessor[inputs_start] * ddim];
+        move_ker(out_data_ptr, select_data_ptr, ddim);
+      }
+      for (int64_t s = (inputs_start + 1); s < inputs_end; s++) {
+        int8_t *select_data_ptr = &qweight_data[indices_accessor[s] * ddim];
+        add_ker(out_data_ptr, select_data_ptr, ddim);
+      }
+    }
+  });
+
+  return output;
+}
+
+at::Tensor AtenIpexJITDev::dil_qembeddingbag(
+    const at::Tensor weight, const at::Tensor indices, const at::Tensor offsets,
+    bool sparse, bool include_last_offset, double w_scale, int64_t w_zp,
+    at::ScalarType w_dtype, double o_scale, int64_t o_zp,
+    at::ScalarType o_dtype) {
+  at::Tensor qweight;
+  {
+    torch_ipex::UniqueReadLock<torch_ipex::ReadWriteMutex> lock(rwmutex);
+    auto it = cached_qweight.find(weight.unsafeGetTensorImpl());
+    if (it != cached_qweight.end()) {
+      // cache hit
+      qweight = std::get<1>(it->second);
+    }
+  }
+
+  if (!qweight.defined()) {
+    // cache miss
+    torch_ipex::UniqueWriteLock<torch_ipex::ReadWriteMutex> lock(rwmutex);
+    auto it = cached_qweight.find(weight.unsafeGetTensorImpl());
+    if (it == cached_qweight.end()) {
+      // check again if qweight is still not cached
+      qweight = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      cached_qweight.emplace(
+          weight.unsafeGetTensorImpl(),
+          val_type{weakref_type(weight.getIntrusivePtr()), qweight});
+    } else {
+      // qweight is cached
+      qweight = std::get<1>(it->second);
+    }
+  }
+
+  return embedding_bag_int8_impl(qweight, indices, offsets,
+                                 include_last_offset);
+}
+
+} // namespace cpu
+
 }  // namespace torch_ipex
 
 namespace {
@@ -405,6 +516,10 @@ at::Tensor embedding_bag(
   verbose::OpNameGuard op_name("embedding_bag");
 #endif
   auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::embedding_bag(weight, indices, offsets, sparse,
+                               include_last_offset);
+  }
   // only have bf16 support now, keep fp32 for other target_type
   bool cast_to_bfloat16 = !at::GradMode::is_enabled() && at::kBFloat16 == target_type;
   auto casted_weight = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight) : weight;

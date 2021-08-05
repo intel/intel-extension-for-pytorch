@@ -127,6 +127,12 @@ class AtenIpexJITDev {
                                     const at::Tensor &right, at::Tensor out_opt,
                                     const c10::Scalar &div_input);
 
+   static at::Tensor dil_layernorm(const at::Tensor &input,
+                                   at::IntArrayRef normalized_shape,
+                                   const c10::optional<at::Tensor> &weight_opt,
+                                   const c10::optional<at::Tensor> &bias_opt,
+                                   float eps, bool cudnn_enable);
+
    // n-dims tensor op
    static at::Tensor dil_convolution_nd_weight_base(
        const at::Tensor &input, const at::Tensor &weight,
@@ -187,11 +193,19 @@ class AtenIpexJITDev {
        at::IntArrayRef kernel_size, int64_t groups, int64_t output_channel,
        bool weight_channels_last, bool weight_prepacked, at::Tensor &accumu,
        at::Scalar alpha);
-   static at::Tensor dil_layernorm(const at::Tensor &input,
-                                   at::IntArrayRef normalized_shape,
-                                   const c10::optional<at::Tensor> &weight_opt,
-                                   const c10::optional<at::Tensor> &bias_opt,
-                                   float eps, bool cudnn_enable);
+
+   // int8 op
+   static at::Tensor dil_qembeddingbag(const at::Tensor weight,
+                                       const at::Tensor indices,
+                                       const at::Tensor offsets, bool sparse,
+                                       bool include_last_offset, double w_scale,
+                                       int64_t w_zp, at::ScalarType w_dtype,
+                                       double o_scale, int64_t o_zp,
+                                       at::ScalarType o_dtype);
+
+   static at::Tensor dil_qinteraction(const std::vector<at::Tensor> input,
+                                      double o_scale, int64_t o_zp,
+                                      at::ScalarType o_dtype);
 };
 
 }  // namespace cpu

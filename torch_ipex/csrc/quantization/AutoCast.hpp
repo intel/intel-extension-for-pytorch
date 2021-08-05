@@ -58,6 +58,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lstm(
 
 at::Tensor flatten(const at::Tensor &input, int64_t start_dim, int64_t end_dim);
 
+at::Tensor embedding_bag(const at::Tensor &weight, const at::Tensor &indices,
+                         const at::Tensor &offsets, bool sparse,
+                         bool include_last_offse);
+
+at::Tensor interaction_forward(const std::vector<at::Tensor> &input);
 } // namespace int8
 } // namespace autocast
 } // namespace torch_ipex

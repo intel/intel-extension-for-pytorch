@@ -42,9 +42,15 @@ void insert_or_updata_observer(const at::TensorList& inputs,
   std::vector<std::vector<std::vector<float>>> weights_min_max_values;
   for (auto i = 0; i < inputs.size(); i++) {
     inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
-  } 
+  }
 
-  if (Int8OptConfig::get_config().get_indicator_weight_granularity(ops_id) == "per_channel") {
+  auto weight_granularity =
+      Int8OptConfig::get_config().get_indicator_weight_granularity(ops_id);
+  if (Int8OptConfig::get_config().get_indicators_size() == 0 &&
+      op_name == "embedding_bag") {
+    weight_granularity = "per_tensor";
+  }
+  if (weight_granularity == "per_channel") {
     for (auto k = 0; k < weights.size(); k++) {
       auto w = weights[k];
       std::vector<std::vector<float>> min_max_values;

@@ -567,6 +567,96 @@ void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph> &graph) {
   rewriter_aten.runOnGraph(graph);
 }
 
+void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph> &graph) {
+  std::string qembedingbag = R"(
+     graph(%weight, %input, %offsets, %sparse, %include_last_offset, %w_scale, %w_zp, %w_dtype, %o_scale, %o_zp, %o_dtype):
+        %r = ipex::qembedding_bag(%weight, %input, %offsets, %sparse, %include_last_offset,  %w_scale, %w_zp, %w_dtype, %o_scale, %o_zp, %o_dtype)
+        return (%r) )";
+
+  std::string embeddingbag_with_quant_dequant = R"(
+      graph(%weight, %input, %offsets, %sparse, %include_last_offset, %w_scale, %w_zp, %w_dtype, %o_scale, %o_zp, %o_dtype):
+        %qw = aten::quantize_per_tensor(%weight, %w_scale, %w_zp, %w_dtype)
+        %dqw = aten::dequantize(%qw)
+        %r = torch_ipex::embedding_bag(%dqw, %input, %offsets, %sparse, %include_last_offset)
+        %qout = aten::quantize_per_tensor(%r, %o_scale, %o_zp, %o_dtype)
+        return (%qout) )";
+
+  SubgraphRewriter rewriter_qembeddingbag;
+  rewriter_qembeddingbag.RegisterRewritePattern(embeddingbag_with_quant_dequant,
+                                                qembedingbag);
+  rewriter_qembeddingbag.runOnGraph(graph);
+}
+
+void replaceInteractionWithQInteraction(std::shared_ptr<Graph> &graph) {
+  std::vector<std::string> patterns;
+  std::vector<std::string> replacements;
+  std::string graph_common_head = R"(graph()";
+  std::string graph_common_tail = R"(, %o_scale, %o_zp, %o_dtype):
+  )";
+  std::string list_construct_common_head =
+      R"(%input : Tensor[] = prim::ListConstruct()";
+  std::string list_construct_common_tail = R"() )";
+  std::string replacement_common_tail =
+      R"(%out =  ipex::qinteraction(%input, %o_scale, %o_zp, %o_dtype) return (%out) )";
+  std::string pattern_common_tail =
+      R"(%out = torch_ipex::interaction_forward(%input)  %qout = aten::quantize_per_tensor(%out, %o_scale, %o_zp, %o_dtype) return (%qout) )";
+
+  for (auto *n : graph->block()->nodes()) {
+    if (n->kind() ==
+        Symbol::fromQualString("torch_ipex::interaction_forward")) {
+      size_t id = 0;
+      auto ListConstructNode = n->input(0)->node();
+
+      bool is_quantized =
+          std::any_of(ListConstructNode->inputs().begin(),
+                      ListConstructNode->inputs().end(), [](auto &v) {
+                        return v->node()->kind() == Symbol::aten("dequantize");
+                      });
+
+      if (!is_quantized)
+        return;
+
+      std::string pattern = R"()";
+      std::string replacement = R"()";
+      std::string dequantizes = R"()";
+      std::vector<std::string> qinputs;
+      std::vector<std::string> dqinputs;
+      for (auto input : ListConstructNode->inputs()) {
+        if (input->node()->kind() == Symbol::aten("dequantize")) {
+          qinputs.push_back("%q" + std::to_string(id));
+          dqinputs.push_back("%dq" + std::to_string(id));
+          std::string dequantize = "%dq" + std::to_string(id) +
+                                   " : Tensor = aten::dequantize(" + "%q" +
+                                   std::to_string(id) + ")";
+          dequantizes.append(dequantize);
+          ++id;
+        }
+      }
+
+      std::string header =
+          graph_common_head + c10::Join(", ", qinputs) + graph_common_tail;
+      pattern += header;
+      pattern += dequantizes;
+      pattern += list_construct_common_head + c10::Join(", ", dqinputs) +
+                 list_construct_common_tail;
+      pattern += pattern_common_tail;
+      patterns.push_back(pattern);
+
+      replacement = header;
+      replacement += list_construct_common_head + c10::Join(", ", qinputs) +
+                     list_construct_common_tail;
+      replacement += replacement_common_tail;
+      replacements.push_back(replacement);
+    }
+  }
+
+  SubgraphRewriter rewriter;
+  for (size_t i = 0; i < patterns.size(); i++) {
+    rewriter.RegisterRewritePattern(patterns[i], replacements[i]);
+    rewriter.runOnGraph(graph);
+  }
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

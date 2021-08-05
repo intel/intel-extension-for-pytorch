@@ -420,6 +420,50 @@ RegisterOperators op(
              return 0;
            };
          },
+         aliasAnalysisFromSchema()),
+
+     Operator(
+         "ipex::qembedding_bag(Tensor weight, Tensor indices, Tensor offsets, "
+         "bool sparse, "
+         "bool include_last_offset, float w_scale, int w_zp, ScalarType "
+         "w_dtype, "
+         "float o_scale, int o_zp, ScalarType o_dtype) -> Tensor",
+         [](const Node *node) -> Operation {
+           return [](Stack *stack) {
+             auto result = AtenIpexJITDev::dil_qembeddingbag(
+                 (std::move(peek(stack, 0, 11))).toTensor(),
+                 (std::move(peek(stack, 1, 11))).toTensor(),
+                 (std::move(peek(stack, 2, 11))).toTensor(),
+                 (std::move(peek(stack, 3, 11))).toBool(),
+                 (std::move(peek(stack, 4, 11))).toBool(),
+                 (std::move(peek(stack, 5, 11))).toDouble(),
+                 (std::move(peek(stack, 6, 11))).toInt(),
+                 (std::move(peek(stack, 7, 11))).toScalarType(),
+                 (std::move(peek(stack, 8, 11))).toDouble(),
+                 (std::move(peek(stack, 9, 11))).toInt(),
+                 (std::move(peek(stack, 10, 11))).toScalarType());
+             drop(stack, 11);
+             pack(stack, std::move(result));
+             return 0;
+           };
+         },
+         aliasAnalysisFromSchema()),
+
+     Operator(
+         "ipex::qinteraction(Tensor[] tensors,  float o_scale, int o_zp, "
+         "ScalarType o_dtype) -> Tensor",
+         [](const Node *node) -> Operation {
+           return [](Stack *stack) {
+             auto result = AtenIpexJITDev::dil_qinteraction(
+                 (std::move(peek(stack, 0, 4))).toTensorVector(),
+                 (std::move(peek(stack, 1, 4))).toDouble(),
+                 (std::move(peek(stack, 2, 4))).toInt(),
+                 (std::move(peek(stack, 3, 4))).toScalarType());
+             drop(stack, 4);
+             pack(stack, std::move(result));
+             return 0;
+           };
+         },
          aliasAnalysisFromSchema())
 
     });

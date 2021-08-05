@@ -38,10 +38,10 @@ class TestEMB(TestCase):
         self.assertEqual(aten_emb.weight.grad.data._values(), ipex_emb.weight.grad.data._values())
         self.assertEqual(aten_emb.weight.grad.data._values(), ipex_emb.weight.grad.data._values(), 0.01)
 
-    def test_emb_fast_path(self):
+    def test_emb_fallback_path(self):
         self._test_emb(mode='mean')
 
-    def test_emb_fallback_path(self):
+    def test_emb_fast_path(self):
         self._test_emb(mode='sum')
 
 if __name__ == '__main__':
