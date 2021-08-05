@@ -213,8 +213,16 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
 
   auto ln_bwd_desc = layer_normalization_backward::desc(
       dnnl::prop_kind::backward, exp_md, exp_md, mean_md, epsilon, flags);
+
+#ifdef USE_SCRATCHPAD_MODE
+  primitive_attr attr;
+  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  auto ln_bwd_pd = layer_normalization_backward::primitive_desc(
+      ln_bwd_desc, attr, engine, ln_fwd_pd);
+#else
   auto ln_bwd_pd = layer_normalization_backward::primitive_desc(
       ln_bwd_desc, engine, ln_fwd_pd);
+#endif
 
   Tensor src_;
   memory src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
@@ -297,6 +305,14 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
 #else
   auto ln_backward = layer_normalization_backward(ln_bwd_pd);
 #endif
+
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = ln_bwd_pd.scratchpad_desc().get_size() / diff_dst.dtype().itemsize();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty({scratchpad_size}, diff_dst.options(), c10::nullopt);
+  auto scratchpad_memory = dpcpp_onednn_memory(ln_bwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
+#endif
+
   DPCPP_ONEDNN_EXEC(ln_backward, strm, args);
 
   Tensor diff_wgh = at::empty_like(wgh);
