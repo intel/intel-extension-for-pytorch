@@ -91,7 +91,9 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
 Operation createLlgaKernel(const Node *node) {
   auto kernel = std::make_shared<fuser::onednn::LlgaKernel>(node);
   return [kernel](Stack *stack) {
+#if defined(IPEX_PROFILE_OP)
     RECORD_FUNCTION(kernel->profileName(), std::vector<c10::IValue>());
+#endif
     kernel->run(*stack);
     return 0;
   };
@@ -105,6 +107,9 @@ RegisterOperators LLGAFusionGroupOp({
 
 Operation createLlgaGuardKernel(const Node *node) {
   return [node](Stack *stack) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION(fuser::onednn::LlgaGuardName(), std::vector<c10::IValue>());
+#endif
     GRAPH_DEBUG("Guarding node: ", node->kind().toQualString());
     std::vector<TypePtr> types = node->tys(attr::types);
     const auto num_inputs = types.size();

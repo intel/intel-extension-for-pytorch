@@ -124,6 +124,9 @@ ArgSpecs LlgaKernel::specializeOutputSpecs(const partition &partition,
 std::tuple<RunArgs, RunArgs>
 LlgaKernel::prepareRunArgs(const TensorArgs &inputs,
                            TensorArgs &outputs) const {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("LLGA_bridge::prepareRunArgs", std::vector<c10::IValue>({}));
+#endif
   RunArgs runInputs, runOutputs;
   for (size_t i = 0; i < nInputs_; i++) {
     auto spec = inputSpecs_[i];
