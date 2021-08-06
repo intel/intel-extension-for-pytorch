@@ -1,1 +1,5 @@
 GitPython==3.1.1
+pyyaml
+pytest
+matplotlib
+scipy
