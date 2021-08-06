@@ -116,78 +116,81 @@ static inline void gru_forward(
   auto dst_iter_usr_memory = dpcpp_onednn_memory(
       {{dst_iter_dims}, data_t, format_ldnc}, engine, dst_iter.data_ptr());
 
+  Tensor new_weight_layer = weight_layer.reshape({weights_layer_dims}),
+         new_weight_iter = weight_iter.reshape({weights_iter_dims}),
+         new_bias = bias.reshape({bias_dims}),
+         new_src_iter = src_iter.reshape({src_iter_dims});
+
+  Tensor weight_layer_, weight_iter_, bias_, src_layer_, src_iter_, dst_layer_,
+      dst_iter_;
+
   auto expected_weights_layer_md = gru_forward_pd.weights_layer_desc();
   auto weights_layer_memory = weights_layer_usr_memory;
   if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
-    weights_layer_memory = memory(expected_weights_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_layer_usr_memory, weights_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, weights_layer_usr_memory},
-         {DNNL_ARG_TO, weights_layer_memory}});
+    weight_layer_ = empty_opaque_tensor(
+        expected_weights_layer_md, weight_layer.options(), c10::nullopt);
+    weights_layer_memory = dpcpp_onednn_memory(
+        expected_weights_layer_md, engine, weight_layer_.data_ptr());
+    xpu::oneDNN::reorder(new_weight_layer, weight_layer_);
   }
 
   auto expected_weights_iter_md = gru_forward_pd.weights_iter_desc();
   auto weights_iter_memory = weights_iter_usr_memory;
   if (weights_iter_usr_memory.get_desc() != expected_weights_iter_md) {
-    weights_iter_memory = memory(expected_weights_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_iter_usr_memory, weights_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, weights_iter_usr_memory},
-         {DNNL_ARG_TO, weights_iter_memory}});
+    weight_iter_ = empty_opaque_tensor(
+        expected_weights_iter_md, weight_iter.options(), c10::nullopt);
+    weights_iter_memory = dpcpp_onednn_memory(
+        expected_weights_iter_md, engine, weight_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_weight_iter, weight_iter_);
   }
 
   auto expected_bias_md = gru_forward_pd.bias_desc();
   auto bias_memory = bias_usr_memory;
   if (bias_usr_memory.get_desc() != expected_bias_md) {
-    bias_memory = memory(expected_bias_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(bias_usr_memory, bias_memory),
-        strm,
-        {{DNNL_ARG_FROM, bias_usr_memory}, {DNNL_ARG_TO, bias_memory}});
+    bias_ = empty_opaque_tensor(expected_bias_md, bias.options(), c10::nullopt);
+    bias_memory =
+        dpcpp_onednn_memory(expected_bias_md, engine, bias_.data_ptr());
+    xpu::oneDNN::reorder(new_bias, bias_);
   }
 
   auto expected_src_layer_md = gru_forward_pd.src_layer_desc();
   auto src_layer_memory = src_layer_usr_memory;
   if (src_layer_usr_memory.get_desc() != expected_src_layer_md) {
-    src_layer_memory = memory(expected_src_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_layer_usr_memory, src_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, src_layer_usr_memory},
-         {DNNL_ARG_TO, src_layer_memory}});
+    src_layer_ = empty_opaque_tensor(
+        expected_src_layer_md, src_layer.options(), c10::nullopt);
+    src_layer_memory = dpcpp_onednn_memory(
+        expected_src_layer_md, engine, src_layer_.data_ptr());
+    xpu::oneDNN::reorder(src_layer, src_layer_);
   }
 
   auto expected_src_iter_md = gru_forward_pd.src_iter_desc();
   auto src_iter_memory = src_iter_usr_memory;
   if (src_iter_usr_memory.get_desc() != expected_src_iter_md) {
-    src_iter_memory = memory(expected_src_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_iter_usr_memory, src_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, src_iter_usr_memory}, {DNNL_ARG_TO, src_iter_memory}});
+    src_iter_ = empty_opaque_tensor(
+        expected_src_iter_md, src_iter.options(), c10::nullopt);
+    src_iter_memory =
+        dpcpp_onednn_memory(expected_src_iter_md, engine, src_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_src_iter, src_iter_);
   }
 
   auto expected_dst_layer_md = gru_forward_pd.dst_layer_desc();
   auto dst_layer_memory = dst_layer_usr_memory;
   if (dst_layer_usr_memory.get_desc() != expected_dst_layer_md) {
-    dst_layer_memory = memory(expected_dst_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_layer_usr_memory, dst_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, dst_layer_usr_memory},
-         {DNNL_ARG_TO, dst_layer_memory}});
+    dst_layer_ = empty_opaque_tensor(
+        expected_dst_layer_md, dst_layer.options(), c10::nullopt);
+    dst_layer_memory = dpcpp_onednn_memory(
+        expected_dst_layer_md, engine, dst_layer_.data_ptr());
+    xpu::oneDNN::reorder(dst_layer, dst_layer_);
   }
 
   auto expected_dst_iter_md = gru_forward_pd.dst_iter_desc();
   auto dst_iter_memory = dst_iter_usr_memory;
   if (dst_iter_usr_memory.get_desc() != expected_dst_iter_md) {
-    dst_iter_memory = memory(expected_dst_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_usr_memory, dst_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, dst_iter_usr_memory}, {DNNL_ARG_TO, dst_iter_memory}});
+    dst_iter_ = empty_opaque_tensor(
+        expected_dst_iter_md, dst_iter.options(), c10::nullopt);
+    dst_iter_memory =
+        dpcpp_onednn_memory(expected_dst_iter_md, engine, dst_iter_.data_ptr());
+    xpu::oneDNN::reorder(dst_iter, dst_iter_);
   }
 
   auto gru_forward_p = lbr_gru_forward(gru_forward_pd);
@@ -223,18 +226,11 @@ static inline void gru_forward(
   }
 
   if (dst_layer_memory != dst_layer_usr_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_layer_memory, dst_layer_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, dst_layer_memory},
-         {DNNL_ARG_TO, dst_layer_usr_memory}});
+    xpu::oneDNN::reorder(dst_layer_, dst_layer);
   }
 
   if (dst_iter_memory != dst_iter_usr_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_memory, dst_iter_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, dst_iter_memory}, {DNNL_ARG_TO, dst_iter_usr_memory}});
+    xpu::oneDNN::reorder(dst_iter_, dst_iter);
   }
 }
 
@@ -406,134 +402,143 @@ static inline void gru_backward(
   auto gru_backward_pd = lbr_gru_backward::primitive_desc(
       gru_backward_desc, engine, gru_forward_pd);
 
+  Tensor new_src_iter = src_iter.reshape({src_iter_dims}),
+         new_dst_iter = dst_iter.reshape({dst_iter_dims}),
+         new_weight_layer = weight_layer.reshape({weights_layer_dims}),
+         new_weight_iter = weight_iter.reshape({weights_iter_dims}),
+         new_bias = bias.reshape({bias_dims}),
+         new_diff_dst_iter = diff_dst_iter.reshape({dst_iter_dims});
+
+  Tensor src_layer_, src_iter_, dst_layer_, dst_iter_, weight_layer_,
+      weight_iter_, bias_, bwd_weight_layer_, bwd_weight_iter_, diff_src_layer_,
+      diff_src_iter_, diff_dst_layer_, diff_dst_iter_, diff_weight_layer_,
+      diff_weight_iter_, diff_bias_;
+
   auto expected_src_layer_md = gru_forward_pd.src_layer_desc();
   auto src_layer_memory = src_layer_usr_memory;
   if (src_layer_usr_memory.get_desc() != expected_src_layer_md) {
-    src_layer_memory = memory(expected_src_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_layer_usr_memory, src_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, src_layer_usr_memory},
-         {DNNL_ARG_TO, src_layer_memory}});
+    src_layer_ = empty_opaque_tensor(
+        expected_src_layer_md, src_layer.options(), c10::nullopt);
+    src_layer_memory = dpcpp_onednn_memory(
+        expected_src_layer_md, engine, src_layer_.data_ptr());
+    xpu::oneDNN::reorder(src_layer, src_layer_);
   }
 
   auto expected_src_iter_md = gru_forward_pd.src_iter_desc();
   auto src_iter_memory = src_iter_usr_memory;
   if (src_iter_usr_memory.get_desc() != expected_src_iter_md) {
-    src_iter_memory = memory(expected_src_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_iter_usr_memory, src_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, src_iter_usr_memory}, {DNNL_ARG_TO, src_iter_memory}});
+    src_iter_ = empty_opaque_tensor(
+        expected_src_iter_md, src_iter.options(), c10::nullopt);
+    src_iter_memory =
+        dpcpp_onednn_memory(expected_src_iter_md, engine, src_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_src_iter, src_iter_);
   }
 
   auto expected_dst_layer_md = gru_forward_pd.dst_layer_desc();
   auto dst_layer_memory = dst_layer_usr_memory;
   if (dst_layer_usr_memory.get_desc() != expected_dst_layer_md) {
-    dst_layer_memory = memory(expected_dst_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_layer_usr_memory, dst_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, dst_layer_usr_memory},
-         {DNNL_ARG_TO, dst_layer_memory}});
+    dst_layer_ = empty_opaque_tensor(
+        expected_dst_layer_md, dst_layer.options(), c10::nullopt);
+    dst_layer_memory = dpcpp_onednn_memory(
+        expected_dst_layer_md, engine, dst_layer_.data_ptr());
+    xpu::oneDNN::reorder(dst_layer, dst_layer_);
   }
 
   auto expected_dst_iter_md = gru_forward_pd.dst_iter_desc();
   auto dst_iter_memory = dst_iter_usr_memory;
   if (dst_iter_usr_memory.get_desc() != expected_dst_iter_md) {
-    dst_iter_memory = memory(expected_dst_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_usr_memory, dst_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, dst_iter_usr_memory}, {DNNL_ARG_TO, dst_iter_memory}});
+    dst_iter_ = empty_opaque_tensor(
+        expected_dst_iter_md, dst_iter.options(), c10::nullopt);
+    dst_iter_memory =
+        dpcpp_onednn_memory(expected_dst_iter_md, engine, dst_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_dst_iter, dst_iter_);
   }
 
   auto expected_weights_layer_md = gru_forward_pd.weights_layer_desc();
   auto weights_layer_memory = weights_layer_usr_memory;
   if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
-    weights_layer_memory = memory(expected_weights_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_layer_usr_memory, weights_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, weights_layer_usr_memory},
-         {DNNL_ARG_TO, weights_layer_memory}});
+    weight_layer_ = empty_opaque_tensor(
+        expected_weights_layer_md, weight_layer.options(), c10::nullopt);
+    weights_layer_memory = dpcpp_onednn_memory(
+        expected_weights_layer_md, engine, weight_layer_.data_ptr());
+    xpu::oneDNN::reorder(new_weight_layer, weight_layer_);
   }
 
   auto expected_weights_iter_md = gru_forward_pd.weights_iter_desc();
   auto weights_iter_memory = weights_iter_usr_memory;
   if (weights_iter_usr_memory.get_desc() != expected_weights_iter_md) {
-    weights_iter_memory = memory(expected_weights_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_iter_usr_memory, weights_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, weights_iter_usr_memory},
-         {DNNL_ARG_TO, weights_iter_memory}});
+    weight_iter_ = empty_opaque_tensor(
+        expected_weights_iter_md, weight_iter.options(), c10::nullopt);
+    weights_iter_memory = dpcpp_onednn_memory(
+        expected_weights_iter_md, engine, weight_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_weight_iter, weight_iter_);
   }
 
   auto expected_bias_md = gru_backward_pd.bias_desc();
   auto bias_memory = bias_usr_memory;
   if (bias_usr_memory.get_desc() != expected_bias_md) {
-    bias_memory = memory(expected_bias_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(bias_usr_memory, bias_memory),
-        strm,
-        {{DNNL_ARG_FROM, bias_usr_memory}, {DNNL_ARG_TO, bias_memory}});
+    bias_ = empty_opaque_tensor(expected_bias_md, bias.options(), c10::nullopt);
+    bias_memory =
+        dpcpp_onednn_memory(expected_bias_md, engine, bias_.data_ptr());
+    xpu::oneDNN::reorder(new_bias, bias_);
   }
 
   auto bwd_expected_weights_layer_md = gru_backward_pd.weights_layer_desc();
   auto bwd_weights_layer_memory = weights_layer_usr_memory;
   if (weights_layer_usr_memory.get_desc() != bwd_expected_weights_layer_md) {
-    bwd_weights_layer_memory = memory(bwd_expected_weights_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_layer_usr_memory, bwd_weights_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, weights_layer_usr_memory},
-         {DNNL_ARG_TO, bwd_weights_layer_memory}});
+    bwd_weight_layer_ = empty_opaque_tensor(
+        bwd_expected_weights_layer_md, weight_layer.options(), c10::nullopt);
+    bwd_weights_layer_memory = dpcpp_onednn_memory(
+        bwd_expected_weights_layer_md, engine, bwd_weight_layer_.data_ptr());
+    xpu::oneDNN::reorder(new_weight_layer, bwd_weight_layer_);
   }
 
   auto bwd_expected_weights_iter_md = gru_backward_pd.weights_iter_desc();
   auto bwd_weights_iter_memory = weights_iter_usr_memory;
   if (weights_iter_usr_memory.get_desc() != bwd_expected_weights_iter_md) {
-    bwd_weights_iter_memory = memory(bwd_expected_weights_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_iter_usr_memory, bwd_weights_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, weights_iter_usr_memory},
-         {DNNL_ARG_TO, bwd_weights_iter_memory}});
+    bwd_weight_iter_ = empty_opaque_tensor(
+        bwd_expected_weights_iter_md, weight_iter.options(), c10::nullopt);
+    bwd_weights_iter_memory = dpcpp_onednn_memory(
+        bwd_expected_weights_iter_md, engine, bwd_weight_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_weight_iter, bwd_weight_iter_);
   }
 
   auto expected_diff_src_layer_md = gru_backward_pd.diff_src_layer_desc();
   auto diff_src_layer_memory = diff_src_layer_usr_memory;
   if (diff_src_layer_usr_memory.get_desc() != expected_diff_src_layer_md) {
-    diff_src_layer_memory = memory(expected_diff_src_layer_md, engine);
+    diff_src_layer_ = empty_opaque_tensor(
+        expected_diff_src_layer_md, diff_src_layer.options(), c10::nullopt);
+    diff_src_layer_memory =
+        memory(expected_diff_src_layer_md, engine, diff_src_layer_.data_ptr());
   }
 
   auto expected_diff_src_iter_md = gru_backward_pd.diff_src_iter_desc();
   auto diff_src_iter_memory = diff_src_iter_usr_memory;
   if (diff_src_iter_usr_memory.get_desc() != expected_diff_src_iter_md) {
-    diff_src_iter_memory = memory(expected_diff_src_iter_md, engine);
+    diff_src_iter_ = empty_opaque_tensor(
+        expected_diff_src_iter_md, diff_src_iter.options(), c10::nullopt);
+    diff_src_iter_memory =
+        memory(expected_diff_src_iter_md, engine, diff_src_iter_.data_ptr());
   }
 
   auto expected_diff_dst_layer_md = gru_backward_pd.diff_dst_layer_desc();
   auto diff_dst_layer_memory = diff_dst_layer_usr_memory;
   if (diff_dst_layer_usr_memory.get_desc() != expected_diff_dst_layer_md) {
-    diff_dst_layer_memory = memory(expected_diff_dst_layer_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_dst_layer_usr_memory, diff_dst_layer_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_dst_layer_usr_memory},
-         {DNNL_ARG_TO, diff_dst_layer_memory}});
+    diff_dst_layer_ = empty_opaque_tensor(
+        expected_diff_dst_layer_md, diff_dst_layer.options(), c10::nullopt);
+    diff_dst_layer_memory = dpcpp_onednn_memory(
+        expected_diff_dst_layer_md, engine, diff_dst_layer_.data_ptr());
+    xpu::oneDNN::reorder(diff_dst_layer, diff_dst_layer_);
   }
 
   auto expected_diff_dst_iter_md = gru_backward_pd.diff_dst_iter_desc();
   auto diff_dst_iter_memory = diff_dst_iter_usr_memory;
   if (diff_dst_iter_usr_memory.get_desc() != expected_diff_dst_iter_md) {
-    diff_dst_iter_memory = memory(expected_diff_dst_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_dst_iter_usr_memory, diff_dst_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_dst_iter_usr_memory},
-         {DNNL_ARG_TO, diff_dst_iter_memory}});
+    diff_dst_iter_ = empty_opaque_tensor(
+        expected_diff_dst_layer_md, diff_dst_iter.options(), c10::nullopt);
+    diff_dst_iter_memory = dpcpp_onednn_memory(
+        expected_diff_dst_layer_md, engine, diff_dst_iter_.data_ptr());
+    xpu::oneDNN::reorder(new_diff_dst_iter, diff_dst_iter_);
   }
 
   auto expected_diff_weights_layer_md =
@@ -541,20 +546,33 @@ static inline void gru_backward(
   auto diff_weights_layer_memory = diff_weights_layer_usr_memory;
   if (diff_weights_layer_usr_memory.get_desc() !=
       expected_diff_weights_layer_md) {
-    diff_weights_layer_memory = memory(expected_diff_weights_layer_md, engine);
+    diff_weight_layer_ = empty_opaque_tensor(
+        expected_diff_weights_layer_md,
+        diff_weight_layer.options(),
+        c10::nullopt);
+    diff_weights_layer_memory = memory(
+        expected_diff_weights_layer_md, engine, diff_weight_layer_.data_ptr());
   }
 
   auto expected_diff_weights_iter_md = gru_backward_pd.diff_weights_iter_desc();
   auto diff_weights_iter_memory = diff_weights_iter_usr_memory;
   if (diff_weights_iter_usr_memory.get_desc() !=
       expected_diff_weights_iter_md) {
-    diff_weights_iter_memory = memory(expected_diff_weights_iter_md, engine);
+    diff_weight_iter_ = empty_opaque_tensor(
+        expected_diff_weights_iter_md,
+        diff_weight_iter.options(),
+        c10::nullopt);
+    diff_weights_iter_memory = memory(
+        expected_diff_weights_iter_md, engine, diff_weight_iter_.data_ptr());
   }
 
   auto expected_diff_bias_md = gru_backward_pd.diff_bias_desc();
   auto diff_bias_memory = diff_bias_usr_memory;
   if (diff_bias_usr_memory.get_desc() != expected_diff_bias_md) {
-    diff_bias_memory = memory(expected_diff_bias_md, engine);
+    diff_bias_ = empty_opaque_tensor(
+        expected_diff_bias_md, diff_bias.options(), c10::nullopt);
+    diff_bias_memory =
+        memory(expected_diff_bias_md, engine, diff_bias_.data_ptr());
   }
 
   auto workspace_memory = dpcpp_onednn_memory(
@@ -582,39 +600,19 @@ static inline void gru_backward(
        {DNNL_ARG_DIFF_BIAS, diff_bias_memory}});
 
   if (diff_src_layer_usr_memory != diff_src_layer_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_src_layer_memory, diff_src_layer_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_src_layer_memory},
-         {DNNL_ARG_TO, diff_src_layer_usr_memory}});
+    xpu::oneDNN::reorder(diff_src_layer_, diff_src_layer);
   }
   if (diff_src_iter_usr_memory != diff_src_iter_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_src_iter_memory, diff_src_iter_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_src_iter_memory},
-         {DNNL_ARG_TO, diff_src_iter_usr_memory}});
+    xpu::oneDNN::reorder(diff_src_iter_, diff_src_iter);
   }
   if (diff_weights_layer_usr_memory != diff_weights_layer_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_weights_layer_memory, diff_weights_layer_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_weights_layer_memory},
-         {DNNL_ARG_TO, diff_weights_layer_usr_memory}});
+    xpu::oneDNN::reorder(diff_weight_layer_, diff_weight_layer);
   }
   if (diff_weights_iter_usr_memory != diff_weights_iter_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_weights_iter_memory, diff_weights_iter_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_weights_iter_memory},
-         {DNNL_ARG_TO, diff_weights_iter_usr_memory}});
+    xpu::oneDNN::reorder(diff_weight_iter_, diff_weight_iter);
   }
   if (diff_bias_usr_memory != diff_bias_memory) {
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(diff_bias_memory, diff_bias_usr_memory),
-        strm,
-        {{DNNL_ARG_FROM, diff_bias_memory},
-         {DNNL_ARG_TO, diff_bias_usr_memory}});
+    xpu::oneDNN::reorder(diff_bias_, diff_bias);
   }
 }
 } // namespace oneDNN
