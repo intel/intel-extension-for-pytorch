@@ -34,9 +34,6 @@ void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
 }
 
 template <typename IndexType, int Dim>
-class fill_slice_dpcpp_ker {};
-
-template <typename IndexType, int Dim>
 void fillSliceWithIndex(
     TensorInfo<int64_t, IndexType> out,
     IndexType totalSlices,
@@ -60,7 +57,7 @@ void fillSliceWithIndex(
         base[i * sliceStride] = i /* + TH_INDEX_BASE */;
       }
     };
-    cgh.parallel_for<fill_slice_dpcpp_ker<IndexType, Dim>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(totalSlices * local_size),
             DPCPP::range<1>(local_size)),

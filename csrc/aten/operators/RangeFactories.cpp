@@ -18,11 +18,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K1(linspace_dpcpp_ker);
-DPCPP_DEF_K1(logspace_dpcpp_ker);
-DPCPP_DEF_K1(range_dpcpp_ker);
-DPCPP_DEF_K1(arange_dpcpp_ker);
-
 template <typename T, typename accT = T>
 class LinspaceOp {
  public:
@@ -83,7 +78,7 @@ Tensor& linspace_dpcpp_out(
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DPCPP_K(linspace_dpcpp_ker, scalar_t)>(kfn);
+        cgh.single_task(kfn);
       };
 
       // submit to DPCPP queue
@@ -133,7 +128,7 @@ Tensor& logspace_dpcpp_out(
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DPCPP_K(logspace_dpcpp_ker, scalar_t)>(kfn);
+        cgh.single_task(kfn);
       };
 
       // submit to DPCPP queue
@@ -187,7 +182,7 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
           };
           // kick off kernel
           // (TODO) single_task need replaced due to low efficiency
-          cgh.single_task<DPCPP_K(range_dpcpp_ker, scalar_t)>(kfn);
+          cgh.single_task(kfn);
         };
 
         // submit to DPCPP queue
@@ -262,7 +257,7 @@ Tensor& arange_dpcpp_out(
           };
           // kick off kernel
           // (TODO) single_task need replaced due to low efficiency
-          cgh.single_task<DPCPP_K(arange_dpcpp_ker, scalar_t)>(kfn);
+          cgh.single_task(kfn);
         };
 
         // submit to DPCPP queue

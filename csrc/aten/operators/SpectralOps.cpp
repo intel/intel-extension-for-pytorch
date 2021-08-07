@@ -13,8 +13,6 @@
 #include <utils/oneMKLUtils.h>
 #endif
 
-DPCPP_DEF_K2(fill_with_conjugate_symmetry_ker, typename scalar_t);
-
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
@@ -72,8 +70,7 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(
       }
     };
 
-    cgh.parallel_for<DPCPP_K(fill_with_conjugate_symmetry_ker, scalar_t)>(
-        DPCPP::range<1>(numel), kfn);
+    cgh.parallel_for(DPCPP::range<1>(numel), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);

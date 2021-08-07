@@ -14,11 +14,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K2(MaxUnpool2d, typename scalar_t);
-DPCPP_DEF_K2(MaxUnpool2dBackward, typename scalar_t);
-DPCPP_DEF_K2(MaxUnpool3d, typename scalar_t);
-DPCPP_DEF_K2(MaxUnpool3dBackward, typename scalar_t);
-
 template <typename scalar_t>
 void max_unpooling2d_forward_kernel(
     const int64_t numInputElements,
@@ -56,7 +51,7 @@ void max_unpooling2d_forward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(MaxUnpool2d, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -110,7 +105,7 @@ void max_unpooling3d_forward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(MaxUnpool3d, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
             DPCPP::range<3>(32, 8, 1)),
@@ -157,7 +152,7 @@ void max_unpooling2d_backward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(MaxUnpool2dBackward, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -213,7 +208,7 @@ void max_unpooling3d_backward_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(MaxUnpool3dBackward, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(32 * num_groups_0, 8 * num_groups_1, totalZ),
             DPCPP::range<3>(32, 8, 1)),

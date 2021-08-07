@@ -68,14 +68,13 @@ Tensor& sign_(Tensor& self) {
   return at::AtenIpexTypeXPU::sign_out(self, self);
 }
 
-class SyclOpConj {};
 Tensor& conj_out(Tensor& out, const Tensor& self) {
   auto iter = TensorIterator::unary_op(out, self);
   // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(kBFloat16, kHalf, iter.dtype(),
   // "conj_xpu", [&]() {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       kBFloat16, kHalf, iter.dtype(), "conj_xpu", [&]() {
-        dpcpp_kernel_for_tensor_iter<SyclOpConj>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t a) -> scalar_t { return conj_impl(a); });
       });
 

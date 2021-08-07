@@ -5,11 +5,6 @@
 
 using namespace xpu::dpcpp;
 
-DPCPP_DEF_K1(memory_scale);
-DPCPP_DEF_K1(memory_scale1);
-DPCPP_DEF_K1(memory_scale2);
-DPCPP_DEF_K1(data_type_convert);
-
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -23,11 +18,10 @@ static inline DPCPP_HOST void dpcppMemoryScale(
   auto total_threads = n_elements;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for<DPCPP_K(memory_scale, dst_dt, src_dt)>(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
-          auto idx = item.get_id(0);
-          dst[idx] = src[idx] * alpha;
-        });
+    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+      auto idx = item.get_id(0);
+      dst[idx] = src[idx] * alpha;
+    });
   };
 
   // launch kernel
@@ -44,11 +38,10 @@ static inline DPCPP_HOST void dpcppMemoryScale1(
   auto total_threads = n_elements;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for<DPCPP_K(memory_scale1, dst_dt, src_dt)>(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
-          auto idx = item.get_id(0);
-          dst[idx] = src[idx] * eps + dst[idx] * (1 - eps);
-        });
+    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+      auto idx = item.get_id(0);
+      dst[idx] = src[idx] * eps + dst[idx] * (1 - eps);
+    });
   };
 
   // launch kernel
@@ -66,11 +59,10 @@ static inline DPCPP_HOST void dpcppMemoryScale2(
   auto total_threads = n_elements;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for<DPCPP_K(memory_scale2, dst_dt, src_dt)>(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
-          auto idx = item.get_id(0);
-          dst[idx] = src[idx] * alpha * eps + dst[idx] * (1 - eps);
-        });
+    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+      auto idx = item.get_id(0);
+      dst[idx] = src[idx] * alpha * eps + dst[idx] * (1 - eps);
+    });
   };
 
   // launch kernel
@@ -87,7 +79,7 @@ static inline DPCPP_HOST void dtype_convert_by_scalar(
   auto total_threads = dpcppMaxWorkGroupSize(dev_id);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    cgh.parallel_for<DPCPP_K(data_type_convert, dst_dt, src_dt)>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_ptr = src;
           auto out_ptr = dst;

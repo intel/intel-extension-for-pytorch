@@ -99,9 +99,6 @@ struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
   }
 };
 
-// DPCPP_DEF_K1(dpcpp_gather_kernel);
-template <typename IndexType, typename Real, int Dims>
-class dpcpp_gather_kernel {};
 template <typename IndexType, typename Real, int Dims>
 void THDPCPPTensor_gatherKernel(
     TensorInfo<Real, IndexType> tensor,
@@ -148,14 +145,11 @@ void THDPCPPTensor_gatherKernel(
       //        add warning
     };
 
-    __cgh.parallel_for</*DPCPP_K(dpcpp_gather_kernel, Real, IndexType, Dims)*/
-                       dpcpp_gather_kernel<Real, IndexType, Dims>>(
-        DPCPP::range</*dim=*/1>(totalElements), kfn);
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DPCPP_DEF_K2(scatterSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
 void THSyclTensor_scatterKernel(
     TensorInfo<Real, IndexType> tensor,
@@ -203,7 +197,7 @@ void THSyclTensor_scatterKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(scatterSycl, IndexType, Real, Dims)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -212,7 +206,6 @@ void THSyclTensor_scatterKernel(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-DPCPP_DEF_K2(scatterAddSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
 void THSyclTensor_scatterAddKernel(
     TensorInfo<Real, IndexType> tensor,
@@ -263,7 +256,7 @@ void THSyclTensor_scatterAddKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(scatterAddSycl, IndexType, Real, Dims)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -271,7 +264,6 @@ void THSyclTensor_scatterAddKernel(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-DPCPP_DEF_K2(scatterFillSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
 void THSyclTensor_scatterFillKernel(
     TensorInfo<Real, IndexType> tensor,
@@ -309,7 +301,7 @@ void THSyclTensor_scatterFillKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(scatterFillSycl, IndexType, Real, Dims)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);

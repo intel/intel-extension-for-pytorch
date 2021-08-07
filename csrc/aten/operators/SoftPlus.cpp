@@ -12,9 +12,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-DPCPP_DEF_K1(softplus_forward);
-DPCPP_DEF_K1(softplus_backward);
-
 Tensor& softplus_out(
     Tensor& out,
     const Tensor& self,
@@ -35,14 +32,13 @@ Tensor& softplus_out(
       [&]() {
         auto b = beta.to<scalar_t>();
         auto t = threshold.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_forward)>(
-            iter, [=](scalar_t a) -> scalar_t {
-              return (
-                  a * b > t ? a
-                            : Numerics<scalar_t>::log1p(
-                                  Numerics<scalar_t>::exp(a * b)) /
-                          b);
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
+          return (
+              a * b > t
+                  ? a
+                  : Numerics<scalar_t>::log1p(Numerics<scalar_t>::exp(a * b)) /
+                      b);
+        });
       });
 
   return out;
@@ -75,7 +71,7 @@ Tensor& softplus_backward_out(
       at::ScalarType::BFloat16, iter.dtype(), "softplus_backward", [&]() {
         auto b = beta.to<scalar_t>();
         auto t = threshold.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_backward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter,
             [=](scalar_t grad_output_data, scalar_t output_data) -> scalar_t {
               scalar_t beta_out = b * output_data;

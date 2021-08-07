@@ -16,12 +16,6 @@
 
 using namespace xpu::dpcpp;
 
-// DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool
-// upper);
-
-template <typename...>
-class CopyTriangleSymetric {};
-
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
@@ -60,8 +54,7 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
       data_ptr[dst_off] = data_ptr[src_off];
     };
 
-    __cgh.parallel_for<CopyTriangleSymetric<scalar_t>>(
-        DPCPP::range</*dim=*/1>(work_item_num), kfn);
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(work_item_num), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);

@@ -12,7 +12,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K1(ComputeDpcppKer);
 static void repeat_interleave_dpcpp_kernel(
     int64_t* repeat_ptr,
     int64_t* cumsum_ptr,
@@ -43,7 +42,7 @@ static void repeat_interleave_dpcpp_kernel(
       }
     };
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(ComputeDpcppKer)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
         kfn);
   };

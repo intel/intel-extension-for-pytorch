@@ -21,8 +21,6 @@ namespace at {
 namespace AtenIpexTypeSparseXPU {
 namespace impl {
 
-DPCPP_DEF_K2(coalesce_values_kernel, typename scalar_t);
-
 template <typename scalar_t>
 void coalesce_values_kernel(
     Tensor segment_offsets,
@@ -71,7 +69,7 @@ void coalesce_values_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(coalesce_values_kernel, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<2>(
             DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64),
             DPCPP::range<2>(4, 64)),

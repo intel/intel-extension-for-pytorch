@@ -10,9 +10,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-DPCPP_DEF_K1(SyclOpLeakyElu);
-DPCPP_DEF_K1(SyclOpLeakyEluBackward);
-
 Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
@@ -27,11 +24,10 @@ Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
       "LeakyReLU",
       [&]() {
         auto negval = negative_slope.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpLeakyElu)>(
-            iter, [=](scalar_t x) -> scalar_t {
-              x = (x >= 0) ? x : x * negval;
-              return x;
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          x = (x >= 0) ? x : x * negval;
+          return x;
+        });
       });
   return out;
 }
@@ -73,7 +69,7 @@ Tensor& leaky_relu_backward_out(
       at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
         auto negval = negative_slope.to<scalar_t>();
 
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpLeakyEluBackward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
               if (x > 0)
                 return grad_output;

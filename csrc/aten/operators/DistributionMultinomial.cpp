@@ -51,8 +51,6 @@ int binary_search_for_multinomial(
   return start;
 }
 
-DPCPP_DEF_K1(sample_multinomial_with_replacement_syck_ker);
-
 template <typename scalar_t>
 void sample_multinomial_with_replacement(
     std::pair<uint64_t, uint64_t> seeds,
@@ -104,15 +102,11 @@ void sample_multinomial_with_replacement(
       }
     };
 
-    cgh.parallel_for<DPCPP_K(
-        sample_multinomial_with_replacement_syck_ker, scalar_t)>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
-DPCPP_DEF_K1(sample_multinomial_without_replacement_syck_ker);
 
 template <typename scalar_t>
 void sample_multinomial_without_replacement(
@@ -164,8 +158,7 @@ void sample_multinomial_without_replacement(
           ScalarConvert<int, scalar_t>::to(0);
     };
 
-    cgh.parallel_for<DPCPP_K(
-        sample_multinomial_without_replacement_syck_ker, scalar_t)>(range, kfn);
+    cgh.parallel_for(range, kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);

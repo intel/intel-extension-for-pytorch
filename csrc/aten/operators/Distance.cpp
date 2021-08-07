@@ -179,9 +179,6 @@ Tensor _euclidean_dist(const Tensor& x1, const Tensor& x2) {
   return result;
 }
 
-template <int p_tpye, typename... T>
-class DPCPPOpPdist {};
-
 template <typename scalar_t, typename F, int p_tpye>
 static void pdist_kernel_impl(
     Tensor& result,
@@ -235,15 +232,12 @@ static void pdist_kernel_impl(
       }
     };
 
-    __cgh.parallel_for<DPCPPOpPdist<p_tpye, scalar_t>>(
+    __cgh.parallel_for(
         DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
-template <int p_type, typename... T>
-class DPCPPOpPdistBackward {};
 
 template <typename scalar_t, typename F, int p_type>
 static void pdist_backward_kernel_impl(
@@ -320,7 +314,7 @@ static void pdist_backward_kernel_impl(
       }
     };
 
-    __cgh.parallel_for<DPCPPOpPdistBackward<p_type, scalar_t>>(work_load, kfn);
+    __cgh.parallel_for(work_load, kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -453,9 +447,6 @@ void pdist_backward(
   at::sum_out(result, buffer, 0);
 }
 
-template <int p_type, typename... T>
-class DPCPPOpCdist {};
-
 template <typename scalar_t, typename F, int p_type>
 static void cdist_forward_kernel_impl(
     Tensor& result,
@@ -510,7 +501,7 @@ static void cdist_forward_kernel_impl(
       }
     };
 
-    __cgh.parallel_for<DPCPPOpCdist<p_type, scalar_t>>(
+    __cgh.parallel_for(
         DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
@@ -635,9 +626,6 @@ static Tensor cdist_forward(
   return result;
 }
 
-template <int p_type, typename... T>
-class DPCPPOpCdistBackward {};
-
 template <typename scalar_t, typename F, int p_type>
 static void cdist_backward_kernel_impl(
     Tensor& buffer,
@@ -706,7 +694,7 @@ static void cdist_backward_kernel_impl(
       }
     };
 
-    __cgh.parallel_for<DPCPPOpCdistBackward<p_type, scalar_t>>(work_load, kfn);
+    __cgh.parallel_for(work_load, kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);

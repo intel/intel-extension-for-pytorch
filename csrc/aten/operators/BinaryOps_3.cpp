@@ -15,17 +15,12 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-class SyclOpAnd {};
-class SyclOpOr {};
-class SyclOpXor {};
-
 static void and_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars<SyclOpAnd>(
-        iter, [](bool a, bool b) { return a && b; });
+    dpcpp_kernel_with_scalars(iter, [](bool a, bool b) { return a && b; });
   } else {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_and_xpu", [&]() {
-      dpcpp_kernel_with_scalars<SyclOpAnd>(
+      dpcpp_kernel_with_scalars(
           iter, [](scalar_t a, scalar_t b) { return a & b; });
     });
   }
@@ -33,11 +28,10 @@ static void and_kernel_dpcpp(TensorIterator& iter) {
 
 static void or_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars<SyclOpOr>(
-        iter, [](bool a, bool b) { return a || b; });
+    dpcpp_kernel_with_scalars(iter, [](bool a, bool b) { return a || b; });
   } else {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_or_xpu", [&]() {
-      dpcpp_kernel_with_scalars<SyclOpOr>(
+      dpcpp_kernel_with_scalars(
           iter, [](scalar_t a, scalar_t b) { return a | b; });
     });
   }
@@ -45,30 +39,22 @@ static void or_kernel_dpcpp(TensorIterator& iter) {
 
 static void xor_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars<SyclOpXor>(
-        iter, [](bool a, bool b) { return a != b; });
+    dpcpp_kernel_with_scalars(iter, [](bool a, bool b) { return a != b; });
   } else {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_xor_xpu", [&]() {
-      dpcpp_kernel_with_scalars<SyclOpXor>(
+      dpcpp_kernel_with_scalars(
           iter, [](scalar_t a, scalar_t b) { return a ^ b; });
     });
   }
 }
 
-template <typename...>
-class minimum_kernel_bool {};
-template <typename...>
-class minimum_kernel_interge {};
-template <typename...>
-class minimum_kernel_float {};
-
 void minimum_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter<minimum_kernel_bool<bool>>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [](bool a, bool b) -> bool { return a && b; });
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
     AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "minimum_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter<minimum_kernel_interge<scalar_t>>(
+      dpcpp_kernel_for_tensor_iter(
           iter,
           [](scalar_t a, scalar_t b) -> scalar_t { return std::min(a, b); });
     });
@@ -79,7 +65,7 @@ void minimum_kernel(TensorIterator& iter) {
         iter.dtype(),
         "min_elementwise_dpcpp",
         [&]() {
-          dpcpp_kernel_for_tensor_iter<minimum_kernel_float<scalar_t>>(
+          dpcpp_kernel_for_tensor_iter(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 if (a != a) {
                   return a;
@@ -93,20 +79,13 @@ void minimum_kernel(TensorIterator& iter) {
   }
 }
 
-template <typename...>
-class maximum_kernel_bool {};
-template <typename...>
-class maximum_kernel_interge {};
-template <typename...>
-class maximum_kernel_float {};
-
 void maximum_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter<maximum_kernel_bool<bool>>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [](bool a, bool b) -> bool { return a || b; });
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
     AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "maximum_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter<maximum_kernel_interge<scalar_t>>(
+      dpcpp_kernel_for_tensor_iter(
           iter,
           [](scalar_t a, scalar_t b) -> scalar_t { return std::max(a, b); });
     });
@@ -117,7 +96,7 @@ void maximum_kernel(TensorIterator& iter) {
         iter.dtype(),
         "max_elementwise_dpcpp",
         [&]() {
-          dpcpp_kernel_for_tensor_iter<maximum_kernel_float<scalar_t>>(
+          dpcpp_kernel_for_tensor_iter(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 if (a != a) {
                   return a;

@@ -16,9 +16,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace impl {
 
-// Note: dpcpp compiler does not support uname type in template.
-class SyclOpAdd {};
-
 static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
@@ -28,7 +25,7 @@ static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       "add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
-        dpcpp_kernel_with_scalars<SyclOpAdd>(
+        dpcpp_kernel_with_scalars(
             iter,
             [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
       });

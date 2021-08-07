@@ -2,8 +2,6 @@
 
 #include <utils/DPCPP.h>
 
-DPCPP_DEF_K2(EltwiseBinNaive, typename func_t, typename scalar_t);
-
 // requirements
 // 1. same strides (contiguous)
 // 2. same format
@@ -18,7 +16,7 @@ void eltwise_binary_naive_kernel(
   uint64_t subgp_size = 32;
   uint64_t wg_num = nelem / subgp_size + 1;
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    __cgh.parallel_for<DPCPP_K(EltwiseBinNaive, func_t, scalar_t)>(
+    __cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(wg_num * subgp_size), DPCPP::range<1>(subgp_size)),
         [=](DPCPP::nd_item<1> item_id) {

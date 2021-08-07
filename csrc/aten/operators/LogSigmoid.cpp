@@ -10,7 +10,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-DPCPP_DEF_K1(DPCPPPOpLogSigmoid);
 std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
     Tensor& output,
     Tensor& buffer,
@@ -29,13 +28,12 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
       iter.dtype(),
       "log_sigmoid_forward",
       [&]() {
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoid)>(
-            iter, [=](scalar_t x) -> scalar_t {
-              const scalar_t max = Numerics<scalar_t>::max(0, -x);
-              const scalar_t z = Numerics<scalar_t>::exp(-max) +
-                  Numerics<scalar_t>::exp(-x - max);
-              return -(max + Numerics<scalar_t>::log(z));
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          const scalar_t max = Numerics<scalar_t>::max(0, -x);
+          const scalar_t z =
+              Numerics<scalar_t>::exp(-max) + Numerics<scalar_t>::exp(-x - max);
+          return -(max + Numerics<scalar_t>::log(z));
+        });
       });
 
   return std::tuple<Tensor&, Tensor&>{output, buffer};
@@ -50,7 +48,6 @@ std::tuple<Tensor, Tensor> log_sigmoid_forward(const Tensor& self) {
   return std::tuple<Tensor, Tensor>{result, buffer};
 }
 
-DPCPP_DEF_K1(DPCPPPOpLogSigmoidBackward);
 Tensor& log_sigmoid_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
@@ -70,7 +67,7 @@ Tensor& log_sigmoid_backward_out(
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "log_sigmoid_backward", [&]() {
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoidBackward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
               const scalar_t max = Numerics<scalar_t>::max(0, -x);
               const scalar_t z = Numerics<scalar_t>::exp(-max) +

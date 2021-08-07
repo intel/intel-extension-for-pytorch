@@ -12,9 +12,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename...>
-class TensorLerpOp {};
-
 template <typename scalar_t>
 void lerp(
     at::Tensor& ret,
@@ -28,7 +25,7 @@ void lerp(
                   .add_input(end)
                   .add_input(weight)
                   .build();
-  dpcpp_kernel_for_tensor_iter<TensorLerpOp<scalar_t>>(
+  dpcpp_kernel_for_tensor_iter(
       iter, [=](scalar_t a, scalar_t b, scalar_t weight) -> scalar_t {
         return (weight < 0.5) ? Numerics<scalar_t>::add(
                                     a,

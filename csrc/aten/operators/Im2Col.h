@@ -10,11 +10,6 @@
 using namespace xpu::dpcpp;
 
 template <typename T>
-class im2col_dpcpp_kernel {};
-template <typename T>
-class col2im_dpcpp_kernel {};
-
-template <typename T>
 static void im2col_kernel(
     const T* data_im,
     const int64_t channels,
@@ -39,7 +34,7 @@ static void im2col_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = data_im;
     auto out_data = data_col;
-    cgh.parallel_for<im2col_dpcpp_kernel<T>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_ptr = in_data;
           auto out_ptr = out_data;
@@ -95,7 +90,7 @@ static void col2im_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = data_col;
     auto out_data = data_im;
-    cgh.parallel_for<col2im_dpcpp_kernel<T>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_ptr = in_data;
           auto out_ptr = out_data;

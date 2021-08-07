@@ -13,10 +13,6 @@
 using namespace at::native;
 using namespace xpu::dpcpp;
 
-DPCPP_DEF_K1(reduceInnermostDimIndex);
-
-DPCPP_DEF_K1(reduceOuterDimIndex);
-
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -125,8 +121,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(
-        reduceInnermostDimIndex, K, Index, BinaryFunction)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -195,7 +190,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(reduceOuterDimIndex, K, Index, BinaryFunction)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);

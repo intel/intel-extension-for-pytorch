@@ -8,13 +8,11 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K1(logical_xor_bool);
-DPCPP_DEF_K1(logical_xor_scalar);
 static void logical_xor_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         kBool, kHalf, iter.input_dtype(), "logical_xor_kernel", [&]() {
-          dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor_bool, scalar_t)>(
+          dpcpp_kernel_for_tensor_iter(
               iter, [](scalar_t a, scalar_t b) -> bool {
                 return bool(a) != bool(b);
               });
@@ -22,7 +20,7 @@ static void logical_xor_kernel(TensorIterator& iter) {
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         kBool, kHalf, iter.dtype(), "logical_xor_kernel", [&]() {
-          dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor_scalar, scalar_t)>(
+          dpcpp_kernel_for_tensor_iter(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 return static_cast<scalar_t>(bool(a) != bool(b));
               });

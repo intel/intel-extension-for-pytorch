@@ -5,9 +5,6 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 
-DPCPP_DEF_K1(SyclOpElu);
-DPCPP_DEF_K1(SyclOpEluBackward);
-
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -35,13 +32,11 @@ Tensor& elu_out(
         auto poscoef = scale.to<scalar_t>();
         auto negiptocoef = input_scale.to<scalar_t>();
 
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElu)>(
-            iter, [=](scalar_t x) -> scalar_t {
-              x = x <= 0
-                  ? (Numerics<scalar_t>::exp(x * negiptocoef) - 1) * negcoef
-                  : x * poscoef;
-              return x;
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          x = x <= 0 ? (Numerics<scalar_t>::exp(x * negiptocoef) - 1) * negcoef
+                     : x * poscoef;
+          return x;
+        });
       });
 
   return out;
@@ -73,7 +68,7 @@ Tensor& elu_backward_out(
         auto poscoef = scale.to<scalar_t>();
         auto negiptocoef = input_scale.to<scalar_t>();
 
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpEluBackward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t output) -> scalar_t {
               if (output <= 0)
                 return grad_output * negiptocoef * (output + negcoef);

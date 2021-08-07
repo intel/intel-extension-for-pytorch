@@ -21,9 +21,6 @@
 #include <oneapi/dpl/numeric>
 #endif
 
-DPCPP_DEF_K1(intrepr);
-DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
-
 using namespace at::native;
 using namespace xpu::dpcpp;
 
@@ -211,9 +208,6 @@ inline void get_coordinate_in_tril_trapezoid(
 
 } // namespace triangle_dpcpp
 
-DPCPP_DEF_K1(triuIndicesSycl);
-DPCPP_DEF_K1(trilIndicesSycl);
-
 template <typename scalar_t>
 void triu_indices_dpcpp_kernel(
     scalar_t* tensor,
@@ -254,7 +248,7 @@ void triu_indices_dpcpp_kernel(
       }
     };
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(triuIndicesSycl, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -305,7 +299,7 @@ void tril_indices_dpcpp_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(trilIndicesSycl, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);

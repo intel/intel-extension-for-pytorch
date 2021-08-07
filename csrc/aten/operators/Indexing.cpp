@@ -33,7 +33,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K1(index_select_ker);
 template <typename scalar_t>
 void indexSelect(
     Tensor& dst,
@@ -107,7 +106,7 @@ void indexSelect(
     auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = indices.data_ptr<int64_t>();
 
-    __cgh.parallel_for<DPCPP_K(index_select_ker, scalar_t)>(
+    __cgh.parallel_for(
         DPCPP::nd_range</*dim=*/1>(
             DPCPP::range</*dim=*/1>(num_slices * wgroup_size),
             DPCPP::range</*dim=*/1>(wgroup_size)),
@@ -152,8 +151,6 @@ void indexSelect(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   return;
 }
-
-DPCPP_DEF_K1(nonzero_kernel);
 
 template <typename T>
 struct NonZeroOp {
@@ -271,7 +268,6 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
   }
 }
 
-DPCPP_DEF_K1(index_add_ker);
 template <typename scalar_t>
 void indexAdd(
     Tensor& dst,
@@ -381,7 +377,7 @@ void indexAdd(
     auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = indices.data_ptr<long>();
 
-    __cgh.parallel_for<DPCPP_K(index_add_ker, scalar_t)>(
+    __cgh.parallel_for(
         DPCPP::nd_range</*dim=*/1>(
             DPCPP::range</*dim=*/1>(numIndices * wgroup_size),
             DPCPP::range</*dim=*/1>(wgroup_size)),
@@ -426,7 +422,6 @@ void indexAdd(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DPCPP_DEF_K1(index_fill_ker);
 template <typename scalar_t>
 void indexFill(
     Tensor& dst,
@@ -480,7 +475,7 @@ void indexFill(
     auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = indices.data_ptr<long>();
 
-    __cgh.parallel_for<DPCPP_K(index_fill_ker, scalar_t)>(
+    __cgh.parallel_for(
         DPCPP::nd_range</*dim=*/1>(
             DPCPP::range</*dim=*/1>(numIndices * wgroup_size),
             DPCPP::range</*dim=*/1>(wgroup_size)),
@@ -518,7 +513,6 @@ void indexFill(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DPCPP_DEF_K1(index_copy_ker);
 template <typename scalar_t>
 void indexCopy(
     Tensor& dst,
@@ -609,7 +603,7 @@ void indexCopy(
       }
     };
 
-    cgh.parallel_for<DPCPP_K(index_copy_ker, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(numIndices * wgroup_size),
             DPCPP::range<1>(wgroup_size)),
@@ -619,8 +613,6 @@ void indexCopy(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DPCPP_DEF_K1(diag_from_dpcpp_ker);
-DPCPP_DEF_K1(diag_to_dpcpp_ker);
 template <typename scalar_t>
 void Diag(Tensor& dst, const Tensor& src, int64_t k) {
   int nDimension = src.dim() == 0 ? 1 : src.dim();
@@ -653,8 +645,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
           const int64_t bOffset = start + (stride0 + stride1) * id;
           out_ptr[strideSelf * id] = in_ptr[bOffset];
         };
-        cgh.parallel_for<DPCPP_K(diag_from_dpcpp_ker, scalar_t)>(
-            DPCPP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
@@ -683,8 +674,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out_ptr[aOffset] = in_ptr[strideSrc * id];
         };
-        cgh.parallel_for<DPCPP_K(diag_to_dpcpp_ker, scalar_t)>(
-            DPCPP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
@@ -719,8 +709,6 @@ void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
       tensor, mask, TensorMaskedFillOp<scalar_t, unsigned char>(value));
 }
 
-DPCPP_DEF_K1(maskedScatter_scan_dpcpp_ker);
-DPCPP_DEF_K1(TensorMaskedScatterOp);
 template <typename scalar_t>
 void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   Tensor mask;
@@ -778,7 +766,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<DPCPP_K(maskedScatter_scan_dpcpp_ker, scalar_t)>(kfn);
+    cgh.single_task(kfn);
   };
   // submit to DPCPP queue
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -807,7 +795,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
       }
     };
 
-    cgh.parallel_for<DPCPP_K(TensorMaskedScatterOp, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         kfn);
   };
@@ -816,8 +804,6 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedScatter);
 }
 
-DPCPP_DEF_K1(maskedSelect_scan_dpcpp_ker);
-DPCPP_DEF_K1(TensorMaskedSelectOp);
 template <typename scalar_t>
 void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
@@ -871,7 +857,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<DPCPP_K(maskedSelect_scan_dpcpp_ker, scalar_t)>(kfn);
+    cgh.single_task(kfn);
   };
 
   // submit to DPCPP queue
@@ -912,7 +898,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
         }
       }
     };
-    cgh.parallel_for<DPCPP_K(TensorMaskedSelectOp, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         kfn);
   };
@@ -930,8 +916,7 @@ struct alignas(N) OpaqueType {
   char data[N];
 };
 
-DPCPP_DEF_K1(dpcpp_put_kernel);
-template <typename scalar_t, typename kernel_name, typename Func>
+template <typename scalar_t, typename Func>
 void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
   auto numel = index.numel();
   auto out_numel = self.numel();
@@ -980,13 +965,11 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
       f(out_ptr, source_ptr + src_offset, out_offset);
     };
 
-    __cgh.parallel_for<DPCPP_K(dpcpp_put_kernel, kernel_name)>(
-        DPCPP::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DPCPP_DEF_K1(index_kernel);
 void index(
     TensorIterator& iter,
     IntArrayRef index_size,
@@ -1001,7 +984,7 @@ void index(
       "index",
       [&] {
         using dtype = OpaqueType<sizeof(scalar_t)>;
-        dpcpp_index_kernel<DPCPP_K(index_kernel, scalar_t)>(
+        dpcpp_index_kernel(
             iter,
             index_size,
             index_stride,
@@ -1013,7 +996,6 @@ void index(
       });
 }
 
-DPCPP_DEF_K1(index_put_kernel);
 void index_put(
     TensorIterator& iter,
     IntArrayRef index_size,
@@ -1021,10 +1003,7 @@ void index_put(
     bool accumulate) {
   if (accumulate) {
     IPEX_DISPATCH_ATOMIC_ALL_TYPES(iter.dtype(), "index_put", [&] {
-      dpcpp_index_kernel<DPCPP_K(
-          index_put_kernel,
-          scalar_t,
-          /*accumulate=*/bool)>(
+      dpcpp_index_kernel(
           iter,
           index_size,
           index_stride,
@@ -1046,7 +1025,7 @@ void index_put(
         "index_put",
         [&] {
           using dtype = OpaqueType<sizeof(scalar_t)>;
-          dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(
+          dpcpp_index_kernel(
               iter,
               index_size,
               index_stride,
@@ -1059,7 +1038,6 @@ void index_put(
   }
 }
 
-DPCPP_DEF_K1(take_ker);
 template <typename scalar_t>
 void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -1092,8 +1070,7 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
       dst_ptr[idx] = src_ptr[offset];
     };
 
-    cgh.parallel_for<DPCPP_K(take_ker, scalar_t)>(
-        DPCPP::range<1>(dst_num_elem), kfn);
+    cgh.parallel_for(DPCPP::range<1>(dst_num_elem), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -1327,7 +1304,6 @@ Tensor masked_select(const Tensor& self, const Tensor& mask) {
   return at::AtenIpexTypeXPU::masked_select_out(out, self, mask);
 }
 
-DPCPP_DEF_K1(dpcpp_put_kernel);
 Tensor& put_(
     Tensor& self,
     const Tensor& index_,
@@ -1363,9 +1339,7 @@ Tensor& put_(
 
   if (accumulate) {
     IPEX_DISPATCH_ATOMIC_ALL_TYPES(self.scalar_type(), "put_", [&] {
-      impl::put<
-          scalar_t,
-          DPCPP_K(dpcpp_put_kernel, scalar_t, /*accumulate=*/bool)>(
+      impl::put<scalar_t>(
           self,
           index,
           source,
@@ -1385,7 +1359,7 @@ Tensor& put_(
         "put_",
         [&] {
           using dtype = impl::OpaqueType<sizeof(scalar_t)>;
-          impl::put<scalar_t, DPCPP_K(dpcpp_put_kernel, scalar_t)>(
+          impl::put<scalar_t>(
               self,
               index,
               source,

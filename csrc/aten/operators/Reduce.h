@@ -24,8 +24,6 @@
 using namespace xpu::dpcpp;
 using xpu::dpcpp::Array;
 
-DPCPP_DEF_K1(reduce_kernel);
-
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -600,7 +598,7 @@ static void launch_reduce_kernel(
           item_id);
     };
 
-    cgh.parallel_for<DPCPP_K(reduce_kernel, DataType, R)>(
+    cgh.parallel_for(
         DPCPP::nd_range<2>(config.get_global_size(), config.get_local_size()),
         kfn);
   };

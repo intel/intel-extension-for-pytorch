@@ -28,9 +28,6 @@ static inline bool is_contiguous(const int64_t* strides) {
       strides[2] == sizeof(scalar_t);
 }
 
-// Note: dpcpp compiler does not support uname type in template.
-class SyclOpThreshold {};
-
 static void threshold_kernel(
     TensorIterator& iter,
     Scalar threshold_scalar,
@@ -48,21 +45,12 @@ static void threshold_kernel(
           all_contiguous = all_contiguous && iter.tensor(i).is_contiguous();
         }
 
-        dpcpp_kernel_for_tensor_iter<SyclOpThreshold>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t x, scalar_t other) -> scalar_t {
               return x <= threshold ? value : other;
             });
       });
 }
-
-template <typename...>
-class rrelu_updateOutput_dpcpp_inplace_kernel {};
-template <typename...>
-class rrelu_updateOutput_dpcpp_kernel {};
-template <typename...>
-class rrelu_updateOutput_eval_dpcpp_kernel {};
-template <typename...>
-class rrelu_updateGradInput_eval_dpcpp_kernel {};
 
 template <typename scalar_t>
 static void RReLU_updateOutput(
@@ -96,7 +84,7 @@ static void RReLU_updateOutput(
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_data = input_.data_ptr<scalar_t>();
         auto noise_data = noise.data_ptr<scalar_t>();
-        cgh.parallel_for<rrelu_updateOutput_dpcpp_inplace_kernel<scalar_t>>(
+        cgh.parallel_for(
             DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
               auto in_ptr = in_data;
               auto noise_ptr = noise_data;
@@ -129,7 +117,7 @@ static void RReLU_updateOutput(
         auto in_data = input_.data_ptr<scalar_t>();
         auto out_data = output.data_ptr<scalar_t>();
         auto noise_data = noise.data_ptr<scalar_t>();
-        cgh.parallel_for<rrelu_updateOutput_dpcpp_kernel<scalar_t>>(
+        cgh.parallel_for(
             DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
               auto in_ptr = in_data;
               auto out_ptr = out_data;
@@ -163,11 +151,9 @@ static void RReLU_updateOutput(
                     .add_output(output)
                     .add_input(input)
                     .build();
-    dpcpp_kernel_for_tensor_iter<
-        rrelu_updateOutput_eval_dpcpp_kernel<scalar_t>>(
-        iter, [=](scalar_t in) -> scalar_t {
-          return (in <= 0) ? in * negSlope : in;
-        });
+    dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t in) -> scalar_t {
+      return (in <= 0) ? in * negSlope : in;
+    });
   }
 }
 
@@ -202,17 +188,12 @@ static void RReLU_updateGradInput(
                     .add_input(gradOutput)
                     .add_input(input)
                     .build();
-    dpcpp_kernel_for_tensor_iter<
-        rrelu_updateGradInput_eval_dpcpp_kernel<scalar_t>>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [=](scalar_t grad_out, scalar_t in) -> scalar_t {
           return (in <= 0) ? grad_out * negSlope : grad_out;
         });
   }
 }
-
-/* prelu forward */
-template <typename scalar_t>
-class prelu_dpcpp_kernel_share_weights {};
 
 template <typename scalar_t>
 void inline prelu_kernel_share_weights(
@@ -226,7 +207,7 @@ void inline prelu_kernel_share_weights(
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = input.data_ptr<scalar_t>();
 
-    cgh.parallel_for<prelu_dpcpp_kernel_share_weights<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto out_ptr = out_data;
           auto in_ptr = in_data;
@@ -238,9 +219,6 @@ void inline prelu_kernel_share_weights(
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
-template <typename scalar_t>
-class prelu_dpcpp_kernel_multi_weights {};
 
 template <typename scalar_t>
 void inline prelu_kernel_multi_weights(
@@ -258,7 +236,7 @@ void inline prelu_kernel_multi_weights(
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = input.data_ptr<scalar_t>();
     auto weight_data = weight.data_ptr<scalar_t>();
-    cgh.parallel_for<prelu_dpcpp_kernel_multi_weights<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto out_ptr = out_data;
           auto in_ptr = in_data;
@@ -274,10 +252,6 @@ void inline prelu_kernel_multi_weights(
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
-/* prelu backward */
-template <typename scalar_t>
-class prelu_backward_dpcpp_kernel_share_weights {};
 
 template <typename scalar_t>
 void inline prelu_backward_kernel_share_weights(
@@ -297,7 +271,7 @@ void inline prelu_backward_kernel_share_weights(
     auto in_data = input.data_ptr<scalar_t>();
     auto grad_out_data = grad_out.data_ptr<scalar_t>();
 
-    cgh.parallel_for<prelu_backward_dpcpp_kernel_share_weights<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_grad_ptr = in_grad_data;
           auto weight_grad_collector_ptr = weight_grad_collector_data;
@@ -316,9 +290,6 @@ void inline prelu_backward_kernel_share_weights(
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
-template <typename scalar_t>
-class prelu_backward_dpcpp_kernel_multi_weights {};
 
 template <typename scalar_t>
 void inline prelu_backward_kernel_multi_weights(
@@ -341,7 +312,7 @@ void inline prelu_backward_kernel_multi_weights(
     auto in_grad_data = input_grad.data_ptr<scalar_t>();
     auto weight_grad_collector_data =
         weight_grad_collector.data_ptr<scalar_t>();
-    cgh.parallel_for<prelu_backward_dpcpp_kernel_multi_weights<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto in_ptr = in_data;
           auto weight_ptr = weight_data;
@@ -365,9 +336,6 @@ void inline prelu_backward_kernel_multi_weights(
 }
 
 template <typename scalar_t>
-class gelu_dpcpp_kernel {};
-
-template <typename scalar_t>
 void GeluKernelImpl(const Tensor& X, Tensor& Y) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = X.numel();
@@ -376,7 +344,7 @@ void GeluKernelImpl(const Tensor& X, Tensor& Y) {
     auto X_data = X.data_ptr<scalar_t>();
     auto Y_data = Y.data_ptr<scalar_t>();
 
-    cgh.parallel_for<gelu_dpcpp_kernel<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto X_ptr = X_data;
           auto Y_ptr = Y_data;
@@ -391,9 +359,6 @@ void GeluKernelImpl(const Tensor& X, Tensor& Y) {
 }
 
 template <typename scalar_t>
-class gelu_backward_dpcpp_kernel {};
-
-template <typename scalar_t>
 void GeluBackwardKernelImpl(const Tensor& dY, const Tensor& X, Tensor& dX) {
   auto kAlpha = M_2_SQRTPI * M_SQRT1_2 * scalar_t(0.5);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -403,7 +368,7 @@ void GeluBackwardKernelImpl(const Tensor& dY, const Tensor& X, Tensor& dX) {
     auto X_data = X.data_ptr<scalar_t>();
     auto dX_data = dX.data_ptr<scalar_t>();
 
-    cgh.parallel_for<gelu_backward_dpcpp_kernel<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto dY_ptr = dY_data;
           auto X_ptr = X_data;
@@ -733,7 +698,6 @@ std::tuple<Tensor, Tensor> prelu_backward(
   return std::tuple<Tensor, Tensor>{input_grad, weight_grad};
 }
 
-DPCPP_DEF_K1(DPCPPOpHardShrink);
 Tensor hardshrink(const Tensor& self, Scalar lambd_) {
   auto out_tensor = at::empty_like(self);
 
@@ -747,15 +711,13 @@ Tensor hardshrink(const Tensor& self, Scalar lambd_) {
       "hardshrink",
       [&] {
         auto lambd = lambd_.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrink)>(
-            iter, [=](scalar_t x) -> scalar_t {
-              return (x >= -lambd && x <= lambd) ? scalar_t(0) : x;
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          return (x >= -lambd && x <= lambd) ? scalar_t(0) : x;
+        });
       });
   return out_tensor;
 }
 
-DPCPP_DEF_K1(DPCPPOpHardShrinkBackward);
 Tensor hardshrink_backward(
     const Tensor& grad,
     const Tensor& self,
@@ -771,7 +733,7 @@ Tensor hardshrink_backward(
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, self.scalar_type(), "hardshrink_backward", [&] {
         auto lambd = lambd_.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrinkBackward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
               return (x >= -lambd && x <= lambd) ? scalar_t(0) : grad_output;
             });

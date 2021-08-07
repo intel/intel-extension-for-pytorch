@@ -12,7 +12,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K1(softshrink_forward);
 static void softshrink_forward(TensorIterator& iter, Scalar lambd) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -21,25 +20,23 @@ static void softshrink_forward(TensorIterator& iter, Scalar lambd) {
       "softshrink_forward",
       [&]() {
         auto lambd_data = lambd.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_forward)>(
-            iter, [=](scalar_t x) -> scalar_t {
-              if (x > lambd_data) {
-                return (x - lambd_data);
-              } else if (x < -lambd_data) {
-                return (x + lambd_data);
-              } else {
-                return ScalarConvert<int, scalar_t>::to(0);
-              }
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          if (x > lambd_data) {
+            return (x - lambd_data);
+          } else if (x < -lambd_data) {
+            return (x + lambd_data);
+          } else {
+            return ScalarConvert<int, scalar_t>::to(0);
+          }
+        });
       });
 }
 
-DPCPP_DEF_K1(softshrink_backward);
 static void softshrink_backward(TensorIterator& iter, Scalar lambd) {
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "softshrink_backward", [&]() {
         auto lambd_data = lambd.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_backward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t input) -> scalar_t {
               if (input > lambd_data || input < -lambd_data) {
                 return grad_output;

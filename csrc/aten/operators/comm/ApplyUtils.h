@@ -16,37 +16,6 @@ using namespace xpu::dpcpp::detail;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-// We pull the kernel name from anonymous namespace to outside,
-// because otherwise dpcpp compiler will fail to recognize
-// these kernel name. [CORC-4860] DPCPP compiler team argue
-// that it violates the spec that kernel name should be
-// globally visible if put the kernel name in anonymous namespace.
-
-template <typename Op, typename scalar, typename IndexType, int ADims, int step>
-class PointwiseApply1 {};
-
-template <
-    typename Op,
-    typename scalar1,
-    typename scalar2,
-    typename IndexType,
-    int ADims,
-    int BDims,
-    int step>
-class PointwiseApply2 {};
-
-template <
-    typename Op,
-    typename scalar1,
-    typename scalar2,
-    typename scalar3,
-    typename IndexType,
-    int ADims,
-    int BDims,
-    int CDims,
-    int step>
-class PointwiseApply3 {};
-
 template <
     typename T1,
     typename IndexType,
@@ -251,7 +220,7 @@ void kernelPointwiseApply1(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* a_pointer = a.data;
-    cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims, step>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
@@ -456,8 +425,7 @@ void kernelPointwiseApply2(
   auto cgf = DPCPP_Q_CGF(cgh) {
     void* in_ptr = input.data;
     void* out_ptr = output.data;
-    cgh.parallel_for<
-        PointwiseApply2<Op, scalar1, scalar2, IndexType, ADims, BDims, step>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
@@ -669,16 +637,7 @@ void kernelPointwiseApply3(
     void* in1_ptr = input1.data;
     void* in2_ptr = input2.data;
     void* out_ptr = output.data;
-    cgh.parallel_for<PointwiseApply3<
-        Op,
-        scalar1,
-        scalar2,
-        scalar3,
-        IndexType,
-        ADims,
-        BDims,
-        CDims,
-        step>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
@@ -912,20 +871,6 @@ template <
     int CDims,
     int DDims,
     int step>
-class PointwiseApply4 {};
-
-template <
-    typename Op,
-    typename scalar1,
-    typename scalar2,
-    typename scalar3,
-    typename scalar4,
-    typename IndexType,
-    int ADims,
-    int BDims,
-    int CDims,
-    int DDims,
-    int step>
 void kernelPointwiseApply4(
     TensorInfo<scalar1, IndexType> output,
     TensorInfo<scalar2, IndexType> input1,
@@ -942,18 +887,7 @@ void kernelPointwiseApply4(
     void* in2_ptr = input2.data;
     void* in3_ptr = input3.data;
     void* out_ptr = output.data;
-    cgh.parallel_for<PointwiseApply4<
-        Op,
-        scalar1,
-        scalar2,
-        scalar3,
-        scalar4,
-        IndexType,
-        ADims,
-        BDims,
-        CDims,
-        DDims,
-        step>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {

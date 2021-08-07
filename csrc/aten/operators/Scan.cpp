@@ -15,15 +15,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename T, typename BinOp>
-class scanthrust_dpcpp_ker {};
-
-template <typename T, typename BinOp>
-class scanOuterDim_dpcpp_kernel {};
-
-template <typename T, typename BinOp>
-class scanInnerDim_dpcpp_kernel {};
-
 template <typename scalar_t, class BinaryFunction>
 typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
     Tensor& dst,
@@ -38,7 +29,7 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
     auto src_data = src.data_ptr<scalar_t>();
     auto dst_data = dst.data_ptr<scalar_t>();
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<scanthrust_dpcpp_ker<scalar_t, BinaryFunction>>([=]() {
+    cgh.single_task([=]() {
       auto ptr_dst = dst_data;
       auto ptr_src = src_data;
       dpcpp_inclusive_scan(ptr_src, ptr_src + size, ptr_dst, binary_op);
@@ -87,7 +78,7 @@ void scanOuterDim(
       }
     };
 
-    cgh.parallel_for<scanOuterDim_dpcpp_kernel<scalar_t, BinaryOp>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         kfn);
@@ -135,7 +126,7 @@ void scanInnermostDim(
       }
     };
 
-    cgh.parallel_for<scanInnerDim_dpcpp_kernel<scalar_t, BinaryFunction>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         kfn);

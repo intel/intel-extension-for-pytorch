@@ -12,9 +12,6 @@
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 
-template <bool has_weight, typename...>
-class histogram_kernel {};
-
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
@@ -85,9 +82,7 @@ void kernelHistogram1D(
       }
     };
 
-    __cgh.parallel_for<
-        histogram_kernel<has_weight, output_t, input_t, IndexType>>(
-        DPCPP::range</*dim=*/1>(totalElements), kfn);
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }

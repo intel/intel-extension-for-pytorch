@@ -17,24 +17,6 @@
 
 #include "Loops.h"
 
-template <typename...>
-class MultiMarginCriterionUpdateOutputKernel1 {};
-template <typename...>
-class MultiMarginCriterionUpdateOutputKernel2 {};
-template <typename...>
-class MultiMarginCriterionUpdateGradInputKernel {};
-
-template <typename...>
-class MultilabelMarginCriterionUpdateOutputKernel1 {};
-template <typename...>
-class MultilabelMarginCriterionUpdateOutputKernel2 {};
-template <typename...>
-class MultilabelMarginCriterionUpdateGradInputKernel {};
-
-class SmoothL1Backward {};
-
-class SmoothL1Forward {};
-
 using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
 
@@ -514,7 +496,7 @@ void smooth_l1_kernel(TensorIterator& iter, double beta) {
       "smooth_l1_kernel",
       [&iter, beta]() {
         scalar_t beta_val(beta);
-        dpcpp_kernel_for_tensor_iter<SmoothL1Forward>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [beta_val](scalar_t a, scalar_t b) -> scalar_t {
               auto z = ::abs(a - b);
               return z < beta_val ? scalar_t(0.5) * z * z / beta_val
@@ -531,7 +513,7 @@ void smooth_l1_backward_kernel(TensorIterator& iter, Scalar norm, double beta) {
       [&iter, &norm, beta] {
         auto norm_val = norm.to<scalar_t>();
         scalar_t beta_val(beta);
-        dpcpp_kernel_for_tensor_iter<SmoothL1Backward>(
+        dpcpp_kernel_for_tensor_iter(
             iter,
             [norm_val, beta_val](
                 scalar_t input,
@@ -684,8 +666,7 @@ void MultiMarginCriterion_updateOutput(
           output_ptr[i] = sum;
         }
       };
-      cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel1<scalar_t>>(
-          DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
         auto input_ptr = input_data;
@@ -725,7 +706,7 @@ void MultiMarginCriterion_updateOutput(
         item_id.barrier(dpcpp_global_and_local_fence);
         output_ptr[0] = local_output_data[0];
       };
-      cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel2<scalar_t>>(
+      cgh.parallel_for(
           DPCPP::nd_range<1>(
               DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
           kfn);
@@ -828,8 +809,7 @@ void MultiMarginCriterion_updateGradInput(
               : grad_output_ptr[0];
       }
     };
-    cgh.parallel_for<MultiMarginCriterionUpdateGradInputKernel<scalar_t>>(
-        DPCPP::range<1>(local_size), kfn);
+    cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -935,8 +915,7 @@ void MultilabelMarginCriterion_updateOutput(
           output_ptr[i] = sum;
         }
       };
-      cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel1<scalar_t>>(
-          DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
         auto input_ptr = input_data;
@@ -983,7 +962,7 @@ void MultilabelMarginCriterion_updateOutput(
         item_id.barrier(dpcpp_global_and_local_fence);
         output_ptr[0] = local_output_data[0];
       };
-      cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel2<scalar_t>>(
+      cgh.parallel_for(
           DPCPP::nd_range<1>(
               DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
           kfn);
@@ -1104,8 +1083,7 @@ void MultilabelMarginCriterion_updateGradInput(
               : grad_output_ptr[0];
       }
     };
-    cgh.parallel_for<MultilabelMarginCriterionUpdateGradInputKernel<scalar_t>>(
-        DPCPP::range<1>(local_size), kfn);
+    cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);

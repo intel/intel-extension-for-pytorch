@@ -14,8 +14,6 @@
 
 #include "Loops.h"
 
-DPCPP_DEF_K1(intrepr);
-
 using namespace at::native;
 using namespace xpu::dpcpp;
 
@@ -62,7 +60,7 @@ Tensor int_repr(const Tensor& self) {
                     .add_input(self)
                     .check_all_same_dtype(false)
                     .build();
-    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter<DPCPP_K(intrepr)>(
+    AtenIpexTypeXPU::dpcpp_kernel_for_tensor_iter(
         iter, [=](scalar_t value) -> underlying_t { return value.val_; });
   });
   return dst;

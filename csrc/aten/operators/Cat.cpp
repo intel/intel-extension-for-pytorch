@@ -69,7 +69,6 @@ struct OutputTensorSizeStride {
   IndexType outputStride[MaxDims];
 };
 
-DPCPP_DEF_K2(CatArrayBatchKer, typename T, typename IndexType, int Dims);
 /**
  * Kernel used to concatenated grimDim.y tensors into an output tensor. Uses a
  * grid-stride loop based off of the blockIdx.x, threadIdx.x for each input to
@@ -132,8 +131,7 @@ void CatArrayBatchedCopy(
         tid += stride;
       }
     };
-    cgh.parallel_for<DPCPP_K(CatArrayBatchKer, T, IndexType, Dims)>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf)
 }

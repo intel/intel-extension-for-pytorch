@@ -33,26 +33,6 @@ namespace DPCPP = cl::sycl;
     DPCPP_KER_PRINTF(fmt_var, ##__VA_ARGS__); \
   }
 
-// macro-s for dpcpp command queue and kernel function
-// Kernel name format
-#define DPCPP_K_NAME(x) __##x##_dpcpp_kernel
-
-// Kernel instance in parallel_for invocation
-#define DPCPP_K(k, ...) DPCPP_K_NAME(k)<char, ##__VA_ARGS__>
-
-// Global unique kernel declaration with variable arguments
-// Full list of type arguments is NOT needed
-#define DPCPP_DEF_K1(k)                                   \
-  template <typename __dummy_typename_dpcpp, typename...> \
-  class DPCPP_K_NAME(k) {}
-
-// Global unique kernel declaration with variable arguments and constant
-// specialization Full list type arguments is MUST due to constant
-// specialization in class template
-#define DPCPP_DEF_K2(k, ...)                                \
-  template <typename __dummy_typename_dpcpp, ##__VA_ARGS__> \
-  class DPCPP_K_NAME(k) {}
-
 // Kernel function implementation
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
 

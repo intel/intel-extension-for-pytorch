@@ -243,7 +243,6 @@ void unrolled_elementwise_kernel(
   elementwise_kernel_helper(f, policy);
 }
 
-DPCPP_DEF_K1(launch_unrolled_kernel_impl);
 template <
     typename func_t,
     typename array_t,
@@ -271,14 +270,7 @@ static inline void launch_unrolled_kernel(
       unrolled_elementwise_kernel(item_id, N, f, data, ic, oc, l, s);
     };
 
-    __cgh.parallel_for<DPCPP_K(
-        launch_unrolled_kernel_impl,
-        func_t,
-        inp_calc_t,
-        out_calc_t,
-        loader_t,
-        storer_t,
-        ret_t)>(DPCPP::range</*dim=*/1>(thread_num), kfn);
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -318,7 +310,6 @@ void vectorized_elementwise_kernel(
   }
 }
 
-DPCPP_DEF_K1(launch_vectorized_kernel_impl);
 // this function assume trivial 1d and no dynamic casting
 template <typename func_t, typename array_t>
 static inline void launch_vectorized_kernel(
@@ -337,8 +328,7 @@ static inline void launch_vectorized_kernel(
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           vectorized_elementwise_kernel<4>(item_id, N, f, data);
         };
-        __cgh.parallel_for<DPCPP_K(launch_vectorized_kernel_impl, func_t, int)>(
-            DPCPP::range</*dim=*/1>(thread_num), kfn);
+        __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
       break;
@@ -348,9 +338,7 @@ static inline void launch_vectorized_kernel(
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           vectorized_elementwise_kernel<2>(item_id, N, f, data);
         };
-        __cgh.parallel_for<DPCPP_K(
-            launch_vectorized_kernel_impl, func_t, float)>(
-            DPCPP::range</*dim=*/1>(thread_num), kfn);
+        __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
       break;
@@ -444,7 +432,7 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   }
 }
 
-template <typename kernel_name, typename func_t>
+template <typename func_t>
 void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kXPU);
@@ -456,7 +444,7 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_kernel_for_tensor_iter<kernel_name>(sub_iter, f);
+      dpcpp_kernel_for_tensor_iter(sub_iter, f);
     }
     return;
   }
@@ -496,7 +484,7 @@ struct BUnaryFunctor {
   arg2_t b;
 };
 
-template <typename kernel_name, typename func_t>
+template <typename func_t>
 void dpcpp_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
   TORCH_INTERNAL_ASSERT(iter.ntensors() == 3);
 
@@ -511,18 +499,17 @@ void dpcpp_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
     AUnaryFunctor<func_t> af(f, iter.scalar_value<arg1_t>(1));
     iter.remove_operand(1);
     const OptionalDeviceGuard device_guard(device_of(iter.tensor(1)));
-    dpcpp_kernel_for_tensor_iter<kernel_name>(iter, af);
+    dpcpp_kernel_for_tensor_iter(iter, af);
   } else if (iter.is_cpu_scalar(2)) {
     BUnaryFunctor<func_t> bf(f, iter.scalar_value<arg2_t>(2));
     iter.remove_operand(2);
-    dpcpp_kernel_for_tensor_iter<kernel_name>(iter, bf);
+    dpcpp_kernel_for_tensor_iter(iter, bf);
   } else {
-    dpcpp_kernel_for_tensor_iter<kernel_name>(iter, f);
+    dpcpp_kernel_for_tensor_iter(iter, f);
   }
 }
 
-DPCPP_DEF_K1(dpcpp_small_index_kernel);
-template <typename kernel_name, typename func_t>
+template <typename func_t>
 void dpcpp_small_index_kernel_impl(
     TensorIterator& iter,
     IntArrayRef index_size,
@@ -639,7 +626,7 @@ void dpcpp_small_index_kernel_impl(
         f(out_ptr + out_offset, in_ptr + in_offset, offset);
       }
     };
-    __cgh.parallel_for<DPCPP_K(dpcpp_small_index_kernel, kernel_name)>(
+    __cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(wgroup_size)),
         kfn);
@@ -647,8 +634,7 @@ void dpcpp_small_index_kernel_impl(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DPCPP_DEF_K1(dpcpp_index_kernel);
-template <typename kernel_name, typename func_t>
+template <typename func_t>
 void dpcpp_index_kernel_impl(
     TensorIterator& iter,
     IntArrayRef index_size,
@@ -699,13 +685,12 @@ void dpcpp_index_kernel_impl(
       }
       f(out_ptr, in_ptr, offset);
     };
-    __cgh.parallel_for<DPCPP_K(dpcpp_index_kernel, kernel_name)>(
-        DPCPP::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(numel), kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename kernel_name, typename func_t>
+template <typename func_t>
 void dpcpp_index_kernel(
     TensorIterator& iter,
     IntArrayRef index_size,
@@ -768,7 +753,7 @@ void dpcpp_index_kernel(
         (total_index_iter > 2 * max_group_num && local_index > wgroup_size &&
          indice_table_size < max_local_mem_size * 0.5);
     if (small_index) {
-      dpcpp_small_index_kernel_impl<kernel_name, func_t>(
+      dpcpp_small_index_kernel_impl<func_t>(
           iter, index_size, index_stride, non_index_size, non_index_stride, f);
       return;
     }
@@ -776,14 +761,13 @@ void dpcpp_index_kernel(
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_index_kernel<kernel_name>(
+      dpcpp_index_kernel(
           sub_iter, index_size, index_stride, IntArrayRef{}, IntArrayRef{}, f);
     }
     return;
   }
 
-  dpcpp_index_kernel_impl<kernel_name, func_t>(
-      iter, index_size, index_stride, f);
+  dpcpp_index_kernel_impl<func_t>(iter, index_size, index_stride, f);
 }
 
 } // namespace AtenIpexTypeXPU

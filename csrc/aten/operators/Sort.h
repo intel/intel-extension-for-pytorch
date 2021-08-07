@@ -114,16 +114,6 @@ template <
     typename Comparator,
     typename IndexType,
     int Power2SortSize>
-class binarySortKVInplaceKernelName {};
-
-template <
-    typename K,
-    typename V,
-    int KeyDims,
-    int ValueDims,
-    typename Comparator,
-    typename IndexType,
-    int Power2SortSize>
 inline void bitonicSortKVInPlace(
     TensorInfo<K, IndexType> keys,
     IndexType keySlices,
@@ -192,14 +182,7 @@ inline void bitonicSortKVInPlace(
       }
     };
 
-    cgh.parallel_for<binarySortKVInplaceKernelName<
-        K,
-        V,
-        KeyDims,
-        ValueDims,
-        Comparator,
-        IndexType,
-        Power2SortSize>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
         kfn);

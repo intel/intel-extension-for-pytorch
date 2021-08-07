@@ -26,9 +26,6 @@ DPCPP_DEVICE inline scalar_t max(scalar_t a, scalar_t b) {
   return a > b ? a : b;
 }
 
-DPCPP_DEF_K1(bicubic2d);
-DPCPP_DEF_K1(bicubic2d_bwd);
-
 static inline void upsample_2d_shape_check(
     const Tensor& input,
     const Tensor& grad_output,

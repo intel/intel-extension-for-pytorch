@@ -28,9 +28,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-// Note: dpcpp compiler does not support uname type in template.
-class SyclOpMulAdd {};
-
 static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
@@ -39,7 +36,7 @@ static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       "mul_add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<SyclOpMulAdd>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
               return a * b + alpha * c;
             });
@@ -134,9 +131,6 @@ Tensor mul_add(
   return result;
 }
 
-template <typename T>
-class PackedAdd_ker {};
-
 template <typename scalar_t>
 static inline void packed_add_kernel(
     unsigned short* __restrict__ w_MSB,
@@ -155,25 +149,22 @@ static inline void packed_add_kernel(
     auto LSB_data = w_LSB;
     auto gw_data = gw;
 
-    cgh.parallel_for<PackedAdd_ker<scalar_t>>(
-        DPCPP::range<1>(num_elem), [=](DPCPP::item<1> item) {
-          int64_t gid = item.get_linear_id();
-          auto MSB_p = MSB_data;
-          auto LSB_p = LSB_data;
-          auto gw_p = gw_data;
+    cgh.parallel_for(DPCPP::range<1>(num_elem), [=](DPCPP::item<1> item) {
+      int64_t gid = item.get_linear_id();
+      auto MSB_p = MSB_data;
+      auto LSB_p = LSB_data;
+      auto gw_p = gw_data;
 
-          packed_bf16 p16;
-          p16.s[0] = LSB_p[gid];
-          p16.s[1] = MSB_p[gid];
-          p16.f += lr * (float)(gw_p[gid]);
-          LSB_p[gid] = p16.s[0];
-          MSB_p[gid] = p16.s[1];
-        });
+      packed_bf16 p16;
+      p16.s[0] = LSB_p[gid];
+      p16.s[1] = MSB_p[gid];
+      p16.f += lr * (float)(gw_p[gid]);
+      LSB_p[gid] = p16.s[0];
+      MSB_p[gid] = p16.s[1];
+    });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-
-DPCPP_DEF_K2(SparsePackedAdd_ker, typename scalar_t);
 
 template <typename scalar_t>
 static inline void sparse_packed_add_kernel(
@@ -270,7 +261,7 @@ static inline void sparse_packed_add_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(SparsePackedAdd_ker, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<2>(
             DPCPP::range<2>(num_group_0 * 4, num_group_1 * 64),
             DPCPP::range<2>(4, 64)),
@@ -343,9 +334,6 @@ Tensor packed_add(
   return top_half;
 }
 
-template <typename T>
-class FusionAmdd_ker {};
-
 template <typename scalar_t>
 static inline void fusion_amdd_kernel(
     scalar_t* __restrict__ p,
@@ -363,13 +351,12 @@ static inline void fusion_amdd_kernel(
     auto m_buf = buf;
     auto gw = d_p;
 
-    cgh.parallel_for<FusionAmdd_ker<scalar_t>>(
-        DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {
-          auto id = item.get_linear_id();
-          gw[id] += w[id] * weight_decay;
-          m_buf[id] = m_buf[id] * momentum + gw[id];
-          w[id] += m_buf[id] * lr;
-        });
+    cgh.parallel_for(DPCPP::range<1>(num_element), [=](DPCPP::item<1> item) {
+      auto id = item.get_linear_id();
+      gw[id] += w[id] * weight_decay;
+      m_buf[id] = m_buf[id] * momentum + gw[id];
+      w[id] += m_buf[id] * lr;
+    });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }

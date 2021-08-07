@@ -19,9 +19,6 @@ inline int imax(int a, int b) {
   return a > b ? a : b;
 }
 
-DPCPP_DEF_K1(ReplicationPad2d);
-DPCPP_DEF_K1(ReplicationPad2dBackward);
-
 template <typename scalar_t>
 void replication_pad_forward_kernel2d(
     scalar_t* input,
@@ -67,7 +64,7 @@ void replication_pad_forward_kernel2d(
           ((batch * o1 + plane) * o2 + outputPointY) * o3 + outputPointX;
       output[out_] = valueToCopy;
     };
-    cgh.parallel_for<DPCPP_K(ReplicationPad2d, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(
                 CeilDiv(outputPlaneSize, workgroup_size) * workgroup_size,
@@ -236,7 +233,7 @@ void replication_pad_backward_kernel(
           ((batch * gi1 + plane) * gi2 + inputPointY) * gi3 + inputPointX;
       atomicAdd((dpcpp_global_ptr_pt<scalar_t>)&gradInput[gi_], valueToCopy);
     };
-    cgh.parallel_for<DPCPP_K(ReplicationPad2dBackward, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(
                 CeilDiv(outputPlaneSize, workgroup_size) * workgroup_size,

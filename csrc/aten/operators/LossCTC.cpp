@@ -10,17 +10,6 @@
 
 using namespace xpu::dpcpp;
 
-template <typename...>
-class ctc_loss_alpha_kernel {};
-template <typename...>
-class ctc_loss_beta_kernel {};
-template <typename...>
-class ctc_loss_collect_nonblank_kernel {};
-template <typename...>
-class ctc_loss_collect_kernel {};
-template <typename...>
-class ctc_loss_zero_padded_kernel {};
-
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
@@ -279,8 +268,7 @@ void ctc_loss_log_alpha_kernel(
       }
     };
 
-    cgh.parallel_for<ctc_loss_alpha_kernel<scalar_t, target_t>>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
@@ -470,8 +458,7 @@ void ctc_loss_backward_log_beta_kernel(
       }
     };
 
-    cgh.parallel_for<ctc_loss_beta_kernel<scalar_t, target_t>>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
@@ -609,8 +596,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
       }
     };
 
-    cgh.parallel_for<ctc_loss_collect_nonblank_kernel<scalar_t, target_t>>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
@@ -747,8 +733,7 @@ void ctc_loss_backward_collect_kernel(
       }
     };
 
-    cgh.parallel_for<ctc_loss_collect_kernel<scalar_t, target_t>>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
@@ -800,8 +785,7 @@ void ctc_loss_zero_padded_gradients(
       }
     };
 
-    cgh.parallel_for<ctc_loss_zero_padded_kernel<scalar_t>>(
-        DPCPP::nd_range<2>(global_range, local_range), kfn);
+    cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);

@@ -14,9 +14,6 @@
 
 #include "Loops.h"
 
-DPCPP_DEF_K1(intrepr);
-DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
-
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;

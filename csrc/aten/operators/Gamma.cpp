@@ -25,23 +25,20 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K1(DigammaOp);
 void digamma_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "digamma_xpu", [&]() {
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(DigammaOp)>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [=](scalar_t a) -> scalar_t { return calc_digamma(a); });
   });
 }
 
-DPCPP_DEF_K1(TrigammaOp);
 void trigamma_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "trigamma_xpu", [&]() {
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(TrigammaOp)>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [=](scalar_t a) -> scalar_t { return calc_trigamma(a); });
   });
 }
 
-DPCPP_DEF_K1(PolygammaOp);
 void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
   if (n == 0) {
     digamma_kernel_xpu(iter);
@@ -49,9 +46,9 @@ void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
     trigamma_kernel_xpu(iter);
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "polygamma_xpu", [&]() {
-      dpcpp_kernel_for_tensor_iter<DPCPP_K(PolygammaOp)>(
-          iter,
-          [=](scalar_t a) -> scalar_t { return calc_polygamma(int(n), a); });
+      dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
+        return calc_polygamma(int(n), a);
+      });
     });
   }
 }

@@ -427,9 +427,6 @@ DPCPP_DEVICE void radixSelect(
 }
 
 template <typename T, typename IndexType, int Dim, bool Order>
-class gatherTopKKernelName {};
-
-template <typename T, typename IndexType, int Dim, bool Order>
 void gatherTopK(
     TensorInfo<T, IndexType> input,
     IndexType inputSliceSize,
@@ -549,7 +546,7 @@ void gatherTopK(
       }
     };
 
-    cgh.parallel_for<gatherTopKKernelName<T, IndexType, Dim, Order>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(numInputSlices * local_size),
             DPCPP::range<1>(local_size)),

@@ -129,7 +129,7 @@ static void upsample_bicubic2d_out_frame(
         }
       }
     };
-    cgh.parallel_for<DPCPP_K(bicubic2d, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
         kfn);
   };
@@ -226,7 +226,7 @@ static void upsample_bicubic2d_backward_out_frame(
         }
       }
     };
-    cgh.parallel_for<DPCPP_K(bicubic2d_bwd, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
         kfn);
   };

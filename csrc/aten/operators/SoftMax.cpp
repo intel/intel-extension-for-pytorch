@@ -21,12 +21,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename...>
-class SpatialSoftmaxForwardKernelName {};
-
-template <typename...>
-class SpatialSoftmaxBackwardKernelName {};
-
 template <typename T, typename AccumT, typename OutT>
 struct LogSoftMaxForwardEpilogue {
   LogSoftMaxForwardEpilogue(AccumT max_input, AccumT sum)
@@ -103,9 +97,7 @@ void SpatialSoftMaxForward(
     auto out_data = output;
     auto local_acc_max = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
-    cgh.parallel_for<SpatialSoftmaxForwardKernelName<
-        scalar_t,
-        Epilogue<scalar_t, accscalar_t, outscalar_t>>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
         [=](DPCPP::nd_item<1> item_id) {
@@ -189,9 +181,7 @@ void SpatialSoftMaxBackward(
 
     // create SLM
     auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
-    cgh.parallel_for<SpatialSoftmaxBackwardKernelName<
-        scalar_t,
-        Epilogue<scalar_t, accscalar_t, outscalar_t>>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
         [=](DPCPP::nd_item<1> item_id) {

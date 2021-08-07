@@ -7,9 +7,6 @@
 #include "Loops.h"
 #include "comm/ATDispatch.h"
 
-DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
-DPCPP_DEF_K1(make_per_channel_quantized_tensor_dpcpp);
-
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -37,10 +34,9 @@ Tensor _make_per_tensor_quantized_tensor(
                         .add_input(self)
                         .check_all_same_dtype(false)
                         .build();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(
-            make_per_tensor_quantized_tensor_dpcpp)>(
-            iter,
-            [=](underlying_t value) -> scalar_t { return scalar_t(value); });
+        dpcpp_kernel_for_tensor_iter(iter, [=](underlying_t value) -> scalar_t {
+          return scalar_t(value);
+        });
       });
   return dst;
 }
@@ -64,10 +60,9 @@ Tensor _make_per_channel_quantized_tensor(
                         .add_input(self)
                         .check_all_same_dtype(false)
                         .build();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(
-            make_per_channel_quantized_tensor_dpcpp)>(
-            iter,
-            [=](underlying_t value) -> scalar_t { return scalar_t(value); });
+        dpcpp_kernel_for_tensor_iter(iter, [=](underlying_t value) -> scalar_t {
+          return scalar_t(value);
+        });
       });
   return dst;
 }

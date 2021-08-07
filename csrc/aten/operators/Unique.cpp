@@ -16,9 +16,6 @@
 #include <oneapi/dpl/numeric>
 #endif
 
-template <typename scalar_t>
-class Unique_Dpcpp_Kernel {};
-
 using namespace xpu::dpcpp;
 
 namespace at {

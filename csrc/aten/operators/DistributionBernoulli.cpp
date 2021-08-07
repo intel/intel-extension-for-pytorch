@@ -12,8 +12,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-DPCPP_DEF_K1(bernoulli_tensor_dpcpp_ker);
-
 Tensor& bernoulli_(
     Tensor& self,
     const Tensor& p_,
@@ -27,7 +25,7 @@ Tensor& bernoulli_(
       iter.dtype(),
       "bernoulli_tensor_dpcpp_",
       [&] {
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(bernoulli_tensor_dpcpp_ker)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t self, scalar_t p) -> scalar_t {
               return static_cast<scalar_t>(self < p);
             });

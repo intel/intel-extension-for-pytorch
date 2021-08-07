@@ -71,9 +71,6 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
   return false;
 }
 
-DPCPP_DEF_K1(SyclOpElwCopy1);
-DPCPP_DEF_K1(SyclOpElwCopy2);
-
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   auto numel = iter.numel();
   if (numel == 0) {
@@ -120,8 +117,7 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
             using src_t = scalar_t;
             IPEX_DISPATCH_ALL_TYPES_AND3(
                 kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
-                  dpcpp_kernel_for_tensor_iter<DPCPP_K(
-                      SyclOpElwCopy1, scalar_t, src_t)>(
+                  dpcpp_kernel_for_tensor_iter(
                       iter, [=](src_t src_val) -> scalar_t {
                         return static_cast<scalar_t>(src_val);
                       });
@@ -130,10 +126,9 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
     } else {
       IPEX_DISPATCH_QINT_TYPES(iter.dtype(1), "copy_", [&] {
         using src_t = scalar_t;
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy2, scalar_t, src_t)>(
-            iter, [=](src_t src_val) -> scalar_t {
-              return static_cast<scalar_t>(src_val);
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](src_t src_val) -> scalar_t {
+          return static_cast<scalar_t>(src_val);
+        });
       });
     }
   }

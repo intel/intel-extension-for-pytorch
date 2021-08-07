@@ -12,9 +12,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K2(ReflectionPad1d, typename scalar_t);
-DPCPP_DEF_K2(ReflectionPad1dBackward, typename scalar_t);
-
 inline std::pair<int64_t, int64_t> get_index_mapping1d(
     int64_t input_w,
     int64_t output_w,
@@ -68,7 +65,7 @@ void reflection_pad1d_out_kernel(
         output_ptr[index_pair.second] = input_ptr[index_pair.first];
       }
     };
-    cgh.parallel_for<DPCPP_K(ReflectionPad1d, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(work_group_size * work_group_num, nplane, nbatch),
             DPCPP::range<3>(work_group_size, 1, 1)),
@@ -181,7 +178,7 @@ void reflection_pad1d_backward_out_kernel(
             grad_output_ptr[index_pair.second]);
       }
     };
-    cgh.parallel_for<DPCPP_K(ReflectionPad1dBackward, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(work_group_size * work_group_num, nplane, nbatch),
             DPCPP::range<3>(work_group_size, 1, 1)),

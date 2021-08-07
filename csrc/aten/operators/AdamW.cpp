@@ -20,9 +20,6 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
-class adamw_dpcpp_kernel {};
-
-template <typename scalar_t>
 static void ComputeAdamWeightDecayKernel(
     const Tensor& grad_input,
     Tensor& out,
@@ -43,7 +40,7 @@ static void ComputeAdamWeightDecayKernel(
     auto avg_ptr = avg.data_ptr<scalar_t>();
     auto avg_sq_ptr = avg_sq.data_ptr<scalar_t>();
     auto out_ptr = out.data_ptr<scalar_t>();
-    cgh.parallel_for<adamw_dpcpp_kernel<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
           auto id = itemId.get_id(0);
 

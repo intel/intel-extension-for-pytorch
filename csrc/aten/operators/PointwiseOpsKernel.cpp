@@ -8,9 +8,6 @@
 
 #include "Loops.h"
 
-DPCPP_DEF_K1(addcmul);
-DPCPP_DEF_K1(addcdiv);
-
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
@@ -23,7 +20,7 @@ static void addcmul_kernel(TensorIterator& iter, Scalar value) {
       "addcmul_dpcpp",
       [&]() {
         auto alpha = value.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(addcmul)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
               return a + alpha * b * c;
             });
@@ -38,7 +35,7 @@ static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
       "addcdiv_dpcpp",
       [&]() {
         auto alpha = value.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(addcdiv)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
               return a + alpha * (b / c);
             });

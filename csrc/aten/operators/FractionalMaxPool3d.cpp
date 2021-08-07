@@ -13,9 +13,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K2(FractionalMaxPool3d, typename scalar_t);
-DPCPP_DEF_K2(FractionalMaxPool3dBackward, typename scalar_t);
-
 template <typename scalar_t, typename accscalar_t>
 inline int64_t get_intervals(
     accscalar_t sample,
@@ -149,7 +146,7 @@ void fractional_max_pool3d_out_frame(
             = maxVal;
       }
     };
-    cgh.parallel_for<DPCPP_K(FractionalMaxPool3d, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(
                 work_group_size * work_group_num, numPlane, numBatch),
@@ -224,7 +221,7 @@ void fractional_max_pool3d_backward_out_frame(
         );
       }
     };
-    cgh.parallel_for<DPCPP_K(FractionalMaxPool3dBackward, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<3>(
             DPCPP::range<3>(
                 work_group_size * work_group_num, numPlane, numBatch),

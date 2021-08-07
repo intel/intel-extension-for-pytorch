@@ -1022,8 +1022,6 @@ Tensor any(const Tensor& self, int64_t dim, bool keepdim) {
   return at::AtenIpexTypeXPU::any_out(result, self, dim, keepdim);
 }
 
-class OpRenorm {};
-
 Tensor& renorm_out(
     Tensor& out,
     const Tensor& self,
@@ -1051,7 +1049,7 @@ Tensor& renorm_out(
                   .set_check_mem_overlap(true)
                   .build();
   float maxnorm_ = maxnorm.toFloat();
-  dpcpp_kernel_for_tensor_iter<OpRenorm>(iter, [=](float norm) -> float {
+  dpcpp_kernel_for_tensor_iter(iter, [=](float norm) -> float {
     if (norm > maxnorm_)
       return maxnorm_ / (norm + 1e-7);
     return 1;

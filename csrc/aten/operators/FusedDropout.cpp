@@ -39,10 +39,6 @@ void bernoulliDistr(
 #endif
 }
 
-template <typename...>
-class contigu_fused_dropout_kernel_dpcpp {};
-template <typename...>
-class fused_dropout_kernel_dpcpp {};
 template <typename scalar_t, typename accscalar_t>
 void fused_dropout_kernel(
     const Tensor& self,
@@ -80,9 +76,7 @@ void fused_dropout_kernel(
           mask_ptr[index] = (uint8_t)rv;
         }
       };
-      cgh.parallel_for<
-          contigu_fused_dropout_kernel_dpcpp<scalar_t, accscalar_t>>(
-          DPCPP::range<1>(numel), kfn);
+      cgh.parallel_for(DPCPP::range<1>(numel), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto index = item_id.get_linear_id();
@@ -94,18 +88,13 @@ void fused_dropout_kernel(
           mask_ptr[index] = (uint8_t)rv;
         }
       };
-      cgh.parallel_for<fused_dropout_kernel_dpcpp<scalar_t, accscalar_t>>(
-          DPCPP::range<1>(numel), kfn);
+      cgh.parallel_for(DPCPP::range<1>(numel), kfn);
     }
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
-template <typename...>
-class contigu_masked_scale_ker {};
-template <typename...>
-class masked_scale_ker {};
 template <typename scalar_t, typename accscalar_t>
 void masked_scale_kernel(
     at::Tensor& ret,
@@ -131,8 +120,7 @@ void masked_scale_kernel(
         auto index = item_id.get_linear_id();
         ret_ptr[index] = self_ptr[index] * mask_ptr[index] * scale;
       };
-      cgh.parallel_for<contigu_masked_scale_ker<scalar_t, accscalar_t>>(
-          DPCPP::range<1>(numel), kfn);
+      cgh.parallel_for(DPCPP::range<1>(numel), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto index = item_id.get_linear_id();
@@ -142,8 +130,7 @@ void masked_scale_kernel(
             IndexToOffset<uint8_t, uint64_t>::get(index, mask_info);
         ret_ptr[index] = self_ptr[self_offset] * mask_ptr[mask_offset] * scale;
       };
-      cgh.parallel_for<masked_scale_ker<scalar_t, accscalar_t>>(
-          DPCPP::range<1>(numel), kfn);
+      cgh.parallel_for(DPCPP::range<1>(numel), kfn);
     }
   };
 

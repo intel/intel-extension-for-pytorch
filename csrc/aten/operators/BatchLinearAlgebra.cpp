@@ -16,13 +16,6 @@
 
 using namespace xpu::dpcpp;
 
-DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
-DPCPP_DEF_K2(
-    triuTrilBatchSycl,
-    typename scalar_t,
-    typename IndexType,
-    bool upper);
-
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
@@ -79,7 +72,7 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(triuTrilSycl, scalar_t, IndexType, upper)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);

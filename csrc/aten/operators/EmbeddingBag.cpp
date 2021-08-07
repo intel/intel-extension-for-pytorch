@@ -31,15 +31,6 @@ constexpr int MODE_MAX = 2;
 constexpr int64_t NROWS_PER_THREAD = 10;
 constexpr int64_t WARP_SIZE = 64;
 
-DPCPP_DEF_K1(partials_per_segment_dpcpp);
-DPCPP_DEF_K1(partial_segment_offset_dpcpp);
-DPCPP_DEF_K2(compute_grad_weight_bags_dpcpp, typename scalar_t);
-DPCPP_DEF_K2(compute_grad_weight_dpcpp, typename scalar_t);
-DPCPP_DEF_K2(sum_and_scatter_dpcpp, typename scalar_t);
-
-DPCPP_DEF_K2(EmbeddingbagSycl, typename scalar_t);
-DPCPP_DEF_K2(AccGradParametersKernel_max_Sycl, typename scalar_t);
-
 void krn_partials_per_segment(
     int64_t* ret,
     const int64_t* segment_offsets,
@@ -67,7 +58,7 @@ void krn_partials_per_segment(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(partials_per_segment_dpcpp)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -109,7 +100,7 @@ void krn_partial_segment_offset(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(partial_segment_offset_dpcpp)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -209,7 +200,7 @@ void compute_grad_weight_bags(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(compute_grad_weight_bags_dpcpp, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -278,7 +269,7 @@ void compute_grad_weight(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(compute_grad_weight_dpcpp, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -347,7 +338,7 @@ void sum_and_scatter(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(sum_and_scatter_dpcpp, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
@@ -645,7 +636,7 @@ void EmbeddingBag_updateOutputKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(EmbeddingbagSycl, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<2>(
             DPCPP::range<2>(kernel_range, chunksPerWorkGroup),
             DPCPP::range<2>(workersPerChunk, chunksPerWorkGroup)),
@@ -790,7 +781,7 @@ void EmbeddingBag_accGradParametersKernel_max(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(AccGradParametersKernel_max_Sycl, scalar_t)>(
+    cgh.parallel_for(
         DPCPP::nd_range<2>(
             DPCPP::range<2>(kernel_range, 4), DPCPP::range<2>(64, 4)),
         kfn);

@@ -21,12 +21,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-DPCPP_DEF_K2(
-    gatherKthValueKernelName,
-    typename scalar_t,
-    typename index_t,
-    int Dim);
-
 template <typename scalar_t, typename index_t, int Dim>
 void gatherKthValue(
     TensorInfo<scalar_t, index_t> input,
@@ -104,7 +98,7 @@ void gatherKthValue(
       }
     };
 
-    cgh.parallel_for<DPCPP_K(gatherKthValueKernelName, scalar_t, index_t, Dim)>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(numInputSlices * local_size),
             DPCPP::range<1>(local_size)),
@@ -228,12 +222,6 @@ void kthvalue_template(
 }
 
 template <typename scalar_t>
-class mode_updateOutput_dpcpp_kernel_vertical {};
-
-template <typename scalar_t>
-class mode_updateOutput_dpcpp_kernel_horizontal {};
-
-template <typename scalar_t>
 std::tuple<Tensor&, Tensor&> mode_out_template(
     Tensor& values,
     Tensor& indices,
@@ -258,7 +246,7 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
       auto values_data = values.data_ptr<scalar_t>();
       auto indices_data = indices.data_ptr<long>();
 
-      cgh.parallel_for<mode_updateOutput_dpcpp_kernel_vertical<scalar_t>>(
+      cgh.parallel_for(
           DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
             auto self_ptr = self_data;
             auto values_ptr = values_data;
@@ -326,7 +314,7 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
       auto values_data = values.data_ptr<scalar_t>();
       auto indices_data = indices.data_ptr<long>();
 
-      cgh.parallel_for<mode_updateOutput_dpcpp_kernel_horizontal<scalar_t>>(
+      cgh.parallel_for(
           DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
             auto self_ptr = self_data;
             auto values_ptr = values_data;

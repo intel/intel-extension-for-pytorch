@@ -15,10 +15,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-// Note: dpcpp compiler does not support uname type in template.
-class SyclOpMul {};
-class SyclOpDiv {};
-
 static void mul_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
@@ -27,7 +23,7 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        dpcpp_kernel_with_scalars<SyclOpMul>(
+        dpcpp_kernel_with_scalars(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
       });
 }
@@ -35,7 +31,7 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
 static void div_kernel_dpcpp(TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div", [&] {
-      dpcpp_kernel_with_scalars<SyclOpDiv>(
+      dpcpp_kernel_with_scalars(
           iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });
   } else {
@@ -45,7 +41,7 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
         iter.dtype(),
         "div",
         [&]() {
-          dpcpp_kernel_with_scalars<SyclOpDiv>(
+          dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
         });
   }

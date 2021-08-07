@@ -12,17 +12,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename T>
-class embedding_dense_backeward_dpcpp_ker {};
-template <typename T>
-class embedding_dense_backeward_dpcpp_ker_pad {};
-template <typename T>
-class embedding_dense_backeward_dpcpp_ker_scale {};
-template <typename T>
-class embedding_dense_backeward_dpcpp_idx_cnt_ker {};
-template <typename T>
-class embedding_dense_backeward_dpcpp_ker_scale_pad {};
-
 template <typename scalar_t>
 static inline void embedding_backward_dpcpp_kernel(
     int64_t* indices_data,
@@ -55,13 +44,12 @@ static inline void embedding_backward_dpcpp_kernel(
       DPCPP::accessor<uint32_t, 1, rw_mode, gbuffer_target> idx_cnt_ptr(
           idx_cnt, cgh, DPCPP::range<1>(row_num_weights), 0);
 
-      cgh.parallel_for<embedding_dense_backeward_dpcpp_idx_cnt_ker<scalar_t>>(
-          DPCPP::range<1>(1), [=](DPCPP::item<1> item) {
-            auto idx_ptr = idx_data;
-            for (int i = 0; i < num_indices; ++i) {
-              idx_cnt_ptr[idx_ptr[i]] += static_cast<uint32_t>(1);
-            }
-          });
+      cgh.parallel_for(DPCPP::range<1>(1), [=](DPCPP::item<1> item) {
+        auto idx_ptr = idx_data;
+        for (int i = 0; i < num_indices; ++i) {
+          idx_cnt_ptr[idx_ptr[i]] += static_cast<uint32_t>(1);
+        }
+      });
     };
     DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_scale);
 
@@ -71,19 +59,17 @@ static inline void embedding_backward_dpcpp_kernel(
       auto g_data = grad_data;
       auto gw_data = grad_weight_data;
 
-      cgh.parallel_for<embedding_dense_backeward_dpcpp_ker_scale<scalar_t>>(
-          DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-            int64_t gid = item.get_linear_id();
-            auto idx_ptr = idx_data;
-            auto g_ptr = g_data;
-            auto gw_ptr = gw_data;
-            for (int nidx = 0; nidx < num_indices; nidx++) {
-              auto idx = idx_ptr[nidx];
-              gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
-                  g_ptr[gid + nidx * stride] * 1.0 /
-                  (scalar_t)idx_cnt_acc[idx]);
-            }
-          });
+      cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
+        int64_t gid = item.get_linear_id();
+        auto idx_ptr = idx_data;
+        auto g_ptr = g_data;
+        auto gw_ptr = gw_data;
+        for (int nidx = 0; nidx < num_indices; nidx++) {
+          auto idx = idx_ptr[nidx];
+          gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
+              g_ptr[gid + nidx * stride] * 1.0 / (scalar_t)idx_cnt_acc[idx]);
+        }
+      });
     };
     DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_scatter);
 
@@ -91,13 +77,11 @@ static inline void embedding_backward_dpcpp_kernel(
       auto cgf_pad = DPCPP_Q_CGF(cgh) {
         auto gw_data = grad_weight_data;
 
-        cgh.parallel_for<
-            embedding_dense_backeward_dpcpp_ker_scale_pad<scalar_t>>(
-            DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-              int64_t gid = item.get_linear_id();
-              auto gw_ptr = gw_data;
-              gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
-            });
+        cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
+          int64_t gid = item.get_linear_id();
+          auto gw_ptr = gw_data;
+          gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
+        });
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_pad);
     }
@@ -108,18 +92,17 @@ static inline void embedding_backward_dpcpp_kernel(
       auto g_data = grad_data;
       auto gw_data = grad_weight_data;
 
-      cgh.parallel_for<embedding_dense_backeward_dpcpp_ker<scalar_t>>(
-          DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-            int64_t gid = item.get_linear_id();
-            auto idx_ptr = idx_data;
-            auto g_ptr = g_data;
-            auto gw_ptr = gw_data;
-            for (int nidx = 0; nidx < num_indices; nidx++) {
-              auto idx = idx_ptr[nidx];
-              gw_ptr[gid + idx * stride] +=
-                  static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
-            }
-          });
+      cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
+        int64_t gid = item.get_linear_id();
+        auto idx_ptr = idx_data;
+        auto g_ptr = g_data;
+        auto gw_ptr = gw_data;
+        for (int nidx = 0; nidx < num_indices; nidx++) {
+          auto idx = idx_ptr[nidx];
+          gw_ptr[gid + idx * stride] +=
+              static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
+        }
+      });
     };
     DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
@@ -127,12 +110,11 @@ static inline void embedding_backward_dpcpp_kernel(
       auto cgf_pad = DPCPP_Q_CGF(cgh) {
         auto gw_data = grad_weight_data;
 
-        cgh.parallel_for<embedding_dense_backeward_dpcpp_ker_pad<scalar_t>>(
-            DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-              int64_t gid = item.get_linear_id();
-              auto gw_ptr = gw_data;
-              gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
-            });
+        cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
+          int64_t gid = item.get_linear_id();
+          auto gw_ptr = gw_data;
+          gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
+        });
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_pad);
     }

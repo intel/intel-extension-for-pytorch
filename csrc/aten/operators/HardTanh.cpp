@@ -9,7 +9,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-DPCPP_DEF_K1(DPCPPOpHardTanh);
 Tensor& hardtanh_out(
     Tensor& out,
     const Tensor& self,
@@ -31,15 +30,14 @@ Tensor& hardtanh_out(
       [&]() {
         scalar_t min_ = min_val.to<scalar_t>();
         scalar_t max_ = max_val.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanh)>(
-            iter, [=](scalar_t x) -> scalar_t {
-              if (x < min_)
-                return min_;
-              else if (x > max_)
-                return max_;
-              else
-                return x;
-            });
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          if (x < min_)
+            return min_;
+          else if (x > max_)
+            return max_;
+          else
+            return x;
+        });
       });
 
   return out;
@@ -56,7 +54,6 @@ Tensor& hardtanh_(Tensor& self, Scalar min_val, Scalar max_val) {
   return at::AtenIpexTypeXPU::hardtanh_out(self, self, min_val, max_val);
 }
 
-DPCPP_DEF_K1(DPCPPOpHardTanhBackward);
 Tensor& hardtanh_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
@@ -77,7 +74,7 @@ Tensor& hardtanh_backward_out(
       at::ScalarType::BFloat16, iter.dtype(), "hardtanh_backward", [&]() {
         auto min_ = min_val.to<scalar_t>();
         auto max_ = max_val.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanhBackward)>(
+        dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
               if (x <= min_ || x >= max_)
                 return 0;

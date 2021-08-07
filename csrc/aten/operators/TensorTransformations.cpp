@@ -23,11 +23,6 @@ namespace impl {
 constexpr size_t dim_bitset_size = 64;
 
 template <typename scalar_t>
-class flip_dpcpp_ker {};
-template <typename scalar_t>
-class roll_dpcpp_ker {};
-
-template <typename scalar_t>
 void flip_dpcpp_kernel(
     const Tensor& in_tensor,
     Tensor& out_tensor,
@@ -91,8 +86,7 @@ void flip_dpcpp_kernel(
       }
       out_tensor_ptr[linear_index] = in_tensor_ptr[dst_offset];
     };
-    cgh.parallel_for<flip_dpcpp_ker<scalar_t>>(
-        DPCPP::nd_range<1>(GRange, tileSize), kfn);
+    cgh.parallel_for(DPCPP::nd_range<1>(GRange, tileSize), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -148,7 +142,7 @@ void roll_dpcpp_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = in_tensor.data_ptr<scalar_t>();
     auto out_data = out_tensor.data_ptr<scalar_t>();
-    cgh.parallel_for<roll_dpcpp_ker<scalar_t>>(
+    cgh.parallel_for(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);

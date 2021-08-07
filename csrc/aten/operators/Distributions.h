@@ -8,8 +8,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-template <typename...>
-class exponential_sycl_ker {};
 template <
     typename scalar_t,
     typename accscalar_t,
@@ -38,9 +36,7 @@ void distribution_elementwise_grid_stride_kernel(
       *out = ret;
     };
 
-    cgh.parallel_for<
-        exponential_sycl_ker<scalar_t, accscalar_t, dist_t, transform_t>>(
-        DPCPP::range<1>(numel), kfn);
+    cgh.parallel_for(DPCPP::range<1>(numel), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);

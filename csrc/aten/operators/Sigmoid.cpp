@@ -15,11 +15,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename...>
-class TensorSigmoidOp {};
-template <typename...>
-class TensorSigmoidGradOp {};
-
 template <typename scalar_t>
 void sigmoid(Tensor& output, const Tensor& self) {
   output.resize_as_(self);
@@ -28,11 +23,10 @@ void sigmoid(Tensor& output, const Tensor& self) {
                   .add_output(output)
                   .add_input(self)
                   .build();
-  dpcpp_kernel_for_tensor_iter<TensorSigmoidOp<scalar_t>>(
-      iter, [=](scalar_t v) -> scalar_t {
-        scalar_t one = (scalar_t)1.0;
-        return one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(v)));
-      });
+  dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t v) -> scalar_t {
+    scalar_t one = (scalar_t)1.0;
+    return one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(v)));
+  });
 }
 
 template <typename scalar_t>
@@ -48,14 +42,14 @@ void sigmoid_backward(
                   .add_input(self)
                   .build();
   if (iter.dtype() == ScalarType::Half) {
-    dpcpp_kernel_for_tensor_iter<TensorSigmoidGradOp<at::Half>>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [=](at::Half go, at::Half in) -> at::Half {
           float in_float = (float)in;
           float go_float = (float)go;
           return (at::Half)(go * (1.f - in_float) * in_float);
         });
   } else {
-    dpcpp_kernel_for_tensor_iter<TensorSigmoidGradOp<scalar_t>>(
+    dpcpp_kernel_for_tensor_iter(
         iter, [=](scalar_t go, scalar_t in) -> scalar_t {
           scalar_t one = (scalar_t)1.0;
           return go * (one - in) * in;

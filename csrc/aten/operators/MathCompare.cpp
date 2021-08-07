@@ -83,7 +83,6 @@ struct TensorNEOp {
   }
 };
 
-DPCPP_DEF_K1(softshrink_forward);
 template <typename ScalarTypeOut, typename ScalarType, class Op>
 void logicalTensor(
     Tensor& self_,
@@ -92,12 +91,11 @@ void logicalTensor(
     Op op) {
   auto iter = TensorIterator::comparison_op(self_, src1, src2);
 
-  dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_forward, Op)>(
-      iter, [=](ScalarType src1, ScalarType src2) {
-        ScalarTypeOut ret;
-        op(ret, src1, src2);
-        return ret;
-      });
+  dpcpp_kernel_for_tensor_iter(iter, [=](ScalarType src1, ScalarType src2) {
+    ScalarTypeOut ret;
+    op(ret, src1, src2);
+    return ret;
+  });
 }
 
 template <typename scalar_t>
