@@ -261,10 +261,10 @@ class TestLSTM(TestCase):
 
                 with ipex.amp.autocast(enabled=bf16, configure=ipex.conf.AmpConf(torch.bfloat16)):
                     if empty_state:
-                        y, hy = model(self._cast_dtype(input, bf16))
+                        y, hy = self._cast_dtype(model, bf16)(self._cast_dtype(input, bf16))
                         y_ipex, hy_ipex = model_ipex(input)
                     else:
-                        y, hy = model(input, (self._cast_dtype(h, bf16), self._cast_dtype(c, bf16)))
+                        y, hy = self._cast_dtype(model, bf16)(self._cast_dtype(input, bf16), (self._cast_dtype(h, bf16), self._cast_dtype(c, bf16)))
                         y_ipex, hy_ipex = model_ipex(input, (h, c))
 
                 if not training and bf16:
