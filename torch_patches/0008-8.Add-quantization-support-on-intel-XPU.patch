@@ -1,7 +1,7 @@
-From 82ab83f5f48354fe0a9a68a3c4e732da58617979 Mon Sep 17 00:00:00 2001
+From 4f9e88a2db2ad85e0ac02e640815de77c1f8d273 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 31 Mar 2021 21:49:51 +0800
-Subject: [PATCH 8/8] 8.Add quantization support on intel XPU
+Subject: [PATCH 08/14] 8.Add quantization support on intel XPU
 
 ---
  aten/src/ATen/core/jit_type.h                 | 17 ++++++++-------

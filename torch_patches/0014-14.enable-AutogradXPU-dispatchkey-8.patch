@@ -1,0 +1,78 @@
+From a01331930ac946e19233dab55222dc1ae9d4287d Mon Sep 17 00:00:00 2001
+From: xiaolil1 <xiaoli.liu@intel.com>
+Date: Thu, 1 Jul 2021 16:20:32 +0800
+Subject: [PATCH 14/14] 14.enable AutogradXPU dispatchkey (#8)
+
+---
+ aten/src/ATen/core/VariableFallbackKernel.cpp | 4 ++++
+ c10/core/Backend.h                            | 2 +-
+ c10/core/DispatchKey.cpp                      | 4 ++++
+ c10/core/DispatchKeySet.cpp                   | 2 ++
+ 4 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/aten/src/ATen/core/VariableFallbackKernel.cpp b/aten/src/ATen/core/VariableFallbackKernel.cpp
+index baf49aea9a..72f6c00d30 100644
+--- a/aten/src/ATen/core/VariableFallbackKernel.cpp
++++ b/aten/src/ATen/core/VariableFallbackKernel.cpp
+@@ -40,6 +40,10 @@ TORCH_LIBRARY_IMPL(_, AutogradCPU, m) {
+   m.fallback(torch::CppFunction::makeFallthrough());
+ }
+ 
++TORCH_LIBRARY_IMPL(_, AutogradXPU, m) {
++  m.fallback(torch::CppFunction::makeFallthrough());
++}
++
+ TORCH_LIBRARY_IMPL(_, AutogradCUDA, m) {
+   m.fallback(torch::CppFunction::makeFallthrough());
+ }
+diff --git a/c10/core/Backend.h b/c10/core/Backend.h
+index 25dbb6e0e8..7e8b9a7a07 100644
+--- a/c10/core/Backend.h
++++ b/c10/core/Backend.h
+@@ -130,7 +130,7 @@ static inline Backend dispatchKeyToBackend(DispatchKey t) {
+     return Backend::QuantizedCPU;
+   } else if (t == DispatchKey::QuantizedCUDA) {
+     return Backend::QuantizedCUDA;
+-  } else if (t == DispatchKey::XPU) {
++  } else if (t == DispatchKey::XPU || t == DispatchKey::AutogradXPU) {
+     return Backend::XPU;
+   } else if (t == DispatchKey::SparseXPU) {
+     return Backend::SparseXPU;
+diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
+index 4545ed5fca..004ebad135 100644
+--- a/c10/core/DispatchKey.cpp
++++ b/c10/core/DispatchKey.cpp
+@@ -77,6 +77,8 @@ const char* toString(DispatchKey t) {
+       return "AutogradCUDA";
+     case DispatchKey::AutogradXLA:
+       return "AutogradXLA";
++    case DispatchKey::AutogradXPU:
++      return "AutogradXPU";
+     case DispatchKey::AutogradPrivateUse1:
+       return "AutogradPrivateUse1";
+     case DispatchKey::AutogradPrivateUse2:
+@@ -128,6 +130,8 @@ DispatchKey getAutogradKeyFromBackend(DispatchKey t) {
+       return DispatchKey::AutogradCUDA;
+     case DispatchKey::XLA:
+       return DispatchKey::AutogradXLA;
++    case DispatchKey::XPU:
++      return DispatchKey::AutogradXPU;
+     case DispatchKey::PrivateUse1:
+       return DispatchKey::AutogradPrivateUse1;
+     case DispatchKey::PrivateUse2:
+diff --git a/c10/core/DispatchKeySet.cpp b/c10/core/DispatchKeySet.cpp
+index f13891f1c0..e4b4758d1d 100644
+--- a/c10/core/DispatchKeySet.cpp
++++ b/c10/core/DispatchKeySet.cpp
+@@ -58,6 +58,8 @@ DispatchKeySet getBackendKeySetFromAutograd(DispatchKey t) {
+       return DispatchKeySet(DispatchKey::CUDA);
+     case DispatchKey::AutogradXLA:
+       return DispatchKeySet(DispatchKey::XLA);
++    case DispatchKey::AutogradXPU:
++      return DispatchKeySet(DispatchKey::XPU);
+     case DispatchKey::AutogradPrivateUse1:
+       return DispatchKeySet(DispatchKey::PrivateUse1);
+     case DispatchKey::AutogradPrivateUse2:
+-- 
+2.25.1
+

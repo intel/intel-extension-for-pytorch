@@ -1,0 +1,25 @@
+From 4071ed47809fd3f237c63a8d94bbbdc941363737 Mon Sep 17 00:00:00 2001
+From: wuhuikx <hui.h.wu@intel.com>
+Date: Fri, 11 Jun 2021 15:15:39 +0800
+Subject: [PATCH 09/14] 9.Support fused_dropout with XPU backend (#3)
+
+---
+ aten/src/ATen/native/Dropout.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/aten/src/ATen/native/Dropout.cpp b/aten/src/ATen/native/Dropout.cpp
+index f664fa3336..ac56071edb 100644
+--- a/aten/src/ATen/native/Dropout.cpp
++++ b/aten/src/ATen/native/Dropout.cpp
+@@ -22,7 +22,7 @@ Tensor make_feature_noise(const Tensor& input) {
+ }
+ 
+ bool is_fused_kernel_acceptable(const Tensor& input, double p) {
+-  return input.is_cuda() && p > 0 && p < 1 && input.numel() > 0;
++  return (input.is_cuda() || input.is_xpu()) && p > 0 && p < 1 && input.numel() > 0;
+ }
+ 
+ // NB: sure, we could have used different overloads here, but I would feel insecure
+-- 
+2.25.1
+

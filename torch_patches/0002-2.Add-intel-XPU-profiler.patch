@@ -1,7 +1,7 @@
-From 6cd8573b7ab2f7b2556ac99b85d51260ffd9c6fb Mon Sep 17 00:00:00 2001
+From a23f38ba8fc0217d21a5c80f4d39147839bd2770 Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Thu, 29 Oct 2020 21:49:47 +0800
-Subject: [PATCH 2/8] 2.Add intel XPU profiler
+Subject: [PATCH 02/14] 2.Add intel XPU profiler
 
 ---
  torch/_C/_autograd.pyi           |   2 +

@@ -1,7 +1,7 @@
-From 85b9631b6532ad6e5fbfad33508366798e9831f7 Mon Sep 17 00:00:00 2001
+From f715133cebbffe70e56a9070608dbe4818040db2 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 9 Dec 2020 17:25:50 +0800
-Subject: [PATCH 6/8] 6.Add prototype torch.runtime for intel XPU.
+Subject: [PATCH 06/14] 6.Add prototype torch.runtime for intel XPU.
 
 ---
  tools/build_variables.bzl          |    1 +
