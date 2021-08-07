@@ -47,7 +47,8 @@ add_subdirectory(${IPEX_ROOT_DIR}/csrc)
 add_subdirectory(${IPEX_ROOT_DIR}/torch_ipex/csrc)
 
 function (print_configuration_summary)
-  get_directory_property(CMAKE_COMPILE_DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
+  # Fetch definitions of ipex_gpu_core as main target
+  get_target_property(IPEX_NATIVE_DEFINITIONS ipex_gpu_core COMPILE_DEFINITIONS)
 
     message(STATUS "")
     message(STATUS "******** Summary ********")
@@ -63,8 +64,8 @@ function (print_configuration_summary)
     message(STATUS "  C++ compiler id       : ${CMAKE_CXX_COMPILER_ID}")
     message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
     message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
-    message(STATUS "  Compile flags         : ${IPEX_COMPILE_FLAGS}")
-    message(STATUS "  Compile definitions   : ${CMAKE_COMPILE_DEFINITIONS}")
+    message(STATUS "  Compile flags         : ${IPEX_SYCL_KERNEL_FLAGS}")
+    message(STATUS "  Compile definitions   : ${IPEX_NATIVE_DEFINITIONS}")
     message(STATUS "  Linker options        : ${CMAKE_SHARED_LINKER_FLAGS}")
 
     message(STATUS "  Intel SYCL include    : ${SYCL_INCLUDE_DIR}")
