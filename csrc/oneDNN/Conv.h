@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <ATen/core/grad_mode.h>
 
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
@@ -205,7 +206,6 @@ static at::Tensor convolution(
 
   auto ic = src.size(1);
   auto oc = dst_tz[1];
-
   auto fmt_any = memory::format_tag::any;
   // 4D: n/c/h/w (n/h/w/c)
   // 5D: n/c/d/h/w (n/d/h/w/c)
@@ -281,7 +281,6 @@ static at::Tensor convolution(
         }
       }
     }
-
     auto dst_scale = attr.oscale_;
     src_scale = src.q_scale();
     conv_scale.clear();
@@ -295,7 +294,6 @@ static at::Tensor convolution(
     pattr.set_output_scales(mask_conv, conv_scale);
     pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
   }
-
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key_pd;
   create_key(
@@ -324,7 +322,6 @@ static at::Tensor convolution(
         1.0, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
   }
   pattr.set_post_ops(po);
-
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
@@ -387,7 +384,7 @@ static at::Tensor convolution(
     bool onoff = false;
     onoff |= Settings::I().is_onednn_layout_enabled();
     onoff |= src.is_contiguous(at::MemoryFormat::ChannelsLast);
-    onoff &= !wgh.requires_grad();
+    onoff &= !at::GradMode::is_enabled();
     return onoff;
   }();
 
