@@ -311,9 +311,9 @@ class TestPrepackCases(TestCase):
 
     def test_linear_inference(self):
         class L(torch.nn.Module):
-            def __init__(self, in_f, out_f):
+            def __init__(self, in_f, out_f, bias):
                 super(L, self).__init__()
-                self.linear = torch.nn.Linear(in_f, out_f)
+                self.linear = torch.nn.Linear(in_f, out_f, bias=bias)
 
             def forward(self, x):
                 return self.linear(x)
@@ -325,7 +325,7 @@ class TestPrepackCases(TestCase):
         options = itertools.product([True, False], input_shapes)
         for bias, x_shape in options:
             x = torch.randn(x_shape, dtype=torch.float32)
-            model = L(in_features, out_features).float().eval()
+            model = L(in_features, out_features, bias).float().eval()
             for dtype in [torch.float32, torch.bfloat16]:
                 x1 = x.clone().requires_grad_()
                 x2 = x.clone().requires_grad_()
@@ -355,7 +355,7 @@ class TestPrepackCases(TestCase):
         for out_features, bias, x_shape in options:
             in_features = x_shape[-1]
             x = torch.randn(x_shape, dtype=torch.float32)
-            model = torch.nn.Linear(in_features, out_features).float().train()
+            model = torch.nn.Linear(in_features, out_features, bias=bias).float().train()
             for dtype in [torch.float32, torch.bfloat16]:
                 x1 = x.clone().requires_grad_()
                 x2 = x.clone().requires_grad_()

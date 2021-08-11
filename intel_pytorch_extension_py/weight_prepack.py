@@ -133,6 +133,8 @@ class _IPEXLinear(torch.nn.Module):
                 self.master_bias = dense_module.master_bias
             elif hasattr(dense_module, 'bias_trail'):
                 self.bias_trail = dense_module.bias_trail
+        else:
+            self.register_parameter('bias', None)
 
     def forward(self, x):
         return torch.ops.torch_ipex.ipex_linear(
