@@ -211,10 +211,8 @@ static at::Tensor convolution(
   // 5D: n/c/d/h/w (n/d/h/w/c)
   auto fmt_src = conv_src_fmt(
       ndim,
-      ndim == 4 ? (!src.is_contiguous() &&
-                   src.is_contiguous(at::MemoryFormat::ChannelsLast))
-                : (!src.is_contiguous() &&
-                   src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+      ndim == 4 ? (src.is_contiguous(at::MemoryFormat::ChannelsLast))
+                : (src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
   // 4D: (g)o/i/h/w ((g)o/h/w/i)
   // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
   auto fmt_wgh = conv_wgh_fmt(

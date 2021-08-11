@@ -277,10 +277,8 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto format_any = memory::format_tag::any;
   auto format_input = conv_src_fmt(
       ndim,
-      ndim == 4 ? (!input.is_contiguous() &&
-                   input.is_contiguous(at::MemoryFormat::ChannelsLast))
-                : (!input.is_contiguous() &&
-                   input.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+      ndim == 4 ? (input.is_contiguous(at::MemoryFormat::ChannelsLast))
+                : (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
   auto format_weight = conv_wgh_fmt(
       ndim,
       groups != 1,
