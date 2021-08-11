@@ -163,7 +163,7 @@ torch::autograd::variable_list
 IPEXBatchNormOp::backward(torch::autograd::AutogradContext *ctx,
                           torch::autograd::variable_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXConvolutionOp::backward", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXBatchNormOp::backward", std::vector<c10::IValue>({}));
 #endif
   auto train = ctx->saved_data["train"].toBool();
   auto eps = ctx->saved_data["eps"].toDouble();
