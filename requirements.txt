@@ -1,12 +1,13 @@
-pytest
-matplotlib
-scipy
 astunparse
+flake8
 future
+matplotlib
 numpy
 psutil
+pytest
 pyyaml
 requests
+scipy
 setuptools
 six
 types-dataclasses

@@ -48,6 +48,7 @@ except ImportError as e:
     sys.exit(1)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
+ipex_pydir = os.path.join(base_dir, 'torch_ipex')
 
 
 def _get_complier():
@@ -83,6 +84,19 @@ def get_git_head_sha(base_dir):
     return ipex_git_sha, torch_version, torch_git_sha
 
 
+def check_flake8_errors(base_dir, ipex_pydir):
+    if shutil.which('flake8') is None:
+        print("WARNING: Please install flake8 by pip!")
+    flak8_cmd = ['flake8', '--quiet']
+    for root, dirs, files in os.walk(ipex_pydir):
+        for file in files:
+            if(file.endswith('.py')):
+                flak8_cmd.append(os.path.join(root, file))
+    ret = subprocess.call(flak8_cmd, cwd=base_dir)
+    if ret != 0:
+        print("WARNING: flake8 found format errors in", ipex_pydir, "!")
+
+
 def get_build_version(ipex_git_sha):
     versions = {}
     version_file = 'version.txt'
@@ -111,6 +125,7 @@ def create_version_files(base_dir, version_sha, ipex_git_sha, torch_version, tor
         f.write("__torch_gitrev__ = '{}'\n".format(torch_git_sha))
 
 
+check_flake8_errors(base_dir, ipex_pydir)
 ipex_git_sha, torch_version, torch_git_sha = get_git_head_sha(base_dir)
 version, version_sha = get_build_version(ipex_git_sha)
 
