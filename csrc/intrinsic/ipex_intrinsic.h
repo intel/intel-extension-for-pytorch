@@ -9,6 +9,17 @@ namespace AtenIpexTypeXPU {
 
 struct DPCPPTensorContext;
 
+void matmul(
+    Tensor& result,
+    const Tensor& m1,
+    const Tensor& m2,
+    const Tensor& b,
+    const Tensor& po,
+    float beta,
+    float alpha,
+    bool m2_trans,
+    int fusion);
+
 at::Tensor& fused_adamW(
     at::Tensor& grad_input,
     const at::Tensor& avg,
@@ -79,19 +90,11 @@ at::Tensor convolution_sigmoid(
     at::Scalar alpha = 0.f,
     at::Scalar beta = 0.f);
 
-at::Tensor matmul_sum(
+at::Tensor matmul_add(
     at::Tensor& accumu,
     const at::Tensor& m1,
     const at::Tensor& m2,
     at::Scalar beta);
-
-at::Tensor& trans_baddbmm_out(
-    at::Tensor& result,
-    const at::Tensor& input,
-    const at::Tensor& batch1,
-    const at::Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
 
 at::Tensor& fill_slice_with_index(at::Tensor& t, int dim);
 
@@ -113,21 +116,21 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     bool keepdim,
     bool take_sqrt);
 
-at::Tensor linear_relu(
+at::Tensor trans_addmm_relu(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias,
     at::Scalar beta = 1.0f,
     at::Scalar alpha = 1.0f);
 
-at::Tensor linear_sigmoid(
+at::Tensor trans_addmm_sigmoid(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias,
     at::Scalar beta = 1.0f,
     at::Scalar alpha = 1.0f);
 
-at::Tensor trans_linear(
+at::Tensor trans_addmm(
     const at::Tensor& input,
     const at::Tensor& m1,
     const at::Tensor& m2,
@@ -226,12 +229,11 @@ at::Tensor dequantize_tensor_per_channel_affine(
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-at::Tensor trans_linear(
+at::Tensor trans_addmm(
     const at::Tensor& input,
     const at::Tensor& m1,
     const at::Tensor& m2,
     at::Scalar beta = 1.0f,
     at::Scalar alpha = 1.0f);
-
 }
 } // namespace at

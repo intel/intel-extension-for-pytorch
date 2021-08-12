@@ -23,7 +23,12 @@ namespace oneDNN {
 
 struct MatmulAttr {
   static const int64_t kind_with_relu = xpu::oneDNN::with_relu;
+  static const int64_t kind_with_gelu = xpu::oneDNN::with_gelu;
+  static const int64_t kind_with_sum = xpu::oneDNN::with_sum;
   static const int64_t kind_with_sigmoid = xpu::oneDNN::with_sigmoid;
+  static const int64_t kind_with_bin_mul = xpu::oneDNN::with_bin_mul;
+  static const int64_t kind_with_bin_add = xpu::oneDNN::with_bin_add;
+  static const int64_t kind_with_bin_sub = xpu::oneDNN::with_bin_sub;
 
   MatmulAttr() : alpha_(1.f), beta_(0.f), attr_(0), m2_trans_(true) {}
   MatmulAttr(float alpha, float beta, int64_t attr, bool m2_trans)
@@ -32,9 +37,24 @@ struct MatmulAttr {
   bool with_relu() {
     return attr_ & kind_with_relu;
   }
+  bool with_gelu() {
+    return attr_ & kind_with_gelu;
+  }
   bool with_sigmoid() {
     return attr_ & kind_with_sigmoid;
   }
+  bool with_sum() {
+    return attr_ & kind_with_sum;
+  };
+  bool with_bin_mul() {
+    return attr_ & kind_with_bin_mul;
+  };
+  bool with_bin_add() {
+    return attr_ & kind_with_bin_add;
+  };
+  bool with_bin_sub() {
+    return attr_ & kind_with_bin_sub;
+  };
   int64_t attr() {
     return attr_;
   }
@@ -152,7 +172,6 @@ static inline void matmul(
 #endif
 
   post_ops po;
-  int64_t post_flags = 0;
   if (attr.alpha_ != 1.f)
     pattr.set_output_scales(/* mask */ 0, {(float)attr.alpha_});
   // Handle difference cases based-on beta value here:
@@ -160,22 +179,22 @@ static inline void matmul(
   // 2. quantization path, no bias fusion support in oneDNN so far
   // 3. beta == 1, partially support bias fusion in oneDNN
   // 4. alpha != 1, post-sum is needed for, alpha * (m1 x m2) + post
-  if (attr.beta_ != 0.f &&
-      (attr.alpha_ != 1.f || attr.beta_ != 1.f || m1.is_quantized() ||
-       m2.is_quantized())) {
+  if (attr.with_sum()) {
     po.append_sum(attr.beta_);
-    post_flags |= xpu::oneDNN::with_sum;
   }
 
   if (attr.with_relu()) {
     po.append_eltwise(1.f, algorithm::eltwise_relu, 0.f, 0.f);
-    post_flags |= xpu::oneDNN::with_relu;
+  }
+
+  if (attr.with_gelu()) {
+    po.append_eltwise(1.f, algorithm::eltwise_gelu, 0.f, 0.f);
   }
 
   if (attr.with_sigmoid()) {
     po.append_eltwise(1.f, algorithm::eltwise_logistic, 0.f, 0.f);
-    post_flags |= xpu::oneDNN::with_sigmoid;
   }
+
   pattr.set_post_ops(po);
 
   std::vector<float> weight_scales;
@@ -215,8 +234,7 @@ static inline void matmul(
 
   auto matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
 
-  if (attr.beta_ == 1.f && attr.alpha_ == 1.f && (!m1.is_quantized()) &&
-      (!m2.is_quantized())) {
+  if (b.defined() && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_dt = b.defined() ? get_onednn_dtype(b) : memory::data_type::f32;
     if (b.sizes() != dst.sizes()) {
       memory::dims b_dims(dst.sizes().size() - 1, 1);
@@ -356,12 +374,11 @@ static inline void matmul(
   if (dst_usr_m.get_desc() != expected_dst_md) {
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
-    if (attr.beta_ != 1.f)
+    if (attr.with_sum())
       xpu::oneDNN::reorder(dst, dst_);
   }
 
-  if (attr.beta_ == 1.f && attr.alpha_ == 1.f && (!m1.is_quantized()) &&
-      (!m2.is_quantized())) {
+  if (b.defined() && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_m = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
 
     DPCPP_ONEDNN_EXEC(

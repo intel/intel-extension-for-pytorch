@@ -1,12 +1,46 @@
 #pragma once
 #include <ATen/ATen.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
-
+#include <oneDNN/oneDNN.h>
 #include <oneapi/dnnl/dnnl.hpp>
 
 namespace torch {
 namespace jit {
 namespace dpcpp {
+
+at::Tensor matmul_fusion_variants(
+    at::Tensor& accumul1,
+    at::Tensor& accumul2,
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    float oscale,
+    float beta1,
+    float beta2,
+    bool trans,
+    int fusion_type = 0);
+
+at::Tensor matmul_fusion_variants_gelu(
+    at::Tensor& accumul1,
+    at::Tensor& accumul2,
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    float oscale,
+    float beta1,
+    float beta2,
+    bool trans);
+
+at::Tensor matmul_fusion_variants_dropout(
+    at::Tensor& accumul1,
+    at::Tensor& accumul2,
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    float oscale,
+    float beta1,
+    float beta2,
+    bool trans,
+    double p,
+    bool train,
+    bool inplace);
 
 at::Tensor& conv2d_sum(
     at::Tensor& accumu,
@@ -47,19 +81,6 @@ at::Tensor conv2d_sigmoid(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups);
-
-at::Tensor matmul_sum(
-    at::Tensor& accumu,
-    const at::Tensor& m1,
-    const at::Tensor& m2,
-    at::Scalar alpha);
-
-at::Tensor trans_matmul_scale_sum(
-    at::Tensor& accumu,
-    const at::Tensor& tensor1,
-    const at::Tensor& tensor2,
-    at::Scalar oscale,
-    at::Scalar alpha);
 
 at::Tensor mul_add(
     const at::Tensor& self,
@@ -137,6 +158,16 @@ at::Tensor trans_addmm_sigmoid(
     const at::Tensor& input,
     at::Scalar beta,
     at::Scalar alpha);
+
+at::Tensor trans_addmm_dropout(
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& input,
+    at::Scalar beta,
+    at::Scalar alpha,
+    double p,
+    bool train,
+    bool inplace);
 
 } // namespace dpcpp
 } // namespace jit

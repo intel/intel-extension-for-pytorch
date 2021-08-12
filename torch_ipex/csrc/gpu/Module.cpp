@@ -317,7 +317,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::linear_relu(input, weight, bias);
+        return at::AtenIpexTypeXPU::trans_addmm_relu(input, weight, bias);
       },
       "fused linear with relu opt. on Intel device");
 
@@ -326,7 +326,7 @@ void init_module(pybind11::module& m) {
       [](const at::Tensor& input,
          const at::Tensor& weight,
          const at::Tensor& bias) {
-        return at::AtenIpexTypeXPU::linear_sigmoid(input, weight, bias);
+        return at::AtenIpexTypeXPU::trans_addmm_sigmoid(input, weight, bias);
       },
       "fused linear with sigmoid opt. on Intel device");
 
@@ -393,6 +393,10 @@ void init_module(pybind11::module& m) {
             correct_bias);
       },
       "optimized adamW optimizer kernel implemtation on Intel device");
+
+  m.def("to_plain", [](const at::Tensor& input) {
+    return at::AtenIpexTypeXPU::to_plain_if_needed(input);
+  });
 
 #if defined(USE_ONEDPL)
   m.def("_onedpl_is_enabled", []() { return true; });

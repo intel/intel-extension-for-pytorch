@@ -19,20 +19,29 @@ static auto conv2d_sum_relu_sym =
     Symbol::fromQualString("dpcpp::conv2d_sum_relu");
 static auto conv2d_sigmoid_sym =
     Symbol::fromQualString("dpcpp::conv2d_sigmoid");
-static auto matmul_sum_sym = Symbol::fromQualString("dpcpp::matmul_sum");
+static auto matmul_add_sym = Symbol::fromQualString("dpcpp::matmul_add");
+static auto t_matmul_sym = Symbol::fromQualString("dpcpp::t_matmul");
 static auto trans_matmul_sym = Symbol::fromQualString("dpcpp::trans_matmul");
-static auto trans_matmul_scale_sym =
-    Symbol::fromQualString("dpcpp::trans_matmul_scale");
-static auto trans_matmul_scale_sum_sym =
-    Symbol::fromQualString("dpcpp::trans_matmul_scale_sum");
+static auto t_matmul_add_sym = Symbol::fromQualString("dpcpp::t_matmul_add");
+static auto t_matmul_add_dropout_sym =
+    Symbol::fromQualString("dpcpp::t_matmul_add_dropout");
+static auto t_matmul_add_add_sym =
+    Symbol::fromQualString("dpcpp::t_matmul_add_add");
+static auto t_matmul_add_gelu_sym =
+    Symbol::fromQualString("dpcpp::t_matmul_add_gelu");
+static auto trans_matmul_div_sym =
+    Symbol::fromQualString("dpcpp::trans_matmul_div");
+static auto trans_matmul_scale_add_sym =
+    Symbol::fromQualString("dpcpp::trans_matmul_scale_add");
 static auto mul_add_sym = Symbol::fromQualString("dpcpp::mul_add");
 static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("dpcpp::q_conv2d_sum_relu");
-static auto trans_addmm_sym = Symbol::fromQualString("dpcpp::trans_addmm");
-static auto trans_addmm_relu_sym =
-    Symbol::fromQualString("dpcpp::trans_addmm_relu");
-static auto trans_addmm_sigmoid_sym =
-    Symbol::fromQualString("dpcpp::trans_addmm_sigmoid");
+static auto t_addmm_sym = Symbol::fromQualString("dpcpp::t_addmm");
+static auto t_addmm_dropout_sym =
+    Symbol::fromQualString("dpcpp::t_addmm_dropout");
+static auto t_addmm_relu_sym = Symbol::fromQualString("dpcpp::t_addmm_relu");
+static auto t_addmm_sigmoid_sym =
+    Symbol::fromQualString("dpcpp::t_addmm_sigmoid");
 static auto dequant_pixelshuffle_sym =
     Symbol::fromQualString("dpcpp::dequant_pixelshuffle");
 static auto dequant_pixelshuffle_quant_sym =

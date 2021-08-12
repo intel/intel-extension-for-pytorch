@@ -44,7 +44,7 @@ at::Tensor dpcppLinear(
         output_scale);
   } else {
     // omit transpose on weight
-    return trans_linear(
+    return trans_addmm(
         bias,
         input.is_quantized() ? at::dequantize(input) : input,
         weight,

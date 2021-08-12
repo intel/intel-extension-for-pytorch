@@ -165,15 +165,20 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "dpcpp::matmul_sum(Tensor m1, Tensor m2, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+        "dpcpp::matmul_add(Tensor m1, Tensor m2, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            auto output = (std::move(peek(stack, 2, 4))).toTensor();
-            auto result = torch::jit::dpcpp::matmul_sum(
-                output,
+            auto accumu1 = (std::move(peek(stack, 2, 4))).toTensor();
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
                 (std::move(peek(stack, 0, 4))).toTensor(),
                 (std::move(peek(stack, 1, 4))).toTensor(),
-                (std::move(peek(stack, 3, 4))).toScalar());
+                1.f,
+                (std::move(peek(stack, 3, 4))).toScalar().to<float>(),
+                0.f,
+                true);
             drop(stack, 4);
             pack(stack, std::move(result));
           };
@@ -183,45 +188,161 @@ RegisterOperators op({
         "dpcpp::trans_matmul(Tensor m2, int dim1, int dim2, Tensor m1) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            at::Tensor input;
-            auto result = torch::jit::dpcpp::trans_matmul_scale_sum(
-                input,
+            at::Tensor accumu1;
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
                 (std::move(peek(stack, 3, 4))).toTensor(),
                 (std::move(peek(stack, 0, 4))).toTensor(),
-                1.0f,
-                0.f);
+                1.f,
+                0.f,
+                0.f,
+                false);
             drop(stack, 4);
             pack(stack, std::move(result));
           };
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "dpcpp::trans_matmul_scale(Tensor m2, int dim1, int dim2, Tensor m1, Scalar oscale) -> Tensor(a!)",
+        "dpcpp::t_matmul(Tensor m2, Tensor m1) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            at::Tensor input;
-            auto result = torch::jit::dpcpp::trans_matmul_scale_sum(
-                input,
+            at::Tensor accumu1;
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
+                (std::move(peek(stack, 1, 2))).toTensor(),
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                1.f,
+                0.f,
+                0.f,
+                false);
+            drop(stack, 2);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "dpcpp::t_matmul_add_dropout(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha, double p, bool train) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto accumu1 = (std::move(peek(stack, 4, 8))).toTensor();
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants_dropout(
+                accumu1,
+                accumu2,
+                (std::move(peek(stack, 3, 8))).toTensor(),
+                (std::move(peek(stack, 0, 8))).toTensor(),
+                1.f,
+                (std::move(peek(stack, 5, 8))).toScalar().to<float>(),
+                0.f,
+                false,
+                (std::move(peek(stack, 6, 8))).toDouble(),
+                (std::move(peek(stack, 7, 8))).toBool(),
+                true);
+            drop(stack, 8);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "dpcpp::t_matmul_add(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto accumu1 = (std::move(peek(stack, 2, 4))).toTensor();
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                1.f,
+                (std::move(peek(stack, 3, 4))).toScalar().to<float>(),
+                0.f,
+                false);
+            drop(stack, 4);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "dpcpp::t_matmul_add_gelu(Tensor m2, Tensor m1, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto accumu1 = (std::move(peek(stack, 2, 4))).toTensor();
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants_gelu(
+                accumu1,
+                accumu2,
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                1.f,
+                (std::move(peek(stack, 3, 4))).toScalar().to<float>(),
+                0.f,
+                false);
+            drop(stack, 4);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "dpcpp::t_matmul_add_add(Tensor m2, Tensor m1, Tensor(a!) accumu1, *, Scalar alpha1, Tensor(a!) accumu2, *, Scalar alpha2) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto accumu1 = (std::move(peek(stack, 2, 6))).toTensor();
+            auto accumu2 = (std::move(peek(stack, 4, 6))).toTensor();
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
+                (std::move(peek(stack, 1, 6))).toTensor(),
+                (std::move(peek(stack, 0, 6))).toTensor(),
+                1.0f,
+                (std::move(peek(stack, 3, 6))).toScalar().to<float>(),
+                (std::move(peek(stack, 5, 6))).toScalar().to<float>(),
+                false);
+            drop(stack, 6);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    // FIXME: support not only div scalar but div tensor
+    Operator(
+        "dpcpp::trans_matmul_div(Tensor m2, int dim1, int dim2, Tensor m1, Scalar oscale) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            at::Tensor accumu1;
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
                 (std::move(peek(stack, 3, 5))).toTensor(),
                 (std::move(peek(stack, 0, 5))).toTensor(),
-                (std::move(peek(stack, 4, 5))).toScalar(),
-                0.f);
+                1.f / (std::move(peek(stack, 4, 5))).toScalar().to<float>(),
+                0.f,
+                0.f,
+                false);
             drop(stack, 5);
             pack(stack, std::move(result));
           };
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "dpcpp::trans_matmul_scale_sum(Tensor m2, int dim1, int dim2, Tensor m1, Scalar oscale, Tensor accumu, Scalar alpha) -> Tensor(a!)",
+        "dpcpp::trans_matmul_scale_add(Tensor m2, int dim1, int dim2, Tensor m1, Scalar oscale, Tensor accumu, Scalar alpha) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            auto accumu = (std::move(peek(stack, 5, 7))).toTensor();
-            auto result = torch::jit::dpcpp::trans_matmul_scale_sum(
-                accumu,
+            auto accumu1 = (std::move(peek(stack, 5, 7))).toTensor();
+            at::Tensor accumu2;
+            auto result = torch::jit::dpcpp::matmul_fusion_variants(
+                accumu1,
+                accumu2,
                 (std::move(peek(stack, 3, 7))).toTensor(),
                 (std::move(peek(stack, 0, 7))).toTensor(),
-                (std::move(peek(stack, 4, 7))).toScalar(),
-                (std::move(peek(stack, 6, 7))).toScalar());
+                1.f / (std::move(peek(stack, 4, 7))).toScalar().to<float>(),
+                (std::move(peek(stack, 6, 7))).toScalar().to<float>(),
+                0.f,
+                false);
             drop(stack, 7);
             pack(stack, std::move(result));
           };
@@ -288,7 +409,7 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "dpcpp::trans_addmm(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
+        "dpcpp::t_addmm(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = torch::jit::dpcpp::trans_addmm(
@@ -303,7 +424,25 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "dpcpp::trans_addmm_relu(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
+        "dpcpp::t_addmm_dropout(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha, double p, bool train) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = torch::jit::dpcpp::trans_addmm_dropout(
+                (std::move(peek(stack, 0, 7))).toTensor(),
+                (std::move(peek(stack, 1, 7))).toTensor(),
+                (std::move(peek(stack, 2, 7))).toTensor(),
+                (std::move(peek(stack, 3, 7))).toScalar(),
+                (std::move(peek(stack, 4, 7))).toScalar(),
+                (std::move(peek(stack, 5, 7))).toDouble(),
+                (std::move(peek(stack, 6, 7))).toBool(),
+                true);
+            drop(stack, 7);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "dpcpp::t_addmm_relu(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = torch::jit::dpcpp::trans_addmm_relu(
@@ -318,7 +457,7 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "dpcpp::trans_addmm_sigmoid(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
+        "dpcpp::t_addmm_sigmoid(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = torch::jit::dpcpp::trans_addmm_sigmoid(

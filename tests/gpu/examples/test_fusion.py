@@ -47,6 +47,32 @@ class TransMatmulScale(torch.nn.Module):
     def forward(self, m1, m2):
         return torch.matmul(m1, m2.transpose(-1, -2)) / 8
 
+class TransMatmulAddAdd(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmulAddAdd, self).__init__()
+
+    def forward(self, m1, m2, add1, add2):
+        return torch.add(torch.matmul(m1, m2.t()), add1, alpha=2.0) + add2
+
+
+class TransMatmulAdd(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmulAdd, self).__init__()
+
+    def forward(self, m1, m2, add1):
+        output = torch.matmul(m1, m2.t())
+        output += add1
+        return output
+
+
+
+class TransMatmulAddGelu(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmulAddGelu, self).__init__()
+
+    def forward(self, m1, m2, add):
+        return F.gelu(torch.add(torch.matmul(m1, m2.t()), add, alpha=2.0) )
+
 
 class Conv2dRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -65,6 +91,7 @@ class Conv2dSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
 
+
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearReLU, self).__init__()
@@ -75,6 +102,7 @@ class LinearReLU(torch.nn.Module):
         x = self.relu(self.linear(x))
         return x
 
+
 class LinearSigmoid(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super(LinearSigmoid, self).__init__()
@@ -83,6 +111,17 @@ class LinearSigmoid(torch.nn.Module):
 
     def forward(self, x):
         x = self.sigmoid(self.linear(x))
+        return x
+
+
+class LinearDropout(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, p, inplace=False):
+        super(LinearDropout, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.dropout = nn.Dropout(p, inplace)
+
+    def forward(self, x):
+        x = self.dropout(self.linear(x))
         return x
 
 
@@ -178,6 +217,92 @@ class TestNNMethod(TestCase):
         self.assertEqual(raw2, real2.to(cpu_device))
         del modelJit
 
+    def test_trans_matmul_add(self, dtype=torch.float):
+        m1 = torch.randn((4, 2), device=cpu_device)
+        m2 = torch.randn((4, 2), device=cpu_device)
+        add1 = torch.randn((4, 4), device=cpu_device)
+
+        model = TransMatmulAdd()
+        raw = model(m1, m2, add1)
+        print("raw: ", raw)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        add1_dpcpp = add1.to(dpcpp_device)
+
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp)
+            print("real:", real.to(cpu_device))
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
+ 
+    def test_trans_matmul_add_add(self, dtype=torch.float):
+        m1 = torch.randn((4, 2), device=cpu_device)
+        m2 = torch.randn((4, 2), device=cpu_device)
+        add1 = torch.randn((4, 4), device=cpu_device)
+        add2 = torch.randn((4, 4), device=cpu_device)
+
+        model = TransMatmulAddAdd()
+        raw = model(m1, m2, add1, add2)
+        print("raw: ", raw)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        add1_dpcpp = add1.to(dpcpp_device)
+        add2_dpcpp = add2.to(dpcpp_device)
+
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp, add2_dpcpp)
+            print("real:", real.to(cpu_device))
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
+
+    def test_trans_3d_matmul_add_add(self, dtype=torch.float):
+        m1 = torch.randn((4, 3, 2), device=cpu_device)
+        m2 = torch.randn((4, 2), device=cpu_device)
+        add1 = torch.randn((4, 3, 4), device=cpu_device)
+        add2 = torch.randn((4), device=cpu_device)
+
+        model = TransMatmulAddAdd()
+        raw = model(m1, m2, add1, add2)
+        print("raw: ", raw)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        add1_dpcpp = add1.to(dpcpp_device)
+        add2_dpcpp = add2.to(dpcpp_device)
+
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m1_dpcpp, m2_dpcpp, add1_dpcpp, add2_dpcpp)
+            print("real:", real.to(cpu_device))
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
+    
+    def test_trans_matmul_gelu(self, dtype=torch.float):
+        m1 = torch.randn((4, 2), device=cpu_device)
+        m2 = torch.randn((4, 2), device=cpu_device)
+        add = torch.randn((4, 4), device=cpu_device)
+        
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        add_dpcpp = add.to(dpcpp_device)
+        
+        model = TransMatmulAddGelu()
+        model_dpcpp = model.to(dpcpp_device) 
+        raw = model_dpcpp(m1_dpcpp, m2_dpcpp, add_dpcpp)
+        print("raw: ", raw.cpu())
+        
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m1_dpcpp, m2_dpcpp, add_dpcpp)
+            print("real:", real.to(cpu_device))
+            print(modelJit.graph_for(m1_dpcpp, m2_dpcpp, add_dpcpp))
+        self.assertEqual(raw, real.to(cpu_device), atol=1e-3, rtol=1.3e-6)
+        del modelJit
+    
     def test_conv_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -202,7 +327,7 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
-
+ 
     def test_conv_sigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -241,8 +366,7 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
-
-
+            
     def test_linear_sigmoid(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearSigmoid(4, 4)
@@ -259,4 +383,23 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
+    
+    def test_linear_dropout(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        inplace = True
+        model = LinearDropout(4, 4, 0.2, True)
+        model.eval()
+        y = model(x)
+        print("raw: ", y)
 
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+  
+    
