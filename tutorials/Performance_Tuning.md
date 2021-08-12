@@ -21,6 +21,7 @@ Although by default primitives of PyTorch and IPEX are highly optimized, there a
   - Memory Allocator
     - Jemalloc
     - TCMalloc
+  - Denormal Number
 
 # Hardware Configuration
 
@@ -213,4 +214,12 @@ cd gperftools-<version>
 ./configure --disable-cpu-profiler --disable-heap-profiler --disable-heap-checker --disable-debugalloc --enable-minimal 
 make
 make install
+```
+
+## Denormal Number
+
+[Denormal number](https://en.wikipedia.org/wiki/Denormal_number) is used to store extremely small numbers which are close to 0. Computations with denormal numbers are remarkably slower than normalized number. To solve the low performance issue caused by denormal numbers, users can use the following PyTorch API function.
+
+```
+torch.set_flush_denormal(True)
 ```
