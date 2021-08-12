@@ -272,14 +272,12 @@ class TestLSTM(TestCase):
                     self.assertEqual(h_ipex.dtype, torch.float)
                     self.assertEqual(c_ipex.dtype, torch.float)
 
-                    # with mkldnn LSTM, y, hy[0] is bf16 and hy[1] is fp32
                     self.assertEqual(y_ipex.dtype, torch.bfloat16)
                     self.assertEqual(hy_ipex[0].dtype, torch.bfloat16)
-                    self.assertEqual(hy_ipex[1].dtype, torch.float)
+                    self.assertEqual(hy_ipex[1].dtype, torch.bfloat16)
                 self.assertEqual(y, y_ipex, prec=prec)
                 self.assertEqual(hy[0], hy_ipex[0], prec=prec)
-
-                self.assertEqual(hy[1], self._cast_dtype(hy_ipex[1], bf16), prec=prec)
+                self.assertEqual(hy[1], hy_ipex[1], prec=prec)
 
     def _test_lstm_pack_padded_sequence(self):
         embedding_dim = 1024

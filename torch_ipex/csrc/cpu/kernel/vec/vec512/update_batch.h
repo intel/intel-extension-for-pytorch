@@ -331,18 +331,19 @@ inline void update_hidden_idx_kernel(at::Tensor not_blank_out,
       idx.push_back(i);
   }
 
-  // hidden[0] and hidden_prime[0]: fp32 or bf16
-  // hidden[1] and hidden_prime[1]: always fp32
+  AT_ASSERTM(hidden_0.scalar_type() == hidden_1.scalar_type(),
+             "hidden_0 and hidden_1 should be in same dtype.");
   AT_ASSERTM((hidden_0.scalar_type() == at::kBFloat16 ||
               hidden_0.scalar_type() == at::kFloat),
              "only support hidden_0 to be float or bf16 tensor");
+
   if (hidden_0.scalar_type() == at::kBFloat16) {
     update_hidden_kernel<at::BFloat16>(idx, hidden_0, hidden_prime_0);
+    update_hidden_kernel<at::BFloat16>(idx, hidden_1, hidden_prime_1);
   } else {
     update_hidden_kernel<float>(idx, hidden_0, hidden_prime_0);
+    update_hidden_kernel<float>(idx, hidden_1, hidden_prime_1);
   }
-
-  update_hidden_kernel<float>(idx, hidden_1, hidden_prime_1);
 }
 
 inline void update_feature_idx_kernel(const at::Tensor &blankness_out,
