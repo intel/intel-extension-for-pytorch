@@ -164,7 +164,6 @@ private:
       }
     } else {
       op_attr = attr;
-      src_desc = {src.get_dims(), data_type::f32, format_tag::any};
       if (src.has_scale()) {
         auto src_scale = src.get_scale();
         src_scale[0] = 1.f / src_scale[0];
@@ -178,25 +177,23 @@ private:
       // align weights data type with src
       dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
                                                              : data_type::f32;
-      src_desc = src.get_desc().to_type(dst_data_type).to_format_any();
-      weights_desc = weights.get_desc().to_type(dst_data_type).to_format_any();
+      src_desc = src.get_desc().to_type(dst_data_type);
+      weights_desc = weights.get_desc().to_type(dst_data_type);
       if (with_bias) {
         IDEEP_ENFORCE(utils::one_of(bias.get_data_type(),
                                     data_type::f32, data_type::bf16),
                       "Incorrect data type in bias");
-        bias_desc = bias.get_desc().to_format_any();
+        bias_desc = bias.get_desc();
       }
     }
 
-    tensor::desc dst_desc(dst_dims, dst_data_type, format_tag::any);
+    tensor::desc dst_desc = dst.get_desc().to_type(dst_data_type);
     auto pd = with_bias
        ? primitive_desc({aprop_kind, src_desc, weights_desc, bias_desc,
                          dst_desc}, op_attr, aengine)
        : primitive_desc({aprop_kind, src_desc, weights_desc, dst_desc},
                         op_attr, aengine);
 
-    auto expected_src = src.reorder_if_differ_in(pd.src_desc(), src_attr);
-    auto expected_weights = weights.reorder_if_differ_in(pd.weights_desc(), weights_attr);
     // [ Note output buffer ]
     // In this case, dst is an empty ideep tensor, can be re-init
     // If dst is not empty, ideep must write result to dst's memory and it is caller's duty to
@@ -204,30 +201,26 @@ private:
     if (dst.is_empty()) {
       dst.init(pd.dst_desc());
     }
-    auto expected_dst = dst.reorder_if_differ_in(pd.dst_desc());
-    if (!dst_scales.empty() && utils::one_of(dst.get_data_type(), data_type::u8, data_type::s8)) {  
-      expected_dst.set_scale(dst_scales_in);
+
+    if (!dst_scales.empty() &&
+        utils::one_of(dst.get_data_type(), data_type::u8, data_type::s8)) {
+      dst.set_scale(dst_scales_in);
     }
 
     if (with_bias){
-      auto expected_bias = bias.reorder_if_differ_in(pd.bias_desc(), bias_attr);
-      super(pd).execute(stream::default_stream(),
-                        {{DNNL_ARG_SRC, expected_src},
-                         {DNNL_ARG_WEIGHTS, expected_weights},
-                         {DNNL_ARG_BIAS, expected_bias},
-                         {DNNL_ARG_DST, expected_dst}});
+      super(pd).execute(stream::default_stream(), {{DNNL_ARG_SRC, src},
+                                                   {DNNL_ARG_WEIGHTS, weights},
+                                                   {DNNL_ARG_BIAS, bias},
+                                                   {DNNL_ARG_DST, dst}});
     } else {
-      super(pd).execute(stream::default_stream(),
-                        {{DNNL_ARG_SRC, expected_src},
-                         {DNNL_ARG_WEIGHTS, expected_weights},
-                         {DNNL_ARG_DST, expected_dst}});
+      super(pd).execute(stream::default_stream(), {{DNNL_ARG_SRC, src},
+                                                   {DNNL_ARG_WEIGHTS, weights},
+                                                   {DNNL_ARG_DST, dst}});
     }
 
-    if (attr.non_negitive_output() && expected_dst.get_data_type() == data_type::s8) {
-      expected_dst.to_type(data_type::u8);
+    if (attr.non_negitive_output() && dst.get_data_type() == data_type::s8) {
+      dst.to_type(data_type::u8);
     }
-    // reorder back to dst's buffer if needed
-    expected_dst.reorder_to_if_differ_from(dst);
   }
 };
 
@@ -242,11 +235,6 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
                       tensor& diff_src,
                       const engine& aengine = engine::cpu_engine()) {
     auto weights_ = weights;
-    if (diff_dst.get_data_type() == data_type::bf16) {
-      weights_.init(weights.get_desc().to_type(data_type::bf16));
-      weights_.reorder_from(weights);
-    }
-
     // workaround: diff_src and weights from caffe2 may have different dims.
     // It would be better for caffe2 to do this reshape anyway.
     if (diff_src_dims.size() != weights.ndims()) {
@@ -255,10 +243,9 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
       weights_.reshape(new_dims);
     }
 
-    auto diff_dst_desc = diff_dst.get_desc().to_format_any();
-    auto weights_desc = weights_.get_desc().to_format_any();
-    auto diff_src_desc =
-        tensor::desc(diff_src_dims, diff_dst.get_data_type(), tag::any);
+    auto diff_dst_desc = diff_dst.get_desc();
+    auto weights_desc = weights_.get_desc();
+    auto diff_src_desc = diff_src.get_desc().to_type(diff_dst.get_data_type());
 
     auto forward_hints =
         inner_product_forward::primitive_desc(
@@ -268,8 +255,6 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     auto pd = primitive_desc(
         {diff_src_desc, weights_desc, diff_dst_desc}, aengine, forward_hints);
 
-    auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
-    auto expected_weights = weights_.reorder_if_differ_in(pd.weights_desc());
     // diff_src's origin content are not used, so it can be re-init directly
     // It's caller's duty to make sure diff_src's buffer size is same with it actually needed
     // Here we dose not support to write to given strided buffer since we know the grad is always contiguous
@@ -280,8 +265,8 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     }
 
     super(pd).execute(stream::default_stream(),
-                      {{DNNL_ARG_DIFF_DST, expected_diff_dst},
-                       {DNNL_ARG_WEIGHTS, expected_weights},
+                      {{DNNL_ARG_DIFF_DST, diff_dst},
+                       {DNNL_ARG_WEIGHTS, weights_},
                        {DNNL_ARG_DIFF_SRC, diff_src}});
   }
 };
@@ -319,18 +304,17 @@ private:
                            tensor& diff_bias,
                            const data_type diff_weight_type,
                            const engine& aengine = engine::cpu_engine()) {
-    auto src_desc = src.get_desc().to_format_any();
-    auto diff_dst_desc = diff_dst.get_desc().to_format_any();
+    auto src_desc = src.get_desc();
+    auto diff_dst_desc = diff_dst.get_desc();
     auto diff_weights_dims = src.get_dims();
     diff_weights_dims[0] = diff_dst.get_dim(1);
     data_type diff_dst_type = diff_dst.get_data_type();
     data_type diff_weight_type_in = data_type::undef== diff_weight_type ?
                                     diff_dst_type : diff_weight_type;
-    auto diff_weights_desc =
-        tensor::desc(diff_weights_dims, diff_weight_type_in, tag::any);
 
-    auto diff_bias_desc =
-        tensor::desc({diff_dst.get_dim(1)}, diff_weight_type_in, tag::any);
+    auto diff_weights_desc =
+        diff_weights.get_desc().to_type(diff_weight_type_in);
+    auto diff_bias_desc = diff_bias.get_desc().to_type(diff_weight_type_in);
 
     // for forward hint, weights_desc should have same data_type
     // with other input desc, expect for bias_desc
@@ -349,18 +333,13 @@ private:
         : primitive_desc({src_desc, diff_weights_desc, diff_dst_desc},
                           aengine, forward_hints);
 
-    auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
-    auto expected_src = src.reorder_if_differ_in(pd.src_desc());
     if (diff_weights.is_empty()){
       diff_weights.init(pd.diff_weights_desc());
     }
-    // Here we need to write to given strided buffer, so if given buffer is different with the best format
-    // We need to firstly init a new buffer to store the output, and copy the output to a given buffer
-    tensor expected_diff_weights = diff_weights.get_desc() == pd.diff_weights_desc() ? diff_weights : tensor(pd.diff_weights_desc());
 
-    exec_args args {{DNNL_ARG_DIFF_DST, expected_diff_dst},
-                    {DNNL_ARG_SRC, expected_src},
-                    {DNNL_ARG_DIFF_WEIGHTS ,expected_diff_weights}};
+    exec_args args{{DNNL_ARG_DIFF_DST, diff_dst},
+                   {DNNL_ARG_SRC, src},
+                   {DNNL_ARG_DIFF_WEIGHTS, diff_weights}};
 
     if (with_diff_bias) {
       if (diff_bias.is_empty()){
@@ -373,7 +352,6 @@ private:
     }
 
     super(pd).execute(stream::default_stream(), args);
-    expected_diff_weights.reorder_to_if_differ_from(diff_weights);
   }
 };
 

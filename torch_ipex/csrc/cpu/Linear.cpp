@@ -155,8 +155,23 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
   at::Tensor grad_input, grad_weight, grad_bias;
   // weight's desc is needed for both bw_d and bw_w
   const ideep::tensor w = get_linear_prepacked_weight(weight, out_features, in_features);
-  auto input_reshaped = input.dim() > 2 ? input.reshape({-1, input.size(input.dim() - 1)}) : input;
-  auto grad_output_reshaped = grad_output.dim() > 2 ? grad_output.reshape({-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
+  // for IP, currently both stag=ab and dtag=ab are only supported by onednn, we
+  // need first make both src and diff_dst contiguous if the input or
+  // grad_output is not expected
+  auto input_contiguous = input.is_contiguous() ? input : input.contiguous();
+  auto input_reshaped =
+      input_contiguous.dim() > 2
+          ? input_contiguous.reshape(
+                {-1, input_contiguous.size(input_contiguous.dim() - 1)})
+          : input_contiguous;
+  auto grad_output_contiguous =
+      grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_reshaped =
+      grad_output_contiguous.dim() > 2
+          ? grad_output_contiguous.reshape(
+                {-1,
+                 grad_output_contiguous.size(grad_output_contiguous.dim() - 1)})
+          : grad_output_contiguous;
   const ideep::tensor grady = itensor_view_from_dense(grad_output_reshaped);
   if (output_mask[0]) {
     at::Tensor grad_input_reshaped = at::empty_like(input_reshaped);
@@ -166,7 +181,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
     ideep::inner_product_backward_data::compute(
       grady, w, input_reshaped.sizes().vec(), gradx
     );
-    grad_input = input.dim() > 2 ? grad_input_reshaped.reshape(input.sizes().vec()) : grad_input_reshaped;
+    grad_input =
+        input_contiguous.dim() > 2
+            ? grad_input_reshaped.reshape(input_contiguous.sizes().vec())
+            : grad_input_reshaped;
   }
   if (output_mask[1] || output_mask[2]) {
   //bw_w

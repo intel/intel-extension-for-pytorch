@@ -1065,29 +1065,59 @@ class VerboseTestCase(TestCase):
         assert self.is_dnnl_reorder(line)
         tokens = line.split(',')
         src_desc, dst_desc = tokens[6].split(' ')
-        src_dtype = src_desc.split('::')[0].split('-')
+        src_dtype = src_desc.split('::')[0].split('_')
         src_format = src_desc.split('::')[1]
-        dst_dtype = dst_desc.split('::')[0].split('-')
+        dst_dtype = dst_desc.split('::')[0].split('_')
         dst_format = dst_desc.split('::')[1]
         return src_dtype, src_format, dst_dtype, dst_format
+
+    def isPlainFormat(self, check_format):
+        format_index = 0
+        format = ""
+        for check in check_format.split(':'):
+            if check == "blocked":
+                break
+            format_index = format_index+1
+        format = check_format.split(':')[format_index+1]
+        # ref to https://spec.oneapi.io/versions/latest/elements/oneDNN/source/data_model/memory/formats.html#
+        format_list=["a",
+                     "ab","ba",
+                     "acb","abc","bac","cba","bca",
+                     "abcd","abdc","acdb","bacd","bcda","cdba","dcab",
+                     "abcde","abdec","acbde","acdeb","bacde","bcdea","cdeba","decab",
+                     "abcdef","acbdef","defcab"]
+        for f in format_list:
+            if f == format:
+                return True
+        return False
+
+    def RedundantReorder(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype[1] == dst_dtype[1] and src_format == dst_format
 
     def ReorderForPack(self, line):
         if not self.is_dnnl_reorder(line):
             return False
         src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
-        return src_dtype == dst_dtype
+        if self.isPlainFormat(src_format) and self.isPlainFormat(dst_format): # for prepack, at least dst should be blocked format and not in the format list
+            return False
+        return src_dtype[1] == dst_dtype[1]
 
     def OnlyReorderDtype(self, line):
         if not self.is_dnnl_reorder(line):
             return False
         src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
-        return src_dtype != dst_dtype and src_format == dst_dtype
+        return src_dtype[1] != dst_dtype[1] and src_format == dst_format
         
     def OnlyReorderFormat(self, line):
         if not self.is_dnnl_reorder(line):
             return False
         src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
-        return src_dtype == dst_dtype and src_format != dst_dtype
+        if self.isPlainFormat(src_format) and not self.isPlainFormat(dst_format): # reorder from plain format to blocked, should be prepack reorder
+            return False
+        return src_dtype[1] == dst_dtype[1]  and src_format != dst_format
 
     def assertOnlyReorderDtype(self, line):
         assert OnlyReorderDtype(line), 'the verbose msg shows not only reorder dtype'
