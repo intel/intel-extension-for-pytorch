@@ -8,6 +8,7 @@ from .fx import *
 from .weight_prepack import _weight_prepack_with_ipex
 from .weight_cast import _weight_dtype_convert_with_ipex
 from .optimizer_utils import _ipex_optimizer
+import _torch_ipex as core
 
 def _replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
@@ -100,3 +101,36 @@ def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=Fa
         return optimized_model
     else:
         return optimized_model, optimized_optimizer
+
+VERBOSE_OFF = 0
+VERBOSE_ON = 1
+VERBOSE_ON_CREATION = 2
+class verbose(object):
+    def __init__(self, level):
+        self.level = level
+
+    def __enter__(self):
+        if self.level == VERBOSE_OFF:
+            return
+        try:
+            st = torch._C._verbose.mkldnn_set_verbose(self.level)
+            assert bool(st), "Failed to set Verbose mode of MKLDNN in PyTorch. Please consider to disable this verbose scope."
+        except:
+            pass
+        st = core.mkldnn_set_verbose(self.level)
+        assert bool(st), "Failed to set Verbose mode of MKLDNN in IPEX. Please consider to disable this verbose scope."
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        core.mkldnn_set_verbose(VERBOSE_OFF)
+        try:
+            torch._C._verbose.mkldnn_set_verbose(VERBOSE_OFF)
+        except:
+            pass
+        return False
+
+try:
+    verbose_torch=torch.backends.mkldnn.verbose
+    torch.backends.mkldnn.verbose = verbose
+except:
+    pass

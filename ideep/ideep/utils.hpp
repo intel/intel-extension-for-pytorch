@@ -298,6 +298,10 @@ inline void array_set(T *arr, const U &val, size_t size) {
     arr[i] = static_cast<T>(val);
 }
 
+inline int set_verbose(int level) {
+  dnnl::status ret = dnnl::set_verbose(level);
+  return ret == dnnl::status::success;
+}
 }
 }
 #endif

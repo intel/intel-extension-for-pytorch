@@ -121,4 +121,5 @@ at::Tensor empty_aten_tensor_from_desc(const ideep::tensor::desc& desc, const at
   return at::empty(at_sizes, options);
 }
 
+int mkldnn_set_verbose(int level) { return ideep::utils::set_verbose(level); }
 }}
