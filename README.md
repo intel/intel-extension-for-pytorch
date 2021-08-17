@@ -46,8 +46,8 @@ python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-s
 
 | IPEX Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
 | :--: | :--: | :--: | :--: | :--: |
-| 1.8.0 |  | :heavy_check_mark: |  |  |
 | 1.9.0 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| 1.8.0 |  | :heavy_check_mark: |  |  |
 
 ### Install IPEX by compiling from source
 
