@@ -18,8 +18,8 @@ class TestNNMethod(TestCase):
         print("normal_dpcpp device", lognormal.device)
         print("normal_dpcpp", lognormal.to("cpu"))
         
-        np_data = lognormal.cpu().detach().numpy()
+        #np_data = lognormal.cpu().detach().numpy()
         
-        print("numpy ", np_data)
-        plt.hist(np_data, 100)
-        plt.show()
+        #print("numpy ", np_data)
+        #plt.hist(np_data, 100)
+        #plt.show()
