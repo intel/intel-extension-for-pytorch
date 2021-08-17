@@ -153,10 +153,17 @@ LlgaKernel::prepareRunArgs(const TensorArgs &inputs,
       if (spec.is_quantized()) {
         at::QuantizerPtr quantizer = spec.get_quantizer();
         auto qtensor = at::new_qtensor(spec.sizes(), opt, quantizer);
+        // TODO: Setting strides is possible only on uniformly quantized tensor.
+        // Currently, only weight will use quantize_per_channel, data will
+        // always use quantize_per_tensor. We will only allocate buffer for data
+        // (output of a LlgaPartition). If in the future, we need allocate
+        // buffer for qensor that is quantized per channel, need implemeted
+        // as_strided_qtensorimpl for PER_CHANNEL QScheme.
+        qtensor.as_strided_(spec.sizes(), spec.strides());
         outputs.push_back(qtensor);
         runOutputs.push_back({spec.logical_tensor(), qtensor.data_ptr()});
       } else {
-        auto tensor = at::empty(spec.sizes(), opt);
+        auto tensor = at::empty_strided(spec.sizes(), spec.strides(), opt);
         outputs.push_back(tensor);
         runOutputs.push_back({spec.logical_tensor(), tensor.data_ptr()});
       }

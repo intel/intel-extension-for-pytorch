@@ -37,7 +37,8 @@ class TestOp(JitLlgaTestCase):
                 stride,
                 dilation,
                 g,
-                bias
+                bias,
+                memory_format
             ] in itertools.product(
                 [7, 8],
                 [8, 15],
@@ -47,7 +48,8 @@ class TestOp(JitLlgaTestCase):
                 [1, 2],
                 [1, 2],
                 [1, 2],
-                [True, False]):
+                [True, False],
+                [torch.contiguous_format, torch.channels_last]):
 
             m = nn.Conv2d(in_channels=in_channels * g,
                           out_channels=out_channels * g,
@@ -57,7 +59,7 @@ class TestOp(JitLlgaTestCase):
                           dilation=dilation,
                           groups=g,
                           bias=bias)
-            x = torch.rand(1, in_channels * g, spatial, spatial)
+            x = torch.rand(1, in_channels * g, spatial, spatial).to(memory_format=memory_format)
             patterns = [
                 ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
             ]
@@ -120,21 +122,23 @@ class TestOp(JitLlgaTestCase):
                 padding,
                 stride,
                 dilation,
-                ceil_mode
+                ceil_mode,
+                memory_format
             ] in itertools.product(
                 [15], # [15, 16], TODO: check backend
                 [3, 5], # [3, 4, 5], TODO: check backend
                 [0, 1],
                 [1, 2], # [1, 2, 4], TODO: fix issue in pad calculation
                 [1, 2],
-                [True, False]):
+                [True, False],
+                [torch.contiguous_format, torch.channels_last]):
 
             m = nn.MaxPool2d(kernel_size=kernel,
                              stride=stride,
                              padding=padding,
                              dilation=dilation,
                              ceil_mode=ceil_mode)
-            x = torch.rand(1, 3, spatial, spatial)
+            x = torch.rand(1, 3, spatial, spatial).to(memory_format=memory_format)
 
             patterns = [
                 ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
@@ -163,21 +167,22 @@ class TestFusionPattern(JitLlgaTestCase):
 
         for eltwise in ['relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
             for inplace in [False, True]:
-                eltwise_fn_name = eltwise + '_' if inplace else eltwise
-                eltwise_fn = get_eltwise_fn(eltwise_fn_name)
+                for memory_format in [torch.contiguous_format, torch.channels_last]:
+                    eltwise_fn_name = eltwise + '_' if inplace else eltwise
+                    eltwise_fn = get_eltwise_fn(eltwise_fn_name)
 
-                m = M(eltwise_fn)
-                x = torch.rand(1, 32, 28, 28)
+                    m = M(eltwise_fn)
+                    x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
 
-                patterns = [
-                    ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", 'aten::' + eltwise, "aten::quantize_per_tensor"], # inplace op will become outplace op on the JIT graph
-                    ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
-                ]
-                for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-                    graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="conv2d_eltwise", qscheme=qscheme)
-                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-                    self.assertFused(graph, ['aten::_convolution', 'aten::' + eltwise, 'aten::quantize_per_channel', 'aten::dequantize'])
-                    self.checkPatterns(graph, patterns)
+                    patterns = [
+                        ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", 'aten::' + eltwise, "aten::quantize_per_tensor"], # inplace op will become outplace op on the JIT graph
+                        ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
+                    ]
+                    for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="conv2d_eltwise", qscheme=qscheme)
+                        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+                        self.assertFused(graph, ['aten::_convolution', 'aten::' + eltwise, 'aten::quantize_per_channel', 'aten::dequantize'])
+                        self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_conv2d_bn(self):
@@ -192,20 +197,21 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.bn1(x)
                 return x
         for bias in [False, True]:
-            m = M(bias).eval()
-            x = torch.rand(1, 32, 16, 16)
-            # TODO: This shape will fail
-            # x = torch.rand(1, 32, 28, 28)
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                m = M(bias).eval()
+                x = torch.rand(1, 32, 16, 16).to(memory_format=memory_format)
+                # TODO: This shape will fail
+                # x = torch.rand(1, 32, 28, 28)
 
-            patterns = [
-                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
-            ]
-            # TODO: add torch.per_tensor_symmetric case.
-            for qscheme in [torch.per_tensor_affine]:
-                graph = self.checkQuantizeTrace(m, [x], atol=1e-1, folding=True, config_name="conv2d_bn", qscheme=qscheme)
-                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-                self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel', 'aten::dequantize'])
-                self.checkPatterns(graph, patterns)
+                patterns = [
+                    ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
+                ]
+                # TODO: add torch.per_tensor_symmetric case.
+                for qscheme in [torch.per_tensor_affine]:
+                    graph = self.checkQuantizeTrace(m, [x], atol=1e-1, folding=True, config_name="conv2d_bn", qscheme=qscheme)
+                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                    self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel', 'aten::dequantize'])
+                    self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_conv2d_bn_relu(self):
@@ -220,17 +226,17 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.bn1(x)
                 x = F.relu(x)
                 return x
-
-        m = M().eval()
-        x = torch.rand(1, 32, 28, 28)
-        patterns = [
-            ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"],
-        ]
-        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, [x], atol=1e-1, folding=True, config_name="conv2d_bn_relu", qscheme=qscheme)
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-            self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel'])
-            self.checkPatterns(graph, patterns)
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            m = M().eval()
+            x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+            patterns = [
+                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"],
+            ]
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], atol=1e-1, folding=True, config_name="conv2d_bn_relu", qscheme=qscheme)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel'])
+                self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_linear_eltwise(self):
@@ -290,19 +296,20 @@ class TestFusionPattern(JitLlgaTestCase):
                 return z
 
         for bias in [True, False]:
-            m = M(bias).eval()
-            x = torch.rand(1, 32, 16, 16, requires_grad=False)
-            y = torch.rand(1, 32, 16, 16, requires_grad=False)
-            patterns = [
-                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
-                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", "aten::relu", "aten::add", "aten::quantize_per_tensor"],
-                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
-            ]
-            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-                graph = self.checkQuantizeTrace(m, [x, y], folding=True, atol=1e-1, config_name="conv2d_sum", qscheme=qscheme)
-                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
-                self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
-                self.checkPatterns(graph, patterns)
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                m = M(bias).eval()
+                x = torch.rand(1, 32, 16, 16, requires_grad=False).to(memory_format=memory_format)
+                y = torch.rand(1, 32, 16, 16, requires_grad=False).to(memory_format=memory_format)
+                patterns = [
+                    ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
+                    ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", "aten::relu", "aten::add", "aten::quantize_per_tensor"],
+                    ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
+                ]
+                for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                    graph = self.checkQuantizeTrace(m, [x, y], folding=True, atol=1e-1, config_name="conv2d_sum", qscheme=qscheme)
+                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+                    self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
+                    self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_linear_dropout_sum(self):
@@ -347,18 +354,18 @@ class TestFusionPattern(JitLlgaTestCase):
                 y = self.conv2(x)
                 y = y.reshape(x.size(0), -1)
                 return y
-
-        m = M()
-        x = torch.rand(1, 32, 28, 28)
-        patterns = [
-            ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", 'aten::relu', "aten::quantize_per_tensor"],
-            ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
-        ]
-        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="defer_size", qscheme=qscheme)
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-            self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel', 'aten::dequantize'])
-            self.checkPatterns(graph, patterns)
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            m = M()
+            x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+            patterns = [
+                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution", 'aten::relu', "aten::quantize_per_tensor"],
+                ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"]
+            ]
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="defer_size", qscheme=qscheme)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+                self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel', 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)
 
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')
@@ -398,30 +405,31 @@ class TestShapeFallback(JitLlgaTestCase):
                 x = self.conv1(x)
                 x = self.conv2(x).reshape(x.size(0), 4, -1)
                 return x
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            x = torch.randn(15, 4, 28, 28).to(memory_format=memory_format)
+            # change the size of the input, check the fallback
+            x_var = torch.randn(7, 4, 16, 16).to(memory_format=memory_format)
+            m = M()
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], x_var = [x_var], atol=2e-1, config_name="conv_reshape", qscheme=qscheme)
 
-        x = torch.randn(15, 4, 28, 28)
-        # change the size of the input, check the fallback
-        x_var = torch.randn(7, 4, 16, 16)
-        m = M()
-        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, [x], x_var = [x_var], atol=2e-1, config_name="conv_reshape", qscheme=qscheme)
-
-            # TODO: enable this check when size peephole optimization is enabled
-            # self.assertGraphContainsExactly(graph, "aten::size", 0)
+                # TODO: enable this check when size peephole optimization is enabled
+                # self.assertGraphContainsExactly(graph, "aten::size", 0)
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
     @llga_test_env
     def _test_vision(self, model_name):
-        m = getattr(torchvision.models, model_name)().eval()
-        x = torch.rand(1, 3, 224, 224) / 10
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            m = getattr(torchvision.models, model_name)().eval()
+            x = (torch.rand(1, 3, 224, 224) / 10).to(memory_format=memory_format)
 
-        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, [x], atol=2e-1, folding=True, config_name=model_name, qscheme=qscheme)
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1, folding=True, config_name=model_name, qscheme=qscheme)
 
-            # TODO: aten::adaptive_avg_pool2d also need to be fused once backend supported it
-            self.assertFused(graph, ['aten::_convolution', 'aten::relu',
-                                    'aten::max_pool2d', 'aten::linear', 'aten::quantize_per_channel'])
+                # TODO: aten::adaptive_avg_pool2d also need to be fused once backend supported it
+                self.assertFused(graph, ['aten::_convolution', 'aten::relu',
+                                        'aten::max_pool2d', 'aten::linear', 'aten::quantize_per_channel'])
 
 
 for model_name, enabled in [
