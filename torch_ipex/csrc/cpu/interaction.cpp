@@ -422,12 +422,16 @@ at::Tensor AtenIpexJITDev::dil_qinteraction(const std::vector<at::Tensor> input,
 } // namespace torch_ipex
 
 namespace {
-static auto dispatch =
-    torch::RegisterOperators()
-        .op("torch_ipex::interaction_forward",
-            &torch_ipex::AtenIpexTypeExt::interaction_forward)
-        .op("torch_ipex::interaction_backward",
-            &torch_ipex::AtenIpexTypeExt::interaction_backward);
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      torch::schema("torch_ipex::interaction_forward(Tensor[] input) -> Tensor",
+                    c10::AliasAnalysisKind::PURE_FUNCTION),
+      torch_ipex::AtenIpexTypeExt::interaction_forward);
+  m.def(torch::schema("torch_ipex::interaction_backward(Tensor grad_out, "
+                      "Tensor[] input) -> Tensor[]",
+                      c10::AliasAnalysisKind::PURE_FUNCTION),
+        torch_ipex::AtenIpexTypeExt::interaction_backward);
+}
 }
 
 namespace torch_ipex {

@@ -494,9 +494,13 @@ at::Tensor AtenIpexJITDev::dil_qembeddingbag(
 }  // namespace torch_ipex
 
 namespace {
-static auto dispatch =
-    torch::RegisterOperators()
-        .op("torch_ipex::embedding_bag", &torch_ipex::AtenIpexTypeExt::embedding_bag);
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(torch::schema(
+            "torch_ipex::embedding_bag(Tensor weight, Tensor indices, Tensor "
+            "offsets, bool sparse, bool include_last_offset) -> Tensor",
+            c10::AliasAnalysisKind::PURE_FUNCTION),
+        torch_ipex::AtenIpexTypeExt::embedding_bag);
+}
 }
 
 namespace torch_ipex {
