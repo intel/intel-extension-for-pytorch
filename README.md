@@ -2,6 +2,8 @@
 
 Intel® Extension for PyTorch (IPEX) is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
 
+Currently IPEX can only be used and compiled on machines with AVX-512 instruction sets.
+
  - [Installation](#installation)
      - [Install PyTorch](#install-pytorch)
      - [Install Intel Extension for PyTorch from Source](#install-intel-extension-for-pytorch-from-source)
