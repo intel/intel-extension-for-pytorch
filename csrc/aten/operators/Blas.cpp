@@ -55,26 +55,29 @@ void mkl_matmul(
     _result =
         at::empty_like(result, result.options().dtype(ScalarType::Double));
   }
-  Tensor _m1 = m1.contiguous().to(ScalarType::Double);
-  Tensor _m2 = m2.contiguous().to(ScalarType::Double);
+
   size_t dims = _result.dim();
+
   TORCH_CHECK(
       dims == 2 || dims == 3,
       "oneMKL matmul only works with 2D or 3D, got ",
       dims);
   TORCH_CHECK(
-      dims == _m1.dim() && dims == _m2.dim(),
+      dims == m1.dim() && dims == m2.dim(),
       "oneMKL input matrixes must have the same ranks");
 
-  int64_t m = _result.size(-2);
-  int64_t k = _m1.size(-1);
-  int64_t n = _result.size(-1);
-  int64_t stridea = m * k;
-  int64_t strideb = k * n;
-  int64_t stridec = m * n;
-  int64_t mb = 1;
-
   if (dims == 3) {
+    Tensor _m1 = m1.contiguous().to(ScalarType::Double);
+    Tensor _m2 = m2.contiguous().to(ScalarType::Double);
+
+    int64_t m = _result.size(-2);
+    int64_t k = _m1.size(-1);
+    int64_t n = _result.size(-1);
+    int64_t stridea = m * k;
+    int64_t strideb = k * n;
+    int64_t stridec = m * n;
+    int64_t mb = 1;
+
     mb = _result.size(0);
     TORCH_CHECK(
         mb == _m1.size(0) && mb == _m2.size(0),
@@ -84,30 +87,137 @@ void mkl_matmul(
         _m1.size(0),
         " m2 mb: ",
         _m2.size(0));
-  }
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::blas::row_major::gemm_batch,
-      dpcpp_queue,
-      oneapi::mkl::transpose::N,
-      oneapi::mkl::transpose::N,
-      m,
-      n,
-      k,
-      alpha.to<float>(),
-      (double*)_m1.data_ptr(),
-      m,
-      stridea,
-      (double*)_m2.data_ptr(),
-      k,
-      strideb,
-      beta.to<float>(),
-      (double*)_result.data_ptr(),
-      m,
-      stridec,
-      mb);
+    auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::row_major::gemm_batch,
+        dpcpp_queue,
+        oneapi::mkl::transpose::N,
+        oneapi::mkl::transpose::N,
+        m,
+        n,
+        k,
+        alpha.to<float>(),
+        (double*)_m1.data_ptr(),
+        m,
+        stridea,
+        (double*)_m2.data_ptr(),
+        k,
+        strideb,
+        beta.to<float>(),
+        (double*)_result.data_ptr(),
+        m,
+        stridec,
+        mb);
+  } else {
+    Tensor _m1 = m1.to(ScalarType::Double);
+    Tensor _m2 = m2.to(ScalarType::Double);
+
+    auto m1_strides = _m1.strides();
+    auto m1_sizes = _m1.sizes();
+    auto m2_strides = _m2.strides();
+    auto m2_sizes = _m2.sizes();
+
+    const auto result_strides = _result.strides();
+    const auto result_sizes = _result.sizes();
+
+    bool transpose_c = false;
+    Tensor c;
+
+    // Cast result as matrix a
+    if (result_strides[0] == 1 &&
+        (result_sizes[1] == 1 ||
+         result_strides[1] >= std::max(int64_t{1}, result_sizes[0]))) {
+      transpose_c = false;
+      c = _result;
+    } else if (
+        result_strides[1] == 1 &&
+        (result_sizes[0] == 1 ||
+         result_strides[0] >= std::max(int64_t{1}, result_sizes[1]))) {
+      std::swap(_m1, _m2);
+      std::swap(m1_sizes, m2_sizes);
+      std::swap(m1_strides, m2_strides);
+      transpose_c = true;
+      c = _result;
+    } else {
+      transpose_c = false;
+      // make c FORTRAN contiguous
+      c = _result.transpose(0, 1).contiguous().transpose_(0, 1);
+    }
+
+    const int64_t m = result_sizes[transpose_c ? 1 : 0];
+    const int64_t n = result_sizes[transpose_c ? 0 : 1];
+    const int64_t k = m1_sizes[transpose_c ? 0 : 1];
+
+    // Cast m1 as matrix a
+    bool transpose_a = false;
+    Tensor a;
+    /* Need lda >= max(1, (transpose_a ? k : m)) */
+    if (m1_strides[transpose_c ? 1 : 0] == 1 &&
+        m1_strides[transpose_c ? 0 : 1] >= std::max(int64_t{1}, m)) {
+      transpose_a = false;
+      a = _m1;
+    } else if (
+        m1_strides[transpose_c ? 0 : 1] == 1 &&
+        m1_strides[transpose_c ? 1 : 0] >= std::max(int64_t{1}, k)) {
+      transpose_a = true;
+      a = _m1;
+    } else {
+      transpose_a = !transpose_c;
+      a = _m1.clone(at::MemoryFormat::Contiguous);
+    }
+
+    // Cast m2 as matrix b
+    bool transpose_b = false;
+    Tensor b;
+    /* Need ldm2_ >= max(1, (transpose_m2 == 'n' ? k : n)) */
+    if (m2_strides[transpose_c ? 1 : 0] == 1 &&
+        m2_strides[transpose_c ? 0 : 1] >= std::max(int64_t{1}, k)) {
+      transpose_b = false;
+      b = _m2;
+    } else if (
+        m2_strides[transpose_c ? 0 : 1] == 1 &&
+        m2_strides[transpose_c ? 1 : 0] >= std::max(int64_t{1}, n)) {
+      transpose_b = true;
+      b = _m2;
+    } else {
+      transpose_b = !transpose_c;
+      b = _m2.clone(at::MemoryFormat::Contiguous);
+    }
+
+    const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 1 : 0];
+    const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 1 : 0];
+    const int64_t ldc = c.strides()[transpose_c ? 0 : 1];
+
+    int64_t stridea = m * k;
+    int64_t strideb = k * n;
+    int64_t stridec = m * n;
+    int64_t mb = 1;
+
+    auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::gemm_batch,
+        dpcpp_queue,
+        transpose_a ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N,
+        transpose_b ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N,
+        m,
+        n,
+        k,
+        alpha.to<float>(),
+        (double*)_m1.data_ptr(),
+        m,
+        stridea,
+        (double*)_m2.data_ptr(),
+        k,
+        strideb,
+        beta.to<float>(),
+        (double*)_result.data_ptr(),
+        m,
+        stridec,
+        mb);
+  }
   if (!_result.is_same(result)) {
     result.copy_(_result);
   }
@@ -168,7 +278,7 @@ void matmul(
       m1.scalar_type() == ScalarType::Double ||
       m2.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
-    impl::mkl_matmul(result, m1, m2, alpha, beta);
+    impl::mkl_matmul(result, m1, m2, beta, alpha);
 #else
     AT_ERROR(
         "Double datatype matmul is not supported. Include oneMKL library in compilation");
