@@ -181,7 +181,7 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(const at::Tensor 
   auto offset_numel = offsets.numel();
   at::Tensor offset2bag_ ;
   if (offset_numel != indices_numel) {
-    offset2bag_ = at::native::full({indices.sizes()[0] + 1}, 0, indices.options());
+    offset2bag_ = at::empty({indices.sizes()[0] + 1}, indices.options()).zero_();
     make_offset2bag(offsets, indices, offset2bag_);
     offset2bag_.resize_({indices.sizes()[0]});
   } else {
@@ -261,7 +261,7 @@ embedding_bag_get_offset2bag(const at::Tensor indices, const at::Tensor & offset
   int64_t indices_numel = indices.numel();
   at::Tensor offset2bag_ ;
   if (indices_numel != 0 && offset2bag.numel() == 0) {
-    offset2bag_ = at::native::full({indices.sizes()[0] + 1}, 0, indices.options());
+    offset2bag_ = at::empty({indices.sizes()[0] + 1}, indices.options()).zero_();
     make_offset2bag(offsets, indices, offset2bag_);
     offset2bag_.resize_({indices.sizes()[0]});
   } else {
@@ -279,7 +279,7 @@ at::Tensor embedding_bag_backward_impl(const at::Tensor & grad, const at::Tensor
       return embedding_bag_sparse_backward_sum_fast<at::BFloat16>(grad, indices, offsets, num_weights, mode);
     } else {
       return embedding_bag_sparse_backward_sum_fast<float>(grad, indices, offsets, num_weights, mode);
-    } 
+    }
   } else {
     auto grad_c = grad.contiguous();
     if (is_bfloat16_tensor(grad)) {

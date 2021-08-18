@@ -32,6 +32,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
     'aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
     'aten::linear(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor',
+    # 'aten::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> Tensor',
     'aten::native_batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)',
     'aten::native_batch_norm_backward(Tensor grad_out, Tensor input, Tensor? weight, Tensor? running_mean, Tensor? running_var, Tensor? save_mean, Tensor? save_invstd, bool train, float eps, bool[3] output_mask) -> (Tensor, Tensor, Tensor)',
     'aten::avg_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> Tensor',
@@ -75,7 +76,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
     'aten::gelu(Tensor self) -> Tensor',
     'aten::gelu_backward(Tensor grad, Tensor self) -> Tensor',
-    'aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=0, int? end=9223372036854775807, int step=1) -> Tensor(a)',
+    'aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -> Tensor(a)',
     'aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)',
     'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
     'aten::unbind.int(Tensor(a) self, int dim=0) -> Tensor(a)[]',
@@ -112,6 +113,10 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
     'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
     'aten::permute(Tensor(a) self, int[] dims) -> Tensor(a)',
+    'aten::to.dtype_layout(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor',
+    'aten::to.device(Tensor self, Device device, ScalarType dtype, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor',
+    'aten::to.dtype(Tensor self, ScalarType dtype, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor',
+    'aten::to.other(Tensor self, Tensor other, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor',
 ]
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
@@ -124,6 +129,41 @@ _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
     'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
     'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
+]
+
+_FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+    "aten::conv1d(Tensor input, Tensor weight, Tensor? bias=None, int[1] stride=1, int[1] padding=0, int[1] dilation=1, int groups=1) -> Tensor",
+    "aten::conv2d(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+    "aten::conv3d(Tensor input, Tensor weight, Tensor? bias=None, int[3] stride=1, int[3] padding=0, int[3] dilation=1, int groups=1) -> Tensor",
+    "aten::conv1d.padding(Tensor input, Tensor weight, Tensor? bias=None, int[1] stride=1, str padding=\"valid\", int[1] dilation=1, int groups=1) -> Tensor",
+    "aten::conv2d.padding(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, str padding=\"valid\", int[2] dilation=1, int groups=1) -> Tensor",
+    "aten::conv3d.padding(Tensor input, Tensor weight, Tensor? bias=None, int[3] stride=1, str padding=\"valid\", int[3] dilation=1, int groups=1) -> Tensor",
+    "aten::convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups) -> Tensor",
+    "aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32) -> Tensor",
+    "aten::_convolution.deprecated(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled) -> Tensor",
+    "aten::conv_transpose1d(Tensor input, Tensor weight, Tensor? bias=None, int[1] stride=1, int[1] padding=0, int[1] output_padding=0, int groups=1, int[1] dilation=1) -> Tensor",
+    "aten::conv_transpose2d.input(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] output_padding=0, int groups=1, int[2] dilation=1) -> Tensor",
+    "aten::conv_transpose3d.input(Tensor input, Tensor weight, Tensor? bias=None, int[3] stride=1, int[3] padding=0, int[3] output_padding=0, int groups=1, int[3] dilation=1) -> Tensor",
+    "aten::log_softmax.int(Tensor self, int dim, ScalarType? dtype=None) -> Tensor",
+    "aten::cross_entropy_loss(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
+    "aten::log_softmax.Dimname(Tensor self, Dimname dim, *, ScalarType? dtype=None) -> Tensor",
+    "aten::softmax.int(Tensor self, int dim, ScalarType? dtype=None) -> Tensor",
+    "aten::softmax.Dimname(Tensor self, Dimname dim, *, ScalarType? dtype=None) -> Tensor",
+    "aten::contiguous(Tensor(a) self, *, MemoryFormat memory_format=contiguous_format) -> Tensor(a)",
+    "aten::flatten.using_ints(Tensor(a) self, int start_dim=0, int end_dim=-1) -> Tensor(a)",
+    "aten::dropout(Tensor input, float p, bool train) -> Tensor",
+    "aten::dropout_(Tensor(a!) self, float p, bool train) -> Tensor(a!)",
+    "aten::nll_loss_nd(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
+    "aten::nll_loss(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
+    "aten::nll_loss.out(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100, *, Tensor(a!) out) -> Tensor(a!)",
+    "aten::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> Tensor",
+    "aten::_batch_norm_impl_index(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> (Tensor, Tensor, Tensor, Tensor, int)",
+    "aten::reshape(Tensor(a) self, int[] shape) -> Tensor(a)",
+    "aten::where.self(Tensor condition, Tensor self, Tensor other) -> Tensor",
+    "aten::where.ScalarSelf(Tensor condition, Scalar self, Tensor other) -> Tensor",
+    "aten::where.ScalarOther(Tensor condition, Tensor self, Scalar other) -> Tensor",
+    "aten::where.Scalar(Tensor condition, Scalar self, Scalar other) -> Tensor",
+    "aten::nll_loss2d(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, int ignore_index=-100) -> Tensor",
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
@@ -217,6 +257,13 @@ class DenseOPCodeGen(object):
     def is_dnnl_func(self, simple_aten_sig):
         stripped_str = simple_aten_sig.replace(' ', '')
         for item in _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG:
+            if stripped_str == item.replace(' ', ''):
+                return True
+        return False
+
+    def is_exclude_func(self, simple_aten_sig):
+        stripped_str = simple_aten_sig.replace(' ', '')
+        for item in _FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG:
             if stripped_str == item.replace(' ', ''):
                 return True
         return False
@@ -580,6 +627,9 @@ class DenseOPCodeGen(object):
 
         func_defs = []
         for cpp_sig, aten_sig, native_cpp_sig, cpp_func_sig_str, aten_func_sig_str in self._sigs:
+            if self.is_exclude_func(aten_func_sig_str):
+                continue
+
             # The operator name should be unique because the new registration mechanism of PyTorch 1.7
             new_cpp_func_name = aten_sig.def_name.replace('.', '_')
             cpp_func_str_h, cpp_func_str_cpp = self.gen_func_signature(cpp_func_sig_str, cpp_sig.def_name, new_cpp_func_name)

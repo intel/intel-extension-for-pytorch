@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Function
 import torch.nn.functional as F
-import _torch_ipex as core
+import torch_ipex._C as core
 from typing import Optional
 
 def linear(input, weight, bias: Optional[torch.Tensor] = None):

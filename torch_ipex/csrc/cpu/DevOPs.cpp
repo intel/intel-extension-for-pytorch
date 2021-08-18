@@ -1232,6 +1232,45 @@ at::Tensor AtenIpexCPUDev::dil_dropout_backward(
   return dbl::comm::gen_aten_tensor_by(std::move(dX));
 }
 
+at::Tensor AtenIpexCPUDev::dil_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    bool train,
+    double momentum,
+    double eps,
+    bool cudnn_enabled) {
+
+  #define CHECK_MISMATCH(arg_name, expected, actual) \
+    IPEX_CHECK(actual == expected, arg_name, " should contain ", expected, " elements not ", actual)
+
+  auto num_features = input.sizes()[1];
+  if (running_mean.defined()) {
+    CHECK_MISMATCH("running_mean", num_features, running_mean.numel());
+  }
+  if (running_var.defined()) {
+    CHECK_MISMATCH("running_var", num_features, running_var.numel());
+  }
+  if (weight.defined()) {
+    CHECK_MISMATCH("weight", num_features, weight.numel());
+  }
+  if (bias.defined()) {
+    CHECK_MISMATCH("bias", num_features, bias.numel());
+  }
+
+  return std::get<0>(at::native_batch_norm(
+    input,
+    weight,
+    bias,
+    running_mean,
+    running_var,
+    train,
+    momentum,
+    eps));
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_norm(
     const at::Tensor& input,
     const at::Tensor& weight,
@@ -2074,9 +2113,8 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   for (auto i =0; i< tensors.size(); i++) {
-    IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
-      "Currently Mkldnn cat operators do not support empty tensor.");
-
+    if(tensors[i].numel() == 0)
+      continue;
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors[i], true);
 
     x.push_back(dbl::comm::try_gen_dil_tensor(tensors[i]));
@@ -2102,8 +2140,8 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   std::vector<int32_t> data_shift;
 
   for (auto i = 0; i < tensors.size(); i++) {
-    IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
-      "Currently Mkldnn cat operators do not support empty tensor.");
+    if(tensors[i].numel() == 0)
+      continue;
     tensors_contiguous[i] = IS_CONTIGUOUS_ANY(tensors[i]) ? tensors[i] : tensors[i].contiguous();
 
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i], true);
@@ -2924,7 +2962,7 @@ at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self,
   return at::Tensor();
 }
 
-at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self, at::Scalar &other) {
+at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self, const at::Scalar &other) {
   auto tensor = at::scalar_to_tensor(other);
   DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
   auto impl = tensor.unsafeGetTensorImpl();
@@ -2940,7 +2978,7 @@ at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self,
   return AtenIpexCPUDev::dil_div_out(self, self, other);
 }
 
-at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self, at::Scalar &other) {
+at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self, const at::Scalar &other) {
   auto tensor = at::scalar_to_tensor(other);
   DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
   auto impl = tensor.unsafeGetTensorImpl();
@@ -2994,6 +3032,89 @@ at::Tensor AtenIpexCPUDev::dil_permute(const at::Tensor & self, at::IntArrayRef 
     newStrides[i] = oldStrides[dim];
   }
   return dil_as_strided(self, newSizes, newStrides, self.storage_offset());
+}
+
+inline at::Tensor to_impl(const at::Tensor& self, const at::TensorOptions& options, bool non_blocking, bool copy) {
+  auto memory_format = options.memory_format_opt().value_or(at::MemoryFormat::Preserve);
+  if (self.dtype() == options.dtype() &&
+      self.layout() == options.layout() &&
+      self.device() == options.device() &&
+      !copy &&
+      (memory_format == at::MemoryFormat::Preserve || self.suggest_memory_format() == memory_format)) {
+    return self;
+  }
+
+  bool pin_out = false;
+  if (memory_format == at::MemoryFormat::Preserve) {
+    if (self.is_non_overlapping_and_dense()) {
+      // Copy all strides
+      auto r = at::empty_strided(self.sizes(),
+                                 self.strides(),
+                                 options.memory_format(c10::nullopt).pinned_memory(pin_out));
+      r.copy_(self, non_blocking);
+      return r;
+    } else {
+      memory_format = self.suggest_memory_format();
+    }
+  }
+  // See Note [Explicit nullopt MemoryFormat argument]
+  auto r = at::empty(self.sizes(),
+                     options.memory_format(memory_format).pinned_memory(pin_out),
+                     c10::nullopt);
+  r.copy_(self, non_blocking);
+  return r;
+}
+
+at::Tensor AtenIpexCPUDev::dil_to(const at::Tensor & self, c10::optional<at::ScalarType> dtype, c10::optional<c10::Layout> layout, c10::optional<c10::Device> device, c10::optional<bool> pin_memory, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> optional_memory_format){
+  DEBUG("AtenIpexCPUDev::dil_to_dtype_layout\n");
+  // See [Note: hacky wrapper removal for TensorOptions]
+  auto options_ = at::TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(pin_memory);
+
+  TORCH_CHECK(
+    !(options_.has_memory_format() && optional_memory_format.has_value()),
+    "Cannot set memory_format both in TensorOptions and explicit argument; please delete "
+    "the redundant setter.");
+  auto options = options_.merge_memory_format(optional_memory_format);
+
+  TORCH_CHECK(options.requires_grad_opt() == c10::nullopt,
+           "to(options) expects unset requires_grad flag, but got "
+           "options.requires_grad set as ", options.requires_grad());
+
+  TORCH_CHECK(!options.has_layout() || self.layout() == options.layout(),
+           "to(options) doesn't support converting to a different layout, "
+           "but got self.layout being ", self.layout(),
+           " and options.layout set as ", options.layout());
+
+  auto specified_options = self.options().merge_in(options);
+  return to_impl(self, specified_options, non_blocking, copy);
+}
+
+at::Tensor AtenIpexCPUDev::dil_to(const at::Tensor & self, c10::Device device, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> optional_memory_format){
+  DEBUG("AtenIpexCPUDev::dil_to_device\n");
+  return to_impl(
+    self,
+    self.options().device(device).dtype(dtype).memory_format(optional_memory_format),
+    non_blocking,
+    copy);
+}
+
+at::Tensor AtenIpexCPUDev::dil_to(const at::Tensor & self, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> optional_memory_format) {
+  DEBUG("AtenIpexCPUDev::dil_to_dtype\n");
+  return to_impl(
+    self,
+    self.options().dtype(dtype).memory_format(optional_memory_format),
+    non_blocking,
+    copy);
+}
+
+at::Tensor AtenIpexCPUDev::dil_to(const at::Tensor& self, const at::Tensor& other, bool non_blocking, bool copy, c10::optional<c10::MemoryFormat> optional_memory_format) {
+  DEBUG("AtenIpexCPUDev::dil_to_other\n");
+  auto options = other.options();
+  return to_impl(
+    self,
+    options.memory_format(optional_memory_format),
+    non_blocking,
+    copy);
 }
 
 }  // namespace cpu

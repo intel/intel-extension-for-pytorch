@@ -4,7 +4,7 @@ from torch import nn
 from torch.nn.parameter import Parameter
 from torch.nn import init
 from torch.autograd import Function
-import _torch_ipex as core
+import torch_ipex._C as core
 
 class IpexMLPHandle:
     def __init__(self, N, C, K, bn, bc, bk, dtype, fuse_bias, act_type):

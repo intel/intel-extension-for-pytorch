@@ -60,8 +60,8 @@ import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
 import copy
 
-import intel_pytorch_extension as ipex
-from intel_pytorch_extension import core
+import torch_ipex as ipex
+from torch_ipex import core
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn

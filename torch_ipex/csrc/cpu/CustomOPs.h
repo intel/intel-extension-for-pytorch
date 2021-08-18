@@ -778,7 +778,7 @@ public:
                     _ipex_bag_size, num_weights, scale_grad_by_freq, mode,
                     _ipex_per_sample_weights)
               : at::_embedding_bag_dense_backward(
-                    _ipex_grad, _ipex_indices, _ipex_offsets, _ipex_offset2bag_,
+                    _ipex_grad, _ipex_indices, _ipex_offset2bag_,
                     _ipex_bag_size, _ipex_maximum_indices, num_weights,
                     scale_grad_by_freq, mode, _ipex_per_sample_weights);
       auto &&_ipex_per_sample_weights_grad =
@@ -806,7 +806,7 @@ public:
                     grad, indices, offsets, offset2bag_, bag_size, num_weights,
                     scale_grad_by_freq, mode, per_sample_weights)
               : at::_embedding_bag_dense_backward(
-                    grad, indices, offsets, offset2bag_, bag_size,
+                    grad, indices, offset2bag_, bag_size,
                     maximum_indices, num_weights, scale_grad_by_freq, mode,
                     per_sample_weights);
       auto per_sample_weights_grad =

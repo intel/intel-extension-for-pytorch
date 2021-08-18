@@ -6,8 +6,10 @@ from .version import __version__
 from .tensor import *
 from .optim import *
 from .ops import *
-import _torch_ipex as core
-core.enable_torch_ccl()
+
+base_dir = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+if base_dir == 'intel_pytorch_extension':
+    print('[WARNING] "import intel_pytorch_extension" will be deprecated in future releases. Please use "import torch_ipex" instead.')
 
 DEVICE = 'xpu:0'
 

@@ -1,4 +1,3 @@
-#include "init_python_bindings.h"
 #include "version.h"
 
 #include <c10/core/Device.h>
@@ -30,8 +29,6 @@
 #include "cpu/FusionOPs.h"
 #include "cpu/int8/Config.h"
 #include "cpu/int8/quantization/Observer.h"
-#include "ProcessGroupCCL.hpp"
-#include <pybind11/chrono.h>
 #include <torch/csrc/api/include/torch/python.h>
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
@@ -223,18 +220,7 @@ void InitIpexModuleBindings(py::module m) {
     }
     Int8OptConfig::get_config().set_indicators(indicators);
   });
-  
-  m.def("enable_torch_ccl", [=]() {
-       py::object module = py::module::import("torch.distributed");
-       py::object register_backend = module.attr("Backend").attr("register_backend"); 
-       register_backend("ccl", py::cpp_function(&c10d::ProcessGroupCCL::createProcessGroupCCL,
-                                            py::arg("store"),
-                                            py::arg("rank"),
-                                            py::arg("size"),
-                                            py::arg("timeout") = std::chrono::milliseconds(
-                                              ::c10d::ProcessGroupCCL::OP_TIMEOUT_MILLIS)));
-       
-  });
+
   m.def("set_xpu_mode", [=](std::string mode){
        AutoOptConfig::singleton().set_xpu_mode(torch_ipex::stringToXPUMode(mode));});
 
@@ -260,4 +246,4 @@ void InitIpexBindings(py::module m) {
 
 }  // namespace torch_ipex
 
-PYBIND11_MODULE(_torch_ipex, m) { torch_ipex::InitIpexBindings(m); }
+PYBIND11_MODULE(_C, m) { torch_ipex::InitIpexBindings(m); }

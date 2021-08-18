@@ -1,6 +1,5 @@
 '''
 From PyTorch:
-
 Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
 Copyright (c) 2014-     Facebook, Inc            (Soumith Chintala)
 Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
@@ -10,37 +9,28 @@ Copyright (c) 2011-2013 NYU                      (Clement Farabet)
 Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
 Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
 Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
-
 From Caffe2:
-
 Copyright (c) 2016-present, Facebook Inc. All rights reserved.
-
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
-
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
-
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
-
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
-
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
-
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
 mark their specific copyright on a particular contribution, they should
 indicate their copyright solely in the commit message of the change when it is
 committed.
-
 All rights reserved.
 '''
 
@@ -48,7 +38,6 @@ All rights reserved.
 r"""Importing this file must **not** initialize CUDA context. test_distributed
 relies on this assumption to properly run. This means that when this is imported
 no CUDA calls shall be made, including torch.cuda.device_count(), etc.
-
 torch.testing._internal.common_cuda.py can freely initialize CUDA context when imported.
 """
 
@@ -88,9 +77,8 @@ import errno
 from typing import cast, Any, Dict, Iterable, Iterator, Optional
 
 from torch.testing._internal import expecttest
-from torch.testing import \
-    (_compare_tensors_internal, _compare_scalars_internal, _compare_return_type,
-     floating_types_and, integral_types, complex_types)
+from torch.testing._core import \
+    (_compare_tensors_internal, _compare_scalars_internal, _compare_return_type)
 
 import torch
 import torch.cuda
@@ -574,11 +562,9 @@ def skipIfNoLapack(fn):
 
 def skipIfNotRegistered(op_name, message):
     """Wraps the decorator to hide the import of the `core`.
-
     Args:
         op_name: Check if this op is registered in `core._REGISTERED_OPERATORS`.
         message: message to fail with.
-
     Usage:
         @skipIfNotRegistered('MyOp', 'MyOp is not linked!')
             This will check if 'MyOp' is in the caffe2.python.core
@@ -1315,7 +1301,6 @@ class TestCase(expecttest.TestCase):
     @contextmanager
     def maybeWarnsRegex(self, category, regex=''):
         """Context manager for code that *may* warn, e.g. ``TORCH_WARN_ONCE``.
-
         This filters expected warnings from the test log and fails the test if
         any unexpected warnings are caught.
         """
@@ -1341,7 +1326,6 @@ class TestCase(expecttest.TestCase):
         is placed in the 'expect' directory in the same directory
         as the test script. You can automatically update the recorded test
         output using --accept.
-
         If you call this multiple times in a single function, you must
         give a unique subname each time.
         """
@@ -1443,6 +1427,24 @@ class TestCase(expecttest.TestCase):
         (stdout, stderr) = TestCase.run_process_no_exception(code, env=env)
         return stderr.decode('ascii')
 
+
+    def get_src_dtype_from_auto_dtype_conversion_info(self, line):
+        return line.strip().split(",")[1].split("=")[1]
+
+    def get_dst_dtype_from_auto_dtype_conversion_info(self, line):
+        return line.strip().split(",")[2].split("=")[1]
+
+    def get_op_name_from_auto_dtype_conversion_info(self, line):
+        return line.strip().split(",")[4].split("=")[1]
+
+    def get_src_dtype_from_auto_dtype_conversion_info(self, line):
+        return line.strip().split(",")[1].split("=")[1]
+
+    def get_dst_dtype_from_auto_dtype_conversion_info(self, line):
+        return line.strip().split(",")[2].split("=")[1]
+
+    def get_op_name_from_auto_dtype_conversion_info(self, line):
+        return line.strip().split(",")[4].split("=")[1]
 
 def download_file(url, binary=True):
     from urllib.parse import urlsplit
@@ -1683,7 +1685,6 @@ def random_fullrank_matrix_distinct_singular_value(matrix_size, *batch_dims,
 
 def random_matrix(rows, columns, *batch_dims, **kwargs):
     """Return rectangular matrix or batches of rectangular matrices.
-
     Parameters:
       dtype - the data type
       device - the device kind
@@ -1723,7 +1724,6 @@ def random_lowrank_matrix(rank, rows, columns, *batch_dims, **kwargs):
 
 def random_sparse_matrix(rows, columns, density=0.01, **kwargs):
     """Return rectangular random sparse matrix within given density.
-
     The density of the result approaches to given density as the size
     of the matrix is increased and a relatively small value of density
     is specified but higher than min(rows, columns)/(rows * columns)
@@ -1750,10 +1750,8 @@ def random_sparse_matrix(rows, columns, density=0.01, **kwargs):
 
 def random_sparse_pd_matrix(matrix_size, density=0.01, **kwargs):
     """Return random sparse positive-definite matrix with given density.
-
     The eigenvalues of the matrix are defined as::
       arange(1, matrix_size+1)/matrix_size
-
     Algorithm:
       A = diag(arange(1, matrix_size+1)/matrix_size)
       while <A density is smaller than required>:

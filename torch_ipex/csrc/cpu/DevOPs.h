@@ -45,6 +45,7 @@ class AtenIpexCPUDev {
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask);
   static at::Tensor dil_dropout(const at::Tensor& self, double ratio, bool train);
   static at::Tensor dil_dropout_backward(const at::Tensor& grady, const at::Tensor& mask, double ratio);
+  static at::Tensor dil_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var, bool train, double momentum, double eps, bool cudnn_enabled);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var, bool train, double momentum, double eps);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_batch_norm_backward(const at::Tensor& grad_output, const at::Tensor& input, const at::Tensor& weight, const at::Tensor& running_mean, const at::Tensor& running_var, const at::Tensor& save_mean, const at::Tensor& save_invstd, bool train,double eps, std::array<bool,3> grad_input_mask);
   static at::Tensor dil_frozen_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var, double eps);
@@ -115,12 +116,16 @@ class AtenIpexCPUDev {
   static at::Tensor dil_upsample_trilinear3d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w);
   static at::Tensor dil_unsqueeze(const at::Tensor& self, int64_t dim);
   static at::Tensor dil_div(const at::Tensor &self, const at::Tensor &other);
-  static at::Tensor dil_div(const at::Tensor &self, at::Scalar &other);
+  static at::Tensor dil_div(const at::Tensor &self, const at::Scalar &other);
   static at::Tensor &dil_div_(at::Tensor &self, const at::Tensor &other);
-  static at::Tensor &dil_div_(at::Tensor &self, at::Scalar &other);
+  static at::Tensor &dil_div_(at::Tensor &self, const at::Scalar &other);
   static at::Tensor &dil_div_out(at::Tensor &out, const at::Tensor &self,
                                  const at::Tensor &other);
   static at::Tensor dil_permute(const at::Tensor & self, at::IntArrayRef dims);
+  static at::Tensor dil_to(const at::Tensor & self, c10::optional<at::ScalarType> dtype, c10::optional<c10::Layout> layout, c10::optional<c10::Device> device, c10::optional<bool> pin_memory, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor dil_to(const at::Tensor & self, c10::Device device, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor dil_to(const at::Tensor & self, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor dil_to(const at::Tensor& self, const at::Tensor& other, bool non_blocking, bool copy, c10::optional<c10::MemoryFormat> optional_memory_format);
 };
 
 }  // namespace cpu

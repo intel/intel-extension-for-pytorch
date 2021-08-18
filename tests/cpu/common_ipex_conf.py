@@ -1,5 +1,5 @@
 import torch
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 
 class AutoMixPrecision(object):
     def __init__(self, enable_or_not = False, train = False):

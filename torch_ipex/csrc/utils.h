@@ -72,16 +72,15 @@ void set_ipex_func_status(IPEXFuncStatus ipex_fun_status);
 
 // A light-weight TORCH_CHECK that does not collect any backtrace info
 #if defined(_DEBUG)
-#define IPEX_CHECK(cond, ...)                                                  \
+  #define IPEX_CHECK(cond, ...)                                                \
   if (!(cond)) {                                                               \
     throw std::runtime_error(                                                  \
-      c10::detail::if_empty_then(                                              \
-        c10::str(__VA_ARGS__),                                                 \
-        "Expected " #cond " to be true, but got false."));                     \
+      c10::detail::torchCheckMsgImpl(                                          \
+        "Expected " #cond " to be true, but got false.", ##__VA_ARGS__));      \
   }
 #else
-// quick path of IPEX_CHECK without reporting message
-#define IPEX_CHECK(cond, ...)                                                  \
+  // quick path of IPEX_CHECK without reporting message
+  #define IPEX_CHECK(cond, ...)                                                  \
   if (!(cond)) { throw std::exception(); }
 #endif
 

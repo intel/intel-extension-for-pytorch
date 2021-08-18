@@ -221,7 +221,8 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.device().type() == at::DeviceType::XPU);
     IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
     ipex_impl->copy_meta_info(cpu_tensor_impl);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! cpuTensor.requires_grad());
+    ipex_impl->copy_auto_grad(cpu_tensor_impl);
+    // TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! cpuTensor.requires_grad());
     CHECK_TENSOR_CRITICAL(_tensor, cpuTensor, true);
     //TODO: Cannot set reserved_
     //      dest_impl->reserved_ = src_impl->reserved_;
