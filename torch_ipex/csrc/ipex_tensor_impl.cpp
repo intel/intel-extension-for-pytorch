@@ -68,7 +68,7 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
     return;
   }
 
-  if (! this->requires_grad()){
+  if (! this->requires_grad()) {
     auto cpu_autograd_meta = static_cast<torch::autograd::AutogradMeta*>(src_impl->autograd_meta());
     if (cpu_autograd_meta->is_view_){
       auto cpu_view_meta = static_cast<torch::autograd::DifferentiableViewMeta*>(src_impl->autograd_meta());
@@ -76,16 +76,20 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
       c10::optional<torch::autograd::ViewInfo> backward_info_;
       c10::optional<torch::autograd::ViewInfo> forward_info_;
 
-      if (cpu_view_meta->has_fw_view()) {
+      if (cpu_view_meta->has_fw_view() && (!cpu_view_meta->shared_view_info())) {
         auto fw_view_info = cpu_view_meta->get_forward_view();
         torch::autograd::ViewInfo fw_view_info_copy(fw_view_info.base_, fw_view_info.view_fn_);
         forward_info_ = fw_view_info_copy;
+      } else {
+        forward_info_ = c10::nullopt;
       }
 
       if (cpu_view_meta->has_bw_view()) {
         auto bw_view_info = cpu_view_meta->get_backward_view();
         torch::autograd::ViewInfo bw_view_info_copy(bw_view_info.base_, bw_view_info.view_fn_);
         backward_info_ = bw_view_info_copy;
+      } else {
+        backward_info_ = c10::nullopt;
       }
 
       this->set_autograd_meta(
@@ -93,6 +97,7 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
           this,
           backward_info_,
           forward_info_,
+          cpu_view_meta->shared_view_info(),
           cpu_view_meta->get_creation_meta()
         )
       );

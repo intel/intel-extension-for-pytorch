@@ -20,6 +20,7 @@ Intel® Extension for PyTorch (IPEX) is a Python package to extend official PyTo
 ### Install PyTorch (Optional)
  |IPEX Version|PyTorch Version|
  |--|--|
+ |[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|
  |[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|
  |[v1.2.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.2.0)|[v1.7.0](https://github.com/pytorch/pytorch/tree/v1.7.0 "v1.7.0")|
  |[v1.1.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.1.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
@@ -38,16 +39,15 @@ From IPEX 1.8.0, compiling PyTorch from source is not required. If you still wan
 ### Install IPEX via wheel file
 
 ```
-python -m pip install torch_ipex==1.8.0 -f https://software.intel.com/ipex-whl-stable
+python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-stable
 ```
 
 :information_source: Wheel files availability for Python versions
 
 | IPEX Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
 | :--: | :--: | :--: | :--: | :--: |
-| 1.8.0 |  | :heavy_check_mark: | | |
-
-**Note**: Currently we only provide wheel file for Python 3.7. For other Python versions, please follow instructions in the following section to compile from source.
+| 1.9.0 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| 1.8.0 |  | :heavy_check_mark: |  |  |
 
 ### Install IPEX by compiling from source
 

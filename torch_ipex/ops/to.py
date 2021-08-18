@@ -1,5 +1,5 @@
 import torch
-import _torch_ipex as core
+import torch_ipex._C as core
 
 torch_to = torch.nn.Module.to
 

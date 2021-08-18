@@ -1,5 +1,5 @@
 import torch
-import _torch_ipex as core
+import torch_ipex._C as core
 from typing import Optional
 
 torch_layer_norm = torch.layer_norm

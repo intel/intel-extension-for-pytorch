@@ -2,7 +2,7 @@ import torch
 import unittest
 from torch.testing._internal import expecttest
 from functools import wraps
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 
 class VerboseTestCase(expecttest.TestCase):
     def __init__(self, method_name='runTest'):

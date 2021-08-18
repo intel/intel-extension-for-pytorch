@@ -5,7 +5,7 @@ from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 from torch.nn.modules.utils import _pair
 
-import _torch_ipex as core
+import torch_ipex._C as core
 
 
 class _ROIAlign(Function):

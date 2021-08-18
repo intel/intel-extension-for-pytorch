@@ -13,12 +13,18 @@ def rnn_tanh(input, hx, _flat_weights, bias, num_layers, dropout, training, bidi
     if input.device.type == 'xpu' and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.rnn_tanh(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
+        if training and input.device.type == 'xpu':
+            raise Exception("IPEX does not support RNN-Tanh training if its dropout is not 0. \
+                Please explicity convert the gru module and its tensors to CPU and convert the output tensor back to ipex.DEVICE.")
         return _VF.rnn_tanh(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
 
 def rnn_relu(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first):
     if input.device.type == 'xpu' and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.rnn_relu(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
+        if training and input.device.type == 'xpu':
+            raise Exception("IPEX does not support RNN-ReLU training if its dropout is not 0. \
+                Please explicity convert the gru module and its tensors to CPU and convert the output tensor back to ipex.DEVICE.")
         return _VF.rnn_relu(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
 
 _rnn_impls = {

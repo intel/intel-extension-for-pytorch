@@ -1,5 +1,5 @@
 import torch
-import _torch_ipex as core
+import torch_ipex._C as core
 from torch.jit._recursive import wrap_cpp_module
 
 torch._C._jit_set_profiling_mode(False)

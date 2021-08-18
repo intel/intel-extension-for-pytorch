@@ -5,7 +5,7 @@ import time
 import sys
 import unittest
 import torch
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 
 sys.path.append("..")
 from common_utils import TestCase

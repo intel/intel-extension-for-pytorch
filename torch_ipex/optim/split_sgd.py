@@ -1,10 +1,10 @@
 import torch
 from torch.optim.optimizer import Optimizer, required
-import _torch_ipex
+import torch_ipex
 
 _available = False
 try:
-    from _torch_ipex import packed_add_ 
+    from torch_ipex._C import packed_add_ 
     _available = True
 except ImportError as e:
     pass

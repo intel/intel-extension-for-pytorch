@@ -15,7 +15,7 @@ import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
 import copy
 
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 
 import torch.nn as nn
 from torch.nn import Parameter
@@ -191,13 +191,13 @@ class TestQuantization(TestCase):
 
     def test_lstm(self):
         self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=False, bias=True, empty_state=False)
-        
+
         self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=True, bias=True, empty_state=False)
-        
+
         self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=False, bias=False, empty_state=False)
-        
+
         self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=True, bias=False, empty_state=False)
-    
+
 if __name__ == '__main__':
     rand_seed = int(time.time() * 1000000000)
     torch.manual_seed(rand_seed)
