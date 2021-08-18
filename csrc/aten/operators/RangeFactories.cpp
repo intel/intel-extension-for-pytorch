@@ -109,15 +109,16 @@ Tensor& logspace_dpcpp_out(
   if (steps == 0) {
     // skip
   } else if (steps == 1) {
-    r.fill_(Numerics<double>::pow(10.0, start.to<double>()));
-  } else {
-    IPEX_DISPATCH_FLOATING_TYPES(r.scalar_type(), "logspace_dpcpp", [&]() {
-      scalar_t scalar_base = static_cast<scalar_t>(base);
+    r.fill_(Numerics<double>::pow(base, start.to<double>()));
+  } else if (isIntegralType(r.scalar_type(), /*includeBool=*/false)) {
+    AT_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "logspace_dpcpp", [&]() {
+      float scalar_base =
+          static_cast<float>(base); // Use float to avoid promotion to double
       scalar_t scalar_start = start.to<scalar_t>();
       scalar_t scalar_end = end.to<scalar_t>();
-      scalar_t step =
-          (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
-      LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
+      float step = static_cast<float>(scalar_end - scalar_start) / (steps - 1);
+      LogspaceOp<scalar_t, double> logspace_method(
+          scalar_start, step, scalar_base);
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto r_data = r.data_ptr<scalar_t>();
@@ -134,6 +135,35 @@ Tensor& logspace_dpcpp_out(
       // submit to DPCPP queue
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     });
+  } else {
+    AT_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        r.scalar_type(),
+        "logspace_dpcpp",
+        [&]() {
+          scalar_t scalar_base = static_cast<scalar_t>(base);
+          scalar_t scalar_start = start.to<scalar_t>();
+          scalar_t scalar_end = end.to<scalar_t>();
+          scalar_t step =
+              (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
+          LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
+          auto& dpcpp_queue = dpcppGetCurrentQueue();
+          auto cgf = DPCPP_Q_CGF(cgh) {
+            auto r_data = r.data_ptr<scalar_t>();
+            // kernel function per work-item
+            auto kfn = DPCPP_Q_KFN() {
+              auto ptr = r_data;
+              dpcpp_tabulate(ptr, ptr + steps, logspace_method);
+            };
+            // kick off kernel
+            // (TODO) single_task need replaced due to low efficiency
+            cgh.single_task(kfn);
+          };
+
+          // submit to DPCPP queue
+          DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+        });
   }
 
   if (!result.is_contiguous()) {
