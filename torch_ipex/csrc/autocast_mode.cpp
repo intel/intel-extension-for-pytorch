@@ -587,6 +587,10 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_tensorsolve), "linalg_tensorsolve",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(frexp), "frexp.Tensor",
                    TUPLE_TWO_TENSORS(const Tensor &), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(unique_consecutive), "unique_consecutive",
+                   TUPLE_THREE_TENSORS(const Tensor &, bool, bool,
+                                       c10::optional<int64_t>),
+                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(cummax), "cummax",
                    TUPLE_TWO_TENSORS(const Tensor &, int64_t), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(cummax), "cummax.dimname",
