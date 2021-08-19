@@ -299,7 +299,10 @@ Tensor& addmm_out(
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
 
-  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f) {
+  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
+      self.scalar_type() == ScalarType::Double ||
+      m1.scalar_type() == ScalarType::Double ||
+      m2.scalar_type() == ScalarType::Double) {
     // post sum
     matmul(
         result,
@@ -434,7 +437,10 @@ Tensor& baddbmm_(
       batch1.sizes(),
       " batch2 ",
       batch2.sizes());
-  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f) {
+  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
+      self.scalar_type() == ScalarType::Double ||
+      batch1.scalar_type() == ScalarType::Double ||
+      batch2.scalar_type() == ScalarType::Double) {
     matmul(
         self,
         batch1,
@@ -470,7 +476,10 @@ Tensor& baddbmm_out(
   checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
-  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f) {
+  if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
+      input.scalar_type() == ScalarType::Double ||
+      batch1.scalar_type() == ScalarType::Double ||
+      batch2.scalar_type() == ScalarType::Double) {
     matmul(
         result,
         batch1,
