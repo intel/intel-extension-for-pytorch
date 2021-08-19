@@ -1,5 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
+#include <ATen/MemoryOverlap.h>
+#include <ATen/native/TypeProperties.h>
 
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
@@ -251,7 +253,8 @@ static void cat(
     Tensor& result,
     TensorList inputs,
     int numInputs,
-    int dimension) {
+    int dimension,
+    bool allSameType) {
   int i, j;
   int64_t offset;
   bool hasSkippedInput = false;
@@ -260,6 +263,26 @@ static void cat(
     return !t.defined() && t.dim() == 1;
   };
   int nDims = 0;
+
+  // Check for type promotion
+  TORCH_CHECK(
+      canCast(at::native::result_type(inputs), result.scalar_type()),
+      "input types ",
+      " can't be cast to the desired output type ",
+      result.scalar_type());
+
+  // Inputs cannot alias the output tensor
+  for (int i = 0; i < inputs.size(); i++) {
+    auto lap = at::get_overlap_status(result, inputs[i]);
+    TORCH_CHECK(
+        lap != at::MemOverlapStatus::PARTIAL &&
+            lap != at::MemOverlapStatus::FULL,
+        "unsupported operation: the input tensors cannot refer to any "
+        "of the output memory locations. Found overlap in input "
+        "tensor ",
+        i);
+  }
+  at::assert_no_internal_overlap(result);
 
   for (i = 0; i < numInputs; i++) {
     if (should_skip(inputs[i])) {
@@ -311,7 +334,7 @@ static void cat(
   if (inputs.size() > 1 && !hasSkippedInput &&
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
       xpu::dpcpp::detail::canUse32BitIndexMath(result) && allContiguous &&
-      all32BitIndexable) {
+      all32BitIndexable && allSameType) {
     IPEX_DISPATCH_ALL_TYPES_AND3(
         at::ScalarType::Half,
         at::ScalarType::Bool,
@@ -538,13 +561,21 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   for (int i = 0; i < tensors.size(); i++) {
     Tensor tensor = tensors[i];
     if (tensor.defined()) {
-      if (tensor.scalar_type() == ScalarType::Double ||
+      if (tensor.scalar_type() == ScalarType::Short ||
+          tensor.scalar_type() == ScalarType::Double ||
           tensor.scalar_type() == ScalarType::Long) {
         skip_dnnl_cat = true;
       }
       break;
     }
   }
+
+  ScalarType firstType = tensors[0].scalar_type();
+  bool allSameType =
+      std::all_of(tensors.begin(), tensors.end(), [firstType](const Tensor& t) {
+        return t.scalar_type() == firstType;
+      });
+  allSameType = allSameType && (out.scalar_type() == firstType);
 
   // If tensors in TensorList are all one-element tensor, single_cat is called
   // to cat them together by queue.memcpy.
@@ -561,8 +592,8 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   }
 
   // DNNL cat does not support double datatype now.
-  if (skip_dnnl_cat) {
-    impl::cat(out, tensors, tensors.size(), dim);
+  if (!allSameType || skip_dnnl_cat) {
+    impl::cat(out, tensors, tensors.size(), dim, allSameType);
   } else if (use_single_cat) {
     impl::single_cat(out, tensors, tensors.size(), dim);
   } else {
@@ -572,7 +603,8 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
 }
 
 Tensor _cat(TensorList tensors, int64_t dim) {
-  auto out = at::empty({0}, tensors[0].options());
+  auto high_type = at::native::result_type(tensors);
+  auto out = at::empty({0}, tensors[0].options().dtype(high_type));
   return at::AtenIpexTypeXPU::_cat_out(out, tensors, dim);
 }
 
