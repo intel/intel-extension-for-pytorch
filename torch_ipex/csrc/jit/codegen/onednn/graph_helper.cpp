@@ -224,7 +224,6 @@ Operator createOperator(Node* node) {
       o.setInputValue(input);
     return o.setOutput(0).setAttr("axis", Operator::Int, 1);
   } else if (node->kind() == Symbol::aten("max_pool2d")) {
-    // TODO: disable for RN50 int8 path?
     auto rounding_type = Operator::Bool(node, 5) ? "ceil" : "floor";
     return Operator(node, opkind::MaxPool)
         .setInput(0)
@@ -252,7 +251,6 @@ Operator createOperator(Node* node) {
     auto dim0 = getDimensions(node->input(0)).value_or(-1);
     auto dim1 = getDimensions(node->input(1)).value_or(-1);
     // TODO: support all shape combinations
-    // TODO: cannot get dims here after updating PyTorch
     REQ((dim0 == 2 && dim1 == 2) || (dim0 == 4 && dim1 == 4) ||
         (dim0 == 3 && dim1 == 2));
     // fall through
@@ -260,8 +258,6 @@ Operator createOperator(Node* node) {
   } else if (node->kind() == Symbol::aten("mm")) {
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
   } else if (node->kind() == Symbol::aten("linear")) {
-
-    // TODO: cannot get dims here after updating PyTorch
     auto dim0 = getDimensions(node->input(0)).value_or(-1);
     auto dim1 = getDimensions(node->input(1)).value_or(-1);
     // REQ(dim1 == 2);
@@ -606,11 +602,6 @@ void LlgaGraphHelper::unmergeIfAnyNodeIsMissing(Node* subgraphNode) {
 size_t LlgaGraphHelper::countSupportedOps(
     const std::shared_ptr<Graph>& graph) const {
   // TODO: count nodes in top-level block for now
-  
-  // TODO: This check happends when the node is already in the partition. We assume that is this case 
-  // the dequantize node is supported since it has been selected before.
-  // We cannot use the isSupported on dequant node since the node before has been rewrite into another partition.
-  // One possible solution is to save the zp, scale, axis... of dequant on the node iteself. 
   size_t cnt = 0;
   for (auto* node : graph->block()->nodes())
     if (isSupported(node))
