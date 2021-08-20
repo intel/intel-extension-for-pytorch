@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")

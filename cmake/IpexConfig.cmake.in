@@ -1,0 +1,55 @@
+# FindTorchIPEX
+# -------
+#
+# Finds the Torch IPEX library
+#
+# This will define the following variables:
+#
+#   TORCH_IPEX_FOUND        -- True if the system has the Torch IPEX library
+#   TORCH_IPEX_INCLUDE_DIRS -- The include directories for torch
+#   TORCH_IPEX_LIBRARIES    -- Libraries to link against
+#   TORCH_IPEX_CXX_FLAGS    -- Additional (required) compiler flags
+#
+# and the following imported targets:
+#
+#   ipex
+
+include(FindPackageHandleStandardArgs)
+
+if(DEFINED ENV{TORCH_IPEX_INSTALL_PREFIX})
+  set(TORCH_IPEX_INSTALL_PREFIX $ENV{TORCH_IPEX_INSTALL_PREFIX})
+else()
+  # Assume we are in <install-prefix>/share/cmake/Ipex/IpexConfig.cmake
+  get_filename_component(CMAKE_CURRENT_LIST_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+  get_filename_component(TORCH_IPEX_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/../../../" ABSOLUTE)
+endif()
+
+# Include directories.
+if(EXISTS "${TORCH_IPEX_INSTALL_PREFIX}/include")
+  set(TORCH_IPEX_INCLUDE_DIRS
+    ${TORCH_IPEX_INSTALL_PREFIX}/include)
+else()
+  set(TORCH_IPEX_INCLUDE_DIRS
+    ${TORCH_IPEX_INSTALL_PREFIX}/include)
+endif()
+
+# Library dependencies.
+find_library(IPEX_GPU_CORE_LIBRARY ipex_gpu_core PATHS "${TORCH_IPEX_INSTALL_PREFIX}/lib")
+set(TORCH_IPEX_LIBRARIES ${IPEX_GPU_CORE_LIBRARY})
+
+find_package_handle_standard_args(TorchIpex DEFAULT_MSG TORCH_IPEX_LIBRARIES TORCH_IPEX_INCLUDE_DIRS)
+
+# When we build libipex_gpu_core with the old GCC ABI, dependent libraries must too.
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  set(TORCH_IPEX_CXX_FLAGS "-D_GLIBCXX_USE_CXX11_ABI=@GLIBCXX_USE_CXX11_ABI@")
+endif()
+
+add_library(ipex SHARED IMPORTED)
+set_target_properties(ipex PROPERTIES
+    IMPORTED_LOCATION "${TORCH_IPEX_LIBRARIES}"
+    INTERFACE_INCLUDE_DIRECTORIES "${TORCH_IPEX_INCLUDE_DIRS}"
+    CXX_STANDARD 17
+)
+if(TORCH_IPEX_CXX_FLAGS)
+  set_property(TARGET ipex PROPERTY INTERFACE_COMPILE_OPTIONS "${TORCH_IPEX_CXX_FLAGS}")
+endif()

@@ -6,7 +6,7 @@
 # aten/build/ will stop being cleaned.  So be careful when
 # refactoring this file!
 
-## torch_ipex
+## ipex
 
 .coverage
 .hypothesis
@@ -22,13 +22,14 @@
 */**/**/**/*.pyc
 */**/**/**/**/*.pyc
 
-torch_ipex/version.py
-torch_ipex/README.md
-torch_ipex/requirements.txt
-torch_ipex/csrc/aten_ipex_sparse_type_default.*
-torch_ipex/csrc/cpu/SparseOPs.*
-torch_ipex/include/
-torch_ipex/lib/
+ipex/version.py
+ipex/README.md
+ipex/requirements.txt
+ipex/csrc/aten_ipex_sparse_type_default.*
+ipex/csrc/cpu/SparseOPs.*
+ipex/include/
+ipex/lib/
+ipex/share/cmake/TorchIpex/IpexConfig.cmake
 
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml

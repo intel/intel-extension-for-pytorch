@@ -20,6 +20,10 @@ def _get_device_index(device: Union[Device, str, int], optional: bool = False,
     If :attr:`device` is ``None``, this will return the current default XPU
     device if :attr:`optional` is ``True``.
     """
+    if isinstance(device, int):
+        device = 'xpu:' + str(device)
+    if device is None and optional:
+        device = 'xpu:0' 
     if isinstance(device, str):
         device = torch.device(device)
     if isinstance(device, torch.device):

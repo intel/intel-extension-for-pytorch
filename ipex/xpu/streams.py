@@ -1,10 +1,10 @@
 import ctypes
-import torch_ipex
+import ipex
 
 
-class Stream(torch_ipex._C._XPUStreamBase):
+class Stream(ipex._C._XPUStreamBase):
     def __new__(cls, device=None, priority=0, **kwargs):
-        with torch_ipex.device(device):
+        with ipex.device(device):
             return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
 
     def __eq__(self, o):
@@ -16,29 +16,29 @@ class Stream(torch_ipex._C._XPUStreamBase):
         return hash((self._cdata, self.device))
 
     def __repr__(self):
-        return ('<torch_ipex.Stream device={0} xpu_stream={1}>'
+        return ('<ipex.Stream device={0} xpu_stream={1}>'
                 .format(self.device, self.xpu_stream))
 
 
-class Event(torch_ipex._C._XPUEventBase):
+class Event(ipex._C._XPUEventBase):
     def __new__(cls, **kwargs):
         return super(Event, cls).__new__(cls, **kwargs)
 
     def record(self, stream=None):
         r"""Records the event in a given stream.
 
-        Uses ``torch_ipex.current_stream()`` if no stream is specified."""
+        Uses ``ipex.current_stream()`` if no stream is specified."""
         if stream is None:
-            stream = torch_ipex.current_stream()
+            stream = ipex.current_stream()
         super(Event, self).record(stream)
 
     def wait(self, stream=None):
         r"""Makes all future work submitted to the given stream wait for this
         event.
 
-        Use ``torch_ipex.current_stream()`` if no stream is specified."""
+        Use ``ipex.current_stream()`` if no stream is specified."""
         if stream is None:
-            stream = torch_ipex.current_stream()
+            stream = ipex.current_stream()
         super(Event, self).wait(stream)
 
     def query(self):

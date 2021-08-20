@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_ipex
+import ipex
 import copy
 
 linear = nn.Linear(1024, 512, bias=False)

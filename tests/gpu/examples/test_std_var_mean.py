@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -16,7 +16,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.var_mean(input_dpcpp)
 
-        if not torch_ipex._double_kernel_disabled():
+        if not ipex._double_kernel_disabled():
             print(output_cpu[0])
             print(output_dpcpp[0])
             print(output_cpu[1])
@@ -31,7 +31,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.var_mean(input_dpcpp, 1)
 
-        if not torch_ipex._double_kernel_disabled():
+        if not ipex._double_kernel_disabled():
             print(output_cpu[0])
             print(output_dpcpp[0])
             print(output_cpu[1])
@@ -46,7 +46,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.std_mean(input_dpcpp)
 
-        if not torch_ipex._double_kernel_disabled():
+        if not ipex._double_kernel_disabled():
             print(output_cpu[0])
             print(output_dpcpp[0])
             print(output_cpu[1])

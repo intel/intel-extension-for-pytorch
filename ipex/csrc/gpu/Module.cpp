@@ -69,7 +69,7 @@ static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
 
 static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  auto module = THPObjectPtr(PyImport_ImportModule("torch_ipex"));
+  auto module = THPObjectPtr(PyImport_ImportModule("ipex.xpu"));
   if (!module)
     throw python_error();
 
@@ -270,7 +270,7 @@ std::string get_dev_type(const DeviceProp& prop) {
 }
 
 static void register_xpu_device_properties(PyObject* module) {
-  // Add _DeviceProperties class to torch_ipex._C
+  // Add _DeviceProperties class to ipex._C
   auto m = py::handle(module).cast<py::module>();
   py::class_<DeviceProp>(m, "_DeviceProperties")
       .def_readonly("name", &DeviceProp::dev_name)
@@ -294,7 +294,7 @@ static void register_xpu_device_properties(PyObject* module) {
 }
 
 static void bindGetDeviceProperties(PyObject* module) {
-  // Add method to torch_ipex._C
+  // Add method to ipex._C
   auto m = py::handle(module).cast<py::module>();
   m.def(
       "_get_device_properties",
@@ -310,8 +310,6 @@ static void bindGetDeviceProperties(PyObject* module) {
 }
 
 void init_module(pybind11::module& m) {
-  torch_ipex::jit::InitFusionPass();
-
   m.def(
       "linear_relu",
       [](const at::Tensor& input,

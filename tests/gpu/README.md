@@ -40,7 +40,7 @@ pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
 ### General case study:
 ```python
 import torch
-import torch_ipex
+import ipex
 ## import testcase parent class TestCaes
 from torch.testing._internal.common_utils import TestCase
 
@@ -88,7 +88,7 @@ class TestTorchMethod2(TestCase):
 ### Skip certain case with reason and comments:
 ```python
 import torch
-import torch_ipex
+import ipex
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 import pytest
@@ -120,7 +120,7 @@ class TestNNMethod(TestCase):
 
 ```python 
 import torch
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest
 
@@ -135,7 +135,7 @@ class TestTorchMethod(TestCase):
 
 ```python
 import torch
-import torch_ipex 
+import ipex 
 from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
 
 cpu_device = torch.device("cpu")

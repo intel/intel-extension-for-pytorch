@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_ipex
+import ipex
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 import pytest

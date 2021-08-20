@@ -1,6 +1,6 @@
 #include <ittnotify.h>
 
-__itt_domain* _itt_domain = __itt_domain_create("torch_ipex");
+__itt_domain* _itt_domain = __itt_domain_create("ipex");
 
 void itt_range_push(const char* msg) {
   __itt_string_handle* hsMsg = __itt_string_handle_create(msg);

@@ -2,7 +2,7 @@ import torch
 from torch.nn.functional import relu_
 from torch.nn.functional import relu
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -42,7 +42,7 @@ class TestNNMethod(TestCase):
         c_dpcpp_fp32 = c.to(device)
 
         # optim
-        optim_dpcpp_bf16 = torch_ipex.SplitSGD(m_dpcpp_bf16.parameters(), lr=0.1, momentum=0, weight_decay=0)
+        optim_dpcpp_bf16 = ipex.optim.SplitSGD(m_dpcpp_bf16.parameters(), lr=0.1, momentum=0, weight_decay=0)
         optim_dpcpp_fp32 = torch.optim.SGD(m_dpcpp_fp32.parameters(), lr=0.1, momentum=0, weight_decay=0)
 
         # forward

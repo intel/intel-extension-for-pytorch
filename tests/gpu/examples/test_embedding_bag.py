@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 import copy
 import pytest
 
@@ -11,7 +11,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not torch_ipex._onedpl_is_enabled()")
+    @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
     def test_embedding_bag(self, dtype=torch.float):
         print("sum cpu")
         embedding_sum = nn.EmbeddingBag(

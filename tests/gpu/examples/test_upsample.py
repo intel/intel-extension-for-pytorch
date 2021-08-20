@@ -2,7 +2,7 @@ import numpy
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase
 
 

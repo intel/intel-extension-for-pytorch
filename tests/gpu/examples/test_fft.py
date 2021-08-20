@@ -1,10 +1,10 @@
 import torch
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
     def test_fft(self, dtype=torch.float):
         x1 = torch.randn(5, 5)
         x2 = torch.randn(4, 3, 2)

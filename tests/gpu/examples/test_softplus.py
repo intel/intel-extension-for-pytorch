@@ -1,6 +1,6 @@
 from __future__ import print_function
 import torch
-import torch_ipex
+import ipex
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase

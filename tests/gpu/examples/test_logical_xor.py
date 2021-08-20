@@ -1,5 +1,5 @@
 import torch
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest
 
@@ -17,7 +17,7 @@ class TestTorchMethod(TestCase):
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
         array2 = [input2, input2.half(), input2.bool()]
-        if not torch_ipex._double_kernel_disabled():
+        if not ipex._double_kernel_disabled():
             array1.append(input1.double())
             array2.append(input2.double())
 

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_ipex
+import ipex
 import copy
 
 conv = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)

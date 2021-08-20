@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
-import torch_ipex
+import ipex
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")

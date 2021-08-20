@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_ipex
+import ipex
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
@@ -11,7 +11,7 @@ dpcpp_device = torch.device("xpu")
 class TestNNMethod(TestCase):
     def test_linear_relu(self, dtype=torch.float):
         linear = nn.Linear(4, 2).to("xpu")
-        linear_relu = torch_ipex.LinearReLU(4, 2).to("xpu")
+        linear_relu = ipex.xpu.LinearReLU(4, 2).to("xpu")
         linear_relu.weight = linear.weight
         linear_relu.bias = linear.bias
         x = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]], requires_grad=True, device=dpcpp_device, dtype=dtype)

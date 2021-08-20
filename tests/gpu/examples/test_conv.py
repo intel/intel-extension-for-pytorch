@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 import pytest
 
 cpu_device = torch.device("cpu")

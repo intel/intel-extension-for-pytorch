@@ -17,7 +17,5 @@ namespace torch_ipex {
 namespace jit {
 using torch::jit::Graph;
 void FusionPass(std::shared_ptr<Graph>& graph);
-
-void InitFusionPass();
 } // namespace jit
 } // namespace torch_ipex

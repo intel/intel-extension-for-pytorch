@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import relu_
 from torch.nn.functional import relu
-import torch_ipex
+import ipex
 
 def test_lazy_reorder():
     cpu_device = torch.device("cpu")

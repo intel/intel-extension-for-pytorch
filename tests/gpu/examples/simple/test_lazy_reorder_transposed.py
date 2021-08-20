@@ -1,11 +1,11 @@
 import torch
-import torch_ipex
+import ipex
 import torch.nn as nn
 import collections
 from torch.autograd import Variable
 
 import torch
-import torch_ipex
+import ipex
 
 from torch.testing._internal.common_utils import TestCase
 

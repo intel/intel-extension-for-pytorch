@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 import numpy as np
 np.set_printoptions(threshold=np.inf)
 

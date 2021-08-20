@@ -3,7 +3,7 @@ import numpy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest
 

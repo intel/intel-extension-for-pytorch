@@ -1,5 +1,5 @@
 import torch
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest
 
@@ -31,10 +31,10 @@ class  TestTorchMethod(TestCase):
         print("sycl")
         input_sycl.requires_grad = True
         output_sycl = m(input_sycl, weight_sycl, bias_sycl)
-        if not torch_ipex._double_kernel_disabled():
+        if not ipex._double_kernel_disabled():
             print("output: ", output_sycl.cpu())
         output_sycl.backward(torch.ones_like(output_sycl).to("xpu"))
-        if not torch_ipex._double_kernel_disabled():
+        if not ipex._double_kernel_disabled():
             print("input.grad: ", input_sycl.grad)
         # input_sycl.grad.zero_()
 

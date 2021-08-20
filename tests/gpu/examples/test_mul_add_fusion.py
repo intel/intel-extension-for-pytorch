@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 
-import torch_ipex
+import ipex
 import pytest
 
 

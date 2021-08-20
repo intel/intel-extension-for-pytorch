@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_ipex
+import ipex
 
 
 class Conv2dRelu(torch.nn.Module):

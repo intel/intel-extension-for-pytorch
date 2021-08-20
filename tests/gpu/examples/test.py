@@ -1,5 +1,5 @@
 import torch
-import torch_ipex
+import ipex
 
 a = torch.ones([10], dtype=torch.float64)
 a = a.to("xpu")

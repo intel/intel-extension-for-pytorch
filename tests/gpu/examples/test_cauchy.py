@@ -1,5 +1,5 @@
 import torch
-import torch_ipex
+import ipex
 from torch.distributions import Cauchy
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase

@@ -69,21 +69,21 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
 #if defined(USE_ITT)
     itt_mark(name);
 #else
-    AT_ERROR("torch_ipex is not compiled with ITT.");
+    AT_ERROR("ipex is not compiled with ITT.");
 #endif
   }
   void ittRangePush(const char* name) override {
 #if defined(USE_ITT)
     itt_range_push(name);
 #else
-    AT_ERROR("torch_ipex is not compiled with ITT.");
+    AT_ERROR("ipex is not compiled with ITT.");
 #endif
   }
   void ittRangePop() override {
 #if defined(USE_ITT)
     itt_range_pop();
 #else
-    AT_ERROR("torch_ipex is not compiled with ITT.");
+    AT_ERROR("ipex is not compiled with ITT.");
 #endif
   }
 };

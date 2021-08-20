@@ -23,7 +23,7 @@ change. This file contains two types of randomized tests:
 """
 import numpy as np
 import torch
-import torch_ipex
+import ipex
 from torch.testing._internal.common_utils import TestCase, run_tests, set_rng_seed, TEST_WITH_UBSAN, load_tests
 from torch.autograd import grad, gradcheck
 from torch._six import inf

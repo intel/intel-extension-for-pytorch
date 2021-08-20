@@ -443,11 +443,6 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   ConstantPropagation(graph);
 }
 
-void InitFusionPass() {
-  RegisterPreFusionPass pass_3(
-      [](std::shared_ptr<Graph>& g) { torch_ipex::jit::FusionPass(g); });
-}
-
 } // namespace jit
 } // namespace torch_ipex
 
@@ -456,5 +451,10 @@ namespace jit {
 RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
   registerPrePass(std::move(p));
 }
+
+static RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
+  torch_ipex::jit::FusionPass(g);
+});
+
 } // namespace jit
 } // namespace torch

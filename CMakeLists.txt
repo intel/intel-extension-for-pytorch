@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(torch_ipex VERSION ${CMAKE_PROJECT_VERSION})
+project(ipex VERSION ${CMAKE_PROJECT_VERSION})
 
 set(IPEX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
@@ -19,7 +19,7 @@ set (CMAKE_GENERATOR "Unix Makefiles")
 # set compilation env first
 include(cmake/DPCPP.cmake)
 
-# The options to build torch_ipex
+# The options to build ipex
 include(CMakeDependentOption)
 option(USE_ONEDPL "Use oneDPL" ON)
 option(USE_ONEMKL "Use oneMKL BLAS" ON)
@@ -44,7 +44,7 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 add_subdirectory(${IPEX_ROOT_DIR}/csrc)
-add_subdirectory(${IPEX_ROOT_DIR}/torch_ipex/csrc)
+add_subdirectory(${IPEX_ROOT_DIR}/ipex/csrc)
 
 function (print_configuration_summary)
   # Fetch definitions of ipex_gpu_core as main target

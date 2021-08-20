@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_ipex
-import torch_ipex.optim
+import ipex
+import ipex.optim
 
 from torch.testing._internal.common_utils import TestCase
 import pytest
@@ -37,7 +37,7 @@ class TestNNMethod(TestCase):
         model_real.train()
         model_ref.train()
 
-        optimizer_real = torch_ipex.optim.SGDMasterWeight(model_real.parameters(), 0.01, 0.9, 0.0001)
+        optimizer_real = ipex.optim.SGDMasterWeight(model_real.parameters(), 0.01, 0.9, 0.0001)
         optimizer_ref = torch.optim.SGD(model_ref.parameters(), 0.01, 0.9, 0.0001)
 
         model_real.bfloat16()
@@ -95,7 +95,7 @@ class TestNNMethod(TestCase):
         model_real.train()
         model_ref.train()
 
-        optimizer_real = torch_ipex.optim.AdamMasterWeight(
+        optimizer_real = ipex.optim.AdamMasterWeight(
             model_real.parameters(),
             0.001,
             weight_decay=0.95

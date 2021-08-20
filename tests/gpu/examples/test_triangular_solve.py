@@ -1,6 +1,6 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import torch_ipex
+import ipex
 import time
 import pytest
 
@@ -8,7 +8,7 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
     def test_triangular_solve(self, dtype=torch.float):
         a = torch.randn(2,2)
         b = torch.randn(2,3)

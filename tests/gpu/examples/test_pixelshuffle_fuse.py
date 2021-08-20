@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_ipex
+import ipex
 from torch.nn.modules.utils import _pair
 import pytest
 

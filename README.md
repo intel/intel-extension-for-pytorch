@@ -41,7 +41,7 @@ IPEX code org
     │   └── gpu               // IPEX gpu test suites
     │       ├── examples      // IPEX gpu examples and unit tests
     │       └── pytorch       // Test suites ported from PyTorch proper
-    ├── torch_ipex            // IPEX Python layer
+    ├── ipex            // IPEX Python layer
     │   └── csrc              // IPEX native implementation for Python
     │       ├── gpu           // IPEX gpu Python API implementation
     │       └── itt           // ITT support
@@ -132,11 +132,11 @@ python3 setup.py install --user
 
 ## Programming Model
 
-*  ```import torch_ipex``` is a MUST before running any cases with Intel GPU Extension for PyTorch.
+*  ```import ipex``` is a MUST before running any cases with Intel GPU Extension for PyTorch.
 *  Must convert tensors and models to xpu device before running with this Extension. Example:
 
 ```bash
-import torch_ipex
+import ipex
 
 input = input.to("xpu")
 model = model.to("xpu")
@@ -278,7 +278,7 @@ ITT is Intel® VTune™ Profiler's Instrumentation and Tracing Technology. To en
 build Intel GPU Extension for PyTorch with USE_ITT=ON and update model as below:
 
 ```bash
-with torch_ipex.profiler.emit_itt():
+with ipex.profiler.emit_itt():
     output = YourModel(input)
 ```
 Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set for VTune.
