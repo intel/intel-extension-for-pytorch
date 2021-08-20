@@ -59,5 +59,10 @@ Tensor& sqrt_out(Tensor& result, const Tensor& self) {
   return result;
 }
 
+Tensor& log1p_(Tensor& self) {
+  at::AtenIpexTypeXPU::log1p_out(self, self);
+  return self;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

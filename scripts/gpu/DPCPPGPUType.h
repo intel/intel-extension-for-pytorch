@@ -318,6 +318,7 @@ static Tensor& lgamma_(Tensor & self); //aten::lgamma_(Tensor(a!) self) -> Tenso
 static Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, c10::optional<int64_t> steps); // {"schema": "aten::linspace.out(Scalar start, Scalar end, int? steps=None, *, Tensor(a!) out) -> Tensor(a!)", "dispatch": "True", "math": "False"}
 static Tensor & log10_out(Tensor & out, const Tensor & self); // aten::log10.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & log1p_out(Tensor & out, const Tensor & self); // aten::log1p.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor & log1p_(Tensor & self); // {"schema": "aten::log1p_(Tensor(a!) self) -> Tensor(a!)", "dispatch": "True", "math": "False"}
 static Tensor & log2_out(Tensor & out, const Tensor & self); // aten::log2.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & log_normal_(Tensor & self, double mean, double std, c10::optional<Generator> generator); // {"schema": "aten::log_normal_(Tensor(a!) self, float mean=1, float std=2, *, Generator? generator=None) -> Tensor(a!)", "dispatch": "True", "math": "False"}
 static Tensor & log_out(Tensor & out, const Tensor & self); // aten::log.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
