@@ -157,10 +157,10 @@ convolution_forward_impl(const at::Tensor &input, const at::Tensor &weight,
                          bool weight_channels_last, bool weight_prepacked,
                          const ideep::attr_t &attr) {
 #if defined(IPEX_DISP_OP)
-  printf("torch_ipex::convolution_forward\n");
+  printf("torch_ipex::convolution_forward_impl\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::convolution_forward",
+  RECORD_FUNCTION("torch_ipex::convolution_forward_impl",
                   std::vector<c10::IValue>({}));
 #endif
   TORCH_CHECK(weight.scalar_type() == input.scalar_type(),
@@ -204,7 +204,8 @@ void convolution_forward_inplace_impl(
   printf("torch_ipex::convolution_forward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::convolution_forward", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::convolution_forward_inplace_impl",
+                  std::vector<c10::IValue>({}));
 #endif
   TORCH_CHECK(weight.scalar_type() == input.scalar_type(), "the input and weight need have same data type");
   TORCH_CHECK(
