@@ -22,11 +22,6 @@ class Operator {
     return *this;
   }
 
-  Operator& setQuantizationInputValue(Value* v, dnnl::graph::logical_tensor::data_type dtype) {
-    o.add_input(createLogicalTensor(v, dtype));
-    return *this;
-  }
-
   Operator& setInput(size_t offset) {
     return setInputValue(n->input(offset));
   }
@@ -40,11 +35,6 @@ class Operator {
   Operator& setOutputValue(Value* v) {
     if (v->mustNotBeNone())
       o.add_output(createLogicalTensor(v));
-    return *this;
-  }
-
-  Operator& setQuantizationOutputValue(Value* v, dnnl::graph::logical_tensor::data_type dtype) {
-    o.add_output(createLogicalTensor(v, dtype));
     return *this;
   }
 
@@ -122,10 +112,6 @@ class Operator {
  private:
   dnnl::graph::logical_tensor createLogicalTensor(Value* value) const {
     return at::LlgaTensorDesc(value).logical_tensor();
-  }
-
-  dnnl::graph::logical_tensor createLogicalTensor(Value* value, dnnl::graph::logical_tensor::data_type dtype) const {
-    return at::LlgaTensorDesc(value, dtype).logical_tensor();
   }
 
   const Node* n;

@@ -2,7 +2,6 @@
 #include "jit/codegen/onednn/graph_helper.h"
 #include "jit/codegen/onednn/operator.h"
 #include "jit/codegen/onednn/runtime.h"
-#include "jit/codegen/onednn/subgraph_dtype_setter.h"
 
 #include <ATen/core/functional.h>
 #include <ATen/quantized/Quantizer.h>
@@ -17,20 +16,6 @@ using namespace dnnl::graph;
 
 using data_type = dnnl::graph::logical_tensor::data_type;
 
-data_type getPropagateDataType(int64_t num) {
-  switch (num) {
-  case OutputDtype::uint8:
-    return data_type::u8;
-  case OutputDtype::int8:
-    return data_type::s8;
-  case OutputDtype::fp32:
-    return data_type::f32;
-  case OutputDtype::undef:
-    return data_type::undef;
-  default:
-    TORCH_CHECK(false, "Not support propagate output type num ", num);
-  }
-}
 LlgaKernel::LlgaKernel(const Node *fusionNode)
     : fusionNode_(fusionNode), graph_(fusionNode->g(attr::Subgraph)),
       nInputs_(graph_->inputs().size()), nOutputs_(graph_->outputs().size()),
@@ -48,10 +33,6 @@ LlgaKernel::LlgaKernel(const Node *fusionNode)
 
 bool LlgaKernel::useOpaqueLayout(size_t offset) const {
   return LlgaNodeWrapper(fusionNode_).useOpaqueLayout(offset);
-}
-
-int64_t LlgaKernel::getOutputDtype(size_t offset) const {
-  return LlgaNodeWrapper(fusionNode_).getOutputDtypes(offset);
 }
 
 ArgSpec LlgaKernel::getQuantizedSpec(ArgSpec spec, size_t offset) const {
@@ -96,23 +77,8 @@ ArgSpecs LlgaKernel::specializeOutputSpecs(const partition &partition,
   for (size_t i = 0; i < nOutputs_; i++) {
     auto spec = ArgSpec(outputs[i]);
 
-    int64_t output_dtype = getOutputDtype(i);
-
-    logical_tensor::data_type propagate_dtype =
-        getPropagateDataType(output_dtype);
-    if (propagate_dtype != logical_tensor::data_type::undef) {
-      spec = spec.dtype(propagate_dtype);
-
-      if (propagate_dtype == data_type::u8 ||
-          propagate_dtype == data_type::s8) {
-        spec = getQuantizedSpec(spec, i);
-      }
-    } else {
-      // TODO: need run with profiling graph executor turned on to know the
-      // exact output dtype. Hard-coded to f32 when can't infer from the node
-      // that produces the output node. This will make bf16 fail to run.
-      spec = spec.dtype(data_type::f32);
-    }
+    if (spec.is_quantized())
+      spec = getQuantizedSpec(spec, i);
 
     if (useOpaqueLayout(i))
       spec = spec.any();

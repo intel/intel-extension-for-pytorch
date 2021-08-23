@@ -7,7 +7,9 @@ namespace onednn {
 
 bool canFuseNode(const Node *node) {
   // TODO: register all canFuseNode of LLGA here
-  return node->kind() == Symbol::aten("quantize_per_tensor");
+  return node->kind() == Symbol::aten("quantize_per_tensor") ||
+         node->kind() == Symbol::aten("quantize_per_channel") ||
+         node->kind() == Symbol::aten("dequantize");
 }
 
 namespace {

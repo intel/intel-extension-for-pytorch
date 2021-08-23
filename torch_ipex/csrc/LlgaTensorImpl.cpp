@@ -77,7 +77,7 @@ dnnl::graph::tensor llga_from_aten_tensor(const Tensor& tensor) {
 
 using data_type = dnnl::graph::logical_tensor::data_type;
 
-data_type getLlgaDataType(at::ScalarType dt) {
+data_type LlgaTensorDesc::getLlgaDataType(at::ScalarType dt) const {
   switch (dt) {
     case at::ScalarType::Float:
       return data_type::f32;
@@ -90,7 +90,7 @@ data_type getLlgaDataType(at::ScalarType dt) {
     case at::ScalarType::QUInt8:
       return data_type::u8;
     default:
-      TORCH_CHECK(false, "Not support data type ", dt);
+      return data_type::undef;
   }
 }
 
@@ -104,6 +104,8 @@ LlgaTensorDesc LlgaTensorDesc::supplementTensorInfo(const at::Tensor& t) const {
     auto sizes = t.sizes().vec();
     auto strides = t.strides().vec();
     auto dtype = getLlgaDataType(t.scalar_type());
+    TORCH_CHECK(dtype != data_type::undef, "Not support data type ",
+                t.scalar_type());
     return {tid_, sizes, strides, dtype};
   }
 }

@@ -35,13 +35,13 @@ struct LlgaTensorDesc {
       strides_ = t.get_strides();
   }
 
-  // TODO: llga need set input/output type constraints while it seems that we cannot
-  // get the dtype during compile time, hard-coded to fp32 for now to 
-  // be able to add_op
-  LlgaTensorDesc(const torch::jit::Value* v, desc::data_type dtype = desc::data_type::f32)
-      : LlgaTensorDesc(v->unique(), {}, {}, dtype) {
+  LlgaTensorDesc(const torch::jit::Value *v)
+      : LlgaTensorDesc(v->unique(), {}, {}, desc::data_type::f32) {
     if (v->type()->isSubtypeOf(TensorType::get())) {
       auto tt = v->type()->cast<TensorType>();
+
+      if (tt->scalarType())
+        dtype_ = getLlgaDataType(tt->scalarType().value());
 
       auto sizes = tt->sizes();
       if (sizes.sizes())
@@ -52,12 +52,15 @@ struct LlgaTensorDesc {
       if (strides.sizes())
         for (auto d : *strides.sizes())
           strides_.push_back(d.value_or(DNNL_GRAPH_UNKNOWN_DIM));
-    }   
+    }
   }
 
   LlgaTensorDesc supplementTensorInfo(const at::Tensor& t) const;
 
   at::ScalarType aten_scalar_type() const;
+
+  dnnl::graph::logical_tensor::data_type
+  getLlgaDataType(at::ScalarType dt) const;
 
   const std::vector<int64_t>& sizes() const {
     return sizes_;

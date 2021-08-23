@@ -77,15 +77,10 @@ class LlgaNodeWrapper {
 
   bool useOpaqueLayout(size_t offset) const;
 
-  void setOutputDtypes(size_t offset, int64_t dtype);
-
-  int64_t getOutputDtypes(size_t offset) const;
-
   friend class LlgaGraphHelper;
 
  private:
   void initOutputLayouts();
-  void initOutputDtypes();
 
   Node* n;
 };

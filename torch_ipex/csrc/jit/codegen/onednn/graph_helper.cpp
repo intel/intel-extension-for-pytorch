@@ -13,17 +13,6 @@ namespace onednn {
 
 using opkind = dnnl::graph::op::kind;
 
-dnnl::graph::logical_tensor::data_type getQuantizationDataType(std::string dt) {
-  
-    if (dt == std::string("int8")) {
-      return dnnl::graph::logical_tensor::data_type::s8;
-    } else if (dt == std::string("uint8")) {
-      return dnnl::graph::logical_tensor::data_type::u8;
-    } else {
-      TORCH_CHECK(false, "Incorrect Quantization data type ", dt);
-    }
-}
-
 void fixConvOptionalBias(Node* node) {
   if (!node->input(2)->mustNotBeNone()) {
     // Replace non-existent optional bias with const None
@@ -100,12 +89,12 @@ Operator makeDequantOp(Node* node, Node* input_node) {
     node->s_(Symbol::attr("in_type"), Operator::String(input_node, 3));
 
     return Operator(node, opkind::Dequantize)
-      .setQuantizationInputValue(node->input(0), getQuantizationDataType(Operator::String(input_node, 3)))
-      .setOutput(0)
-      .setAttr("scales", Operator::FloatToVector(input_node, 1))
-      .setAttr("zps", Operator::IntToVector(input_node, 2))
-      .setAttr("in_type", Operator::String(input_node, 3))
-      .setAttr("qtype", std::string("per_tensor"));
+        .setInput(0)
+        .setOutput(0)
+        .setAttr("scales", Operator::FloatToVector(input_node, 1))
+        .setAttr("zps", Operator::IntToVector(input_node, 2))
+        .setAttr("in_type", Operator::String(input_node, 3))
+        .setAttr("qtype", std::string("per_tensor"));
   } else {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));
     node->t_(Symbol::attr("zps"), Operator::Tensor(input_node, 2));
@@ -114,13 +103,13 @@ Operator makeDequantOp(Node* node, Node* input_node) {
     node->i_(Symbol::attr("axis"), Operator::Int(input_node, 3));
 
     return Operator(node, opkind::Dequantize)
-      .setQuantizationInputValue(node->input(0), getQuantizationDataType(Operator::String(input_node, 4)))
-      .setOutput(0)
-      .setAttr("scales", FloatTensorToVector(Operator::Tensor(input_node, 1)))
-      .setAttr("zps", IntTensorToVector(Operator::Tensor(input_node, 2)))
-      .setAttr("axis", Operator::Int(input_node, 3))
-      .setAttr("in_type", Operator::String(input_node, 4))
-      .setAttr("qtype", std::string("per_channel"));
+        .setInput(0)
+        .setOutput(0)
+        .setAttr("scales", FloatTensorToVector(Operator::Tensor(input_node, 1)))
+        .setAttr("zps", IntTensorToVector(Operator::Tensor(input_node, 2)))
+        .setAttr("axis", Operator::Int(input_node, 3))
+        .setAttr("in_type", Operator::String(input_node, 4))
+        .setAttr("qtype", std::string("per_channel"));
   }
 }
 
@@ -278,20 +267,20 @@ Operator createOperator(Node* node) {
 
     return Operator(node, opkind::Quantize)
         .setInput(0)
-        .setQuantizationOutputValue(node->output(0), getQuantizationDataType(Operator::String(node, 3)))
+        .setOutput(0)
         .setAttr("scales", Operator::FloatToVector, 1)
         .setAttr("zps", Operator::IntToVector, 2)
         .setAttr("out_type", Operator::String, 3)
         .setAttr("qtype", std::string("per_tensor"));
   } else if (node->kind() == Symbol::aten("quantize_per_channel")) {
     return Operator(node, opkind::Quantize)
-      .setInput(0)
-      .setQuantizationOutputValue(node->output(0), getQuantizationDataType(Operator::String(node, 4)))
-      .setAttr("scales", FloatTensorToVector(Operator::Tensor(node, 1)))
-      .setAttr("zps", IntTensorToVector(Operator::Tensor(node, 2)))
-      .setAttr("axis", Operator::Int, 3)
-      .setAttr("out_type", Operator::String, 4)
-      .setAttr("qtype", std::string("per_channel"));
+        .setInput(0)
+        .setOutput(0)
+        .setAttr("scales", FloatTensorToVector(Operator::Tensor(node, 1)))
+        .setAttr("zps", IntTensorToVector(Operator::Tensor(node, 2)))
+        .setAttr("axis", Operator::Int, 3)
+        .setAttr("out_type", Operator::String, 4)
+        .setAttr("qtype", std::string("per_channel"));
   } else if (node->kind() == Symbol::aten("dequantize")) {
     if (node->numAttributes() == 0) {
       Node* input_node = node->input(0)->node();
@@ -316,21 +305,22 @@ Operator createOperator(Node* node) {
         }
 
         return Operator(node, opkind::Dequantize)
-          .setQuantizationInputValue(node->input(0), getQuantizationDataType(node->s(Symbol::attr("in_type"))))
-          .setOutput(0)
-          .setAttr("scales", scales_float)
-          .setAttr("zps", node->is(Symbol::attr("zps")))
-          .setAttr("in_type", node->s(Symbol::attr("in_type")))
-          .setAttr("qtype", node->s(Symbol::attr("qtype")));
+            .setInput(0)
+            .setOutput(0)
+            .setAttr("scales", scales_float)
+            .setAttr("zps", node->is(Symbol::attr("zps")))
+            .setAttr("in_type", node->s(Symbol::attr("in_type")))
+            .setAttr("qtype", node->s(Symbol::attr("qtype")));
       } else {
         return Operator(node, opkind::Dequantize)
-          .setQuantizationInputValue(node->input(0), getQuantizationDataType(node->s(Symbol::attr("in_type"))))
-          .setOutput(0)
-          .setAttr("scales", FloatTensorToVector(node->t(Symbol::attr("scales"))))
-          .setAttr("zps", IntTensorToVector(node->t(Symbol::attr("zps"))))
-          .setAttr("axis", node->i(Symbol::attr("axis")))
-          .setAttr("in_type", node->s(Symbol::attr("in_type")))
-          .setAttr("qtype", node->s(Symbol::attr("qtype")));
+            .setInput(0)
+            .setOutput(0)
+            .setAttr("scales",
+                     FloatTensorToVector(node->t(Symbol::attr("scales"))))
+            .setAttr("zps", IntTensorToVector(node->t(Symbol::attr("zps"))))
+            .setAttr("axis", node->i(Symbol::attr("axis")))
+            .setAttr("in_type", node->s(Symbol::attr("in_type")))
+            .setAttr("qtype", node->s(Symbol::attr("qtype")));
       }
     }
   }
@@ -547,7 +537,6 @@ Node* LlgaGraphHelper::createSingletonSubgraph(Node* n, AliasDb& aliasDb) {
       n, Symbol::fromQualString(LlgaFusionGroupName()), aliasDb);
   opToOwningPartition_.add(group, partitionId);
   LlgaNodeWrapper(group).initOutputLayouts();
-  LlgaNodeWrapper(group).initOutputDtypes();
   return group;
 }
 
@@ -639,28 +628,6 @@ void LlgaNodeWrapper::initOutputLayouts() {
   // Init all output layouts as undef
   std::vector<int64_t> layouts(n->outputs().size(), 0);
   n->is_(Symbol::attr("output_layouts"), layouts);
-}
-
-void LlgaNodeWrapper::setOutputDtypes(size_t offset, int64_t dtype) {
-  TORCH_CHECK(offset < n->outputs().size(), "Invalid output offset ", offset);
-  auto& layouts =
-      const_cast<std::vector<int64_t>&>(n->is(Symbol::attr("output_dtypes")));
-  layouts.at(offset) = dtype;
-}
-
-int64_t LlgaNodeWrapper::getOutputDtypes(size_t offset) const {
-  TORCH_CHECK(offset < n->outputs().size(), "Invalid output offset ", offset);
-  return n->is(Symbol::attr("output_dtypes"))[offset];
-}
-
-void LlgaNodeWrapper::initOutputDtypes() {
-  if (n->hasAttribute(Symbol::attr("output_dtypes"))) {
-    return;
-  }
-
-  // Init all output dtypes as undef
-  std::vector<int64_t> dtypes(n->outputs().size(), 0);
-  n->is_(Symbol::attr("output_dtypes"), dtypes);
 }
 
 } // namespace onednn

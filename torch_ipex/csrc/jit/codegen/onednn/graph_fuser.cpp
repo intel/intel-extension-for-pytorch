@@ -1,6 +1,5 @@
 #include "jit/codegen/onednn/graph_fuser.h"
 #include "jit/codegen/onednn/graph_helper.h"
-#include "jit/codegen/onednn/subgraph_dtype_setter.h"
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/common_subexpression_elimination.h>
@@ -40,9 +39,6 @@ class GraphRewriter {
     // subgraphs and then recursively cleanup & unmerge the small subgraphs
     buildupSubgraphs();
     cleanupSubgraphs();
-
-    // Set the output dtype of each Subgraph
-    SetSubgraphDtype(graph_);
 
     // Run CSE globally once to eliminate duplicates that may have occurred
     // while inlining subgraphs.
