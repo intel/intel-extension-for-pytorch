@@ -101,6 +101,8 @@ class Operator {
     return reinterpret_cast<uint64_t>(node); // cast node address as op id
   }
 
+  static Node *getNode(uint64_t opId) { return reinterpret_cast<Node *>(opId); }
+
   dnnl::graph::op::kind kind() const {
     return k;
   }

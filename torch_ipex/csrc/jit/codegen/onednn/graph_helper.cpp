@@ -332,36 +332,7 @@ dnnl::graph::op createLlgaOp(Node* node) {
 }
 
 bool isSupported(Node* node) {
-  // return createOperator(node).kind() != opkind::Wildcard;
-  
-  // TODO: special handling here for the below WildCard OPs:
-  //   upsample_nearest2d,
-  //   ListConstruct,
-  //   TupleConstruct,
-  //   size
-  // Since the usage of Wildcard OP is still not well-defined, 
-  // we have decided previously not to send the Wildcard OPs to LLGA.
-  // As a result, for the below pattern, LLGA is not aware of the
-  // WildCard OP: TupleConstruct and will wrongly select the 
-  // dequant-conv-quant into a partition.
-  // Workaround here to send the upsample_nearest2d, ListConstruct and
-  // TupleConstruct to LLGA.
-  // In the future, need define the usage of WildCard OPs and send 
-  // all of them to LLGA to correctly select the partitions.
-  //
-  //                 quant
-  //      + - - - - - -|- - - - - - +
-  //      |        dequant          |
-  //      |           |             |
-  //      |         conv            |
-  //      |       /      \          |
-  //      |  quant    TupleConstruct|
-  //      + - | - - - - - - | - - - +
-  // 
-  return node->kind() == aten::upsample_nearest2d || 
-    node->kind() == prim::ListConstruct || 
-    node->kind() == prim::TupleConstruct || 
-    createOperator(node).kind() != opkind::Wildcard;
+  return createOperator(node).kind() != opkind::Wildcard;
 };
 
 DeviceType inferDeviceFromValue(Value* v) {
@@ -419,9 +390,6 @@ LlgaGraphHelper::LlgaGraphHelper(
   GRAPH_DEBUG("Constructing LLGA graph");
   // TODO: select nodes in top-level block for now
   for (auto* node : graph->block()->nodes()) {
-    // TODO: remove once wildcard is supported
-    if (!isSupported(node))
-      continue;
     auto op = createLlgaOp(node);
     g.add_op(op);
     GRAPH_DEBUG("  Added node ", node->kind().toQualString());

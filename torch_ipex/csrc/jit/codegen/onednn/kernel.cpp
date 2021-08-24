@@ -16,6 +16,15 @@ using namespace dnnl::graph;
 
 using data_type = dnnl::graph::logical_tensor::data_type;
 
+bool onlyContainsSingleConstantOp(dnnl::graph::partition partition) {
+  bool onlyContainsSingleOp = partition.get_ops_num() == 1;
+  if (!onlyContainsSingleOp)
+    return false;
+  auto opId = partition.get_ops()[0];
+  auto node = Operator::getNode(opId);
+  return node->kind() == prim::Constant;
+}
+
 LlgaKernel::LlgaKernel(const Node *fusionNode)
     : fusionNode_(fusionNode), graph_(fusionNode->g(attr::Subgraph)),
       nInputs_(graph_->inputs().size()), nOutputs_(graph_->outputs().size()),
@@ -25,9 +34,25 @@ LlgaKernel::LlgaKernel(const Node *fusionNode)
   // LLGA now) to carry a serialized string representation from graph rewrite
   // and deserialize it here.
   auto partitions = LlgaGraphHelper(graph_).getPartitions();
-  TORCH_CHECK(partitions.size() == 1,
+
+  std::vector<size_t> supportedPartitionIds;
+  // During graph rewrite, PyTorch will clone prim::Constant into subgraph to
+  // enable more optimizations. Since prim::Constant is a Wildcard op for oneDNN
+  // graph, we need exclude the unsupported partitions (which should only
+  // contain prim::Constant) during runtime.
+  for (size_t partId = 0; partId < partitions.size(); partId++) {
+    if (partitions[partId].is_supported()) {
+      supportedPartitionIds.push_back(partId);
+    } else {
+      TORCH_CHECK(onlyContainsSingleConstantOp(partitions[partId]),
+                  "unsupported partitions during runtime could contain only "
+                  "prim::Constant node");
+    }
+  }
+  TORCH_CHECK(supportedPartitionIds.size() == 1,
               "LLGA subgraph should contain only one partition");
-  partition_ = partitions[0];
+  partition_ = partitions[supportedPartitionIds[0]];
+
   GRAPH_DEBUG("Initialized ", debugName(), "\n", graph_->toString());
 }
 
