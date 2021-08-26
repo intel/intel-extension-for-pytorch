@@ -22,24 +22,16 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <
-    typename policy_t,
-    typename scalar_t,
-    typename equal_t,
-    typename equal_by_key_t,
-    typename not_equal_t>
-std::tuple<Tensor, Tensor, int64_t> compute_unique(
+#ifdef USE_ONEDPL
+template <typename policy_t, typename scalar_t, typename not_equal_t>
+Tensor compute_inverse(
     const policy_t& policy,
     scalar_t* data,
     int64_t num_inp,
     const Tensor& sorted_indices,
     const bool return_inverse,
-    const bool return_counts,
     TensorOptions options,
-    equal_t equal,
-    equal_by_key_t equal_by_key,
     not_equal_t not_equal) {
-#ifdef USE_ONEDPL
   // inverse indices
   Tensor inverse_indices;
   auto data_begin = data;
@@ -48,7 +40,7 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
   } else {
     TORCH_CHECK(
         sorted_indices.defined(),
-        "return_inverse is set to true, but sorted_indices is undefined. Send a bug report!");
+        "compute_inverse is invoked, but sorted_indices is undefined. Send a bug report!");
     int64_t* sorted_indices_ptr = sorted_indices.data_ptr<int64_t>();
     auto sorted_indices_begin = sorted_indices_ptr;
     Tensor inv_loc = at::empty({num_inp}, options);
@@ -71,6 +63,24 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     inverse_indices = inv_loc;
   }
 
+  return inverse_indices;
+}
+
+template <
+    typename policy_t,
+    typename scalar_t,
+    typename equal_t,
+    typename equal_by_key_t>
+std::tuple<Tensor, int64_t> compute_unique(
+    const policy_t& policy,
+    scalar_t* data,
+    int64_t num_inp,
+    const Tensor& sorted_indices,
+    const bool return_counts,
+    TensorOptions options,
+    equal_t equal,
+    equal_by_key_t equal_by_key) {
+  auto data_begin = data;
   // unique and count
   Tensor counts = at::empty({0}, options);
   int64_t num_out;
@@ -95,9 +105,9 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
         policy, range_begin + 1, range_begin + num_out + 1, counts_begin);
   }
 
-  return std::tuple<Tensor, Tensor, int64_t>(inverse_indices, counts, num_out);
-#endif
+  return std::tuple<Tensor, int64_t>(counts, num_out);
 }
+#endif
 
 template <typename scalar_t>
 std::tuple<Tensor, Tensor, Tensor> unique_template(
@@ -136,12 +146,26 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
 
   Tensor inverse_indices, counts;
   int64_t num_out;
-  std::tie(inverse_indices, counts, num_out) = compute_unique(
+
+  inverse_indices = compute_inverse(
       policy,
       output_data,
       num_inp,
       sorted_indices,
       return_inverse,
+      options,
+      [](auto lhs, auto rhs) -> bool {
+        if (lhs != rhs) {
+          return true;
+        }
+        return false;
+      });
+
+  std::tie(counts, num_out) = compute_unique(
+      policy,
+      output_data,
+      num_inp,
+      sorted_indices,
       return_counts,
       options,
       [](auto lhs, auto rhs) -> bool {
@@ -156,12 +180,6 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
           return false;
         }
         return true;
-      },
-      [](auto lhs, auto rhs) -> bool {
-        if (lhs != rhs) {
-          return true;
-        }
-        return false;
       });
   output.resize_(num_out);
 
@@ -234,12 +252,30 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   Tensor origin_indices = indices.clone();
   Tensor inverse_indices, counts;
   int64_t num_out;
-  std::tie(inverse_indices, counts, num_out) = compute_unique(
+
+  inverse_indices = compute_inverse(
       policy,
       indices_data,
       num_inp,
       indices,
       return_inverse,
+      options,
+      [=](auto a, auto b) -> int64_t {
+        for (int64_t i = 0; i < n; ++i) {
+          scalar_t lhs = input_flat_ptr[i + a * n];
+          scalar_t rhs = input_flat_ptr[i + b * n];
+          if (lhs != rhs) {
+            return 1;
+          }
+        }
+        return 0;
+      });
+
+  std::tie(counts, num_out) = compute_unique(
+      policy,
+      indices_data,
+      num_inp,
+      indices,
       return_counts,
       options,
       [=](auto a, auto b) -> bool {
@@ -262,16 +298,6 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
           }
         }
         return true;
-      },
-      [=](auto a, auto b) -> int64_t {
-        for (int64_t i = 0; i < n; ++i) {
-          scalar_t lhs = input_flat_ptr[i + a * n];
-          scalar_t rhs = input_flat_ptr[i + b * n];
-          if (lhs != rhs) {
-            return 1;
-          }
-        }
-        return 0;
       });
   origin_indices.resize_(num_out);
   return std::tuple<Tensor, Tensor, Tensor>(

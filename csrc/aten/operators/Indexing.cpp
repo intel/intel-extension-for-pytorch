@@ -11,6 +11,7 @@
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include "comm/ATDispatch.h"
+#include "comm/Algorithm.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/MathReduce.h"
@@ -236,8 +237,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
         start,
         start + N,
         oneapi::dpl::make_transform_iterator(
-            strided_tensor.begin(),
-            [](auto& x) { return std::forward_as_tuple(x, std::ignore); }),
+            strided_tensor.begin(), dpcpp_transformation<int64_t>()),
         [](auto h) {
           using std::get;
           return NonZeroOp<scalar_t>{}(get<1>(h));

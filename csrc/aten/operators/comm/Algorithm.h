@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utils/DPCPP.h>
+#include <tuple>
 #include "Numerics.h"
 
 // alternative for thrust::tabulate
@@ -63,5 +64,12 @@ DPCPP_DEVICE struct dpcpp_identity {
 
   T& operator()(T& t) const {
     return t;
+  }
+};
+
+template <typename T>
+DPCPP_DEVICE struct dpcpp_transformation {
+  std::tuple<T, decltype(std::ignore)> operator()(T& x) const {
+    return std::forward_as_tuple(x, std::ignore);
   }
 };

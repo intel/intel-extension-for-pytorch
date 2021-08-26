@@ -6,29 +6,6 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-namespace impl {
-
-static void logical_xor_kernel(TensorIterator& iter) {
-  if (iter.dtype() == ScalarType::Bool) {
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-        kBool, kHalf, iter.input_dtype(), "logical_xor_kernel", [&]() {
-          dpcpp_kernel_for_tensor_iter(
-              iter, [](scalar_t a, scalar_t b) -> bool {
-                return bool(a) != bool(b);
-              });
-        });
-  } else {
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-        kBool, kHalf, iter.dtype(), "logical_xor_kernel", [&]() {
-          dpcpp_kernel_for_tensor_iter(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return static_cast<scalar_t>(bool(a) != bool(b));
-              });
-        });
-  }
-}
-
-} // namespace impl
 
 static void check_convert(Scalar scalar, ScalarType scalarType) {
   // Validate that is possible to convert scalar to tensor dtype without
@@ -55,7 +32,16 @@ Tensor& logical_xor_out(
   }
 
   auto iter = TensorIterator::comparison_op(result, self, other);
-  impl::logical_xor_kernel(iter);
+  auto scalarType =
+      (iter.dtype() == ScalarType::Bool) ? iter.input_dtype() : iter.dtype();
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      kBool, kHalf, scalarType, "logical_xor_kernel", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a, scalar_t b) -> scalar_t {
+              return static_cast<scalar_t>(bool(a) != bool(b));
+            });
+      });
+
   return result;
 }
 

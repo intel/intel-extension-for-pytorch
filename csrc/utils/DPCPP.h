@@ -20,12 +20,7 @@ namespace DPCPP = cl::sycl;
 #endif
 
 #define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
-
-#if (__SYCL_COMPILER_VERSION >= 20200930)
-#define DPCPP_KER_PRINTF DPCPP::ONEAPI::experimental::printf
-#else
-#define DPCPP_KER_PRINTF DPCPP::intel::experimental::printf
-#endif
+#define DPCPP_KER_PRINTF DPCPP::ext::oneapi::experimental::printf
 
 #define DPCPP_K_PRINT(fmt_str, ...)           \
   {                                           \

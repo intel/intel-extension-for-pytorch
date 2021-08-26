@@ -8,7 +8,8 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    #@pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    @pytest.mark.skip(reason="skip due to bugs caused by oneDPL and compiler upgrades")
     def test_nonzero(self, dtype=torch.float):
 
         #

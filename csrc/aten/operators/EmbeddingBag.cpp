@@ -8,6 +8,7 @@
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
+#include "comm/Algorithm.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
 
@@ -399,8 +400,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
         copy_begin,
         copy_begin + numel,
         oneapi::dpl::make_transform_iterator(
-            segment_offsets_begin,
-            [](auto& x) { return std::forward_as_tuple(x, std::ignore); }),
+            segment_offsets_begin, dpcpp_transformation<int64_t>()),
         [](auto h) {
           using std::get;
           return get<1>(h) != 0;
