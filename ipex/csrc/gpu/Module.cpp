@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/tensor/python_tensor.h>
 
+#include <autograd/InferenceMode.h>
 #include <core/Allocator.h>
 #include <core/Device.h>
 #include <core/Generator.h>
@@ -293,6 +294,12 @@ static void register_xpu_device_properties(PyObject* module) {
       });
 }
 
+static void register_inference_mode(PyObject* module) {
+  // Add _DeviceProperties class to torch_ipex._C
+  auto m = py::handle(module).cast<py::module>();
+  py::class_<InferenceMode>(m, "_InferenceMode").def(py::init<bool>());
+}
+
 static void bindGetDeviceProperties(PyObject* module) {
   // Add method to ipex._C
   auto m = py::handle(module).cast<py::module>();
@@ -439,5 +446,6 @@ void init_module(pybind11::module& m) {
   THPStorage_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
   register_xpu_device_properties(module);
+  register_inference_mode(module);
   bindGetDeviceProperties(module);
 }

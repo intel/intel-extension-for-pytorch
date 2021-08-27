@@ -3,6 +3,7 @@ set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT}/aten")
 set(IPEX_GPU_ATEN_CORE_DIR "${IPEX_GPU_ATEN_SRC_DIR}/core")
 set(IPEX_GPU_ATEN_GENERATED "${IPEX_GPU_ATEN_SRC_DIR}/generated")
 set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT}/runtime")
+set(IPEX_GPU_AUTOGRAD_SRC_DIR "${IPEX_GPU_ROOT}/autograd")
 set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT}/utils")
 
 # sources
@@ -17,6 +18,9 @@ add_subdirectory(${IPEX_GPU_ATEN_SRC_DIR})
 
 set(IPEX_RUNTIME_SRCS)
 add_subdirectory(${IPEX_GPU_RUNTIME_SRC_DIR})
+
+set(IPEX_AUTOGRAD_SRCS)
+add_subdirectory(${IPEX_GPU_AUTOGRAD_SRC_DIR})
 
 set(IPEX_JIT_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT}/jit)
@@ -44,6 +48,7 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_ATEN_OPS_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
+        ${IPEX_AUTOGRAD_SRCS}
         ${IPEX_GPU_GEN_FILES}
         ${IPEX_TENSOR_SRCS}
         ${IPEX_UTILS_SRCS})

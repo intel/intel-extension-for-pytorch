@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 
+#include <autograd/InferenceMode.h>
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Utils.h>
@@ -340,7 +341,7 @@ static inline void matmul(
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
     onoff |= Settings::I().is_onednn_layout_enabled();
-    onoff &= !m2.requires_grad();
+    onoff &= InferenceMode::is_enabled();
     return onoff;
   }();
 

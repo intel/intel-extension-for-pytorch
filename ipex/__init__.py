@@ -7,6 +7,7 @@ from .version import __version__, __ipex_gitrev__
 from . import itt as itt
 from . import optim
 from . import profiler as profiler
+from .autograd import inference_mode
 
 
 def version():

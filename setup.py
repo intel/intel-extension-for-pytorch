@@ -337,6 +337,7 @@ setup(
     # Exclude the build files.
     packages=['ipex',
               'ipex.xpu',
+              'ipex.autograd',
               'ipex.xpu.intrinsic',
               'ipex.xpu.intrinsic.modules',
               'ipex.optim'],
