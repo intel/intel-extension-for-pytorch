@@ -10,6 +10,7 @@
 #include "Conv.h"
 #include "Eltwise.h"
 #include "GRU.h"
+#include "LSTM.h"
 #include "LayerNorm.h"
 #include "Matmul.h"
 #include "Pooling.h"

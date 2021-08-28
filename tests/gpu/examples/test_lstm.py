@@ -96,3 +96,16 @@ class TestNNMethod(TestCase):
         for i in range(len(param_dpcpp_grad)):
             print(param_grad[i] - param_dpcpp_grad[i].cpu())
             self.assertEqual(param_grad[i], param_dpcpp_grad[i].cpu())
+
+    def test_lstm_batch_first(self, dtype=torch.float):
+        lstm_cpu = nn.LSTM( 14, 5, batch_first=True, num_layers=1)
+        input_cpu = torch.randn([16, 7060, 14])
+        output_cpu, (hy_cpu, cy_cpu) = lstm_cpu(input_cpu)
+
+        input_xpu = input_cpu.to("xpu")
+        lstm_xpu = lstm_cpu.to("xpu")
+        output_xpu, (hy_xpu, cy_xpu) = lstm_xpu(input_xpu)
+
+        self.assertEqual(output_cpu, output_xpu.cpu())
+        self.assertEqual(hy_cpu, hy_xpu.cpu())
+        self.assertEqual(cy_cpu, cy_xpu.cpu())
