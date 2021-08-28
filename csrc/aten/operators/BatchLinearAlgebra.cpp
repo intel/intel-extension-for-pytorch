@@ -507,6 +507,12 @@ static void apply_svd(
   scalar_t* U_data = (scalar_t*)U.data_ptr();
   value_t* S_data = (value_t*)S.data_ptr();
   scalar_t* VT_data = (scalar_t*)VT.data_ptr();
+  auto self_stride = at::native::matrixStride(self);
+  auto U_stride = at::native::matrixStride(U);
+  auto S_stride = S.size(-1);
+  auto VT_stride = at::native::matrixStride(VT);
+  auto batchsize = at::native::batchCount(self);
+
   auto m = self.size(-2);
   auto n = self.size(-1);
   std::int64_t lda = m;
@@ -527,23 +533,31 @@ static void apply_svd(
       oneapi::mkl::lapack::gesvd_scratchpad_size<scalar_t>(
           dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
-  DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::lapack::gesvd,
-      dpcpp_queue,
-      jobu,
-      jobvt,
-      m,
-      n,
-      (scalar_t*)(self.data_ptr()),
-      lda,
-      S_data,
-      U_data,
-      ldu,
-      VT_data,
-      ldvt,
-      (scalar_t*)(scratchpad_at.data_ptr()),
-      scratchpadsize);
+
+  for (int64_t i = 0; i < batchsize; i++) {
+    scalar_t* self_working_ptr = &self_data[i * self_stride];
+    scalar_t* U_working_ptr = &U_data[i * U_stride];
+    scalar_t* S_working_ptr = &S_data[i * S_stride];
+    scalar_t* VT_working_ptr = &VT_data[i * VT_stride];
+
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::gesvd,
+        dpcpp_queue,
+        jobu,
+        jobvt,
+        m,
+        n,
+        self_working_ptr,
+        lda,
+        S_working_ptr,
+        U_working_ptr,
+        ldu,
+        VT_working_ptr,
+        ldvt,
+        (scalar_t*)(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  }
 #else
   AT_ERROR("svd: oneMKL library not found in compilation");
 #endif
@@ -1167,7 +1181,6 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
 
   if (self.numel() > 0) {
     auto self_working_copy = native::cloneBatchedColumnMajor(self);
-
     AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "svd_xpu", [&] {
       impl::apply_svd<scalar_t>(
           self_working_copy,
@@ -1177,7 +1190,6 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
           jobz,
           infos);
     });
-
     if (self.dim() > 2) {
       native::batchCheckErrors(infos, "svd_xpu");
     } else {
