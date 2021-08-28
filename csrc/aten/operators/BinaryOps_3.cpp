@@ -138,10 +138,6 @@ Tensor& min_out(Tensor& result, const Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::minimum_out(result, self, other);
 }
 
-Tensor min(const Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::minimum(self, other);
-}
-
 Tensor& maximum_out(Tensor& result, const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
       !self.is_complex() && !other.is_complex(),
@@ -166,10 +162,6 @@ Tensor maximum(const Tensor& self, const Tensor& other) {
 // binary max, alias for maximum
 Tensor& max_out(Tensor& result, const Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::maximum_out(result, self, other);
-}
-
-Tensor max(const Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::maximum(self, other);
 }
 
 Tensor& bitwise_and_out(Tensor& out, const Tensor& self, const Tensor& other) {
