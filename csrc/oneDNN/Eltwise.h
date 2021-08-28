@@ -4,6 +4,7 @@
 
 #include <intrinsic/ipex_intrinsic.h>
 #include <oneDNN/LRUCache.h>
+#include <oneDNN/Reorder.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/Utils.h>
 #include <runtime/Utils.h>
@@ -205,6 +206,7 @@ static inline void eltwise_backward(
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
 
+  Tensor diff_dst__;
   auto expected_dst_md = eltwise_forward_pd.dst_desc();
   if (Settings::I().is_onednn_layout_enabled()) {
     auto src_dst_ctx =
@@ -212,15 +214,12 @@ static inline void eltwise_backward(
     auto diff_dst_ctx =
         at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
     if ((diff_dst_ctx.is_plain()) && (!src_dst_ctx.is_plain())) {
-      auto diff_dst_ = at::empty_like(src_dst);
-      auto diff_dst_memory =
-          dpcpp_onednn_memory(expected_dst_md, engine, diff_dst_.data_ptr());
+      diff_dst__ =
+          empty_opaque_tensor(expected_dst_md, src_dst.options(), c10::nullopt);
+      diff_dst_memory =
+          dpcpp_onednn_memory(expected_dst_md, engine, diff_dst__.data_ptr());
       diff_dst_md = expected_dst_md;
-      DPCPP_ONEDNN_EXEC(
-          dnnl::reorder(diff_dst_usr_memory, diff_dst_memory),
-          strm,
-          {{DNNL_ARG_FROM, diff_dst_usr_memory},
-           {DNNL_ARG_TO, diff_dst_memory}});
+      xpu::oneDNN::reorder(diff_dst, diff_dst__);
     }
   }
 

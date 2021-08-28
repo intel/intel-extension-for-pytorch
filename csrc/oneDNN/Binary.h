@@ -4,6 +4,7 @@
 
 #include <ATen/AtenIpexTypeXPU.h>
 #include <oneDNN/LRUCache.h>
+#include <oneDNN/Reorder.h>
 #include <oneDNN/Runtime.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
@@ -79,10 +80,7 @@ static inline Tensor bin(
   if (md1 != tar_md) {
     _t1 = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
     m1 = dpcpp_onednn_memory(tar_md, engine, _t1.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(m1_usr, m1),
-        strm,
-        {{DNNL_ARG_FROM, m1_usr}, {DNNL_ARG_TO, m1}});
+    xpu::oneDNN::reorder(t1, _t1);
     md1 = tar_md;
   }
   Tensor _t2;
@@ -90,10 +88,7 @@ static inline Tensor bin(
   if (md2 != tar_md && t1.sizes() == t2.sizes()) {
     _t2 = empty_opaque_tensor(tar_md, t2.options(), c10::nullopt);
     m2 = dpcpp_onednn_memory(tar_md, engine, _t2.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(m2_usr, m2),
-        strm,
-        {{DNNL_ARG_FROM, m2_usr}, {DNNL_ARG_TO, m2}});
+    xpu::oneDNN::reorder(t2, _t2);
     md2 = tar_md;
   }
 
