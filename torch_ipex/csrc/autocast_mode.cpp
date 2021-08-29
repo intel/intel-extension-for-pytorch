@@ -244,30 +244,16 @@ MAKE_REGISTER_FUNC(ADD_NS(grid_sampler), "grid_sampler",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(polar), "polar",
                    Tensor(const Tensor &, const Tensor &), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(take_along_dim), "take_along_dim",
-                   Tensor(const Tensor &, const Tensor &,
-                          c10::optional<int64_t>),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(multinomial), "multinomial",
                    Tensor(const Tensor &, int64_t, bool,
                           c10::optional<at::Generator>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(poisson), "poisson",
                    Tensor(const Tensor &, c10::optional<at::Generator>), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(cosh), "cosh", Tensor(const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fmod), "fmod.Tensor",
                    Tensor(const Tensor &, const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fmod), "fmod.Scalar",
                    Tensor(const Tensor &, const Scalar &), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(mvlgamma), "mvlgamma",
-                   Tensor(const Tensor &, int64_t), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(nan_to_num), "nan_to_num",
-                   Tensor(const Tensor &, c10::optional<double>,
-                          c10::optional<double>, c10::optional<double>),
-                   fp32)
-MAKE_REGISTER_FUNC(ADD_NS(nextafter), "nextafter",
-                   Tensor(const Tensor &, const Tensor &), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(sinh), "sinh", Tensor(const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(prod), "prod",
                    Tensor(const Tensor &, c10::optional<at::ScalarType>), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(prod), "prod.dim_int",
@@ -313,12 +299,6 @@ MAKE_REGISTER_FUNC(ADD_NS(stft), "stft",
                           c10::optional<int64_t>, const c10::optional<Tensor> &,
                           bool, c10::optional<bool>, c10::optional<bool>),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(istft), "istft",
-                   Tensor(const Tensor &, int64_t, c10::optional<int64_t>,
-                          c10::optional<int64_t>, const c10::optional<Tensor> &,
-                          bool, bool, c10::optional<bool>,
-                          c10::optional<int64_t>, bool),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(cdist), "cdist",
                    Tensor(const Tensor &, const Tensor &, double,
                           c10::optional<int64_t>),
@@ -352,10 +332,6 @@ MAKE_REGISTER_FUNC(ADD_NS(histc), "histc",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(logcumsumexp), "logcumsumexp",
                    Tensor(const Tensor &, int64_t), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(renorm), "renorm",
-                   Tensor(const Tensor &, const at::Scalar &, int64_t,
-                          const at::Scalar &),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(searchsorted), "searchsorted.Tensor",
                    Tensor(const Tensor &, const Tensor &, bool, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(searchsorted), "searchsorted.Scalar",
@@ -412,6 +388,8 @@ MAKE_REGISTER_FUNC(ADD_NS(max_unpool3d), "max_unpool3d",
                    Tensor(const Tensor &, const Tensor &, IntArrayRef,
                           IntArrayRef, IntArrayRef),
                    fp32)
+MAKE_REGISTER_FUNC(ADD_NS(adaptive_avg_pool1d), "adaptive_avg_pool1d",
+                   Tensor(const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(adaptive_avg_pool3d), "adaptive_avg_pool3d",
                    Tensor(const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(reflection_pad1d), "reflection_pad1d",
@@ -433,17 +411,10 @@ MAKE_REGISTER_FUNC(ADD_NS(hardshrink), "hardshrink",
 MAKE_REGISTER_FUNC(ADD_NS(hardsigmoid), "hardsigmoid", Tensor(const Tensor &),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(hardswish), "hardswish", Tensor(const Tensor &), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(leaky_relu), "leaky_relu",
-                   Tensor(const Tensor &, const Scalar &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(log_sigmoid), "log_sigmoid", Tensor(const Tensor &),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(prelu), "prelu",
                    Tensor(const Tensor &, const Tensor &), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(rrelu), "rrelu",
-                   Tensor(const Tensor &, const at::Scalar &,
-                          const at::Scalar &, bool,
-                          c10::optional<at::Generator>),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(selu), "selu", Tensor(const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(celu), "celu", Tensor(const Tensor &, const Scalar &),
                    fp32)
@@ -455,6 +426,9 @@ MAKE_REGISTER_FUNC(ADD_NS(group_norm), "group_norm",
                    Tensor(const Tensor &, int64_t,
                           const c10::optional<Tensor> &,
                           const c10::optional<Tensor> &, double, bool),
+                   fp32)
+MAKE_REGISTER_FUNC(ADD_NS(smooth_l1_loss), "smooth_l1_loss",
+                   Tensor(const Tensor &, const Tensor &, int64_t, double),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(mse_loss), "mse_loss",
                    Tensor(const Tensor &, const Tensor &, int64_t), fp32)
@@ -468,16 +442,8 @@ MAKE_REGISTER_FUNC(ADD_NS(ctc_loss), "ctc_loss.Tensor",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(kl_div), "kl_div",
                    Tensor(const Tensor &, const Tensor &, int64_t, bool), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(margin_ranking_loss), "margin_ranking_loss",
-                   Tensor(const Tensor &, const Tensor &, const Tensor &,
-                          double, int64_t),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(multilabel_margin_loss), "multilabel_margin_loss",
                    Tensor(const Tensor &, const Tensor &, int64_t), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(pixel_shuffle), "pixel_shuffle",
-                   Tensor(const Tensor &, int64_t), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(pixel_unshuffle), "pixel_unshuffle",
-                   Tensor(const Tensor &, int64_t), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(fft_fft), "fft_fft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
                           c10::optional<c10::string_view>),
@@ -538,10 +504,6 @@ MAKE_REGISTER_FUNC(ADD_NS(fft_ihfft), "fft_ihfft",
                    Tensor(const Tensor &, c10::optional<int64_t>, int64_t,
                           c10::optional<c10::string_view>),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(special_exp2), "special_exp2", Tensor(const Tensor &),
-                   fp32)
-MAKE_REGISTER_FUNC(ADD_NS(special_gammaln), "special_gammaln",
-                   Tensor(const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(conv_tbc), "conv_tbc",
                    Tensor(const Tensor &, const Tensor &, const Tensor &,
                           int64_t),
@@ -585,11 +547,9 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_tensorsolve), "linalg_tensorsolve",
                    Tensor(const Tensor &, const Tensor &,
                           c10::optional<at::IntArrayRef>),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(frexp), "frexp.Tensor",
-                   TUPLE_TWO_TENSORS(const Tensor &), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(unique_consecutive), "unique_consecutive",
-                   TUPLE_THREE_TENSORS(const Tensor &, bool, bool,
-                                       c10::optional<int64_t>),
+MAKE_REGISTER_FUNC(ADD_NS(fake_quantize_per_tensor_affine),
+                   "fake_quantize_per_tensor_affine",
+                   Tensor(const Tensor &, double, int64_t, int64_t, int64_t),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(cummax), "cummax",
                    TUPLE_TWO_TENSORS(const Tensor &, int64_t), fp32)

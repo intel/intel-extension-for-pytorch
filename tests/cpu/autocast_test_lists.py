@@ -96,13 +96,7 @@ class AutocastCPUTestLists(object):
             ("grid_sampler", (torch.randn((2, 3, 33, 22), dtype=torch.bfloat16, device=dev),
                               torch.randn((2, 22, 11, 2), dtype=torch.bfloat16, device=dev),
                               0, 0, False)),
-            ("take_along_dim", (torch.tensor([[10, 30, 20], [60, 40, 50]], dtype=torch.bfloat16), torch.tensor([1, 0]))),
-            ("cosh", torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16)),
             ("fmod", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1.5)),
-            ("mvlgamma", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 2)),
-            ("nan_to_num", torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16)),
-            ("nextafter", (dummy_bf16[1][0], dummy_bf16[0][0])),
-            ("sinh", torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16)),
             ("prod", torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16)),
             ("quantile", (torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.bfloat16), torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.bfloat16))),
             ("nanquantile", (torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.bfloat16), torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.bfloat16))),
@@ -115,7 +109,6 @@ class AutocastCPUTestLists(object):
             ("diagflat", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1)),
             ("histc", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1)),
             ("logcumsumexp", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1)),
-            ("renorm", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1, 0, 5)),
             ("tril", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1)),
             ("triu", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16), 1)),
             ("vander", (torch.tensor([[1, 2, 3, 4]], dtype=torch.bfloat16))),
@@ -123,12 +116,9 @@ class AutocastCPUTestLists(object):
             ("inverse", mat2_bf16),
             ("pinverse", mat2_bf16),
             ("max_pool3d", dummy_bf16[3], {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)}),
-            ("rrelu", dummy_bf16[2]),
             ("selu", dummy_bf16[2]),
             ("celu", dummy_bf16[2]),
             ("group_norm", torch.randn(1, 6, 10, 10).to(torch.bfloat16), {"num_groups": 1}),
-            ("pixel_shuffle", torch.randn(1, 9, 4, 4).to(torch.bfloat16), {"upscale_factor": 1}),
-            ("pixel_unshuffle", torch.randn(1, 9, 4, 4).to(torch.bfloat16), {"downscale_factor": 1}),
             ("conv_tbc", (torch.randn(2, 1, 8).to(torch.bfloat16), torch.randn(3, 8, 8).to(torch.bfloat16), dummy_bf16[0][0])),
         ]
         self.nn_bf16 = [
@@ -151,8 +141,6 @@ class AutocastCPUTestLists(object):
             ("fft_ihfft", torch.randn(1, 4).to(torch.bfloat16)),
         ]
         self.special_fp32 = [
-            ("special_exp2", dummy_bf16[2]),
-            ("special_gammaln", dummy_bf16[2]),
         ]
         self.linalg_fp32 = [
             ("linalg_matrix_norm", dummy_bf16[2]),
@@ -190,12 +178,12 @@ class AutocastCPUTestLists(object):
             ("hardshrink", dummy_bf16[2]),
             ("hardsigmoid", dummy_bf16[2]),
             ("hardswish", dummy_bf16[2]),
-            ("leaky_relu", dummy_bf16[2]),
             ("log_sigmoid", dummy_bf16[2]),
             ("prelu", torch.randn(1, 3, 2, 2).to(torch.bfloat16), {"weight": torch.randn(2)}),
             ("softplus", dummy_bf16[2]),
             ("softshrink", dummy_bf16[2]),
             ("mse_loss", (torch.randn(3, 5, requires_grad=True).to(torch.bfloat16), torch.randn(3, 5).to(torch.bfloat16))),
+            ("smooth_l1_loss", mat0_bf16 + mat1_bf16),
         ]
         self.torch_need_autocast_promote = [
             ("cat", (pointwise0_bf16 + pointwise1_fp32,)),
@@ -208,8 +196,6 @@ class AutocastCPUTestLists(object):
             ("vdot", (torch.tensor([2, 3], dtype=torch.bfloat16), torch.tensor([2, 1], dtype=torch.bfloat16))),
         ]
         self.torch_fp32_multi_output = [
-            ("frexp", (torch.arange(9.).to(torch.bfloat16), )),
-            ("unique_consecutive", (torch.arange(9.).to(torch.bfloat16), False)),
             ("cummax", (torch.randn(10).to(torch.bfloat16), 0)),
             ("cummin", (torch.randn(10).to(torch.bfloat16), 0)),
             ("eig", (torch.randn(10, 10).to(torch.bfloat16), True)),
