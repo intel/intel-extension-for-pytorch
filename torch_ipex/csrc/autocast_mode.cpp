@@ -421,9 +421,6 @@ MAKE_REGISTER_FUNC(ADD_NS(group_norm), "group_norm",
                           const c10::optional<Tensor> &,
                           const c10::optional<Tensor> &, double, bool),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(smooth_l1_loss), "smooth_l1_loss",
-                   Tensor(const Tensor &, const Tensor &, int64_t, double),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(mse_loss), "mse_loss",
                    Tensor(const Tensor &, const Tensor &, int64_t), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(ctc_loss), "ctc_loss.IntList",

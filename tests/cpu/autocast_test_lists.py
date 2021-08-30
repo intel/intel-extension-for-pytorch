@@ -183,7 +183,6 @@ class AutocastCPUTestLists(object):
             ("softplus", dummy_bf16[2]),
             ("softshrink", dummy_bf16[2]),
             ("mse_loss", (torch.randn(3, 5, requires_grad=True).to(torch.bfloat16), torch.randn(3, 5).to(torch.bfloat16))),
-            ("smooth_l1_loss", mat0_bf16 + mat1_bf16),
         ]
         self.torch_need_autocast_promote = [
             ("cat", (pointwise0_bf16 + pointwise1_fp32,)),
