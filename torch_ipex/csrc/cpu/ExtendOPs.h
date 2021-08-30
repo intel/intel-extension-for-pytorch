@@ -169,6 +169,8 @@ class AtenIpexTypeExt {
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> lstm(
       const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
       int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
+  static at::Tensor cumsum(at::Tensor &result, const at::Tensor &self,
+                           int64_t dim, c10::optional<at::ScalarType> dtype);
 };
 
 }  // namespace torch_ipex
