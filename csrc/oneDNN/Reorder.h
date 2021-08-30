@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 
+#include <ATen/record_function.h>
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Utils.h>
@@ -63,6 +64,7 @@ static inline void reorder(
     const Tensor& src,
     Tensor& dst,
     const ReorderAttr& rattr = ReorderAttr()) {
+  RECORD_FUNCTION("dnnl_reorder", std::vector<c10::IValue>({src}));
   TORCH_CHECK(
       dst.data_ptr() != src.data_ptr(),
       "oneDNN reorder supports out-place implementation only ...");
