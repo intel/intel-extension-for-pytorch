@@ -374,10 +374,6 @@ MAKE_REGISTER_FUNC(ADD_NS(col2im), "col2im",
                    Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
                           IntArrayRef, IntArrayRef),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(max_pool1d), "max_pool1d",
-                   Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
-                          IntArrayRef, bool),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(max_pool3d), "max_pool3d",
                    Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
                           IntArrayRef, bool),
@@ -388,8 +384,6 @@ MAKE_REGISTER_FUNC(ADD_NS(max_unpool3d), "max_unpool3d",
                    Tensor(const Tensor &, const Tensor &, IntArrayRef,
                           IntArrayRef, IntArrayRef),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(adaptive_avg_pool1d), "adaptive_avg_pool1d",
-                   Tensor(const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(adaptive_avg_pool3d), "adaptive_avg_pool3d",
                    Tensor(const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(reflection_pad1d), "reflection_pad1d",
