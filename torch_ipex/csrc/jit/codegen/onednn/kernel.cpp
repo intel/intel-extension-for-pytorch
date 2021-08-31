@@ -70,14 +70,10 @@ ArgSpecs LlgaKernel::specializeInputSpecs(const TensorArgs &inputs) const {
 
 ArgSpecs LlgaKernel::specializeOutputSpecs(const partition &partition,
                                            const ArgSpecs &inputSpecs) const {
-  auto inputs = fmap(inputSpecs, toLogicalTensor);
-  auto outputs = fmap(graph_->outputs(), toLogicalTensor);
-  partition.infer_shape(inputs, outputs);
-
   ArgSpecs outputSpecs;
   outputSpecs.reserve(nOutputs_);
   for (size_t i = 0; i < nOutputs_; i++) {
-    auto spec = ArgSpec(outputs[i]);
+    auto spec = ArgSpec(graph_->outputs()[i]);
 
     if (spec.is_quantized())
       spec = getQuantizedSpec(spec, i);
