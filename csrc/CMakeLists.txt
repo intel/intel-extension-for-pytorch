@@ -185,4 +185,4 @@ configure_file(
         @ONLY)
 install(FILES
         ${PROJECT_BINARY_DIR}/IpexConfig.cmake
-        DESTINATION share/cmake/TorchIpex)
+        DESTINATION share/cmake/Ipex)
