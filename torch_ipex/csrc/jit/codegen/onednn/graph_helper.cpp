@@ -396,14 +396,17 @@ LlgaGraphHelper::LlgaGraphHelper(
   }
 
   GRAPH_DEBUG("Get Partitions");
-  partitions_ = g.get_partitions(policy);
+  std::vector<dnnl::graph::partition> partitions = g.get_partitions(policy);
+  // excluded unsupported Wildcard partitions
+  for (size_t partId = 0; partId < partitions.size(); partId++) {
+    if (partitions[partId].is_supported())
+      partitions_.push_back(partitions[partId]);
+  }
 
   GRAPH_DEBUG("  Got #partitions: ", partitions_.size());
   for (size_t partId = 0; partId < partitions_.size(); partId++) {
-    if (partitions_[partId].is_supported()) {
-      for (auto opId : partitions_[partId].get_ops()) {
-        opToOwningPartition_.add(opId, partId);
-      }
+    for (auto opId : partitions_[partId].get_ops()) {
+      opToOwningPartition_.add(opId, partId);
     }
   }
 
