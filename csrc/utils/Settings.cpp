@@ -10,17 +10,25 @@ namespace dpcpp {
 
 /*
  * All available launch options for IPEX
- * IPEX_SHOW_OPTION:            Default = 0, Set 1 to show all launch option
- * values IPEX_VERBOSE:                Default = 0, Set verbose level with
- * synchronization execution mode IPEX_WARNING:                Default = 0, Set
- * warning level for IPEX log lines IPEX_XPU_BACKEND:            Default = 0
- * (XB_GPU), Set XPU_BACKEND as global IPEX backend IPEX_FORCE_SYNC: Default =
- * 0, Set 1 to enforce synchronization execution mode IPEX_DISABLE_PROFILING:
- * Default = 0, Set 1 to disable IPEX event profiling
- * IPEX_DISABLE_TILE_PARTITION: Default = 0, Set 1 to disable tile partition and
- * map device per physical device. IPEX_ONEDNN_LAYOUT:          Default = 0, Set
- * 1 to enable onednn specific layouts IPEX_TF32_MODE:              Default = 0,
- * Set 1 to enable TF32 mode execution
+ *
+ * IPEX_SHOW_OPTION:
+ *    Default = 0, Set 1 to show all launch option values
+ * IPEX_VERBOSE:
+ *    Default = 0, Set verbose level with synchronization execution mode
+ * IPEX_WARNING:
+ *    Default = 0, Set warning level as int value for IPEX log lines
+ * IPEX_XPU_BACKEND:
+ *    Default = 0 (XB_GPU), Set XPU_BACKEND as global IPEX backend
+ * IPEX_FORCE_SYNC:
+ *    Default = 0, Set 1 to enforce synchronization execution mode
+ * IPEX_DISABLE_PROFILING:
+ *    Default = 0, Set 1 to disable IPEX event profiling
+ * IPEX_DISABLE_TILE_PARTITION:
+ *    Default = 0, Set 1 to disable tile partition and map per root device
+ * IPEX_ONEDNN_LAYOUT:
+ *    Default = 0, Set 1 to enable onednn specific layouts
+ * IPEX_TF32_MODE:
+ *    Default = 0, Set 1 to enable TF32 mode execution
  */
 
 static std::mutex s_mutex;

@@ -7,7 +7,6 @@ import yaml
 import re
 import scripts.gpu.common_with_cwrap as common_with_cwrap
 import ast
-import types
 from scripts.gpu.model import *
 import scripts.gpu.local as local
 from scripts.gpu.api import legacy_dispatcher
@@ -682,7 +681,7 @@ def preprocess_decl(declarations):
                 option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
-                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([ f['type'] for f in native_formals ]))
+                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([f['type'] for f in native_formals]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
             elif declaration['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
                 option['declaration_formals'] = declaration['formals']
@@ -691,7 +690,7 @@ def preprocess_decl(declarations):
                 option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
-                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([ f['type'] for f in native_formals ]))
+                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([f['type'] for f in native_formals]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
             else:
                 assert declaration['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
@@ -701,7 +700,7 @@ def preprocess_decl(declarations):
                 option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
-                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([ f['type'] for f in native_formals ]))
+                native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([f['type'] for f in native_formals]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
 
         declaration['options'] = handle_outputs_taken_as_arguments(

@@ -50,6 +50,7 @@ except ImportError as e:
 os.environ.setdefault('IPEX_BACKEND', 'gpu')
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ipex_pydir = os.path.join(base_dir, 'ipex')
+ipex_scripts = os.path.join(base_dir, 'scripts')
 
 
 def _get_complier():
@@ -85,17 +86,21 @@ def get_git_head_sha(base_dir):
     return ipex_git_sha, torch_version, torch_git_sha
 
 
-def check_flake8_errors(base_dir, ipex_pydir):
+def check_flake8_errors(base_dir, filepath):
     if shutil.which('flake8') is None:
         print("WARNING: Please install flake8 by pip!")
-    flak8_cmd = ['flake8', '--quiet']
-    for root, dirs, files in os.walk(ipex_pydir):
-        for file in files:
-            if(file.endswith('.py')):
-                flak8_cmd.append(os.path.join(root, file))
+    flak8_cmd = ['flake8']  # '--quiet'
+    if os.path.isdir(filepath):
+        for root, dirs, files in os.walk(filepath):
+            for file in files:
+                if(file.endswith('.py')):
+                    flak8_cmd.append(os.path.join(root, file))
+    elif os.path.isfile(filepath):
+        flak8_cmd.append(filepath)
     ret = subprocess.call(flak8_cmd, cwd=base_dir)
     if ret != 0:
-        print("WARNING: flake8 found format errors in", ipex_pydir, "!")
+        print("ERROR: flake8 found format errors in", filepath, "!")
+        sys.exit(1)
 
 
 def get_build_version(ipex_git_sha):
@@ -127,7 +132,10 @@ def create_version_files(base_dir, version, ipex_git_sha, torch_version, torch_g
         f.write("__torch_gitrev__ = '{}'\n".format(torch_git_sha))
 
 
+check_flake8_errors(base_dir, os.path.abspath(__file__))
 check_flake8_errors(base_dir, ipex_pydir)
+check_flake8_errors(base_dir, ipex_scripts)
+
 ipex_git_sha, torch_version, torch_git_sha = get_git_head_sha(base_dir)
 version, version_sha = get_build_version(ipex_git_sha)
 

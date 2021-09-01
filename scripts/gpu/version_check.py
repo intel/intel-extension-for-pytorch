@@ -6,15 +6,16 @@ import torch
 
 class VersionAnalyzer():
     def __init__(self):
-        self.Pattern = ' (\w+)\('
+        self.Pattern = r" (\w+)\("
         self.OpModifications = {}
         self.DiffOp = []
         self.AddedOp = []
         self.RemovedOp = []
-        
+
         try:
             torch_path = os.path.dirname(torch.__file__)
-            self.THAtenRegistDeclare = os.path.join(torch_path,"include","torch","csrc","autograd","generated","RegistrationDeclarations.h")
+            self.THAtenRegistDeclare = os.path.join(torch_path, "include", "torch", "csrc", "autograd",
+                                                    "generated", "RegistrationDeclarations.h")
             cwd = os.path.dirname(os.path.abspath(__file__))
             self.ExtAtenRegistDeclare = os.path.join(cwd, "reference", "RegistrationDeclarations.h")
         except Exception:
@@ -36,6 +37,7 @@ class VersionAnalyzer():
                     self.OpModifications[match.group(1)] = 1
                 else:
                     self.OpModifications[match.group(1)] = -1
+
     def report(self):
         if self.OpModifications is not {}:
             for key in self.OpModifications:

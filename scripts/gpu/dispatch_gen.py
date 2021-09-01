@@ -27,25 +27,25 @@ def compare(file1, file2):
 
 def gpu_gen_and_should_copy(install_dir):
     cwd = os.path.dirname(os.path.abspath(__file__))
-    generate_code_cmd = ['python', \
-                         'gen-gpu-decl.py', \
-                         '--gpu_decl=./', \
-                         'DPCPPGPUType.h', \
-                         'QUANTIZEDDPCPPGPUType.h', \
-                         'DedicateType.h', \
-                         'DispatchStubOverride.h', \
+    generate_code_cmd = ['python',
+                         'gen-gpu-decl.py',
+                         '--gpu_decl=./',
+                         'DPCPPGPUType.h',
+                         'QUANTIZEDDPCPPGPUType.h',
+                         'DedicateType.h',
+                         'DispatchStubOverride.h',
                          'RegistrationDeclarations.h']
     if subprocess.call(generate_code_cmd, cwd=cwd) != 0:
         print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
         sys.exit(1)
 
-    generate_code_cmd =['python', \
-                        'gen-gpu-ops.py', \
-                        '--output_folder=./', \
-                        'DPCPPGPUType.h', \
-                        'QUANTIZEDDPCPPGPUType.h', \
-                        'RegistrationDeclarations_DPCPP.h', \
-                        'Functions_DPCPP.h']
+    generate_code_cmd = ['python',
+                         'gen-gpu-ops.py',
+                         '--output_folder=./',
+                         'DPCPPGPUType.h',
+                         'QUANTIZEDDPCPPGPUType.h',
+                         'RegistrationDeclarations_DPCPP.h',
+                         'Functions_DPCPP.h']
     if subprocess.call(generate_code_cmd, cwd=cwd) != 0:
         print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
         sys.exit(1)

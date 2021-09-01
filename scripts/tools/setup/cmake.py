@@ -116,7 +116,7 @@ class CMake:
         #     return cmake_command
         # cmake3 = 'cmake3' # which('cmake3')
         cmake3 = None
-        cmake = 'cmake' # which('cmake')
+        cmake = 'cmake'  # which('cmake')
         if cmake3 is not None and CMake._get_version(cmake3) >= LooseVersion("3.5.0"):
             cmake_command = 'cmake3'
             return cmake_command

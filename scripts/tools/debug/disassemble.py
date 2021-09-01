@@ -24,5 +24,4 @@ def get_compile_options(command):
 
 
 def disassemble(file):
-
-    
+    pass
