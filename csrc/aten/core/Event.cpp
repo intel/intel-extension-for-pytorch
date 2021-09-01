@@ -24,6 +24,10 @@ namespace dpcpp {
   }
 #endif
 
+DPCPPEvent::DPCPPEvent(DPCPP::event event) {
+  events_.push_back(event);
+}
+
 DPCPPEvent::DPCPPEvent(DPCPPEvent&& other) {
   moveHelper(std::move(other));
 }

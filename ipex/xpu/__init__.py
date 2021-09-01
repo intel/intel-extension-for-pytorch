@@ -1,3 +1,4 @@
+import contextlib
 import sys
 from typing import Optional, Tuple, Union
 import torch
@@ -161,6 +162,38 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
     """
     return Stream(_cdata=ipex._C._getCurrentStream(
         _get_device_index(device, optional=True)))
+
+
+@contextlib.contextmanager
+def stream(stream):
+    r"""Context-manager that selects a given stream.
+
+    Arguments:
+        stream (Stream): selected stream. This manager is a no-op if it's
+            ``None``.
+
+    .. note:: Streams are per-device. If the selected stream is not on the
+        current device, this function will also change the current device to
+        match the stream.
+    """
+    if stream is None:
+        yield
+        return
+    src_prev_stream = current_stream()
+
+    if src_prev_stream.device != stream.device:
+        # The given stream is on a different device; have to restore the
+        # current_stream on that device on exit as well
+        with device(stream.device):
+            dst_prev_stream = current_stream()
+
+    ipex._C._setCurrentStream(stream._cdata)
+    try:
+        yield
+    finally:
+        if src_prev_stream.device != stream.device:
+            ipex._C._setCurrentStream(dst_prev_stream._cdata)
+        ipex._C._setCurrentStream(src_prev_stream._cdata)
 
 
 from torch.storage import _StorageBase

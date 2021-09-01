@@ -20,6 +20,7 @@ namespace dpcpp {
 struct DPCPPEvent {
   // Constructors
   DPCPPEvent() {}
+  DPCPPEvent(DPCPP::event);
 
   ~DPCPPEvent() {}
 

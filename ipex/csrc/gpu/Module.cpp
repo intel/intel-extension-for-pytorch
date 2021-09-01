@@ -9,6 +9,7 @@
 #include <core/Generator.h>
 #include <intrinsic/ipex_intrinsic.h>
 #include <jit/fusion_pass.h>
+#include <runtime/Memory.h>
 #include "Event.h"
 #include "Module.h"
 #include "Storage.h"
@@ -89,6 +90,23 @@ PyObject* THPModule_getCurrentStream_wrap(
   int64_t device = THPUtils_unpackLong(device_index);
   return PyLong_FromUnsignedLongLong(
       xpu::dpcpp::getCurrentDPCPPStream(device).pack());
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THPModule_setCurrentStream_wrap(PyObject* self, PyObject* obj) {
+  HANDLE_TH_ERRORS
+  THPUtils_assert(PyLong_Check(obj), "invalid stream");
+  uint64_t bits = PyLong_AsUnsignedLongLong(obj);
+  if (bits == static_cast<uint64_t>(-1) && PyErr_Occurred()) {
+    throw python_error();
+  }
+  auto stream = xpu::dpcpp::DPCPPStream::unpack(bits);
+  auto device = static_cast<int>(xpu::dpcpp::current_device());
+  if (device != stream.device_index()) {
+    xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
+  }
+  xpu::dpcpp::setCurrentDPCPPStream(stream);
+  Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
@@ -229,6 +247,10 @@ static struct PyMethodDef _THPModule_methods[] = {
      nullptr},
     {"_getCurrentStream",
      (PyCFunction)THPModule_getCurrentStream_wrap,
+     METH_O,
+     nullptr},
+    {"_setCurrentStream",
+     (PyCFunction)THPModule_setCurrentStream_wrap,
      METH_O,
      nullptr},
     {"_emptyCache", (PyCFunction)THPModule_emptyCache, METH_NOARGS, nullptr},
@@ -373,6 +395,7 @@ void init_module(pybind11::module& m) {
             p, d_p, buf, weight_decay, momentum, dampening, lr);
       },
       "enable Fusion SGD for weight update. on Intel device");
+
   m.def(
       "fused_adamW",
       [](at::Tensor& grad_input,

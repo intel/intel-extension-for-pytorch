@@ -4,7 +4,7 @@ import ipex
 
 class Stream(ipex._C._XPUStreamBase):
     def __new__(cls, device=None, priority=0, **kwargs):
-        with ipex.device(device):
+        with ipex.xpu.device(device):
             return super(Stream, cls).__new__(cls, priority=priority, **kwargs)
 
     def __eq__(self, o):
@@ -18,6 +18,49 @@ class Stream(ipex._C._XPUStreamBase):
     def __repr__(self):
         return ('<ipex.Stream device={0} xpu_stream={1}>'
                 .format(self.device, self.xpu_stream))
+
+    def wait_event(self, event):
+        r"""Makes all future work submitted to the stream wait for an event.
+
+        Arguments:
+            event (Event): an event to wait for.
+        """
+        event.wait(self)
+
+    def wait_stream(self, stream):
+        r"""Synchronizes with another stream.
+
+        All future work submitted to this stream will wait until all kernels
+        submitted to a given stream at the time of call complete.
+
+        Arguments:
+            stream (Stream): a stream to synchronize.
+
+        .. note:: This function returns without waiting for currently enqueued
+           kernels in :attr:`stream`: only future operations are affected.
+        """
+        self.wait_event(stream.record_event())
+
+    def record_event(self, event=None):
+        r"""Records an event.
+
+        Arguments:
+            event (Event, optional): event to record. If not given, a new one
+                will be allocated.
+
+        Returns:
+            Recorded event.
+        """
+        if event is None:
+            event = Event()
+        event.record(self)
+        return event
+
+    def synchronize(self):
+        r"""Wait for all the kernels in this stream to complete.
+
+        """
+        super(Stream, self).synchronize()
 
 
 class Event(ipex._C._XPUEventBase):
