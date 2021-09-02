@@ -1,8 +1,6 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <ATen/NativeFunctions.h>
-
 #include <c10/util/intrusive_ptr.h>
 #include <c10/core/UndefinedTensorImpl.h>
 #include <c10/core/impl/LocalDispatchKeySet.h>
@@ -35,8 +33,9 @@ enum class DtypeCastPolicy : uint8_t {
   promote, // Run in the widest dtype among several args.
 };
 
-bool is_autocast_enabled();
-void set_autocast_enabled(bool new_enabled);
+bool is_quantization_enabled();
+void set_quantization_enabled(bool new_enabled);
+
 at::ScalarType get_autocast_dtype();
 void set_autocast_dtype(at::ScalarType dtype);
 int autocast_increment_nesting();

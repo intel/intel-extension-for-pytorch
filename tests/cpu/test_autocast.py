@@ -20,7 +20,7 @@ class TestFunction(TestCase):
         torch.manual_seed(rand_seed)
         _in_cpu = torch.rand((1, 1, 7, 7))
         _conv = torch.nn.Conv2d(1, 1, (3, 3))
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             out_autocast = _conv(_in_cpu)
         self.assertEqual(out_autocast.dtype, torch.bfloat16)
 
@@ -30,12 +30,12 @@ class TestFunction(TestCase):
         torch.manual_seed(rand_seed)
         _in_cpu = torch.rand((1, 1, 7, 7))
         _conv = torch.nn.Conv2d(1, 1, (3, 3))
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
-            with ipex.amp.autocast(enabled=False):
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            with torch.cpu.amp.autocast(enabled=False):
                 out_autocast = _conv(_in_cpu)
             self.assertEqual(out_autocast.dtype, torch.float)
 
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.float)):
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.float):
                 out_autocast = _conv(_in_cpu)
             self.assertEqual(out_autocast.dtype, torch.float)
 
@@ -61,10 +61,10 @@ class TestAutocastWithJit(TestCase):
         def test_generate_autocast_jit_trace_model(model, x):
             model.eval()
             ipex.core.disable_jit_opt()
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
             ipex.core.enable_jit_opt()
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model2 = torch.jit.trace(model, x.clone())
         for i in range(self.models.__len__()):
             test_generate_autocast_jit_trace_model(self.models[i], self.inputs[i])
@@ -73,9 +73,9 @@ class TestAutocastWithJit(TestCase):
         def test_nchw_autocast_jit_trace_model(model, x):
             model.eval()
             ipex.core.disable_jit_opt()
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone())
                 y2 = model(x.clone())
             ipex.core.enable_jit_opt()
@@ -87,9 +87,9 @@ class TestAutocastWithJit(TestCase):
         def test_nhwc_autocast_jit_trace_model(model, x):
             model.eval()
             ipex.core.disable_jit_opt()
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x.to(memory_format=torch.channels_last))
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone().to(memory_format=torch.channels_last))
                 y2 = model(x.clone().to(memory_format=torch.channels_last))
             ipex.core.enable_jit_opt()
@@ -109,7 +109,7 @@ class TestCustomerOps(TestCase):
 
         def interact_fusion_autocast(x, ly):
             A = [x] + ly
-            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
                 R = ipex.interaction(*A)
             return R
 
@@ -149,7 +149,7 @@ class TestCustomerOps(TestCase):
             B.mean().backward()
             C.mean().backward()
             D.mean().backward()
-            
+
             self.assertEqual(x1.grad.dtype, torch.float)
             self.assertEqual(x1_bf16.grad.dtype, torch.bfloat16)
             self.assertEqual(x2.grad.dtype, torch.float)
@@ -178,7 +178,7 @@ class TestCustomerOps(TestCase):
         # bf16_offsets = offsets.clone().detach()
 
         cpu_out = cpu_emb(input, offsets)
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
             inference_out = autocast_emb(input, offsets)
 
         self.assertEqual(cpu_out.dtype, torch.float)
@@ -187,7 +187,7 @@ class TestCustomerOps(TestCase):
 
         # re-init autocast_emb
         autocast_emb = copy.deepcopy(cpu_emb)
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             traininig_out = autocast_emb(input, offsets)
 
         # do not cast weight to bf16 while not inference only
@@ -259,7 +259,7 @@ class TestLSTM(TestCase):
                 model_ipex.train() if training else model_ipex.eval()
                 ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
 
-                with ipex.amp.autocast(enabled=bf16, configure=ipex.conf.AmpConf(torch.bfloat16)):
+                with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
                     if empty_state:
                         y, hy = self._cast_dtype(model, bf16)(self._cast_dtype(input, bf16))
                         y_ipex, hy_ipex = model_ipex(input)
@@ -302,9 +302,9 @@ class TestLSTM(TestCase):
         hidden_0 = hid_0.clone().requires_grad_(False)
         hidden_1 = hid_1.clone().requires_grad_(False)
         embeds = torch.nn.utils.rnn.pack_padded_sequence(sentences, sent_lens, batch_first=True, enforce_sorted=False)
-        
+
         model = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
-        
+
         model_ipex = copy.deepcopy(model)
         ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
 
@@ -322,12 +322,12 @@ class TestLSTM(TestCase):
         self._test_lstm(training=False, bf16=False)
 
         self._test_lstm(training=False, bf16=True, prec=2e-2)
-        
+
         self._test_lstm(training=True, bf16=False)
 
         # TODO: autocast does not support LSTM bf16 training
         # self._test_lstm(training=True, bf16=True)
-    
+
     def test_lstm_pack_padded_sequence(self):
         self._test_lstm_pack_padded_sequence()
 
@@ -353,9 +353,9 @@ class TestAutocastOperations(TestCase):
         if add_kwargs is None:
             add_kwargs = {}
 
-        self.assertFalse(ipex.core.is_autocast_enabled())
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
-            self.assertTrue(ipex.core.is_autocast_enabled())
+        self.assertFalse(torch.is_autocast_cpu_enabled())
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            self.assertTrue(torch.is_autocast_cpu_enabled())
             out_type = out_type if out_type is not None else run_as_type
             output = output_method = None
 
@@ -397,8 +397,8 @@ class TestAutocastOperations(TestCase):
             # Compare numerics to Python-side "autocasting" that (we expect) does the same thing
             # as the C++-side autocasting, and should be bitwise accurate.
             output_to_compare = output if output is not None else output_method
-            with ipex.amp.autocast(enabled=False, configure=ipex.conf.AmpConf(torch.bfloat16)):
-                self.assertFalse(ipex.core.is_autocast_enabled())
+            with torch.cpu.amp.autocast(enabled=False, dtype=torch.bfloat16):
+                self.assertFalse(torch.is_autocast_cpu_enabled())
 
                 if module is not None and hasattr(module, op):
                     control = getattr(module, op)(*cast(args, run_as_type), **add_kwargs)
@@ -407,8 +407,8 @@ class TestAutocastOperations(TestCase):
                 self.assertTrue(type(output_to_compare) == type(control))
                 comparison = compare(output_to_compare, control)
                 self.assertTrue(comparison, "torch.{} result did not match control".format(op))
-            self.assertTrue(ipex.core.is_autocast_enabled())
-        self.assertFalse(ipex.core.is_autocast_enabled())
+            self.assertTrue(torch.is_autocast_cpu_enabled())
+        self.assertFalse(torch.is_autocast_cpu_enabled())
 
     def _run_autocast_pass_test(self, op, args, run_as_type, out_type=None, module=torch, add_kwargs=None):
         # helper to cast args
@@ -423,9 +423,9 @@ class TestAutocastOperations(TestCase):
         if add_kwargs is None:
             add_kwargs = {}
 
-        self.assertFalse(ipex.core.is_autocast_enabled())
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
-            self.assertTrue(ipex.core.is_autocast_enabled())
+        self.assertFalse(torch.is_autocast_cpu_enabled())
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            self.assertTrue(torch.is_autocast_cpu_enabled())
             out_type = out_type if out_type is not None else run_as_type
 
             # Try module.* variant, if requested:

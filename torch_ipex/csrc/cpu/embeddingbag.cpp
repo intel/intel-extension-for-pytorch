@@ -520,7 +520,7 @@ at::Tensor embedding_bag(
   verbose::OpNameGuard op_name("embedding_bag");
 #endif
   auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
+  if (is_quantization_enabled()) {
     return int8::embedding_bag(weight, indices, offsets, sparse,
                                include_last_offset);
   }
@@ -534,4 +534,5 @@ TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
   m.impl("embedding_bag", torch_ipex::autocast::embedding_bag);
 }
 
-}}
+} // namespace autocast
+} // namespace torch_ipex

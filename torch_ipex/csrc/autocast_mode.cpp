@@ -16,18 +16,12 @@ thread_local std::unordered_map<c10::TensorImpl *, val_type> cached_casts;
 
 thread_local int nesting = 0;
 
-thread_local at::ScalarType current_target_dtype = at::kBFloat16;
+thread_local at::ScalarType current_target_dtype = at::kFloat;
+thread_local bool int8_enabled = false;
 } // namespace
 
-bool is_autocast_enabled() {
-  return !c10::impl::tls_is_dispatch_key_excluded(
-      c10::DispatchKey::AutocastCPU);
-}
-
-void set_autocast_enabled(bool new_enabled) {
-  c10::impl::tls_set_dispatch_key_excluded(DispatchKey::AutocastCPU,
-                                           !new_enabled);
-}
+bool is_quantization_enabled() { return int8_enabled; }
+void set_quantization_enabled(bool new_enabled) { int8_enabled = new_enabled; }
 
 at::ScalarType get_autocast_dtype() { return current_target_dtype; }
 

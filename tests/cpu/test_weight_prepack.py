@@ -48,14 +48,13 @@ class TestPrepackCases(TestCase):
                 origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
                 origin_model2 = copy.deepcopy(model).train()
                 origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
-                conf = ipex.AmpConf(dtype)
                 ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
                 # inplace case
                 ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
                 self.assertTrue(ipex_model1.weight.dtype == dtype)
                 self.assertTrue(ipex_model2.weight.dtype == dtype)
 
-                with ipex.amp.autocast(enabled=True, configure=conf):
+                with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                     # original path
                     y1 = origin_model1(x1)
                     loss1 = y1.sum()
@@ -112,7 +111,6 @@ class TestPrepackCases(TestCase):
         model = model.to(memory_format=torch.channels_last).train()
         x = torch.randn(32, 256, 1, 1).to(memory_format=torch.channels_last)
         for dtype in [torch.float32, torch.bfloat16]:
-            conf = ipex.AmpConf(dtype)
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
             x3 = x.clone().requires_grad_()
@@ -122,7 +120,7 @@ class TestPrepackCases(TestCase):
             origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
             ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
             ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
-            with ipex.amp.autocast(enabled=True, configure=conf):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # train one step for origin.
                 y1 = origin_model1(x1)
                 loss1 = y1.sum()
@@ -172,14 +170,13 @@ class TestPrepackCases(TestCase):
         optimizer_options = [Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
         options = itertools.product([torch.float32, torch.bfloat16], optimizer_options)
         for dtype, optimizer in options:
-            conf = ipex.AmpConf(dtype)
             origin_x = x.clone()
             ipex_x = x.clone()
             origin_model = copy.deepcopy(model).train()
             lr = 1e-4 if optimizer is SGD else 1e-2
             origin_optimizer = optimizer(origin_model.parameters(), lr=lr)
             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
-            with ipex.amp.autocast(enabled=True, configure=conf):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # train one step for origin.
                 y1 = origin_model(origin_x)
                 loss1 = y1.sum()
@@ -217,7 +214,7 @@ class TestPrepackCases(TestCase):
             self.assertEqual(origin_model1.weight, origin_model2.weight)
             # check momentum_buffer works.
             ipex_model, ipex_optimizer = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
-            with ipex.amp.autocast(enabled=True, configure=conf):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # train second step for origin.
                 y1 = origin_model1(origin_x)
                 loss1 = y1.sum()
@@ -252,17 +249,15 @@ class TestPrepackCases(TestCase):
     def _test_imagenet_model(self, model):
         model = model.to(memory_format=torch.channels_last)
         for dtype in [torch.float32, torch.bfloat16]:
-            # inference case, will do conv+bn folding for 'O0' and 'O1'. will do weight' prepack for 'O1'.
+            # inference case, will do conv+bn folding 'O1'. do nothing for 'O0'.
             ipex_model1 = ipex.optimize(model.eval(), dtype=dtype, level='O0')
             ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1')
             x = torch.randn(32, 3, 224, 224).to(memory_format=torch.channels_last)
-            conf = ipex.AmpConf(dtype)
-            with ipex.amp.autocast(enabled=True, configure=conf):
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 y1 = ipex_model1(x)
                 y2 = ipex_model2(x)
-            self.assertEqual(y1, y2)
+            self.assertEqual(y1, y2, rtol=1e-3, atol=1e-1)
             # traing case.
-            conf = ipex.AmpConf(dtype)
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = ASGD(origin_model.parameters(), lr=0.01)
             # do nothing for 'O0'
@@ -273,7 +268,7 @@ class TestPrepackCases(TestCase):
 
             xx = [torch.randn(32, 3, 224, 224), torch.randn(32, 3, 224, 224)]
             for i in range(2):
-                with ipex.amp.autocast(enabled=True, configure=conf):
+                with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                     x = xx[i]
                     # original case
                     y = origin_model(x)
@@ -330,11 +325,10 @@ class TestPrepackCases(TestCase):
                 x1 = x.clone().requires_grad_()
                 x2 = x.clone().requires_grad_()
                 origin_model = copy.deepcopy(model).eval()
-                conf = ipex.AmpConf(dtype)
                 ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
                 self.assertEqual(ipex_model.linear.weight.dtype, dtype)
-                with ipex.amp.autocast(enabled=True, configure=conf):
+                with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                     # original path
                     y1 = origin_model(x1)
                     loss1 = y1.sum()
@@ -361,11 +355,10 @@ class TestPrepackCases(TestCase):
                 x2 = x.clone().requires_grad_()
                 origin_model = copy.deepcopy(model).train()
                 origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
-                conf = ipex.AmpConf(dtype)
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                 self.assertTrue(ipex_model.weight.dtype == dtype)
                 for i in range(2):
-                    with ipex.amp.autocast(enabled=True, configure=conf):
+                    with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                         # original path
                         y1 = origin_model(x1)
                         loss1 = y1.sum()

@@ -7,55 +7,56 @@
 namespace torch_ipex {
 namespace autocast {
 
-at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups) {
+template <class Ret, class F, class... Args>
+Ret DataTypeCastFuction(F Quant, F At, std::string op_name, Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-
   auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::conv2d(input, weight, bias, stride, padding, dilation, groups);
-  }
 #if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("conv2d");
+  verbose::OpNameGuard op_name(op_name);
 #endif
-  return at::conv2d(cpu_cached_cast(target_type, input),
-                    cpu_cached_cast(target_type, weight),
-                    cpu_cached_cast(target_type, bias),
-                    stride, padding, dilation, groups);
+  if (is_quantization_enabled()) {
+    return Quant(args...);
+  } else {
+    return At(cpu_cached_cast(target_type, args)...);
+  }
 }
 
-at::Tensor conv3d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups) {
+template <class Ret, class F, class... Args>
+Ret FallThroughFuction(F Quant, F At, std::string op_name, Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::conv3d(input, weight, bias, stride, padding, dilation, groups);
-  }
 #if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("conv3d");
+  verbose::OpNameGuard op_name(op_name);
 #endif
-  return at::conv3d(cpu_cached_cast(target_type, input),
-                    cpu_cached_cast(target_type, weight),
-                    cpu_cached_cast(target_type, bias),
-                    stride, padding, dilation, groups);
+  if (is_quantization_enabled()) {
+    return Quant(args...);
+  } else {
+    return At(args...);
+  }
+}
+
+at::Tensor conv2d(const at::Tensor &input, const at::Tensor &weight,
+                  const c10::optional<at::Tensor> &bias, at::IntArrayRef stride,
+                  at::IntArrayRef padding, at::IntArrayRef dilation,
+                  int64_t groups) {
+  return DataTypeCastFuction<at::Tensor>(int8::conv2d, at::conv2d, "conv2d",
+                                         input, weight, bias, stride, padding,
+                                         dilation, groups);
+}
+
+at::Tensor conv3d(const at::Tensor &input, const at::Tensor &weight,
+                  const c10::optional<at::Tensor> &bias, at::IntArrayRef stride,
+                  at::IntArrayRef padding, at::IntArrayRef dilation,
+                  int64_t groups) {
+  return DataTypeCastFuction<at::Tensor>(int8::conv3d, at::conv3d, "conv3d",
+                                         input, weight, bias, stride, padding,
+                                         dilation, groups);
 }
 
 at::Tensor conv_transpose3d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef output_padding, int64_t groups, at::IntArrayRef dilation) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::conv_transpose3d(input, weight, bias, stride, padding, output_padding, groups, dilation);
-  }
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("conv_transpose3d");
-#endif
-  return at::conv_transpose3d(cpu_cached_cast(target_type, input),
-                              cpu_cached_cast(target_type, weight),
-                              cpu_cached_cast(target_type, bias),
-                              stride, padding, output_padding, groups, dilation);
+  return DataTypeCastFuction<at::Tensor>(
+      int8::conv_transpose3d, at::conv_transpose3d, "conv_transpose3d", input,
+      weight, bias, stride, padding, output_padding, groups, dilation);
 }
 
 at::Tensor _convolution(const at::Tensor& input, const at::Tensor& weight, const  c10::optional<at::Tensor>& bias,
@@ -63,14 +64,18 @@ at::Tensor _convolution(const at::Tensor& input, const at::Tensor& weight, const
     bool transposed, at::IntArrayRef output_padding, int64_t groups,
     bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::_convolution(input, weight, bias, stride, padding, dilation, transposed,
-                              output_padding, groups, benchmark, deterministic, cudnn_enabled, allow_tf32);
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("_convolution");
+#endif
+  if (is_quantization_enabled()) {
+    return int8::_convolution(input, weight, bias, stride, padding, dilation,
+                              transposed, output_padding, groups, benchmark,
+                              deterministic, cudnn_enabled, allow_tf32);
   }
   // makeFallthrough to support 3DUNET transposed conv3d jit path
-  return at::_convolution(input, weight, bias, stride, padding, dilation, transposed,
-                          output_padding, groups, benchmark, deterministic, cudnn_enabled, allow_tf32);
+  return at::_convolution(input, weight, bias, stride, padding, dilation,
+                          transposed, output_padding, groups, benchmark,
+                          deterministic, cudnn_enabled, allow_tf32);
 }
 
 at::Tensor _convolution_deprecated(const at::Tensor& input, const at::Tensor& weight,
@@ -78,114 +83,73 @@ at::Tensor _convolution_deprecated(const at::Tensor& input, const at::Tensor& we
     at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups,
     bool benchmark, bool deterministic, bool cudnn_enabled) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::_convolution(input, weight, bias, stride, padding, dilation, transposed, 
-                              output_padding, groups, benchmark, deterministic, cudnn_enabled);
-  }
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("_convolution_deprecated");
 #endif
-  return at::_convolution(cpu_cached_cast(target_type, input),
-                            cpu_cached_cast(target_type, weight),
-                            cpu_cached_cast(target_type, bias),
-                            stride, padding, dilation, transposed, output_padding,
-                            groups, benchmark, deterministic, cudnn_enabled); 
+  auto target_type = get_autocast_dtype();
+  if (is_quantization_enabled()) {
+    return int8::_convolution(input, weight, bias, stride, padding, dilation, transposed, 
+                              output_padding, groups, benchmark, deterministic, cudnn_enabled);
+  }
+  return at::_convolution(
+      cpu_cached_cast(target_type, input), cpu_cached_cast(target_type, weight),
+      cpu_cached_cast(target_type, bias), stride, padding, dilation, transposed,
+      output_padding, groups, benchmark, deterministic, cudnn_enabled);
 }
 
 at::Tensor batch_norm(const at::Tensor& input, const c10::optional<at::Tensor>& weight,
     const c10::optional<at::Tensor>& bias, const c10::optional<at::Tensor>& running_mean, 
     const c10::optional<at::Tensor>& running_var, bool training, double momentum, double eps, bool cudnn_enabled) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::batch_norm(input, weight, bias, running_mean, running_var, training, momentum, eps, cudnn_enabled);
-  }
-  // convert to fp32 path.
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("batch_norm");
-#endif
-  // This is temporary solution before the bn supports mixed precision in the
-  // stock pytorch, i.e. input can be bf16 or fp32, but for weight and bias,
-  // they are always fp32.
-  return torch_ipex::cpu::batch_norm(input, weight, bias, running_mean,
-                                     running_var, training, momentum, eps,
-                                     cudnn_enabled);
+  return FallThroughFuction<at::Tensor>(
+      int8::batch_norm, torch_ipex::cpu::batch_norm, "batch_norm", input,
+      weight, bias, running_mean, running_var, training, momentum, eps,
+      cudnn_enabled);
 }
 
 at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::linear(input, weight, bias);
-  }
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("linear");
-#endif
-  return at::linear(cpu_cached_cast(target_type, input),
-                    cpu_cached_cast(target_type, weight),
-                    cpu_cached_cast(target_type, bias));
+  return DataTypeCastFuction<at::Tensor>(int8::linear, at::linear, "linear",
+                                         input, weight, bias);
 }
 
 at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride,
         at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
-  }
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("max_pool2d");
-#endif
-  return at::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
+  return FallThroughFuction<at::Tensor>(int8::max_pool2d, at::max_pool2d,
+                                        "max_pool2d", input, kernel_size,
+                                        stride, padding, dilation, ceil_mode);
 }
 
 at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_size) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::adaptive_avg_pool2d(input, output_size);
-  }
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("adaptive_avg_pool2d");
-#endif
-  return at::adaptive_avg_pool2d(input, output_size);
+  return FallThroughFuction<at::Tensor>(
+      int8::adaptive_avg_pool2d, at::adaptive_avg_pool2d, "adaptive_avg_pool2d",
+      input, output_size);
 }
 
 at::Tensor relu(const at::Tensor& input) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::relu(input);
-  }
-  // make fall makeFallthrough.
-  return at::relu(input);
+  return FallThroughFuction<at::Tensor>(int8::relu, at::relu, "relu", input);
 }
 
 at::Tensor& relu_(at::Tensor& input) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("relu_");
+#endif
+  if (is_quantization_enabled()) {
     return int8::relu_(input);
   }
-  // make fall makeFallthrough.
   return at::relu_(input);
 }
 
 at::Tensor sigmoid(const at::Tensor& input) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::sigmoid(input);
-  }
-  // make fall makeFallthrough.
-  return at::sigmoid(input);
+  return FallThroughFuction<at::Tensor>(int8::sigmoid, at::sigmoid, "sigmoid",
+                                        input);
 }
 
 at::Tensor& add_tensor_(at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("add_tensor_");
+#endif
+  if (is_quantization_enabled()) {
     return int8::add_tensor_(input, other, alpha);
   }
   // make fall makeFallthrough.
@@ -194,63 +158,32 @@ at::Tensor& add_tensor_(at::Tensor& input, const at::Tensor& other, const at::Sc
 }
 
 at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::add_tensor(input, other, alpha);
-  }
-  // make fall makeFallthrough.
-  return at::add(input, other, alpha);
+  return FallThroughFuction<at::Tensor>(int8::add_tensor, at::add, "add_tensor",
+                                        input, other, alpha);
 }
 
 at::Tensor dropout(const at::Tensor& input, double p, bool train) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::dropout(input, p, train);
-  }
-  // Fall Through.
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("dropout");
-#endif
-  return at::dropout(input, p, train);
+  return FallThroughFuction<at::Tensor>(int8::dropout, at::dropout, "dropout",
+                                        input, p, train);
 }
 
 at::Tensor gelu(const at::Tensor& input) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::gelu(input);
-  }
-  // Fall Through.
-  return at::gelu(input);
+  return FallThroughFuction<at::Tensor>(int8::gelu, at::gelu, "gelu", input);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 lstm_aten(const at::Tensor &_input, at::TensorList hx, at::TensorList _params,
           bool has_biases, int64_t num_layers, double dropout_p, bool train,
           bool bidirectional, bool batch_first) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  // not support projection case, for projection case, make fall through.
-  if (at::ScalarType::Char == target_type && !(hx[0].size(2) != hx[1].size(2))) {
-    return int8::lstm(_input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-  }
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("lstm");
-#endif
-  return at::lstm(_input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  return FallThroughFuction<std::tuple<at::Tensor, at::Tensor, at::Tensor>>(
+      int8::lstm, at::lstm, "lstm", _input, hx, _params, has_biases, num_layers,
+      dropout_p, train, bidirectional, batch_first);
 }
 
 at::Tensor flatten(const at::Tensor &input, int64_t start_dim,
                    int64_t end_dim) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
-    return int8::flatten(input, start_dim, end_dim);
-  }
-  // Fall Through.
-  return at::flatten(input, start_dim, end_dim);
+  return FallThroughFuction<at::Tensor>(int8::flatten, at::flatten, "flatten",
+                                        input, start_dim, end_dim);
 }
 
 } // autocast

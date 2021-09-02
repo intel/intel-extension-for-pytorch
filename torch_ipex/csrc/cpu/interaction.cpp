@@ -447,7 +447,7 @@ at::Tensor interaction_forward(const std::vector<at::Tensor> &input) {
 #endif
 
   auto target_type = get_autocast_dtype();
-  if (at::ScalarType::Char == target_type) {
+  if (is_quantization_enabled()) {
     return int8::interaction_forward(input);
   }
 

@@ -1,6 +1,7 @@
 import copy
 
 import torch
+import torch.fx.experimental.optimization as optimization
 import warnings
 
 from .ops.lstm import IpexLSTM
@@ -71,36 +72,118 @@ def _copy_model_and_optimizer(model, optimizer):
                 new_optimizer.state[new_model_param] = copy.deepcopy(optimizer.state[p])
         return new_model, new_optimizer
 
-def optimize(model, dtype=torch.bfloat16, optimizer=None, level='O1', inplace=False):
+class _Properties(object):
+    r"""
+    This class is to establish a set of default properties.
+
+    """
+    def __init__(self):
+        self.opt_level=None,
+        self.conv_bn_folding=None,
+        self.weights_prepack=None,
+        self.master_weight=None
+
+# O0 properties
+class _O0:
+    def __call__(self, properties):
+        properties.opt_level="O0"
+        properties.conv_bn_folding=False
+        properties.weights_prepack=False
+        #properties.master_weight=False
+        return properties
+
+
+# O1 properties
+class _O1:
+    def __call__(self, properties):
+        properties.opt_level="O1"
+        properties.conv_bn_folding=True
+        properties.weights_prepack=True
+        #properties.master_weight=True
+        return properties
+
+opt_levels = {"O0": _O0(),
+              "O1": _O1()}
+
+def optimize(
+    model,
+    dtype=torch.bfloat16,
+    optimizer=None,
+    level="O1",
+    inplace=False,
+    conv_bn_folding=None,
+    weights_prepack=None):
+    r"""
+    Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
+    conversation for Convolution, Linear, Embedding, and layerNorm. there also has a weight prepack for
+    Convoluttion and Linear for better performance.
+
+    Args:
+        model: (torch.nn.Module): user model to do optimization.
+        dtype: it can be torch.float or torch.bfloat16, it will do model's parameters data dtype cast if
+            dtype is torch.bfloat16, the default value is torch.bfloat16.
+        optimizer: (optim.Optimizer), user optimzizer to do optimization, suach as split-sgd, the default
+            value is None, it means for inference case.
+        level: can be 'O0' or 'O1', do nothing for 'O0', just return the origin model and optimizer,
+            'O1' will do ipex optimization as abrove said, the default value is 'O1'.
+        inplace: whether do inplace optimization, default value if False.
+        conv_bn_folding: whether do conv_bn folding, it only works for inference model, the default value is True.
+        weights_prepack: whether do weight prepack for convolution and linear to avoid OneDNN weight reorder.
+            the default value is True(only workd for training model, the inference model is not optimized well).
+
+    """
+
+    if model.training:
+        assert optimizer is not None, "The optimizer should be given for training mode"
+    else:
+        assert optimizer is None, "The optimizer should not be given for inference mode"
+
+    opt_properties = _Properties()
+    if level not in opt_levels:
+        raise RuntimeError(
+            "Unexpected optimization level {}. ".format(level) +
+             "Options are 'O0', 'O1'.")
+    else:
+        opt_properties = opt_levels[level](opt_properties)
+
+    if level is not None:
+        opt_properties.opt_level = level
+    if conv_bn_folding is not None:
+        opt_properties.conv_bn_folding = conv_bn_folding
+    if weights_prepack is not None:
+        opt_properties.weights_prepack = weights_prepack
+
     if inplace:
         optimized_model = model
         optimized_optimizer = optimizer
     else:
         optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
+
     if not model.training:
-        try:
-            optimized_model = conv_bn_fuse(optimized_model, inplace=inplace)
-        except:
-            warnings.warn("Conv BN folding failed during the optimize process.")
-        # do weight data type convert for inference model.
+        if opt_properties.conv_bn_folding:
+            try:
+                optimized_model = optimization.fuse(optimized_model, inplace=inplace)
+            except:
+                warnings.warn("Conv BatchNorm folding failed during the optimize process.")
         if dtype == torch.bfloat16:
             optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
-    if level == 'O0':
-        pass
-    elif level == 'O1':
-        # Do weight prepack, and convert optimizer for training case.
-        params_attr = {}
-        if dtype == torch.bfloat16 and model.training:
-            optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, params_attr)
+
+    # convert optimizer for training case.
+    params_attr = {}
+    #TODO: add option master_weight for bf16 case
+    if dtype == torch.bfloat16 and model.training:
+        optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, params_attr)
+
+    #TODO enable inference weight prepack as default.
+    if opt_properties.weights_prepack and model.training:
         optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, params_attr)
-    else:
-        assert False, "Only support level O0 and O1 now for optimize"
 
     # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model
     else:
         return optimized_model, optimized_optimizer
+
 
 VERBOSE_OFF = 0
 VERBOSE_ON = 1

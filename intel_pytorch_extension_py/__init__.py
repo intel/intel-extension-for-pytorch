@@ -14,3 +14,4 @@ from .weight_prepack import *
 from .optimizer_utils import *
 from .weight_cast import *
 from .optim import *
+from .quantization import *

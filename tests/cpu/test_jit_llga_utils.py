@@ -2,6 +2,7 @@ import os
 import copy
 import tempfile
 import torch
+import torch.fx.experimental.optimization as optimization
 
 from functools import wraps
 from torch.testing._internal.jit_utils import JitTestCase, warmup_backward, \
@@ -115,16 +116,16 @@ class JitLlgaTestCase(JitTestCase):
     def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
+            conf = ipex.QuantConf(qscheme=qscheme)
             # fold conv bn
             if folding:
-                model = ipex.fx.conv_bn_fuse(model)
+                model = optimization.fuse(model)
 
             if remove_dropout:
                 ipex.utils._replace_dropout_with_identity(model)
 
             # do calibration
-            conf = ipex.AmpConf(torch.int8, qscheme=qscheme)
-            with ipex.amp.calibrate():
+            with ipex.quantization.calibrate(conf):
                 y = model(*x)
 
             with tempfile.TemporaryDirectory() as tmp:
@@ -133,11 +134,10 @@ class JitLlgaTestCase(JitTestCase):
                 # TODO: remove the serialization and test it in another separate UT once IPEX supported
                 # directly using the conf for int8 path
                 conf.save(path)
-                conf = ipex.AmpConf(torch.int8, path)
+                conf = ipex.QuantConf(path)
 
                 # jit trace to insert quant/dequant
-                with ipex.amp.autocast(enabled=True, configure=conf):
-                    model = torch.jit.trace(model, x, check_trace=False)
+                model = ipex.quantization.convert(model, conf, x)
 
             fp32_model_with_quant_dequant = copy.deepcopy(model)
 

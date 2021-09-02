@@ -12,7 +12,7 @@ class Module(torch.nn.Module):
         return y
 
 def run_model(level):
-    m = Module()
+    m = Module().eval()
     m = ipex.optimize(m, dtype=torch.float32, level="O1")
     d = torch.rand(1, 1, 112, 112)
     with ipex.utils.verbose(level):

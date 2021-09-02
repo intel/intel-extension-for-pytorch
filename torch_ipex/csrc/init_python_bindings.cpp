@@ -50,8 +50,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("_get_git_revs", []() { return GetRevisions(); });
   m.def("mkldnn_set_verbose", &torch_ipex::verbose::_mkldnn_set_verbose);
   // ipex amp autocast
-  m.def("is_autocast_enabled", &torch_ipex::autocast::is_autocast_enabled);
-  m.def("set_autocast_enabled", &torch_ipex::autocast::set_autocast_enabled);
   m.def("get_autocast_dtype", []() {
     at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
     return py::reinterpret_steal<py::object>(
@@ -62,6 +60,11 @@ void InitIpexModuleBindings(py::module m) {
         torch::python::detail::py_object_to_dtype(dtype);
     torch_ipex::autocast::set_autocast_dtype(target_dtype);
   });
+  m.def("is_quantization_enabled",
+        &torch_ipex::autocast::is_quantization_enabled);
+  m.def("set_quantization_enabled",
+        &torch_ipex::autocast::set_quantization_enabled);
+
   m.def("autocast_increment_nesting",
         &torch_ipex::autocast::autocast_increment_nesting);
   m.def("autocast_decrement_nesting",
