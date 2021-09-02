@@ -194,6 +194,10 @@ class AtenIpexJITDev {
        bool weight_channels_last, bool weight_prepacked, at::Tensor &accumu,
        at::Scalar alpha);
 
+   static at::Tensor dil_shuffle(const at::Tensor &self,
+                                 at::IntArrayRef view_shape, int64_t dim0,
+                                 int64_t dim1);
+
    // int8 op
    static at::Tensor dil_qembeddingbag(const at::Tensor weight,
                                        const at::Tensor indices,

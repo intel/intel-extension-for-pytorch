@@ -79,16 +79,16 @@ at::Tensor AtenIpexJITDev::dil_convolution_sigmoid(
 }
 
 /**
- * Dispatch at::matmul + at::div pattern to ipex for jit inference, but only one-element 
- * tensor and channel dim boadcast is enabled in oneDNN 2.2.0 now. So, for simplicity,this path is just 
- * a fallback path now.
- * output(out) = (tensor1 * tensor2).div(div_input)
- *  
- * @param tensor1 
- * @param tensor2 
- * @param out Optinal output provided by user for matmul 
- * @param div_input Input Tensor for div 
- * @return Value for the fusion pattern output. 
+ * Dispatch at::matmul + at::div pattern to ipex for jit inference, but only
+ * one-element tensor and channel dim boadcast is enabled in oneDNN 2.2.0 now.
+ * So, for simplicity,this path is just a fallback path now. output(out) =
+ * (tensor1 * tensor2).div(div_input)
+ *
+ * @param tensor1
+ * @param tensor2
+ * @param out Optinal output provided by user for matmul
+ * @param div_input Input Tensor for div
+ * @return Value for the fusion pattern output.
  */
 at::Tensor  AtenIpexJITDev::dil_matmul_div(
     const at::Tensor& tensor1,
@@ -101,19 +101,18 @@ at::Tensor  AtenIpexJITDev::dil_matmul_div(
   if (out.defined()) {
     at::matmul_out(out, tensor1, tensor2);
     return out.div(div_input);
-  } 
+  }
   auto output = at::matmul(tensor1, tensor2);
   return output.div(div_input);
-      
- 
 }
 
 /**
- *Dispatch at::matmul + at::div pattern to ipex for jit inference, but only bmm with same shape for 
- *tensor1 and tensor2 and scalar input for div will be dispatched to oneDNN kernel. Otherwise will fallback.
- *For oneDNN kernel, scalar input will be used as the scale attribute for matmul primitive.
+ *Dispatch at::matmul + at::div pattern to ipex for jit inference, but only bmm
+ *with same shape for tensor1 and tensor2 and scalar input for div will be
+ *dispatched to oneDNN kernel. Otherwise will fallback. For oneDNN kernel,
+ *scalar input will be used as the scale attribute for matmul primitive.
  *output(out) = (tensor1 * tensor2).div(div_input_scalar).
- *ToDo: matmul + div scalar for matmul with other shape  
+ *ToDo: matmul + div scalar for matmul with other shape
  *
  *@param tensor1
  *@param tensor2
@@ -131,8 +130,8 @@ at::Tensor  AtenIpexJITDev::dil_matmul_div(
 #endif
   auto dim_tensor1 = tensor1.dim();
   auto dim_tensor2 = tensor2.dim();
-  if (dim_tensor1 == dim_tensor2 && dim_tensor1 >= 3) { 
-    float scale = 1.0 / div_input.to<float>(); 
+  if (dim_tensor1 == dim_tensor2 && dim_tensor1 >= 3) {
+    float scale = 1.0f / div_input.to<float>();
     return bmm_impl(tensor1, tensor2, out, ideep::attr_t(), scale);
   } else {
     return AtenIpexJITDev::dil_matmul_div(tensor1, tensor2, out, at::native::wrapped_scalar_tensor(div_input));
@@ -309,26 +308,24 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
   return linear_impl(self, weight, bias, attr);
 }
 
-
 /**
  *Dispatch Linear + Add fusion pattern to ipex oneDNN kernel for inference mode.
  *This feature might improve performance for cases like residual learning blocks
- *Pattern: accum = accum * alpha + Linear(self, weight, bias) 
+ *Pattern: accum = accum * alpha + Linear(self, weight, bias)
  *
- *@param self Activatin input for Linear  
+ *@param self Activatin input for Linear
  *@param weight Weight for Linear
  *@param bias Bias for Linear
  *@param accum One input for add operation, another is the output of Linear
- *@param alpha Scale for accum when doing add operation. 
+ *@param alpha Scale for accum when doing add operation.
  *
- *@return Value for the fusion pattern output. 
+ *@return Value for the fusion pattern output.
  */
-at::Tensor AtenIpexJITDev::dil_linear_add(
-    const at::Tensor& self, 
-    const at::Tensor& weight, 
-    const at::Tensor& bias, 
-    at::Tensor& accumu, 
-    at::Scalar alpha) {
+at::Tensor AtenIpexJITDev::dil_linear_add(const at::Tensor &self,
+                                          const at::Tensor &weight,
+                                          const at::Tensor &bias,
+                                          at::Tensor &accumu,
+                                          at::Scalar alpha) {
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_linear_add", std::vector<c10::IValue>({}));
 #endif
@@ -466,6 +463,18 @@ at::Tensor AtenIpexJITDev::dil_layernorm(
   const at::Tensor &bias = *bias_maybe_owned;
   return std::get<0>(
       at::native_layer_norm(input, normalized_shape, weight, bias, eps));
+}
+
+at::Tensor AtenIpexJITDev::dil_shuffle(const at::Tensor &self,
+                                       at::IntArrayRef view_shape, int64_t dim0,
+                                       int64_t dim1) {
+  ideep::tensor _self = itensor_view_from_dense(self);
+  auto group_dim = dim0 < dim1 ? dim0 : dim1;
+  auto groups = view_shape[group_dim];
+  auto output = at::empty_like(self);
+  ideep::tensor _output = itensor_view_from_dense(output);
+  ideep::channel_shuffle_forward::compute(_self, _output, groups, group_dim);
+  return output;
 }
 
 }  // namespace cpu

@@ -872,6 +872,12 @@ class Tester(TestCase):
             prec=5e-3,
             levels=['O0'])
 
+    def test_channel_shuffle(self):
+        self._test_output(
+            ChannelShuffle(10, 16, 50, 50, 4),
+            torch.rand(10, 16, 50, 50),
+            kind_in_graph="ipex::shuffle_2d")
+
     def test_jit_function(self):
         # test hool trace and script can works for function
         def fn(input, weight, bias):
