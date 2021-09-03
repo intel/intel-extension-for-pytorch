@@ -207,6 +207,10 @@ gen
 .pytest_cache
 aten/build/*
 
+.clang-format-bin/
+.clang-tidy-bin/
+
+
 # Bram
 plsdontbreak
 
