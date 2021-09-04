@@ -89,7 +89,8 @@ Tensor& fill_(Tensor& self, const Tensor& value) {
 }
 
 Tensor& zero_(Tensor& self) {
-  return at::AtenIpexTypeXPU::fill_(self, 0);
+  dpcppMemsetAsync(self.data_ptr(), 0, self.numel() * self.itemsize());
+  return self;
 }
 
 Tensor& fill_slice_with_index(Tensor& t, int dim) {
