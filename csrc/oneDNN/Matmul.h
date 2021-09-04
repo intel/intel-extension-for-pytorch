@@ -301,10 +301,9 @@ static inline void matmul(
   auto matmul_pd = matmul::primitive_desc(matmul_desc, pattr, engine);
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = matmul_pd.scratchpad_desc().get_size() /
-      sizeof(matmul_pd.scratchpad_desc().data_type());
+  int scratchpad_size = matmul_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, dst.options(), c10::nullopt);
+      {scratchpad_size}, m1.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(
       matmul_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
 #endif

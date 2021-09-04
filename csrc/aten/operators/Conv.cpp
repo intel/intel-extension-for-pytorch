@@ -207,10 +207,9 @@ Tensor dpcpp_convolution_backward_input(
   }
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size() /
-      grad_output.dtype().itemsize();
+  int scratchpad_size = conv_backward_data_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, grad_output.options(), c10::nullopt);
+      {scratchpad_size}, grad_output.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(
       conv_backward_data_pd.scratchpad_desc(),
       engine,
@@ -450,10 +449,9 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   }
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = conv_backward_weight_pd.scratchpad_desc().get_size() /
-      grad_output.dtype().itemsize();
+  int scratchpad_size = conv_backward_weight_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, input.options(), c10::nullopt);
+      {scratchpad_size}, input.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dnnl::memory(
       conv_backward_weight_pd.scratchpad_desc(),
       engine,

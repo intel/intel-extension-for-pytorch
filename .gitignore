@@ -29,7 +29,7 @@ ipex/csrc/aten_ipex_sparse_type_default.*
 ipex/csrc/cpu/SparseOPs.*
 ipex/include/
 ipex/lib/
-ipex/share/cmake/TorchIpex/IpexConfig.cmake
+ipex/share/
 
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml

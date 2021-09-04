@@ -489,10 +489,9 @@ static at::Tensor convolution(
 #endif
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size =
-      conv_forward_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  int scratchpad_size = conv_forward_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, src.options(), c10::nullopt);
+      {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(
       conv_forward_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   DPCPP_ONEDNN_EXEC(

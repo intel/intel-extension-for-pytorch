@@ -114,10 +114,9 @@ static inline void eltwise(
 #endif
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size =
-      eltwise_forward_pd.scratchpad_desc().get_size() / src.dtype().itemsize();
+  int scratchpad_size = eltwise_forward_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, src.options(), c10::nullopt);
+      {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(
       eltwise_forward_pd.scratchpad_desc(),
       engine,
@@ -271,10 +270,9 @@ static inline void eltwise_backward(
 #endif
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size = eltwise_backward_pd.scratchpad_desc().get_size() /
-      src_dst.dtype().itemsize();
+  int scratchpad_size = eltwise_backward_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, src_dst.options(), c10::nullopt);
+      {scratchpad_size}, src_dst.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(
       eltwise_backward_pd.scratchpad_desc(),
       engine,

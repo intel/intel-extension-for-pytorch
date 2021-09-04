@@ -299,10 +299,9 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
 #endif
 
 #ifdef USE_SCRATCHPAD_MODE
-  int scratchpad_size =
-      ln_bwd_pd.scratchpad_desc().get_size() / diff_dst.dtype().itemsize();
+  int scratchpad_size = ln_bwd_pd.scratchpad_desc().get_size();
   Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
-      {scratchpad_size}, diff_dst.options(), c10::nullopt);
+      {scratchpad_size}, src.options().dtype(at::kByte), c10::nullopt);
   auto scratchpad_memory = dpcpp_onednn_memory(
       ln_bwd_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_memory});
