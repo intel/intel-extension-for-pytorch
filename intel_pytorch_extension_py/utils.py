@@ -5,7 +5,6 @@ import torch.fx.experimental.optimization as optimization
 import warnings
 
 from .ops.lstm import IpexLSTM
-from .fx import *
 from .weight_prepack import _weight_prepack_with_ipex
 from .weight_cast import _weight_dtype_convert_with_ipex
 from .optimizer_utils import _ipex_optimizer

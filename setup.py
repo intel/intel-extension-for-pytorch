@@ -301,7 +301,6 @@ setup(
       'torch_ipex',
       'intel_pytorch_extension',
       'intel_pytorch_extension.amp',
-      'intel_pytorch_extension.fx',
       'intel_pytorch_extension.ops',
       'intel_pytorch_extension.optim',
       'intel_pytorch_extension.quantization'],
