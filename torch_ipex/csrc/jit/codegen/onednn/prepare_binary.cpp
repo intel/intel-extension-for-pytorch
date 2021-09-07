@@ -38,7 +38,8 @@ static void ConvertScalarToTensor(Block* block) {
       ConvertScalarToTensor(sub);
     }
 
-    if (node->kind() == aten::add || node->kind() == aten::mul) {
+    if (node->kind() == aten::add || node->kind() == aten::mul ||
+        node->kind() == aten::div) {
       mayConvertScalarInputToTensor(node);
     }
   }
@@ -71,14 +72,15 @@ static void DecomposeFusedAdd(Block* block) {
   }
 }
 
-static void EliminateIdentityMulAdd(Block* block) {
+static void EliminateIdentityMulAddDiv(Block* block) {
   for (auto node : block->nodes()) {
     for (auto sub : node->blocks()) {
-      EliminateIdentityMulAdd(sub);
+      EliminateIdentityMulAddDiv(sub);
     }
 
     if ((node->kind() == aten::add && compareConstValue(node->input(1), 0.0)) ||
-        (node->kind() == aten::mul && compareConstValue(node->input(1), 1.0))) {
+        (node->kind() == aten::mul && compareConstValue(node->input(1), 1.0)) ||
+        (node->kind() == aten::div && compareConstValue(node->input(1), 1.0))) {
       node->output()->replaceAllUsesWith(node->input(0));
     }
   }
@@ -86,9 +88,9 @@ static void EliminateIdentityMulAdd(Block* block) {
 
 void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   DecomposeFusedAdd(graph->block());
-  EliminateIdentityMulAdd(graph->block());
+  EliminateIdentityMulAddDiv(graph->block());
   EliminateDeadCode(graph);
-  // ConvertScalarToTensor must be placed after EliminateIdentityMulAdd
+  // ConvertScalarToTensor must be placed after EliminateIdentityMulAddDiv
   ConvertScalarToTensor(graph->block());
   // TODO: after conv-bn folding, bias will become bias? (Optional) after this pass 
   // and will lose it when using mustNotBeNone to check Optional Bias

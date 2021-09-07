@@ -159,6 +159,8 @@ Operator createOperator(Node* node) {
         .setAttr("keep_stats", false);
   } else if (node->kind() == Symbol::aten("add")) {
     return makeBinaryOp(node, opkind::Add);
+  } else if (node->kind() == Symbol::aten("div")) {
+    return makeBinaryOp(node, opkind::Divide);
   } else if (node->kind() == Symbol::aten("tanh")) {
     return makeEltwiseOp(node, opkind::Tanh);
   } else if (node->kind() == Symbol::aten("relu")) {
