@@ -194,6 +194,36 @@ class TestCustomerOps(TestCase):
         self.assertEqual(traininig_out.dtype, torch.float)
         self.assertEqual(cpu_out, traininig_out)
 
+# it will be removed after pytorch bacth_norm optimized well.
+class TestBatchNorm(TestCase):
+    def test_batch_norm(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+                self.bn = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+
+            def forward(self, x):
+                x = self.conv(x)
+                x = self.bn(x)
+                x.relu_()
+                return x
+
+        # make fall through for batch_norm for autocast case.
+        x = torch.randn(1, 3, 224, 224)
+        model = M()
+        # test training case.
+        model.train()
+        with torch.cpu.amp.autocast():
+            y = model(x)
+
+        self.assertEqual(y.dtype, torch.bfloat16)
+        # test inference case.
+        model.eval()
+        with torch.cpu.amp.autocast():
+            y = model(x)
+        self.assertEqual(y.dtype, torch.bfloat16)
+
 class M(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
         super(M, self).__init__()

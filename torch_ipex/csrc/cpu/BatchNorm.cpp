@@ -1,8 +1,10 @@
+#include <torch/extension.h>
+
 #include "BatchNorm.h"
 #include "mkldnn/MKLDNNCommon.h"
+#include "mkldnn/MKLDNNConversions.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
-#include <torch/extension.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -59,11 +61,12 @@ batch_norm_impl(const at::Tensor &input, const at::Tensor &weight,
       return std::make_tuple(output, saved_mean, saved_var);
     } else {
       return std::make_tuple(
-          at::native::mkldnn_to_dense(new_with_itensor_mkldnn(
+          mkldnn_to_dense(new_with_itensor_mkldnn(
               std::move(y),
               optTypeMetaToScalarType(input.options().dtype_opt()),
               input.options().device_opt())),
-          saved_mean, saved_var);
+          saved_mean,
+          saved_var);
     }
   } else {
     TORCH_CHECK(input.dim() == 4 || input.dim() == 5,
@@ -85,11 +88,12 @@ batch_norm_impl(const at::Tensor &input, const at::Tensor &weight,
       return std::make_tuple(output, at::Tensor(), at::Tensor());
     } else {
       return std::make_tuple(
-          at::native::mkldnn_to_dense(new_with_itensor_mkldnn(
+          mkldnn_to_dense(new_with_itensor_mkldnn(
               std::move(y),
               optTypeMetaToScalarType(input.options().dtype_opt()),
               input.options().device_opt())),
-          at::Tensor(), at::Tensor());
+          at::Tensor(),
+          at::Tensor());
     }
   }
 }
@@ -128,11 +132,12 @@ batch_norm_backward_impl(const at::Tensor &grad_output, const at::Tensor &input,
     return std::make_tuple(grad_input, grad_weight, grad_bias);
   } else {
     return std::make_tuple(
-        at::native::mkldnn_to_dense(new_with_itensor_mkldnn(
+        mkldnn_to_dense(new_with_itensor_mkldnn(
             std::move(gradx),
             optTypeMetaToScalarType(grad_output.options().dtype_opt()),
             grad_output.options().device_opt())),
-        grad_weight, grad_bias);
+        grad_weight,
+        grad_bias);
   }
 }
 
@@ -201,12 +206,16 @@ at::Tensor batch_norm(const at::Tensor &input,
                                   running_mean_opt, running_var_opt, train,
                                   momentum, eps);
   } else {
-    at::Tensor input_ = input;
-    if (input.scalar_type() == at::kBFloat16) {
-      input_ = input.to(at::kFloat);
-    }
-    return at::batch_norm(input_, weight_opt, bias_opt, running_mean_opt,
-                          running_var_opt, train, momentum, eps, cudnn_enabled);
+    return at::batch_norm(
+        input,
+        weight_opt,
+        bias_opt,
+        running_mean_opt,
+        running_var_opt,
+        train,
+        momentum,
+        eps,
+        cudnn_enabled);
   }
 }
 
