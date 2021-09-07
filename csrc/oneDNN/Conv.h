@@ -155,6 +155,23 @@ static inline memory::dims compatible_wgh_dims(
   return {};
 }
 
+static inline bool onednn_conv_use_channels_last(
+    const at::Tensor& input,
+    const at::Tensor& weight) {
+  // Convolution modules, unlike binary p-wise operator, have
+  // channels last as the dominating memory format. If both
+  // input and weight are in contiguous memory format, the
+  // operator produces output in contiguous memory format.
+  // Otherwise, output will be in channels last memory format.
+  auto input_sug_mem_fmt = input.suggest_memory_format();
+  auto wgh_sug_mem_fmt = weight.suggest_memory_format();
+  return (
+      (at::MemoryFormat::ChannelsLast == input_sug_mem_fmt) ||
+      (at::MemoryFormat::ChannelsLast3d == input_sug_mem_fmt) ||
+      (at::MemoryFormat::ChannelsLast == wgh_sug_mem_fmt) ||
+      (at::MemoryFormat::ChannelsLast3d == wgh_sug_mem_fmt));
+}
+
 static at::Tensor convolution(
     at::Tensor& dst,
     const at::Tensor& src,
@@ -178,7 +195,7 @@ static at::Tensor convolution(
       dst_opt = attr.with_relu() ? device(kXPU).dtype(kQUInt8)
                                  : device(kXPU).dtype(kQInt8);
     }
-    if (src.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    if (onednn_conv_use_channels_last(src, wgh)) {
       dst_opt = dst_opt.memory_format(at::MemoryFormat::ChannelsLast);
     }
 
@@ -210,22 +227,11 @@ static at::Tensor convolution(
   auto fmt_any = memory::format_tag::any;
   // 4D: n/c/h/w (n/h/w/c)
   // 5D: n/c/d/h/w (n/d/h/w/c)
-  auto fmt_src = conv_src_fmt(
-      ndim,
-      ndim == 4 ? (src.is_contiguous(at::MemoryFormat::ChannelsLast))
-                : (src.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto fmt_src = conv_src_fmt(ndim, onednn_conv_use_channels_last(src, wgh));
   // 4D: (g)o/i/h/w ((g)o/h/w/i)
   // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
-  auto fmt_wgh = conv_wgh_fmt(
-      ndim,
-      groups != 1,
-      wgh.size(1) == 1
-          ? false
-          : (wgh.ndimension() == 4
-                 ? (!wgh.is_contiguous() &&
-                    wgh.is_contiguous(at::MemoryFormat::ChannelsLast))
-                 : (!wgh.is_contiguous() &&
-                    wgh.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
+  auto fmt_wgh =
+      conv_wgh_fmt(ndim, groups != 1, onednn_conv_use_channels_last(src, wgh));
   auto fmt_bia = memory::format_tag::x;
 
   memory::dims src_tz = src.sizes().vec();
@@ -237,7 +243,7 @@ static at::Tensor convolution(
 
   // plain combination
   auto src_md = memory::desc(src_tz, src_data_t, fmt_src);
-  auto wgh_md = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+  auto wgh_md = onednn_conv_use_channels_last(src, wgh)
       ? memory::desc(wgh_tz, wei_data_t, fmt_any)
       : memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_src);
@@ -355,7 +361,9 @@ static at::Tensor convolution(
     } else {
       auto expected_dst_md = conv_forward_pd.dst_desc();
       auto plain_dst_md = memory::desc({dst_tz}, dst_data_t, fmt_src);
-      auto dst_opt = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+      auto dst_opt = onednn_conv_use_channels_last(src, wgh)
+          // src.options() is just used to fill dst_opt. can also be
+          // any other tensor to do this
           ? src.options().memory_format(at::MemoryFormat::ChannelsLast)
           : src.options();
       if (expected_dst_md != plain_dst_md) {
@@ -385,7 +393,7 @@ static at::Tensor convolution(
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
     onoff |= Settings::I().is_onednn_layout_enabled();
-    onoff |= src.is_contiguous(at::MemoryFormat::ChannelsLast);
+    onoff |= onednn_conv_use_channels_last(src, wgh);
     onoff &= !at::GradMode::is_enabled();
     return onoff;
   }();

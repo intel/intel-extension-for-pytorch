@@ -33,7 +33,12 @@ Tensor dpcpp_convolution_backward_input(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto grad_input = at::empty(input_size, grad_output.options());
+  // smf: suggest memory format
+  auto smf = onednn_conv_use_channels_last(grad_output, weight)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
+  auto grad_input = at::empty(input_size, grad_output.options(), smf);
+
   if (grad_input.numel() == 0) {
     return grad_input;
   }
@@ -48,23 +53,10 @@ Tensor dpcpp_convolution_backward_input(
   auto bias_t = dnnl::memory::data_type::f32;
   auto weight_usr_t = weight_t;
   auto format_any = memory::format_tag::any;
-  auto format_input = conv_src_fmt(
-      ndim,
-      ndim == 4
-          ? (!grad_output.is_contiguous() &&
-             grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-          : (!grad_output.is_contiguous() &&
-             grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto format_input =
+      conv_src_fmt(ndim, onednn_conv_use_channels_last(grad_output, weight));
   auto format_weight = conv_wgh_fmt(
-      ndim,
-      groups != 1,
-      weight.size(1) == 1
-          ? false
-          : (weight.ndimension() == 4
-                 ? (!weight.is_contiguous() &&
-                    weight.is_contiguous(at::MemoryFormat::ChannelsLast))
-                 : (!weight.is_contiguous() &&
-                    weight.is_contiguous(at::MemoryFormat::ChannelsLast3d))));
+      ndim, groups != 1, onednn_conv_use_channels_last(grad_output, weight));
 
   memory::dims input_tz = grad_input.sizes().vec();
   memory::dims weight_tz =
@@ -86,10 +78,8 @@ Tensor dpcpp_convolution_backward_input(
   auto input_md = Settings::I().is_onednn_layout_enabled()
       ? memory::desc(input_tz, data_grad, format_any)
       : memory::desc(input_tz, data_grad, format_input);
-  auto weight_md =
-      ((!grad_output.is_contiguous() &&
-        grad_output.is_contiguous(at::MemoryFormat::ChannelsLast)) ||
-       Settings::I().is_onednn_layout_enabled())
+  auto weight_md = (onednn_conv_use_channels_last(grad_output, weight) ||
+                    Settings::I().is_onednn_layout_enabled())
       ? memory::desc(weight_tz, weight_t, format_any)
       : memory::desc(weight_tz, weight_t, format_weight);
   auto output_md = Settings::I().is_onednn_layout_enabled()
@@ -200,8 +190,8 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_grad_input_md = conv_backward_data_pd.diff_src_desc();
   auto grad_input_memory = grad_input_usr_memory;
   if (grad_input_memory.get_desc() != expected_grad_input_md) {
-    grad_input_ = empty_opaque_tensor(
-        expected_grad_input_md, grad_input.options(), c10::nullopt);
+    grad_input_ =
+        empty_opaque_tensor(expected_grad_input_md, grad_input.options(), smf);
     grad_input_memory = dpcpp_onednn_memory(
         expected_grad_input_md, engine, grad_input_.data_ptr());
   }
@@ -255,12 +245,16 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
+  auto smf = onednn_conv_use_channels_last(input, grad_output)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
+
   Tensor grad_bias;
   if (bias_defined) {
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
   }
 
-  auto grad_weight = at::empty(weight_size, grad_output.options());
+  auto grad_weight = at::empty(weight_size, grad_output.options(), smf);
   if (input.numel() == 0) {
     return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
   }
@@ -274,21 +268,10 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto weight_t = data_grad;
   auto bias_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
-  auto format_input = conv_src_fmt(
-      ndim,
-      ndim == 4 ? (input.is_contiguous(at::MemoryFormat::ChannelsLast))
-                : (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto format_input =
+      conv_src_fmt(ndim, onednn_conv_use_channels_last(input, grad_output));
   auto format_weight = conv_wgh_fmt(
-      ndim,
-      groups != 1,
-      grad_output.size(1) == 1
-          ? false
-          : (grad_output.ndimension() == 4
-                 ? (!grad_output.is_contiguous() &&
-                    grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-                 : (!grad_output.is_contiguous() &&
-                    grad_output.is_contiguous(
-                        at::MemoryFormat::ChannelsLast3d))));
+      ndim, groups != 1, onednn_conv_use_channels_last(input, grad_output));
   auto format_bias = memory::format_tag::x;
 
   // Naive Master weight - We keep BF16 gw and gb output, and reorder them to
@@ -425,7 +408,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto grad_weight_memory = grad_weight_usr_memory;
   if (grad_weight_usr_memory.get_desc() != expected_grad_weight_md) {
     grad_weight_ = empty_opaque_tensor(
-        expected_grad_weight_md, grad_weight.options(), c10::nullopt);
+        expected_grad_weight_md, grad_weight.options(), smf);
     grad_weight_memory = dpcpp_onednn_memory(
         expected_grad_weight_md, engine, grad_weight_.data_ptr());
   }
@@ -794,11 +777,15 @@ Tensor _convolution_out(
   auto input = input_r.is_contiguous() ||
           input_r.is_contiguous(at::MemoryFormat::ChannelsLast)
       ? input_r
-      : input_r.contiguous();
+      : onednn_conv_use_channels_last(input_r, weight_r)
+          ? input_r.contiguous(at::MemoryFormat::ChannelsLast)
+          : input_r.contiguous();
   auto weight = weight_r.is_contiguous() ||
           weight_r.is_contiguous(at::MemoryFormat::ChannelsLast)
       ? weight_r
-      : weight_r.contiguous();
+      : onednn_conv_use_channels_last(input_r, weight_r)
+          ? weight_r.contiguous(at::MemoryFormat::ChannelsLast)
+          : weight_r.contiguous();
   auto bias = bias_r;
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
@@ -1054,20 +1041,20 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   // for now, we contiguous the input before oneDNN.
   auto input_ndim = input.ndimension();
   Tensor input_ = 4 == input_ndim
-      ? (input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast
              ? input.contiguous(at::MemoryFormat::ChannelsLast)
              : input.contiguous())
-      : (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+      : (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d
              ? input.contiguous(at::MemoryFormat::ChannelsLast3d)
              : input.contiguous());
 
   auto ndim = grad_output.ndimension();
   // grad_output_ should be polluted by input
   Tensor grad_output_ = 4 == ndim
-      ? (input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast
              ? grad_output.contiguous(at::MemoryFormat::ChannelsLast)
              : grad_output.contiguous())
-      : (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+      : (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d
              ? grad_output.contiguous(at::MemoryFormat::ChannelsLast3d)
              : grad_output.contiguous());
 
