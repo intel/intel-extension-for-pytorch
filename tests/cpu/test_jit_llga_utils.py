@@ -63,6 +63,12 @@ def findFusionGroups( graph):
     return result
 
 
+def warmup_forward(f, *args, profiling_count=2):
+    for i in range(profiling_count):
+        results = f(*args)
+    return results
+
+
 class JitLlgaTestCase(JitTestCase):
     def checkScript(self, m, x):
         requires_grad = any(t.requires_grad for t in x)
@@ -74,17 +80,20 @@ class JitLlgaTestCase(JitTestCase):
             graph = scripted.graph_for(*x)
         return scripted, graph
 
-    def checkTrace(self, m, x, *args, **kwargs):
-        grad = any(t.requires_grad for t in x)
-        with torch.set_grad_enabled(grad), \
+    def checkTrace(self, m, x, freeze=True, *args, **kwargs):
+        m.eval()
+        with torch.no_grad(), \
                 torch._jit_internal._disable_emit_hooks():
-            traced = super().checkTrace(m, x, inputs_require_grads=grad)
+            traced = torch.jit.trace(m, x)
+            if freeze:
+                traced = torch.jit.freeze(traced)
+            warmup_forward(traced, *x)
             fwd_graph = traced.graph_for(*x)
-        if grad:
-            warmup_backward(traced(*x).sum())
-            return traced, fwd_graph, backward_graph(traced)
-        else:
-            return traced, fwd_graph
+
+            ref_o = m(*x)
+            jit_o = traced(*x)
+            self.assertEqual(jit_o, ref_o)
+        return fwd_graph, traced
 
     def assertFused(self, graph, fused_patterns):
         for pat in fused_patterns:
