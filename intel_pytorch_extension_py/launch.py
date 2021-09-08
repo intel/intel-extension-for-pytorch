@@ -14,7 +14,7 @@ import psutil
 from datetime import datetime
 
 format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-logging.basicConfig(level = logging.INFO, format = format_str)
+logging.basicConfig(level=logging.INFO, format=format_str)
 logger = logging.getLogger(__name__)
 
 r"""
@@ -117,7 +117,7 @@ class CPUinfo():
 
             # Get information about  cpu, core, socket and node
             for line in lscpu_info:
-                pattern = r"^([\d]+,[\d]+,[\d]+,[\d]+)"
+                pattern = r"^([\d]+,[\d]+,[\d]+,[\d]?)"
                 regex_out = re.search(pattern, line)
                 if regex_out:
                     self.cpuinfo.append(regex_out.group(1).strip().split(","))
@@ -125,21 +125,22 @@ class CPUinfo():
 
     def get_socket_info(self):
 
-        self.socket_physical_cores = [] #socket_id is index
-        self.socket_logical_cores = []  #socket_id is index
-        self.physical_core_node_map={} #phyical core to numa node id
-        self.logical_core_node_map={}  #logical core to numa node id
-        self.sockets =  int(max([line[2] for line in self.cpuinfo])) + 1
+        self.socket_physical_cores = []  # socket_id is index
+        self.socket_logical_cores = []   # socket_id is index
+        self.physical_core_node_map = {}  # phyical core to numa node id
+        self.logical_core_node_map = {}   # logical core to numa node id
+        self.sockets = int(max([line[2] for line in self.cpuinfo])) + 1
         for socket_id in range(self.sockets):
             cur_socket_physical_core = []
             cur_socket_logical_core = []
             for line in self.cpuinfo:
                 if socket_id == int(line[2]):
+                    node_id = line[3] if line[3] != '' else '0'
                     if int(line[1]) not in cur_socket_physical_core:
                         cur_socket_physical_core.append(int(line[1]))
-                        self.physical_core_node_map[int(line[1])] = int(line[3])
+                        self.physical_core_node_map[int(line[1])] = int(node_id)
                     cur_socket_logical_core.append(int(line[0]))
-                    self.logical_core_node_map[int(line[0])] = int(line[3])
+                    self.logical_core_node_map[int(line[0])] = int(node_id)
             self.socket_physical_cores.append(cur_socket_physical_core)
             self.socket_logical_cores.append(cur_socket_logical_core)
 
@@ -204,7 +205,7 @@ class Launcher():
             library_paths.append(os.environ["VIRTUAL_ENV"] + "/lib/")
 
         library_paths += ["{}/.local/lib/".format(expanduser("~")), "/usr/local/lib/",
-                         "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
+                          "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
         lib_find = False
         for lib_path in library_paths:
             library_file = lib_path + "lib" + lib_type + ".so"
@@ -233,10 +234,10 @@ class Launcher():
             find_tc = self.add_lib_preload(lib_type="tcmalloc")
             if not find_tc:
                 logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
-                   " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
-                   "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
-                   "you can use 'conda install -c conda-forge gperftools' to install tcmalloc"
-                   .format("TCmalloc", "tcmalloc", expanduser("~")))
+                               " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+                               "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+                               "you can use 'conda install -c conda-forge gperftools' to install tcmalloc"
+                               .format("TCmalloc", "tcmalloc", expanduser("~")))
             else:
                 logger.info("Use TCMalloc memory allocator")
 
@@ -244,10 +245,10 @@ class Launcher():
             find_je = self.add_lib_preload(lib_type="jemalloc")
             if not find_je:
                 logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
-                   " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
-                   "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
-                   "you can use 'conda install -c conda-forge jemalloc' to install jemalloc"
-                   .format("JeMalloc", "jemalloc", expanduser("~")))
+                               " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+                               "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+                               "you can use 'conda install -c conda-forge jemalloc' to install jemalloc"
+                               .format("JeMalloc", "jemalloc", expanduser("~")))
             else:
                 logger.info("Use JeMallocl memory allocator")
                 self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000")
@@ -295,10 +296,10 @@ class Launcher():
             find_iomp = self.add_lib_preload(lib_type="iomp5")
             if not find_iomp:
                 logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
-                   " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
-                   "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
-                   "you can use 'conda install intel-openm' to install intel openMP"
-                   .format("iomp", "iomp5", expanduser("~")))
+                               " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+                               "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+                               "you can use 'conda install intel-openm' to install intel openMP"
+                               .format("iomp", "iomp5", expanduser("~")))
             else:
                 logger.info("Using Intel OpenMP")
                 if set_kmp_affinity:
@@ -314,14 +315,13 @@ class MultiInstanceLauncher(Launcher):
         processes = []
         cores = []
         set_kmp_affinity = True
-        if args.core_list:#user specify what cores will be used by params
+        if args.core_list:  # user specify what cores will be used by params
             cores = args.core_list.strip().split(",")
             if args.ncore_per_instance == -1:
                 logger.error("please specify the '--ncore_per_instance' if you have pass the --core_list params")
                 exit(-1)
             elif args.ninstances > 1 and args.ncore_per_instance * args.ninstances < len(cores):
-                logger.warning("only first {} cores will be used, but you specify {} cores in core_list".format
-                      (args.ncore_per_instance * args.ninstances, len(cores)))
+                logger.warning("only first {} cores will be used, but you specify {} cores in core_list".format(args.ncore_per_instance * args.ninstances, len(cores)))
             else:
                 args.ninstances = len(cores) // args.ncore_per_instance
         else:
@@ -338,7 +338,7 @@ class MultiInstanceLauncher(Launcher):
                 else:
                     cores = self.cpuinfo.get_all_physical_cores()
             if not args.multi_instance and args.ninstances == -1 and args.ncore_per_instance == -1:
-                args.ninstances = 1;
+                args.ninstances = 1
                 args.ncore_per_instance = len(cores)
             elif args.multi_instance and args.ninstances == -1 and args.ncore_per_instance == -1:
                 args.throughput_mode = True
@@ -361,59 +361,60 @@ class MultiInstanceLauncher(Launcher):
                 args.ncore_per_instance = len(cores) // args.ninstances
 
         self.set_multi_thread_and_allocator(args.ncore_per_instance,
-                                           args.disable_iomp,
-                                           set_kmp_affinity,
-                                           args.enable_tcmalloc,
-                                           args.enable_jemalloc,
-                                           args.use_default_allocator)
+                                            args.disable_iomp,
+                                            set_kmp_affinity,
+                                            args.enable_tcmalloc,
+                                            args.enable_jemalloc,
+                                            args.use_default_allocator)
         os.environ["LAUNCH_CMD"] = "#"
         for i in range(args.ninstances):
-           cmd = []
-           cur_process_cores = ""
-           if not args.disable_numactl:
-               cmd = ["numactl"]
-               core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
-               core_list = sorted(core_list)
-               same_numa = self.cpuinfo.numa_aware_check(core_list)
-               core_ranges = []
-               for core in core_list:
-                   if len(core_ranges) == 0:
-                       range_elem = {'start': core, 'end': core}
-                       core_ranges.append(range_elem)
-                   else:
-                       if core - core_ranges[-1]['end'] == 1:
-                           core_ranges[-1]['end'] = core
-                       else:
-                           range_elem = {'start': core, 'end': core}
-                           core_ranges.append(range_elem)
-               for r in core_ranges:
-                   cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
-               cur_process_cores = cur_process_cores[:-1]
-               numa_params = "-C {} ".format(cur_process_cores)
-               if same_numa:
-                   numa_params += "-m {}".format(self.cpuinfo.logical_core_node_map[core_list[0]])
-               cmd.extend(numa_params.split())
-           with_python = not args.no_python
-           if with_python:
-               cmd.append(sys.executable)
-           if args.module:
-               cmd.append("-m")
-           cmd.append(args.program)
-           log_name = args.log_file_prefix + "_instance_{}_cores_".format(i) + cur_process_cores.replace(',', '_') + ".log"
-           log_name = os.path.join(args.log_path, log_name)
-           cmd.extend(args.program_args)
-           os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
-           cmd = " ".join(cmd)
-           if args.log_path:
-               cmd = "{} 2>&1 | tee {}".format(cmd, log_name)
-           logger.info(cmd)
-           process = subprocess.Popen(cmd, env=os.environ, shell=True)
-           processes.append(process)
+            cmd = []
+            cur_process_cores = ""
+            if not args.disable_numactl:
+                cmd = ["numactl"]
+                core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
+                core_list = sorted(core_list)
+                same_numa = self.cpuinfo.numa_aware_check(core_list)
+                core_ranges = []
+                for core in core_list:
+                    if len(core_ranges) == 0:
+                        range_elem = {'start': core, 'end': core}
+                        core_ranges.append(range_elem)
+                    else:
+                        if core - core_ranges[-1]['end'] == 1:
+                            core_ranges[-1]['end'] = core
+                        else:
+                            range_elem = {'start': core, 'end': core}
+                            core_ranges.append(range_elem)
+                for r in core_ranges:
+                    cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
+                cur_process_cores = cur_process_cores[:-1]
+                numa_params = "-C {} ".format(cur_process_cores)
+                if same_numa:
+                    numa_params += "-m {}".format(self.cpuinfo.logical_core_node_map[core_list[0]])
+                cmd.extend(numa_params.split())
+            with_python = not args.no_python
+            if with_python:
+                cmd.append(sys.executable)
+                cmd.append("-u")
+            if args.module:
+                cmd.append("-m")
+            cmd.append(args.program)
+            log_name = args.log_file_prefix + "_instance_{}_cores_".format(i) + cur_process_cores.replace(',', '_') + ".log"
+            log_name = os.path.join(args.log_path, log_name)
+            cmd.extend(args.program_args)
+            os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
+            cmd_s = " ".join(cmd)
+            if args.log_path:
+                cmd_s = "{} 2>&1 | tee {}".format(cmd_s, log_name)
+            logger.info(cmd_s)
+            process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
+            processes.append(process)
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
         for process in processes:
             process.wait()
             if process.returncode != 0:
-                raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd)
+                raise subprocess.CalledProcessError(returncode=process.returncode, cmd=cmd_s)
 
 class DistributedTrainingLauncher(Launcher):
     r"""
@@ -435,7 +436,7 @@ class DistributedTrainingLauncher(Launcher):
         for proc in range(ppn):
             domain_binary = 0
             begin = proc * cores_per_rank + ccl_worker_count
-            end = proc * cores_per_rank + cores_per_rank -1
+            end = proc * cores_per_rank + cores_per_rank - 1
             for i in range(begin, end + 1):
                 domain_binary |= (1 << i)
             pin_domain += hex(domain_binary) + ","
@@ -453,7 +454,7 @@ class DistributedTrainingLauncher(Launcher):
         affinity = ''
         for proc in range(ppn):
             for ccl_worker in range(ccl_worker_count):
-                affinity += str(proc * cores_per_rank + ccl_worker)+ ","
+                affinity += str(proc * cores_per_rank + ccl_worker) + ","
         return affinity
 
     def launch(self, args):
@@ -462,19 +463,20 @@ class DistributedTrainingLauncher(Launcher):
         '''
         if args.nnodes > 1 and not os.path.exists(args.hostfile):
             raise ValueError("hostfile is necessary when you use multi-node distributed training,"
-                              "Please create hostfile which include the ip list you used for distributed running")
+                             "Please create hostfile which include the ip list you used for distributed running")
         elif args.nnodes > 1:
             ipv4_addr_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
             ip_list = []
             with open(args.hostfile) as f:
-                 for line in f:
-                     line = line.strip().strip("\n")
-                     is_valid = re.match(ipv4_addr_pattern, line)
-                     if not is_valid:
-                         logger.error("{} is not valid IPV4 address".format(line))
-                         exit(-1)
-                     else:
-                         ip_list.append(line)
+                for line in f:
+                    line = line.strip().strip("\n")
+                    # is_valid = re.match(ipv4_addr_pattern, line)
+                    # if not is_valid:
+                    #     logger.error("{} is not valid IPV4 address".format(line))
+                    #     exit(-1)
+                    # else:
+                    #     ip_list.append(line)
+                    ip_list.append(line)
             if len(ip_list) < args.nnodes:
                 logger.error("The number of IP {} should greater than nnodes parameters {}".format(len(ip_list), args.nnodes))
                 exit(-1)
@@ -486,8 +488,8 @@ class DistributedTrainingLauncher(Launcher):
                     if snic.address == ip_list[0]:
                         master_check = True
             if not master_check:
-               logger.error("MASTER_ADDR is not right. Please make sure the first ip {} in your hostfile is the current node".format(ip_list[0]))
-               exit(-1)
+                logger.error("MASTER_ADDR is incorrect. Please make sure the first line {} in your hostfile is ip address of the current node".format(ip_list[0]))
+                exit(-1)
 
             logger.info("Begin to validate the ip connect")
             args.master_addr = ip_list[0]
@@ -501,7 +503,7 @@ class DistributedTrainingLauncher(Launcher):
 
         total_cores_per_node = self.cpuinfo.physical_core_nums()
         if args.use_logical_core:
-            total_cores_per_node = self.cpuinfo.logcal_core_nums()
+            total_cores_per_node = self.cpuinfo.logical_core_nums()
 
         # set distributed related environmental variables
         self.set_env("MASTER_ADDR", args.master_addr)
@@ -510,16 +512,15 @@ class DistributedTrainingLauncher(Launcher):
         self.set_env("I_MPI_PIN_DOMAIN", mpi_pin_domain)
 
         ppn = args.nproc_per_node
-        total_cores = len(self.cpuinfo.get_all_physical_cores())
-        cores_per_rank = total_cores // ppn
+        cores_per_rank = total_cores_per_node // ppn
 
         opm_num_threads = cores_per_rank - args.ccl_worker_count
         self.set_multi_thread_and_allocator(opm_num_threads,
-                                           args.disable_iomp,
-                                           True,
-                                           args.enable_tcmalloc,
-                                           args.enable_jemalloc,
-                                           args.use_default_allocator)
+                                            args.disable_iomp,
+                                            True,
+                                            args.enable_tcmalloc,
+                                            args.enable_jemalloc,
+                                            args.use_default_allocator)
 
         self.set_env("CCL_WORKER_COUNT", str(args.ccl_worker_count))
         ccl_affinity = self.get_ccl_worker_affinity(args.nproc_per_node, args.ccl_worker_count, total_cores_per_node)
@@ -527,9 +528,8 @@ class DistributedTrainingLauncher(Launcher):
 
         os.environ["LAUNCH_CMD"] = "#"
         cmd = ['mpiexec.hydra']
-        mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes*args.nproc_per_node,
-                      args.nproc_per_node,  mpi_pin_domain, opm_num_threads)
-        mpi_config += args.more_mpi_parms
+        mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node, mpi_pin_domain, opm_num_threads)
+        mpi_config += args.more_mpi_params
         if args.nnodes > 1:
             mpi_config += " -hostfile {}".format(args.hostfile)
         cmd.extend(mpi_config.split())
@@ -554,73 +554,73 @@ def add_distributed_training_params(parser):
 
     group = parser.add_argument_group("Distributed Training Parameters With oneCCL backend")
     group.add_argument("--nnodes", metavar='\b', type=int, default=1,
-                        help="The number of nodes to use for distributed "
-                             "training")
+                       help="The number of nodes to use for distributed "
+                       "training")
     group.add_argument("--nproc_per_node", metavar='\b', type=int, default=socket_nums,
-                        help="The number of processes to launch on each node")
-    #ccl control
+                       help="The number of processes to launch on each node")
+    # ccl control
     group.add_argument("--ccl_worker_count", metavar='\b', default=4, type=int,
-                        help="Core numbers per rank used for ccl communication")
-    #mpi control
+                       help="Core numbers per rank used for ccl communication")
+    # mpi control
     group.add_argument("--master_addr", metavar='\b', default="127.0.0.1", type=str,
-                        help="Master node (rank 0)'s address, should be either "
-                             "the IP address or the hostname of node 0, for "
-                             "single node multi-proc training, the "
-                             "--master_addr can simply be 127.0.0.1")
+                       help="Master node (rank 0)'s address, should be either "
+                            "the IP address or the hostname of node 0, for "
+                            "single node multi-proc training, the "
+                            "--master_addr can simply be 127.0.0.1")
     group.add_argument("--master_port", metavar='\b', default=29500, type=int,
-                        help="Master node (rank 0)'s free port that needs to "
-                             "be used for communication during distributed "
-                             "training")
+                       help="Master node (rank 0)'s free port that needs to "
+                            "be used for communication during distributed "
+                            "training")
     group.add_argument("--hostfile", metavar='\b', default="hostfile", type=str,
-                        help="Hostfile is necessary for multi-node multi-proc "
-                              "training. hostfile includes the node address list "
-                              "node address which should be either the IP address"
-                              "or the hostname.")
-    group.add_argument("--more_mpi_parms", metavar='\b', default="", type=str,
-                        help="User can pass more parameters for mpiexec.hydra "
-                              "except for -np -ppn -hostfile and -genv I_MPI_PIN_DOMAIN")
+                       help="Hostfile is necessary for multi-node multi-proc "
+                            "training. hostfile includes the node address list "
+                            "node address which should be either the IP address"
+                            "or the hostname.")
+    group.add_argument("--more_mpi_params", metavar='\b', default="", type=str,
+                       help="User can pass more parameters for mpiexec.hydra "
+                            "except for -np -ppn -hostfile and -genv I_MPI_PIN_DOMAIN")
 
 def add_memory_allocator_params(parser):
 
     group = parser.add_argument_group("Memory Allocator Parameters")
-        #allocator control
+    # allocator control
     group.add_argument("--enable_tcmalloc", action='store_true', default=False,
-                        help="Enable tcmalloc allocator")
+                       help="Enable tcmalloc allocator")
     group.add_argument("--enable_jemalloc", action='store_true', default=False,
-                        help="Enable jemalloc allocator")
-    group.add_argument("--use_default_allocator",  action='store_true', default=False,
-                        help="Use default memory allocator")
+                       help="Enable jemalloc allocator")
+    group.add_argument("--use_default_allocator", action='store_true', default=False,
+                       help="Use default memory allocator")
 
 def add_multi_instance_params(parser):
 
     group = parser.add_argument_group("Multi-instance Parameters")
-     #multi-instance control
+    # multi-instance control
     group.add_argument("--ncore_per_instance", metavar='\b', default=-1, type=int,
-                         help="Cores per instance")
+                       help="Cores per instance")
     group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
-                         help="For multi-instance, you should give the cores number you used for per instance.")
+                       help="For multi-instance, you should give the cores number you used for per instance.")
     group.add_argument("--latency_mode", action='store_true', default=False,
-                         help="By detault 4 core per instance and use all physical cores")
+                       help="By detault 4 core per instance and use all physical cores")
     group.add_argument("--throughput_mode", action='store_true', default=False,
-                         help="By default one instance per socket and use all physical cores")
+                       help="By default one instance per socket and use all physical cores")
     group.add_argument("--socket_id", metavar='\b', default=-1, type=int,
-                         help="Socket id for multi-instance, by default all sockets will be used")
+                       help="Socket id for multi-instance, by default all sockets will be used")
     group.add_argument("--use_logical_core", action='store_true', default=False,
-                         help="Whether only use physical cores")
-    group.add_argument("--disable_numactl",  action='store_true', default=False,
-                         help="Disable numactl")
+                       help="Whether only use physical cores")
+    group.add_argument("--disable_numactl", action='store_true', default=False,
+                       help="Disable numactl")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
-                         help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
+                       help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,
-                         help="The log file directory. Default path is '', which means disable logging to files.")
+                       help="The log file directory. Default path is '', which means disable logging to files.")
     group.add_argument("--log_file_prefix", metavar='\b', default="run", type=str,
-                         help="log file prefix")
+                       help="log file prefix")
 
 def add_kmp_iomp_params(parser):
 
     group = parser.add_argument_group("IOMP Parameters")
     group.add_argument("--disable_iomp", action='store_true', default=False,
-                        help="By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD")
+                       help="By default, we use Intel OpenMP and libiomp5.so will be add to LD_PRELOAD")
 
 
 def parse_args():
@@ -637,7 +637,7 @@ def parse_args():
                                         "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
                                         "\n################################# Basic usage ############################# \n"
                                         "\n 1. single instance\n"
-                                         "\n   >>> python -m intel_pytorch_extension.launch python_script args \n"
+                                        "\n   >>> python -m intel_pytorch_extension.launch python_script args \n"
                                         "\n2. multi-instance \n"
                                         "\n    >>> python -m intel_pytorch_extension.launch --ninstances xxx --ncore_per_instance xx python_script args\n"
                                         "\n3. Single-Node multi-process distributed training\n"
@@ -653,7 +653,7 @@ def parse_args():
                         help="Enable multi-instance, by default one instance per socket")
 
     parser.add_argument('--distributed', action='store_true', default=False,
-                    help='Enable distributed training.')
+                        help='Enable distributed training.')
     parser.add_argument("-m", "--module", default=False, action="store_true",
                         help="Changes each process to interpret the launch script "
                              "as a python module, executing with the same behavior as"
@@ -705,7 +705,7 @@ def main():
     if args.nnodes > 1:
         args.distributed = True
 
-    if not args.no_python  and not args.program.endswith(".py"):
+    if not args.no_python and not args.program.endswith(".py"):
         logger.error("For non Python script, you should use '--no_python' parameter.")
         exit()
 
@@ -717,8 +717,7 @@ def main():
 
     launcher.launch(args)
     for x in sorted(set(os.environ.keys()) - env_before):
-        logger.debug(f'{x}={os.environ[x]}')
+        logger.debug('{0}={1}'.format(x, os.environ[x]))
 
 if __name__ == "__main__":
     main()
-
