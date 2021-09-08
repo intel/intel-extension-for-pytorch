@@ -357,7 +357,7 @@ setup(
             'include/*.h',
             'include/core/*.h',
             'include/utils/*.h',
-            'share/cmake/TorchIpex/*']
+            'share/cmake/Ipex/*']
     },
     long_description=long_description,
     long_description_content_type='test/markdown',
