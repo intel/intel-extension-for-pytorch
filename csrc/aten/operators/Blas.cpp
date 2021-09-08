@@ -52,8 +52,7 @@ void mkl_matmul(
   if (result.is_contiguous() && result.scalar_type() == ScalarType::Double) {
     _result = result;
   } else {
-    _result =
-        at::empty_like(result, result.options().dtype(ScalarType::Double));
+    _result = result.contiguous().to(ScalarType::Double);
   }
 
   size_t dims = _result.dim();
@@ -78,6 +77,10 @@ void mkl_matmul(
     int64_t stridec = m * n;
     int64_t mb = 1;
 
+    int64_t ldc = _result.stride(-2);
+    int64_t lda = _m1.stride(-2);
+    int64_t ldb = _m2.stride(-2);
+
     mb = _result.size(0);
     TORCH_CHECK(
         mb == _m1.size(0) && mb == _m2.size(0),
@@ -100,14 +103,14 @@ void mkl_matmul(
         k,
         alpha.to<float>(),
         (double*)_m1.data_ptr(),
-        m,
+        lda,
         stridea,
         (double*)_m2.data_ptr(),
-        k,
+        ldb,
         strideb,
         beta.to<float>(),
         (double*)_result.data_ptr(),
-        m,
+        ldc,
         stridec,
         mb);
   } else {
@@ -129,7 +132,7 @@ void mkl_matmul(
     if (result_strides[0] == 1 &&
         (result_sizes[1] == 1 ||
          result_strides[1] >= std::max(int64_t{1}, result_sizes[0]))) {
-      transpose_c = false;
+      transpose_c = false; // c_row_major = false
       c = _result;
     } else if (
         result_strides[1] == 1 &&
@@ -206,17 +209,18 @@ void mkl_matmul(
         n,
         k,
         alpha.to<float>(),
-        (double*)_m1.data_ptr(),
-        m,
+        (double*)a.data_ptr(),
+        lda,
         stridea,
-        (double*)_m2.data_ptr(),
-        k,
+        (double*)b.data_ptr(),
+        ldb,
         strideb,
         beta.to<float>(),
-        (double*)_result.data_ptr(),
-        m,
+        (double*)c.data_ptr(),
+        ldc,
         stridec,
         mb);
+    _result = c;
   }
   if (!_result.is_same(result)) {
     result.copy_(_result);
@@ -416,6 +420,11 @@ Tensor mm(const Tensor& self, const Tensor& mat2) {
   auto result = at::empty({0}, self.options());
   at::AtenIpexTypeXPU::mm_out(result, self, mat2);
   return result;
+}
+
+Tensor mv(const Tensor& self, const Tensor& vec) {
+  Tensor result = at::empty({self.size(0)}, self.options());
+  return at::addmv_(result, self, vec, 0, 1);
 }
 
 Tensor& baddbmm_(
