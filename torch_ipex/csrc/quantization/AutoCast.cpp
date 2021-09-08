@@ -4,6 +4,7 @@
 #include <ATen/NativeFunctions.h>
 #include <torch/csrc/autograd/function.h>
 
+#include "AutoCast_utils.hpp"
 #include "Common.hpp"
 #include "Config.hpp"
 #include "torch_ipex/csrc/autocast_mode.h"
@@ -13,831 +14,571 @@ namespace torch_ipex {
 namespace autocast {
 namespace int8 {
 
-namespace {
-
-using weakref_scales = c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
-using val_scales = std::tuple<weakref_scales, at::Tensor>;
-// TODO: zero_points cached
-thread_local std::unordered_map<c10::TensorImpl *, val_scales> scales_casts;
-// cach op tensors flow
-// TODO: change the key work for slice or view.
-using val_name = std::tuple<weakref_scales, std::string>;
-thread_local std::unordered_map<c10::TensorImpl *, val_name> tensors_flow;
-
-} // namespace
-
-void clear_autocast_cache_int8() { scales_casts.clear(); }
-
-at::Tensor conv2d(const at::Tensor &input, const at::Tensor &weight, const c10::optional<at::Tensor> &bias,
-     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups) {
+at::Tensor conv2d(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "conv2d." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    auto output = at::conv2d(input, weight, bias, stride, padding, dilation, groups);
-    std::string op_output = "conv2d." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
-                                          "conv2d", op_id, op_inputs, op_outputs);
+    auto output =
+        at::conv2d(input, weight, bias, stride, padding, dilation, groups);
+    calibrate({input}, {weight}, {output}, "conv2d", op_id, OP_TYPE_DEFAULT);
     return output;
-    }
-
-    auto qparams = torch_ipex::get_int8_scales(op_id);
-    std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-    std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-    std::vector<bool> inputs_quantized, outputs_quantized;
-    std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-    auto conv_x = input;
-    auto conv_w = weight;
-    if (inputs_quantized[0]) {
-      // add quantize and dequantize for input and weight.
-      auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-          qparams[0][0].zero_point, input_quantized_dtypes[0]);
-      conv_x = input_q.dequantize();
-      if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
-        auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-        auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
-        auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
-        conv_w = weight_q.dequantize();
-      } else {
-        std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
-        auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
-        conv_w = weight_q.dequantize();
-      }
-    }
-
-    auto output = at::conv2d(conv_x, conv_w, bias, stride, padding, dilation, groups);
-    // add quantize and dequantize output.
-    if (outputs_quantized[0]) {
-      auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-          qparams[1][0].zero_point, output_quantized_dtypes[0]);
-      return output_q.dequantize();
-    }
-    return output;
+  }
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {weight},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::conv2d(
+      r_inputs[0], r_weights[0], bias, stride, padding, dilation, groups);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor conv3d(const at::Tensor &input, const at::Tensor &weight, const c10::optional<at::Tensor> &bias,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups) {
+at::Tensor conv3d(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "conv3d." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    auto output = at::conv3d(input, weight, bias, stride, padding, dilation, groups);
-    std::string op_output = "conv3d." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
-                                          "conv3d", op_id, op_inputs, op_outputs);
+    auto output =
+        at::conv3d(input, weight, bias, stride, padding, dilation, groups);
+    calibrate({input}, {weight}, {output}, "conv3d", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto conv_x = input;
-  auto conv_w = weight;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input and weight.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    conv_x = input_q.dequantize();
-    if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
-      auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
-      auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    } else {
-      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    }
-  }
-
-  auto output = at::conv3d(conv_x, conv_w, bias, stride, padding, dilation, groups);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {weight},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::conv3d(
+      r_inputs[0], r_weights[0], bias, stride, padding, dilation, groups);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor conv_transpose3d(const at::Tensor &input, const at::Tensor &weight, const c10::optional<at::Tensor> &bias,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef output_padding, int64_t groups, at::IntArrayRef dilation) {
+at::Tensor conv_transpose3d(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "conv_transpose3d." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    auto output = at::conv_transpose3d(input, weight, bias, stride, padding, output_padding, groups, dilation);
-    std::string op_output = "conv_transpose3d." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
-                                          "conv_transpose3d", op_id, op_inputs, op_outputs);
+    auto output = at::conv_transpose3d(
+        input, weight, bias, stride, padding, output_padding, groups, dilation);
+    calibrate(
+        {input},
+        {weight},
+        {output},
+        "conv_transpose3d",
+        op_id,
+        OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto conv_x = input;
-  auto conv_w = weight;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input and weight.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    conv_x = input_q.dequantize();
-    if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
-      auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
-      auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    } else {
-      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    }
-  }
-
-  auto output = at::conv_transpose3d(conv_x, conv_w, bias, stride, padding, output_padding, groups, dilation);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {weight},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::conv_transpose3d(
+      r_inputs[0],
+      r_weights[0],
+      bias,
+      stride,
+      padding,
+      output_padding,
+      groups,
+      dilation);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor _convolution(const at::Tensor &input, const at::Tensor &weight, const c10::optional<at::Tensor> &bias,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding,
-    int64_t groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32) {
-    // just need add id for int8 tracing path(conv2d -> conv2d -> _convolution).
-    int64_t ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
-    return at::_convolution(input, weight, bias, stride, padding, dilation,
-                            transposed, output_padding, groups, benchmark, deterministic, cudnn_enabled, allow_tf32);
+at::Tensor _convolution(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool transposed,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled,
+    bool allow_tf32) {
+  // just need add id for int8 tracing path(conv2d -> conv2d -> _convolution).
+  int64_t ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  return at::_convolution(
+      input,
+      weight,
+      bias,
+      stride,
+      padding,
+      dilation,
+      transposed,
+      output_padding,
+      groups,
+      benchmark,
+      deterministic,
+      cudnn_enabled,
+      allow_tf32);
 }
 
-at::Tensor _convolution(const at::Tensor &input, const at::Tensor &weight, const c10::optional<at::Tensor> &bias,
-                        at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
-                        bool transposed, at::IntArrayRef output_padding, int64_t groups,
-                        bool benchmark, bool deterministic, bool cudnn_enabled) {
-  return at::_convolution(input, weight, bias, stride, padding, dilation,
-                          transposed, output_padding, groups, benchmark, deterministic, cudnn_enabled);
+at::Tensor _convolution(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool transposed,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    bool benchmark,
+    bool deterministic,
+    bool cudnn_enabled) {
+  return at::_convolution(
+      input,
+      weight,
+      bias,
+      stride,
+      padding,
+      dilation,
+      transposed,
+      output_padding,
+      groups,
+      benchmark,
+      deterministic,
+      cudnn_enabled);
 }
 
-at::Tensor batch_norm(const at::Tensor &input, const c10::optional<at::Tensor> &weight, const c10::optional<at::Tensor> &bias,
-     const c10::optional<at::Tensor> &running_mean, const c10::optional<at::Tensor> &running_var, bool training,
-     double momentum, double eps, bool cudnn_enabled) {
+at::Tensor batch_norm(
+    const at::Tensor& input,
+    const c10::optional<at::Tensor>& weight,
+    const c10::optional<at::Tensor>& bias,
+    const c10::optional<at::Tensor>& running_mean,
+    const c10::optional<at::Tensor>& running_var,
+    bool training,
+    double momentum,
+    double eps,
+    bool cudnn_enabled) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "batch_norm." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    auto output = at::batch_norm(input, weight, bias, running_mean, running_var,
-                                 training, momentum, eps, cudnn_enabled);
-    std::string op_output = "batch_norm." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "batch_norm",
-                                          op_id, op_inputs, op_outputs);
+    auto output = at::batch_norm(
+        input,
+        weight,
+        bias,
+        running_mean,
+        running_var,
+        training,
+        momentum,
+        eps,
+        cudnn_enabled);
+    calibrate({input}, {}, {output}, "batch_norm", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto bn_x = input;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    bn_x = input_q.dequantize();
-  }
-  auto output = at::batch_norm(bn_x, weight, bias, running_mean, running_var, training, momentum, eps, cudnn_enabled);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::batch_norm(
+      r_inputs[0],
+      weight,
+      bias,
+      running_mean,
+      running_var,
+      training,
+      momentum,
+      eps,
+      cudnn_enabled);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor max_pool2d(const at::Tensor &input, at::IntArrayRef kernel_size, at::IntArrayRef stride,
-    at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+at::Tensor max_pool2d(
+    const at::Tensor& input,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool ceil_mode) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "max_pool2d." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    auto output = at::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
-    std::string op_output = "max_pool2d." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {input}, "max_pool2d",
-                                          op_id, op_inputs, op_outputs);
+    auto output = at::max_pool2d(
+        input, kernel_size, stride, padding, dilation, ceil_mode);
+    calibrate({input}, {}, {output}, "max_pool2d", op_id, OP_TYPE_POOLING);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto pool_x = input;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    pool_x = input_q.dequantize();
-  }
-  auto output = at::max_pool2d(pool_x, kernel_size, stride, padding, dilation, ceil_mode);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::max_pool2d(
+      r_inputs[0], kernel_size, stride, padding, dilation, ceil_mode);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor adaptive_avg_pool2d(const at::Tensor &input, at::IntArrayRef output_size) {
+at::Tensor adaptive_avg_pool2d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "adaptive_avg_pool2d." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-
     auto output = at::adaptive_avg_pool2d(input, output_size);
-    std::string op_output = "adaptive_avg_pool2d." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {input}, "adaptive_avg_pool2d",
-                                          op_id, op_inputs, op_outputs);
+    calibrate(
+        {input}, {}, {output}, "adaptive_avg_pool2d", op_id, OP_TYPE_POOLING);
     return output;
   }
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto pool_x = input;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    pool_x = input_q.dequantize();
-  }
-  auto output = at::adaptive_avg_pool2d(pool_x, output_size);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::adaptive_avg_pool2d(r_inputs[0], output_size);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor relu(const at::Tensor &input) {
+at::Tensor relu(const at::Tensor& input) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "relu." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-
     auto output = at::relu(input);
-    std::string op_output = "relu." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "relu",
-                                          op_id, op_inputs, op_outputs);
+    calibrate({input}, {}, {output}, "relu", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto relu_x = input;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    relu_x = input_q.dequantize();
-  }
-  auto output = at::relu(relu_x);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::relu(r_inputs[0]);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor &relu_(at::Tensor &input) {
+at::Tensor& relu_(at::Tensor& input) {
   // always add id, but not compute scales or insert quant and dequant.
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "relu_." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    auto &output = at::relu_(input);
-    std::string op_output = "relu_." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    if (it == tensors_flow.end()) {
-      tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                           val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    } else {
-      it->second = val_name{weakref_scales(output.getIntrusivePtr()), op_output};
-    }
-    torch_ipex::insert_or_updata_observer({}, {}, "relu_", op_id, op_inputs, op_outputs);
+    auto& output = at::relu_(input);
+    calibrate({input}, {}, {output}, "relu_", op_id, OP_TYPE_INPLACE);
     return output;
   }
-
   return at::relu_(input);
 }
 
-at::Tensor sigmoid(const at::Tensor &input) {
+at::Tensor sigmoid(const at::Tensor& input) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "sigmoid." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-
     auto output = at::sigmoid(input);
-    std::string op_output = "sigmoid." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "sigmoid",
-                                          op_id, op_inputs, op_outputs);
+    calibrate({input}, {}, {output}, "sigmoid", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto sigmoid_x = input;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    sigmoid_x = input_q.dequantize();
-  }
-  auto output = at::sigmoid(sigmoid_x);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::sigmoid(r_inputs[0]);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor linear(const at::Tensor &input, const at::Tensor &weight, const c10::optional<at::Tensor> &bias) {
+at::Tensor linear(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "linear." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
     auto output = at::linear(input, weight, bias);
-    std::string op_output = "linear." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, {weight},
-                                          "linear", op_id, op_inputs, op_outputs);
+    calibrate({input}, {weight}, {output}, "linear", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto linear_x = input;
-  auto linear_w = weight;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input and weight.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    linear_x = input_q.dequantize();
-    if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
-      auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      auto zero_points = at::zeros(weight_scale[0].numel(), at::dtype(at::kLong));
-      auto weight_q = at::quantize_per_channel(weight, weight_scale[0], zero_points, 0, at::kQInt8);
-      linear_w = weight_q.dequantize();
-    } else {
-      std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
-      linear_w = weight_q.dequantize();
-    }
-  }
-  auto output = at::linear(linear_x, linear_w, bias);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {weight},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::linear(r_inputs[0], r_weights[0], bias);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
   return output;
 }
 
-at::Tensor &add_tensor_(at::Tensor &input, const at::Tensor &other, const at::Scalar &alpha) {
+at::Tensor& add_tensor_(
+    at::Tensor& input,
+    const at::Tensor& other,
+    const at::Scalar& alpha) {
   // always add id, but not compute scales or insert quant and dequant.
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it1 = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it1 == tensors_flow.end()) {
-      std::string op_input1 = "add_." + std::to_string(op_id) + ".input1";
-      op_inputs.push_back(op_input1);
-    } else {
-      op_inputs.push_back(std::get<1>(it1->second));
-    }
-    auto it2 = tensors_flow.find(other.unsafeGetTensorImpl());
-    if (it2 == tensors_flow.end()) {
-      std::string op_input2 = "add_." + std::to_string(op_id) + ".input2";
-      op_inputs.push_back(op_input2);
-    } else {
-      op_inputs.push_back(std::get<1>(it2->second));
-    }
-
     input.add_(other, alpha);
-    std::string op_output = "add_." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    if (it1 == tensors_flow.end()) {
-      tensors_flow.emplace(input.unsafeGetTensorImpl(),
-                           val_name{weakref_scales(input.getIntrusivePtr()), op_output});
-    } else {
-      it1->second = val_name{weakref_scales(input.getIntrusivePtr()), op_output};
-    }
-    torch_ipex::insert_or_updata_observer({}, {}, "add_", op_id, op_inputs, op_outputs);
+    calibrate({input, other}, {}, {input}, "add_", op_id, OP_TYPE_INPLACE);
     return input;
   }
   input.add_(other, alpha);
   return input;
 }
 
-at::Tensor add_tensor(const at::Tensor &input, const at::Tensor &other, const at::Scalar &alpha) {
+at::Tensor add_tensor(
+    const at::Tensor& input,
+    const at::Tensor& other,
+    const at::Scalar& alpha) {
   // always add id, but not compute scales or insert quant and dequant.
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it1 = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it1 == tensors_flow.end()) {
-      std::string op_input1 = "add." + std::to_string(op_id) + ".input1";
-      op_inputs.push_back(op_input1);
-    } else {
-      op_inputs.push_back(std::get<1>(it1->second));
-    }
-    auto it2 = tensors_flow.find(other.unsafeGetTensorImpl());
-    if (it2 == tensors_flow.end()) {
-      std::string op_input2 = "add." + std::to_string(op_id) + ".input2";
-      op_inputs.push_back(op_input2);
-    } else {
-      op_inputs.push_back(std::get<1>(it2->second));
-    }
-
     auto output = at::add(input, other, alpha);
-    std::string op_output = "add." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input, other}, {output}, "add", op_id, op_inputs, op_outputs);
+    calibrate({input, other}, {}, {output}, "add", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto add_x1 = input;
-  auto add_x2 = other;
-
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input and weight.
-    auto input_q1 = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
-    add_x1 = input_q1.dequantize();
-  }
-
-  if (inputs_quantized[1]) {
-    // add quantize and dequantize for input and weight.
-    auto input_q2 = at::quantize_per_tensor(other, qparams[0][1].scale,
-        qparams[0][1].zero_point, input_quantized_dtypes[1]);
-    add_x2 = input_q2.dequantize();
-  }
-  auto output = at::add(add_x1, add_x2, alpha);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input, other},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::add(r_inputs[0], r_inputs[1], alpha);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor dropout(const at::Tensor &input, double p, bool train) {
+at::Tensor dropout(const at::Tensor& input, double p, bool train) {
   // always add id, but not compute scales or insert quant and dequant.
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "dropout." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
     auto output = at::dropout(input, p, train);
-    std::string op_output = "dropout." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    if (it == tensors_flow.end()) {
-      tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                           val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    } else {
-      it->second = val_name{weakref_scales(output.getIntrusivePtr()), op_output};
-    }
-    torch_ipex::insert_or_updata_observer({}, {}, "dropout", op_id, op_inputs, op_outputs);
+    calibrate({input}, {}, {output}, "dropout", op_id, OP_TYPE_INPLACE);
     return output;
   }
-
   return at::dropout(input, p, train);
 }
 
-at::Tensor gelu(const at::Tensor &input) {
+at::Tensor gelu(const at::Tensor& input) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "gelu." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-
     auto output = at::gelu(input);
-    std::string op_output = "gelu." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "gelu",
-                                          op_id, op_inputs, op_outputs);
+    calibrate({input}, {}, {output}, "gelu", op_id, OP_TYPE_DEFAULT);
     return output;
   }
+  return at::gelu(input);
 }
 
 std::tuple<Tensor, Tensor, Tensor> lstm(
-    const Tensor& input, TensorList hx, TensorList _params, bool has_biases,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+    const Tensor& input,
+    TensorList hx,
+    TensorList _params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  at::Tensor output, hy, cy;
+  int step = has_biases ? 4 : 2;
   if (torch_ipex::check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "lstm." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-    at::Tensor output, hy, cy;
-    std::tie(output, hy, cy) = at::lstm(input, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-    std::string op_output = "lstm." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(output.unsafeGetTensorImpl(),
-                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    std::tie(output, hy, cy) = at::lstm(
+        input,
+        hx,
+        _params,
+        has_biases,
+        num_layers,
+        dropout_p,
+        train,
+        bidirectional,
+        batch_first);
     std::vector<at::Tensor> weights;
-    if (has_biases) {
-      // hx: [w10, w11, b10, b11, w20, w21, b20, b21 ...]
-      for (int i = 0; i < _params.size(); i+=4) {
-        auto w = at::cat({_params[i], _params[i + 1]}, 1);
-        weights.push_back(w);
-      }
-    } else {
-      // hx: [w10, w11, w20, w21 ...]
-      for (int i = 0; i < _params.size(); i+=2) {
-        auto w = at::cat({_params[i], _params[i + 1]}, 1);
-        weights.push_back(w);
-      }
+    for (int i = 0; i < _params.size(); i += step) {
+      auto w = at::cat({_params[i], _params[i + 1]}, 1);
+      weights.push_back(w);
     }
-    torch_ipex::insert_or_updata_observer({input}, {output}, weights,
-                                          "lstm", op_id, op_inputs, op_outputs);
+    calibrate({input}, weights, {output}, "lstm", op_id, OP_TYPE_DEFAULT);
     return std::make_tuple(output, hy, cy);
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) = torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) = torch_ipex::get_int8_insert_quantized_status(op_id);
-  at::Tensor output, hy, cy;
+  params p = get_params(op_id);
   auto lstm_x = input;
-  if (inputs_quantized[0]) {
+  if (p.inputs_quantized[0]) {
     // add quantize and dequantize for input and weight.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-        qparams[0][0].zero_point, input_quantized_dtypes[0]);
+    auto input_q = at::quantize_per_tensor(
+        input,
+        p.qparams[0][0].scale,
+        p.qparams[0][0].zero_point,
+        p.input_quantized_dtypes[0]);
     lstm_x = input_q.dequantize();
     std::vector<at::Tensor> lstm_params;
-    int idx = 0, step = 2;
-    if (has_biases) {
-      step = 4;
-    }
     if (torch_ipex::get_int8_weight_granularity(op_id) == "per_channel") {
-      auto &weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
-      for (int i = 0; i < _params.size(); i += step) {
-        auto zero_points = at::zeros(weight_scale[idx].numel(), at::dtype(at::kLong));
-        auto weight_q = at::quantize_per_channel(_params[i], weight_scale[idx], zero_points, 0, at::kQInt8);
+      auto& weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
+      for (int i = 0, idx = 0; i < _params.size(); i += step, idx += 1) {
+        auto zero_points =
+            at::zeros(weight_scale[idx].numel(), at::dtype(at::kLong));
+        auto weight_q = at::quantize_per_channel(
+            _params[i], weight_scale[idx], zero_points, 0, at::kQInt8);
         lstm_params.emplace_back(weight_q.dequantize());
-        auto zero_points_2 = at::zeros(weight_scale[idx].numel(), at::dtype(at::kLong));
-        auto weight_q_2 = at::quantize_per_channel(_params[i + 1], weight_scale[idx], zero_points_2, 0, at::kQInt8);
+        auto zero_points_2 =
+            at::zeros(weight_scale[idx].numel(), at::dtype(at::kLong));
+        auto weight_q_2 = at::quantize_per_channel(
+            _params[i + 1], weight_scale[idx], zero_points_2, 0, at::kQInt8);
         lstm_params.emplace_back(weight_q_2.dequantize());
         if (has_biases) {
-           lstm_params.emplace_back(_params[i + 2]);
-           lstm_params.emplace_back(_params[i + 3]);
+          lstm_params.emplace_back(_params[i + 2]);
+          lstm_params.emplace_back(_params[i + 3]);
         }
-        idx += 1;
       }
     } else {
       std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
-      for (int i = 0; i < _params.size(); i += step) {
-        auto weight_q = at::quantize_per_tensor(_params[i], w_scale[idx], 0, at::kQInt8);
+      for (int i = 0, idx = 0; i < _params.size(); i += step, idx += 1) {
+        auto weight_q =
+            at::quantize_per_tensor(_params[i], w_scale[idx], 0, at::kQInt8);
         lstm_params.emplace_back(weight_q.dequantize());
-        auto weight_q_2 = at::quantize_per_tensor(_params[i+1], w_scale[idx], 0, at::kQInt8);
+        auto weight_q_2 = at::quantize_per_tensor(
+            _params[i + 1], w_scale[idx], 0, at::kQInt8);
         lstm_params.emplace_back(weight_q_2.dequantize());
         if (has_biases) {
-           lstm_params.emplace_back(_params[i + 2]);
-           lstm_params.emplace_back(_params[i + 3]);
+          lstm_params.emplace_back(_params[i + 2]);
+          lstm_params.emplace_back(_params[i + 3]);
         }
-        idx += 1;
       }
     }
-    std::tie(output, hy, cy) = at::lstm(lstm_x, hx, lstm_params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+    std::tie(output, hy, cy) = at::lstm(
+        lstm_x,
+        hx,
+        lstm_params,
+        has_biases,
+        num_layers,
+        dropout_p,
+        train,
+        bidirectional,
+        batch_first);
   } else {
-    std::tie(output, hy, cy) = at::lstm(lstm_x, hx, _params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+    std::tie(output, hy, cy) = at::lstm(
+        lstm_x,
+        hx,
+        _params,
+        has_biases,
+        num_layers,
+        dropout_p,
+        train,
+        bidirectional,
+        batch_first);
   }
   // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-        qparams[1][0].zero_point, output_quantized_dtypes[0]);
+  if (p.outputs_quantized[0]) {
+    auto output_q = at::quantize_per_tensor(
+        output,
+        p.qparams[1][0].scale,
+        p.qparams[1][0].zero_point,
+        p.output_quantized_dtypes[0]);
     return std::make_tuple(output_q.dequantize(), hy, cy);
   }
   return std::make_tuple(output, hy, cy);
 }
 
-at::Tensor flatten(const at::Tensor &input, int64_t start_dim,
-                   int64_t end_dim) {
+at::Tensor flatten(
+    const at::Tensor& input,
+    int64_t start_dim,
+    int64_t end_dim) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
-    std::vector<std::string> op_inputs, op_outputs;
-    if (it == tensors_flow.end()) {
-      std::string op_input = "flatten." + std::to_string(op_id) + ".input";
-      op_inputs.push_back(op_input);
-    } else {
-      op_inputs.push_back(std::get<1>(it->second));
-    }
-
     auto output = at::flatten(input, start_dim, end_dim);
-    std::string op_output = "flatten." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(
-        output.unsafeGetTensorImpl(),
-        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "flatten", op_id,
-                                          op_inputs, op_outputs);
+    calibrate({input}, {}, {output}, "flatten", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) =
-      torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) =
-      torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto flatten_x = input;
-  if (inputs_quantized[0]) {
-    // add quantize and dequantize for input.
-    auto input_q = at::quantize_per_tensor(input, qparams[0][0].scale,
-                                           qparams[0][0].zero_point,
-                                           input_quantized_dtypes[0]);
-    flatten_x = input_q.dequantize();
-  }
-  auto output = at::flatten(flatten_x, start_dim, end_dim);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-                                            qparams[1][0].zero_point,
-                                            output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {input},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::flatten(r_inputs[0], start_dim, end_dim);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
-at::Tensor embedding_bag(const at::Tensor &weight, const at::Tensor &indices,
-                         const at::Tensor &offsets, bool sparse,
-                         bool include_last_offset) {
+at::Tensor embedding_bag(
+    const at::Tensor& weight,
+    const at::Tensor& indices,
+    const at::Tensor& offsets,
+    bool sparse,
+    bool include_last_offset) {
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::embedding_bag", "")
                        .typed<decltype(embedding_bag)>();
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    std::vector<std::string> op_outputs;
     auto output =
         op.call(weight, indices, offsets, sparse, include_last_offset);
-    std::string op_output =
-        "embedding_bag." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(
-        output.unsafeGetTensorImpl(),
-        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer(/*inputs=*/{}, {output}, {weight},
-                                          "embedding_bag", op_id,
-                                          /*op_inputs*/ {}, op_outputs);
+    calibrate({}, {weight}, {output}, "embedding_bag", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) =
-      torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) =
-      torch_ipex::get_int8_insert_quantized_status(op_id);
+  params p = get_params(op_id);
   auto emb_w = weight;
   std::vector<float> w_scale;
 
@@ -849,79 +590,40 @@ at::Tensor embedding_bag(const at::Tensor &weight, const at::Tensor &indices,
   w_scale = torch_ipex::get_int8_weight_scale(op_id);
   auto weight_q = at::quantize_per_tensor(weight, w_scale[0], 0, at::kQInt8);
   emb_w = weight_q.dequantize();
-
   auto output = op.call(emb_w, indices, offsets, sparse, include_last_offset);
   // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
+  if (p.outputs_quantized[0]) {
     auto output_q = at::quantize_per_tensor(output, w_scale[0], 0, at::kQInt8);
     return output_q.dequantize();
   }
   return output;
 }
 
-at::Tensor interaction_forward(const std::vector<at::Tensor> &input) {
+at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::interaction_forward", "")
                        .typed<decltype(interaction_forward)>();
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
-    std::vector<std::string> op_inputs, op_outputs;
-    for (int i = 0; i < input.size(); i++) {
-      auto it = tensors_flow.find(input[i].unsafeGetTensorImpl());
-      if (it == tensors_flow.end()) {
-        std::string op_input = "interaction." + std::to_string(op_id) +
-                               ".input" + std::to_string(i);
-        op_inputs.push_back(op_input);
-      } else {
-        op_inputs.push_back(std::get<1>(it->second));
-      }
-    }
     auto output = op.call(input);
-    std::string op_output = "interaction." + std::to_string(op_id) + ".output";
-    op_outputs.push_back(op_output);
-    tensors_flow.emplace(
-        output.unsafeGetTensorImpl(),
-        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer(input, {output}, "interaction", op_id,
-                                          op_inputs, op_outputs);
+    calibrate(input, {}, {output}, "interaction", op_id, OP_TYPE_DEFAULT);
     return output;
   }
-
-  auto qparams = torch_ipex::get_int8_scales(op_id);
-  std::vector<at::ScalarType> input_quantized_dtypes, output_quantized_dtypes;
-  std::tie(input_quantized_dtypes, output_quantized_dtypes) =
-      torch_ipex::get_int8_quantized_dtypes(op_id);
-  std::vector<bool> inputs_quantized, outputs_quantized;
-  std::tie(inputs_quantized, outputs_quantized) =
-      torch_ipex::get_int8_insert_quantized_status(op_id);
-  auto x = input;
-  for (int i = 0; i < input.size(); i++) {
-    if (inputs_quantized[i]) {
-      // add quantize and dequantize for input and weight.
-      auto input_q = at::quantize_per_tensor(input[i], qparams[0][i].scale,
-                                             qparams[0][i].zero_point,
-                                             input_quantized_dtypes[i]);
-      x[i] = input_q;
-    }
-  }
-
-  for (int i = 0; i < input.size(); i++) {
-    if (inputs_quantized[i]) {
-      x[i] = x[i].dequantize();
-    }
-  }
-
-  auto output = op.call(x);
-  // add quantize and dequantize output.
-  if (outputs_quantized[0]) {
-    auto output_q = at::quantize_per_tensor(output, qparams[1][0].scale,
-                                            qparams[1][0].zero_point,
-                                            output_quantized_dtypes[0]);
-    return output_q.dequantize();
-  }
-  return output;
+  params p = get_params(op_id);
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      input,
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = op.call(r_inputs);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return outputs[0];
 }
 
+} // namespace int8
 } // namespace autocast
-} // namespace cpu
 } // namespace torch_ipex
