@@ -71,22 +71,38 @@ class Operator {
     return static_cast<float>(toIValue(node->input(offset))->toDouble());
   }
 
+  static std::vector<float> FloatValueToVector(float value) {
+    return {value};
+  }
+
   static std::vector<float> FloatToVector(const Node* node, size_t offset) {
-    return {Float(node, offset)};
+    return FloatValueToVector(Float(node, offset));
+  }
+
+  static std::vector<int64_t> IntValueToVector(int64_t value) {
+    return {value};
   }
 
   static std::vector<int64_t> IntToVector(const Node* node, size_t offset) {
-    return {Int(node, offset)};
+    return IntValueToVector(Int(node, offset));
+  }
+
+  static std::string QuantString(at::ScalarType scalar_type) {
+    switch (scalar_type) {
+      case at::ScalarType::QInt8:
+        return std::string("int8");
+      case at::ScalarType::QUInt8:
+        return std::string("uint8");
+      default:
+        TORCH_CHECK(
+            false,
+            "Invalid quant data type ",
+            static_cast<size_t>(scalar_type));
+    }
   }
 
   static std::string String(const Node* node, size_t offset) {
-    std::string str = toString(static_cast<at::ScalarType>(Int(node, offset)));
-    TORCH_CHECK((str == "QUInt8") || (str == "QInt8"), "Incorrect scalar type: ", str);
-    if (str == "QUInt8") {
-      return std::string("uint8");
-    } else {
-      return std::string("int8");
-    }
+    return QuantString(static_cast<at::ScalarType>(Int(node, offset)));
   }
 
   static at::Tensor Tensor(const Node* node, size_t offset) {

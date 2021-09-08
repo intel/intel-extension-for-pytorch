@@ -95,7 +95,7 @@ Operator makeDequantOp(Node* node, Node* input_node) {
         .setAttr("zps", Operator::IntToVector(input_node, 2))
         .setAttr("in_type", Operator::String(input_node, 3))
         .setAttr("qtype", std::string("per_tensor"));
-  } else {
+  } else if (input_node->kind() == Symbol::aten("quantize_per_channel")) {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));
     node->t_(Symbol::attr("zps"), Operator::Tensor(input_node, 2));
     node->t_(Symbol::attr("scales"), Operator::Tensor(input_node, 1));
@@ -110,6 +110,54 @@ Operator makeDequantOp(Node* node, Node* input_node) {
         .setAttr("axis", Operator::Int(input_node, 3))
         .setAttr("in_type", Operator::String(input_node, 4))
         .setAttr("qtype", std::string("per_channel"));
+  } else {
+    TORCH_CHECK(
+        input_node->kind() == prim::Constant,
+        "Expect input_node kind to be prim::Constant but got ",
+        input_node->kind().toQualString());
+
+    Value* v = input_node->output();
+    TORCH_CHECK(
+        v->type()->cast<TensorType>(),
+        "Constant input to dequant must be Tensor type");
+    auto qtensor = toIValue(v)->toTensor();
+
+    TORCH_CHECK(
+        qtensor.scalar_type() == at::ScalarType::QInt8 ||
+            qtensor.scalar_type() == at::ScalarType::QUInt8,
+        "Expect input to dequant to be int8 dtype but got ",
+        qtensor.scalar_type());
+    auto scalar_type = qtensor.scalar_type();
+
+    switch (qtensor.qscheme()) {
+      case at::kPerTensorAffine:
+        return Operator(node, opkind::Dequantize)
+            .setInput(0)
+            .setOutput(0)
+            .setAttr(
+                "scales",
+                Operator::FloatValueToVector(
+                    static_cast<float>(qtensor.q_scale())))
+            .setAttr("zps", Operator::IntValueToVector(qtensor.q_zero_point()))
+            .setAttr("in_type", Operator::QuantString(scalar_type))
+            .setAttr("qtype", std::string("per_tensor"));
+      case at::kPerChannelAffine:
+        return Operator(node, opkind::Dequantize)
+            .setInput(0)
+            .setOutput(0)
+            .setAttr(
+                "scales", FloatTensorToVector(qtensor.q_per_channel_scales()))
+            .setAttr(
+                "zps", IntTensorToVector(qtensor.q_per_channel_zero_points()))
+            .setAttr("axis", qtensor.q_per_channel_axis())
+            .setAttr("in_type", Operator::QuantString(scalar_type))
+            .setAttr("qtype", std::string("per_channel"));
+      default:
+        TORCH_CHECK(
+            false,
+            "Unsupported tensor quantization type ",
+            toString(qtensor.qscheme()));
+    }
   }
 }
 
@@ -286,19 +334,15 @@ Operator createOperator(Node* node) {
   } else if (node->kind() == Symbol::aten("dequantize")) {
     if (node->numAttributes() == 0) {
       Node* input_node = node->input(0)->node();
-      // TODO: how to handle input(1) == Symbol::aten("q_scale")
-      REQ(((input_node->kind() == Symbol::aten("quantize_per_tensor")) || (input_node->kind() == Symbol::aten("quantize_per_channel"))) && (input_node->input(1)->node()->kind() != Symbol::aten("q_scale")));
-
-      // TODO: how to handle this case:
-      //      quantize_per_tensor
-      //   ---/-----/-----\-----\---
-      //dequant q_scale  q_zp  dtype
-      // REQ(input_node->output(0)->uses().size() <= 2);
+      TORCH_CHECK(
+          input_node->kind() == prim::Constant ||
+              input_node->kind() == Symbol::aten("quantize_per_tensor") ||
+              input_node->kind() == Symbol::aten("quantize_per_channel"),
+          "Unsupported input node kind to dequant ",
+          input_node->kind().toQualString());
 
       return makeDequantOp(node, input_node);
     } else {
-
-
       if (node->s(Symbol::attr("qtype")) == std::string("per_tensor")) {
         std::vector<double> scales_double = node->fs(Symbol::attr("scales"));
         std::vector<float> scales_float;
