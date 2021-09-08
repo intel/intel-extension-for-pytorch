@@ -9,12 +9,15 @@
 namespace torch_ipex {
 namespace cpu {
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor>
-batch_norm_impl(const at::Tensor &input, const at::Tensor &weight,
-                const at::Tensor &bias,
-                const c10::optional<at::Tensor> &running_mean_opt,
-                const c10::optional<at::Tensor> &running_var_opt, bool train,
-                double momentum, double eps) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_forward(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const c10::optional<at::Tensor>& running_mean_opt,
+    const c10::optional<at::Tensor>& running_var_opt,
+    bool train,
+    double momentum,
+    double eps) {
   const at::Tensor &running_mean =
       c10::value_or_else(running_mean_opt, [] { return at::Tensor(); });
   const at::Tensor &running_var =
@@ -85,32 +88,33 @@ batch_norm_impl(const at::Tensor &input, const at::Tensor &weight,
     }
 
     if (is_channels_last) {
-      return std::make_tuple(output, at::Tensor(), at::Tensor());
+      return std::make_tuple(output, running_mean, running_var);
     } else {
       return std::make_tuple(
           mkldnn_to_dense(new_with_itensor_mkldnn(
               std::move(y),
               optTypeMetaToScalarType(input.options().dtype_opt()),
               input.options().device_opt())),
-          at::Tensor(),
-          at::Tensor());
+          running_mean,
+          running_var);
     }
   }
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor>
-batch_norm_backward_impl(const at::Tensor &grad_output, const at::Tensor &input,
-                         const at::Tensor &weight, const at::Tensor &save_mean,
-                         const at::Tensor &save_invstd, bool train, double eps,
-                         std::array<bool, 3> grad_input_mask) {
-  TORCH_CHECK(
-      train,
-      "mkldnn_batch_norm_backward: currently mkldnn only support train model");
+std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward(
+    const at::Tensor& grad_output,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& save_mean,
+    const at::Tensor& save_var,
+    bool train,
+    double eps,
+    std::array<bool, 3> grad_input_mask) {
   ideep::tensor grady = itensor_view_from_dense(grad_output);
   ideep::tensor x = itensor_view_from_dense(input);
   ideep::tensor w = itensor_view_from_dense(weight);
   ideep::tensor m = itensor_view_from_dense(save_mean);
-  ideep::tensor v = itensor_view_from_dense(save_invstd);
+  ideep::tensor v = itensor_view_from_dense(save_var);
 
   bool is_channels_last =
       grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
@@ -125,19 +129,24 @@ batch_norm_backward_impl(const at::Tensor &grad_output, const at::Tensor &input,
   }
   gradw = itensor_view_from_dense(grad_weight);
   gradb = itensor_view_from_dense(grad_bias);
-  ideep::batch_normalization_backward::compute(x, m, v, grady, w, gradx, gradw,
-                                               gradb, eps);
+  ideep::batch_normalization_backward::compute(
+      x, m, v, grady, w, gradx, gradw, gradb, eps);
 
   if (is_channels_last) {
-    return std::make_tuple(grad_input, grad_weight, grad_bias);
+    return std::make_tuple(
+        grad_input_mask[0] ? grad_input : at::Tensor(),
+        grad_input_mask[1] ? grad_weight : at::Tensor(),
+        grad_input_mask[2] ? grad_bias : at::Tensor());
   } else {
     return std::make_tuple(
-        mkldnn_to_dense(new_with_itensor_mkldnn(
-            std::move(gradx),
-            optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-            grad_output.options().device_opt())),
-        grad_weight,
-        grad_bias);
+        grad_input_mask[0]
+            ? mkldnn_to_dense(new_with_itensor_mkldnn(
+                  std::move(gradx),
+                  optTypeMetaToScalarType(grad_output.options().dtype_opt()),
+                  grad_output.options().device_opt()))
+            : at::Tensor(),
+        grad_input_mask[1] ? grad_weight : at::Tensor(),
+        grad_input_mask[2] ? grad_bias : at::Tensor());
   }
 }
 
@@ -156,11 +165,20 @@ IPEXBatchNormOp::forward(torch::autograd::AutogradContext *ctx,
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
   ctx->saved_data["bias_requires_grad"] = bias.requires_grad();
-  at::Tensor output, save_mean, save_invstd;
-  std::tie(output, save_mean, save_invstd) =
-      batch_norm_impl(input, weight, bias, running_mean_opt, running_var_opt,
-                      train, momentum, eps);
-  ctx->save_for_backward({input, weight, save_mean, save_invstd});
+  at::Tensor output, save_mean, save_var;
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::batch_norm_forward", "")
+                       .typed<decltype(batch_norm_forward)>();
+  std::tie(output, save_mean, save_var) = op.call(
+      input,
+      weight,
+      bias,
+      running_mean_opt,
+      running_var_opt,
+      train,
+      momentum,
+      eps);
+  ctx->save_for_backward({input, weight, save_mean, save_var});
   return output;
 }
 
@@ -181,13 +199,28 @@ IPEXBatchNormOp::backward(torch::autograd::AutogradContext *ctx,
   at::Tensor input = saved[0];
   at::Tensor weight = saved[1];
   at::Tensor save_mean = saved[2];
-  at::Tensor save_invstd = saved[3];
+  at::Tensor save_var = saved[3];
   at::Tensor grad_input, grad_weight, grad_bias;
-  std::tie(grad_input, grad_weight, grad_bias) =
-      batch_norm_backward_impl(grad_outputs[0], input, weight, save_mean,
-                               save_invstd, train, eps, output_mask);
-  return {grad_input,   grad_weight,  grad_bias,    at::Tensor(),
-          at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor()};
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::batch_norm_backward", "")
+                       .typed<decltype(batch_norm_backward)>();
+  std::tie(grad_input, grad_weight, grad_bias) = op.call(
+      grad_outputs[0],
+      input,
+      weight,
+      save_mean,
+      save_var,
+      train,
+      eps,
+      output_mask);
+  return {grad_input,
+          grad_weight,
+          grad_bias,
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor()};
 }
 
 at::Tensor batch_norm(const at::Tensor &input,
@@ -200,7 +233,7 @@ at::Tensor batch_norm(const at::Tensor &input,
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("torch_ipex::batch_norm", std::vector<c10::IValue>({}));
 #endif
-  if (weight_opt.has_value() && bias_opt.has_value() && train &&
+  if (weight_opt.has_value() && bias_opt.has_value() &&
       !torch::jit::tracer::isTracing()) {
     return IPEXBatchNormOp::apply(input, weight_opt.value(), bias_opt.value(),
                                   running_mean_opt, running_var_opt, train,
@@ -219,5 +252,70 @@ at::Tensor batch_norm(const at::Tensor &input,
   }
 }
 
+at::Tensor frozen_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "torch_ipex::frozen_batch_norm", std::vector<c10::IValue>({}));
+#endif
+  return IPEXBatchNormOp::apply(
+      input, weight, bias, running_mean, running_var, false, 0, 0);
+}
+
 } // namespace cpu
+} // namespace torch_ipex
+
+namespace {
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "frozen_batch_norm(Tensor input, Tensor weight, Tensor bias, Tensor running_mean, Tensor running_var) -> Tensor");
+  m.impl(
+      "frozen_batch_norm",
+      c10::DispatchKey::Autograd,
+      torch_ipex::cpu::frozen_batch_norm);
+  m.def(
+      "batch_norm_forward(Tensor input, Tensor weight, Tensor bias, Tensor? running_mean, Tensor? running_var, bool train, float momentum, float eps) -> (Tensor, Tensor, Tensor)");
+  m.impl(
+      "batch_norm_forward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::batch_norm_forward);
+  m.def(
+      "batch_norm_backward(Tensor grad_output, Tensor input, Tensor weight, Tensor save_mean, Tensor save_var, bool train, float eps, bool[3] grad_input_mask) -> (Tensor, Tensor, Tensor)");
+  m.impl(
+      "batch_norm_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::batch_norm_backward);
+}
+
+} // namespace
+
+namespace torch_ipex {
+namespace autocast {
+
+at::Tensor frozen_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::frozen_batch_norm", "")
+                       .typed<decltype(frozen_batch_norm)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("frozen_batch_norm");
+#endif
+  return op.call(input, weight, bias, running_mean, running_var);
+}
+
+TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
+  m.impl("frozen_batch_norm", torch_ipex::autocast::frozen_batch_norm);
+}
+
+} // namespace autocast
 } // namespace torch_ipex

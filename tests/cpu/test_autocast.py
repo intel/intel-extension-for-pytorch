@@ -224,6 +224,62 @@ class TestBatchNorm(TestCase):
             y = model(x)
         self.assertEqual(y.dtype, torch.bfloat16)
 
+    def _test_batch_norm(self, bn):
+        m = copy.deepcopy(bn)
+        m_autocast = copy.deepcopy(bn)
+        m_bf16 = copy.deepcopy(bn)
+        input = torch.randn(20, 100, 35, 45)
+        x = input.clone().detach().requires_grad_()
+        x_autocast = input.clone().detach().requires_grad_()
+        x_bf16 = input.clone().detach().bfloat16().requires_grad_()
+        y = m(x)
+        y.mean().backward()
+        with torch.cpu.amp.autocast():
+            y_autocast = m_autocast(x_autocast)
+            y_autocast.mean().backward()
+        self.assertEqual(y, y_autocast)
+        self.assertEqual(x.grad, x_autocast.grad)
+        self.assertEqual(m.weight.grad, m_autocast.weight.grad)
+        self.assertEqual(m.bias.grad, m_autocast.bias.grad)
+        
+        # bfloat16
+        with torch.cpu.amp.autocast():
+            y_bf16 = m_bf16(x_bf16)
+            y_bf16.mean().backward()
+        self.assertEqual(y_bf16.dtype, torch.bfloat16)
+        self.assertEqual(x_bf16.grad.dtype, torch.bfloat16)
+
+        # channels last
+        m1_autocast = copy.deepcopy(bn)
+        x1_autocast = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        with torch.cpu.amp.autocast():
+            y1_autocast = m1_autocast(x1_autocast)
+            y1_autocast.mean().backward()
+        self.assertTrue(y1_autocast.is_contiguous(memory_format=torch.channels_last))
+        self.assertTrue(x1_autocast.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y, y1_autocast)
+        self.assertEqual(x.grad, x1_autocast.grad)
+        self.assertEqual(m.weight.grad, m1_autocast.weight.grad)
+        self.assertEqual(m.bias.grad, m1_autocast.bias.grad)
+
+    def test_batch_norm_train(self):
+        bn = nn.BatchNorm2d(100).train()
+        bn.weight.data = torch.randn(100)
+        bn.bias.data = torch.randn(100)
+        self._test_batch_norm(bn)
+
+    def test_batch_norm_eval(self):
+        bn = nn.BatchNorm2d(100).eval()
+        bn.weight.data = torch.randn(100)
+        bn.bias.data = torch.randn(100)
+        self._test_batch_norm(bn)
+
+    def test_batch_norm_untrack_running_stats(self):
+        bn = nn.BatchNorm2d(100, track_running_stats=False)
+        bn.weight.data = torch.randn(100)
+        bn.bias.data = torch.randn(100)
+        self._test_batch_norm(bn)
+
 class M(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
         super(M, self).__init__()
