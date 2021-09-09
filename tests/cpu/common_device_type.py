@@ -49,7 +49,7 @@ import threading
 from functools import wraps
 import unittest
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 import copy
 from common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL, \
     skipCUDANonDefaultStreamIf

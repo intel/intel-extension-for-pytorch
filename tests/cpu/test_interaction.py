@@ -5,7 +5,7 @@ from functools import reduce
 
 import torch
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn

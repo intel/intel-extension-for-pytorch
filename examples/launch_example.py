@@ -9,7 +9,7 @@ device = 'cpu'
 model.to(device)
 input_batch = input_batch.to(device)
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.float32, level='O1')
 input_batch = input_batch.to(memory_format=torch.channels_last)
 

@@ -17,23 +17,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
- 
+
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
- 
+
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
- 
+
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
- 
+
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
- 
+
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -88,7 +88,7 @@ import torch.backends.mkl
 from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 torch.backends.disable_global_flags()
 
@@ -1110,7 +1110,7 @@ class VerboseTestCase(TestCase):
             return False
         src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
         return src_dtype[1] != dst_dtype[1] and src_format == dst_format
-        
+
     def OnlyReorderFormat(self, line):
         if not self.is_dnnl_reorder(line):
             return False
@@ -1121,7 +1121,7 @@ class VerboseTestCase(TestCase):
 
     def assertOnlyReorderDtype(self, line):
         assert OnlyReorderDtype(line), 'the verbose msg shows not only reorder dtype'
-        
+
     def assertOnlyReorderFormat(self, line):
         assert OnlyReorderFormat(line), 'the verbose msg shows not only reorder format'
 

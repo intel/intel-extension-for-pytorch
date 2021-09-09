@@ -89,7 +89,7 @@ torch/share/
 torch/test/
 torch/version.py
 
-intel_pytorch_extension_py/version.py
+torch_ipex_py/version.py
 torch_ipex/csrc/version.cpp
 torch_ipex/csrc/aten_ipex_sparse_type_default.*
 torch_ipex/csrc/cpu/SparseOPs*

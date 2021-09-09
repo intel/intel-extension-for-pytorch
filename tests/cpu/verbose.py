@@ -1,6 +1,6 @@
 import argparse
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 class Module(torch.nn.Module):
     def __init__(self):

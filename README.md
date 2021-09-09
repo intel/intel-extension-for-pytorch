@@ -89,7 +89,7 @@ import torch
 import torch.nn as nn
 
 # Import Extension
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
@@ -117,7 +117,7 @@ The extension can simply the case, you just need to enable the auto-mix-precisio
 import torch
 import torch.nn as nn
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 # Automatically mix precision
 ipex.enable_auto_mixed_precision(mixed_dtype = torch.bfloat16)
 

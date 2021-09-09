@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_test_env
 from torch.testing._internal.common_utils import TEST_SCIPY
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 try:
     import torchvision
@@ -379,14 +379,14 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.conv1(x)
                 y = self.eltwise(x)
                 return [x, y]
-        
+
         # The pattern is as the following:
         #      conv
-        #     |    \    
+        #     |    \
         # eltwise   \
         #    |       \
         #  ListConstruct
-        # 
+        #
         # The output of conv is used by a wildcard op: ListConstruct.
         # Thus conv-eltwise cannot be selected into the same Partition.
         m = M()

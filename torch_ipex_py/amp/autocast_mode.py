@@ -1,8 +1,6 @@
 import torch
-import functools
-import warnings
-import numpy as np
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
+
 
 class _autocast_bf16(torch.cpu.amp.autocast):
     def __enter__(self):
@@ -19,5 +17,6 @@ class _autocast_bf16(torch.cpu.amp.autocast):
         torch.set_autocast_cpu_enabled(self.prev)
         core.set_autocast_dtype(self.prev_dtype)
         return False
+
 
 torch.cpu.amp.autocast = _autocast_bf16

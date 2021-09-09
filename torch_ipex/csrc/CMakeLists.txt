@@ -2,9 +2,9 @@
 # of core files without having to trundle through all of ATen's CMakeLists.txt
 # Add files needed from jit folders
 LIST(APPEND DPCPP_COMMON_SRCS
-    ${DPCPP_ROOT}/init_python_bindings.cpp
     ${DPCPP_ROOT}/version.cpp
     ${DPCPP_ROOT}/utils.cpp
+    ${DPCPP_ROOT}/verbose.cpp
     ${DPCPP_ROOT}/autocast_mode.cpp
     ${DPCPP_ROOT}/LlgaTensorImpl.cpp
     ${DPCPP_ROOT}/autocast_kernel.cpp

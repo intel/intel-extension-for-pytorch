@@ -1,5 +1,5 @@
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from torch.utils import ThroughputBenchmark
 import argparse
 
@@ -40,7 +40,7 @@ def training_benchmark(interact_module, dtype, result_dir):
     for _ in range(100):
         y = interact_module.forward(inputs).sum()
         y.backward()
-    
+
     startT = time.time()
     for _ in range(1000):
         y = interact_module.forward(inputs).sum()

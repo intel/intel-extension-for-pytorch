@@ -3,10 +3,10 @@ import itertools
 import copy
 
 import torch
-import intel_pytorch_extension as ipex
-from intel_pytorch_extension.weight_cast import _weight_dtype_convert_with_ipex as cast
-from intel_pytorch_extension.weight_cast import IPEX_WEIGHT_CAST_MODULE as IPEX_WEIGHT_CAST_MODULE
-from intel_pytorch_extension.optimizer_utils import IPEX_OPTIMIZER_MAPPING as IPEX_OPTIMIZER_MAPPING
+import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch.weight_cast import _weight_dtype_convert_with_ipex as cast
+from intel_extension_for_pytorch.weight_cast import IPEX_WEIGHT_CAST_MODULE as IPEX_WEIGHT_CAST_MODULE
+from intel_extension_for_pytorch.optimizer_utils import IPEX_OPTIMIZER_MAPPING as IPEX_OPTIMIZER_MAPPING
 
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
@@ -31,7 +31,7 @@ class TestModule(torch.nn.Module):
 class TestWeightCastCases(TestCase):
     def is_master_weight_solution(self, module, optimizer):
         return type(module) in IPEX_WEIGHT_CAST_MODULE and type(optimizer) not in IPEX_OPTIMIZER_MAPPING
-    
+
     def is_master_weight_split_solution(self, module, optimizer):
         return type(module) in IPEX_WEIGHT_CAST_MODULE and type(optimizer) in IPEX_OPTIMIZER_MAPPING
 

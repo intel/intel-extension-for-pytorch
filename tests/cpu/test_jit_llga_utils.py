@@ -12,7 +12,7 @@ from torch.testing._internal.common_utils import freeze_rng_state, run_tests, \
 
 from torch.jit._recursive import wrap_cpp_module
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 LLGA_FUSION_GROUP = 'ipex::LlgaFusionGroup'
 

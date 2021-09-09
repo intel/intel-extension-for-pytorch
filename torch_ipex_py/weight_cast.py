@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 import warnings
 from .weight_prepack import _IPEXConvNd, _IPEXConv2d, _IPEXLinear
 from .optimizer_utils import IPEX_OPTIMIZER_MAPPING, _ipex_optimizer

@@ -74,6 +74,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-result")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-strict-overflow")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-strict-aliasing")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=deprecated-declarations")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-qualifiers")
 if (CMAKE_COMPILER_IS_GNUCXX AND NOT (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0.0))
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-stringop-overflow")
 endif()
@@ -166,6 +167,13 @@ else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
 
+# Set Python include dir
+if(DEFINED PYTHON_INCLUDE_DIR)
+  include_directories(${PYTHON_INCLUDE_DIR})
+else()
+  message(FATAL_ERROR, "Cannot find installed Python head file directory")
+endif()
+
 # include pybind11 after pytorch include
 # to be able to use the py::class defined in PyTorch when binding c++ API to Python in IPEX
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
@@ -195,7 +203,7 @@ ExternalProject_Add(xsmm
   )
 # Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
-pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
+add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
 #link_directories(${PYTORCH_INSTALL_DIR}/lib)
@@ -214,15 +222,13 @@ else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-add_dependencies(${PLUGIN_NAME} pybind11)
-#add_dependencies(${PLUGIN_NAME} torch_ccl)
 add_dependencies(${PLUGIN_NAME} dnnl_graph)
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 add_dependencies(${PLUGIN_NAME} xsmm)
-#target_link_libraries(${PLUGIN_NAME} PUBLIC torch_ccl)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
+install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

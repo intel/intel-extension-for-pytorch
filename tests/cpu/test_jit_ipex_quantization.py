@@ -7,7 +7,7 @@ from torch.testing import FileCheck
 
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_test_env
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 
 class TestIpexOps(JitLlgaTestCase):

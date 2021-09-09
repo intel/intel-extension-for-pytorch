@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_test_env
 from torch.testing._internal.common_utils import TEST_SCIPY
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 try:
     import torchvision
@@ -37,7 +37,7 @@ class TestOp(JitLlgaTestCase):
 
             def forward(self, x, y):
                 return x.matmul(y)
-        
+
         x = torch.randn(128, 16, 384, 64)
         y = torch.randn(128, 16, 64, 384)
         m = M()

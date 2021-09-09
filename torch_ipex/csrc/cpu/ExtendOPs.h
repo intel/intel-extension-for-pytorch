@@ -3,7 +3,6 @@
 
 #include <ATen/Tensor.h>
 #include <torch/extension.h>
-#include "ideep/ideep.hpp"
 
 namespace torch_ipex {
 
@@ -131,8 +130,9 @@ class AtenIpexTypeExt {
                           const int64_t num_classes);
 
   static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
-  static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, 
-                                                                     const std::vector<at::Tensor> & input);
+  static std::vector<at::Tensor> interaction_backward(
+      const at::Tensor& grad_out,
+      const std::vector<at::Tensor>& input);
 
   static at::Tensor embedding_bag(
       const at::Tensor &weight,
@@ -142,9 +142,9 @@ class AtenIpexTypeExt {
       bool include_last_offset);
 
   static bool embedding_bag_fast_path_sum(
-      const at::Tensor weight, 
-      const c10::optional<at::Tensor> per_sample_weights, 
-      int64_t mode, 
+      const at::Tensor weight,
+      const c10::optional<at::Tensor> per_sample_weights,
+      int64_t mode,
       const c10::optional<int64_t> padding_idx);
 
   /// \brief Do scale and transform from xywh to ltrb for predicted loc and do Softmax along the last dim for predicted score.

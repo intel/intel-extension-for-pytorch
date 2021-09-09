@@ -1,7 +1,7 @@
 import os
 import json
 import torch
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 
 qscheme_dict ={torch.per_tensor_affine:0,
                torch.per_channel_affine:1,

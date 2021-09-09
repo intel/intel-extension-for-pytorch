@@ -1,8 +1,8 @@
 import unittest
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import time, sys
-from intel_pytorch_extension.launch import  *
+from intel_extension_for_pytorch.launch import  *
 import os
 import glob
 

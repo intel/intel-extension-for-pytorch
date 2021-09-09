@@ -5,7 +5,7 @@ from torch.utils import ThroughputBenchmark
 from torch.testing import assert_allclose
 from torch.testing._internal.common_utils import run_tests, TestCase
 
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 from test_jit_llga_quantization_fuser import llga_test_env
 
@@ -36,9 +36,9 @@ class TestThroughputBenchmark(JitLlgaTestCase):
 
             m = LinearEltwise(D_in, H, D_out)
             x = torch.randn(B, D_in)
-            
+
             graph, m_llga, m_cpu = self.prepareModel(m, [x])
-            
+
             ipex.core._jit_set_llga_enabled(False)
             module_result = m_cpu(x)
             ipex.core._jit_set_llga_enabled(True)

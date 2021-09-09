@@ -13,7 +13,7 @@ except ImportError:
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
 

@@ -8,7 +8,7 @@ from .ops.lstm import IpexLSTM
 from .weight_prepack import _weight_prepack_with_ipex
 from .weight_cast import _weight_dtype_convert_with_ipex
 from .optimizer_utils import _ipex_optimizer
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 
 def _replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.

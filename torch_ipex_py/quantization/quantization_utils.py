@@ -2,7 +2,7 @@ import torch
 import functools
 import warnings
 import numpy as np
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 from .. import conf
 
 def _get_default_recipe(configures):

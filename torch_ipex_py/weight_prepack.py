@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 import warnings
 import types
 import copy
@@ -126,7 +126,7 @@ class _IPEXLinear(torch.nn.Module):
         elif hasattr(dense_module, 'weight_trail'):
             self.weight_trail = torch.ops.torch_ipex.linear_weight_prepack(
                 dense_module.weight_trail.detach().clone())
-  
+
         if dense_module.bias is not None:
             self.bias = nn.Parameter(dense_module.bias.detach().clone())
             if hasattr(dense_module, 'master_bias'):
@@ -163,7 +163,7 @@ class _IPEXLinear(torch.nn.Module):
             weight.detach(),
             self.out_features,
             self.in_features,
-            self.weight_transposed, 
+            self.weight_transposed,
             unpack_dtype)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
@@ -177,7 +177,7 @@ IPEX_WEIGHT_PREPACK_MODULE = {
 
 def optimizer_state_dict(self):
     r"""Returns the state of the optimizer as a :class:`dict`.
-    This optimizer_state_dict is used to 
+    This optimizer_state_dict is used to
     (1) Unpack params/related state
     It contains two entries:
 
@@ -190,7 +190,7 @@ def optimizer_state_dict(self):
         opt = self.optimizer
     else:
         opt = self
-    
+
     opt_temp = copy.deepcopy(opt)
     params_attr_ = {}
     is_bf16 = hasattr(self, 'master_weight_split')
@@ -236,7 +236,7 @@ def optimizer_state_dict(self):
 def _optimizer_convert_for_weight_prepack(optimizer, weight_pair, bias_pair, attrs, attr_key):
     """
     1. convert user's optimizer weights and related states to packed format
-    While optimizer is maintain "master weight", the key in attrs is "weight", 
+    While optimizer is maintain "master weight", the key in attrs is "weight",
     Need pass "weight" here as attr_key visit attr.
     2. convert user's optimizer bias to new model's bias since there is a "clone"
     """
@@ -336,7 +336,7 @@ def _weight_prepack_with_ipex(module, optimizer, params_attr):
         for name, sub_m in m.named_children():
             setattr(new_m, name, convert_rec(sub_m))
         return new_m
-    
+
     opt_model, opt_optmizer, params_attr = convert_rec(module), optimizer, params_attr
     if optimizer is not None:
         setattr(optimizer, 'params_attr', params_attr)

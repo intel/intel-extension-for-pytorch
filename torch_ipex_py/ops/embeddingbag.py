@@ -1,5 +1,5 @@
 import torch
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 import warnings
 
 torch_embedding_bag = torch.embedding_bag

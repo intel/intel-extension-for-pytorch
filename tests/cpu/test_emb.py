@@ -18,7 +18,7 @@ class TestEMB(TestCase):
         aten_out.mean().backward()
 
         # ipex fast path (both fp32/bf16)
-        import intel_pytorch_extension
+        import intel_extension_for_pytorch
         ipex_out = ipex_emb(input, offsets)
         ipex_out.mean().backward()
         if mode == 'sum':
@@ -26,7 +26,7 @@ class TestEMB(TestCase):
             bf16_out.mean().backward()
             self.assertEqual(aten_out, bf16_out.float(), 0.01)
             self.assertEqual(bf16_emb.weight.grad.data._values().dtype, torch.bfloat16)
-        del(intel_pytorch_extension)
+        del(intel_extension_for_pytorch)
 
         self.assertEqual(aten_out, ipex_out)
 

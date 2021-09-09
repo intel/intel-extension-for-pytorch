@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.autograd import Function
-import _torch_ipex as core
+import intel_extension_for_pytorch._C as core
 
 def interaction(*args):
     # Current pytorch dose not support vector<Tensor> input for c++ custom function

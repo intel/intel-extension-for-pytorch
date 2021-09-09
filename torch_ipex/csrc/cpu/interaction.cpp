@@ -7,7 +7,6 @@
 #include "torch_ipex/csrc/cpu/CustomOPs.h"
 #include "torch_ipex/csrc/cpu/mkldnn/MKLDNNCommon.h"
 #include "torch_ipex/csrc/quantization/AutoCast.hpp"
-#include "xsmm/libxsmm_utils.h"
 #include <ATen/Parallel.h>
 #include <ATen/quantized/Quantizer.h>
 #include <algorithm>

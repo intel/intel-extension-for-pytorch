@@ -27,7 +27,6 @@
 #include "verbose.hpp"
 
 //#include "ProcessGroupCCL.hpp"
-#include <pybind11/chrono.h>
 #include "autocast_mode.h"
 #include <torch/csrc/api/include/torch/python.h>
 #include <c10/core/DeviceType.h>
@@ -211,4 +210,6 @@ void InitIpexBindings(py::module m) {
 
 }  // namespace torch_ipex
 
-PYBIND11_MODULE(_torch_ipex, m) { torch_ipex::InitIpexBindings(m); }
+PYBIND11_MODULE(_C, m) {
+  torch_ipex::InitIpexBindings(m);
+}

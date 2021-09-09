@@ -1,8 +1,8 @@
 import unittest, copy
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
-from intel_pytorch_extension import ROIAlign
+from intel_extension_for_pytorch import ROIAlign
 
 import numpy as np
 import math
@@ -114,7 +114,7 @@ class RoIAlignTester(TestCase):
         self.assertTrue(y2.dtype == torch.float32)
         self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
         self.assertTrue(torch.allclose(gt_y.to(y2.dtype), y2, rtol=1e-5, atol=1e-5))
-        
+
         y2.mean().backward()
         self.assertTrue(x2.grad.dtype == torch.float32)
         self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))

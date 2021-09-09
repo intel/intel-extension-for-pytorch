@@ -61,8 +61,8 @@ from torch.jit._recursive import wrap_cpp_module
 import torch.fx.experimental.optimization as optimization
 import copy
 
-import intel_pytorch_extension as ipex
-from intel_pytorch_extension import core
+import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch import core
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn

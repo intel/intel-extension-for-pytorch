@@ -1,5 +1,5 @@
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 import torch.nn as nn
 import itertools
 
@@ -38,7 +38,7 @@ def run_model(dtype=None):
         optimizer.zero_grad()
         run_mod.backward()
         optimizer.step()
-    
+
 
 if __name__ == "__main__":
     print(f"fp32, {'*' * 50}")

@@ -1,5 +1,5 @@
 import torch
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from torch.testing._internal.common_utils import TestCase
 import unittest
 import itertools

@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import unittest, copy
 from common_utils import TestCase
-from intel_pytorch_extension import FrozenBatchNorm2d
+from intel_extension_for_pytorch import FrozenBatchNorm2d
 
 class FrozenBN2d(nn.Module):
     """

@@ -2,7 +2,7 @@ import unittest
 import copy
 import torch
 import torch.nn as nn
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import time, sys
 from torch.testing._core import _get_default_tolerance
