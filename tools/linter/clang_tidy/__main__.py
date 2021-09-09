@@ -10,8 +10,22 @@ from typing import List
 
 from tools.linter.clang_tidy.run import run
 from tools.linter.clang_tidy.generate_build_files import generate_build_files
-from tools.linter.install.clang_tidy import INSTALLATION_PATH
+from tools.linter.install.clang_tidy import INSTALLATION_PATH, PLATFORM_TO_URL, PLATFORM_TO_HASH, OUTPUT_DIR
+from tools.linter.install.download_bin import download
 
+try:
+    import torch
+except ImportError as e:
+    print('Unable to import torch. Error:')
+    print('\t', e)
+    print('You need to install pytorch first.')
+    sys.exit(1)
+
+
+def project_inc_dirs() -> List[str]:
+    inc_dirs = []
+    inc_dirs.append(os.path.join(os.environ['CONDA_PREFIX'], "include"))
+    return inc_dirs
 
 def clang_search_dirs() -> List[str]:
     # Compilers are ordered based on fallback preference
@@ -48,6 +62,7 @@ def clang_search_dirs() -> List[str]:
 
     return search_paths
 
+PYTORCH_PATH = os.path.dirname(os.path.abspath(torch.__file__))
 
 DEFAULTS = {
     "glob": [
@@ -76,13 +91,12 @@ DEFAULTS = {
         "-torch/csrc/deploy/interpreter/test_main.cpp",
     ],
     "paths": ["torch_ipex/csrc"],
-    "include-dir": ["/usr/lib/llvm-11/include/openmp"] + [os.path.join(os.environ['CONDA_PREFIX'], "include")] + clang_search_dirs(),
+    "include-dir": ["/usr/lib/llvm-11/include/openmp"] + project_inc_dirs() + clang_search_dirs(),
     "clang-tidy-exe": INSTALLATION_PATH,
-    "compile-commands-dir": "build",
+    "compile-commands-dir": "build/Release",
     "config-file": ".clang-tidy-oss",
     "disable-progress-bar": False,
 }
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="clang-tidy wrapper script")
@@ -168,24 +182,39 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+def update_defaults() -> None:
+    build_types = ["Release", "RelWithDebInfo", "Debug"]
+    found_compile_commands_dir = False
+    for build_type in build_types:
+        compile_command_dir = os.path.join("build", build_type, "compile_commands.json")
+        if pathlib.Path(compile_command_dir).exists():
+            DEFAULTS["compile-commands-dir"] = compile_command_dir
+            found_compile_commands_dir = True
+            break
+
+    if not found_compile_commands_dir:
+        print("Error: Clang-tidy cannot get the compile_commands.json file. You can build the code first.")
 
 def main() -> None:
-    options = parse_args()
+    update_defaults()
 
-    if not pathlib.Path("build").exists():
+    options = parse_args()
+    if not pathlib.Path("build/Release").exists():
         generate_build_files()
 
     # Check if clang-tidy executable exists
     exists = os.access(options.clang_tidy_exe, os.X_OK)
 
     if not exists:
-        msg = (
-            f"Could not find '{options.clang_tidy_exe}'\n"
-            + "We provide a custom build of clang-tidy that has additional checks.\n"
-            + "You can install it by running:\n"
-            + "$ python3 tools/linter/install/clang_tidy.py"
-        )
-        raise RuntimeError(msg)
+        ok = download("clang-tidy", OUTPUT_DIR, PLATFORM_TO_URL, PLATFORM_TO_HASH)
+        if not ok:
+            msg = (
+                f"Could not find '{options.clang_tidy_exe}'\n"
+                + "We provide a custom build of clang-tidy that has additional checks.\n"
+                + "You can install it by running:\n"
+                + "$ python3 tools/linter/install/clang_tidy.py"
+            )
+            raise RuntimeError(msg)
 
     result, _ = run(options)
     sys.exit(result.returncode)
