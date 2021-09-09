@@ -89,6 +89,22 @@ ideep::tensor itensor_view_from_dense(const at::Tensor& tensor) {
           tensor.data_ptr()};
 }
 
+ideep::tensor itensor_view_from_dense(
+    const at::Tensor& tensor,
+    const ideep::tensor::desc& desc) {
+  TORCH_CHECK(
+      tensor.device().is_cpu(),
+      "itensor_view_from_dense expects CPU tensor input");
+  TORCH_CHECK(
+      tensor.layout() == at::Layout::Strided,
+      "itensor_view_from_dense expects dense tensor input");
+  TORCH_CHECK(
+      tensor.scalar_type() == at::ScalarType::Float ||
+          tensor.scalar_type() == at::ScalarType::BFloat16,
+      "itensor_view_from_dense expects float or bfloat16 tensor input");
+  return {desc, tensor.data_ptr()};
+}
+
 // Helper function for getting an ideep tensor out of an aten Tensor.
 // Note in case the aten Tensor is a dense tensor, the returned ideep
 // tensor is just a view of the storage of the aten dense tensor, so

@@ -1,7 +1,3 @@
-#include "ExtendOPs.h"
-#include "WeightPrepack.h"
-#include "torch_ipex/csrc/autocast_mode.h"
-#include "torch_ipex/csrc/autocast_verbose.h"
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/InitialTensorOptions.h>
@@ -9,6 +5,11 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
+#include "ExtendOPs.h"
+#include "WeightPrepack.h"
+#include "mkldnn/MKLDNNCommon.h"
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
 
 namespace torch_ipex {
 
@@ -185,20 +186,20 @@ at::Tensor mkldnn_rnn_layer(at::Tensor &hy_, at::Tensor &cy_,
 
   // per layer input size
   int64_t input_size = input.size(2);
-  auto x = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto x = torch_ipex::cpu::itensor_view_from_dense(
       input,
       rnn.src_layer_desc(input_size, get_mkldnn_dtype(input.scalar_type())));
-  auto hx = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto hx = torch_ipex::cpu::itensor_view_from_dense(
       hx_, rnn.src_iter_desc(get_mkldnn_dtype(hx_.scalar_type())));
-  auto cx = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto cx = torch_ipex::cpu::itensor_view_from_dense(
       cx_, rnn.src_iter_c_desc(get_mkldnn_dtype(cx_.scalar_type())));
-  auto b = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto b = torch_ipex::cpu::itensor_view_from_dense(
       bias, rnn.bias_desc(get_mkldnn_dtype(bias.scalar_type())));
-  auto y = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto y = torch_ipex::cpu::itensor_view_from_dense(
       output, rnn.dst_layer_desc(get_mkldnn_dtype(output.scalar_type())));
-  auto hy = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto hy = torch_ipex::cpu::itensor_view_from_dense(
       hy_, rnn.dst_iter_desc(get_mkldnn_dtype(hy_.scalar_type())));
-  auto cy = torch_ipex::cpu::get_mkldnn_tensor_view(
+  auto cy = torch_ipex::cpu::itensor_view_from_dense(
       cy_, rnn.dst_iter_c_desc(get_mkldnn_dtype(cy_.scalar_type())));
 
   ideep::tensor w1, w2;

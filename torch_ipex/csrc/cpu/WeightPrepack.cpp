@@ -310,25 +310,6 @@ ideep::tensor get_linear_prepacked_weight(
   return cached_weight;
 }
 
-// Create mkldnn memory view from ATen tensor
-inline ideep::tensor get_mkldnn_tensor_view(
-    const at::Tensor& tensor, const ideep::tensor::desc& desc) {
-  TORCH_CHECK(
-      tensor.device().is_cpu(),
-      "itensor_view_from_dense expects CPU tensor input");
-  TORCH_CHECK(
-      tensor.layout() == at::Layout::Strided,
-      "itensor_view_from_dense expects dense tensor input");
-  TORCH_CHECK(tensor.scalar_type() == at::ScalarType::Float || tensor.scalar_type() == at::ScalarType::BFloat16,
-             "itensor_view_from_dense expects float or bfloat16 tensor input");
-  //TORCH_INTERNAL_ASSERT(at::impl::variable_excluded_from_dispatch());
-  if (tensor.scalar_type() == at::ScalarType::Float){
-    return {desc, tensor.template data_ptr<float>()};
-  } else {
-    return {desc, tensor.template data_ptr<c10::BFloat16>()};
-  }
-}
-
 bool is_prepacked(const at::Tensor& weight) {
   auto cached_weight = read_cached_weights(weight);
   return cached_weight.is_empty();
@@ -354,9 +335,17 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
   TORCH_CHECK(all_in_cache || all_miss, "both of the weights of LSTM should be cached or neither should be cached");
 
   if (cached_weight_ih.is_empty()) {
-    auto w1 = get_mkldnn_tensor_view(weight_ih, {{1, 1, input_size, num_gates, hidden_size}, get_mkldnn_dtype(weight_ih.scalar_type()), ideep::format_tag::ldgoi});
-    auto w2 = get_mkldnn_tensor_view(weight_hh, {{1, 1, hidden_size, num_gates, hidden_size}, get_mkldnn_dtype(weight_hh.scalar_type()), ideep::format_tag::ldgoi});
-  
+    auto w1 = itensor_view_from_dense(
+        weight_ih,
+        {{1, 1, input_size, num_gates, hidden_size},
+         get_mkldnn_dtype(weight_ih.scalar_type()),
+         ideep::format_tag::ldgoi});
+    auto w2 = itensor_view_from_dense(
+        weight_hh,
+        {{1, 1, hidden_size, num_gates, hidden_size},
+         get_mkldnn_dtype(weight_hh.scalar_type()),
+         ideep::format_tag::ldgoi});
+
     ideep::tensor::desc packed_desc_ih, packed_desc_hh;
     std::tie(packed_desc_ih, packed_desc_hh) = ideep::lstm_forward::expected_weights_desc(
         output_sizes,

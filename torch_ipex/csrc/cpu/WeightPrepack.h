@@ -103,8 +103,6 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_prepacked_weight(
     const ideep::tensor& bias,
     const bool reverse);
 
-ideep::tensor get_mkldnn_tensor_view(const at::Tensor& tensor, const ideep::tensor::desc& desc);
-
 bool is_prepacked(const at::Tensor& weight);
 
 // Prepack linear's weight according to dummy input.
