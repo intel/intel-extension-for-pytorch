@@ -73,7 +73,7 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(
     cgh.parallel_for(DPCPP::range<1>(numel), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 static inline void _fft_fill_with_conjugate_symmetry_(

@@ -92,7 +92,7 @@ void fused_dropout_kernel(
     }
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 template <typename scalar_t, typename accscalar_t>
@@ -134,7 +134,7 @@ void masked_scale_kernel(
     }
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 } // namespace impl

@@ -135,7 +135,7 @@ void fractional_max_pool2d_out_frame(
             DPCPP::range<3>(work_group_size, 1, 1)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -200,7 +200,7 @@ void fractional_max_pool2d_backward_out_frame(
             DPCPP::range<3>(work_group_size, 1, 1)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 void fractional_max_pool2d_out_template(

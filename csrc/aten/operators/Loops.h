@@ -273,7 +273,7 @@ static inline void launch_unrolled_kernel(
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 #if 1
@@ -330,7 +330,7 @@ static inline void launch_vectorized_kernel(
         };
         __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
       break;
     }
     case 2: {
@@ -340,7 +340,7 @@ static inline void launch_vectorized_kernel(
         };
         __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
       break;
     }
     case 1: {
@@ -631,7 +631,7 @@ void dpcpp_small_index_kernel_impl(
             DPCPP::range<1>(global_size), DPCPP::range<1>(wgroup_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename func_t>
@@ -687,7 +687,7 @@ void dpcpp_index_kernel_impl(
     };
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(numel), kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename func_t>

@@ -149,7 +149,7 @@ void indexSelect(
         });
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   return;
 }
 
@@ -419,7 +419,7 @@ void indexAdd(
         });
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -510,7 +510,7 @@ void indexFill(
         });
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -610,7 +610,7 @@ void indexCopy(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -647,7 +647,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
         };
         cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
   } else {
     int64_t totalElements = src.numel();
@@ -676,7 +676,7 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
         };
         cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
   }
 }
@@ -769,7 +769,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     cgh.single_task(kfn);
   };
   // submit to DPCPP queue
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
   Tensor contigSrc = src.contiguous();
 
@@ -801,7 +801,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   };
 
   // submit to DPCPP queue
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedScatter);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgfMaskedScatter);
 }
 
 template <typename scalar_t>
@@ -861,7 +861,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   };
 
   // submit to DPCPP queue
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
   TensorInfo<scalar_t, uint64_t> src_info =
       getTensorInfo<scalar_t, uint64_t>(src);
@@ -904,7 +904,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   };
 
   // submit to DPCPP queue
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedSelect);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgfMaskedSelect);
 
   if (&tensor != &tensorContig) {
     tensor.copy_(tensorContig);
@@ -967,7 +967,7 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
 
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(numel), kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 void index(
@@ -1073,7 +1073,7 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
     cgh.parallel_for(DPCPP::range<1>(dst_num_elem), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl

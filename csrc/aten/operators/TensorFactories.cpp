@@ -254,7 +254,7 @@ void triu_indices_dpcpp_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -305,7 +305,7 @@ void tril_indices_dpcpp_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 Tensor triu_indices_dpcpp(

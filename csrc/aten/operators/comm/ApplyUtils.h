@@ -238,7 +238,7 @@ void kernelPointwiseApply1(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <
@@ -455,7 +455,7 @@ void kernelPointwiseApply2(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <
@@ -670,7 +670,7 @@ void kernelPointwiseApply3(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <
@@ -924,7 +924,7 @@ void kernelPointwiseApply4(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar, int step, typename Op, bool with_offset = false>

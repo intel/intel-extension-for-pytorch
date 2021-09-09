@@ -713,7 +713,7 @@ void MultiMarginCriterion_updateOutput(
     }
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -812,7 +812,7 @@ void MultiMarginCriterion_updateGradInput(
     cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -969,7 +969,7 @@ void MultilabelMarginCriterion_updateOutput(
     }
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -1086,7 +1086,7 @@ void MultilabelMarginCriterion_updateGradInput(
     cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 } // namespace impl

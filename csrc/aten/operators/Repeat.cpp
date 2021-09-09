@@ -47,7 +47,7 @@ static void repeat_interleave_dpcpp_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 // static void repeat_interleave_dpcpp(int64_t *repeat_ptr, int64_t *cumsum_ptr,

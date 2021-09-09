@@ -73,7 +73,7 @@ void replication_pad_forward_kernel2d(
             DPCPP::range<3>(workgroup_size, 1, 1)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 void replication_pad2d_out_template(
@@ -242,7 +242,7 @@ void replication_pad_backward_kernel(
             DPCPP::range<3>(workgroup_size, 1, 1)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 void replication_pad2d_backward_out_template(

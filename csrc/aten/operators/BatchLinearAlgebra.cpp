@@ -78,7 +78,7 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <bool upper>

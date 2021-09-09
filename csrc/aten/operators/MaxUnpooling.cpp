@@ -57,7 +57,7 @@ void max_unpooling2d_forward_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -112,7 +112,7 @@ void max_unpooling3d_forward_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -158,7 +158,7 @@ void max_unpooling2d_backward_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -215,7 +215,7 @@ void max_unpooling3d_backward_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 Tensor& max_unpooling2d_forward_template(

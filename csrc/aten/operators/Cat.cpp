@@ -135,7 +135,7 @@ void CatArrayBatchedCopy(
     };
     cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf)
+  DPCPP_Q_SUBMIT(queue, cgf)
 }
 
 template <typename scalar_t>

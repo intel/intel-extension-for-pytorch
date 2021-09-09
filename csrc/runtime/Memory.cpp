@@ -24,7 +24,7 @@ void memcpyHostToDevice(
   }
 
   dpcpp_log("dpcpp_kernel", e);
-  DPCPP_E_FORCE_SYNC(e);
+  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 void memcpyDeviceToHost(
@@ -45,7 +45,7 @@ void memcpyDeviceToHost(
   }
 
   dpcpp_log("dpcpp_kernel", e);
-  DPCPP_E_FORCE_SYNC(e);
+  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 void memcpyDeviceToDevice(
@@ -64,7 +64,7 @@ void memcpyDeviceToDevice(
   }
 
   dpcpp_log("dpcpp_kernel", e);
-  DPCPP_E_FORCE_SYNC(e);
+  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
@@ -76,7 +76,7 @@ void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
   }
 
   dpcpp_log("dpcpp_kernel", e);
-  DPCPP_E_FORCE_SYNC(e);
+  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 } // namespace dpcpp

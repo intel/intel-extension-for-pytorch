@@ -39,7 +39,7 @@ void distribution_elementwise_grid_stride_kernel(
     cgh.parallel_for(DPCPP::range<1>(numel), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 template <

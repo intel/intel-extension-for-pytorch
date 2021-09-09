@@ -57,7 +57,7 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(work_item_num), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 Tensor chain_matmul_three_matrices(TensorList matrices) {

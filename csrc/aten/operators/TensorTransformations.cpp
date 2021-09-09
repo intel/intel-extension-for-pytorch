@@ -89,7 +89,7 @@ void flip_dpcpp_kernel(
     cgh.parallel_for(DPCPP::nd_range<1>(GRange, tileSize), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
@@ -164,7 +164,7 @@ void roll_dpcpp_kernel(
         });
   };
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 // Roll a tensor along a dimension

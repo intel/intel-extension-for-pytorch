@@ -271,7 +271,7 @@ void ctc_loss_log_alpha_kernel(
     cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 // The second (backward) half of the forward backward algorithm, (10) and (11).
@@ -461,7 +461,7 @@ void ctc_loss_backward_log_beta_kernel(
     cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 // This implements the subtrahend of equation (16) for all *nonblank*
@@ -599,7 +599,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
     cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 // This is the naive implementation of equation (16). It is parallelised in
@@ -736,7 +736,7 @@ void ctc_loss_backward_collect_kernel(
     cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 // This is to zero gradients which corresponding to the out-of-sequence position
@@ -788,7 +788,7 @@ void ctc_loss_zero_padded_gradients(
     cgh.parallel_for(DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
 // The forward computation. Lot's of admin and a call to the alpha kernel.

@@ -75,7 +75,7 @@ void coalesce_values_kernel(
             DPCPP::range<2>(4, 64)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 } // namespace impl
 

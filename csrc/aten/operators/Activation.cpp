@@ -105,7 +105,7 @@ static void RReLU_updateOutput(
               }
             });
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
       output.set_(input_);
     } else {
       output.resize_as_(input_);
@@ -140,7 +140,7 @@ static void RReLU_updateOutput(
               }
             });
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
   } else {
     const scalar_t negSlope =
@@ -217,7 +217,7 @@ void inline prelu_kernel_share_weights(
               : weight_val * static_cast<scalar_t>(in_ptr[id]);
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -250,7 +250,7 @@ void inline prelu_kernel_multi_weights(
               : static_cast<scalar_t>(weight_ptr[channel]) * input_data_val;
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -288,7 +288,7 @@ void inline prelu_backward_kernel_share_weights(
                   static_cast<scalar_t>(grad_out_ptr[id]);
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -332,7 +332,7 @@ void inline prelu_backward_kernel_multi_weights(
               : input_data_val * grad_out_data_val;
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -355,7 +355,7 @@ void GeluKernelImpl(const Tensor& X, Tensor& Y) {
               static_cast<scalar_t>(X_ptr[id]) * scalar_t(0.5);
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -384,7 +384,7 @@ void GeluBackwardKernelImpl(const Tensor& dY, const Tensor& X, Tensor& dX) {
                X_ptr[id] * kAlpha * dX_ptr[id]);
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl

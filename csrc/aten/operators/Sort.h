@@ -188,7 +188,7 @@ inline void bitonicSortKVInPlace(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 // Returns 2^(ceil(lg(n)) from Stanford bit twiddling hacks

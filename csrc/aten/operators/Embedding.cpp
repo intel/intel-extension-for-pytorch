@@ -37,7 +37,7 @@ static inline void embedding_backward_dpcpp_kernel(
       auto idx_cnt_acc = idx_cnt.get_access<rw_mode>(cgh);
       cgh.template fill(idx_cnt_acc, static_cast<uint32_t>(0));
     };
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_fill);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_fill);
 
     auto cgf_scale = DPCPP_Q_CGF(cgh) {
       auto idx_data = indices_data;
@@ -51,7 +51,7 @@ static inline void embedding_backward_dpcpp_kernel(
         }
       });
     };
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_scale);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_scale);
 
     auto cgf_scatter = DPCPP_Q_CGF(cgh) {
       auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
@@ -71,7 +71,7 @@ static inline void embedding_backward_dpcpp_kernel(
         }
       });
     };
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_scatter);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_scatter);
 
     if (padding_idx != -1) {
       auto cgf_pad = DPCPP_Q_CGF(cgh) {
@@ -83,7 +83,7 @@ static inline void embedding_backward_dpcpp_kernel(
           gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
         });
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_pad);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf_pad);
     }
 
   } else {
@@ -104,7 +104,7 @@ static inline void embedding_backward_dpcpp_kernel(
         }
       });
     };
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
     if (padding_idx != -1) {
       auto cgf_pad = DPCPP_Q_CGF(cgh) {
@@ -116,7 +116,7 @@ static inline void embedding_backward_dpcpp_kernel(
           gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
         });
       };
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_pad);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf_pad);
     }
   }
 }

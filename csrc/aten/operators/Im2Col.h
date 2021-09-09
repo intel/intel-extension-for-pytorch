@@ -65,7 +65,7 @@ static void im2col_kernel(
           }
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename T>
@@ -132,5 +132,5 @@ static void col2im_kernel(
           out_ptr[id] = static_cast<T>(val);
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }

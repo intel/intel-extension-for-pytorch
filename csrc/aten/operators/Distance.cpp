@@ -236,7 +236,7 @@ static void pdist_kernel_impl(
         DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t, typename F, int p_type>
@@ -317,7 +317,7 @@ static void pdist_backward_kernel_impl(
     __cgh.parallel_for(work_load, kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 void pdist_forward(Tensor& result, const Tensor& self, double p) {
@@ -505,7 +505,7 @@ static void cdist_forward_kernel_impl(
         DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 static Tensor cdist_forward(
@@ -697,7 +697,7 @@ static void cdist_backward_kernel_impl(
     __cgh.parallel_for(work_load, kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 static Tensor cdist_backward(

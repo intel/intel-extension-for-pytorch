@@ -84,7 +84,7 @@ void kernelHistogram1D(
 
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define HANDLE_CASE(WEIGHTS_OP, WITH_WEIGHT)                       \

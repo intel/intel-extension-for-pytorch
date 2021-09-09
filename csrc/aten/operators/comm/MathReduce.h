@@ -128,7 +128,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   };
 
   // submit to DPCPP queue
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename K, typename Index, class BinaryFunction>
@@ -197,7 +197,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   };
 
   // submit to DPCPP queue
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 };
 
 template <

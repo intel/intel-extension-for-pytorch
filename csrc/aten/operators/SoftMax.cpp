@@ -145,7 +145,7 @@ void SpatialSoftMaxForward(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 // It is naive implementation for the softmax. Not optimized if the dim_size is
@@ -215,7 +215,7 @@ void SpatialSoftMaxBackward(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl

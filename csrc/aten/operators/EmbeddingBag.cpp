@@ -64,7 +64,7 @@ void krn_partials_per_segment(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 void krn_partial_segment_offset(
@@ -106,7 +106,7 @@ void krn_partial_segment_offset(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -206,7 +206,7 @@ void compute_grad_weight_bags(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -275,7 +275,7 @@ void compute_grad_weight(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -344,7 +344,7 @@ void sum_and_scatter(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 Tensor embedding_bag_backward_dpcpp_kernel(
@@ -642,7 +642,7 @@ void EmbeddingBag_updateOutputKernel(
             DPCPP::range<2>(workersPerChunk, chunksPerWorkGroup)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 Tensor embedding_bag_backward_dpcpp_sum_avg(
@@ -786,7 +786,7 @@ void EmbeddingBag_accGradParametersKernel_max(
             DPCPP::range<2>(kernel_range, 4), DPCPP::range<2>(64, 4)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 Tensor embedding_bag_backward_dpcpp_max(

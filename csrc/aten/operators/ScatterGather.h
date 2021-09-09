@@ -147,7 +147,7 @@ void THDPCPPTensor_gatherKernel(
 
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename IndexType, typename Real, int Dims>
@@ -203,7 +203,7 @@ void THSyclTensor_scatterKernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename IndexType, typename Real, int Dims>
@@ -261,7 +261,7 @@ void THSyclTensor_scatterAddKernel(
             DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename IndexType, typename Real, int Dims>
@@ -307,7 +307,7 @@ void THSyclTensor_scatterFillKernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 } // namespace AtenIpexTypeXPU

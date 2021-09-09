@@ -108,7 +108,7 @@ void ClassNLLCriterion_updateOutput(
       cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
     };
 
-    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_SUBMIT(queue, cgf);
     return;
   }
 
@@ -160,7 +160,7 @@ void ClassNLLCriterion_updateOutput(
       cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
     };
 
-    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_SUBMIT(queue, cgf);
   } else if (input.dim() == 2) {
     int64_t batch_size = input.size(0);
     int n_target = input.size(1);
@@ -223,7 +223,7 @@ void ClassNLLCriterion_updateOutput(
           kfn);
     };
 
-    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_SUBMIT(queue, cgf);
   }
 }
 
@@ -316,7 +316,7 @@ void ClassNLLCriterion_updateGradInput(
           kfn);
     };
 
-    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_SUBMIT(queue, cgf);
     return;
   }
 
@@ -361,7 +361,7 @@ void ClassNLLCriterion_updateGradInput(
       };
       cgh.parallel_for(DPCPP::range<1>(1), kfn);
     };
-    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_SUBMIT(queue, cgf);
   } else {
     int nframe = input.size(0);
     int ndim = input.size(1);
@@ -403,7 +403,7 @@ void ClassNLLCriterion_updateGradInput(
       cgh.parallel_for(DPCPP::range<1>(local_size), kfn);
     };
 
-    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_SUBMIT(queue, cgf);
   }
 }
 
@@ -521,7 +521,7 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
     cgh.parallel_for(DPCPP::range</*dim=*/1>(count), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t, typename accscalar_t>
@@ -627,7 +627,7 @@ void spatial_class_nll_criterion_update_output_kernel(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
   if (reduction == at::Reduction::Mean) {
     auto cgf = DPCPP_Q_CGF(cgh) {
@@ -645,7 +645,7 @@ void spatial_class_nll_criterion_update_output_kernel(
       cgh.parallel_for(DPCPP::range</*dim=*/1>(1), kfn);
     };
 
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   }
 }
 
@@ -715,7 +715,7 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
     cgh.parallel_for(DPCPP::range</*dim=*/1>(count), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -790,7 +790,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
     cgh.parallel_for(DPCPP::range</*dim=*/1>(count), kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl

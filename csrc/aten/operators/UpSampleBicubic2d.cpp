@@ -133,7 +133,7 @@ static void upsample_bicubic2d_out_frame(
         DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 // Backward (adjoint) operation 1 <- 2 (accumulates)
@@ -230,7 +230,7 @@ static void upsample_bicubic2d_backward_out_frame(
         DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 static void upsample_bicubic2d_out_template(

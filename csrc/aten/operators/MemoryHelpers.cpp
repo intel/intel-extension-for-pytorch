@@ -26,7 +26,7 @@ DPCPP_HOST void dpcppMemoryScale(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define MEM_SCALE_EXPLICIT_INST(DST_T, SRC_T) \
@@ -59,7 +59,7 @@ DPCPP_HOST void dpcppMemoryScale1(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define MEM_SCALE1_EXPLICIT_INST(DST_T, SRC_T) \
@@ -93,7 +93,7 @@ DPCPP_HOST void dpcppMemoryScale2(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define MEM_SCALE2_EXPLICIT_INST(DST_T, SRC_T) \
@@ -134,7 +134,7 @@ DPCPP_HOST void dtype_convert_by_scalar(
   };
 
   // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define DT_CONVERT_EXPLICIT_INST(DST_T, SRC_T)      \

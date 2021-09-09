@@ -105,7 +105,7 @@ void gatherKthValue(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 struct KthValueLauncher {
@@ -293,7 +293,7 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
             indices_ptr[id] = indices;
           });
     };
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
   } else {
     /*  self_.dim == 1 or horizontal seek mode.
@@ -361,7 +361,7 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
             indices_ptr[id] = indices;
           });
     };
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   }
   return std::forward_as_tuple(values, indices);
 }

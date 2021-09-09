@@ -34,7 +34,7 @@ namespace DPCPP = cl::sycl;
 // Command group function implementation
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
 
-#define DPCPP_E_FORCE_SYNC(e)                                    \
+#define DPCPP_E_SYNC_FOR_DEBUG(e)                                \
   {                                                              \
     static auto force_sync = Settings::I().is_force_sync_exec(); \
     if (force_sync) {                                            \
@@ -74,55 +74,39 @@ namespace DPCPP = cl::sycl;
       auto e = (ker_submit);                                                 \
       auto end_evt = (q).submit_barrier();                                   \
       dpcpp_mark((str), start_evt, end_evt);                                 \
-      DPCPP_E_FORCE_SYNC(e);                                                 \
+      DPCPP_E_SYNC_FOR_DEBUG(e);                                             \
     } else {                                                                 \
       auto e = (ker_submit);                                                 \
-      DPCPP_E_FORCE_SYNC(e);                                                 \
+      DPCPP_E_SYNC_FOR_DEBUG(e);                                             \
     }                                                                        \
     (q).throw_asynchronous();                                                \
   }
 
-#define DPCPP_Q_SYNC_SUBMIT_VERBOSE(q, cgf, ...)                               \
-  {                                                                            \
-    IPEX_TIMER(t, verbose, __func__);                                          \
-    auto e = (q).submit((cgf), ##__VA_ARGS__);                                 \
-    t.now("submit");                                                           \
-    e.wait_and_throw();                                                        \
-    t.now("event wait");                                                       \
-    dpcpp_log("dpcpp_kernel", e);                                              \
-    static auto event_prof_enabled =                                           \
-        Settings::I().is_event_profiling_enabled();                            \
-    if (event_prof_enabled) {                                                  \
-      auto e_start =                                                           \
-          e.template get_profiling_info<dpcpp_event_profiling_start>();        \
-      auto e_end = e.template get_profiling_info<dpcpp_event_profiling_end>(); \
-      t.event_duration((e_end - e_start) / 1000.0);                            \
-    }                                                                          \
-  }
-
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                      \
-  {                                                           \
-    static auto verbose = Settings::I().get_verbose_level();  \
-    if (verbose) {                                            \
-      DPCPP_Q_SYNC_SUBMIT_VERBOSE((q), (cgf), ##__VA_ARGS__); \
-    } else {                                                  \
-      auto e = (q).submit((cgf), ##__VA_ARGS__);              \
-      dpcpp_log("dpcpp_kernel", e);                           \
-      e.wait_and_throw();                                     \
-    }                                                         \
-  }
-
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)                     \
-  {                                                           \
-    static auto verbose = Settings::I().get_verbose_level();  \
-    if (verbose) {                                            \
-      DPCPP_Q_SYNC_SUBMIT_VERBOSE((q), (cgf), ##__VA_ARGS__); \
-    } else {                                                  \
-      auto e = (q).submit((cgf), ##__VA_ARGS__);              \
-      (q).throw_asynchronous();                               \
-      dpcpp_log("dpcpp_kernel", e);                           \
-      DPCPP_E_FORCE_SYNC(e);                                  \
-    }                                                         \
+#define DPCPP_Q_SUBMIT(q, cgf, ...)                                       \
+  {                                                                       \
+    static auto verbose = Settings::I().get_verbose_level();              \
+    if (verbose) {                                                        \
+      IPEX_TIMER(t, verbose, __func__);                                   \
+      auto e = (q).submit((cgf), ##__VA_ARGS__);                          \
+      t.now("submit");                                                    \
+      e.wait_and_throw();                                                 \
+      t.now("event wait");                                                \
+      dpcpp_log("dpcpp_kernel", e);                                       \
+      static auto event_prof_enabled =                                    \
+          Settings::I().is_event_profiling_enabled();                     \
+      if (event_prof_enabled) {                                           \
+        auto e_start =                                                    \
+            e.template get_profiling_info<dpcpp_event_profiling_start>(); \
+        auto e_end =                                                      \
+            e.template get_profiling_info<dpcpp_event_profiling_end>();   \
+        t.event_duration((e_end - e_start) / 1000.0);                     \
+      }                                                                   \
+    } else {                                                              \
+      auto e = (q).submit((cgf), ##__VA_ARGS__);                          \
+      (q).throw_asynchronous();                                           \
+      dpcpp_log("dpcpp_kernel", e);                                       \
+      DPCPP_E_SYNC_FOR_DEBUG(e);                                          \
+    }                                                                     \
   }
 
 // the descriptor as entity attribute

@@ -163,7 +163,7 @@ static inline void packed_add_kernel(
       MSB_p[gid] = p16.s[1];
     });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename scalar_t>
@@ -267,7 +267,7 @@ static inline void sparse_packed_add_kernel(
             DPCPP::range<2>(4, 64)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 #endif
 }
 
@@ -358,7 +358,7 @@ static inline void fusion_amdd_kernel(
       w[id] += m_buf[id] * lr;
     });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 Tensor fusion_amdd(

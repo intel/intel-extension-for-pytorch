@@ -71,7 +71,7 @@ void reflection_pad1d_out_kernel(
             DPCPP::range<3>(work_group_size, 1, 1)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 void reflection_pad1d_out_template(
@@ -184,7 +184,7 @@ void reflection_pad1d_backward_out_kernel(
             DPCPP::range<3>(work_group_size, 1, 1)),
         kfn);
   };
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 void reflection_pad1d_backward_out_template(

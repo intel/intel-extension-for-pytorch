@@ -36,7 +36,7 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
     });
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t, class BinaryOp>
@@ -84,7 +84,7 @@ void scanOuterDim(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t, class BinaryFunction>
@@ -132,7 +132,7 @@ void scanInnermostDim(
         kfn);
   };
 
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t, class BinaryFunction>

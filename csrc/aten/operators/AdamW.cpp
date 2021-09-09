@@ -62,7 +62,7 @@ static void ComputeAdamWeightDecayKernel(
           out_ptr[id] = var_ele;
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl

@@ -82,7 +82,7 @@ Tensor& linspace_dpcpp_out(
       };
 
       // submit to DPCPP queue
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     });
   }
 
@@ -133,7 +133,7 @@ Tensor& logspace_dpcpp_out(
       };
 
       // submit to DPCPP queue
-      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     });
   } else {
     AT_DISPATCH_FLOATING_TYPES_AND2(
@@ -162,7 +162,7 @@ Tensor& logspace_dpcpp_out(
           };
 
           // submit to DPCPP queue
-          DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+          DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
         });
   }
 
@@ -216,7 +216,7 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
         };
 
         // submit to DPCPP queue
-        DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+        DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
         if (!result.is_contiguous()) {
           result.copy_(r);
@@ -291,7 +291,7 @@ Tensor& arange_dpcpp_out(
         };
 
         // submit to DPCPP queue
-        DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+        DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
       });
   return result;
 }

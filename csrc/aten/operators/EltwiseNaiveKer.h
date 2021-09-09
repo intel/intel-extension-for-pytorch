@@ -25,5 +25,5 @@ void eltwise_binary_naive_kernel(
             op(res_ptr + off, op1_ptr + off, op2_ptr + off);
         });
   };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
