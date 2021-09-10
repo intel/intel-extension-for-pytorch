@@ -233,7 +233,8 @@ at::Tensor batch_norm(const at::Tensor &input,
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("torch_ipex::batch_norm", std::vector<c10::IValue>({}));
 #endif
-  if (weight_opt.has_value() && bias_opt.has_value() &&
+  if (weight_opt.has_value() && weight_opt.value().defined() &&
+      bias_opt.has_value() && bias_opt.value().defined() &&
       !torch::jit::tracer::isTracing()) {
     return IPEXBatchNormOp::apply(input, weight_opt.value(), bias_opt.value(),
                                   running_mean_opt, running_var_opt, train,

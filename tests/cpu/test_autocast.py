@@ -4,11 +4,26 @@ import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
-import time, sys
-from torch.testing._core import _get_default_tolerance
+import time
+import sys
 import itertools
 import collections
 from autocast_test_lists import AutocastCPUTestLists
+from typing import Tuple
+from test_jit import Conv_Bn_Relu, BatchNorm_Conv_BatchNorm, ConvBatchNorm_Fixed, ConvReshapeBatchNorm, CascadedConvBnSumRelu, LinearBn, Linear_Reshape_Bn
+_default_tolerances = {
+    'float64': (1e-5, 1e-8),  # NumPy default
+    'float32': (1e-4, 1e-5),  # This may need to be changed
+    'float16': (1e-3, 1e-3),  # This may need to be changed
+}
+
+def _get_default_tolerance(a, b=None) -> Tuple[float, float]:
+    if b is None:
+        dtype = str(a.dtype).split('.')[-1]  # e.g. "float32"
+        return _default_tolerances.get(dtype, (0, 0))
+    a_tol = _get_default_tolerance(a)
+    b_tol = _get_default_tolerance(b)
+    return (max(a_tol[0], b_tol[0]), max(a_tol[1], b_tol[1]))
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -42,20 +57,20 @@ class TestFunction(TestCase):
 class TestAutocastWithJit(TestCase):
     def setUp(self):
         super(TestAutocastWithJit, self).setUp()
-        from test_jit import Conv_Bn_Relu, BatchNorm_Conv_BatchNorm, ConvBatchNorm_Fixed, ConvReshapeBatchNorm,\
-                            CascadedConvBnSumRelu, LinearBn, Linear_Reshape_Bn
-        self.models = [Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1), BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),
-                    ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1), ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
-                    ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
-                    CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
-                    LinearBn(2, 32, 32, bias=True),
-                    Linear_Reshape_Bn(2, 32, 32, (1, 1, 64, 16), bias=True)]
-        self.inputs = [torch.randn(32, 3, 64, 64), torch.randn(32, 3, 64, 64),
-                    torch.randn(32, 3, 64, 64), torch.randn(32, 3, 32, 32, 32),
-                    torch.randn(32, 3, 64, 64),
-                    torch.rand(32, 3, 64, 64),
-                    torch.rand(1, 1, 32, 32),
-                    torch.rand(1, 1, 32, 32)]
+        self.models = [
+            Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1),
+            BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),
+            ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
+            ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
+            ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
+            CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
+            LinearBn(2, 32, 32, bias=True),
+            Linear_Reshape_Bn(2, 32, 32, (1, 1, 64, 16), bias=True)]
+        self.inputs = [
+            torch.randn(32, 3, 64, 64), torch.randn(32, 3, 64, 64),
+            torch.randn(32, 3, 64, 64), torch.randn(32, 3, 32, 32, 32),
+            torch.randn(32, 3, 64, 64), torch.rand(32, 3, 64, 64),
+            torch.rand(1, 1, 32, 32), torch.rand(1, 1, 32, 32)]
 
     def test_generate_autocast_jit_trace_model(self):
         def test_generate_autocast_jit_trace_model(model, x):
@@ -113,7 +128,7 @@ class TestCustomerOps(TestCase):
                 R = ipex.interaction(*A)
             return R
 
-        dtypes=[torch.float32]
+        dtypes = [torch.float32]
         for dtype in dtypes:
             x1 = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
             x1_bf16 = x1.clone().bfloat16().detach().requires_grad_()
@@ -130,14 +145,14 @@ class TestCustomerOps(TestCase):
                 ly2.append(V.clone().detach().requires_grad_())
                 ly2_bf16.append(V.clone().bfloat16().detach().requires_grad_())
 
-            A = interact_fusion(x1, ly1) # all fp32
-            B = interact_fusion_autocast(x1_bf16, ly1_bf16) # all bf16
-            C = interact_fusion_autocast(x2, ly2_bf16) # fp32 dense bf16 emb
-            D = interact_fusion_autocast(x2_bf16, ly2) # bf16 dense fp32 emb
+            A = interact_fusion(x1, ly1)  # all fp32
+            B = interact_fusion_autocast(x1_bf16, ly1_bf16)  # all bf16
+            C = interact_fusion_autocast(x2, ly2_bf16)  # fp32 dense bf16 emb
+            D = interact_fusion_autocast(x2_bf16, ly2)  # bf16 dense fp32 emb
 
             self.assertEqual(A.dtype, torch.float)
             self.assertEqual(B.dtype, torch.bfloat16)
-            #promote to fp32
+            # promote to fp32
             self.assertEqual(C.dtype, torch.float)
             self.assertEqual(D.dtype, torch.float)
 
@@ -241,7 +256,7 @@ class TestBatchNorm(TestCase):
         self.assertEqual(x.grad, x_autocast.grad)
         self.assertEqual(m.weight.grad, m_autocast.weight.grad)
         self.assertEqual(m.bias.grad, m_autocast.bias.grad)
-        
+
         # bfloat16
         with torch.cpu.amp.autocast():
             y_bf16 = m_bf16(x_bf16)
@@ -314,7 +329,7 @@ class TestLSTM(TestCase):
             input = input.to(torch.bfloat16)
         return input
 
-    def _test_lstm(self, training, bf16, prec = 1e-5):
+    def _test_lstm(self, training, bf16, prec=1e-5):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -379,8 +394,7 @@ class TestLSTM(TestCase):
         hid_1 = torch.randn(num_layers * num_direc, batch_size, hidden_dim)
 
         sentences = sent.clone().requires_grad_(False)
-        sent_lens = torch.Tensor([1, 2, 3, 4, 5, 1, 3, 2, 96, 5, 3, 1, 1, 2, 1, 2, 3, 6, \
-        1, 2, 4, 6, 2, 1])
+        sent_lens = torch.Tensor([1, 2, 3, 4, 5, 1, 3, 2, 96, 5, 3, 1, 1, 2, 1, 2, 3, 6, 1, 2, 4, 6, 2, 1])
 
         assert sent_lens.shape[0] == batch_size
         assert sent_lens.max().item() == max_lens

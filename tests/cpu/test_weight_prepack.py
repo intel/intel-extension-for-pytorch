@@ -1,5 +1,3 @@
-import math
-import random
 import unittest
 import itertools
 import copy
@@ -29,14 +27,15 @@ class TestPrepackCases(TestCase):
             x_shape = (N, C) + input_shapes[dim]
             x = torch.randn(x_shape, dtype=torch.float32)
 
-            model = conv_module[dim](in_channels=C,
-                                    out_channels=M,
-                                    kernel_size=3,
-                                    stride=2,
-                                    padding=1,
-                                    dilation=dilation,
-                                    bias=bias,
-                                    groups=groups).float().train()
+            model = conv_module[dim](
+                in_channels=C,
+                out_channels=M,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                dilation=dilation,
+                bias=bias,
+                groups=groups).float().train()
 
             model = model.to(memory_format=torch.channels_last)
             for dtype in [torch.float32, torch.bfloat16]:
@@ -102,7 +101,7 @@ class TestPrepackCases(TestCase):
                         self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=1e-2, atol=5e-02)
 
     def test_conv2d(self):
-        self._test_convolution_training_base(dim = 2)
+        self._test_convolution_training_base(dim=2)
         # TODO: add inference case.
 
     def test_conv2d_nc11(self):
@@ -342,7 +341,7 @@ class TestPrepackCases(TestCase):
         linear_module = torch.nn.Linear
         out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]
         in_feature = [128, 479, torch.randint(3, 10, (1, )).item()]
-        input_shapes=[]
+        input_shapes = []
         for s in in_feature:
             input_shapes += [(128, s), (2, 64, s), (2, 2, 32, s)]
         options = itertools.product(out_feature, [True, False], input_shapes)
@@ -372,7 +371,7 @@ class TestPrepackCases(TestCase):
                         loss2.backward()
                         ipex_optimizer.step()
                 self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1)
-                self.assertEqual(loss1, loss2)
+                self.assertEqual(loss1, loss2, rtol=1e-2, atol=1e-1)
                 self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-1)
                 if bias:
                     self.assertEqual(origin_model.bias.grad, ipex_model.bias.grad.float())
