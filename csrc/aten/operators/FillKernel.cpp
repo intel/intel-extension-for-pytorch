@@ -70,6 +70,17 @@ void fillSliceWithIndex(
 } // namespace impl
 
 Tensor& fill_out(Tensor& self, Scalar value) {
+  if (self.itemsize() == sizeof(unsigned char)) {
+    IPEX_DISPATCH_BYTE_ALL_TYPES_AND(
+        kBool, self.scalar_type(), "fill_bytes", [&] {
+          dpcppMemsetAsync(
+              self.data_ptr(),
+              value.to<scalar_t>(),
+              self.numel() * self.itemsize());
+        });
+    return self;
+  }
+
   auto iter = TensorIterator::nullary_op(self);
   impl::fill_kernel_dpcpp(iter, value);
   return self;

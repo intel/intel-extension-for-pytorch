@@ -35,6 +35,25 @@
     }                                                                        \
   }()
 
+#define IPEX_DISPATCH_BYTE_ALL_TYPES_AND(SCALARTYPE, TYPE, NAME, ...)        \
+  [&] {                                                                      \
+    const auto& the_type = TYPE;                                             \
+    /* don't use TYPE again in case it is an expensive or side-effect op  */ \
+    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    switch (_st) {                                                           \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)       \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)        \
+      AT_PRIVATE_CASE_TYPE(at::kQInt8, int8_t, __VA_ARGS__)                  \
+      AT_PRIVATE_CASE_TYPE(at::kQUInt8, uint8_t, __VA_ARGS__)                \
+      AT_PRIVATE_CASE_TYPE(                                                  \
+          SCALARTYPE,                                                        \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE>::t),           \
+          __VA_ARGS__)                                                       \
+      default:                                                               \
+        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
+    }                                                                        \
+  }()
+
 // Some kernels must support full data types, for example, fill and copy.
 // This dispatch macro helps to keep all data types support in any build config.
 #define IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND(SCALARTYPE, TYPE, NAME, ...) \
