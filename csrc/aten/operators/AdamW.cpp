@@ -8,6 +8,7 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ApplyUtils.h"
+#include "comm/Numerics.h"
 
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
@@ -19,12 +20,16 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+// Here is the adamW link,
+// https://github.com/huggingface/transformers/blob/master/src/transformers/optimization.py
+// scalar_t = weight dtype = grad dtype(BF16 or FP16)
 template <typename scalar_t>
 static void ComputeAdamWeightDecayKernel(
-    const Tensor& grad_input,
-    Tensor& out,
-    const Tensor& avg,
-    const Tensor& avg_sq,
+    Tensor& master_weight,
+    Tensor& weight,
+    Tensor& grad,
+    Tensor& avg,
+    Tensor& avg_sq,
     double step,
     double lr,
     double eps,
@@ -33,34 +38,57 @@ static void ComputeAdamWeightDecayKernel(
     double weight_decay,
     const bool correct_bias) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto total_threads = grad_input.numel();
+  auto total_threads = master_weight.numel();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_input_ptr = grad_input.data_ptr<scalar_t>();
-    auto avg_ptr = avg.data_ptr<scalar_t>();
-    auto avg_sq_ptr = avg_sq.data_ptr<scalar_t>();
-    auto out_ptr = out.data_ptr<scalar_t>();
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto id = itemId.get_id(0);
+    auto master_weight_ptr = master_weight.data_ptr<float>();
+    auto weight_ptr = weight.data_ptr<scalar_t>();
+    auto grad_ptr = grad.data_ptr<scalar_t>();
+    auto exp_avg_ptr = avg.data_ptr<float>();
+    auto exp_avg_sq_ptr = avg_sq.data_ptr<float>();
+    cgh.parallel_for(DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item) {
+      auto id = item.get_id(0);
 
-          auto alpha = lr;
-          if (correct_bias) {
-            alpha = alpha * DPCPP::sqrt(1.0 - DPCPP::pow(beta2, step)) /
-                (1.0 - DPCPP::pow(beta1, step));
-          }
-          auto wd_sub = 1.0 - weight_decay * lr;
+      // master weight grad should be fp32 to involve in computation to keep
+      // acc.
+      auto grad_elm = static_cast<float>(grad_ptr[id]);
 
-          auto grad_ele = grad_input_ptr[id];
-          auto m_ele = avg_ptr[id];
-          auto v_ele = avg_sq_ptr[id];
-          auto m = m_ele + (grad_ele - m_ele) * (1.0 - beta1); // exp_avg
-          auto v = v_ele +
-              (grad_ele * grad_ele - v_ele) * (1.0 - beta2); // exp_avg_sq
-          auto var_ele =
-              wd_sub * out_ptr[id] - (m * alpha) / (DPCPP::sqrt(v) + eps);
-          out_ptr[id] = var_ele;
-        });
+      // exp_avg
+      auto exp_ele = exp_avg_ptr[id];
+      exp_ele = exp_ele * beta1 + grad_elm * (1.0 - beta1);
+      exp_avg_ptr[id] = exp_ele;
+
+      // exp_avg_sq
+      auto exp_avg_ele = exp_avg_sq_ptr[id];
+      exp_avg_ele = exp_avg_ele * beta2 + grad_elm * grad_elm * (1.0 - beta2);
+      exp_avg_sq_ptr[id] = exp_avg_ele;
+
+      // denom
+      auto denom = Numerics<float>::sqrt(exp_avg_ele) + eps;
+
+      auto step_size = lr;
+      if (correct_bias) {
+        step_size = step_size *
+            Numerics<float>::sqrt(1.0 - Numerics<float>::pow(beta2, step)) /
+            (1.0 - Numerics<float>::pow(beta1, step));
+      }
+
+      // p.data.addcdiv_(exp_avg, denom, value=-step_size)
+      auto master_weight_elem = master_weight_ptr[id];
+      master_weight_elem = master_weight_elem - step_size * (exp_ele / denom);
+
+      // p.data.add_(p.data, alpha=(-group["lr"] * group["weight_decay"]))
+      if (weight_decay > 0.0) {
+        master_weight_elem =
+            master_weight_elem - master_weight_elem * (lr * weight_decay);
+      }
+
+      // update master weight fp32
+      master_weight_ptr[id] = master_weight_elem;
+
+      // update real weight bf16
+      weight_ptr[id] = static_cast<scalar_t>(master_weight_elem);
+    });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
@@ -68,9 +96,11 @@ static void ComputeAdamWeightDecayKernel(
 } // namespace impl
 
 Tensor& fused_adamW(
+    Tensor& master_grad_input,
     Tensor& grad_input,
-    const Tensor& avg,
-    const Tensor& avg_sq,
+    Tensor& grad,
+    Tensor& avg,
+    Tensor& avg_sq,
     int64_t step,
     double lr,
     double eps,
@@ -79,14 +109,23 @@ Tensor& fused_adamW(
     double weight_decay,
     const bool correct_bias) {
   RECORD_FUNCTION(
-      "fused_adamW", std::vector<c10::IValue>({grad_input, avg, avg_sq}));
-  auto gI_ = grad_input.contiguous();
-  Tensor output = at::empty_like(gI_);
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      grad_input.scalar_type(), "apply_adam_weight_decay_dpcpp", [&] {
+      "fused_adamW",
+      std::vector<c10::IValue>({master_grad_input, avg, avg_sq}));
+  auto master_w = master_grad_input.contiguous();
+  auto w = grad_input.contiguous();
+  auto gw = grad.contiguous();
+
+  // scalar_t = weight dtype = grad dtype
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      w.scalar_type(),
+      "apply_adam_weight_decay_dpcpp",
+      [&] {
         impl::ComputeAdamWeightDecayKernel<scalar_t>(
-            gI_,
-            output,
+            master_w,
+            w,
+            gw,
             avg,
             avg_sq,
             step,
@@ -97,7 +136,7 @@ Tensor& fused_adamW(
             weight_decay,
             correct_bias);
       });
-  return grad_input;
+  return master_grad_input;
 }
 
 } // namespace AtenIpexTypeXPU

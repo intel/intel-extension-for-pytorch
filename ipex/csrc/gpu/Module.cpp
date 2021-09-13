@@ -398,9 +398,11 @@ void init_module(pybind11::module& m) {
 
   m.def(
       "fused_adamW",
-      [](at::Tensor& grad_input,
-         const at::Tensor& avg,
-         const at::Tensor& avg_sq,
+      [](at::Tensor& master_grad_input,
+         at::Tensor& grad_input,
+         at::Tensor& grad,
+         at::Tensor& avg,
+         at::Tensor& avg_sq,
          int64_t step,
          double lr,
          double eps,
@@ -409,7 +411,9 @@ void init_module(pybind11::module& m) {
          double weight_decay,
          const bool correct_bias) {
         return at::AtenIpexTypeXPU::fused_adamW(
+            master_grad_input,
             grad_input,
+            grad,
             avg,
             avg_sq,
             step,

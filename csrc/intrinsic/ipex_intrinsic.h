@@ -21,9 +21,11 @@ void matmul(
     int fusion);
 
 at::Tensor& fused_adamW(
+    at::Tensor& master_grad_input,
     at::Tensor& grad_input,
-    const at::Tensor& avg,
-    const at::Tensor& avg_sq,
+    at::Tensor& grad,
+    at::Tensor& avg,
+    at::Tensor& avg_sq,
     int64_t step = 1.0,
     double lr = 1.0,
     double eps = 1.0,

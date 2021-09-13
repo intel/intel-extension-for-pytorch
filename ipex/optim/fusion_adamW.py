@@ -6,7 +6,7 @@ from torch.optim import Optimizer
 
 
 
-class FusedAdamW(Optimizer):
+class FusedAdamWMasterWeight(Optimizer):
     """
     Implements Adam algorithm with weight decay fix as introduced in
     `Decoupled Weight Decay Regularization <https://arxiv.org/abs/1711.05101>`__.
@@ -45,6 +45,12 @@ class FusedAdamW(Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, correct_bias=correct_bias)
         super().__init__(params, defaults)
 
+        for group in self.param_groups:
+            for p in group["params"]:
+                p_master_weight = p.detach().clone()
+                # p.master_weight keeps the original datatype of the parameter, for example, fp32.
+                setattr(p, "master_weight", p_master_weight)
+
     def step(self, closure: Callable = None):
         """
         Performs a single optimization step.
@@ -59,6 +65,11 @@ class FusedAdamW(Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
+
+                if p.master_weight.device is not p.data.device:
+                    p.master_weight = p.master_weight.to(p.data.device)
+
+                # convert grad to fp32 in updating
                 grad = p.grad.data
                 if grad.is_sparse:
                     raise RuntimeError("Adam does not support sparse gradients, please consider SparseAdam instead")
@@ -69,17 +80,20 @@ class FusedAdamW(Optimizer):
                 if len(state) == 0:
                     state["step"] = 0
                     # Exponential moving average of gradient values
-                    state["exp_avg"] = torch.zeros_like(p.data)
+                    state["exp_avg"] = torch.zeros_like(p.master_weight.data)
                     # Exponential moving average of squared gradient values
-                    state["exp_avg_sq"] = torch.zeros_like(p.data)
+                    state["exp_avg_sq"] = torch.zeros_like(p.master_weight.data)
 
-                exp_avg, exp_avg_sq = state["exp_avg"], state["exp_avg_sq"]
                 beta1, beta2 = group["betas"]
 
                 state["step"] += 1
 
-                ipex._C.fused_adamW(p.data, state["exp_avg"], state["exp_avg_sq"], state["step"],
+                # fp32 master weight is involved into adamW to keep the acc and return fp32 master weight and bf16 weight at the same time.
+                ipex._C.fused_adamW(p.master_weight.data, p.data, grad, state["exp_avg"], state["exp_avg_sq"], state["step"],
                                     group["lr"], group["eps"], beta1, beta2, group["weight_decay"],
                                     group["correct_bias"])
+
+                # after updated, master weight replace the previous parameter.
+                # p.data.copy_(p.master_weight.data)
 
         return loss
