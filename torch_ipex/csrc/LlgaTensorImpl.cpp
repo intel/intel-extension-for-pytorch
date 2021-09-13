@@ -106,7 +106,7 @@ LlgaTensorDesc LlgaTensorDesc::supplementTensorInfo(const at::Tensor& t) const {
     auto dtype = getLlgaDataType(t.scalar_type());
     TORCH_CHECK(dtype != data_type::undef, "Not support data type ",
                 t.scalar_type());
-    return {tid_, sizes, strides, dtype};
+    return {tid_, sizes, strides, dtype, property_type_};
   }
 }
 

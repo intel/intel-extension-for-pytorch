@@ -14,11 +14,13 @@ struct LlgaTensorDesc {
       size_t tid,
       std::vector<int64_t> sizes,
       std::vector<int64_t> strides,
-      desc::data_type dtype)
+      desc::data_type dtype,
+      desc::property_type property_type)
       : tid_(tid),
         sizes_(sizes),
         strides_(strides),
         dtype_(dtype),
+        property_type_(property_type),
         layout_type_(desc::layout_type::strided),
         layout_id_(-1) {}
 
@@ -27,6 +29,7 @@ struct LlgaTensorDesc {
         sizes_(t.get_dims()),
         strides_({-1}),
         dtype_(t.get_data_type()),
+        property_type_(t.get_property_type()),
         layout_type_(t.get_layout_type()),
         layout_id_(-1) {
     if (is_opaque())
@@ -35,8 +38,13 @@ struct LlgaTensorDesc {
       strides_ = t.get_strides();
   }
 
-  LlgaTensorDesc(const torch::jit::Value *v)
-      : LlgaTensorDesc(v->unique(), {}, {}, desc::data_type::f32) {
+  LlgaTensorDesc(const torch::jit::Value* v)
+      : LlgaTensorDesc(
+            v->unique(),
+            {},
+            {},
+            desc::data_type::f32,
+            get_property_type(v)) {
     if (v->type()->isSubtypeOf(TensorType::get())) {
       auto tt = v->type()->cast<TensorType>();
 
@@ -86,7 +94,7 @@ struct LlgaTensorDesc {
   }
 
   LlgaTensorDesc dtype(desc::data_type new_dtype) const {
-    return LlgaTensorDesc(tid_, sizes_, strides_, new_dtype);
+    return LlgaTensorDesc(tid_, sizes_, strides_, new_dtype, property_type_);
   }
 
   desc::layout_type layout_type() const {
@@ -113,6 +121,15 @@ struct LlgaTensorDesc {
     return quantizer_;
   }
 
+  desc::property_type get_property_type(const torch::jit::Value* v) {
+    switch (v->node()->kind()) {
+      case prim::Constant:
+        return desc::property_type::constant;
+      default:
+        return desc::property_type::variable;
+    }
+  }
+
   LlgaTensorDesc any() {
     return layout_type(desc::layout_type::any);
   }
@@ -123,13 +140,14 @@ struct LlgaTensorDesc {
 
   desc logical_tensor() const {
     if (is_dimensionality_unknown()) {
-      return desc(tid_, dtype_, DNNL_GRAPH_UNKNOWN_NDIMS, layout_type_);
+      return desc(
+          tid_, dtype_, DNNL_GRAPH_UNKNOWN_NDIMS, layout_type_, property_type_);
     } else if (is_opaque()) {
-      return desc(tid_, dtype_, sizes_, layout_id_);
+      return desc(tid_, dtype_, sizes_, layout_id_, property_type_);
     } else if (is_any()) {
-      return desc(tid_, dtype_, sizes_, layout_type_);
+      return desc(tid_, dtype_, sizes_, layout_type_, property_type_);
     } else {
-      return desc(tid_, dtype_, sizes_, strides_);
+      return desc(tid_, dtype_, sizes_, strides_, property_type_);
     }
   }
 
@@ -178,6 +196,7 @@ struct LlgaTensorDesc {
   std::vector<int64_t> sizes_;
   std::vector<int64_t> strides_;
   desc::data_type dtype_;
+  desc::property_type property_type_;
   desc::layout_type layout_type_;
   size_t layout_id_;
   QuantizerPtr quantizer_;
