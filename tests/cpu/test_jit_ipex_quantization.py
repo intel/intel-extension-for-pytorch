@@ -85,7 +85,7 @@ class TestIpexOps(JitLlgaTestCase):
         input = torch.LongTensor([1,2,4,5,4,3,2,9])
         offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
         for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, [input, offsets], config_name="emb", qscheme=qscheme)
+            graph = self.checkQuantizeTrace(m, [input, offsets], atol=1e-2, config_name="emb", qscheme=qscheme)
             self.assertGraphContainsExactly(graph, 'ipex::qembedding_bag', 1)
 
     @llga_test_env
@@ -102,9 +102,9 @@ class TestIpexOps(JitLlgaTestCase):
         m = M()
         inputs = []
         for i in range(0, 27):
-            inputs.append(torch.randn([128, 128]))
+            inputs.append(torch.randn([128, 128]) * 0.1)
         for qscheme in [torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, inputs, config_name="interaction", qscheme=qscheme)
+            graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, config_name="interaction", qscheme=qscheme)
             self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
 
 if __name__ == '__main__':

@@ -100,24 +100,16 @@ class JitLlgaTestCase(JitTestCase):
             self.assertGraphContainsExactly(graph, pat, 0)
 
     def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", x_var=None, qscheme=torch.per_tensor_affine):
-        graph, model, fp32_model_with_quant_dequant = self.prepareModel(model, x, folding, remove_dropout, config_name, qscheme)
+        graph, traced_model, fp32_model = self.prepareModel(model, x, folding, remove_dropout, config_name, qscheme)
         with torch.no_grad():
-            # calculate after getting the graph
-            y_llga = model(*x)
-
-            # disable llga for fp32 path
-            ipex.core._jit_set_llga_enabled(False)
-            y = fp32_model_with_quant_dequant(*x)
-            # test Fallback when input shape changes:
-            if x_var:
-                y_var = fp32_model_with_quant_dequant(*x_var)
-            ipex.core._jit_set_llga_enabled(True)
-
+            y = fp32_model(*x)
+            y_llga = traced_model(*x)
             self.assertEqual(y, y_llga, atol=atol, rtol=rtol)
 
             # test Fallback when input shape changes:
             if x_var:
-                y_var_llga = model(*x_var)
+                y_var = fp32_model(*x_var)
+                y_var_llga = traced_model(*x_var)
                 self.assertEqual(y_var, y_var_llga, atol=atol, rtol=rtol)
 
             return graph
@@ -146,20 +138,15 @@ class JitLlgaTestCase(JitTestCase):
                 conf = ipex.QuantConf(path)
 
                 # jit trace to insert quant/dequant
-                model = ipex.quantization.convert(model, conf, x)
-
-            fp32_model_with_quant_dequant = copy.deepcopy(model)
-
-            # freeze the module
-            model = freeze(model)
+                traced_model = ipex.quantization.convert(model, conf, x)
 
             # warm up run
-            y0 = model(*x)
+            y0 = traced_model(*x)
 
             # get the graph at the second run after freezing
-            graph = model.graph_for(*x)
+            graph = traced_model.graph_for(*x)
 
-            return graph, model, fp32_model_with_quant_dequant
+            return graph, traced_model, model
 
     def checkPatterns(self, graph, patterns):
         fusion_groups = findFusionGroups(graph)
