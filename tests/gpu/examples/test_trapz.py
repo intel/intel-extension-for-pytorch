@@ -1,6 +1,8 @@
 import torch
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
 import pytest
 
 try:
@@ -9,6 +11,7 @@ except ImportError:
     TEST_NUMPY = False
 else:
     TEST_NUMPY = True
+
 
 @pytest.mark.skipif("not TEST_NUMPY")
 class TestTorchMethod(TestCase):
@@ -47,4 +50,3 @@ class TestTorchMethod(TestCase):
                 'There must be one `x` value for each sample point'):
             test_x((2, 3), 1, [1.0, 2.0], device)
             test_x((2, 3), 1, [1.0, 2.0, 3.0, 4.0], device)
-

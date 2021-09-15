@@ -1,8 +1,10 @@
-import numpy
 import torch
 import torch.nn as nn
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
+import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -28,7 +30,7 @@ class TestNNMethod(TestCase):
 
         conv1.to("xpu")
         max_pool.to("xpu")
-        
+
         x_dpcpp.requires_grad_(True)
         y_dpcpp1 = conv1(x_dpcpp)
         y_dpcpp = max_pool(y_dpcpp1)

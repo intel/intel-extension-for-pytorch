@@ -1,14 +1,18 @@
+import copy
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
-import os
-import copy
+
 import pytest
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
+
 
 class TestNNMethod(TestCase):
     def test_qbinary(self, dtype=torch.float):
@@ -35,5 +39,5 @@ class TestNNMethod(TestCase):
 
         ref1 = torch.ops.quantized.add(q_x_cpu, q_y_cpu, scale_out, 0)
         real1 = torch.ops.quantized.add(q_x_xpu, q_y_xpu, scale_out, 0)
-        
+
         self.assertEqual(ref1, real1)

@@ -1,17 +1,20 @@
 import torch
-import ipex
-from torch.distributions import Geometric
 import torch.nn as nn
+from torch.distributions import Geometric
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
 
+
 class TestTorchMethod(TestCase):
     def test_geometric(self):
-        p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True,device=sycl_device)
-        r = torch.tensor(0.3, requires_grad=True,device=sycl_device)
+        p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True, device=sycl_device)
+        r = torch.tensor(0.3, requires_grad=True, device=sycl_device)
         self.assertEqual(Geometric(p).sample((8,)).size(), (8, 3))
         self.assertFalse(Geometric(p).sample().requires_grad)
         self.assertEqual(Geometric(r).sample((8,)).size(), (8,))

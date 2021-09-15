@@ -23,12 +23,6 @@
 
 from __future__ import print_function
 
-from subprocess import check_call
-from setuptools import setup, Extension, distutils
-import setuptools.command.build_ext
-import setuptools.command.install
-from distutils.spawn import find_executable
-
 import distutils.command.clean
 import os
 import pathlib
@@ -36,11 +30,19 @@ import platform
 import shutil
 import subprocess
 import sys
+from distutils.spawn import find_executable
+from subprocess import check_call
+
+import setuptools.command.build_ext
+import setuptools.command.install
+from setuptools import Extension, distutils, setup
+
 from scripts.tools.setup.cmake import CMake
 
 try:
     import torch
-    from torch.utils.cpp_extension import include_paths, CppExtension, BuildExtension
+    from torch.utils.cpp_extension import (BuildExtension, CppExtension,
+                                           include_paths)
 except ImportError as e:
     print('Unable to import torch. Error:')
     print('\t', e)
@@ -51,6 +53,7 @@ os.environ.setdefault('IPEX_BACKEND', 'gpu')
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ipex_pydir = os.path.join(base_dir, 'ipex')
 ipex_scripts = os.path.join(base_dir, 'scripts')
+ipex_examples = os.path.join(base_dir, 'tests/gpu/examples')
 
 
 def _get_complier():
@@ -135,6 +138,7 @@ def create_version_files(base_dir, version, ipex_git_sha, torch_version, torch_g
 check_flake8_errors(base_dir, os.path.abspath(__file__))
 check_flake8_errors(base_dir, ipex_pydir)
 check_flake8_errors(base_dir, ipex_scripts)
+check_flake8_errors(base_dir, ipex_examples)
 
 ipex_git_sha, torch_version, torch_git_sha = get_git_head_sha(base_dir)
 version, version_sha = get_build_version(ipex_git_sha)

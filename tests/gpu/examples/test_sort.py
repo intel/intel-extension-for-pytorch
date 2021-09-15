@@ -1,6 +1,7 @@
+# import time
 import torch
 from torch.testing._internal.common_utils import TestCase
-# import time
+
 import ipex
 
 cpu_device = torch.device("cpu")

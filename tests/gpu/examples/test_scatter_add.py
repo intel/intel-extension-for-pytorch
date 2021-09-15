@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import ipex
 
+import ipex
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -56,7 +56,7 @@ class TestTorchMethod(TestCase):
         x3_dpcpp = x3.to("xpu")
         x4_dpcpp = x4.to("xpu")
         x4 = torch.zeros_like(x4).scatter_add(0, torch.tensor([[0, 1, 2, 0, 0, 0, 1, 2, 0, 0], [
-                                        2, 0, 0, 1, 2, 2, 0, 0, 1, 2]], device=cpu_device), x3)
+            2, 0, 0, 1, 2, 2, 0, 0, 1, 2]], device=cpu_device), x3)
         print(x4)
 
         x4_dpcpp = torch.zeros_like(x4_dpcpp).scatter_add(0, torch.tensor([[0, 1, 2, 0, 0, 0, 1, 2, 0, 0], [

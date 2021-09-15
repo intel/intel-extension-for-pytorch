@@ -1,12 +1,14 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 
 class TestTorchMethod(TestCase):
     def test_sparse(self, dtype=torch.float):
         i_cpu = torch.LongTensor([[0, 1, 1], [2, 0, 0]])
         v_cpu = torch.FloatTensor([3, 4, 5])
-        r_cpu = torch.torch._sparse_coo_tensor_unsafe(i_cpu, v_cpu, torch.Size([2,3]))
+        r_cpu = torch.torch._sparse_coo_tensor_unsafe(i_cpu, v_cpu, torch.Size([2, 3]))
         dense_dim_cpu = r_cpu.dense_dim()
         sparse_dim_cpu = r_cpu.sparse_dim()
         indices_cpu = r_cpu._indices()
@@ -30,4 +32,3 @@ class TestTorchMethod(TestCase):
         self.assertEqual(value_cpu, value_xpu)
         # assertEqual needs to_dense op support
         # self.assertEqual(coalesce_cpu, coalesce_xpu)
-

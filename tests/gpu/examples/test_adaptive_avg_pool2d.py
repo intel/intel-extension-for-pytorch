@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -18,11 +20,11 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.to(cpu_device))
 
         avg_pool = nn.AdaptiveAvgPool2d((2, 2))
-        #conv1 = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=True)
+        # conv1 = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=True)
 
         x_cpu.requires_grad_(True)
 
-        #y_cpu = conv1(x_cpu)
+        # y_cpu = conv1(x_cpu)
         y_cpu = avg_pool(x_cpu)
         print("y_cpu", y_cpu)
         # conv1.zero_grad()
@@ -31,8 +33,8 @@ class TestNNMethod(TestCase):
 
         x_dpcpp.requires_grad_(True)
         avg_pool.to(dpcpp_device)
-        #conv1 = conv1.dpcpp()
-        #y_dpcpp = conv1(x_dpcpp)
+        # conv1 = conv1.dpcpp()
+        # y_dpcpp = conv1(x_dpcpp)
         y_dpcpp = avg_pool(x_dpcpp)
         print("y_dpcpp", y_dpcpp.cpu())
         # conv1.zero_grad()

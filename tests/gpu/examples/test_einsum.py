@@ -1,11 +1,14 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 @pytest.mark.skip(reason="Skip due to failing in oneDNN acceptance test only")
 class TestTorchMethod(TestCase):
@@ -48,7 +51,7 @@ class TestTorchMethod(TestCase):
         y_dpcpp = torch.einsum('ii->i', A_dpcpp)
         print('y_cpu = ', y_cpu)
         print('y_dpcpp = ', y_dpcpp.to(cpu_device))
-        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device)) # pr
+        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))  # pr
 
         A_cpu = torch.randn(4, 3, 3, dtype=dtype, device=cpu_device)
         y_cpu = torch.einsum('...ii->...i', A_cpu)

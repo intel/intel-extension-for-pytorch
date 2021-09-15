@@ -1,9 +1,10 @@
-import numpy
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
+import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -12,7 +13,7 @@ dpcpp_device = torch.device("xpu")
 class TestTorchMethod(TestCase):
     def test_RangeFactories(self, dtype=torch.float):
 
-        #x=torch.tensor([1,1,1,1,1], device=cpu_device)
+        # x=torch.tensor([1,1,1,1,1], device=cpu_device)
         x = torch.logspace(start=-10, end=10, steps=5, device=cpu_device)
         y = torch.linspace(start=-10, end=10, steps=5, device=cpu_device)
         z = torch.arange(1, 2.5, 0.5, device=cpu_device)

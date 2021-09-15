@@ -1,6 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -27,4 +29,3 @@ class TestTorchMethod(TestCase):
         self.assertEqual(res, res_dpcpp.to(cpu_device))
         self.assertEqual(res, res_dpcpp_1.to(cpu_device))
         self.assertEqual(res_1, res_dpcpp_1.to(cpu_device))
-

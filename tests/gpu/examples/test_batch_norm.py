@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -80,9 +81,9 @@ class TestNNMethod(TestCase):
 
         y_dpcpp.backward(grad_dpcpp)
 
-        #y = y_dpcpp1.cpu()
-        #y = Variable(y, requires_grad = True)
-        # y.backward(grad_cpu)
+        # y = y_dpcpp1.cpu()
+        # y = Variable(y, requires_grad = True)
+        #  y.backward(grad_cpu)
         print("y_dpcpp = ", y_dpcpp.cpu())
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
@@ -123,7 +124,7 @@ class TestNNMethod(TestCase):
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
-        
+
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x = torch.randn(1, 2, 3, 3, dtype=torch.float)
         conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
@@ -173,7 +174,6 @@ class TestNNMethod(TestCase):
         y_dpcpp = bn(y_dpcpp1)
 
         y_dpcpp.backward(grad_dpcpp)
-
 
         print("y_dpcpp = ", y_dpcpp.cpu())
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())

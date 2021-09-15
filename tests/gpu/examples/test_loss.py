@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
 
 cpu_device = torch.device('cpu')
 xpu_device = torch.device("xpu")
 S = 5
+
 
 class TestNNMethod(TestCase):
     def test_kl_div_loss(self, dtype=torch.float):
@@ -29,24 +31,23 @@ class TestNNMethod(TestCase):
         l_dpcpp = loss_dpcpp(log_prob1_dpcpp, prob2_dpcpp)
         loss_none_reduce_dpcpp = nn.KLDivLoss(reduction='sum').to("xpu")
         expected_dpcpp = loss_none_reduce_dpcpp(
-            log_prob1_dpcpp, prob2_dpcpp)/input_shape[0]
+            log_prob1_dpcpp, prob2_dpcpp) / input_shape[0]
 
         print(l_dpcpp.to("cpu"), expected_dpcpp.to("cpu"))
         self.assertEqual(l, l_dpcpp.cpu())
         self.assertEqual(expected, expected_dpcpp.cpu())
 
-
     def _do_test(self, loss, input, target, dtype, device):
         input = input.to(dtype=dtype, device=device)
         target = target.to(dtype=dtype, device=device)
-        
+
         output = loss(input, target)
         grad_output = torch.ones_like(output, dtype=dtype, device=device)
         grad_inputs = torch.autograd.grad(output, input, grad_output)
 
         print("output is: ", output.cpu())
         print("grad_inputs are: ", tuple(x.cpu() for x in grad_inputs))
-        
+
         return output, grad_inputs
 
     def test_bce_loss(self, dtype=torch.float):
@@ -82,8 +83,8 @@ class TestNNMethod(TestCase):
             self.assertEqual(grad_input_cpu, grad_input_xpu)
 
     def test_soft_margin_loss(self, dtype=torch.float):
-        input = torch.randn( (S, S), requires_grad=True)
-        target = torch.randn( (S, S) )
+        input = torch.randn((S, S), requires_grad=True)
+        target = torch.randn((S, S))
         for reduction in ["none", "mean", "sum"]:
             print("reduction is ", reduction)
             loss = nn.SoftMarginLoss(reduction=reduction)
@@ -96,8 +97,8 @@ class TestNNMethod(TestCase):
             self.assertEqual(grad_input_cpu, grad_input_xpu)
 
     def test_smooth_l1_loss(self, dtype=torch.float):
-        input = torch.randn( (S, S), requires_grad=True)
-        target = torch.randn( (S, S) )
+        input = torch.randn((S, S), requires_grad=True)
+        target = torch.randn((S, S))
         for reduction in ["none", "mean", "sum"]:
             print("reduction is ", reduction)
             loss = nn.SmoothL1Loss(reduction=reduction)
@@ -110,8 +111,8 @@ class TestNNMethod(TestCase):
             self.assertEqual(grad_input_cpu, grad_input_xpu)
 
     def test_mse_loss(self, dtype=torch.float):
-        input = torch.randn( (S, S), requires_grad=True)
-        target = torch.randn( (S, S) )
+        input = torch.randn((S, S), requires_grad=True)
+        target = torch.randn((S, S))
         for reduction in ["none", "mean", "sum"]:
             print("reduction is ", reduction)
             loss = nn.MSELoss(reduction=reduction)
@@ -124,8 +125,8 @@ class TestNNMethod(TestCase):
             self.assertEqual(grad_input_cpu, grad_input_xpu)
 
     def test_l1_loss(self, dtype=torch.float):
-        input = torch.randn( (S, S), requires_grad=True)
-        target = torch.randn( (S, S) )
+        input = torch.randn((S, S), requires_grad=True)
+        target = torch.randn((S, S))
         for reduction in ["none", "mean", "sum"]:
             print("reduction is ", reduction)
             loss = nn.L1Loss(reduction=reduction)

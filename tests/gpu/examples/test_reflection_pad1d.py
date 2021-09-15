@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
 
 
 class TestNNMethod(TestCase):

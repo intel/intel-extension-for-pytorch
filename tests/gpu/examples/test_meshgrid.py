@@ -1,10 +1,13 @@
 import torch
-import numpy as np
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
+import numpy as np
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTensorMethod(TestCase):
     def test_meshgrid(self, dtype=torch.float):
@@ -20,7 +23,6 @@ class TestTensorMethod(TestCase):
         grid_x_dpcpp, grid_y_dpcpp = torch.meshgrid(x_dpcpp, y_dpcpp)
         print("\ngrid_x_dpcpp: ", grid_x_dpcpp.to(cpu_device))
         print("\ngrid_y_dpcpp: ", grid_y_dpcpp.to(cpu_device))
-
 
         self.assertEqual(grid_x, grid_x_dpcpp.to(cpu_device))
         self.assertEqual(grid_y, grid_y_dpcpp.to(cpu_device))

@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
 
 cpu_device = torch.device('cpu')
 dpcpp_device = torch.device("xpu")
@@ -54,7 +55,7 @@ class TestNNMethod(TestCase):
             print(input2.grad.cpu())
 
             return input1, input2
-            #finally:
+            # finally:
             #    input1.grad.zero_()
             #    input2.grad.zero_()
 

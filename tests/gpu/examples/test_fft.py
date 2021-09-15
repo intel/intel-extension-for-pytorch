@@ -1,7 +1,10 @@
 import torch
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
 import pytest
+
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
@@ -19,7 +22,6 @@ class TestNNMethod(TestCase):
         y3_dpcpp = torch.stft(x1_dpcpp, 1, hop_length=1)
         y4_dpcpp = torch.fft(x2_dpcpp, 2)
         y5_dpcpp = torch.ifft(y4_dpcpp, 2)
-
 
         self.assertEqual(y1, y1_dpcpp.cpu())
         self.assertEqual(y3, y3_dpcpp.cpu())

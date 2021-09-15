@@ -1,15 +1,14 @@
 import torch
 import torch.nn as nn
-
-import ipex
 from torch.testing._internal.common_utils import TestCase
 
+import ipex
 
 dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 
 
-class  TestTorchMethod(TestCase):
+class TestTorchMethod(TestCase):
     def test_addbmm(self, dtype=torch.float):
 
         m1_cpu = torch.randn([10, 3, 4], dtype=dtype)
@@ -21,10 +20,10 @@ class  TestTorchMethod(TestCase):
         m2_dpcpp = m2_cpu.to(dpcpp_device)
         x_dpcpp = x_cpu.to(dpcpp_device)
         x_dpcpp2 = x_cpu2.to(dpcpp_device)
-    
+
         alpha = 2.0
         beta = 3.5
-        
+
         print("cpu addbmm_ self", x_cpu)
         x_cpu.addbmm_(m1_cpu, m2_cpu, beta=beta, alpha=alpha)
         print("cpu addbmm_ result", x_cpu)
@@ -32,8 +31,8 @@ class  TestTorchMethod(TestCase):
         print("dpcpp addbmm_ self", x_dpcpp.cpu())
         x_dpcpp.addbmm_(m1_dpcpp, m2_dpcpp, beta=beta, alpha=alpha)
         print("dpcpp addbmm_ result", x_dpcpp.cpu())
-        self.assertEqual(x_cpu,x_dpcpp.cpu())
-       
+        self.assertEqual(x_cpu, x_dpcpp.cpu())
+
         print("cpu addbmm self", x_cpu)
         y = x_cpu2.addbmm(m1_cpu, m2_cpu, beta=beta, alpha=alpha)
         print("cpu addbmm result", y)

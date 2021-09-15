@@ -1,5 +1,7 @@
 import torch
-from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
+from torch.testing._internal.common_utils import (TestCase,
+                                                  repeat_test_for_types)
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -12,6 +14,6 @@ class TestTorchMethod(TestCase):
         x1 = torch.tensor([[1., 2.], [3., 4.]]).to("xpu")
         x2 = torch.tensor([[1., 1.], [4., 4.]]).to("xpu")
 
-        self.assertEqual(False,  torch.equal(x1.cpu(), x2.cpu()))
-        self.assertEqual(True,  torch.equal(x1.cpu(), x1.cpu()))
-        self.assertEqual(True,  torch.equal(x2.cpu(), x2.cpu()))
+        self.assertEqual(False, torch.equal(x1.cpu(), x2.cpu()))
+        self.assertEqual(True, torch.equal(x1.cpu(), x1.cpu()))
+        self.assertEqual(True, torch.equal(x2.cpu(), x2.cpu()))

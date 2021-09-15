@@ -1,10 +1,13 @@
 import torch
-import numpy as np
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
+import numpy as np
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTensorMethod(TestCase):
     def test_tensordot(self, dtype=torch.float):

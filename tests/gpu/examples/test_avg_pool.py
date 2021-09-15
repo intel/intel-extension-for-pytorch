@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -74,7 +75,6 @@ class TestNNMethod(TestCase):
         print("y_cpu", y_cpu)
         output_cpu = y_cpu.backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
-
 
         avg_pool.to(dpcpp_device)
         x_dpcpp.requires_grad_(True)

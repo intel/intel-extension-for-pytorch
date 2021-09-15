@@ -1,8 +1,10 @@
-import numpy
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
+import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -27,5 +29,5 @@ class TestNNMethod(TestCase):
         dpcpp_res.backward(torch.tensor(
             [[0.5, 1.0, 1.5], [2.0, 2.5, 3.0]], device=dpcpp_device))
         print(user_dpcpp.grad.to("cpu"))
-        self.assertEqual(cpu_res,  dpcpp_res.cpu())
+        self.assertEqual(cpu_res, dpcpp_res.cpu())
         self.assertEqual(user_cpu.grad, user_dpcpp.grad.cpu())

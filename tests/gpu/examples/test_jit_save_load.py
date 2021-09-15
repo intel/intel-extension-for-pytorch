@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import ipex
 
 
@@ -16,7 +17,8 @@ class Conv2dRelu(torch.nn.Module):
 a1 = torch.ones([1, 2, 1, 1])
 a1.fill_(2)
 
-model = Conv2dRelu(2, 2, kernel_size=3, stride=1, bias=True) # // you can find a simple model in tests/example/test_fusion.py
+# // you can find a simple model in tests/example/test_fusion.py
+model = Conv2dRelu(2, 2, kernel_size=3, stride=1, bias=True)
 
 print("johnlu module to ")
 model = model.to('xpu').eval()
@@ -36,4 +38,3 @@ modelJit = torch.jit.load('./simple_trace_case.zip')
 
 for param in modelJit.parameters():
     print("johnlu loaded modelJit param", param.cpu())
-

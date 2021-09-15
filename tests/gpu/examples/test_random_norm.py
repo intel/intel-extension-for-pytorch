@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -18,4 +20,3 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(x_dpcpp.mean(), 2.0, rtol=0.3, atol=0.3)
         self.assertEqual(x_dpcpp.std(), 0.5, rtol=0.3, atol=0.3)
-

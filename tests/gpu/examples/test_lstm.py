@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
 
 cpu_device = torch.device('cpu')
 dpcpp_device = torch.device("xpu")
@@ -27,7 +28,7 @@ class TestNNMethod(TestCase):
         print("cpu cn = ", cn)
 
         grad_out = torch.tensor([[[1, 2, 3, 4, 5, 6, 7, 8]]],
-                                dtype=torch.float,  device=cpu_device)  # (1,1,8)
+                                dtype=torch.float, device=cpu_device)  # (1,1,8)
         grad_out = Variable(grad_out, requires_grad=True)
         output.backward(grad_out)
         input_grad = input.grad
@@ -49,9 +50,9 @@ class TestNNMethod(TestCase):
         rnn_dpcpp = rnn.to("xpu")
         rnn_dpcpp.zero_grad()
         h0_dpcpp = torch.tensor([[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [
-            [5, 6, 5, 6]]], dtype=torch.float,  device=dpcpp_device)
+            [5, 6, 5, 6]]], dtype=torch.float, device=dpcpp_device)
         c0_dpcpp = torch.tensor([[[6, 7, 6, 7]], [[7, 8, 7, 8]], [[8, 9, 8, 9]], [
-            [9, 1, 9, 1]]], dtype=torch.float,  device=dpcpp_device)
+            [9, 1, 9, 1]]], dtype=torch.float, device=dpcpp_device)
         h0_dpcpp.requires_grad = True
         c0_dpcpp.requires_grad = True
         output_dpcpp, (hn_dpcpp, cn_dpcpp) = rnn_dpcpp(
@@ -98,7 +99,7 @@ class TestNNMethod(TestCase):
             self.assertEqual(param_grad[i], param_dpcpp_grad[i].cpu())
 
     def test_lstm_batch_first(self, dtype=torch.float):
-        lstm_cpu = nn.LSTM( 14, 5, batch_first=True, num_layers=1)
+        lstm_cpu = nn.LSTM(14, 5, batch_first=True, num_layers=1)
         input_cpu = torch.randn([16, 7060, 14])
         output_cpu, (hy_cpu, cy_cpu) = lstm_cpu(input_cpu)
 

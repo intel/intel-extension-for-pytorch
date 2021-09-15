@@ -1,12 +1,15 @@
 import torch
 from torch.nn import functional as F
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
+
 
 class TestNNMethod(TestCase):
     @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
-    def test_pinverse(self): 
+    def test_pinverse(self):
         a = torch.randn(5, 3)
         b = torch.pinverse(a)
         print('output cpu = ', b)

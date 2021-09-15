@@ -1,10 +1,13 @@
 import torch
-import ipex
-import pytest
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
+import pytest
 
 cpu_device = torch.device('cpu')
 xpu_device = torch.device('xpu')
+
 
 class TestTorchMethod(TestCase):
     def test_cartesian_prod(self, dtype=torch.float):

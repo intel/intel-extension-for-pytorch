@@ -1,7 +1,9 @@
+import copy
+
 import torch
 import torch.nn as nn
+
 import ipex
-import copy
 
 conv = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
 conv_xpu = copy.deepcopy(conv).bfloat16().to("xpu")
@@ -16,7 +18,7 @@ input_xpu.requires_grad_(True)
 
 output = bn(conv(input))
 print(output)
-#print(linear.weight.data.cpu())
+# print(linear.weight.data.cpu())
 
 grad = torch.randn([64, 64, 64, 64])
 output.backward(grad)

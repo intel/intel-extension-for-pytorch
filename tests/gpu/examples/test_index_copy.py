@@ -1,9 +1,11 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
 xpu_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_index_copy(self, dtype=torch.float):

@@ -1,10 +1,13 @@
-import torch
-import ipex
-from torch.distributions import Cauchy
-import torch.nn as nn
-from torch.testing._internal.common_utils import TestCase
-import pytest
 import math
+
+import torch
+import torch.nn as nn
+from torch.distributions import Cauchy
+from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
+import pytest
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
@@ -15,6 +18,7 @@ def is_all_nan(tensor):
     Checks if all entries of a tensor is nan.
     """
     return (tensor != tensor).all()
+
 
 class TestTorchMethod(TestCase):
     def test_cauchy(self):
@@ -34,4 +38,3 @@ class TestTorchMethod(TestCase):
         self.assertEqual(Cauchy(loc, scale).sample((7,)).size(), (7, 5, 5))
         self.assertEqual(Cauchy(loc_1d, scale_1d).sample().size(), (1,))
         self.assertEqual(Cauchy(loc_1d, scale_1d).sample((1,)).size(), (1, 1))
-

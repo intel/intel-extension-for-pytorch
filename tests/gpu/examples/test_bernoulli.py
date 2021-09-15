@@ -1,6 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -15,4 +17,5 @@ class TestTorchMethod(TestCase):
         print(dpcpp_res.cpu())
 
         # Examine the output contains only 1 and 0
-        self.assertTrue(True, torch.ne(dpcpp_res.to(cpu_device), 0).mul_(torch.ne(dpcpp_res.to(cpu_device), 1)).sum().item() == 0)
+        self.assertTrue(True, torch.ne(dpcpp_res.to(cpu_device), 0).mul_(
+            torch.ne(dpcpp_res.to(cpu_device), 1)).sum().item() == 0)

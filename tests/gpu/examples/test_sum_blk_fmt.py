@@ -1,15 +1,18 @@
+import copy
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
-import ipex
-import os
-import copy
-import pytest
 
+import ipex
+
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestNNMethod(TestCase):
     def test_sum_blk_fusion(self, dtype=torch.float):
@@ -35,4 +38,3 @@ class TestNNMethod(TestCase):
         self.assertEqual(ref2, real2.to(cpu_device))
         self.assertEqual(ref3, real3.to(cpu_device))
         self.assertEqual(ref4, real4.to(cpu_device))
-

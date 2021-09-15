@@ -1,9 +1,11 @@
-import numpy
 import torch
 import torch.nn as nn
-import ipex
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
+import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -47,7 +49,7 @@ class TestNNMethod(TestCase):
         print("dpcpp output", y_dpcpp.cpu())
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
-    def test_LeakyReLU_channels_last(self,  Xelu=nn.LeakyReLU(0.1), dtype=torch.float):
+    def test_LeakyReLU_channels_last(self, Xelu=nn.LeakyReLU(0.1), dtype=torch.float):
         x_cpu = torch.randn([1, 2, 3, 4], device=cpu_device, requires_grad=True)
         grad_x = torch.randn(1, 2, 3, 4, device=cpu_device, requires_grad=True)
         y_cpu = Xelu(x_cpu)

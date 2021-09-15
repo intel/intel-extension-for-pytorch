@@ -1,17 +1,18 @@
 import torch
-from torch.nn.functional import relu_
-from torch.nn.functional import relu
+from torch.nn.functional import relu, relu_
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
+
 class TestNNMethod(TestCase):
     def test_SplitSGD(self):
-        device='xpu'
-        dtype_bf16=torch.bfloat16
-        dtype_fp32=torch.float32
+        device = 'xpu'
+        dtype_bf16 = torch.bfloat16
+        dtype_fp32 = torch.float32
 
         # input and target
         input_cpu = torch.randn(1, 3, 224, 224, device='cpu', dtype=torch.float32, requires_grad=True)

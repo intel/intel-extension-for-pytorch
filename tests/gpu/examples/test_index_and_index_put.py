@@ -1,6 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import numpy as np
 import pytest
 
@@ -11,7 +13,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    #@pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    # @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
     @pytest.mark.skip(reason="skip due to bugs caused by oneDPL and compiler upgrades")
     def test_index_and_index_put(self, dtype=torch.float):
         x_cpu = torch.randn([3, 3], dtype=torch.float, device=cpu_device)

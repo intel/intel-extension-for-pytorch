@@ -1,8 +1,10 @@
-import numpy
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
+import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")

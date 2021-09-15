@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.testing._internal.common_utils import TestCase
+
 import ipex
 import ipex.optim
 
-from torch.testing._internal.common_utils import TestCase
 import pytest
 
 
@@ -18,6 +19,7 @@ class Conv2dRelu(torch.nn.Module):
         y = F.relu(self.conv1(x), inplace=True)
         y = F.relu(self.conv2(y), inplace=True)
         return y
+
 
 class TestNNMethod(TestCase):
     def test_SGDMasterWeight(self, dtype=torch.float):

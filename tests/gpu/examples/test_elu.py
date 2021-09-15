@@ -1,10 +1,13 @@
+import copy
+
 import torch
-import numpy
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
-import copy
+
+import numpy
 
 dtype = torch.float32
 cpu_device = torch.device("cpu")
@@ -23,7 +26,6 @@ class TestTorchMethod(TestCase):
             print("cpu output ", y_cpu)
             print("cpu grad ", x_cpu.grad)
 
-
             xelu_dpcpp = Xelu.to("xpu")
 
             x_dpcpp = Variable(x_cpu.clone().to("xpu"), requires_grad=True)
@@ -40,4 +42,4 @@ class TestTorchMethod(TestCase):
 
         test_Xelu(nn.ELU())
         test_Xelu(nn.CELU())
-        test_Xelu(nn.SELU()) 
+        test_Xelu(nn.SELU())

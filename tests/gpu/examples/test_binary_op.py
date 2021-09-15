@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -9,8 +10,8 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_binary_op_channels_last(self, dtype=torch.float):
-        a_cpu = torch.randn(1,2,3,4)
-        b_cpu = torch.randn(1,2,3,4)
+        a_cpu = torch.randn(1, 2, 3, 4)
+        b_cpu = torch.randn(1, 2, 3, 4)
         y_cpu = a_cpu + b_cpu
 
         a_xpu = a_cpu.to("xpu").to(memory_format=torch.channels_last)
@@ -24,14 +25,14 @@ class TestTorchMethod(TestCase):
         x_cpu = torch.randn(5)
 
         x_dpcpp = x_cpu.to(dpcpp_device)
-        #y_cpu1 = x_cpu.new_ones((2, 3))
+        # y_cpu1 = x_cpu.new_ones((2, 3))
         y_cpu1 = torch.randn(5)
-        #y_cpu2 = x_cpu.new_ones((2, 3))
+        # y_cpu2 = x_cpu.new_ones((2, 3))
         y_cpu2 = torch.randn(5)
 
         y_cpu1_int = torch.tensor(
             [[3, 1, 2, 3], [2, 3, 4, 1]], dtype=torch.int32)
-        #y_cpu2 = x_cpu.new_ones((2, 3))
+        # y_cpu2 = x_cpu.new_ones((2, 3))
         y_cpu2_int = torch.tensor(
             [[1, 5, 2, 4], [1, 1, 5, 5]], dtype=torch.int32)
 

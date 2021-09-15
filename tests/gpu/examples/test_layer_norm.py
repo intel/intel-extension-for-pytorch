@@ -1,10 +1,13 @@
 from __future__ import print_function
-import numpy
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
+import numpy
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -55,8 +58,8 @@ class TestNNMethod(TestCase):
         print("y_cpu = ", y_cpu)
         print("x_cpu.grad = ", x_cpu.grad)
         print("layer_norm.grad = ", layer_norm.weight.grad)
-        #x_cpu.grad.detach()
-        #x_cpu.grad.zero_()
+        # x_cpu.grad.detach()
+        # x_cpu.grad.zero_()
 
         # layer_norm_dpcpp = torch.load("./log/layer_norm.pt").to(dpcpp_device)
         layer_norm_dpcpp = layer_norm.to(dpcpp_device)
@@ -138,7 +141,7 @@ class TestNNMethod(TestCase):
         x_i = torch.randn([1, 1, 3, 3], device=cpu_device)
         x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
 
-        layernorm = nn.LayerNorm([1,3,3])
+        layernorm = nn.LayerNorm([1, 3, 3])
         y_cpu = layernorm(x_i)
         layernorm.to(dpcpp_device).to(dtype)
         y_dpcpp = layernorm(x_dpcpp_i)
@@ -148,7 +151,7 @@ class TestNNMethod(TestCase):
         x_i = torch.randn([1, 1, 3, 3], device=cpu_device)
         x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
 
-        layernorm = nn.LayerNorm([1,3,3])
+        layernorm = nn.LayerNorm([1, 3, 3])
         y_cpu = layernorm(x_i)
         layernorm.to(dpcpp_device).to(dtype)
         y_dpcpp = layernorm(x_dpcpp_i)

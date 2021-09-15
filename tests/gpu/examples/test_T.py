@@ -1,9 +1,11 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTensorMethod(TestCase):
     def test_T_and_t(self, dtype=torch.float):

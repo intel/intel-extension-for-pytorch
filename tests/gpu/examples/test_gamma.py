@@ -1,9 +1,10 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import numpy as np
 import pytest
-
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -32,7 +33,6 @@ class TestTorchMethod(TestCase):
         print(y_dpcpp_lgamma.to(cpu_device))
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         self.assertEqual(y, y_dpcpp_lgamma.to(cpu_device))
-
 
         print("---")
         x.lgamma_()
@@ -75,7 +75,6 @@ class TestTorchMethod(TestCase):
         print(x_dpcpp.to(cpu_device))
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
-
     def test_polygamma(self, dtype=torch.float):
         x_cpu = torch.tensor([1, 0.5])
         x_xpu = x_cpu.to('xpu')
@@ -101,4 +100,3 @@ class TestTorchMethod(TestCase):
             print("x_cpu_clone = ", x_cpu_clone)
             print("x_xpu_clone = ", x_xpu_clone.cpu())
             self.assertEqual(x_cpu_clone, x_xpu_clone)
-

@@ -1,9 +1,12 @@
+import copy
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
-import copy
+
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -11,7 +14,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    #@pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    # @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
     @pytest.mark.skip(reason="skip due to bugs caused by oneDPL and compiler upgrades")
     def test_embedding_bag(self, dtype=torch.float):
         print("sum cpu")
@@ -35,7 +38,7 @@ class TestTorchMethod(TestCase):
         grad_dpcpp = grad_cpu.to(dpcpp_device)
         output_dpcpp = embedding_sum(input_dpcpp, offsets_dpcpp)
         print(output_dpcpp.to("cpu"))
-        
+
         embedding_sum.zero_grad()
         output_dpcpp.backward(grad_dpcpp)
         for param in embedding_sum._parameters.values():
@@ -44,7 +47,6 @@ class TestTorchMethod(TestCase):
         print(grad_weight_dpcpp)
         self.assertEqual(output, output_dpcpp.to(cpu_device))
         self.assertEqual(grad_weight_cpu, grad_weight_dpcpp)
-
 
         print("mean cpu")
         embedding_mean = nn.EmbeddingBag(10, 3, mode='mean')
@@ -69,7 +71,6 @@ class TestTorchMethod(TestCase):
         print(grad_weight_dpcpp)
         self.assertEqual(output, output_dpcpp.to(cpu_device))
         self.assertEqual(grad_weight_cpu, grad_weight_dpcpp)
-
 
         print("max cpu")
         embedding_max = nn.EmbeddingBag(10, 3, mode='max')

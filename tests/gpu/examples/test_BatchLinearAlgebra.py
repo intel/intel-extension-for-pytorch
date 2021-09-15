@@ -1,21 +1,25 @@
+import itertools
+import time
+
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
-import time
+
 import pytest
-import itertools
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     def test_batch_linear_algebra(self, dtype=torch.float):
         x_cpu = torch.randn(5, 5)
 
         x_dpcpp = x_cpu.to(dpcpp_device)
-        #y_cpu1 = x_cpu.new_ones((2, 3))
+        # y_cpu1 = x_cpu.new_ones((2, 3))
         y_cpu1 = torch.randn(5, 5)
-        #y_cpu2 = x_cpu.new_ones((2, 3))
+        # y_cpu2 = x_cpu.new_ones((2, 3))
         y_cpu2 = torch.randn(5, 5)
 
         y_dpcpp1 = y_cpu1.to(dpcpp_device)
@@ -53,37 +57,37 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
     def test_cholesky_solve(self, dtype=torch.float):
         a = torch.randn([3, 3], device=cpu_device)
-        print (" cpu a  ", a)
+        print(" cpu a  ", a)
         a = torch.mm(a, a.t())
-        print (" cpu mm a  ", a)
+        print(" cpu mm a  ", a)
         a_dpcpp = a.to(dpcpp_device)
-        print (" xpu a_dpcpp  ", a_dpcpp.cpu())
+        print(" xpu a_dpcpp  ", a_dpcpp.cpu())
 
         u = torch.cholesky(a)
-        print (" =cpu u ==", u)
+        print(" =cpu u ==", u)
         u_dpcpp = u.to(dpcpp_device)
-        print (" xpu u_dpcpp  ", u_dpcpp.cpu())
+        print(" xpu u_dpcpp  ", u_dpcpp.cpu())
 
         b = torch.randn([3, 2], device=cpu_device)
-        print (" cpu b  ", b)
+        print(" cpu b  ", b)
         b_dpcpp = b.to(dpcpp_device)
-        print (" xpu b_dpcpp  ", b_dpcpp.cpu())
+        print(" xpu b_dpcpp  ", b_dpcpp.cpu())
 
         res = torch.cholesky_solve(b, u)
-        print (" cpu res  ", res)
+        print(" cpu res  ", res)
         check_res = torch.mm(a.inverse(), b)
-        print (" cpu check_res  ", check_res)
+        print(" cpu check_res  ", check_res)
         res_tensor = b.cholesky_solve(u)
-        print (" cpu res_tensor  ", res_tensor)
+        print(" cpu res_tensor  ", res_tensor)
 
         res_dpcpp = torch.cholesky_solve(b_dpcpp, u_dpcpp)
-        print (" xpu res_dpcpp  ", res_dpcpp.cpu())
+        print(" xpu res_dpcpp  ", res_dpcpp.cpu())
 
         check_res_dpcpp = torch.mm(a_dpcpp.inverse(), b_dpcpp)
-        print (" xpu check_res_dpcpp  ", check_res_dpcpp.cpu())
+        print(" xpu check_res_dpcpp  ", check_res_dpcpp.cpu())
 
         res_tensor_dpcpp = b_dpcpp.cholesky_solve(u_dpcpp)
-        print (" xpu res_tensor_dpcpp  ", res_tensor_dpcpp.cpu())
+        print(" xpu res_tensor_dpcpp  ", res_tensor_dpcpp.cpu())
 
         self.assertEqual(res.to(cpu_device), res_dpcpp.to(cpu_device))
         self.assertEqual(check_res.to(cpu_device), check_res_dpcpp.to(cpu_device))
@@ -95,7 +99,7 @@ class TestTorchMethod(TestCase):
         torch.manual_seed(ts)
 
         A = torch.randn(3, 3).to(cpu_device)
-        
+
         a = torch.det(A)
         print("torch.det(A)", a.to(cpu_device))
         b = torch.logdet(A)
@@ -106,22 +110,22 @@ class TestTorchMethod(TestCase):
         print("A.det()", A_det.to(cpu_device))
         A_det_log = A.det().log()
         print("A.det().log()", A_det_log.to(cpu_device))
-        
+
         ######
         A_dpcpp = A.to(dpcpp_device)
-        
+
         a_dpcpp = torch.det(A_dpcpp)
         print("torch.det(A_dpcpp)", a_dpcpp.to(cpu_device))
         b_dpcpp = torch.logdet(A_dpcpp)
         print("torch.logdet(A_dpcpp)", b_dpcpp.to(cpu_device))
-       
+
         print("A_dpcpp", A_dpcpp.to(cpu_device))
         A_dpcpp_det = A_dpcpp.det()
         print("A_dpcpp.det()", A_dpcpp_det.to(cpu_device))
         A_dpcpp_det_log = A_dpcpp.det().log()
         print("A_dpcpp.det().log()", A_dpcpp_det_log.to(cpu_device))
 
-        ## asssert
+        # asssert
         self.assertEqual(a, a_dpcpp.to(cpu_device))
         self.assertEqual(b, b_dpcpp.to(cpu_device))
         self.assertEqual(A.to(cpu_device), A_dpcpp.to(cpu_device))
@@ -151,11 +155,11 @@ class TestTorchMethod(TestCase):
             _validate(A_xpu.cpu(), LU_xpu.cpu(), pivot_xpu.cpu())
             LU_xpu, pivot_xpu = A_xpu.lu()
             _validate(A_xpu.cpu(), LU_xpu.cpu(), pivot_xpu.cpu())
-        
+
     @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
     def test_lu_solve(self, dtype=torch.float):
         def _validate(A, x, b):
-            b_ = torch.matmul(A, x);
+            b_ = torch.matmul(A, x)
             self.assertEqual(b, b_, rtol=1.3e-6, atol=0.02)
 
         for sizeA, sizeb in [[(3, 3), (3, 1)],
@@ -184,7 +188,7 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
     def test_solve(self, dtype=torch.float):
         def _validate(A, x, b):
-            d_ = torch.dist(b, torch.matmul(A, x));
+            d_ = torch.dist(b, torch.matmul(A, x))
             d = torch.zeros_like(d_)
             self.assertEqual(d, d_, rtol=1.3e-6, atol=5e-5)
 
@@ -215,7 +219,7 @@ class TestTorchMethod(TestCase):
     def test_inverse(self, dtype=torch.float):
         def _validate(A, A_):
             self.assertEqual(torch.matmul(A, A_), torch.eye(A.size(-1)).expand_as(A),
-                             rtol = 1.3e-6, atol = 0.005)
+                             rtol=1.3e-6, atol=0.005)
 
         for size in [(3, 3), (2, 3, 3), (128, 64, 64)]:
             A = torch.randn(size, dtype=dtype)
@@ -271,7 +275,7 @@ class TestTorchMethod(TestCase):
     def test_ormqr(self, dtype=torch.float):
         A = torch.randn(8, 5)
         c = torch.randn(5, 7)
-        
+
         for left, transpose in itertools.product([True, False], [True, False]):
             print("torch.ormqr:")
             # ON CPU
@@ -304,4 +308,3 @@ class TestTorchMethod(TestCase):
             print("xpu: c_ = ", c__xpu.cpu())
             # validate
             self.assertEqual(c__cpu, c__xpu)
-

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -96,7 +97,7 @@ class TestNNMethod(TestCase):
 
             self.assertEqual(y, y_xpu)
             self.assertEqual(grad_cpu, grad_xpu)
-            
+
             # large test: P > 25 & R > 25
             a = torch.randn([3, 30, 15], requires_grad=True)
             b = torch.randn([3, 35, 15], requires_grad=True)

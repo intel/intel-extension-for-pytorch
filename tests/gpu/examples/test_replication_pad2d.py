@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
 
 
 class TestNNMethod(TestCase):
     def test_replication_pad2d(self, dtype=torch.float):
-        x_cpu = torch.arange(2*3*6*8, dtype=dtype).reshape(2, 3, 6, 8)
+        x_cpu = torch.arange(2 * 3 * 6 * 8, dtype=dtype).reshape(2, 3, 6, 8)
         x_dpcpp = x_cpu.to("xpu")
-        grad_cpu = torch.arange(2*3*9*11, dtype=dtype).reshape(2, 3, 9, 11)
+        grad_cpu = torch.arange(2 * 3 * 9 * 11, dtype=dtype).reshape(2, 3, 9, 11)
         grad_dpcpp = grad_cpu.to("xpu")
 
         m = nn.ReplicationPad2d((1, 2, 3, 0))

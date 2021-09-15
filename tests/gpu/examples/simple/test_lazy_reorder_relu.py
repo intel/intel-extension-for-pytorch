@@ -1,7 +1,9 @@
+import copy
+
 import torch
 import torch.nn as nn
+
 import ipex
-import copy
 
 conv = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1, bias=False)
 conv_xpu = copy.deepcopy(conv).bfloat16().to("xpu")

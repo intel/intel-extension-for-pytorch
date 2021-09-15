@@ -6,6 +6,7 @@ import math
 
 WARM = 10
 
+
 class TestTorchMethod(TestCase):
     def test_fused_masterweight_adamW(self):
         # hpersparameters
@@ -31,32 +32,32 @@ class TestTorchMethod(TestCase):
         param_grad_cpu = []
 
         # param_master_weight is used to store the master weight parameters, which are same as Bert, FP32.
-        param_master_weight=[]
+        param_master_weight = []
 
-        param_master_weight.append(torch.randn([1024,1024], dtype=torch.float32, device='xpu'))
-        param_master_weight.append(torch.randn([1024,4096], dtype=torch.float32, device='xpu'))
+        param_master_weight.append(torch.randn([1024, 1024], dtype=torch.float32, device='xpu'))
+        param_master_weight.append(torch.randn([1024, 4096], dtype=torch.float32, device='xpu'))
         param_master_weight.append(torch.randn([1024], dtype=torch.float32, device='xpu'))
-        param_master_weight.append(torch.randn([2,1024], dtype=torch.float32, device='xpu'))
-        param_master_weight.append(torch.randn([30522,1024], dtype=torch.float32, device='xpu'))
+        param_master_weight.append(torch.randn([2, 1024], dtype=torch.float32, device='xpu'))
+        param_master_weight.append(torch.randn([30522, 1024], dtype=torch.float32, device='xpu'))
         param_master_weight.append(torch.randn([30522], dtype=torch.float32, device='xpu'))
-        param_master_weight.append(torch.randn([4096,1024], dtype=torch.float32, device='xpu'))
+        param_master_weight.append(torch.randn([4096, 1024], dtype=torch.float32, device='xpu'))
         param_master_weight.append(torch.randn([4096], dtype=torch.float32, device='xpu'))
-        param_master_weight.append(torch.randn([512,1024], dtype=torch.float32, device='xpu'))
+        param_master_weight.append(torch.randn([512, 1024], dtype=torch.float32, device='xpu'))
 
         # param weight is original weight from model and has been convert to BF16
         for p in param_master_weight:
             param_weight.append(p.detach().clone().bfloat16())
 
         # param_grad create the according grad, BF16.
-        param_grad.append(torch.randn([1024,1024], dtype=torch.bfloat16, device='xpu'))
-        param_grad.append(torch.randn([1024,4096], dtype=torch.bfloat16, device='xpu'))
+        param_grad.append(torch.randn([1024, 1024], dtype=torch.bfloat16, device='xpu'))
+        param_grad.append(torch.randn([1024, 4096], dtype=torch.bfloat16, device='xpu'))
         param_grad.append(torch.randn([1024], dtype=torch.bfloat16, device='xpu'))
-        param_grad.append(torch.randn([2,1024], dtype=torch.bfloat16, device='xpu'))
-        param_grad.append(torch.randn([30522,1024], dtype=torch.bfloat16, device='xpu'))
+        param_grad.append(torch.randn([2, 1024], dtype=torch.bfloat16, device='xpu'))
+        param_grad.append(torch.randn([30522, 1024], dtype=torch.bfloat16, device='xpu'))
         param_grad.append(torch.randn([30522], dtype=torch.bfloat16, device='xpu'))
-        param_grad.append(torch.randn([4096,1024], dtype=torch.bfloat16, device='xpu'))
+        param_grad.append(torch.randn([4096, 1024], dtype=torch.bfloat16, device='xpu'))
         param_grad.append(torch.randn([4096], dtype=torch.bfloat16, device='xpu'))
-        param_grad.append(torch.randn([512,1024], dtype=torch.bfloat16, device='xpu'))
+        param_grad.append(torch.randn([512, 1024], dtype=torch.bfloat16, device='xpu'))
 
         # param_weight, BF16 weight
         # param_grad, BF16 grad
@@ -76,7 +77,7 @@ class TestTorchMethod(TestCase):
         # xpu update - warmup
         for _ in range(WARM):
             for i in range(len(param_weight)):
-                ipex._C.fused_adamW(torch.empty_like(param_master_weight[i]).data, torch.empty_like(param_weight[i]).data, torch.empty_like(param_grad[i]).data, 
+                ipex._C.fused_adamW(torch.empty_like(param_master_weight[i]).data, torch.empty_like(param_weight[i]).data, torch.empty_like(param_grad[i]).data,
                                     torch.empty_like(exp_avg[i]).data, torch.empty_like(exp_avg_sq[i]).data, step,
                                     lr, eps, beta1, beta2, weight_decay, correct_bias)
         for i in range(len(param_weight)):

@@ -1,11 +1,15 @@
+import time
+
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
-import time
+
 import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif("not ipex._onemkl_is_enabled()")

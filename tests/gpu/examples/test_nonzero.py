@@ -1,6 +1,8 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -8,7 +10,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    #@pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    # @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
     @pytest.mark.skip(reason="skip due to bugs caused by oneDPL and compiler upgrades")
     def test_nonzero(self, dtype=torch.float):
 
@@ -76,4 +78,3 @@ class TestNNMethod(TestCase):
                          0], torch.nonzero(b_dpcpp, as_tuple=True)[0].cpu())
         self.assertEqual(torch.nonzero(b_cpu, as_tuple=True)[
                          1], torch.nonzero(b_dpcpp, as_tuple=True)[1].cpu())
-

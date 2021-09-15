@@ -1,15 +1,19 @@
 from __future__ import print_function
-import numpy
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
+import numpy
 import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
- 
+
+
 class TestNNMethod(TestCase):
     def test_nll_loss(self, dtype=torch.float):
         # input is of size N x C = 3 x 5
@@ -33,7 +37,6 @@ class TestNNMethod(TestCase):
         print("SYCL: ", input_dpcpp.grad.to("cpu"))
         self.assertEqual(output, output_dpcpp.cpu())
         self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
-
 
         # input is of size N x C x H x W = 3 x 5 x 2 x 2
         input = torch.randn(3, 5, 2, 2)
@@ -83,7 +86,6 @@ class TestNNMethod(TestCase):
         input.grad.zero_()
         input_dpcpp.grad.detach_()
         input_dpcpp.grad.zero_()
-
 
         output = F.nll_loss(input, target, reduction='mean')
         output.backward(x)

@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
-import ipex
 
+import ipex
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -33,15 +34,15 @@ class TestNNMethod(TestCase):
 
         t.fill_(False)
         t.random_()
-        #self.assertEqual(t.min(), False)
-        #self.assertEqual(t.max(), True)
-        #self.assertTrue(0.4 < (t.eq(True)).to(torch.int).sum().item() / size < 0.6)
+        # self.assertEqual(t.min(), False)
+        # self.assertEqual(t.max(), True)
+        # self.assertTrue(0.4 < (t.eq(True)).to(torch.int).sum().item() / size < 0.6)
 
         t.fill_(True)
         t.random_()
-        #self.assertEqual(t.min(), False)
-        #self.assertEqual(t.max(), True)
-        #self.assertTrue(0.4 < (t.eq(True)).to(torch.int).sum().item() / size < 0.6)
+        # self.assertEqual(t.min(), False)
+        # self.assertEqual(t.max(), True)
+        # self.assertTrue(0.4 < (t.eq(True)).to(torch.int).sum().item() / size < 0.6)
 
     def test_random_from_to_bool(self):
         size = 2000
@@ -81,14 +82,15 @@ class TestNNMethod(TestCase):
                 else:
                     self.assertRaisesRegex(
                         RuntimeError,
-                        "random_ expects 'from' to be less than 'to', but got from=" + str(from_) + " >= to=" + str(to_),
+                        "random_ expects 'from' to be less than 'to', but got from=" +
+                        str(from_) + " >= to=" + str(to_),
                         lambda: t.random_(from_, to_)
                     )
 
     def test_random_full_range(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793
         dtype = torch.double
-        
+
         size = 2000
         alpha = 0.1
 
@@ -116,7 +118,7 @@ class TestNNMethod(TestCase):
     def test_random_from_to(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793
         dtype = torch.double
-        
+
         size = 2000
         alpha = 0.1
 
@@ -179,14 +181,15 @@ class TestNNMethod(TestCase):
                 else:
                     self.assertRaisesRegex(
                         RuntimeError,
-                        "random_ expects 'from' to be less than 'to', but got from=" + str(from_) + " >= to=" + str(to_),
+                        "random_ expects 'from' to be less than 'to', but got from=" +
+                        str(from_) + " >= to=" + str(to_),
                         lambda: t.random_(from_, to_)
                     )
 
     def test_random_to(self):
         # TODO: https://github.com/pytorch/pytorch/issues/33793
         dtype = torch.double
-        
+
         size = 2000
         alpha = 0.1
 
@@ -264,4 +267,3 @@ class TestNNMethod(TestCase):
         t.random_()
         self.assertTrue(0 <= t.min() < alpha * to_inc)
         self.assertTrue((to_inc - alpha * to_inc) < t.max() <= to_inc)
-

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -19,7 +20,7 @@ class TestNNMethod(TestCase):
         print("output: ", output_cpu)
         output_cpu.backward(torch.ones_like(output_cpu))
         print("input.grad: ", input_cpu.grad)
-        
+
         print("xpu")
         input_dpcpp.requires_grad = True
         output_dpcpp = m(input_dpcpp)

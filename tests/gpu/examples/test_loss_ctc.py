@@ -1,7 +1,8 @@
 import torch
+from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
-from torch.testing._internal.common_utils import TestCase
 import pytest
 
 cpu_device = torch.device('cpu')
@@ -20,7 +21,7 @@ class TestTorchMethod(TestCase):
             print("b", b[mask].detach().numpy())
             print("diff", comp[mask].detach().numpy())
             print("marging", margin[mask].detach().numpy())
-            print("relative diff ratio", (comp[mask]/b[mask]).detach().numpy())
+            print("relative diff ratio", (comp[mask] / b[mask]).detach().numpy())
 
         def _test_loss_ctc(log_probs, targets, input_lengths, target_lengths):
             log_probs.requires_grad_(True)

@@ -1,10 +1,13 @@
 from __future__ import print_function
-import numpy
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
+import numpy
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -61,18 +64,18 @@ class TestNNMethod(TestCase):
                                 [0.1, 1.1, 0.8]]]],
                              requires_grad=True, device=cpu_device)
         y_cpu_output = torch.tensor([[[[0.5, 1.5, 0.1],
-                                [2.2, 1.3, 1.7],
-                                [0.1, 1.1, 0.8]]]],
-                             requires_grad=True, device=cpu_device)
+                                       [2.2, 1.3, 1.7],
+                                       [0.1, 1.1, 0.8]]]],
+                                    requires_grad=True, device=cpu_device)
 
         x_dpcpp = torch.tensor([[[[0.5, 1.5, 0.1],
                                 [2.2, 1.3, 1.7],
                                 [0.1, 1.1, 0.8]]]],
-                             requires_grad=True, device=dpcpp_device)
+                               requires_grad=True, device=dpcpp_device)
         y_dpcpp_output = torch.tensor([[[[0.5, 1.5, 0.1],
-                                [2.2, 1.3, 1.7],
-                                [0.1, 1.1, 0.8]]]],
-                             requires_grad=True, device=dpcpp_device)
+                                         [2.2, 1.3, 1.7],
+                                         [0.1, 1.1, 0.8]]]],
+                                      requires_grad=True, device=dpcpp_device)
 
         print("x:", x_cpu)
         print("x_dpcpp:", x_dpcpp.cpu())

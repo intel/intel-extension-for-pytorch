@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-from torch.nn.functional import relu_
-from torch.nn.functional import relu
+from torch.nn.functional import relu, relu_
+
 import ipex
+
 
 def test_lazy_reorder():
     cpu_device = torch.device("cpu")
@@ -12,7 +13,6 @@ def test_lazy_reorder():
     conv2 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
     bn1 = nn.BatchNorm2d(2)
     bn2 = nn.BatchNorm2d(2)
-    relu = nn.ReLU()
     max_pool = nn.MaxPool2d(kernel_size=3, stride=1,
                             padding=1, return_indices=True)
 

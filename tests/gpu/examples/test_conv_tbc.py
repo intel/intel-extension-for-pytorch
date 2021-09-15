@@ -1,13 +1,15 @@
 import torch
-import ipex
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
 import pytest
 
 dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 
 
-class  TestTorchMethod(TestCase):
+class TestTorchMethod(TestCase):
     def test_conv_tbc(self, dtype=torch.float):
 
         input_cpu = torch.randn(3, 4, 5)
@@ -40,4 +42,3 @@ class  TestTorchMethod(TestCase):
 
         self.assertEqual(output_cpu, output_sycl.cpu())
         self.assertEqual(input_cpu.grad, input_sycl.grad.cpu())
-

@@ -1,11 +1,14 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")
+
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif("not ipex._onedpl_is_enabled()")

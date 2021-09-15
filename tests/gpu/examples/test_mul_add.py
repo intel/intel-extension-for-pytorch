@@ -1,15 +1,14 @@
 import torch
 import torch.nn as nn
-
-import ipex
 from torch.testing._internal.common_utils import TestCase
 
+import ipex
 
 dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 
 
-class  TestTorchMethod(TestCase):
+class TestTorchMethod(TestCase):
     def test_padded(self, dtype=torch.float):
 
         C = 2
@@ -61,4 +60,3 @@ class  TestTorchMethod(TestCase):
         ref = x.cpu() * y.cpu() + z.cpu()
         print(real, ref)
         self.assertEqual(real, ref)
-

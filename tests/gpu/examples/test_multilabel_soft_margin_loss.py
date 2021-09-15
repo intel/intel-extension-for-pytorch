@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
+
 import ipex
 
 cpu_device = torch.device("cpu")
@@ -86,6 +87,6 @@ class TestNNMethod(TestCase):
         print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
-        tol = output_cpu.item()*5e-5
-        self.assertEqual(output_cpu, output_dpcpp.cpu(),tol)
+        tol = output_cpu.item() * 5e-5
+        self.assertEqual(output_cpu, output_dpcpp.cpu(), tol)
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())

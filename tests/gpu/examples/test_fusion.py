@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
-import ipex
-import pytest
 
+import ipex
+
+import pytest
 
 torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)
@@ -16,7 +17,6 @@ dpcpp_device = torch.device("xpu")
 class MatmulSum(torch.nn.Module):
     def __init__(self):
         super(MatmulSum, self).__init__()
-
 
     def forward(self, m1, m2, a):
         y = torch.matmul(m1, m2)
@@ -47,6 +47,7 @@ class TransMatmulScale(torch.nn.Module):
     def forward(self, m1, m2):
         return torch.matmul(m1, m2.transpose(-1, -2)) / 8
 
+
 class TransMatmulAddAdd(torch.nn.Module):
     def __init__(self):
         super(TransMatmulAddAdd, self).__init__()
@@ -65,13 +66,12 @@ class TransMatmulAdd(torch.nn.Module):
         return output
 
 
-
 class TransMatmulAddGelu(torch.nn.Module):
     def __init__(self):
         super(TransMatmulAddGelu, self).__init__()
 
     def forward(self, m1, m2, add):
-        return F.gelu(torch.add(torch.matmul(m1, m2.t()), add, alpha=2.0) )
+        return F.gelu(torch.add(torch.matmul(m1, m2.t()), add, alpha=2.0))
 
 
 class Conv2dRelu(torch.nn.Module):
@@ -145,10 +145,10 @@ class TestNNMethod(TestCase):
         del modelJit
 
     def test_trans_baddbmm_scale_sum_fusion(self, dtype=torch.float):
-        m1 = torch.randn((2,2,3), device=cpu_device)
-        m2 = torch.randn((2,2,3), device=cpu_device)
-        added1 = torch.randn((2,1,1), device=cpu_device)
-        added2 = torch.randn((2,2,2), device=cpu_device)
+        m1 = torch.randn((2, 2, 3), device=cpu_device)
+        m2 = torch.randn((2, 2, 3), device=cpu_device)
+        added1 = torch.randn((2, 1, 1), device=cpu_device)
+        added2 = torch.randn((2, 2, 2), device=cpu_device)
 
         model = TransMatmulScalePost()
         raw1 = model(m1, m2, added1)
@@ -172,8 +172,8 @@ class TestNNMethod(TestCase):
         del modelJit
 
     def test_trans_baddbmm_fusion(self, dtype=torch.float):
-        m1 = torch.randn((2,2,3), device=cpu_device)
-        m2 = torch.randn((2,2,3), device=cpu_device)
+        m1 = torch.randn((2, 2, 3), device=cpu_device)
+        m2 = torch.randn((2, 2, 3), device=cpu_device)
 
         model = TransMatmul()
         raw1 = model(m1, m2)
@@ -195,8 +195,8 @@ class TestNNMethod(TestCase):
         del modelJit
 
     def test_trans_baddbmm_scale_fusion(self, dtype=torch.float):
-        m1 = torch.randn((2,2,3), device=cpu_device)
-        m2 = torch.randn((2,2,3), device=cpu_device)
+        m1 = torch.randn((2, 2, 3), device=cpu_device)
+        m2 = torch.randn((2, 2, 3), device=cpu_device)
 
         model = TransMatmulScale()
         raw1 = model(m1, m2)
@@ -236,7 +236,7 @@ class TestNNMethod(TestCase):
             print("real:", real.to(cpu_device))
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
- 
+
     def test_trans_matmul_add_add(self, dtype=torch.float):
         m1 = torch.randn((4, 2), device=cpu_device)
         m2 = torch.randn((4, 2), device=cpu_device)
@@ -280,21 +280,21 @@ class TestNNMethod(TestCase):
             print("real:", real.to(cpu_device))
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
-    
+
     def test_trans_matmul_gelu(self, dtype=torch.float):
         m1 = torch.randn((4, 2), device=cpu_device)
         m2 = torch.randn((4, 2), device=cpu_device)
         add = torch.randn((4, 4), device=cpu_device)
-        
+
         m1_dpcpp = m1.to(dpcpp_device)
         m2_dpcpp = m2.to(dpcpp_device)
         add_dpcpp = add.to(dpcpp_device)
-        
+
         model = TransMatmulAddGelu()
-        model_dpcpp = model.to(dpcpp_device) 
+        model_dpcpp = model.to(dpcpp_device)
         raw = model_dpcpp(m1_dpcpp, m2_dpcpp, add_dpcpp)
         print("raw: ", raw.cpu())
-        
+
         modelJit = torch.jit.script(model)
         with torch.no_grad():
             real = modelJit(m1_dpcpp, m2_dpcpp, add_dpcpp)
@@ -302,7 +302,7 @@ class TestNNMethod(TestCase):
             print(modelJit.graph_for(m1_dpcpp, m2_dpcpp, add_dpcpp))
         self.assertEqual(raw, real.to(cpu_device), atol=1e-3, rtol=1.3e-6)
         del modelJit
-    
+
     def test_conv_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -327,7 +327,7 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
- 
+
     def test_conv_sigmoid_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -366,7 +366,7 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
-            
+
     def test_linear_sigmoid(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         model = LinearSigmoid(4, 4)
@@ -383,7 +383,7 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
-    
+
     def test_linear_dropout(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
         inplace = True
@@ -401,5 +401,3 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
-  
-    

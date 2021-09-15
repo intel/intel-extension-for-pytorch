@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
-import ipex
-import pytest
 
+import ipex
+
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
+
 
 class TestTensorMethod(TestCase):
     def test_permute(self, dtype=torch.float):

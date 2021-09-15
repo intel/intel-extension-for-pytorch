@@ -1,22 +1,26 @@
 import torch
 import torch.nn as nn
-import ipex
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
+
+import ipex
+
 import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
+
 class TestNNMethod(TestCase):
     def test_linear(self, dtype=torch.float):
-        #cpu
+        # cpu
         linear = nn.Linear(4, 2)
         tanh = nn.Tanh()
 
         print("linear weight", linear.weight)
 
-        x_cpu = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]], requires_grad=True, device=cpu_device, dtype=dtype)
+        x_cpu = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]],
+                             requires_grad=True, device=cpu_device, dtype=dtype)
         print("x_cpu", x_cpu)
 
         z_cpu = linear(x_cpu)
@@ -29,7 +33,7 @@ class TestNNMethod(TestCase):
         print("cpu input grad", x_cpu.grad)
         print("cpu linear grad", linear.weight.grad)
 
-        #dpcpp
+        # dpcpp
         linear_dpcpp = linear.to("xpu")
         linear.zero_grad()
 
@@ -37,7 +41,8 @@ class TestNNMethod(TestCase):
 
         print("dpcpp linear weight", linear_dpcpp.weight.to("cpu"))
 
-        x_dpcpp = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]], requires_grad=True, device=dpcpp_device, dtype=dtype)
+        x_dpcpp = torch.tensor([[1.23, 2.34, 6.45, 2.22], [0.23, 1.34, 7.45, 1.22]],
+                               requires_grad=True, device=dpcpp_device, dtype=dtype)
         print("x_dpcpp", x_dpcpp.to("cpu"))
 
         z_dpcpp = linear_dpcpp(x_dpcpp)
@@ -56,8 +61,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(linear.weight, linear_dpcpp.weight.cpu())
         self.assertEqual(linear.weight.grad, linear_dpcpp.weight.grad.cpu())
 
-
-        #new added case for the shared weights in one tensor
+        # new added case for the shared weights in one tensor
         # functionality
         x_cpu = torch.ones([3, 4], device=cpu_device, dtype=dtype)
         grad_cpu = torch.ones([3, 2], device=cpu_device, dtype=dtype)
@@ -89,5 +93,3 @@ class TestNNMethod(TestCase):
         self.assertEqual(weight, weight_sycl.cpu())
         self.assertEqual(y1_cpu, y1_sycl.cpu())
         self.assertEqual(y2_cpu, y2_sycl.cpu())
-
-
