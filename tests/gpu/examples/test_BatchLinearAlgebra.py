@@ -35,7 +35,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(torch.triu(y_cpu2),
                          torch.triu(y_dpcpp2).to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_cholesky(self, dtype=torch.float):
         x_cpu = torch.randn(3, 3)
         print("x cpu \n", x_cpu)
@@ -54,7 +54,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(res.to(cpu_device), res_dpcpp.to(cpu_device))
         self.assertEqual(res.to(cpu_device), res_tensor_dpcpp.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_cholesky_solve(self, dtype=torch.float):
         a = torch.randn([3, 3], device=cpu_device)
         print(" cpu a  ", a)
@@ -93,7 +93,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(check_res.to(cpu_device), check_res_dpcpp.to(cpu_device))
         self.assertEqual(res_tensor.to(cpu_device), res_tensor_dpcpp.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_logdet(self, dtype=torch.float):
         ts = int(time.time())
         torch.manual_seed(ts)
@@ -132,7 +132,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(A_det.to(cpu_device), A_dpcpp_det.to(cpu_device))
         self.assertEqual(A_det_log.to(cpu_device), A_dpcpp_det_log.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lu(self, dtype=torch.float):
         def _validate(A, LU, pivot):
             P, L, U = torch.lu_unpack(LU, pivot)
@@ -156,7 +156,7 @@ class TestTorchMethod(TestCase):
             LU_xpu, pivot_xpu = A_xpu.lu()
             _validate(A_xpu.cpu(), LU_xpu.cpu(), pivot_xpu.cpu())
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lu_solve(self, dtype=torch.float):
         def _validate(A, x, b):
             b_ = torch.matmul(A, x)
@@ -185,7 +185,7 @@ class TestTorchMethod(TestCase):
             x_xpu = b_xpu.lu_solve(*A_xpu.lu())
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_solve(self, dtype=torch.float):
         def _validate(A, x, b):
             d_ = torch.dist(b, torch.matmul(A, x))
@@ -215,7 +215,7 @@ class TestTorchMethod(TestCase):
             x_xpu, lu_xpu = b_xpu.solve(A_xpu)
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_inverse(self, dtype=torch.float):
         def _validate(A, A_):
             self.assertEqual(torch.matmul(A, A_), torch.eye(A.size(-1)).expand_as(A),
@@ -238,7 +238,7 @@ class TestTorchMethod(TestCase):
             Ai_xpu = A_xpu.inverse()
             _validate(A_xpu.cpu(), Ai_xpu.cpu())
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_qr(self, dtype=torch.float):
         def _validate(A, Q, R):
             self.assertEqual(A, torch.matmul(Q, R))
@@ -271,7 +271,7 @@ class TestTorchMethod(TestCase):
 
             self.assertEqual(q_cpu, q_xpu)
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_ormqr(self, dtype=torch.float):
         A = torch.randn(8, 5)
         c = torch.randn(5, 7)

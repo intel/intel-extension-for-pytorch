@@ -43,7 +43,7 @@ class TestNNMethod(TestCase):
         c_dpcpp_fp32 = c.to(device)
 
         # optim
-        optim_dpcpp_bf16 = ipex.optim.SplitSGD(m_dpcpp_bf16.parameters(), lr=0.1, momentum=0, weight_decay=0)
+        optim_dpcpp_bf16 = torch.xpu.optim.SplitSGD(m_dpcpp_bf16.parameters(), lr=0.1, momentum=0, weight_decay=0)
         optim_dpcpp_fp32 = torch.optim.SGD(m_dpcpp_fp32.parameters(), lr=0.1, momentum=0, weight_decay=0)
 
         # forward

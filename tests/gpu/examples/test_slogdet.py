@@ -13,7 +13,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_slogdet(self, dtype=torch.float):
         A = torch.randn(3, 3)
         A_xpu = A.to("xpu")

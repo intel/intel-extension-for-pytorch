@@ -11,7 +11,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lgamma(self, dtype=torch.float):
         a = np.array([[0.5, 1, 1.5],
                       [2.5, 3, 3.5]])
@@ -43,7 +43,7 @@ class TestTorchMethod(TestCase):
         print(x_dpcpp.to(cpu_device))
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_mvlgamma(self, dtype=torch.float):
         a = np.array([[1.6835, 1.8474, 1.1929],
                       [1.0475, 1.7162, 1.4180]])

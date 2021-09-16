@@ -19,7 +19,7 @@ class TestTorchMethod(TestCase):
         # TODO: check for diferent dtype
         array1 = [input1, input1.half(), input1.bool()]
         array2 = [input2, input2.half(), input2.bool()]
-        if not ipex._double_kernel_disabled():
+        if not torch.xpu.has_double_dtype():
             array1.append(input1.double())
             array2.append(input2.double())
 

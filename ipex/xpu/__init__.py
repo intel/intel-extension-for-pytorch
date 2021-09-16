@@ -9,6 +9,7 @@ from .streams import Stream
 from .random import *
 from .memory import *
 from .intrinsic import *
+from .settings import *
 
 from ipex._utils import _get_device_index  # , _dummy_type
 import ipex.optim as optim

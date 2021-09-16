@@ -10,7 +10,7 @@ sycl_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_activation(self):
         output = torch.unique(torch.tensor([1, 3, 2, 3], dtype=torch.long))
         output_dpcpp = torch.unique(torch.tensor([1, 3, 2, 3], dtype=torch.long, device=sycl_device))

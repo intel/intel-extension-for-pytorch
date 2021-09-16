@@ -11,7 +11,7 @@ sycl_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onedpl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_index_randperm(self):
         src = torch.empty(150, 45, device=sycl_device).random_(0, 2**22)
         idx = torch.randperm(src.shape[0], device=sycl_device)

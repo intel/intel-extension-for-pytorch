@@ -12,7 +12,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_cholesky_inverse(self, dtype=torch.float):
         a = torch.randn(3, 3).to(cpu_device)
 
@@ -32,7 +32,7 @@ class TestTorchMethod(TestCase):
         print("xpu", t1_dpcpp.to(cpu_device))
         self.assertEqual(t1, t1_dpcpp.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_geqrf(self, dtype=torch.float):
         A = torch.tensor([[6.80, -2.11, 5.66, 5.97, 8.23],
                           [-6.05, -3.30, 5.36, -4.44, 1.08],
@@ -61,7 +61,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(a, a_dpcpp.to(cpu_device))
         self.assertEqual(tau, tau_dpcpp.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_ger(self, dtype=torch.float):
         v1 = torch.arange(1., 5., device=cpu_device)
         v2 = torch.arange(1., 4., device=cpu_device)
@@ -92,7 +92,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(A12, A12_dpcpp.to(cpu_device))
         self.assertEqual(A21, A21_dpcpp.to(cpu_device))
 
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_addr(self, dtype=torch.float):
         x1_cpu = torch.randn(3, dtype=torch.float)
         x2_cpu = torch.randn(2, dtype=torch.float)

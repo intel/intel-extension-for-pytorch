@@ -57,22 +57,6 @@ def library_paths():
     return paths
 
 
-def _usm_is_enabled():
-    return _C._usm_is_enabled()
-
-
-def _onedpl_is_enabled():
-    return _C._onedpl_is_enabled()
-
-
-def _onemkl_is_enabled():
-    return _C._onemkl_is_enabled()
-
-
-def _double_kernel_disabled():
-    return _C._double_kernel_disabled()
-
-
 # Path to folder containing CMake definitions for torch ipex package
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), 'share', 'cmake')
 

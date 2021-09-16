@@ -13,7 +13,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_symeig(self, dtype=torch.float):
         a = torch.randn(5, 5)
         a = a + a.t()

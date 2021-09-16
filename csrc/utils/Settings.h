@@ -43,6 +43,12 @@ class IPEX_API Settings final {
   void enable_tf32_mode();
   void disable_tf32_mode();
 
+  bool is_onedpl_enabled() const;
+
+  bool is_onemkl_enabled() const;
+
+  bool is_double_disabled() const;
+
  private:
   Settings()
       : verbose_level(0),

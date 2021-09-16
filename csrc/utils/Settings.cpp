@@ -254,5 +254,32 @@ void Settings::disable_tf32_mode() {
   tf32_mode_enabled = false;
 }
 
+bool Settings::is_onedpl_enabled() const {
+  std::call_once(init_env_flag, init_dpcpp_env);
+#if defined(USE_ONEDPL)
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool Settings::is_onemkl_enabled() const {
+  std::call_once(init_env_flag, init_dpcpp_env);
+#if defined(USE_ONEMKL)
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool Settings::is_double_disabled() const {
+  std::call_once(init_env_flag, init_dpcpp_env);
+#if defined(BUILD_INTERNAL_DEBUG) && !defined(BUILD_DOUBLE_KERNEL)
+  return false;
+#else
+  return true;
+#endif
+}
+
 } // namespace dpcpp
 } // namespace xpu

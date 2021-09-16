@@ -18,7 +18,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.var_mean(input_dpcpp)
 
-        if not ipex._double_kernel_disabled():
+        if not torch.xpu.has_double_dtype():
             print(output_cpu[0])
             print(output_dpcpp[0])
             print(output_cpu[1])
@@ -33,7 +33,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.var_mean(input_dpcpp, 1)
 
-        if not ipex._double_kernel_disabled():
+        if not torch.xpu.has_double_dtype():
             print(output_cpu[0])
             print(output_dpcpp[0])
             print(output_cpu[1])
@@ -48,7 +48,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.std_mean(input_dpcpp)
 
-        if not ipex._double_kernel_disabled():
+        if not torch.xpu.has_double_dtype():
             print(output_cpu[0])
             print(output_dpcpp[0])
             print(output_cpu[1])

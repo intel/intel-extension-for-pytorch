@@ -33,10 +33,10 @@ class TestTorchMethod(TestCase):
         print("sycl")
         input_sycl.requires_grad = True
         output_sycl = m(input_sycl, weight_sycl, bias_sycl)
-        if not ipex._double_kernel_disabled():
+        if not torch.xpu.has_double_dtype():
             print("output: ", output_sycl.cpu())
         output_sycl.backward(torch.ones_like(output_sycl).to("xpu"))
-        if not ipex._double_kernel_disabled():
+        if not torch.xpu.has_double_dtype():
             print("input.grad: ", input_sycl.grad)
         # input_sycl.grad.zero_()
 

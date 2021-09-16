@@ -12,7 +12,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lognormal(self, dtype=torch.float):
         lognormal = torch.ones(1000000, device=dpcpp_device)
         lognormal.log_normal_(std=1 / 4)

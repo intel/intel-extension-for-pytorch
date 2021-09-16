@@ -12,7 +12,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not ipex._onemkl_is_enabled()")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_triangular_solve(self, dtype=torch.float):
         a = torch.randn(2, 2)
         b = torch.randn(2, 3)

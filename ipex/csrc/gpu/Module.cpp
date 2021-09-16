@@ -10,6 +10,7 @@
 #include <intrinsic/ipex_intrinsic.h>
 #include <jit/fusion_pass.h>
 #include <runtime/Memory.h>
+#include <utils/Settings.h>
 #include "Event.h"
 #include "Module.h"
 #include "Storage.h"
@@ -430,23 +431,45 @@ void init_module(pybind11::module& m) {
     return at::AtenIpexTypeXPU::to_plain_if_needed(input);
   });
 
-#if defined(USE_ONEDPL)
-  m.def("_onedpl_is_enabled", []() { return true; });
-#else
-  m.def("_onedpl_is_enabled", []() { return false; });
-#endif
+  m.def(
+      "_is_onedpl_enabled", []() { return Settings::I().is_onedpl_enabled(); });
 
-#if defined(USE_ONEMKL)
-  m.def("_onemkl_is_enabled", []() { return true; });
-#else
-  m.def("_onemkl_is_enabled", []() { return false; });
-#endif
+  m.def(
+      "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
 
-#if defined(BUILD_DOUBLE_KERNEL)
-  m.def("_double_kernel_disabled", []() { return false; });
-#else
-  m.def("_double_kernel_disabled", []() { return true; });
-#endif
+  m.def("_is_double_disabled", []() {
+    return Settings::I().is_double_disabled();
+  });
+
+  m.def(
+      "_get_warning_level", []() { return Settings::I().get_warning_level(); });
+
+  m.def("_get_xpu_backend", []() {
+    return int(Settings::I().get_xpu_backend());
+  });
+  m.def("_set_xpu_backend", [](const int& backend) {
+    return Settings::I().set_xpu_backend(static_cast<XPU_BACKEND>(backend));
+  });
+
+  m.def("_is_force_sync_exec", []() {
+    return Settings::I().is_force_sync_exec();
+  });
+
+  m.def("_is_event_profiling_enabled", []() {
+    return Settings::I().is_event_profiling_enabled();
+  });
+
+  m.def("_is_tile_partition_enabled", []() {
+    return Settings::I().is_tile_partition_enabled();
+  });
+
+  m.def("_is_onednn_layout_enabled", []() {
+    return Settings::I().is_onednn_layout_enabled();
+  });
+
+  m.def("_is_tf32_mode_enabled", []() {
+    return Settings::I().is_tf32_mode_enabled();
+  });
 
   auto set_module_attr = [&](const char* name, PyObject* v) {
     // PyObject_SetAttrString doesn't steal reference. So no need to incref.
