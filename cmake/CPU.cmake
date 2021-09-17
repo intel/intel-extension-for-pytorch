@@ -156,7 +156,6 @@ include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
 # include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
 # include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 
 
 # Set installed PyTorch dir
@@ -189,22 +188,9 @@ add_subdirectory(${DPCPP_ROOT}/quantization)
 add_subdirectory(${DPCPP_ROOT}/jit)
 add_subdirectory(${DPCPP_ROOT}/cpu)
 
-# libxsmm
-include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
-ExternalProject_Add(xsmm
-  SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/xsmm
-  BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND
-    make
-    "AVX=3"
-    "-j"
-  INSTALL_COMMAND ""
-  )
 # Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
-target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
 #link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
@@ -224,7 +210,6 @@ endif()
 
 add_dependencies(${PLUGIN_NAME} dnnl_graph)
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
-add_dependencies(${PLUGIN_NAME} xsmm)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
