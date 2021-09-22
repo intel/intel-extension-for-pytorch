@@ -139,14 +139,16 @@ LlgaKernel::prepareRunArgs(const TensorArgs &inputs,
   RunArgs runInputs, runOutputs;
   for (size_t i = 0; i < nGraphInputs_; i++) {
     auto spec = inputSpecs_[i];
-    runInputs.push_back({spec.logical_tensor(), inputs[i].data_ptr()});
+    runInputs.push_back(
+        {spec.logical_tensor(), Engine::getEngine(), inputs[i].data_ptr()});
   }
   for (size_t i = 0; i < constantInputs_.size(); i++) {
     // constantInputSpecs are placed after graphInputSpecs
     auto constantInputSpecIdx = nGraphInputs_ + i;
     auto constantInputSpec = inputSpecs_[constantInputSpecIdx];
-    runInputs.push_back(
-        {constantInputSpec.logical_tensor(), constantInputs_[i].data_ptr()});
+    runInputs.push_back({constantInputSpec.logical_tensor(),
+                         Engine::getEngine(),
+                         constantInputs_[i].data_ptr()});
   }
 
   for (size_t i = 0; i < nOutputs_; i++) {
@@ -160,7 +162,8 @@ LlgaKernel::prepareRunArgs(const TensorArgs &inputs,
       auto inputOffset = iter->second;
       auto inputTensor = inputs[inputOffset];
       outputs.push_back(inputTensor);
-      runOutputs.push_back({spec.logical_tensor(), inputTensor.data_ptr()});
+      runOutputs.push_back(
+          {spec.logical_tensor(), Engine::getEngine(), inputTensor.data_ptr()});
     } else if (spec.is_opaque()) {
       auto tensor = at::empty_llga(spec, opt);
       outputs.push_back(tensor);
@@ -177,11 +180,13 @@ LlgaKernel::prepareRunArgs(const TensorArgs &inputs,
         // as_strided_qtensorimpl for PER_CHANNEL QScheme.
         qtensor.as_strided_(spec.sizes(), spec.strides());
         outputs.push_back(qtensor);
-        runOutputs.push_back({spec.logical_tensor(), qtensor.data_ptr()});
+        runOutputs.push_back(
+            {spec.logical_tensor(), Engine::getEngine(), qtensor.data_ptr()});
       } else {
         auto tensor = at::empty_strided(spec.sizes(), spec.strides(), opt);
         outputs.push_back(tensor);
-        runOutputs.push_back({spec.logical_tensor(), tensor.data_ptr()});
+        runOutputs.push_back(
+            {spec.logical_tensor(), Engine::getEngine(), tensor.data_ptr()});
       }
     }
   }
