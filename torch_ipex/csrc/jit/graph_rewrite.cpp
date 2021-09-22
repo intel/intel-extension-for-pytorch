@@ -569,14 +569,13 @@ void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph> &graph) {
 
 void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph> &graph) {
   std::string qembedingbag = R"(
-     graph(%weight, %input, %offsets, %sparse, %include_last_offset, %w_scale, %w_zp, %w_dtype, %o_scale, %o_zp, %o_dtype):
-        %r = ipex::qembedding_bag(%weight, %input, %offsets, %sparse, %include_last_offset,  %w_scale, %w_zp, %w_dtype, %o_scale, %o_zp, %o_dtype)
+     graph(%weight, %input, %offsets, %sparse, %include_last_offset, %o_scale, %o_zp, %o_dtype):
+        %r = ipex::qembedding_bag(%weight, %input, %offsets, %sparse, %include_last_offset, %o_scale, %o_zp, %o_dtype)
         return (%r) )";
 
   std::string embeddingbag_with_quant_dequant = R"(
-      graph(%weight, %input, %offsets, %sparse, %include_last_offset, %w_scale, %w_zp, %w_dtype, %o_scale, %o_zp, %o_dtype):
-        %qw = aten::quantize_per_tensor(%weight, %w_scale, %w_zp, %w_dtype)
-        %dqw = aten::dequantize(%qw)
+      graph(%qweight, %input, %offsets, %sparse, %include_last_offset,  %o_scale, %o_zp, %o_dtype):
+        %dqw = aten::dequantize(%qweight)
         %r = torch_ipex::embedding_bag(%dqw, %input, %offsets, %sparse, %include_last_offset)
         %qout = aten::quantize_per_tensor(%r, %o_scale, %o_zp, %o_dtype)
         return (%qout) )";

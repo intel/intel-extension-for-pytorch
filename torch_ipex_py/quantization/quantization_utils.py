@@ -171,7 +171,7 @@ def convert(model, conf, inputs):
     torch._C._jit_set_profiling_executor(True)
     with torch.no_grad(), _quantization_int8():
         trace_model = torch.jit.trace(model, inputs, check_trace=False)
-    trace_model = torch.jit._recursive.wrap_cpp_module(torch._C._freeze_module(trace_model._c, preserveParameters=True))
+    trace_model = torch.jit.freeze(trace_model)
 
     return trace_model
 

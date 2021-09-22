@@ -386,11 +386,6 @@ at::Tensor AtenIpexTypeExt::embedding_bag(
 }
 
 namespace cpu {
-using weakref_type =
-    c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
-using val_type = std::tuple<weakref_type, at::Tensor>;
-std::unordered_map<c10::TensorImpl *, val_type> cached_qweight;
-torch_ipex::ReadWriteMutex rwmutex;
 
 at::Tensor embedding_bag_int8_impl(const at::Tensor &qweight,
                                    const at::Tensor &indices,
@@ -455,38 +450,15 @@ at::Tensor embedding_bag_int8_impl(const at::Tensor &qweight,
 }
 
 at::Tensor AtenIpexJITDev::dil_qembeddingbag(
-    const at::Tensor weight, const at::Tensor indices, const at::Tensor offsets,
-    bool sparse, bool include_last_offset, double w_scale, int64_t w_zp,
-    at::ScalarType w_dtype, double o_scale, int64_t o_zp,
+    const at::Tensor weight,
+    const at::Tensor indices,
+    const at::Tensor offsets,
+    bool sparse,
+    bool include_last_offset,
+    double o_scale,
+    int64_t o_zp,
     at::ScalarType o_dtype) {
-  at::Tensor qweight;
-  {
-    torch_ipex::UniqueReadLock<torch_ipex::ReadWriteMutex> lock(rwmutex);
-    auto it = cached_qweight.find(weight.unsafeGetTensorImpl());
-    if (it != cached_qweight.end()) {
-      // cache hit
-      qweight = std::get<1>(it->second);
-    }
-  }
-
-  if (!qweight.defined()) {
-    // cache miss
-    torch_ipex::UniqueWriteLock<torch_ipex::ReadWriteMutex> lock(rwmutex);
-    auto it = cached_qweight.find(weight.unsafeGetTensorImpl());
-    if (it == cached_qweight.end()) {
-      // check again if qweight is still not cached
-      qweight = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
-      cached_qweight.emplace(
-          weight.unsafeGetTensorImpl(),
-          val_type{weakref_type(weight.getIntrusivePtr()), qweight});
-    } else {
-      // qweight is cached
-      qweight = std::get<1>(it->second);
-    }
-  }
-
-  return embedding_bag_int8_impl(qweight, indices, offsets,
-                                 include_last_offset);
+  return embedding_bag_int8_impl(weight, indices, offsets, include_last_offset);
 }
 
 } // namespace cpu

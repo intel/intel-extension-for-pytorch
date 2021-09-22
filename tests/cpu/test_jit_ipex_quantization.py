@@ -49,9 +49,9 @@ class TestIpexOps(JitLlgaTestCase):
         m = M()
         x = torch.rand(1, 3, 14, 14)
         patterns = [
-            ["aten::quantize_per_channel", "aten::dequantize", "aten::_convolution"],
+            ["aten::dequantize", "aten::_convolution"],
             ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
-            ["aten::quantize_per_channel", "aten::dequantize", "aten::linear"],
+            ["aten::dequantize", "aten::linear"],
         ]
         for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
             graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="flatten", qscheme=qscheme)

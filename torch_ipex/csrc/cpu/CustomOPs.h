@@ -199,13 +199,15 @@ class AtenIpexJITDev {
                                  int64_t dim1);
 
    // int8 op
-   static at::Tensor dil_qembeddingbag(const at::Tensor weight,
-                                       const at::Tensor indices,
-                                       const at::Tensor offsets, bool sparse,
-                                       bool include_last_offset, double w_scale,
-                                       int64_t w_zp, at::ScalarType w_dtype,
-                                       double o_scale, int64_t o_zp,
-                                       at::ScalarType o_dtype);
+   static at::Tensor dil_qembeddingbag(
+       const at::Tensor weight,
+       const at::Tensor indices,
+       const at::Tensor offsets,
+       bool sparse,
+       bool include_last_offset,
+       double o_scale,
+       int64_t o_zp,
+       at::ScalarType o_dtype);
 
    static at::Tensor dil_qinteraction(const std::vector<at::Tensor> input,
                                       double o_scale, int64_t o_zp,

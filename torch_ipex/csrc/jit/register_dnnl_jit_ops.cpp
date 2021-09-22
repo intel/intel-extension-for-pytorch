@@ -179,7 +179,7 @@ RegisterOperators op({
     Operator(
         "ipex::conv2d_clamp(" CONV_ARGS
         ", float lower_bound=-1.0, float upper_bound=1.0) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_convolution_clamp(
                 (std::move(peek(stack, 0, 9))).toTensor(),
@@ -200,7 +200,7 @@ RegisterOperators op({
     Operator(
         "ipex::conv2d_elu(" CONV_ARGS ", float alpha=1.0, Scalar scale=1.0, "
         "Scalar input_scale=1.0) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_convolution_elu(
                 (std::move(peek(stack, 0, 10))).toTensor(),
@@ -223,7 +223,7 @@ RegisterOperators op({
     Operator(
         "ipex::conv2d_clamp(" CONV_ARGS_ND_WEIGHT
         ", float lower_bound=-1.0, float upper_bound=1.0) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_convolution_nd_weight_clamp(
                 (std::move(peek(stack, 0, 13))).toTensor(),
@@ -250,7 +250,7 @@ RegisterOperators op({
         "ipex::conv2d_elu(" CONV_ARGS_ND_WEIGHT
         ", float alpha=1.0, Scalar scale=1.0, Scalar input_scale=1.0) -> "
         "Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_convolution_nd_weight_elu(
                 (std::move(peek(stack, 0, 14))).toTensor(),
@@ -277,7 +277,7 @@ RegisterOperators op({
     Operator(
         "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
         "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_max_pool2d(
                 (std::move(peek(stack, 0, 6))).toTensor(),
@@ -295,7 +295,7 @@ RegisterOperators op({
     Operator(
         "ipex::linear(Tensor input, Tensor weight, Tensor? bias=None) -> "
         "Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_linear(
                 (std::move(peek(stack, 0, 3))).toTensor(),
@@ -310,7 +310,7 @@ RegisterOperators op({
     Operator(
         "ipex::linear_add(Tensor input, Tensor weight, Tensor? bias, "
         "Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto output = (std::move(peek(stack, 3, 5))).toTensor();
             auto result = AtenIpexJITDev::dil_linear_add(
@@ -328,7 +328,7 @@ RegisterOperators op({
     Operator(
         "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Tensor "
         "div_input) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_matmul_div(
                 (std::move(peek(stack, 0, 4))).toTensor(),
@@ -345,7 +345,7 @@ RegisterOperators op({
     Operator(
         "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Scalar "
         "div_input) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_matmul_div(
                 (std::move(peek(stack, 0, 4))).toTensor(),
@@ -362,7 +362,7 @@ RegisterOperators op({
     Operator(
         "ipex::matmul_div(Tensor left, Tensor right,  Tensor div_input) -> "
         "Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_matmul_div(
                 (std::move(peek(stack, 0, 3))).toTensor(),
@@ -378,7 +378,7 @@ RegisterOperators op({
     Operator(
         "ipex::matmul_div(Tensor left, Tensor right,  Scalar div_input) -> "
         "Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_matmul_div(
                 (std::move(peek(stack, 0, 3))).toTensor(),
@@ -393,7 +393,7 @@ RegisterOperators op({
 
     Operator(
         "ipex::softmax(Tensor self, int dim, ScalarType ? dtype) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_softmax(
                 (std::move(peek(stack, 0, 3))).toTensor(),
@@ -410,7 +410,7 @@ RegisterOperators op({
         "ipex::layernorm(Tensor a, int[] normalized_shape, Tensor ? "
         "weight_opt, Tensor ? bias_opt, float eps, bool cudnn_enable) -> "
         "Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_layernorm(
                 (std::move(peek(stack, 0, 6))).toTensor(),
@@ -428,25 +428,20 @@ RegisterOperators op({
 
     Operator(
         "ipex::qembedding_bag(Tensor weight, Tensor indices, Tensor offsets, "
-        "bool sparse, "
-        "bool include_last_offset, float w_scale, int w_zp, ScalarType "
-        "w_dtype, "
+        "bool sparse, bool include_last_offset, "
         "float o_scale, int o_zp, ScalarType o_dtype) -> Tensor",
-        [](const Node *node) -> Operation {
-          return [](Stack *stack) {
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
             auto result = AtenIpexJITDev::dil_qembeddingbag(
-                (std::move(peek(stack, 0, 11))).toTensor(),
-                (std::move(peek(stack, 1, 11))).toTensor(),
-                (std::move(peek(stack, 2, 11))).toTensor(),
-                (std::move(peek(stack, 3, 11))).toBool(),
-                (std::move(peek(stack, 4, 11))).toBool(),
-                (std::move(peek(stack, 5, 11))).toDouble(),
-                (std::move(peek(stack, 6, 11))).toInt(),
-                (std::move(peek(stack, 7, 11))).toScalarType(),
-                (std::move(peek(stack, 8, 11))).toDouble(),
-                (std::move(peek(stack, 9, 11))).toInt(),
-                (std::move(peek(stack, 10, 11))).toScalarType());
-            drop(stack, 11);
+                (std::move(peek(stack, 0, 8))).toTensor(),
+                (std::move(peek(stack, 1, 8))).toTensor(),
+                (std::move(peek(stack, 2, 8))).toTensor(),
+                (std::move(peek(stack, 3, 8))).toBool(),
+                (std::move(peek(stack, 4, 8))).toBool(),
+                (std::move(peek(stack, 5, 8))).toDouble(),
+                (std::move(peek(stack, 6, 8))).toInt(),
+                (std::move(peek(stack, 7, 8))).toScalarType());
+            drop(stack, 8);
             pack(stack, std::move(result));
             return 0;
           };
@@ -456,7 +451,7 @@ RegisterOperators op({
     Operator(
         "ipex::qinteraction(Tensor[] tensors,  float o_scale, int o_zp, "
         "ScalarType o_dtype) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_qinteraction(
                 (std::move(peek(stack, 0, 4))).toTensorVector(),
@@ -476,7 +471,7 @@ RegisterOperators op({
         "  int[5] view_shape,"
         "  int trans_dim0,"
         "  int trans_dim1) -> Tensor",
-        [](const Node *node) -> Operation {
+        [](const Node* node) -> Operation {
           return [](Stack *stack) {
             auto result = AtenIpexJITDev::dil_shuffle(
                 (std::move(peek(stack, 0, 4))).toTensor(),
