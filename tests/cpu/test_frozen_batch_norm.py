@@ -37,6 +37,12 @@ class FrozenBNTester(TestCase):
     def test_frozen_batch_norm(self):
         m = FrozenBatchNorm2d(100)
         m1 = FrozenBN2d(100)
+        running_mean = torch.randn(100)
+        running_var = torch.randn(100)
+        m.running_mean = running_mean
+        m.running_var = running_var
+        m1.running_mean = running_mean
+        m1.running_var = running_var
         input = torch.randn(20, 100, 35, 45)
         x = input.clone().detach().requires_grad_()
         x1 = input.clone().detach().requires_grad_()
@@ -66,13 +72,19 @@ class FrozenBNTester(TestCase):
     def test_frozen_batch_norm_bfloat16(self):
         m = FrozenBatchNorm2d(100)
         m1 = FrozenBN2d(100)
+        running_mean = torch.randn(100)
+        running_var = torch.randn(100)
+        m.running_mean = running_mean
+        m.running_var = running_var
+        m1.running_mean = running_mean
+        m1.running_var = running_var
         input = torch.randn(20, 100, 35, 45).bfloat16()
         x = input.clone().detach().requires_grad_()
         x1 = input.clone().detach().requires_grad_()
         y = m(x)
         y1 = m1(x1)
         self.assertTrue(y.dtype == torch.bfloat16)
-        self.assertEqual(y, y1)
+        self.assertEqual(y, y1, prec=0.1)
 
         # backward
         y.mean().backward()
@@ -85,7 +97,7 @@ class FrozenBNTester(TestCase):
         y2 = m(x2)
         self.assertTrue(y2.dtype == torch.bfloat16)
         self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
-        self.assertEqual(y2, y1)
+        self.assertEqual(y2, y1, prec=0.1)
 
         y2.mean().backward()
         self.assertTrue(x2.grad.dtype == torch.bfloat16)

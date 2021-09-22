@@ -129,8 +129,23 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward(
   }
   gradw = itensor_view_from_dense(grad_weight);
   gradb = itensor_view_from_dense(grad_bias);
-  ideep::batch_normalization_backward::compute(
-      x, m, v, grady, w, gradx, gradw, gradb, eps);
+  if (train) {
+    ideep::batch_normalization_backward::compute(
+        x, m, v, grady, w, gradx, gradw, gradb, eps);
+  } else {
+    ideep::batch_normalization_backward::compute(
+        x,
+        m,
+        v,
+        grady,
+        w,
+        gradx,
+        gradw,
+        gradb,
+        eps,
+        ideep::tensor(),
+        ideep::batch_normalization_flag::use_global_stats);
+  }
 
   if (is_channels_last) {
     return std::make_tuple(
