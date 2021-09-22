@@ -133,6 +133,7 @@ static inline void reorder(
 }
 
 static inline Tensor reorder_copy(Tensor& dst, const Tensor& src) {
+  RECORD_FUNCTION("reorder_copy", std::vector<c10::IValue>({src}));
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 
+#include <ATen/record_function.h>
 #include <core/Generator.h>
 #include <runtime/Utils.h>
 #include "Distributions.h"
@@ -28,12 +29,15 @@ void bernoulliDistr(
     std::pair<uint64_t, uint64_t> seeds,
     int64_t numel,
     float p) {
+  RECORD_FUNCTION("bernoulliDistr", {});
   auto& sycl_queue = dpcppGetCurrentQueue();
   std::initializer_list<std::uint64_t> seed = {seeds.first, 0, seeds.second};
 #ifdef USE_ONEMKL
   oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
   oneapi::mkl::rng::bernoulli<scalar_t> distr(p);
-  oneapi::mkl::rng::generate(distr, engine, numel, rand);
+  auto e = oneapi::mkl::rng::generate(distr, engine, numel, rand);
+  dpcpp_log("dpcpp_kernel", e);
+  DPCPP_E_SYNC_FOR_DEBUG(e);
 #else
   AT_ERROR("lu: oneMKL library not found in compilation");
 #endif
