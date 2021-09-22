@@ -624,6 +624,29 @@ at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
   return outputs[0];
 }
 
+at::Tensor matmul(const at::Tensor& mat1, const at::Tensor& mat2) {
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (torch_ipex::check_int8_calibration()) {
+    auto output = at::matmul(mat1, mat2);
+    calibrate({mat1, mat2}, {}, {output}, "matmul", op_id, OP_TYPE_DEFAULT);
+    return output;
+  }
+  params p = get_params(op_id);
+
+  std::vector<at::Tensor> r_inputs, r_weights;
+  std::tie(r_inputs, r_weights) = insert_q_dq_inputs(
+      {mat1, mat2},
+      {},
+      p.qparams[0],
+      p.input_quantized_dtypes,
+      p.inputs_quantized,
+      op_id);
+  auto output = at::matmul(r_inputs[0], r_inputs[1]);
+  auto outputs = insert_q_dq_outputs(
+      {output}, p.qparams[1], p.output_quantized_dtypes, p.outputs_quantized);
+  return output;
+}
+
 } // namespace int8
 } // namespace autocast
 } // namespace torch_ipex

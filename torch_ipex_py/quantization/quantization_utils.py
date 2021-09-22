@@ -79,7 +79,7 @@ def _get_default_recipe(configures):
     # post process for add, linear, if cur op hasn't post quantized op, i.e. 'outputs_quantized' is True,
     # for good perfromance, the default recipe:
     # int8_input -> op -> q -> dq will converted to int8_input -> op.
-    ops_remove_q_dq_after = ['add', 'linear', 'conv2d']
+    ops_remove_q_dq_after = ['add', 'linear', 'conv2d', 'matmul']
     # post process for flatten, if flatten's pre-pop and post op are fp32 op, don't need add q and dq
     # before and after it.
     ops_remove_q_dq_before_after = ['flatten']

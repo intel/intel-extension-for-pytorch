@@ -149,6 +149,27 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::max_pool2d'])
                 self.checkPatterns(graph, patterns)
 
+    @llga_test_env
+    def test_bmm_int8_in_f32_out(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                mm_res = torch.matmul(x, y)
+                return mm_res
+
+        x = torch.randn(128, 16, 384, 64) * 0.1
+        y = torch.randn(128, 1, 64, 384) * 0.1
+        patterns = [
+            ["aten::dequantize", "aten::matmul"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, config_name="bmm", qscheme=torch.per_tensor_affine)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul'])
+        self.checkPatterns(graph, patterns)
+
 class TestFusionPattern(JitLlgaTestCase):
     @llga_test_env
     def test_conv2d_eltwise(self):
@@ -415,13 +436,12 @@ class TestFusionPattern(JitLlgaTestCase):
         y = torch.randn(128, 1, 64, 384)
         patterns = [
                 ["aten::dequantize", "aten::matmul", "aten::div"],
-        ]    
+        ]
         m = M(8.)
         graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, config_name="bmm_div_scalar", qscheme=torch.per_tensor_affine)
-        # TODO: enable the below check when matmul-div fusion is supported in the backend
-        # self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-        # self.assertFused(graph, ['aten::matmul', 'aten::div'])
-        # self.checkPatterns(graph, patterns)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul', 'aten::div'])
+        self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_bmm_div_identity(self):
@@ -434,19 +454,18 @@ class TestFusionPattern(JitLlgaTestCase):
                 mm_res = torch.matmul(x, y)
                 return mm_res.div(self.div_value)
 
-        x = torch.randn(128, 16, 384, 64)
-        y = torch.randn(128, 1, 64, 384)
+        x = torch.randn(128, 16, 384, 64) * 0.1
+        y = torch.randn(128, 1, 64, 384) * 0.1
         patterns = [
                 ["aten::dequantize", "aten::matmul"],
-        ]  
+        ]
         m = M(1.)
         graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, config_name="bmm_div_identity", qscheme=torch.per_tensor_affine)
         # divide by 1 should be removed by Constant Propagation
         self.assertGraphContainsExactly(graph, "aten::div", 0, consider_subgraphs=True)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::matmul'])
-        # TODO: enable this check when int8 matmul is supported in the backend
-        # self.checkPatterns(graph, patterns)
+        self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_bmm_div_tensor(self):
@@ -458,18 +477,17 @@ class TestFusionPattern(JitLlgaTestCase):
                 mm_res = torch.matmul(x, y)
                 return mm_res.div(z)
 
-        x = torch.randn(128, 16, 384, 64)
-        y = torch.randn(128, 1, 64, 384)
+        x = torch.randn(128, 16, 384, 64) * 0.1
+        y = torch.randn(128, 1, 64, 384) * 0.1
+        z = torch.randn(1) # TODO: enable torch.randn(20) and torch.randn(1, 1, 20, 20) once backend supported them
         patterns = [
                 ["aten::dequantize", "aten::matmul", "aten::div"],
-        ]   
-        for z in [torch.randn(384), torch.randn(128, 16, 384, 384)]:
-            m = M()
-            graph = self.checkQuantizeTrace(m, [x, y, z], atol=2e-1, config_name="bmm_div_tensor", qscheme=torch.per_tensor_affine)
-            # TODO: enable the below check when matmul-div fusion is supported in the backend
-            # self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-            # self.assertFused(graph, ['aten::matmul', 'aten::div'])
-            # self.checkPatterns(graph, patterns)
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y, z], atol=2e-1, config_name="bmm_div_tensor", qscheme=torch.per_tensor_affine)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul', 'aten::div'])
+        self.checkPatterns(graph, patterns)
 
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')

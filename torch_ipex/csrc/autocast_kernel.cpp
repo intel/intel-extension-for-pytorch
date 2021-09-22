@@ -186,5 +186,10 @@ at::Tensor flatten(const at::Tensor &input, int64_t start_dim,
                                         input, start_dim, end_dim);
 }
 
+at::Tensor matmul(const at::Tensor& mat1, const at::Tensor& mat2) {
+  return DataTypeCastFuction<at::Tensor>(
+      int8::matmul, at::matmul, "matmul", mat1, mat2);
+}
+
 } // autocast
 } // torch_ipex

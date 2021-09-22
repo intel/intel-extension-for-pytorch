@@ -56,5 +56,7 @@ lstm_aten(const at::Tensor &_input, at::TensorList hx, at::TensorList _params,
 
 at::Tensor flatten(const at::Tensor &input, int64_t start_dim, int64_t end_dim);
 
+at::Tensor matmul(const at::Tensor& mat1, const at::Tensor& mat2);
+
 } // autocast
 } // torch_ipex

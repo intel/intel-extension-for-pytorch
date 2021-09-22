@@ -602,6 +602,9 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
          TORCH_FN((&torch_ipex::autocast::lstm_aten)));
   m.impl(TORCH_SELECTIVE_NAME("aten::flatten.using_ints"),
          TORCH_FN((&torch_ipex::autocast::flatten)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::matmul"),
+      TORCH_FN((&torch_ipex::autocast::matmul)));
 }
 
 } // namespace autocast
