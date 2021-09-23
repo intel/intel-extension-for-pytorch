@@ -15,7 +15,7 @@ static std::vector<std::unique_ptr<DPCPP::context>> gCtxPool;
 #if !defined(USE_MULTI_CONTEXT)
 static void initDeviceContext() {
   int cnt;
-  DPCPP::vector_class<DPCPP::device> devs;
+  std::vector<DPCPP::device> devs;
   dpcppGetDeviceCount(&cnt);
   for (int i = 0; i < cnt; i++) {
     devs.push_back(dpcppGetRawDevice(i));

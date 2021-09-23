@@ -25,6 +25,7 @@ Available DPC++ Platforms / Devices
 */
 
 #include <stdlib.h>
+#include <vector>
 #include <CL/sycl.hpp>
 
 int main(int argc, char *argv[]) {
@@ -32,12 +33,12 @@ int main(int argc, char *argv[]) {
   std::cout<< "           Available DPC++ Platforms / Devices                  \n";
   std::cout<< "================================================================\n";
 
-  sycl::vector_class<sycl::platform> platforms = sycl::platform::get_platforms();
+  std::vector<sycl::platform> platforms = sycl::platform::get_platforms();
   for (size_t pid = 0; pid < platforms.size(); pid++) {
     sycl::string_class pname = platforms[pid].get_info<sycl::info::platform::name>();
     std::cout << "|Platform" << pid << " :\n" << "|" << pname << std::endl;
 
-    sycl::vector_class<sycl::device> devices = platforms[pid].get_devices(sycl::info::device_type::all);
+    std::vector<sycl::device> devices = platforms[pid].get_devices(sycl::info::device_type::all);
     for (size_t device_id = 0; device_id < devices.size(); device_id++) {
       sycl::string_class dname = devices[device_id].get_info<sycl::info::device::name>();
 
