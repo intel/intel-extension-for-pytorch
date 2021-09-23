@@ -17,6 +17,7 @@ except RuntimeError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, 'no torchvision')
 
+
 class TestOp(JitLlgaTestCase):
     @llga_test_env
     def test_linear(self):
@@ -45,6 +46,28 @@ class TestOp(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::matmul'])
+
+    @llga_test_env
+    def test_to(self):
+        class M(nn.Module):
+            def __init__(self, dtype):
+                super(M, self).__init__()
+                self.dtype = dtype
+
+            def forward(self, x):
+                return x.to(dtype=self.dtype)
+
+        for src_dtype, dst_dtype in [
+            [torch.bfloat16, torch.float],
+            [torch.float, torch.bfloat16]
+        ]:
+            x = torch.randn((1, 16, 4, 64), dtype=src_dtype)
+            m = M(dst_dtype)
+
+            graph, _ = self.checkTrace(m, [x])
+            # we do not rewrite single to
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
 
 if __name__ == '__main__':
     run_tests()

@@ -305,6 +305,8 @@ Operator createOperator(Node* node) {
         .setInput(0, 1, 2)
         .setOutput(0)
         .setAttr("transpose_b", true);
+  } else if (node->kind() == Symbol::aten("to")) {
+    return Operator(node, opkind::TypeCast).setInput(0).setOutput(0);
   } else if (node->kind() == Symbol::aten("quantize_per_tensor")) {
     // TODO: how to handle this case
     REQ(node->input(1)->node()->kind() != Symbol::aten("q_scale"));
@@ -517,10 +519,10 @@ void removeAttrOfDequant(Node *n) {
   }
 }
 
-bool LlgaGraphHelper::isSingleQuantDequant(Node *n) {
+bool LlgaGraphHelper::isSingleQuantDequantTo(Node* n) {
   if (n->kind() != Symbol::aten("quantize_per_tensor") &&
       n->kind() != Symbol::aten("quantize_per_channel") &&
-      n->kind() != Symbol::aten("dequantize"))
+      n->kind() != Symbol::aten("dequantize") && n->kind() != aten::to)
     return false;
   if (!opToOwningPartition_.has(n))
     return false;
@@ -538,10 +540,10 @@ bool LlgaGraphHelper::shouldConsiderForMerge(Node* node) {
   if (isViewOp(node)) {
     return false;
   }
-  // For a partition composed of 1 single quant or 1 single dequant,
+  // For a partition composed of 1 single quant, 1 single dequant or 1 single to
   // do not rewrite it in the bridge, so that the FWK may have chances
-  // to optimize single int8 op that LLGA does not support
-  if (isSingleQuantDequant(node)) {
+  // to optimize single int8/bf16 op that LLGA does not support
+  if (isSingleQuantDequantTo(node)) {
     // We have added attr on dequant node to create LLGA dequant op.
     // If we won't rewrite it with LLGA op, remove the attr here.
     removeAttrOfDequant(node);
