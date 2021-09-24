@@ -6,6 +6,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
+#include "comm/PSTLFunctions.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
@@ -184,8 +185,7 @@ Tensor coalesce(const Tensor& self) {
         });
     auto zipped_uniqueOffsets =
         oneapi::dpl::make_zip_iterator(indices1D_ptr, uniqueOffsets_ptr);
-    auto newEnd = std::unique(
-        policy,
+    auto newEnd = at::AtenIpexTypeXPU::unique(
         zipped_uniqueOffsets,
         zipped_uniqueOffsets + nnz,
         [](auto lhs, auto rhs) {

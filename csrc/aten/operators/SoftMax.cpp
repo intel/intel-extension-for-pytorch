@@ -10,7 +10,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-#include "comm/SimpelReduce.h"
+#include "comm/SimpleReduce.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp::detail;

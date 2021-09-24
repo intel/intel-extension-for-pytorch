@@ -14,8 +14,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    # @pytest.mark.skipif("not torch.xpu.has_onedpl()")
-    @pytest.mark.skip(reason="skip due to bugs caused by oneDPL and compiler upgrades")
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_embedding_bag(self, dtype=torch.float):
         print("sum cpu")
         embedding_sum = nn.EmbeddingBag(

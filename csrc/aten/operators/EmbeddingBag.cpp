@@ -11,6 +11,7 @@
 #include "comm/Algorithm.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
+#include "comm/PSTLFunctions.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
@@ -378,6 +379,8 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     auto sorted_indices_begin = sorted_indices.data_ptr<int64_t>();
     auto dummy = at::empty_like(sorted_indices);
     auto dummy_begin = dummy.data_ptr<int64_t>();
+    auto idx_tensor = at::empty_like(sorted_indices);
+    auto idx_begin = idx_tensor.data_ptr<int64_t>();
     std::adjacent_difference(
         policy,
         sorted_indices_begin,
@@ -389,23 +392,26 @@ Tensor embedding_bag_backward_dpcpp_kernel(
           }
           return false;
         });
+
     // For algorithm adjacent difference, for output, its first element is
     // always equal to source first element. We need to set it as 1 manually.
     dummy[0] = 1;
-    auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
-    auto copy_begin = oneapi::dpl::make_zip_iterator(count_begin, dummy_begin);
+    Tensor count_tensor =
+        at::empty({numel}, at::TensorOptions().device(kXPU).dtype(kLong));
+    auto count_begin = count_tensor.data_ptr<int64_t>();
+    at::AtenIpexTypeXPU::iota(count_begin, count_begin + numel, (int64_t)0);
     auto segment_offsets_begin = segment_offsets.data_ptr<int64_t>();
-    auto ends = std::copy_if(
-        policy,
-        copy_begin,
-        copy_begin + numel,
-        oneapi::dpl::make_transform_iterator(
-            segment_offsets_begin, dpcpp_transformation<int64_t>()),
-        [](auto h) {
-          using std::get;
-          return get<1>(h) != 0;
+    at::AtenIpexTypeXPU::transform(
+        dummy_begin,
+        dummy_begin + numel,
+        count_begin,
+        idx_begin,
+        [](auto d, auto idx) { return d ? idx : -1; });
+    auto ends = at::AtenIpexTypeXPU::copy_if(
+        idx_begin, idx_begin + numel, segment_offsets_begin, [](auto x) {
+          return x != -1;
         });
-    num_of_segments = std::distance(segment_offsets_begin, ends.base());
+    num_of_segments = std::distance(segment_offsets_begin, ends);
   }
 
   auto partials_per_segment =
@@ -423,8 +429,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
   // Unit: index in `partial_segment_offset`
   auto partials_per_segment_offset =
       at::empty({num_of_segments}, orig_indices.options());
-  std::exclusive_scan(
-      policy,
+  at::AtenIpexTypeXPU::exclusive_scan(
       partials_per_segment.data_ptr<int64_t>(),
       partials_per_segment.data_ptr<int64_t>() + num_of_segments,
       partials_per_segment_offset.data_ptr<int64_t>(),

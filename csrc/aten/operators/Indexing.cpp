@@ -16,6 +16,7 @@
 #include "comm/Atomics.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
+#include "comm/PSTLFunctions.h"
 
 #include "IndexingUtils.h"
 #include "Loops.h"
@@ -165,106 +166,57 @@ struct NonZeroOp {
   }
 };
 
-#ifdef USE_ONEDPL
-template <typename Iterator>
-class strided_range {
- public:
-  using difference_type =
-      typename std::iterator_traits<Iterator>::difference_type;
-
-  struct stride_functor {
-    using reference = typename std::iterator_traits<Iterator>::reference;
-    difference_type stride;
-    Iterator base;
-
-    stride_functor(difference_type stride, Iterator begin)
-        : stride(stride), base(begin) {}
-
-    reference operator()(const difference_type& i) const {
-      return base[stride * i];
-    }
-  };
-
-  using CountingIterator =
-      typename oneapi::dpl::counting_iterator<difference_type>;
-  // type of the strided_range iterator
-  using TransformIterator = typename oneapi::dpl::
-      transform_iterator<CountingIterator, stride_functor>;
-
-  // construct strided_range for the range [first,last)
-  strided_range(Iterator first, Iterator last, difference_type stride)
-      : first(first), last(last), stride(stride) {}
-
-  TransformIterator begin(void) const {
-    return TransformIterator(
-        CountingIterator(0), stride_functor(stride, first));
-  }
-
-  TransformIterator end(void) const {
-    return begin() + ((last - first) + (stride - 1)) / stride;
-  }
-
- protected:
-  Iterator first;
-  Iterator last;
-  difference_type stride;
-};
-#endif
-
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
-  auto self = self_.contiguous();
-
+  Tensor self = self_.contiguous();
   int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
   int64_t N = self.numel();
 
-  // First to resize out tensor to full elements row
-  tensor = tensor.resize_({N, num_dim}).contiguous();
-
-  // Prepare input tensor strides for calculating result index
   if (N > 0) {
-#if defined(USE_ONEDPL)
-    auto& dpcpp_queue = dpcppGetCurrentQueue();
-    auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
-    auto tensor_begin = tensor.data_ptr<long>();
-    auto self_begin = self.data_ptr<scalar_t>();
-    strided_range<decltype(tensor_begin)> strided_tensor(
-        tensor_begin, tensor_begin + N * num_dim, num_dim);
-    oneapi::dpl::counting_iterator<int64_t> idxfirst(0);
-    auto start = oneapi::dpl::make_zip_iterator(idxfirst, self_begin);
-    auto dend = std::copy_if(
-        policy,
-        start,
-        start + N,
-        oneapi::dpl::make_transform_iterator(
-            strided_tensor.begin(), dpcpp_transformation<int64_t>()),
-        [](auto h) {
-          using std::get;
-          return NonZeroOp<scalar_t>{}(get<1>(h));
+    Tensor idx_tensor = at::empty(
+        {N}, tensor.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+    Tensor idx_vec = at::empty(
+        {N}, tensor.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+
+    auto self_begin = (scalar_t*)self.data_ptr();
+    auto idx_begin = (int64_t*)idx_tensor.data_ptr();
+    auto idx_vec_begin = (int64_t*)idx_vec.data_ptr();
+    at::AtenIpexTypeXPU::iota(idx_vec_begin, idx_vec_begin + N, (int64_t)0);
+
+    at::AtenIpexTypeXPU::transform(
+        self_begin,
+        self_begin + N,
+        idx_vec_begin,
+        idx_vec_begin,
+        [](scalar_t x, int64_t idx) -> int64_t {
+          return (NonZeroOp<scalar_t>{}(x) == scalar_t(0)) ? -1 : idx;
         });
 
-    auto num_nonzeros = std::distance(strided_tensor.begin(), dend.base());
+    auto idx_end = at::AtenIpexTypeXPU::copy_if(
+        idx_vec_begin, idx_vec_begin + N, idx_begin, [](int64_t idx) {
+          return idx != -1;
+        });
+
+    auto num_nonzeros = std::distance(idx_begin, idx_end);
 
     if (num_nonzeros > 0 && num_dim > 0) {
+      tensor = tensor.resize_({num_dim, num_nonzeros}).contiguous();
+      auto tensor_begin = (int64_t*)tensor.data_ptr();
+
       int64_t div = 1;
-      for (int dim = num_dim - 1; dim >= 0; dim--) {
-        strided_range<decltype(tensor_begin)> stride_dim(
-            tensor_begin + dim, tensor_begin + N * num_dim, num_dim);
-        auto dim_size = self.size(dim);
-        std::transform(
-            policy,
-            strided_tensor.begin(),
-            strided_tensor.begin() + num_nonzeros,
-            stride_dim.begin(),
-            [=](long linear_id) { return (linear_id / div) % dim_size; });
+      for (int64_t dim = num_dim - 1; dim >= 0; dim -= 1) {
+        int64_t dim_size = self.size(dim);
+        at::AtenIpexTypeXPU::transform(
+            idx_begin,
+            idx_begin + num_nonzeros,
+            tensor_begin + dim * num_nonzeros,
+            [=](int64_t linear_id) { return (linear_id / div) % dim_size; });
         div *= dim_size;
       }
+
+      tensor = tensor.t_();
     }
-    tensor.resize_({num_nonzeros, num_dim});
-#else
-    throw std::runtime_error(
-        "no oneDPL found when compile. USM nonzero not supported");
-#endif
+    tensor = tensor.resize_({num_nonzeros, num_dim}).contiguous();
   }
 }
 
