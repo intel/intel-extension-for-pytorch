@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CL/sycl.hpp>
+#include <ext/oneapi/atomic_enums.hpp>
 #include <utils/Macros.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
@@ -11,6 +12,7 @@
 
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;
+namespace DPCPP_EXT = DPCPP::ext::oneapi;
 
 // Kernel inside print utils
 #if defined(__SYCL_DEVICE_ONLY__)
@@ -396,3 +398,30 @@ template <
     int Dims = 1>
 DPCPP_HOST using dpcpp_host_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
+
+// dpcpp memory order
+static constexpr auto dpcpp_mem_odr_rlx = DPCPP_EXT::memory_order::relaxed;
+
+static constexpr auto dpcpp_mem_odr_acq = DPCPP_EXT::memory_order::acquire;
+
+static constexpr auto dpcpp_mem_odr_rel = DPCPP_EXT::memory_order::release;
+
+static constexpr auto dpcpp_mem_odr_acq_rel = DPCPP_EXT::memory_order::acq_rel;
+
+static constexpr auto dpcpp_mem_odr_seq_cst = DPCPP_EXT::memory_order::seq_cst;
+
+// dpcpp memory scope
+static constexpr auto dpcpp_mem_scp_wi = DPCPP_EXT::memory_scope::work_item;
+
+static constexpr auto dpcpp_mem_scp_sg = DPCPP_EXT::memory_scope::sub_group;
+
+static constexpr auto dpcpp_mem_scp_wg = DPCPP_EXT::memory_scope::work_group;
+
+static constexpr auto dpcpp_mem_scp_dev = DPCPP_EXT::memory_scope::device;
+
+static constexpr auto dpcpp_mem_scp_sys = DPCPP_EXT::memory_scope::system;
+
+// dpcpp atomic
+template <typename T>
+using dpcpp_atomic_ref_relaxed_t = DPCPP_EXT::
+    atomic_ref<T, dpcpp_mem_odr_rlx, dpcpp_mem_scp_dev, dpcpp_global_space>;
