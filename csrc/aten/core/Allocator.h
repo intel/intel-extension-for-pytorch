@@ -32,7 +32,7 @@ void* getBaseAllocationFromDevAlloc(void* ptr, size_t* size);
 
 void recordStreamInDevAlloc(const DataPtr& ptr, DPCPPStream stream);
 
-void dumpMemoryStatusFromDevAlloc(DeviceIndex device_index);
+IPEX_API void dumpMemoryStatusFromDevAlloc(DeviceIndex device_index);
 
 std::mutex* getFreeMutexOfDevAlloc();
 

@@ -431,6 +431,10 @@ void init_module(pybind11::module& m) {
     return at::AtenIpexTypeXPU::to_plain_if_needed(input);
   });
 
+  m.def("dump_memory_stat", [](const int& device_index) {
+    return xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
+  });
+
   m.def(
       "_is_onedpl_enabled", []() { return Settings::I().is_onedpl_enabled(); });
 
