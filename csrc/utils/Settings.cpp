@@ -1,3 +1,4 @@
+#include <oneDNN/Utils.h>
 #include <utils/Settings.h>
 
 #include <iostream>
@@ -252,6 +253,10 @@ void Settings::enable_tf32_mode() {
 void Settings::disable_tf32_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
   tf32_mode_enabled = false;
+}
+
+bool Settings::set_onednn_verbose(int level) {
+  return xpu::oneDNN::set_onednn_verbose(level);
 }
 
 bool Settings::is_onedpl_enabled() const {

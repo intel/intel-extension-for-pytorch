@@ -451,7 +451,7 @@ void init_module(pybind11::module& m) {
   m.def("_get_xpu_backend", []() {
     return int(Settings::I().get_xpu_backend());
   });
-  m.def("_set_xpu_backend", [](const int& backend) {
+  m.def("_set_xpu_backend", [](const int backend) {
     return Settings::I().set_xpu_backend(static_cast<XPU_BACKEND>(backend));
   });
 
@@ -473,6 +473,10 @@ void init_module(pybind11::module& m) {
 
   m.def("_is_tf32_mode_enabled", []() {
     return Settings::I().is_tf32_mode_enabled();
+  });
+
+  m.def("_set_onednn_verbose", [](const int level) {
+    return Settings::I().set_onednn_verbose(level);
   });
 
   auto set_module_attr = [&](const char* name, PyObject* v) {

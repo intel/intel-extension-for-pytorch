@@ -7,6 +7,11 @@ class XPU_BACKEND(Enum):
     AUTO = 2
     MAX = AUTO + 1
 
+class VERBOSE_LEVEL(Enum):
+    OFF = 0
+    ON = 1
+    ON_DETAIL = 2
+
 def has_onedpl():
     return _C._is_onedpl_enabled()
 
@@ -39,3 +44,18 @@ def using_onednn_layout():
 
 def using_tf32_mode():
     return _C._is_tf32_mode_enabled()
+
+class onednn_verbose(object):
+    def __init__(self, level : VERBOSE_LEVEL):
+        self.level = level
+
+    def __enter__(self):
+        if self.level == VERBOSE_LEVEL.OFF:
+            return
+        st = _C._set_onednn_verbose(self.level.value)
+        assert bool(st), "WARNING: Failed to turn on oneDNN verbose!"
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _C._set_onednn_verbose(VERBOSE_LEVEL.OFF.value)
+        return False

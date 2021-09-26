@@ -23,7 +23,7 @@ def _get_device_index(device: Union[Device, str, int], optional: bool = False,
     if isinstance(device, int):
         device = 'xpu:' + str(device)
     if device is None and optional:
-        device = 'xpu:0' 
+        device = 'xpu:0'
     if isinstance(device, str):
         device = torch.device(device)
     if isinstance(device, torch.device):
