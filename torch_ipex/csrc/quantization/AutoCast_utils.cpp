@@ -117,12 +117,14 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> insert_q_dq_inputs(
   bool weights_quantized = false;
   for (int i = 0; i < inputs.size(); i++) {
     if (inputs_quantized[i]) {
+      bool bf16 = inputs[i].scalar_type() == at::kBFloat16;
       auto input_q = at::quantize_per_tensor(
-          inputs[i],
+          bf16 ? inputs[i].to(at::kFloat) : inputs[i],
           inputs_qparams[i].scale,
           inputs_qparams[i].zero_point,
           inputs_quantized_dtypes[i]);
-      r_inputs.push_back(input_q.dequantize());
+      r_inputs.push_back(
+          bf16 ? input_q.dequantize().to(at::kBFloat16) : input_q.dequantize());
       weights_quantized = true;
     } else {
       r_inputs.push_back(inputs[i]);
@@ -132,18 +134,30 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> insert_q_dq_inputs(
   auto weight_granularity = torch_ipex::get_int8_weight_granularity(op_id);
   for (int i = 0; i < weights.size(); i++) {
     if (weights_quantized) {
+      bool bf16 = weights[i].scalar_type() == at::kBFloat16;
       if (weight_granularity == "per_channel") {
         auto& weight_scale = torch_ipex::get_int8_weight_tensor_scale(op_id);
         auto zero_points =
             at::zeros(weight_scale[i].numel(), at::dtype(at::kLong));
         auto weight_q = at::quantize_per_channel(
-            weights[i], weight_scale[i], zero_points, 0, at::kQInt8);
-        r_weights.push_back(weight_q.dequantize());
+            bf16 ? weights[i].to(at::kFloat) : weights[i],
+            weight_scale[i],
+            zero_points,
+            0,
+            at::kQInt8);
+        r_weights.push_back(
+            bf16 ? weight_q.dequantize().to(at::kBFloat16)
+                 : weight_q.dequantize());
       } else {
         std::vector<float> w_scale = torch_ipex::get_int8_weight_scale(op_id);
-        auto weight_q =
-            at::quantize_per_tensor(weights[i], w_scale[i], 0, at::kQInt8);
-        r_weights.push_back(weight_q.dequantize());
+        auto weight_q = at::quantize_per_tensor(
+            bf16 ? weights[i].to(at::kFloat) : weights[i],
+            w_scale[i],
+            0,
+            at::kQInt8);
+        r_weights.push_back(
+            bf16 ? weight_q.dequantize().to(at::kBFloat16)
+                 : weight_q.dequantize());
       }
     } else {
       r_weights.push_back(weights[i]);
@@ -160,12 +174,15 @@ std::vector<at::Tensor> insert_q_dq_outputs(
   std::vector<at::Tensor> r_outputs;
   for (int i = 0; i < outputs.size(); i++) {
     if (outputs_quantized[i]) {
+      bool bf16 = outputs[i].scalar_type() == at::kBFloat16;
       auto output_q = at::quantize_per_tensor(
-          outputs[i],
+          bf16 ? outputs[i].to(at::kFloat) : outputs[i],
           outputs_qparams[i].scale,
           outputs_qparams[i].zero_point,
           outputs_quantized_dtypes[i]);
-      r_outputs.push_back(output_q.dequantize());
+      r_outputs.push_back(
+          bf16 ? output_q.dequantize().to(at::kBFloat16)
+               : output_q.dequantize());
     } else {
       r_outputs.push_back(outputs[i]);
     }

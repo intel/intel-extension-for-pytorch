@@ -115,6 +115,32 @@ class TestOp(JitLlgaTestCase):
                 self.checkPatterns(graph, patterns)
 
     @llga_test_env
+    def test_linear_int8_in_bf16_out(self):
+        class M(nn.Module):
+            def __init__(self, bias):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(15, 20, bias=bias)
+
+            def forward(self, x):
+                x = self.linear1(x)
+                return x
+
+        for bias in [True]: # TODO：[True, False] when supported in backend
+            x = torch.randn(2, 15)
+            m = M(bias)
+
+            patterns = [
+                ["aten::dequantize", "aten::to", "aten::linear"],
+            ]
+
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="linear_int8_bf16", qscheme=qscheme, int8_bf16=True)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                # single aten::to won't be rewritten by llga backend
+                self.assertFused(graph, ['aten::dequantize', 'aten::linear'])
+                self.checkPatterns(graph, patterns)                
+
+    @llga_test_env
     def test_max_pool2d(self):
         for [
                 spatial,
@@ -432,8 +458,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 mm_res = torch.matmul(x, y)
                 return mm_res.div(self.div_value)
 
-        x = torch.randn(128, 16, 384, 64)
-        y = torch.randn(128, 1, 64, 384)
+        x = torch.randn(1, 16, 384, 64)
+        y = torch.randn(1, 1, 64, 384)
         patterns = [
                 ["aten::dequantize", "aten::matmul", "aten::div"],
         ]
@@ -454,8 +480,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 mm_res = torch.matmul(x, y)
                 return mm_res.div(self.div_value)
 
-        x = torch.randn(128, 16, 384, 64) * 0.1
-        y = torch.randn(128, 1, 64, 384) * 0.1
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
         patterns = [
                 ["aten::dequantize", "aten::matmul"],
         ]
@@ -477,8 +503,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 mm_res = torch.matmul(x, y)
                 return mm_res.div(z)
 
-        x = torch.randn(128, 16, 384, 64) * 0.1
-        y = torch.randn(128, 1, 64, 384) * 0.1
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
         z = torch.randn(1) # TODO: enable torch.randn(20) and torch.randn(1, 1, 20, 20) once backend supported them
         patterns = [
                 ["aten::dequantize", "aten::matmul", "aten::div"],
@@ -488,6 +514,28 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)
+
+    @llga_test_env
+    def test_bmm_div_int8_in_bf16_out(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                mm_res = torch.matmul(x, y) / 2
+                return mm_res
+
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
+        patterns = [
+            ["aten::dequantize", "aten::to", "aten::matmul", "aten::div"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, config_name="bmm", qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        # single aten::to won't be rewritten by llga backend
+        self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
+        self.checkPatterns(graph, patterns)  
 
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')

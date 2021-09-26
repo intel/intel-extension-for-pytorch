@@ -15,7 +15,7 @@ Ret DataTypeCastFuction(F Quant, F At, std::string op_name, Args... args) {
   verbose::OpNameGuard op_name(op_name);
 #endif
   if (is_quantization_enabled()) {
-    return Quant(args...);
+    return Quant(cpu_cached_cast(target_type, args)...);
   } else {
     return At(cpu_cached_cast(target_type, args)...);
   }

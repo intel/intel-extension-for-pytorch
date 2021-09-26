@@ -99,22 +99,24 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", x_var=None, qscheme=torch.per_tensor_affine):
-        graph, traced_model, fp32_model = self.prepareModel(model, x, folding, remove_dropout, config_name, qscheme)
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", x_var=None, qscheme=torch.per_tensor_affine, int8_bf16=False):
+        graph, traced_model, fp32_model = self.prepareModel(model, x, folding, remove_dropout, config_name, qscheme, int8_bf16)
         with torch.no_grad():
             y = fp32_model(*x)
+            y = y.to(torch.bfloat16) if int8_bf16 else y
             y_llga = traced_model(*x)
             self.assertEqual(y, y_llga, atol=atol, rtol=rtol)
 
             # test Fallback when input shape changes:
             if x_var:
                 y_var = fp32_model(*x_var)
+                y_var = y_var.to(torch.bfloat16) if int8_bf16 else y_var
                 y_var_llga = traced_model(*x_var)
                 self.assertEqual(y_var, y_var_llga, atol=atol, rtol=rtol)
 
             return graph
 
-    def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine):
+    def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine, int8_bf16=False):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             conf = ipex.QuantConf(qscheme=qscheme)
@@ -138,7 +140,11 @@ class JitLlgaTestCase(JitTestCase):
                 conf = ipex.QuantConf(path)
 
                 # jit trace to insert quant/dequant
-                traced_model = ipex.quantization.convert(model, conf, x)
+                if int8_bf16:
+                    with torch.cpu.amp.autocast():
+                        traced_model = ipex.quantization.convert(model, conf, x)
+                else:
+                    traced_model = ipex.quantization.convert(model, conf, x)
 
             # warm up run
             y0 = traced_model(*x)

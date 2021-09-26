@@ -145,7 +145,6 @@ class _quantization_int8(object):
 
         torch.set_autocast_cpu_enabled(True)
         core.set_quantization_enabled(True)
-        core.autocast_increment_nesting()
         core.disable_int8_calibration()
 
     def __exit__(self, *args):
