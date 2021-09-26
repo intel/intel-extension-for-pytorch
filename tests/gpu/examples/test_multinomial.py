@@ -41,39 +41,45 @@ class TestTorchMethod(TestCase):
     def test_multinomial(self, dtype=torch.float):
         #  create a tensor of weights
         w = torch.tensor([1, 10, 3, 2], dtype=torch.float)
-        print("weights", w.unsqueeze(0).renorm(1, 0, 1))
+        # print("weights", w.unsqueeze(0).renorm(1, 0, 1))
 
         weights = torch.ones(1000, w.size()[0])
         weights[:] = w
 
         weights_dpcpp = weights.to(dpcpp_device)
-        x_cpu = torch.multinomial(weights, 1000, replacement=True)
-        x_xpu = torch.multinomial(weights_dpcpp, 1000, replacement=True)
-        for i in range(len(x_cpu)):
-            y_cpu = x_cpu[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
-            y_xpu = x_xpu[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
+        torch.xpu.manual_seed(100)
+        x = torch.multinomial(weights_dpcpp, 1000, replacement=True)
+        torch.xpu.manual_seed(100)
+        x_1 = torch.multinomial(weights_dpcpp, 1000, replacement=True)
+        for i in range(len(x)):
+            y = x[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
+            y_1 = x_1[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
             #  Will not check the results due to different random seed
             #  self.assertEqual(y_cpu, y_xpu)
 
-        print("x_cpu[0] replacement=True", x_cpu[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        print("x_cpu[200] replacement=True", x_cpu[200].bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        print("x_cpu[999] replacement=True", x_cpu[999].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_cpu[0] replacement=True", x_cpu[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_cpu[200] replacement=True", x_cpu[200].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_cpu[999] replacement=True", x_cpu[999].bincount().unsqueeze(0).float().renorm(1, 0, 1))
 
-        print("x_xpu[0] replacement=True", x_xpu[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        print("x_xpu[200] replacement=True", x_xpu[200].bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        print("x_xpu[999] replacement=True", x_xpu[999].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_xpu[0] replacement=True", x_xpu[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_xpu[200] replacement=True", x_xpu[200].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_xpu[999] replacement=True", x_xpu[999].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        self.assertEqual(y, y_1)
 
-        x_cpu2 = torch.multinomial(weights, 4, replacement=False)
-        x_cpu2 = x_cpu2.transpose(0, 1)
-        x_xpu2 = torch.multinomial(weights_dpcpp, 4, replacement=False)
-        x_xpu2 = x_cpu2.transpose(0, 1).to(cpu_device)
-        for i in range(len(x_cpu2)):
-            y_cpu2 = x_cpu2[i].bincount().unsqueeze(0).float().renorm(1, 0, 1)
-            y_dpcp2 = x_xpu2[i].bincount().unsqueeze(
+        torch.xpu.manual_seed(1000)
+        x2 = torch.multinomial(weights_dpcpp, 4, replacement=False)
+        x2 = x2.transpose(0, 1)
+        torch.xpu.manual_seed(1000)
+        x2_1 = torch.multinomial(weights_dpcpp, 4, replacement=False)
+        x2_1 = x2_1.transpose(0, 1)
+        for i in range(len(x2)):
+            y2 = x2[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
+            y2_1 = x2_1[i].cpu().bincount().unsqueeze(
                 0).float().renorm(1, 0, 1)
 
-        print("x_cpu.transpose(0,1)[0] replacement=False", x_cpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        print("x_xpu.transpose(0,1)[0] replacement=False", x_xpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_cpu.transpose(0,1)[0] replacement=False", x_cpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        # print("x_xpu.transpose(0,1)[0] replacement=False", x_xpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        self.assertEqual(y2, y2_1)
 
 #  TODO: test full bincount distribution over all trails with no replacement
 #  weights = weights.unsqueeze(0).renorm(1, 0, 1).squeeze()

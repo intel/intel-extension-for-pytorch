@@ -17,5 +17,7 @@ class TestTorchMethod(TestCase):
         print(dpcpp_res.cpu())
 
         # Examine the output contains only 1 and 0
-        self.assertTrue(True, torch.ne(dpcpp_res.to(cpu_device), 0).mul_(
+        self.assertTrue(torch.ne(dpcpp_res.to(cpu_device), 0).mul_(
             torch.ne(dpcpp_res.to(cpu_device), 1)).sum().item() == 0)
+        # self.assertTrue(True, torch.ne(dpcpp_res.to(cpu_device), 0).mul_(
+        #    torch.ne(dpcpp_res.to(cpu_device), 1)).sum().item() == 0)

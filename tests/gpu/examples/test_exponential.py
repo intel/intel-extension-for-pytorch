@@ -13,17 +13,14 @@ cpu_device = torch.device("cpu")
 class TestTorchMethod(TestCase):
     def test_exponential(self, dtype=torch.float):
         #  Will not compare the results due to random seeds
-        exp_cpu = torch.ones(1000000, device=cpu_device, dtype=dtype)
-        exp_dist = exp_cpu.to("xpu")
-        exp_cpu.exponential_(1)
+        exp = torch.ones(1000000, device=dpcpp_device, dtype=dtype)
+        exp_1 = torch.ones(1000000, device=dpcpp_device, dtype=dtype)
+        exp_dist = exp
+        exp_dist_1 = exp_1
+        torch.xpu.manual_seed(100)
         exp_dist.exponential_(1)
-        #  self.assertEqual(exp_cpu, exp_dist.cpu())
-
-        print("exponential device ", exp_dist.device)
-        print("exponential ", exp_dist.to("cpu"))
-
-        #  np_data = exp_dist.cpu().detach().numpy()
-
-        #  print("numpy ", np_data)
-        #  plt.hist(np_data, 100)
-        #  plt.show()
+        torch.xpu.manual_seed(100)
+        exp_dist_1.exponential_(1)
+        print("exp_dist device:", exp_dist.device)
+        print("exp_dist_1 device:", exp_dist_1.device)
+        self.assertEqual(exp_dist.cpu(), exp_dist_1.cpu())

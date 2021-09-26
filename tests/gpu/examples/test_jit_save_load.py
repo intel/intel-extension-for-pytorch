@@ -1,8 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.testing._internal.common_utils import TestCase
 
+import pytest
 import ipex
+import tempfile
 
 
 class Conv2dRelu(torch.nn.Module):
@@ -14,27 +17,17 @@ class Conv2dRelu(torch.nn.Module):
         return F.relu(self.conv(x) + a, inplace=True)
 
 
-a1 = torch.ones([1, 2, 1, 1])
-a1.fill_(2)
+class TestJitSaveLoadMethod(TestCase):
+    def test_jit_save_load(self):
+        # // you can find a simple model in tests/example/test_fusion.py
+        model = Conv2dRelu(2, 2, kernel_size=3, stride=1, bias=True)
+        model = model.to('xpu').eval()
+        origin_modelJit = torch.jit.script(model)
+        ckpt = tempfile.NamedTemporaryFile()
+        origin_modelJit.save(ckpt.name)
+        loaded_modelJit = torch.jit.load(ckpt.name)
 
-# // you can find a simple model in tests/example/test_fusion.py
-model = Conv2dRelu(2, 2, kernel_size=3, stride=1, bias=True)
-
-print("johnlu module to ")
-model = model.to('xpu').eval()
-input = torch.randn([1, 2, 3, 3])  # torch.randn((conv_input_shape)).to(“xpu”)
-
-print("johnlu to")
-a1 = a1.to('xpu')
-input = input.to('xpu')
-
-modelJit = torch.jit.script(model)
-# modelJit = torch.jit.trace(model, (input, a1))
-for param in modelJit.parameters():
-    print("johnlu original modelJit param", param.cpu())
-
-modelJit.save('./simple_trace_case.zip')
-modelJit = torch.jit.load('./simple_trace_case.zip')
-
-for param in modelJit.parameters():
-    print("johnlu loaded modelJit param", param.cpu())
+        for o, l in zip(origin_modelJit.parameters(), loaded_modelJit.parameters()):
+            print(f"o: {o.cpu()}")
+            print(f"l: {l.cpu()}")
+            assert torch.equal(o, l), " param tensor in saved & loaded not equal"

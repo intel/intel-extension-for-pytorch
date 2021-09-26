@@ -11,17 +11,19 @@ cpu_device = torch.device('cpu')
 dpcpp_device = torch.device("xpu")
 
 
-class TestNNMethod(TestCase):
+class TestLogNormal(TestCase):
+    @pytest.mark.skip("torch.xpu.manual_seed not supprted, JIRA:https://jira.devtools.intel.com/browse/PYTORCHDGQ-652")
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lognormal(self, dtype=torch.float):
         lognormal = torch.ones(1000000, device=dpcpp_device)
+        torch.xpu.manual_seed(100)  # manually set seed
         lognormal.log_normal_(std=1 / 4)
 
-        print("normal_dpcpp device", lognormal.device)
-        print("normal_dpcpp", lognormal.to("cpu"))
+        lognormal_1 = torch.ones(1000000, device=dpcpp_device)
+        torch.xpu.manual_seed(100)
+        lognormal_1.log_normal_(std=1 / 4)
 
-        # np_data = lognormal.cpu().detach().numpy()
+        print("lognormal_1.device:", lognormal_1.device)
+        print("lognormal.device:", lognormal.device)
 
-        #  print("numpy ", np_data)
-        # plt.hist(np_data, 100)
-        #  plt.show()
+        self.assertEqual(lognormal_1.cpu(), lognormal.cpu())
