@@ -537,6 +537,60 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)  
 
+    @llga_test_env
+    def test_split_dequant_to(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(2, 1, bias=True)
+                self.linear2 = nn.Linear(2, 1, bias=True)
+                self.linear3 = nn.Linear(2, 1, bias=True)
+
+            def forward(self, x):
+                a = self.linear1(x)
+                b = self.linear2(x)
+                c = self.linear3(x)
+                return torch.cat([a, b, c])
+
+        # The below pattern:
+        #           to
+        #           |
+        #         quant
+        #           |
+        #        dequant
+        #           |
+        #          to
+        #     /    |    \
+        # linear linear linear
+        #    |     |      |
+        #
+        # should be transformed to:
+        #               to
+        #               |
+        #             quant
+        #        /      |     \
+        #   dequant dequant  dequant
+        #      |       |       |
+        #     to       to     to
+        #      |       |       |
+        #  linear   linear  linear
+        #      |       |       |
+
+        patterns = [
+            ["aten::dequantize", "aten::to", "aten::linear"],
+            ["aten::dequantize", "aten::to", "aten::linear"],
+            ["aten::dequantize", "aten::to", "aten::linear"],
+        ]
+        m = M()
+        x = torch.randn(2, 2)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="split_dequant_to",
+                                        qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        # single aten::to won't be rewritten by llga backend
+        self.assertFused(graph, ['aten::dequantize', 'aten::linear'])
+        self.checkPatterns(graph, patterns)
+
+
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')
     @llga_test_env

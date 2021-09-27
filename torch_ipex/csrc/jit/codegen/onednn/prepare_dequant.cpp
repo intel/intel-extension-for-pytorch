@@ -5,50 +5,82 @@ namespace jit {
 namespace fuser {
 namespace onednn {
 
-void mayDecomposeDequant(Node* node) {
-  if (node->input(0)->node()->kind() != Symbol::aten("quantize_per_tensor") && node->input(0)->node()->kind() != Symbol::aten("quantize_per_channel")) {
-      return;
-  }
+class OpSplitter {
+ private:
+  std::shared_ptr<Graph> graph_;
 
-  auto* quant_node = node->input(0);
+ public:
+  OpSplitter(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
-  auto* dequant = node->output(0);
-  auto& uses = dequant->uses();
-  if (uses.size() < 2) {
-      return;
-  }
+  bool analyzeNode(Node* node) {
+    // If node->kind() matches the NodeKind, the node will be a candidate to be
+    // splitted. If the input to the current node matches with InputKind, will
+    // split the node
+    static std::unordered_map<Symbol, std::set<Symbol>> NodeKindToInputKind{
+        {aten::to, {Symbol::aten("dequantize")}},
+        {Symbol::aten("dequantize"),
+         {Symbol::aten("quantize_per_tensor"),
+          Symbol::aten("quantize_per_channel")}},
+    };
 
-  WithInsertPoint guard(node);
-  auto g = node->owningGraph();
-  int nb_uses = uses.size();
-
-  // save the dequant_users before modifying the graph
-  std::vector<torch::jit::Node*> dequant_users;
-  for (const auto& use : uses) {
-    dequant_users.push_back(use.user);
-  }
-
-  for (int i = 1; i < nb_uses; i++) {
-    auto split_dequant = g->insert(Symbol::aten("dequantize"), {quant_node});
-    auto dequant_user =  dequant_users[i];
-    dequant_user->replaceInputWith(dequant, split_dequant);
-  }
-}
-
-static void DecomposeDequant(Block* block) {
-  for (auto node : block->nodes()) {
-    for (auto sub : node->blocks()) {
-      DecomposeDequant(sub);
+    auto it = NodeKindToInputKind.find(node->kind());
+    if (it == NodeKindToInputKind.end()) {
+      return false;
     }
 
-    if (node->kind() == Symbol::aten("dequantize")) {
-      mayDecomposeDequant(node);
+    auto& input_kind = it->second;
+    if (input_kind.find(node->input(0)->node()->kind()) == input_kind.end()) {
+      return false;
+    }
+
+    auto* output_value = node->output(0);
+    auto& uses = output_value->uses();
+    int nb_uses = uses.size();
+    if (nb_uses < 2) {
+      return false;
+    }
+
+    WithInsertPoint guard(node);
+    auto g = node->owningGraph();
+
+    // save the users before modifying the graph
+    std::vector<torch::jit::Node*> output_users;
+    for (const auto& use : uses) {
+      output_users.push_back(use.user);
+    }
+
+    auto output_type = output_value->type()->expect<TensorType>();
+
+    std::vector<NamedValue> input_values;
+    for (auto* v : node->inputs()) {
+      NamedValue nv(v);
+      input_values.push_back(nv);
+    }
+    at::ArrayRef<NamedValue> args(input_values);
+
+    for (int i = 1; i < nb_uses; i++) {
+      auto split_node = g->insert(node->kind(), args);
+      split_node->setType(output_type);
+
+      auto output_user = output_users[i];
+      output_user->replaceInputWith(output_value, split_node);
+    }
+    return true;
+  }
+
+  void run() {
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (Node* node : graph_->block()->nodes()) {
+        changed |= analyzeNode(node);
+      }
     }
   }
-}
+};
 
 void PrepareDequantForLLGA(std::shared_ptr<Graph>& graph) {
-  DecomposeDequant(graph->block());
+  OpSplitter(graph).run();
 }
 
 } // namespace onednn
