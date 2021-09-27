@@ -2,6 +2,7 @@
 
 #include <CL/sycl.hpp>
 #include <ext/oneapi/atomic_enums.hpp>
+#include <utils/Helpers.h>
 #include <utils/Macros.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
@@ -49,11 +50,11 @@ namespace DPCPP_EXT = DPCPP::ext::oneapi;
     static auto verbose = Settings::I().get_verbose_level();                 \
     if (verbose) {                                                           \
       IPEX_TIMER(t, verbose, __func__);                                      \
-      auto start_evt = (q).submit_barrier();                                 \
+      auto start_evt = xpu::dpcpp::queue_barrier(q);                         \
       t.now("start barrier");                                                \
       auto e = (ker_submit);                                                 \
       t.now("submit");                                                       \
-      auto end_evt = (q).submit_barrier();                                   \
+      auto end_evt = xpu::dpcpp::queue_barrier(q);                           \
       t.now("end barrier");                                                  \
       e.wait_and_throw();                                                    \
       t.now("event wait");                                                   \
@@ -72,9 +73,9 @@ namespace DPCPP_EXT = DPCPP::ext::oneapi;
         t.event_duration((ee_start - se_end) / 1000.0);                      \
       }                                                                      \
     } else if (is_profiler_enabled()) {                                      \
-      auto start_evt = (q).submit_barrier();                                 \
+      auto start_evt = xpu::dpcpp::queue_barrier(q);                         \
       auto e = (ker_submit);                                                 \
-      auto end_evt = (q).submit_barrier();                                   \
+      auto end_evt = xpu::dpcpp::queue_barrier(q);                           \
       dpcpp_mark((str), start_evt, end_evt);                                 \
       DPCPP_E_SYNC_FOR_DEBUG(e);                                             \
     } else {                                                                 \

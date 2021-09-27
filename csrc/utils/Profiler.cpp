@@ -2,6 +2,7 @@
 #include <runtime/Utils.h>
 #include <torch/csrc/autograd/profiler.h>
 #include <utils/DPCPP.h>
+#include <utils/Helpers.h>
 #include <utils/Profiler.h>
 #include <utils/Settings.h>
 #include <sstream>
@@ -34,18 +35,10 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
   bool is_ext_mark; // True to mark the external lib kernels
 };
 
-static inline DPCPP::event submit_barrier(DPCPP::queue& Q) {
-  DPCPP::event e;
-  if (is_profiler_enabled()) {
-    e = Q.submit_barrier();
-  }
-  return e;
-}
-
 struct DPCPPProfilerStubsImpl : public XPUStubs {
   void record(XPUEventStub& event) override {
     auto& Q = xpu::dpcpp::dpcppGetCurrentQueue();
-    auto evt = submit_barrier(Q);
+    auto evt = xpu::dpcpp::queue_barrier(Q);
     event.reset(new DPCPPEventStubImpl(evt));
   }
 

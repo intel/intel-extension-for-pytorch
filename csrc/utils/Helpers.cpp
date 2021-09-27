@@ -1,3 +1,4 @@
+#include <aten/operators/Utils.h>
 #include <core/Device.h>
 #include <core/Stream.h>
 #include <runtime/Exception.h>
@@ -145,6 +146,16 @@ void parallel_for_setup(
       GRange0 += static_cast<int64_t>(tileSize0 - xMode);
     }
   }
+}
+
+cl::sycl::event queue_barrier(cl::sycl::queue& queue) {
+  return at::AtenIpexTypeXPU::dpcpp_q_barrier(queue);
+}
+
+cl::sycl::event queue_barrier(
+    cl::sycl::queue& queue,
+    std::vector<cl::sycl::event>& events) {
+  return at::AtenIpexTypeXPU::dpcpp_q_barrier(queue, events);
 }
 
 } // namespace dpcpp

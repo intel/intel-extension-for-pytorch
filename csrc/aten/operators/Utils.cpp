@@ -1,4 +1,4 @@
-#include "MemoryHelpers.h"
+#include "Utils.h"
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 #include <runtime/Utils.h>
@@ -149,6 +149,29 @@ DT_CONVERT_EXPLICIT_INST(float, float);
 DT_CONVERT_EXPLICIT_BI_INST(int, int64_t);
 DT_CONVERT_EXPLICIT_BI_INST(at::Half, float);
 DT_CONVERT_EXPLICIT_BI_INST(at::BFloat16, float);
+
+DPCPP_HOST DPCPP::event dpcpp_q_barrier(DPCPP::queue& q) {
+#ifdef USE_QUEUE_BARRIER
+  return q.submit_barrier();
+#else
+  auto cgf = [&](DPCPP::handler& cgh) { cgh.single_task([=]() {}); };
+  return q.submit(cgf);
+#endif
+}
+
+DPCPP_HOST DPCPP::event dpcpp_q_barrier(
+    DPCPP::queue& q,
+    std::vector<DPCPP::event>& events) {
+#ifdef USE_QUEUE_BARRIER
+  return q.submit_barrier(events);
+#else
+  auto cgf = [&](DPCPP::handler& cgh) {
+    cgh.depends_on(events);
+    cgh.single_task([=]() {});
+  };
+  return q.submit(cgf);
+#endif
+}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

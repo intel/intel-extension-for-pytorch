@@ -2,7 +2,7 @@
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
-#include "MemoryHelpers.h"
+#include "Utils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 

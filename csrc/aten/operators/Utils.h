@@ -35,5 +35,10 @@ DPCPP_HOST void dtype_convert_by_scalar(
     const src_dt* src,
     size_t n_elements);
 
+DPCPP_HOST DPCPP::event dpcpp_q_barrier(DPCPP::queue& q);
+DPCPP_HOST DPCPP::event dpcpp_q_barrier(
+    DPCPP::queue& q,
+    std::vector<DPCPP::event>& events);
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

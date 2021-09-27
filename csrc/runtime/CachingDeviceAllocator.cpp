@@ -3,6 +3,7 @@
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+#include <utils/Helpers.h>
 #include <utils/Profiler.h>
 
 namespace xpu {
@@ -423,7 +424,7 @@ void CachingDeviceAllocator::insert_events(Block* block) {
   std::unordered_set<Queue*> queues(std::move(block->m_queue_uses));
   AT_ASSERT(block->m_queue_uses.empty());
   for (auto it = queues.begin(); it != queues.end(); ++it) {
-    auto event = (*it)->getDpcppQueue().submit_barrier();
+    auto event = xpu::dpcpp::queue_barrier((*it)->getDpcppQueue());
     block->m_event_cnt++;
     dpcpp_events.emplace_back(event, block);
   }

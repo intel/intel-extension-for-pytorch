@@ -1,5 +1,6 @@
 #pragma once
 
+#include <CL/sycl.hpp>
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
 
@@ -35,6 +36,11 @@ void parallel_for_setup(
     int64_t& GRange0,
     int64_t& GRange1,
     int64_t& GRange2);
+
+cl::sycl::event queue_barrier(cl::sycl::queue& queue);
+cl::sycl::event queue_barrier(
+    cl::sycl::queue& queue,
+    std::vector<cl::sycl::event>& events);
 
 } // namespace dpcpp
 } // namespace xpu

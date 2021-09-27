@@ -4,7 +4,7 @@
 
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
-#include <operators/MemoryHelpers.h>
+#include <operators/Utils.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include "Reorder.h"
