@@ -263,14 +263,14 @@ static inline void matmul(
           dst_any_md,
           attr.beta_,
           attr.alpha_,
-          post_flags);
+          attr.attr_);
 #endif
       matmul_desc = matmul::desc(m1_any_md, m2_any_md, b_md, dst_any_md);
     } else {
       // attr + plain
 #ifdef USE_PRIMITIVE_CACHE
       create_key(
-          key, m1_md, m2_md, b_md, dst_md, attr.beta_, attr.alpha_, post_flags);
+          key, m1_md, m2_md, b_md, dst_md, attr.beta_, attr.alpha_, attr.attr_);
 #endif
       matmul_desc = matmul::desc(m1_md, m2_md, b_md, dst_md);
     }
@@ -285,14 +285,14 @@ static inline void matmul(
           dst_any_md,
           attr.beta_,
           attr.alpha_,
-          post_flags);
+          attr.attr_);
 #endif
       matmul_desc = matmul::desc(m1_any_md, m2_any_md, dst_any_md);
     } else {
       // no attr + plain
 #ifdef USE_PRIMITIVE_CACHE
       create_key(
-          key, m1_md, m2_md, dst_md, attr.beta_, attr.alpha_, post_flags);
+          key, m1_md, m2_md, dst_md, attr.beta_, attr.alpha_, attr.attr_);
 #endif
       matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
     }
