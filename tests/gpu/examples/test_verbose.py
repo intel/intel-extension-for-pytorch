@@ -26,7 +26,7 @@ def run_model(level):
     d = torch.rand(1, 1, 112, 112)
     m = m.to('xpu')
     d = d.to('xpu')
-    with torch.xpu.onednn_verbose(torch.xpu.VERBOSE_LEVEL(level)):
+    with torch.xpu.onednn_verbose(level):
         m(d)
 
     os.dup2(stdout, 1)
