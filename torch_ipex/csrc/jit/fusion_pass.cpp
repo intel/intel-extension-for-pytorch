@@ -6,12 +6,13 @@
 #include "cpu/Pooling.h"
 
 #include <c10/util/hash.h>
-#include <torch/csrc/jit/runtime/operator.h>
-#include <torch/csrc/jit/passes/subgraph_rewrite.h>
+#include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/frontend/error_report.h>
+#include <torch/csrc/jit/passes/remove_dropout.h>
+#include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
+#include <torch/csrc/jit/runtime/operator.h>
 
 using namespace torch::jit;
 
@@ -319,6 +320,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   RemoveTensorTypeSpecializations(graph);
   // Replace _convolution with conv2d or conv3d
   graph_rewrite::replaceConvolutionWithAtenConv(graph);
+
+  // remove dropout;
+  torch::jit::removeDropout(graph);
 
   // Fuse conv with eltwise operator
   graph_rewrite::FuseConvolutionWithEltwise(graph);

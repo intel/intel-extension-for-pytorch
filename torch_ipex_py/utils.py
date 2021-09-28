@@ -81,6 +81,7 @@ class _Properties(object):
         self.conv_bn_folding=None,
         self.weights_prepack=None,
         self.master_weight=None
+        self.remove_dropout=None
 
 # O0 properties
 class _O0:
@@ -88,6 +89,7 @@ class _O0:
         properties.opt_level="O0"
         properties.conv_bn_folding=False
         properties.weights_prepack=False
+        properties.remove_dropout=False
         #properties.master_weight=False
         return properties
 
@@ -98,6 +100,7 @@ class _O1:
         properties.opt_level="O1"
         properties.conv_bn_folding=True
         properties.weights_prepack=True
+        properties.remove_dropout=True
         #properties.master_weight=True
         return properties
 
@@ -111,7 +114,8 @@ def optimize(
     level="O1",
     inplace=False,
     conv_bn_folding=None,
-    weights_prepack=None):
+    weights_prepack=None,
+    remove_dropout=None):
     r"""
     Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
     conversation for Convolution, Linear, Embedding, and layerNorm. there also has a weight prepack for
@@ -125,10 +129,11 @@ def optimize(
             value is None, it means for inference case.
         level: can be 'O0' or 'O1', do nothing for 'O0', just return the origin model and optimizer,
             'O1' will do ipex optimization as abrove said, the default value is 'O1'.
-        inplace: whether do inplace optimization, default value if False.
-        conv_bn_folding: whether do conv_bn folding, it only works for inference model, the default value is True.
+        inplace: whether do inplace optimization, default value is None.
+        conv_bn_folding: whether do conv_bn folding, it only works for inference model, the default value is None.
         weights_prepack: whether do weight prepack for convolution and linear to avoid OneDNN weight reorder.
-            the default value is True(only workd for training model, the inference model is not optimized well).
+            the default value is None(only workd for training model, the inference model is not optimized well).
+        remove_dropout: whether remove dropout from model, it only works for inference model, the default value is None.
 
     """
 
@@ -151,6 +156,8 @@ def optimize(
         opt_properties.conv_bn_folding = conv_bn_folding
     if weights_prepack is not None:
         opt_properties.weights_prepack = weights_prepack
+    if remove_dropout is not None:
+        opt_properties.remove_dropout = remove_dropout
 
     if inplace:
         optimized_model = model
@@ -164,6 +171,11 @@ def optimize(
                 optimized_model = optimization.fuse(optimized_model, inplace=inplace)
             except:
                 warnings.warn("Conv BatchNorm folding failed during the optimize process.")
+        if opt_properties.remove_dropout:
+            try:
+                optimized_model = optimization.remove_dropout(optimized_model)
+            except:
+                warnings.warn("Failed to remove the Dropout module during the optimize process.")
         if dtype == torch.bfloat16:
             optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
 
