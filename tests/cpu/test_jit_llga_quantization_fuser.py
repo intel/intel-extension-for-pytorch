@@ -387,6 +387,60 @@ class TestFusionPattern(JitLlgaTestCase):
         self.checkPatterns(graph, patterns)
 
     @llga_test_env
+    def test_linear_dropout_sum_bf16(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(15, 20, bias=True)
+                self.dropout = nn.Dropout()
+                self.linear2 = nn.Linear(15, 20, bias=True)
+
+            def forward(self, x, y):
+                x = self.linear1(x)
+                x = self.dropout(x)
+                z = self.linear2(y) + x
+                return z
+        x = torch.randn(2, 15)
+        y = torch.randn(2, 15)
+        m = M()
+        patterns = [
+            # TODO: should be ["aten::dequantize", "aten::to", "aten::linear", "aten::to", "aten::quantize_per_tensor"] once backend supported this pattern
+            ["aten::dequantize", "aten::to", "aten::linear"],
+            ["aten::dequantize", "aten::to", "aten::linear", "aten::add"]
+        ]
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True,
+                                        config_name="linear_dropout_sum", qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::dequantize'])
+        self.checkPatterns(graph, patterns)
+
+    @llga_test_env
+    def test_linear_gelu_bf16(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(28, 64, bias=True)
+                self.eltwise = nn.GELU()
+                self.linear2 = nn.Linear(64, 1, bias=True)
+
+            def forward(self, x):
+                x = self.linear(x)
+                x = self.eltwise(x)
+                x = self.linear2(x)
+                return x
+        patterns = [
+            ["aten::dequantize", "aten::to", "aten::linear", "aten::gelu", "aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::linear"]
+        ]        
+        m = M()
+        x = torch.rand(32, 28, requires_grad=False)
+        for qscheme in [torch.per_tensor_affine]:
+            graph = self.checkQuantizeTrace(m, [x], x_var=[torch.rand(2, 28, requires_grad=False)], atol=1e-1, config_name="linear_eltwise", qscheme=qscheme, int8_bf16=True)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+            self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::gelu'])
+            self.checkPatterns(graph, patterns)
+
+    @llga_test_env
     def test_defer_size(self):
         class M(nn.Module):
             def __init__(self):
