@@ -348,6 +348,28 @@ class ConvSwishInplace(nn.Module):
         res = a.mul_(b)
         return res
 
+class ConvSiluOutplace(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSiluOutplace, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+        self.silu = nn.SiLU()
+
+    def forward(self, x):
+        a1 = self.conv2d(x)
+        b1 = self.silu(a1)
+        return b1
+
+class ConvSiluInplace(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSiluInplace, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+        self.silu = nn.SiLU(inplace=True)
+
+    def forward(self, x):
+        a1 = self.conv2d(x)
+        b1 = self.silu(a1)
+        return b1
+
 class ConvSigmoidOutplace(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, image_size):
         super(ConvSigmoidOutplace, self).__init__()
@@ -549,6 +571,24 @@ class Tester(TestCase):
             kind_in_graph="ipex::conv2d_swish")
         self._test_output_bf16(
             ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish",
+            prec=0.02)
+        self._test_output(
+            ConvSiluOutplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish")
+        self._test_output(
+            ConvSiluInplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish")
+        self._test_output_bf16(
+            ConvSiluOutplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish",
+            prec=0.02)
+        self._test_output_bf16(
+            ConvSiluInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_swish",
             prec=0.02)

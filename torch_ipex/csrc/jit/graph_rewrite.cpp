@@ -150,6 +150,18 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
         %r = ipex::conv2d_swish(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
+  std::string conv2d_silu_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::silu(%r)
+        return (%s) )";
+
+  std::string conv2d_silu_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::silu_(%r)
+        return (%s) )";
+
   std::string conv2d_sigmoid_mul_outplace = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
         %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
@@ -232,10 +244,21 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
   rewriter_conv_swish_outplace.RegisterRewritePattern(
       conv2d_sigmoid_mul_outplace, conv2d_swish_fusion);
   rewriter_conv_swish_outplace.runOnGraph(graph);
+
   SubgraphRewriter rewriter_conv_swish_inplace;
-  rewriter_conv_swish_inplace.RegisterRewritePattern(conv2d_sigmoid_mul_inplace,
-                                                     conv2d_swish_fusion);
+  rewriter_conv_swish_inplace.RegisterRewritePattern(
+      conv2d_sigmoid_mul_inplace, conv2d_swish_fusion);
   rewriter_conv_swish_inplace.runOnGraph(graph);
+
+  SubgraphRewriter rewriter_conv_silu_inplace;
+  rewriter_conv_silu_inplace.RegisterRewritePattern(
+      conv2d_silu_inplace, conv2d_swish_fusion);
+  rewriter_conv_silu_inplace.runOnGraph(graph);
+
+  SubgraphRewriter rewriter_conv_silu_outplace;
+  rewriter_conv_silu_outplace.RegisterRewritePattern(
+      conv2d_silu_outplace, conv2d_swish_fusion);
+  rewriter_conv_silu_outplace.runOnGraph(graph);
 
   // Fuse conv2d + sigmoid
   SubgraphRewriter rewriter_conv_sigmoid_outplace;
@@ -535,8 +558,8 @@ void replaceAtenLinearWithIpexLinear(std::shared_ptr<Graph>& graph) {
   rewriter_linear.runOnGraph(graph);
 }
 
-//replace aten::softmax to ipex::softmax during jit pass 
-//there is better performanc for ipex::softmax with oneDNN than aten::softmax
+// replace aten::softmax to ipex::softmax during jit pass
+// there is better performanc for ipex::softmax with oneDNN than aten::softmax
 void replaceAtenLinearWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
   std::string aten_softmax = R"(
       graph(%a, %dim:int, %half_to_float:bool):
