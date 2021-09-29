@@ -379,7 +379,6 @@ static void single_cat(
 void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
   int i, j;
   int64_t offset;
-  bool hasSkippedInput = false;
   Tensor notSkippedTensor; // non-owning reference
   auto should_skip = [](const Tensor& t) {
     return !t.defined() && t.dim() == 1;
@@ -388,7 +387,6 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
   int nDims = 0;
   for (i = 0; i < numInputs; i++) {
     if (should_skip(inputs[i])) {
-      hasSkippedInput = true;
       continue;
     }
     nDims = inputs[i].dim();

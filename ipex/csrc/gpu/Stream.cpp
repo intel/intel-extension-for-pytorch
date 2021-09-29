@@ -19,9 +19,9 @@ static PyObject* THDPStream_pynew(
   int priority = 0;
   uint64_t cdata = 0;
 
-  static char* kwlist[] = {"priority", "_cdata", nullptr};
+  static const char* kwlist[] = {"priority", "_cdata", nullptr};
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "|iK", kwlist, &priority, &cdata)) {
+          args, kwargs, "|iK", const_cast<char**>(kwlist), &priority, &cdata)) {
     return nullptr;
   }
 
