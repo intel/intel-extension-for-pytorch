@@ -3,12 +3,14 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import pytest
 
 sycl_device = torch.device("xpu")
 device = sycl_device
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_dropout(self):
         p = 0.2
         input = torch.Tensor(1000)

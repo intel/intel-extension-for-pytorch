@@ -37,6 +37,7 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(r_cpu, r_xpu.cpu())
 
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_batch_svd(self, dtype=torch.float):
         # Since U and V of an SVD is not unique, each vector can be multiplied by an arbitrary phase factor e^iϕ
         # while the SVD result is still correct. Different platforms, like Numpy, or inputs on different device types,

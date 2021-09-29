@@ -216,6 +216,7 @@ class TestDistributions(TestCase):
         # self._gradcheck_log_prob(lambda p: Multinomial(total_count, None, p.log()), [p])
         self.assertRaises(NotImplementedError, Multinomial(10, p).rsample)
 
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_multinomial_1d_log_prob(self):
         total_count = 10
         p = torch.tensor([0.1, 0.2, 0.3], requires_grad=True, device=sycl_device)
