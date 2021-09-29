@@ -671,6 +671,15 @@ at::Tensor AtenIpexTypeExt::ROIAlign_forward(
   return IPEXROIAlignOp::_forward(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
 }
 
+TORCH_LIBRARY_IMPL(torchvision, CPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torchvision::roi_align"),
+      TORCH_FN((&torch_ipex::roi_align_forward_kernel)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("torchvision::_roi_align_backward"),
+      TORCH_FN((&torch_ipex::roi_align_backward_kernel)));
+}
+
 } // namespace torch_ipex
 
 namespace {

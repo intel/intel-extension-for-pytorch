@@ -1,19 +1,60 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+from typing import List, Union
+
 import torch
-from torch import nn
-from torch.autograd import Function
-from torch.autograd.function import once_differentiable
+from torch import nn, Tensor
 from torch.nn.modules.utils import _pair
+from torch.jit.annotations import BroadcastingList2
+
+from typing import List, Union
+
+def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
+    """
+    Efficient version of torch.cat that avoids a copy if there is only a single element in a list
+    """
+    # TODO add back the assert
+    # assert isinstance(tensors, (list, tuple))
+    if len(tensors) == 1:
+        return tensors[0]
+    return torch.cat(tensors, dim)
 
 
-class ROIAlign(nn.Module):
+def convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
+    concat_boxes = _cat([b for b in boxes], dim=0)
+    temp = []
+    for i, b in enumerate(boxes):
+        temp.append(torch.full_like(b[:, :1], i))
+    ids = _cat(temp, dim=0)
+    rois = torch.cat([ids, concat_boxes], dim=1)
+    return rois
+
+
+def check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
+    if isinstance(boxes, (list, tuple)):
+        for _tensor in boxes:
+            assert _tensor.size(1) == 4, \
+                'The shape of the tensor in the boxes list is not correct as List[Tensor[L, 4]]'
+    elif isinstance(boxes, torch.Tensor):
+        assert boxes.size(1) == 5, 'The boxes tensor shape is not correct as Tensor[K, 5]'
+    else:
+        assert False, 'boxes is expected to be a Tensor[L, 5] or a List[Tensor[K, 4]]'
+    return
+
+def roi_align(
+    input: Tensor,
+    boxes: Union[Tensor, List[Tensor]],
+    output_size: BroadcastingList2[int],
+    spatial_scale: float = 1.0,
+    sampling_ratio: int = -1,
+    aligned: bool = False,
+) -> Tensor:
     """
     Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN.
+
     Args:
         input (Tensor[N, C, H, W]): The input tensor, i.e. a batch with ``N`` elements. Each element
             contains ``C`` feature maps of dimensions ``H x W``.
             If the tensor is quantized, we expect a batch size of ``N == 1``.
-        rois (Tensor[K, 5] or List[Tensor[L, 4]]): the box coordinates in (x1, y1, x2, y2)
+        boxes (Tensor[K, 5] or List[Tensor[L, 4]]): the box coordinates in (x1, y1, x2, y2)
             format where the regions will be taken from.
             The coordinate must satisfy ``0 <= x1 < x2`` and ``0 <= y1 < y2``.
             If a single Tensor is passed, then the first column should
@@ -32,26 +73,45 @@ class ROIAlign(nn.Module):
         aligned (bool): If False, use the legacy implementation.
             If True, pixel shift the box coordinates it by -0.5 for a better alignment with the two
             neighboring pixel indices. This version is used in Detectron2
+
     Returns:
         Tensor[K, C, output_size[0], output_size[1]]: The pooled RoIs.
     """
-    def __init__(self, output_size, spatial_scale, sampling_ratio, aligned = False):
-        super(ROIAlign, self).__init__()
+    check_roi_boxes_shape(boxes)
+    rois = boxes
+    output_size = _pair(output_size)
+    if not isinstance(rois, torch.Tensor):
+        rois = convert_boxes_to_roi_format(rois)
+    return torch.ops.torch_ipex.ROIAlign_forward(input, rois, spatial_scale,
+                                           output_size[0], output_size[1],
+                                           sampling_ratio, aligned)
+
+
+class RoIAlign(nn.Module):
+    """
+    See :func:`roi_align`.
+    """
+    def __init__(
+        self,
+        output_size: BroadcastingList2[int],
+        spatial_scale: float,
+        sampling_ratio: int,
+        aligned: bool = False,
+    ):
+        super(RoIAlign, self).__init__()
         self.output_size = output_size
         self.spatial_scale = spatial_scale
         self.sampling_ratio = sampling_ratio
         self.aligned = aligned
 
-    def forward(self, input, rois):
-        return torch.ops.torch_ipex.ROIAlign_forward(
-            input, rois, self.spatial_scale, self.output_size[0], self.output_size[1], self.sampling_ratio, self.aligned
-        )
+    def forward(self, input: Tensor, rois: Tensor) -> Tensor:
+        return roi_align(input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.aligned)
 
-    def __repr__(self):
-        tmpstr = self.__class__.__name__ + "("
-        tmpstr += "output_size=" + str(self.output_size)
-        tmpstr += ", spatial_scale=" + str(self.spatial_scale)
-        tmpstr += ", sampling_ratio=" + str(self.sampling_ratio)
+    def __repr__(self) -> str:
+        tmpstr = self.__class__.__name__ + '('
+        tmpstr += 'output_size=' + str(self.output_size)
+        tmpstr += ', spatial_scale=' + str(self.spatial_scale)
+        tmpstr += ', sampling_ratio=' + str(self.sampling_ratio)
         tmpstr += ', aligned=' + str(self.aligned)
-        tmpstr += ")"
+        tmpstr += ')'
         return tmpstr

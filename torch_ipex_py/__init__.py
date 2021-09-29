@@ -2,6 +2,11 @@ import os
 import json
 import warnings
 import torch
+try:
+    import torchvision
+    HAS_TORCHVISION = True
+except ImportError:
+    HAS_TORCHVISION = False
 from .version import __version__
 from .conf import *
 from .amp import *
