@@ -17,6 +17,8 @@ namespace ipex {
   static auto conv2d_relu = Symbol::fromQualString("ipex::conv2d_relu");
   static auto conv2d_sum = Symbol::fromQualString("ipex::conv2d_sum");
   static auto conv2d_sum_relu = Symbol::fromQualString("ipex::conv2d_sum_relu");
+  static auto conv_transpose2d =
+      Symbol::fromQualString("ipex::conv_transpose2d");
 
   static auto linear_add = Symbol::fromQualString("ipex::linear_add");
   static auto linear = Symbol::fromQualString("ipex::linear");
@@ -82,6 +84,16 @@ class AtenIpexJITDev {
                        at::IntArrayRef padding, at::IntArrayRef dilation,
                        int64_t groups, float alpha, at::Scalar scale,
                        at::Scalar input_scale);
+
+   static at::Tensor dil_conv_transpose2d(
+       const at::Tensor& input,
+       const at::Tensor& weight,
+       const at::Tensor& bias,
+       at::IntArrayRef stride,
+       at::IntArrayRef padding,
+       at::IntArrayRef output_padding,
+       int64_t groups,
+       at::IntArrayRef dilation);
 
    static at::Tensor &
    dil_convolution_sum(const at::Tensor &input, const at::Tensor &weight,

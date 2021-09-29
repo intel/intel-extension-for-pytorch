@@ -416,6 +416,15 @@ class ConvElu(nn.Module):
         c = torch.add(b, b)
         return c
 
+class ConvTranspose2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
+        super(ConvTranspose2d, self).__init__()
+        self.conv_transpose2d = nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride, padding, output_padding, groups, bias, dilation)
+
+    def forward(self, x):
+        x = self.conv_transpose2d(x)
+        return x
+
 class ChannelShuffle(nn.Module):
     def __init__(self, batchsize, num_channels, height, width, groups):
         super(ChannelShuffle, self).__init__()
@@ -782,6 +791,19 @@ class Tester(TestCase):
             kind_in_graph="ipex::conv3d_sum_relu",
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
+
+    def test_output_conv_transpose2d(self):
+        self._test_output(
+            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
+            torch.randn(20, 16, 50, 100),
+            kind_in_graph="ipex::conv_transpose2d",
+            kind_not_in_graph="aten::conv_transpose2d")
+        self._test_output_bf16(
+            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
+            torch.randn(20, 16, 50, 100),
+            kind_in_graph="ipex::conv_transpose2d",
+            kind_not_in_graph="aten::conv_transpose2d",
+            prec=0.02)        
 
     def test_output_linear_relu(self):
         self._test_output(

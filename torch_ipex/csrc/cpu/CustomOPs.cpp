@@ -1,5 +1,6 @@
 #include "torch_ipex/csrc/cpu/CustomOPs.h"
 #include "Conv.h"
+#include "ConvTranspose.h"
 #include "LayerNorm.h"
 #include "Linear.h"
 #include "Matmul.h"
@@ -209,6 +210,23 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
     dilation,
     groups,
     ideep::attr_t::fuse_elu(scale_value, alpha, input_scale_value));
+}
+
+at::Tensor AtenIpexJITDev::dil_conv_transpose2d(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "AtenIpexJITDev::conv_transpose2d", std::vector<c10::IValue>({}));
+#endif
+  return convolution_transpose_impl(
+      input, weight, bias, stride, padding, output_padding, groups, dilation);
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum(

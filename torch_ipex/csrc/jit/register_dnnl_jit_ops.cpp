@@ -273,7 +273,25 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
-
+    Operator(
+        "ipex::conv_transpose2d(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] output_padding, int groups, int[2] dilation) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = AtenIpexJITDev::dil_conv_transpose2d(
+                (std::move(peek(stack, 0, 8))).toTensor(),
+                (std::move(peek(stack, 1, 8))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 8))),
+                (std::move(peek(stack, 3, 8))).toIntVector(),
+                (std::move(peek(stack, 4, 8))).toIntVector(),
+                (std::move(peek(stack, 5, 8))).toIntVector(),
+                (std::move(peek(stack, 6, 8))).toInt(),
+                (std::move(peek(stack, 7, 8))).toIntVector());
+            drop(stack, 8);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
     Operator(
         "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
         "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",

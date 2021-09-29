@@ -341,6 +341,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // replace aten conv with ipex conv
   graph_rewrite::replaceAtenConvolutionWithIpexConv(graph);
 
+  // replace aten conv_transpose with ipex conv_transpose
+  graph_rewrite::replaceAtenTransposeConvolutionWithIpexTransposeConv(graph);
+
   // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
 
