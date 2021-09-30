@@ -404,51 +404,14 @@ at::Tensor pixel_shuffle(const at::Tensor& self, int64_t upscale_factor) {
       " is not divisible by ",
       upscale_factor_squared);
 
-  return at::native_pixel_shuffle(self, upscale_factor);
-}
-
-at::Tensor math_pixel_shuffle(const at::Tensor& self, int64_t upscale_factor) {
-  // Format: (B1, ..., Bn), C, H, W
-  int64_t c = self.size(-3);
-  int64_t h = self.size(-2);
-  int64_t w = self.size(-1);
-  const auto NUM_NON_BATCH_DIMS = 3;
-  const auto self_sizes_batch_end = self.sizes().end() - NUM_NON_BATCH_DIMS;
-
-  int64_t upscale_factor_squared = upscale_factor * upscale_factor;
-  int64_t oc = c / upscale_factor_squared;
-  int64_t oh = h * upscale_factor;
-  int64_t ow = w * upscale_factor;
-
-  // First, reshape to split the channels dim from c into 3 separate dims: (oc,
-  // upscale_factor, upscale_factor). This allows shuffling to be done next by
-  // permuting dims.
-  std::vector<int64_t> added_dims_shape(
-      self.sizes().begin(), self_sizes_batch_end);
-  added_dims_shape.insert(
-      added_dims_shape.end(), {oc, upscale_factor, upscale_factor, h, w});
-  const auto input_reshaped = self.reshape(added_dims_shape);
-
-  // Next, shuffle by permuting the new upscale_factor dims alongside the height
-  // and width dims.
-  std::vector<int64_t> permutation(self.sizes().begin(), self_sizes_batch_end);
-  // std::iota is used to maintain the batch dims within the permutation.
-  std::iota(permutation.begin(), permutation.end(), 0);
-  permutation.insert(
-      permutation.end(),
-      {-5 /* oc */,
-       -2 /* h */,
-       -4 /* 1st upscale_factor */,
-       -1 /* w */,
-       -3 /* 2nd upscale_factor */});
-  const auto input_permuted = input_reshaped.permute(permutation);
-
-  // Finally, upscale by collapsing (h, upscale_factor) -> a single dim (oh)
-  // and (w, upscale_factor) -> a single dim (ow).
-  std::vector<int64_t> final_shape(self.sizes().begin(), self_sizes_batch_end);
-  final_shape.insert(final_shape.end(), {oc, oh, ow});
-
-  return input_permuted.reshape(final_shape);
+  // NOTE: The original PR registers the math_pixel_shuffle as an
+  // operator, and then this operator will be dispatched to
+  // native_pixel_shuffle. After that, the native_pixel_shuffle will be
+  // dispatched to pixel_shuffle_cpu for cpu device and to math_pixel_shuffle
+  // for other devices.
+  if (at::GradMode::is_enabled())
+    return PixelShuffleOp::apply(self, upscale_factor);
+  return PixelShuffleOp::_forward(self, upscale_factor);
 }
 
 at::Tensor pixel_unshuffle(const at::Tensor& self, int64_t downscale_factor) {
@@ -482,53 +445,84 @@ at::Tensor pixel_unshuffle(const at::Tensor& self, int64_t downscale_factor) {
       " is not divisible by ",
       downscale_factor);
 
-  return at::native_pixel_unshuffle(self, downscale_factor);
+  if (at::GradMode::is_enabled())
+    return PixelUnshuffleOp::apply(self, downscale_factor);
+  return PixelUnshuffleOp::_forward(self, downscale_factor);
 }
 
-at::Tensor math_pixel_unshuffle(
+at::Tensor PixelShuffleOp::_forward(
+    const at::Tensor& self,
+    int64_t upscale_factor) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("PixelShuffleOp::_forward", std::vector<c10::IValue>({self}));
+#endif
+  return pixel_shuffle_cpu(self, upscale_factor);
+}
+
+at::Tensor PixelShuffleOp::forward(
+    torch::autograd::AutogradContext* ctx,
+    const at::Tensor& self,
+    int64_t upscale_factor) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("PixelShuffleOp::forward", std::vector<c10::IValue>({self}));
+#endif
+  at::AutoNonVariableTypeMode g;
+  ctx->saved_data["upscale_factor"] = upscale_factor;
+  ctx->saved_data["input_sizes"] = self.sizes();
+  return _forward(self, upscale_factor);
+}
+
+torch::autograd::tensor_list PixelShuffleOp::backward(
+    torch::autograd::AutogradContext* ctx,
+    torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("PixelShuffleOp::backward", std::vector<c10::IValue>({self}));
+#endif
+  at::Tensor grad_output = grad_outputs[0];
+  int64_t upscale_factor = ctx->saved_data["upscale_factor"].toInt();
+  auto input_sizes = ctx->saved_data["input_sizes"].toIntList().vec();
+  return {
+      pixel_shuffle_backward_cpu(grad_output, input_sizes, upscale_factor),
+      at::Tensor()};
+}
+
+at::Tensor PixelUnshuffleOp::_forward(
     const at::Tensor& self,
     int64_t downscale_factor) {
-  // Format: (B1, ..., Bn), C, H, W
-  int64_t c = self.size(-3);
-  int64_t h = self.size(-2);
-  int64_t w = self.size(-1);
-  constexpr auto NUM_NON_BATCH_DIMS = 3;
-  const auto self_sizes_batch_end = self.sizes().end() - NUM_NON_BATCH_DIMS;
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "PixelUnshuffleOp::_forward", std::vector<c10::IValue>({self}));
+#endif
+  return pixel_unshuffle_cpu(self, downscale_factor);
+}
 
-  int64_t downscale_factor_squared = downscale_factor * downscale_factor;
-  int64_t oc = c * downscale_factor_squared;
-  int64_t oh = h / downscale_factor;
-  int64_t ow = w / downscale_factor;
+at::Tensor PixelUnshuffleOp::forward(
+    torch::autograd::AutogradContext* ctx,
+    const at::Tensor& self,
+    int64_t downscale_factor) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "PixelUnshuffleOp::forward", std::vector<c10::IValue>({self}));
+#endif
+  at::AutoNonVariableTypeMode g;
+  ctx->saved_data["downscale_factor"] = downscale_factor;
+  ctx->saved_data["input_sizes"] = self.sizes();
+  return _forward(self, downscale_factor);
+}
 
-  // First, reshape to split height dim into (oh, downscale_factor) dims and
-  // width dim into (ow, downscale_factor) dims. This allows unshuffling to be
-  // done next by permuting dims.
-  std::vector<int64_t> added_dims_shape(
-      self.sizes().begin(), self_sizes_batch_end);
-  added_dims_shape.insert(
-      added_dims_shape.end(), {c, oh, downscale_factor, ow, downscale_factor});
-  const auto input_reshaped = self.reshape(added_dims_shape);
-
-  // Next, unshuffle by permuting the downscale_factor dims alongside the
-  // channel dim.
-  std::vector<int64_t> permutation(self.sizes().begin(), self_sizes_batch_end);
-  // std::iota is used to maintain the batch dims within the permutation.
-  std::iota(permutation.begin(), permutation.end(), 0);
-  permutation.insert(
-      permutation.end(),
-      {-5 /* c */,
-       -3 /* 1st downscale_factor */,
-       -1 /*2nd downscale_factor */,
-       -4 /* oh */,
-       -2 /* ow */});
-  const auto input_permuted = input_reshaped.permute(permutation);
-
-  // Finally, downscale by collapsing (c, downscale_factor, downscale_factor) ->
-  // a single dim (oc), resulting in height=oh and width=ow.
-  std::vector<int64_t> final_shape(self.sizes().begin(), self_sizes_batch_end);
-  final_shape.insert(final_shape.end(), {oc, oh, ow});
-
-  return input_permuted.reshape(final_shape);
+torch::autograd::tensor_list PixelUnshuffleOp::backward(
+    torch::autograd::AutogradContext* ctx,
+    torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "PixelUnshuffleOp::backward", std::vector<c10::IValue>({self}));
+#endif
+  at::Tensor grad_output = grad_outputs[0];
+  int64_t downscale_factor = ctx->saved_data["downscale_factor"].toInt();
+  auto input_sizes = ctx->saved_data["input_sizes"].toIntList().vec();
+  return {
+      pixel_unshuffle_backward_cpu(grad_output, input_sizes, downscale_factor),
+      at::Tensor()};
 }
 
 TORCH_LIBRARY_IMPL(aten, CPU, m) {

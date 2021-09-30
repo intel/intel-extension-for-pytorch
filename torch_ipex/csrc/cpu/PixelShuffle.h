@@ -1,5 +1,8 @@
 #pragma once
 
+#include <ATen/Tensor.h>
+#include <torch/csrc/autograd/custom_function.h>
+
 namespace torch_ipex {
 namespace cpu {
 
@@ -72,6 +75,38 @@ at::Tensor pixel_unshuffle(const at::Tensor& self, int64_t downscale_factor);
 at::Tensor math_pixel_unshuffle(
     const at::Tensor& self,
     int64_t downscale_factor);
+
+class PixelShuffleOp : public torch::autograd::Function<PixelShuffleOp> {
+ public:
+  // forward function without autograd overhead, will go this way when only do
+  // forward
+  static at::Tensor _forward(const at::Tensor& self, int64_t upscale_factor);
+
+  static at::Tensor forward(
+      torch::autograd::AutogradContext* ctx,
+      const at::Tensor& self,
+      int64_t upscale_factor);
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::tensor_list grad_outputs);
+};
+
+class PixelUnshuffleOp : public torch::autograd::Function<PixelUnshuffleOp> {
+ public:
+  // forward function without autograd overhead, will go this way when only do
+  // forward
+  static at::Tensor _forward(const at::Tensor& self, int64_t downscale_factor);
+
+  static at::Tensor forward(
+      torch::autograd::AutogradContext* ctx,
+      const at::Tensor& self,
+      int64_t downscale_factor);
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::tensor_list grad_outputs);
+};
 
 } // namespace cpu
 } // namespace torch_ipex
