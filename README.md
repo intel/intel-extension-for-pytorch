@@ -1,26 +1,44 @@
-# Intel® Extension for PyTorch
+# Intel® Extension for PyTorch*
 
-Intel® Extension for PyTorch (IPEX) is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features).
+Intel® Extension for PyTorch*  extends official PyTorch with Intel optimizations for extra performance boost on Intel hardware techniques. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance bring extra performance boost on top of PyTorch. SomeMost of the optimizations will be included in stock PyTorch releases eventually, and the intenstion of the extension is to deliver up to date features and optimizations who runfor PyTorch on Intel hardware, examples include AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX).  
 
-Currently IPEX can only be used and compiled on machines with AVX-512 instruction sets.
+The extension takes advantage of features on the latest Intel hardware platforms, such as AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX). It will also be enabled for Intel discrete graphics cards. Thus, with the extension, users are able to experience up-to-date features of Intel hardware platforms, and achieve performance optimizations.The extension also will be the PR(Pull-Request) buffer for the Intel PyTorch framework dev team. The PR buffer will not only contain functions, but also optimization (for example, take advantage of Intel's new hardware features). 
+
+**NOTE:** Currently the extension supports AVX-512 instruction sets and AVX-2 support is WIP. The latest extension is compatible with PyTorch 1.10. And the latest extension change the device underhood from XPU to CPU which means that the model and tensor does not need to be coverted to the XPU device. The XPU code is hosted at [xpu-cpu](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-cpu) branch
 
  - [Installation](#installation)
-     - [Install PyTorch](#install-pytorch)
-     - [Install Intel Extension for PyTorch from Source](#install-intel-extension-for-pytorch-from-source)
+     - [Install PyTorch (Optional)](#install-pytorch-optional)
+     - [Install IPEX via wheel file](#install-ipex-via-wheel-file)
+     - [Install Intel Extension for PyTorch from Source](#install-extension-by-compiling-from-source)
+ - [Features](#features)
+     - [Ease-of-use Python API](#ease-of-use-python-api) 
+     - [Channels Last](#channels-last)
+     - [Auto Mixed Precision (AMP)](#auto-mixed-precision-amp)
+     - [Graph Optimization](#graph-optimization)
+     - [Operator Optimization](#operator-optimization)
  - [Getting Started](#getting-started)
-     - [Automatically Mix Precison](#automatically-mix-precision)
-        - [BFloat16](#BFloat16)
-        - [INT8](#int8-quantization)
+     - [Training](#training)
+         - [Float32](#float32)
+         - [BFloat16](#bfloat16)
+     - [Inference - Imperative Mode](#inference---imperative-mode)
+         - [Float32](#float32-1)
+         - [BFloat16](#bfloat16-1)
+     - [Inference - TorchScript Mode](#inference---torchscript-mode)
+         - [Float32](#float32-2)
+         - [BFloat16](#bfloat16-2)
+     - [Inference - C++](#inference---c)
+ - [Operator Optimizations](operator-optimizations)
      - [Supported Customized Operators](#supported-customized-operators)
      - [Supported Fusion Patterns](#supported-fusion-patterns)
  - [Tutorials](#tutorials)
  - [Joint blogs](#joint-blogs)
+ - [Contribution](#contribution)
  - [License](#license)
 
 ## Installation
 
 ### Install PyTorch (Optional)
- |IPEX Version|PyTorch Version|
+ |Extension Version|PyTorch Version|
  |--|--|
  |[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|
  |[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|
@@ -51,7 +69,7 @@ python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-s
 | 1.9.0 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | 1.8.0 |  | :heavy_check_mark: |  |  |
 
-### Install IPEX by compiling from source
+### Install Extension by compiling from source
 
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
@@ -65,12 +83,106 @@ git submodule update --init --recursive
 python setup.py install
 ```
 
+## Features
+### Ease-of-use Python API
+Intel® Extension for PyTorch* provides simple frontend Python APIs and utilities for users to get performance optimizations  such as graph optimization and operator optimization with minor code changes. Typically, only 2 to 3 clauses are required to be added to the original code.
+
+### Channels Last
+Comparing to the default NCHW memory format, channels_last (NHWC) memory format could further accelerate convolutional neural networks.In Intel® Extension for PyTorch*, NHWC memory format  has been enabled for most key CPU operators, though not all of them have been merged to PyTorch master branch yet. They are expected to be fully landed in PyTorch upstream soon.
+
+### Auto Mixed Precision (AMP)
+Low precision data type BFloat16 has been natively supported on the 3rd Generation Xeon scalable Servers (aka Cooper Lake) with AVX512 instruction set and will be  supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set with further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators have been  massively enabled in Intel® Extension for PyTorch*, and partially upstreamed to PyTorch master branch. Most of these optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.
+
+### Graph Optimization
+To optimize performance further with torchscript, Intel® Extension for PyTorch* supports fusion of frequently used operator patterns, like Conv2D+ReLU, Linear+ReLU, etc.  The benefit of the fusions are delivered to users in a transparant fashion.
+
+### Operator Optimization
+Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance . A few  ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via ATen registration mechanism. Moreover, some customized operators are implemented for several popular topologies . For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.
+
 ## Getting Started
 
-If you want to explore Intel Extension for PyTorch, you just need to convert the model and input tensors to the extension device, then the extension will be enabled automatically. Take an example, the code as follows is a model without the extension.
+Minor code changes are required for users to get start with Intel® Extension for PyTorch*. Both PyTorch imperative mode and TorchScript mode are supported. This section introduces usage of Intel® Extension for PyTorch* API functions for both imperative mode and TorchScript mode, covering data type Float32 and BFloat16. C++ usage will also be introduced at the end.
+
+You just need to import Intel® Extension for PyTorch* package and apply its optimize function against the model object. If it is a training workload, the optimize function also needs to be applied against the optimizer object.
+
+For training and inference with BFloat16 data type, torch.cpu.amp has been enabled in PyTorch upstream to support mixed precision with convenience, and BFloat16 datatype has been enabled excessively for CPU operators in PyTorch upstream and Intel® Extension for PyTorch*. Running torch.cpu.amp will match each operator to its appropriate datatype and returns the best possible performance.
+
+The code changes that are required for Intel® Extension for PyTorch* are highlighted with comments in a line above.
+
+### Training
+#### Float32
 ```python
 import torch
 import torch.nn as nn
+# Import intel_extension_for_pytorch
+import intel_extension_for_pytorch as ipex
+
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
+        self.linear = nn.Linear(4, 5)
+
+    def forward(self, input):
+        return self.linear(input)
+
+model = Model()
+model.set_state_dict(torch.load(PATH))
+optimizer.set_state_dict(torch.load(PATH))
+
+# Invoke optimize function against the model object and optimizer object
+model, optimizer = ipex.optimize(model, optimizer, dtype=torch.float32)
+
+for images, label in train_loader():
+    # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+    images = images.to(memory_format=torch.channels_last)
+
+    loss = criterion(model(images), label)
+    loss.backward()
+    optimizer.step()
+torch.save(model.state_dict(), PATH)
+torch.save(optimizer.state_dict(), PATH)
+```
+#### BFloat16
+```python
+import torch
+import torch.nn as nn
+# Import intel_extension_for_pytorch
+import intel_extension_for_pytorch as ipex
+
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
+        self.linear = nn.Linear(4, 5)
+
+    def forward(self, input):
+        return self.linear(input)
+
+model = Model()
+model.set_state_dict(torch.load(PATH))
+optimizer.set_state_dict(torch.load(PATH))
+
+# Invoke optimize function against the model object and optimizer object with data type set to torch.bfloat16
+model, optimizer = ipex.optimize(model, optimizer, dtype=torch.bfloat16)
+
+for images, label in train_loader():
+    with torch.cpu.amp.autocast():
+        # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+        images = images.to(memory_format=torch.channels_last)
+        loss = criterion(model(images), label)
+    loss.backward()
+    optimizer.step()
+torch.save(model.state_dict(), PATH)
+torch.save(optimizer.state_dict(), PATH)
+```
+
+### Inference - Imperative Mode
+#### Float32
+```python
+import torch
+import torch.nn as nn
+
+# Import intel_extension_for_pytorch 
+import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
@@ -82,45 +194,17 @@ class Model(nn.Module):
 
 input = torch.randn(2, 4)
 model = Model()
+# Invoke optimize function against the model object
+model = ipex.optimize(model)
 res = model(input)
 ```
-You just need to transform the above python script as follows and then the extension will be enabled and accelerate the computation automatically.
-```python
-import torch
-import torch.nn as nn
-
-# Import Extension
-import intel_pytorch_extension as ipex
-
-class Model(nn.Module):
-    def __init__(self):
-        super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
-
-    def forward(self, input):
-        return self.linear(input)
-
-# Convert the input tensor to the Extension device
-input = torch.randn(2, 4).to(ipex.DEVICE)
-# Convert the model to the Extension device
-model = Model().to(ipex.DEVICE)
-
-res = model(input)
-```
-
-### Automatically Mix Precision
-In addition, Intel Extension for PyTorch supports the mixed precision. It means that some operators of a model may run with Float32 and some other operators may run with BFloat16 or INT8.
-In traditional, if you want to run a model with a low precision type, you need to convert the parameters and the input tensors to the low precision type manually. And if the model contains some operators that do not support the low precision type, then you have to convert back to Float32. Round after round until the model can run normally.
-The extension can simply the case, you just need to enable the auto-mix-precision as follows, then you can benefit from the low precision. Currently, the extension only supports BFloat16.
-
 #### BFloat16
 ```python
 import torch
 import torch.nn as nn
 
-import intel_pytorch_extension as ipex
-# Automatically mix precision
-ipex.enable_auto_mixed_precision(mixed_dtype = torch.bfloat16)
+# Import intel_extension_for_pytorch 
+import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
@@ -130,118 +214,96 @@ class Model(nn.Module):
     def forward(self, input):
         return self.linear(input)
 
-input = torch.randn(2, 4).to(ipex.DEVICE)
-model = Model().to(ipex.DEVICE)
-
-res = model(input)
+input = torch.randn(2, 4)
+model = Model()
+# Invoke optimize function against the model object with data type set to torch.bfloat16
+model = ipex.optimize(model, dtype=torch.bfloat16)
+with torch.cpu.amp.autocast():
+    res = model(input)
 ```
-#### INT8 Quantization
-Currently, Intel Extension for PyTorch has supported static and symmetric quantization. Development of dynamic quantization is undergoing. And asymmetric quantization will be enabled once oneDNN is upgraded to v2.0 or higher versions.
-
-How to quantize the following model:
+### Inference - TorchScript Mode
+TorchScript mode makes graph optimization possible , hence improves performance for some topologies. Intel® Extension for PyTorch* enables most commonly used operator pattern fusion, and users can get the performance benefit without additional code changes
+#### Float32
 ```python
 import torch
 import torch.nn as nn
 
+# Import intel_extension_for_pytorch 
+import intel_extension_for_pytorch as ipex
+
+# oneDNN graph fusion is enabled by default, uncomment the line below to disable it explicitly 
+# ipex.enable_onednn_fusion(False)
+
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.conv = nn.Conv2d(3, 64, 7, stride=2)
+        self.linear = nn.Linear(4, 5)
 
     def forward(self, input):
-        return self.conv(input).relu()
+        return self.linear(input)
+
+input = torch.randn(2, 4)
+model = Model()
+# Invoke optimize function against the model object
+model = ipex.optimize(model)
+model = torch.jit.trace(model, torch.rand(args.batch_size, 3, 224, 224))
+model = torch.jit.freeze(model)
+res = model(input)
 ```
-Firstly we need to do calibration step against a representative dataset (set ```running_mode``` to ```calibration```):
+#### BFloat16
 ```python
-# Convert the model to the Extension device
-model = Model().to(ipex.DEVICE)
+import torch
+import torch.nn as nn
 
-# Create a configuration file to save quantization parameters.
-conf = ipex.AmpConf(torch.int8)
-with torch.no_grad():
-    for x in cali_dataset:
-        # Run the model under calibration mode to collect quantization parameters
-        with ipex.AutoMixPrecision(conf, running_mode='calibration'):
-            y = model(x.to(ipex.DEVICE))
-# Save the configuration file
-conf.save('configure.json')
+# Import intel_extension_for_pytorch 
+import intel_extension_for_pytorch as ipex
+
+# oneDNN graph fusion is enabled by default, uncomment the line below to disable it explicitly 
+# ipex.enable_onednn_fusion(False)
+
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
+        self.linear = nn.Linear(4, 5)
+
+    def forward(self, input):
+        return self.linear(input)
+
+input = torch.randn(2, 4)
+model = Model()
+# Invoke optimize function against the model with data type set to torch.bfloat16
+model = ipex.optimize(model, dtype=torch.bfloat16)
+with torch.cpu.amp.autocast():
+    model = torch.jit.trace(model, torch.rand(args.batch_size, 3, 224, 224))
+    model = torch.jit.freeze(model)
+       res = model(input)
 ```
-The content of the configuration file is as follows.
-
-```json
-[
-    {
-        "id": 0,
-        "name": "Convolution",
-        "algorithm": "min_max",
-        "weight_granularity": "per_channel",
-        "inputs_scale": [
-            25.05583953857422
-        ],
-        "outputs_scale": [
-            43.98969650268555
-        ],
-        "inputs_uint8_used": [
-            false
-        ],
-        "outputs_uint8_used": [
-            false
-        ],
-        "quantized": true
-    },
-    {
-        "id": 1,
-        "name": "Relu",
-        "algorithm": "min_max",
-        "weight_granularity": "per_channel",
-        "inputs_scale": [
-            43.98969650268555
-        ],
-        "outputs_scale": [
-            43.98969650268555
-        ],
-        "inputs_uint8_used": [
-            false
-        ],
-        "outputs_uint8_used": [
-            false
-        ],
-        "quantized": true
-    }
-]
+### Inference - C++
+To work with libtorch, C++ library of PyTorch, Intel® Extension for PyTorch* provides its C++ dynamic library as well. The C++ library is supposed to handle inference workload only, such as service deployment. For regular development, please use Python interface. Comparing to usage of libtorch, no specific code changes are required, except for converting input data into channels last data format. During compilation, Intel optimizations will be activated automatically once C++ dynamic library of Intel® Extension for PyTorch* is linked.
+```C++
+#include <torch/script.h>
+#include <iostream> 
+#include <memory> 
+ 
+int main(int argc, const char* argv[]) { 
+  torch::jit::script::Module module; 
+  try { 
+    module = torch::jit::load(argv[1]); 
+  } 
+  catch (const c10::Error& e) { 
+    std::cerr << "error loading the model\n"; 
+    return -1; 
+  } 
+std::vector<torch::jit::IValue> inputs; 
+// make sure input data are converted to channels last format
+inputs.push_back(torch::ones({1, 3, 224, 224}).to(c10::MemoryFormat::ChannelsLast)); 
+ 
+at::Tensor output = module.forward(inputs).toTensor(); 
+ 
+  return 0; 
+} 
 ```
-- ```id``` is a sequence number of operators which were quantized statically in the calibration step.
-**Manually changing this value will cause unexpected behaviors**.
-- ```name``` is the name of the operator to be quantized.
-- ```algorithm``` indicates how to calculate the scales of the observed tensors. Currently only ```min_max``` is supported.
-- ```weight_granularity``` controls how to quantize the operator weights. The ```Convolution``` and ```Linear``` both supports  ```per_channel``` and ```per_tensor```. And the other operators only supports ```per_tensor```.
-- ```inputs_scale``` and ```outputs_scale``` are the scales to quantize the input tensors and output tensors respectively.
-- ```inputs_uint8_used``` and ```outputs_uint8_used``` indicate whether to use ```int8``` or ```uint8```. Default value is ```false```, indicating that ```int8``` is used.
-- ```quantized``` determines whether this operator should be quantized or not during inference.
-
-After doing calibration step, we can use the saved configuration json file to do evalution (set ```running_mode``` to ```inference```):
-```python
-conf = ipex.AmpConf(torch.int8, 'configure.json')
-with torch.no_grad():
-    for x in cali_dataset:
-        with ipex.AutoMixPrecision(conf, running_mode='inference'):
-            y = model(x.to(ipex.DEVICE))
-```
-
-Supported Quantization Operators:
-- ```Convoluton```
-- ```BatchNorm```
-- ```MaxPooling```
-- ```AvgPooling```
-- ```AdaptivePooling```
-- ```Linear```
-- ```convolution + relu```
-- ```convolution + sum```
-- ```convolution + sum + relu```
-- ```convolution + BatchNorm```
-
-
-
+## Operator Optimizations
 ### Supported Customized Operators
 * ROIAlign
 * NMS

@@ -1,5 +1,5 @@
 import torch
-import torch_ipex as ipex
+import intel_extension_for_pytorch as ipex
 
 torch_function = ['rand', 'randint', 'arange', 'bartlett_window', 'blackman_window', \
                   'empty', '_empty_affine_quantized', '_empty_per_channel_affine_quantized', \

@@ -11,7 +11,15 @@ SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn EXCLUDE_FROM_ALL)
+
+
+# TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
+# use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
+add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
+# add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+
+
+#find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 FIND_PACKAGE(AVX)
@@ -24,6 +32,9 @@ ENDIF()
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   message("Debug build.")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -D_DEBUG")
+ELSEIF(CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
+  message("RelWithDebInfo build")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -DNDEBUG")
 ELSE()
   message("Release build.")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
@@ -35,6 +46,10 @@ ENDIF()
 
 IF("${IPEX_PROFILE_OP}" STREQUAL "1")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_PROFILE_OP")
+ENDIF()
+
+IF("${ENABLE_AUTOCAST_VERBOSE}" STREQUAL "1")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_AUTOCAST_VERBOSE")
 ENDIF()
 
 # ---[ Build flags
@@ -59,6 +74,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-result")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-strict-overflow")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-strict-aliasing")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=deprecated-declarations")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-qualifiers")
 if (CMAKE_COMPILER_IS_GNUCXX AND NOT (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0.0))
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-stringop-overflow")
 endif()
@@ -66,10 +82,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=pedantic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=redundant-decls")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=old-style-cast")
 IF (C_AVX512_FOUND OR CXX_AVX512_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DAVX512")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY_AVX2")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_AVX512")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512bw")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512vl")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512dq")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mf16c")
 ENDIF()
 IF (C_AVX512_BF16_FOUND OR CXX_AVX512_BF16_FOUND)
@@ -126,8 +144,19 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
-include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
+include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
+include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
+
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/include)
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/llga/third_party/oneDNN/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
+# TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
+# include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+# include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
+
 
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
@@ -137,10 +166,16 @@ else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
 
-include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
-include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
+# Set Python include dir
+if(DEFINED PYTHON_INCLUDE_DIR)
+  include_directories(${PYTHON_INCLUDE_DIR})
+else()
+  message(FATAL_ERROR, "Cannot find installed Python head file directory")
+endif()
+
+# include pybind11 after pytorch include
+# to be able to use the py::class defined in PyTorch when binding c++ API to Python in IPEX
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 
 # sources
 set(DPCPP_SRCS)
@@ -149,24 +184,13 @@ set(DPCPP_CPU_SRCS)
 set(DPCPP_JIT_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
-add_subdirectory(${DPCPP_ROOT}/cpu)
+add_subdirectory(${DPCPP_ROOT}/quantization)
 add_subdirectory(${DPCPP_ROOT}/jit)
+add_subdirectory(${DPCPP_ROOT}/cpu)
 
-# libxsmm
-include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
-ExternalProject_Add(xsmm
-  SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/xsmm
-  BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND
-    make
-    "AVX=3"
-    "-j"
-  INSTALL_COMMAND ""
-  )
+# Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
-target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
 #link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
@@ -184,15 +208,12 @@ else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-add_dependencies(${PLUGIN_NAME} dnnl)
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
-add_dependencies(${PLUGIN_NAME} xsmm)
+add_dependencies(${PLUGIN_NAME} dnnl_graph)
+target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
+target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
-
-#set_property(TARGET ${PLUGIN_NAME} PROPERTY VERSION "${IPEX_VERSION}")
-#set_property(TARGET ${PLUGIN_NAME} PROPERTY SOVERSION "${IPEX_VERSION}")
-install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION lib)
+install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
