@@ -7,14 +7,32 @@ The extension takes advantage of features on the latest Intel hardware platforms
 **NOTE:** Currently the extension supports AVX-512 instruction sets and AVX-2 support is WIP. The latest extension is compatible with PyTorch 1.10. And the latest extension change the device underhood from XPU to CPU which means that the model and tensor does not need to be coverted to the XPU device. The XPU code is hosted at [xpu-cpu](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-cpu) branch
 
  - [Installation](#installation)
-     - [Install PyTorch](#install-pytorch)
-     - [Install Intel Extension for PyTorch from Source](#install-intel-extension-for-pytorch-from-source)
- - [Features](#getting-started)
- - [Getting Started]
-     - [Training]
-     - [Inference]
- - [Operator Optimizations]
+     - [Install PyTorch (Optional)](#install-pytorch-optional)
+     - [Install IPEX via wheel file](#install-ipex-via-wheel-file)
+     - [Install Intel Extension for PyTorch from Source](#install-extension-by-compiling-from-source)
+ - [Features](#features)
+     - [Ease-of-use Python API](#ease-of-use-python-api) 
+     - [Channels Last](#channels-last)
+     - [Auto Mixed Precision (AMP)](#auto-mixed-precision-amp)
+     - [Graph Optimization](#graph-optimization)
+     - [Operator Optimization](#operator-optimization)
+ - [Getting Started](#getting-started)
+     - [Training](#training)
+         - [Float32](#float32)
+         - [BFloat16](#bfloat16)
+     - [Inference - Imperative Mode](#inference---imperative-mode)
+         - [Float32](#float32-1)
+         - [BFloat16](#bfloat16-1)
+     - [Inference - TorchScript Mode](#inference---torchscript-mode)
+         - [Float32](#float32-2)
+         - [BFloat16](#bfloat16-2)
+     - [Inference - C++](#inference---c)
+ - [Operator Optimizations](operator-optimizations)
+     - [Supported Customized Operators](#supported-customized-operators)
+     - [Supported Fusion Patterns](#supported-fusion-patterns)
+ - [Tutorials](#tutorials)
  - [Joint blogs](#joint-blogs)
+ - [Contribution](#contribution)
  - [License](#license)
 
 ## Installation
