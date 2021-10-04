@@ -1,5 +1,5 @@
 import torch
-import torch_ipex as ipex
+import intel_extension_for_pytorch as ipex
 from common_utils import int8_calibration
 
 ipex.core.enable_auto_dnnl()
