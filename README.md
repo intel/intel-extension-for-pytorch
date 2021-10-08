@@ -48,13 +48,13 @@ The extension takes advantage of features on the latest Intel hardware platforms
  |[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
 
-For IPEX version earlier than 1.8.0, a patch has to be manually applied to PyTorch source code. Please check previous installation guide.
+For the extension version earlier than 1.8.0, a patch has to be manually applied to PyTorch source code. Please check previous installation guide.
 
-From IPEX 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
+From 1.8.0, compiling PyTorch from source is not required. If you still want to compile PyTorch, please follow instructions [here](https://github.com/pytorch/pytorch#installation). Please make sure to checkout the correct PyTorch version according to the table above.
 
 **Note:** Compiling with gcc 7 on some environments, like CentOS 7, may fail. Please use GCC >= 8 to compile.
 
-**Note:** Installing IPEX will automatically invoke installation of the corresponding version of PyTorch.
+**Note:** Installing the extension will automatically invoke installation of the corresponding version of PyTorch.
 
 ### Install via wheel file
 
@@ -64,7 +64,7 @@ python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-s
 
 :information_source: Wheel files availability for Python versions
 
-| IPEX Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
+| Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
 | :--: | :--: | :--: | :--: | :--: |
 | 1.9.0 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | 1.8.0 |  | :heavy_check_mark: |  |  |
@@ -332,8 +332,8 @@ at::Tensor output = module.forward(inputs).toTensor();
 
 ## Joint-blogs
 * [Intel and Facebook Accelerate PyTorch Performance with 3rd Gen Intel® Xeon® Processors and Intel® Deep Learning Boost’s new BFloat16 capability](https://www.intel.com/content/www/us/en/artificial-intelligence/posts/intel-facebook-boost-bfloat16.html)
-* [Accelerate PyTorch with IPEX and oneDNN using Intel BF16 Technology](https://medium.com/pytorch/accelerate-pytorch-with-ipex-and-onednn-using-intel-bf16-technology-dca5b8e6b58f)
-* [Scaling up BERT-like model Inference on modern CPU - Part 1 by IPEX launcher](https://huggingface.co/blog/bert-cpu-scaling-part-1)
+* [Accelerate PyTorch with the extension and oneDNN using Intel BF16 Technology](https://medium.com/pytorch/accelerate-pytorch-with-ipex-and-onednn-using-intel-bf16-technology-dca5b8e6b58f)
+* [Scaling up BERT-like model Inference on modern CPU - Part 1 by the launcher of the extension](https://huggingface.co/blog/bert-cpu-scaling-part-1)
 
 
 ## Contribution
