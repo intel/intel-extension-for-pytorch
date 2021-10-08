@@ -8,7 +8,7 @@ The extension takes advantage of features on the latest Intel hardware platforms
 
  - [Installation](#installation)
      - [Install PyTorch (Optional)](#install-pytorch-optional)
-     - [Install IPEX via wheel file](#install-ipex-via-wheel-file)
+     - [Install via wheel file](#install-via-wheel-file)
      - [Install Intel Extension for PyTorch from Source](#install-extension-by-compiling-from-source)
  - [Features](#features)
      - [Ease-of-use Python API](#ease-of-use-python-api) 
@@ -56,7 +56,7 @@ From IPEX 1.8.0, compiling PyTorch from source is not required. If you still wan
 
 **Note:** Installing IPEX will automatically invoke installation of the corresponding version of PyTorch.
 
-### Install IPEX via wheel file
+### Install via wheel file
 
 ```
 python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-stable
@@ -79,7 +79,7 @@ cd intel-extension-for-pytorch
 git submodule sync
 git submodule update --init --recursive
 
-# run setup.py to compile IPEX and install the binaries
+# run setup.py to compile and install the binaries
 python setup.py install
 ```
 
