@@ -9,13 +9,13 @@
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/iterator>
 #include <oneapi/dpl/numeric>
-#endif
 
 namespace sycl {
 template <typename T>
 struct sycl::is_device_copyable<oneapi::dpl::zip_iterator<T*, T*>>
     : std::true_type {};
 } // namespace sycl
+#endif
 
 namespace at {
 namespace AtenIpexTypeXPU {
