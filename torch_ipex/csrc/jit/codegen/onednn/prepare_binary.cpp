@@ -38,8 +38,7 @@ static void ConvertScalarToTensor(Block* block) {
       ConvertScalarToTensor(sub);
     }
 
-    if (node->kind() == aten::add || node->kind() == aten::mul ||
-        node->kind() == aten::div) {
+    if (node->kind() == aten::add || node->kind() == aten::div) {
       mayConvertScalarInputToTensor(node);
     }
   }
