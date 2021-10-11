@@ -40,8 +40,7 @@ def _convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
     module_convert_list = [torch.nn.Conv2d,
                            torch.nn.Linear,
-                           torch.nn.Embedding,
-                           torch.nn.LayerNorm]
+                           torch.nn.Embedding]
     for module_cls in module_convert_list:
         if isinstance(module, module_cls):
             weight_data = module.weight.detach().clone().to(dtype)
@@ -118,7 +117,7 @@ def optimize(
     remove_dropout=None):
     r"""
     Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
-    conversation for Convolution, Linear, Embedding, and layerNorm. there also has a weight prepack for
+    conversation for Convolution, Linear, Embedding. there also has a weight prepack for
     Convoluttion and Linear for better performance.
 
     Args:

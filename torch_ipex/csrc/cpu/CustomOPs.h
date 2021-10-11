@@ -33,7 +33,6 @@ namespace ipex {
 
   static auto max_pool2d = Symbol::fromQualString("ipex::max_pool2d");
   static auto softmax = Symbol::fromQualString("ipex::softmax");
-  static auto layernorm = Symbol::fromQualString("ipex::layernorm");
 
   // n-dims tensor op.
   static auto convolution_nd_weight_base =
@@ -138,12 +137,6 @@ class AtenIpexJITDev {
    static at::Tensor dil_matmul_div(const at::Tensor &left,
                                     const at::Tensor &right, at::Tensor out_opt,
                                     const c10::Scalar &div_input);
-
-   static at::Tensor dil_layernorm(const at::Tensor &input,
-                                   at::IntArrayRef normalized_shape,
-                                   const c10::optional<at::Tensor> &weight_opt,
-                                   const c10::optional<at::Tensor> &bias_opt,
-                                   float eps, bool cudnn_enable);
 
    // n-dims tensor op
    static at::Tensor dil_convolution_nd_weight_base(

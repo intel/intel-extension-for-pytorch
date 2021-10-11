@@ -425,26 +425,6 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
-        "ipex::layernorm(Tensor a, int[] normalized_shape, Tensor ? "
-        "weight_opt, Tensor ? bias_opt, float eps, bool cudnn_enable) -> "
-        "Tensor",
-        [](const Node* node) -> Operation {
-          return [](Stack *stack) {
-            auto result = AtenIpexJITDev::dil_layernorm(
-                (std::move(peek(stack, 0, 6))).toTensor(),
-                (std::move(peek(stack, 1, 6))).toIntVector(),
-                toOptionalTensor(std::move(peek(stack, 2, 6))),
-                toOptionalTensor(std::move(peek(stack, 3, 6))),
-                (std::move(peek(stack, 4, 6))).toDouble(),
-                (std::move(peek(stack, 5, 6))).toBool());
-            drop(stack, 6);
-            pack(stack, std::move(result));
-            return 0;
-          };
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
         "ipex::qembedding_bag(Tensor weight, Tensor indices, Tensor offsets, "
         "bool sparse, bool include_last_offset, "
         "float o_scale, int o_zp, ScalarType o_dtype) -> Tensor",

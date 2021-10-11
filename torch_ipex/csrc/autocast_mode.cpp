@@ -194,12 +194,6 @@ MAKE_REGISTER_FUNC(ADD_NS(conv_transpose2d), "conv_transpose2d.input",
                           const c10::optional<Tensor> &, IntArrayRef,
                           IntArrayRef, IntArrayRef, int64_t, IntArrayRef),
                    user_defined_dtype)
-MAKE_REGISTER_FUNC(ADD_NS(layer_norm), "layer_norm",
-                   Tensor(const Tensor &, IntArrayRef,
-                          const c10::optional<Tensor> &,
-                          const c10::optional<Tensor> &, double, bool),
-                   user_defined_dtype)
-
 // fp32 cast policy a.k.a BlackList
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool1d), "avg_pool1d",
                    Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
