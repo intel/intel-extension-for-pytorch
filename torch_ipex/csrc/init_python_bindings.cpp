@@ -52,8 +52,9 @@ void InitIpexModuleBindings(py::module m) {
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {
     at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
-    return py::reinterpret_steal<py::object>(
-        (PyObject*)torch::getTHPDtype(current_dtype));
+    auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
+    Py_INCREF(dtype);
+    return py::reinterpret_steal<py::object>(dtype);
   });
   m.def("set_autocast_dtype", [](py::object dtype) {
     at::ScalarType target_dtype =
