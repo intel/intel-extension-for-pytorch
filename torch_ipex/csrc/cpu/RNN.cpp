@@ -6,7 +6,7 @@
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
 #include "ExtendOPs.h"
-#include "WeightPrepack.h"
+#include "WeightPack.h"
 #include "mkldnn/MKLDNNCommon.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
@@ -145,7 +145,7 @@ std::vector<int64_t> _output_size(const RNNParams &rnn) {
 //                           +---------+
 //
 at::Tensor _shuffle_weight(const at::Tensor &weight, int64_t fn_mode) {
-  if (torch_ipex::cpu::is_prepacked(weight))
+  if (torch_ipex::cpu::is_packed(weight))
     return weight;
 
   auto weight_t = weight.contiguous();
@@ -203,9 +203,18 @@ at::Tensor mkldnn_rnn_layer(at::Tensor &hy_, at::Tensor &cy_,
       cy_, rnn.dst_iter_c_desc(get_mkldnn_dtype(cy_.scalar_type())));
 
   ideep::tensor w1, w2;
-  std::tie(w1, w2) = torch_ipex::cpu::get_lstm_prepacked_weight(
-      weight_ih, weight_hh, input_size, rnn.num_gates, rnn.hidden_size,
-      {output_size.cbegin(), output_size.cend()}, x, hx, cx, b, reverse);
+  std::tie(w1, w2) = torch_ipex::cpu::get_lstm_packed_weight(
+      weight_ih,
+      weight_hh,
+      input_size,
+      rnn.num_gates,
+      rnn.hidden_size,
+      {output_size.cbegin(), output_size.cend()},
+      x,
+      hx,
+      cx,
+      b,
+      reverse);
 
   ideep::lstm_forward::compute(x, hx, cx, w1, w2, b, y, hy, cy, reverse);
 

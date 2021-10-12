@@ -7,10 +7,13 @@ namespace onednn {
 
 bool canFuseNode(const Node* node) {
   // TODO: register all canFuseNode of LLGA here
+
   return node->kind() == Symbol::aten("quantize_per_tensor") ||
       node->kind() == Symbol::aten("quantize_per_channel") ||
       node->kind() == Symbol::aten("dequantize") ||
-      node->kind() == aten::_convolution;
+      node->kind() == Symbol::aten("_convolution") ||
+      node->kind() == Symbol::fromQualString("torch_ipex::convolution_forward");
+  node->kind() == Symbol::fromQualString("torch_ipex::ipex_linear");
 }
 
 namespace {

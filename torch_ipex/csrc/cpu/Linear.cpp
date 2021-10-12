@@ -1,75 +1,14 @@
 #include <torch/extension.h>
 
+#include "Linear.h"
+#include "WeightPack.h"
+#include "mkldnn/MKLDNNCommon.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
-#include "Linear.h"
-#include "mkldnn/MKLDNNCommon.h"
-#include "WeightPrepack.h"
 #include "torch_ipex/csrc/utils.h"
 
 namespace torch_ipex {
 namespace cpu {
-
-at::Tensor linear_kernel(
-    const at::Tensor& self,
-    const ideep::tensor& mkldnn_weight,
-    const at::Tensor& bias,
-    const ideep::attr_t& attr) {
-  auto self_ = self.is_contiguous() ? self : self.contiguous();
-  const int64_t dim = self.dim();
-  // reshape first if input dim != 2 and the reshape will cost a memory copy.
-  auto self_reshaped =
-      dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
-  const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
-
-  std::vector<int64_t> output_size_reshaped = {self_reshaped.size(0), mkldnn_weight.get_dim(0)};
-  auto output = at::empty(output_size_reshaped, self.options());
-  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
-
-  if (bias.defined()) {
-    auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
-    const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
-    ideep::inner_product_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        mkldnn_bias,
-        mkldnn_output,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
-  } else {
-    ideep::inner_product_forward::compute(
-        mkldnn_input,
-        mkldnn_weight,
-        mkldnn_output,
-        ideep::scale_t(),
-        ideep::scale_t(),
-        ideep::scale_t(),
-        attr);
-  }
-
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(mkldnn_weight.get_dim(0));
-
-  if (self.dim() != 2) {
-    return output.reshape(output_size);
-  }
-  return output;
-}
-
-at::Tensor linear_impl(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const ideep::attr_t& attr) {
-  TORCH_CHECK(self.numel() % self.size(self.dim() - 1) == 0);
-  const int64_t batch_size = self.numel() / self.size(self.dim() - 1);
-  const ideep::tensor mkldnn_weight = get_linear_prepacked_weight(weight, batch_size, self.scalar_type());
-  return linear_kernel(self, mkldnn_weight, bias, attr);
-}
-
 /**
  * Linear inplace version with oneDNN kernel. 
  * Inplace version will be used when user provides output tensor. eg: Linear+Add fusion. 
@@ -80,11 +19,10 @@ at::Tensor linear_impl(
  *@param bias Bias for Linear
  *@param output Output tensor provided by user
  *@param attr Attribute for oneDNN primitive.
- *@return output This tensor is provided by user.
  */
-at::Tensor linear_inplace_impl(
+void linear_kernel_output(
     const at::Tensor& self,
-    const at::Tensor& weight,
+    const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
     at::Tensor& output,
     const ideep::attr_t& attr) {
@@ -93,11 +31,13 @@ at::Tensor linear_inplace_impl(
   auto self_reshaped =
       dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
   const ideep::tensor mkldnn_input = itensor_view_from_dense(self_reshaped);
-  const ideep::tensor mkldnn_weight = get_linear_prepacked_weight(weight, mkldnn_input.get_dim(0), self.scalar_type());
-
-  std::vector<int64_t> output_size_reshaped = {self_reshaped.size(0), weight.size(0)};
-  output = output.reshape(output_size_reshaped);
-  output = output.to(self_.suggest_memory_format());
+  auto output_size = output.sizes();
+  auto output_memory_format = output.suggest_memory_format();
+  if (dim != 2) {
+    std::vector<int64_t> output_size_reshaped = {
+        self_reshaped.size(0), mkldnn_weight.get_dim(0)};
+    output = output.reshape(output_size_reshaped);
+  }
   ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
   if (bias.defined()) {
@@ -122,16 +62,23 @@ at::Tensor linear_inplace_impl(
         ideep::scale_t(),
         attr);
   }
+  if (self.dim() != 2) {
+    output = output.reshape(output_size);
+    output = output.to(output_memory_format);
+  }
+}
 
+at::Tensor linear_kernel(
+    const at::Tensor& self,
+    const ideep::tensor& mkldnn_weight,
+    const at::Tensor& bias,
+    const ideep::attr_t& attr) {
   auto input_size = self.sizes();
   std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-
-  if (self.dim() != 2) {
-    return output.reshape(output_size);
-  }
+  output_size.push_back(mkldnn_weight.get_dim(0));
+  auto output = at::empty(output_size, self.options());
+  linear_kernel_output(self, mkldnn_weight, bias, output, attr);
   return output;
-
 }
 
 at::Tensor linear_forward_impl(
@@ -141,7 +88,8 @@ at::Tensor linear_forward_impl(
     const int64_t in_features,
     const at::Tensor& bias,
     const ideep::attr_t& attr) {
-  const ideep::tensor mkldnn_weight = get_linear_prepacked_weight(weight, out_features, in_features);
+  const ideep::tensor mkldnn_weight =
+      get_linear_packed_weight(weight, out_features, in_features);
   return linear_kernel(self, mkldnn_weight, bias, attr);
 }
 
@@ -154,7 +102,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
     std::array<bool,3> output_mask) {
   at::Tensor grad_input, grad_weight, grad_bias;
   // weight's desc is needed for both bw_d and bw_w
-  const ideep::tensor w = get_linear_prepacked_weight(weight, out_features, in_features);
+  const ideep::tensor w =
+      get_linear_packed_weight(weight, out_features, in_features);
   // for IP, currently both stag=ab and dtag=ab are only supported by onednn, we
   // need first make both src and diff_dst contiguous if the input or
   // grad_output is not expected

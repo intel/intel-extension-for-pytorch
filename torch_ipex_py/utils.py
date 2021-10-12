@@ -181,11 +181,11 @@ def optimize(
     # convert optimizer for training case.
     params_attr = {}
     #TODO: add option master_weight for bf16 case
-    if dtype == torch.bfloat16 and model.training:
+    if dtype == torch.bfloat16:
         optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, params_attr)
 
     #TODO enable inference weight prepack as default.
-    if opt_properties.weights_prepack and model.training:
+    if opt_properties.weights_prepack:
         optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, params_attr)
 
     # TODO: model list, optimizer list.

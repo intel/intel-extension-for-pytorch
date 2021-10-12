@@ -31,23 +31,24 @@ class _IPEXConvNd(nn.Module):
             self.groups,
             self.out_channels,
             self.weight_channels_last,
-            self.weight_prepacked)
+            self.weight_packed)
+
 class _IPEXConv2d(_IPEXConvNd):
     def __init__(self, dense_module):
         super(_IPEXConv2d, self).__init__(dense_module)
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last)
-        self.weight_prepacked = True
+        self.weight_packed = True
 
         # TODO: ".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
-        self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_prepack(
+        self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_pack(
             dense_module.weight.detach().clone(),
             self.padding,
             self.stride,
             self.dilation,
             self.groups))
         if hasattr(dense_module, 'master_weight'):
-            self.master_weight = torch.ops.torch_ipex.conv2d_weight_prepack(
+            self.master_weight = torch.ops.torch_ipex.conv2d_weight_pack(
                 dense_module.master_weight.detach().clone(),
                 self.padding,
                 self.stride,
@@ -55,7 +56,7 @@ class _IPEXConv2d(_IPEXConvNd):
                 self.groups,
                 self.weight.dtype)
         elif hasattr(dense_module, 'weight_trail'):
-            self.weight_trail = torch.ops.torch_ipex.conv2d_weight_prepack(
+            self.weight_trail = torch.ops.torch_ipex.conv2d_weight_pack(
                 dense_module.weight_trail.detach().clone(),
                 self.padding,
                 self.stride,
@@ -105,7 +106,7 @@ class _IPEXConv2d(_IPEXConvNd):
 
 class _IPEXLinear(torch.nn.Module):
     def __init__(self, dense_module):
-        super(_IPEXLinear, self).__init__()
+        super(_IPEXLinear, self).__init__(dense_module)
         # use in_features, out features and weight_transposed to restore origin 2D weight
         self.out_features = dense_module.out_features
         self.in_features = dense_module.in_features
@@ -117,14 +118,14 @@ class _IPEXLinear(torch.nn.Module):
         # TODO:".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
         self.weight = torch.nn.Parameter(
-            torch.ops.torch_ipex.linear_weight_prepack(dense_module.weight.detach().clone())
+            torch.ops.torch_ipex.linear_weight_pack(dense_module.weight.detach().clone())
         )
         if hasattr(dense_module, 'master_weight'):
-            self.master_weight = torch.ops.torch_ipex.linear_weight_prepack(
+            self.master_weight = torch.ops.torch_ipex.linear_weight_pack(
                 dense_module.master_weight.detach().clone(),
                 self.weight.dtype)
         elif hasattr(dense_module, 'weight_trail'):
-            self.weight_trail = torch.ops.torch_ipex.linear_weight_prepack(
+            self.weight_trail = torch.ops.torch_ipex.linear_weight_pack(
                 dense_module.weight_trail.detach().clone())
 
         if dense_module.bias is not None:
@@ -271,7 +272,7 @@ def _optimizer_convert_for_weight_prepack(optimizer, weight_pair, bias_pair, att
                                     if attr['op'] is torch.nn.Conv2d:
                                         value_temp = state_value.to(memory_format=torch.channels_last) \
                                             if attr['weight_channels_last'] else state_value
-                                        state[state_key] = torch.ops.torch_ipex.conv2d_weight_prepack(
+                                        state[state_key] = torch.ops.torch_ipex.conv2d_weight_pack(
                                             value_temp,
                                             attr['padding'],
                                             attr['stride'],
@@ -279,7 +280,7 @@ def _optimizer_convert_for_weight_prepack(optimizer, weight_pair, bias_pair, att
                                             attr['groups'],
                                             pack_dtype)
                                     elif attr['op'] is torch.nn.Linear:
-                                        state[state_key] = torch.ops.torch_ipex.linear_weight_prepack(
+                                        state[state_key] = torch.ops.torch_ipex.linear_weight_pack(
                                             state_value,
                                             pack_dtype)
 

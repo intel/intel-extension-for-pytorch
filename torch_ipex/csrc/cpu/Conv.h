@@ -8,6 +8,27 @@
 namespace torch_ipex {
 namespace cpu {
 
+void convolution_kernel_output(
+    const at::Tensor& input,
+    const ideep::tensor& mkldnn_weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    at::Tensor& output,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    const ideep::attr_t& attr);
+
+at::Tensor convolution_kernel(
+    const at::Tensor& input,
+    const ideep::tensor& mkldnn_weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    const ideep::attr_t& attr);
+
 std::vector<int64_t> calc_conv_output_size(
     at::IntArrayRef input_size,
     at::IntArrayRef kernel_size,
