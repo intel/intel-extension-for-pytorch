@@ -658,7 +658,17 @@ at::Tensor AtenIpexTypeExt::layer_norm(
   }
 }
 
+
+TORCH_LIBRARY_IMPL(aten, Autograd, m) {
+  m.impl("adaptive_avg_pool2d", static_cast<at::Tensor  (*)(const at::Tensor & self, at::IntArrayRef output_size)>(&AtenIpexTypeExt::adaptive_avg_pool2d));
+}
+
+TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("adaptive_avg_pool2d", static_cast<at::Tensor  (*)(const at::Tensor & self, at::IntArrayRef output_size)>(&AtenIpexTypeExt::adaptive_avg_pool2d));
+}
+
 } // namespace torch_ipex
+
 
 namespace {
 static auto dispatch =
@@ -680,11 +690,6 @@ static auto dispatch =
               return torch_ipex::AtenIpexTypeExt::max_pool3d(
                   self, kernel_size.vec(), stride.vec(), padding.vec(),
                   dilation.vec(), ceil_mode);
-            })
-        .op("torch_ipex::adaptive_avg_pool2d",
-            [](const at::Tensor &self, c10::List<int64_t> output_size) {
-              return torch_ipex::AtenIpexTypeExt::adaptive_avg_pool2d(
-                  self, output_size.vec());
             })
         .op("torch_ipex::embedding_bag",
             [](const at::Tensor &weight, const at::Tensor &indices,
