@@ -31,13 +31,13 @@ ENDIF()
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   message("Debug build.")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -D_DEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_DEBUG")
 ELSEIF(CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
   message("RelWithDebInfo build")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 ELSE()
   message("Release build.")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 ENDIF()
 
 IF("${IPEX_DISP_OP}" STREQUAL "1")
@@ -155,8 +155,6 @@ include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
 # TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
 # include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
 # include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
-
-
 
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)

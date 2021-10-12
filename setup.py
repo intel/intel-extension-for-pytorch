@@ -269,14 +269,15 @@ class IPEXCPPLibBuild(build_clib, object):
             Path(output_lib_path).mkdir(parents=True, exist_ok=True)
 
         cmake_args = [
+            '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
-            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
-            '-DPYTHON_EXECUTABLE=' + sys.executable,
-            '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DCMAKE_INSTALL_PREFIX=' + os.path.abspath(output_lib_path),
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
+            '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
+            '-DPYTHON_EXECUTABLE=' + sys.executable,
+            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
             '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib"]
 
