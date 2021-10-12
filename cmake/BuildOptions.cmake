@@ -88,10 +88,28 @@ if (NOT APPLE)
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
 endif()
-set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -O0")
-set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -O0")
+
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
-#link option
+# FIXME: Disable -O0 in debug build to avoid build endlessly issue
+# https://github.com/intel/llvm/issues/4689
+# set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer")
+
+# ---[ link option
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
+# set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -O0")
+set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -v")
+set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer")
 set(CMAKE_SKIP_RPATH TRUE)
+
+function(append_compile_flags SRC_FILES FLAGS)
+    foreach(src_file IN LISTS ${SRC_FILES})
+        get_source_file_property(CUR_FLAGS ${src_file} COMPILE_FLAGS)
+        list(REMOVE_ITEM CUR_FLAGS "NOTFOUND")
+        set(CUR_FLAGS "${CUR_FLAGS} ${FLAGS}")
+        set_source_files_properties(${src_file} COMPILE_FLAGS "${CUR_FLAGS}")
+    endforeach()
+endfunction()

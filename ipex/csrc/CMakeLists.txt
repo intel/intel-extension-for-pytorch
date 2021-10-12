@@ -1,6 +1,7 @@
 set(IPEX_GPU_SRCS)
-add_subdirectory(./gpu)
-append_sycl_flag(IPEX_GPU_SRCS ${IPEX_SYCL_KERNEL_FLAGS})
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/gpu)
+# FIXME: Do not set kernel flags, after remove oneDPL dependency in Storage.cpp
+append_compile_flags(IPEX_GPU_SRCS ${IPEX_SYCL_KERNEL_FLAGS})
 
 set(IPEX_COMMON_SRCS)
 FILE(GLOB IPEX_COMMON_SRCS "*.cpp")
@@ -9,7 +10,7 @@ list(REMOVE_ITEM IPEX_COMMON_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/_C.cpp")
 set(TORCH_IPEX_SRCS)
 list(APPEND TORCH_IPEX_SRCS ${IPEX_COMMON_SRCS} ${IPEX_GPU_SRCS})
 # TODO: remove this flag after building host files with gcc/g++
-append_sycl_flag(TORCH_IPEX_SRCS "-fsized-deallocation")
+append_compile_flags(TORCH_IPEX_SRCS "-fsized-deallocation")
 add_library(ipex_python SHARED ${TORCH_IPEX_SRCS})
 
 include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
@@ -37,7 +38,7 @@ target_include_directories(ipex_python PUBLIC ${pybind11_INCLUDE_DIRS})
 if (USE_ITT)
     target_compile_definitions(ipex_python PUBLIC USE_ITT)
     target_include_directories(ipex_python PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-    add_subdirectory(./itt)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/itt)
     target_sources(ipex_python PUBLIC ${DPCPP_ITT_SRCS})
 endif()
 

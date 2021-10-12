@@ -13,11 +13,7 @@ set(CMAKE_SKIP_BUILD_RPATH  FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-
-set (CMAKE_GENERATOR "Unix Makefiles")
-
-# set compilation env first
-include(cmake/DPCPP.cmake)
+set(CMAKE_GENERATOR "Unix Makefiles")
 
 # The options to build ipex
 include(CMakeDependentOption)
@@ -39,6 +35,7 @@ cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 
 include(${PROJECT_SOURCE_DIR}/cmake/BuildOptions.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/DPCPP.cmake)
 
 # Need the torch package
 find_package(Torch REQUIRED)

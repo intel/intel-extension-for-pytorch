@@ -50,6 +50,9 @@ find_file(INTEL_SYCL_VERSION
         include
         include/CL/sycl
         include/sycl/CL/sycl
+        lib/clang/14.0.0/include/CL/sycl
+        lib/clang/13.0.0/include/CL/sycl
+        lib/clang/12.0.0/include/CL/sycl
         lib/clang/11.0.0/include/CL/sycl
         lib/clang/10.0.0/include/CL/sycl
         lib/clang/9.0.0/include/CL/sycl
@@ -94,30 +97,19 @@ set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-early-optimizations
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 if(BUILD_BY_PER_KERNEL)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
 elseif(USE_AOT_DEVLIST)
     set(SPIRV_OPT "spir64-unknown-unknown-sycldevice")
     set(AOT_ARCH_OPT "spir64_gen-unknown-unknown-sycldevice")
     set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xsycl-target-backend=${AOT_ARCH_OPT}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${AOT_ARCH_OPT}")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
 else()
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_source")
 endif()
-
-function(append_sycl_flag SRC_FILES SYCL_FLAGS)
-    foreach(src_file IN LISTS ${SRC_FILES})
-        get_source_file_property(CUR_FLAGS ${src_file} COMPILE_FLAGS)
-        list(REMOVE_ITEM CUR_FLAGS "NOTFOUND")
-        set(CUR_FLAGS "${CUR_FLAGS} ${SYCL_FLAGS}")
-        set_source_files_properties(${src_file} COMPILE_FLAGS "${CUR_FLAGS}")
-    endforeach()
-endfunction()
 
 message(STATUS "DPCPP found. Compiling with SYCL support")
