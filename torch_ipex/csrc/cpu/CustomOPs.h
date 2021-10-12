@@ -515,8 +515,7 @@ public:
   }
 };
 
-class NewApaptiveAvgPoolingOp
-    : public torch::autograd::Function<NewApaptiveAvgPoolingOp> {
+class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgPoolingOp> {
 public:
   static at::Tensor _forward(at::Tensor input, at::IntArrayRef output_size) {
 #if defined(IPEX_PROFILE_OP)

@@ -132,6 +132,7 @@ _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
 ]
 
 _FN_EXCLUDE_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+    "aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> Tensor",
     "aten::conv1d(Tensor input, Tensor weight, Tensor? bias=None, int[1] stride=1, int[1] padding=0, int[1] dilation=1, int groups=1) -> Tensor",
     "aten::conv2d(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
     "aten::conv3d(Tensor input, Tensor weight, Tensor? bias=None, int[3] stride=1, int[3] padding=0, int[3] dilation=1, int groups=1) -> Tensor",
