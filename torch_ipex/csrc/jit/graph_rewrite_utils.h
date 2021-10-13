@@ -22,8 +22,8 @@ auto accumu_use_check = [](const Node* add_node, const Value* accumu_value) {
 //    add
 // output = op_output + alpha*Y
 auto fuse_add_filter_v1 =
-    [&](const Match& match,
-        const std::unordered_map<std::string, Value*>& vmap) {
+    [](const Match& match,
+       const std::unordered_map<std::string, Value*>& vmap) {
       auto accumu = match.values_map.at(vmap.at("accumu"));
       auto add_node = match.values_map.at(vmap.at("res"))->node();
       bool accumu_same_used = accumu_use_check(add_node, accumu);
@@ -59,8 +59,8 @@ auto fuse_add_filter_v1 =
 //    add
 // output = Y + alpha*op_output
 auto fuse_add_filter_v2 =
-    [&](const Match& match,
-        const std::unordered_map<std::string, Value*>& vmap) {
+    [](const Match& match,
+       const std::unordered_map<std::string, Value*>& vmap) {
       auto accumu = match.values_map.at(vmap.at("accumu"));
       auto add_node = match.values_map.at(vmap.at("res"))->node();
       bool accumu_same_used = accumu_use_check(add_node, accumu);
