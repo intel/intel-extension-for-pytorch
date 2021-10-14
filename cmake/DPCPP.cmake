@@ -50,13 +50,6 @@ find_file(INTEL_SYCL_VERSION
         include
         include/CL/sycl
         include/sycl/CL/sycl
-        lib/clang/14.0.0/include/CL/sycl
-        lib/clang/13.0.0/include/CL/sycl
-        lib/clang/12.0.0/include/CL/sycl
-        lib/clang/11.0.0/include/CL/sycl
-        lib/clang/10.0.0/include/CL/sycl
-        lib/clang/9.0.0/include/CL/sycl
-        lib/clang/8.0.0/include/CL/sycl
     NO_DEFAULT_PATH)
 
 if(NOT INTEL_SYCL_VERSION)
@@ -74,14 +67,6 @@ if(NOT SYCL_LIBRARY)
     message(FATAL_ERROR "SYCL library not found")
 endif()
 
-# Find the OpenCL library from the SYCL distribution
-find_library(OpenCL_LIBRARY
-        NAMES "OpenCL"
-        HINTS ${sycl_root_hints}
-        PATH_SUFFIXES lib
-        NO_DEFAULT_PATH)
-set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
-
 # Find LevelZero
 find_path(LevelZero_INCLUDE_DIR
         NAMES level_zero/ze_api.h
@@ -97,6 +82,7 @@ set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-early-optimizations
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl")
 if(BUILD_BY_PER_KERNEL)
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
@@ -119,7 +105,8 @@ elseif(USE_AOT_DEVLIST)
         set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
     endif()
 else()
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+    # Use auto mode of device code split
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")
 endif()
 
 message(STATUS "DPCPP found. Compiling with SYCL support")
