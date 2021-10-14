@@ -12,13 +12,6 @@ SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 
-
-# TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
-# use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
-# add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
-
-
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -39,6 +32,11 @@ ELSE()
   message("Release build.")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 ENDIF()
+
+# TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
+# use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
+add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
+# add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
 
 IF("${IPEX_DISP_OP}" STREQUAL "1")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
