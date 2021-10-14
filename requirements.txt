@@ -1,14 +1,18 @@
+# for install
 astunparse
 flake8
 future
-matplotlib
 numpy
 psutil
-pytest
 pyyaml
 requests
-scipy
 setuptools
 six
 types-dataclasses
 typing_extensions
+# for test
+hypothesis
+matplotlib
+pytest
+scipy
+
