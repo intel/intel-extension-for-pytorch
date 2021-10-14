@@ -10,7 +10,6 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
-@pytest.mark.skip(reason="Skip due to failing in oneDNN acceptance test only")
 class TestTorchMethod(TestCase):
     def test_einsum(self, dtype=torch.float):
         x_cpu1 = torch.randn(5, dtype=dtype, device=cpu_device)

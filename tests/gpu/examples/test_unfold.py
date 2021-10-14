@@ -9,7 +9,6 @@ cpu_device = torch.device("cpu")
 dpcp_device = torch.device("xpu")
 
 
-@pytest.mark.skip(reason="Skip due to failing in oneDNN acceptance test only")
 class TestTorchMethod(TestCase):
     def test_unflod(self, dtype=torch.float):
         x_cpu = torch.tensor([1., 2., 3., 4., 5., 6., 7.])
