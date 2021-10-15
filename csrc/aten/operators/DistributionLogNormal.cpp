@@ -67,7 +67,7 @@ Tensor& log_normal_(
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(1.0);
       auto& dpcpp_queue = dpcppGetCurrentQueue();
-      oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
+      oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->current_seed());
       oneapi::mkl::rng::
           lognormal<scalar_t, oneapi::mkl::rng::lognormal_method::box_muller2>
               distribution(mean, std, displ, scale);

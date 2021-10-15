@@ -12,7 +12,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestLogNormal(TestCase):
-    @pytest.mark.skip("torch.xpu.manual_seed not supprted, JIRA:https://jira.devtools.intel.com/browse/PYTORCHDGQ-652")
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lognormal(self, dtype=torch.float):
         lognormal = torch.ones(1000000, device=dpcpp_device)
