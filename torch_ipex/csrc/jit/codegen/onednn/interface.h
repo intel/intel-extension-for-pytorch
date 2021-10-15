@@ -16,6 +16,10 @@ static std::atomic<bool>& getLlgaEnabled() {
 
 TORCH_API void fuseGraph(std::shared_ptr<Graph>& g);
 
+void setLlgaWeightCacheEnabled(bool enabled);
+
+bool getLlgaWeightCacheEnabled();
+
 } // namespace onednn
 } // namespace fuser
 

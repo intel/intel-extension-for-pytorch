@@ -78,6 +78,12 @@ void InitIpexModuleBindings(py::module m) {
   m.def("_jit_llga_fuser", [](std::shared_ptr<torch::jit::Graph> g) {
         return torch::jit::fuser::onednn::fuseGraph(g);
   });
+  m.def(
+      "_jit_set_llga_weight_cache_enabled",
+      &torch::jit::fuser::onednn::setLlgaWeightCacheEnabled);
+  m.def(
+      "_jit_llga_weight_cache_enabled",
+      &torch::jit::fuser::onednn::getLlgaWeightCacheEnabled);
 
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
