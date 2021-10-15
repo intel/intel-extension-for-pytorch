@@ -59,10 +59,7 @@ class CachingHostAllocator final {
   std::set<Block, decltype(Block::Comparator)*> mAvailable;
 
  public:
-  static CachingHostAllocator* Instance() {
-    static CachingHostAllocator myInstance;
-    return &myInstance;
-  }
+  static CachingHostAllocator* Instance(); // Singleton
 
   bool isHostPtr(void* ptr);
 

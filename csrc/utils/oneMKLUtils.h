@@ -7,13 +7,10 @@
 namespace xpu {
 namespace oneMKL {
 
-// OneMklExInfoManager singleton
-class OneMklExInfoManager {
+// oneMKLExpInfo singleton
+class oneMKLExpInfo {
  public:
-  static OneMklExInfoManager& Instance() {
-    static thread_local OneMklExInfoManager myInstance;
-    return myInstance;
-  }
+  static oneMKLExpInfo& Instance(); // Singleton
 
   int64_t getLastInfo() {
     return accessLastInfo();
@@ -29,16 +26,15 @@ class OneMklExInfoManager {
     if (true == write) {
       onemkl_last_info = info;
       return onemkl_last_info;
-      ;
     }
     return onemkl_last_info;
   }
 
  protected:
-  OneMklExInfoManager() {
+  oneMKLExpInfo() {
     onemkl_last_info = 0;
   }
-  ~OneMklExInfoManager() {}
+  ~oneMKLExpInfo() {}
 };
 
 } // namespace oneMKL

@@ -28,6 +28,9 @@ using namespace xpu::dpcpp;
 namespace xpu {
 namespace oneDNN {
 
+// Keep non-static and non-inline
+bool set_onednn_verbose(int level);
+
 static inline dnnl::memory dpcpp_onednn_memory(
     dnnl::memory::desc md,
     dnnl::engine& engine,
@@ -37,10 +40,7 @@ static inline dnnl::memory dpcpp_onednn_memory(
 
 // GpuEngineManager singleton
 struct GpuEngineManager {
-  static GpuEngineManager& Instance() {
-    static GpuEngineManager myInstance;
-    return myInstance;
-  }
+  static GpuEngineManager& Instance(); // Singleton
 
   engine& get_engine(const Device& device) {
     TORCH_INTERNAL_ASSERT(device.type() == kXPU);
@@ -69,10 +69,7 @@ struct GpuEngineManager {
 
 // GpuStreamManager singleton
 struct GpuStreamManager {
-  static GpuStreamManager& Instance() {
-    static thread_local GpuStreamManager myInstance;
-    return myInstance;
-  }
+  static GpuStreamManager& Instance(); // Singleton
 
 #ifdef USE_PERSIST_STREAM
   dnnl::stream& get_stream() {

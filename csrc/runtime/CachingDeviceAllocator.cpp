@@ -2,7 +2,6 @@
 #include <runtime/Context.h>
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
-#include <tensor/Context.h>
 #include <utils/Helpers.h>
 #include <utils/Profiler.h>
 
@@ -57,6 +56,11 @@ static void update_stat(Stat& stat, int64_t amount) {
   if (amount < 0) {
     stat.freed += -amount;
   }
+}
+
+CachingDeviceAllocator* CachingDeviceAllocator::Instance() {
+  static CachingDeviceAllocator myInstance;
+  return &myInstance;
 }
 
 CachingDeviceAllocator::~CachingDeviceAllocator() {

@@ -124,10 +124,7 @@ class CachingDeviceAllocator final {
       size_t* largest);
 
  public:
-  static CachingDeviceAllocator* Instance() {
-    static CachingDeviceAllocator myInstance;
-    return &myInstance;
-  }
+  static CachingDeviceAllocator* Instance(); // Singleton
 
   std::mutex* getDPCPPFreeMutex() const;
 

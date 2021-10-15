@@ -1,4 +1,4 @@
-#include <oneDNN/Utils.h>
+#include <oneDNN/Runtime.h>
 #include <utils/Settings.h>
 
 #include <iostream>
@@ -140,6 +140,11 @@ static void init_dpcpp_env() {
     std::cerr << " *********************************************************"
               << std::endl;
   }
+}
+
+Settings& Settings::I() {
+  static Settings mySettings;
+  return mySettings;
 }
 
 int Settings::get_verbose_level() const {

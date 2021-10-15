@@ -25,7 +25,9 @@ endforeach()
 list(APPEND aten_ops_src ${_SLOW_SRCS} ${_FAST_SRCS})
 set(IPEX_ATEN_OPS_SRCS ${aten_ops_src} PARENT_SCOPE)
 
-FILE(GLOB aten_core_src "core/*.cpp" "core/detail/*.cpp")
+# Add oneDNN runtime src here to avoid adding
+# any unexpected kernel src in oneDNN folder
+FILE(GLOB aten_core_src "core/*.cpp" "core/detail/*.cpp" "../oneDNN/Runtime.cpp")
 set(IPEX_ATEN_CORE_SRCS ${aten_core_src} PARENT_SCOPE)
 
 list(APPEND aten_core_headers

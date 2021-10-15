@@ -85,10 +85,5 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
   return strides;
 }
 
-static inline bool set_onednn_verbose(int level) {
-  dnnl::status rs = dnnl::set_verbose(level);
-  return rs == dnnl::status::success;
-}
-
 } // namespace oneDNN
 } // namespace xpu

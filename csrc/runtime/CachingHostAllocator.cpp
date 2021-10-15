@@ -13,6 +13,11 @@ namespace dpcpp {
 
 constexpr size_t kHostAlignment = 512;
 
+CachingHostAllocator* CachingHostAllocator::Instance() {
+  static CachingHostAllocator myInstance;
+  return &myInstance;
+}
+
 void* CachingHostAllocator::Block::getPtr() const {
   return mPtr;
 }

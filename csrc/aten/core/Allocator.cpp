@@ -12,6 +12,7 @@ namespace dpcpp {
 /// Device Allocator
 class DeviceAllocator final : public at::Allocator {
  public:
+  // Singleton
   static DeviceAllocator* Instance() {
     static DeviceAllocator myInstance;
     return &myInstance;
@@ -164,6 +165,7 @@ std::mutex* getFreeMutexOfDevAlloc() {
 /// Host Allocator
 class HostAllocator final : public at::Allocator {
  public:
+  // Singleton
   static HostAllocator* Instance() {
     static HostAllocator myInstance;
     return &myInstance;
