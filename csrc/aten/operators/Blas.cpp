@@ -29,7 +29,9 @@ namespace impl {
 bool check_broadcast(const Tensor& src, const IntArrayRef& shape) {
   auto src_dim = src.dim();
   auto tgt_dim = shape.size();
-  if (src_dim == 0 || src_dim > tgt_dim)
+  if (src_dim == 0 && src_dim < tgt_dim)
+    return true;
+  if (src_dim > tgt_dim)
     return false;
   do {
     src_dim--;
@@ -300,8 +302,25 @@ Tensor& addmm_out(
     Scalar beta,
     Scalar alpha) {
   checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m1.dim() == 2 && m2.dim() == 2, "tensors must be 2-D");
+
+  Tensor self_;
+  if (&result != &self) {
+    std::tie(self_) =
+        expand_size(self, {m1.size(0), m2.size(1)}, "addmm_dpcpp");
+  } else {
+    self_ = self;
+  }
+
+  IntArrayRef mat1_sizes = m1.sizes();
+  IntArrayRef mat2_sizes = m2.sizes();
+  IntArrayRef self__sizes = self_.sizes();
+  TORCH_CHECK(
+      mat1_sizes[1] == mat2_sizes[0], "mat1 dim 1 must match mat2 dim 0");
+  TORCH_CHECK(
+      self__sizes[0] == mat1_sizes[0], "self_ dim 0 must match mat1 dim 0");
+  TORCH_CHECK(
+      self__sizes[1] == mat2_sizes[1], "self_ dim 1 must match mat2 dim 1");
 
   if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
       self.scalar_type() == ScalarType::Double ||
@@ -318,7 +337,7 @@ Tensor& addmm_out(
                 ? m2
                 : m2.to(m1.scalar_type()),
         at::Tensor(),
-        self,
+        self_,
         beta.to<float>(),
         alpha.to<float>(),
         true,
@@ -334,7 +353,7 @@ Tensor& addmm_out(
                m2.scalar_type() == ScalarType::BFloat16)
                 ? m2
                 : m2.to(m1.scalar_type()),
-        self,
+        self_,
         at::Tensor(),
         beta.to<float>(),
         alpha.to<float>(),
@@ -350,15 +369,6 @@ Tensor& addmm_(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(
-      self.size(0) == m1.size(0) && self.size(1) == m2.size(1),
-      "size mismatch input ",
-      self.sizes(),
-      " m1 ",
-      m1.sizes(),
-      " m2 ",
-      m2.sizes());
   Tensor bias = at::empty_like(self).copy_(self);
   // oneDNN cannot support result/bias (write/read) use the same memory.
   // we will remove copy to keep performance once matmul refactor done.
@@ -434,20 +444,22 @@ Tensor& baddbmm_(
     Scalar beta,
     Scalar alpha) {
   checkBackend("baddbmm_", {self, batch1, batch2}, Backend::XPU);
-  TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
+  Tensor b_self;
+  std::tie(b_self) = expand_size(
+      self, {batch1.size(0), batch1.size(1), batch2.size(2)}, "baddbmm_dpcpp");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(
-      self.size(0) == batch1.size(0) && self.size(1) == batch1.size(1) &&
-          self.size(2) == batch2.size(2),
+      b_self.size(0) == batch1.size(0) && b_self.size(1) == batch1.size(1) &&
+          b_self.size(2) == batch2.size(2),
       "size mismatch input ",
-      self.sizes(),
+      b_self.sizes(),
       " batch1 ",
       batch1.sizes(),
       " batch2 ",
       batch2.sizes());
   if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
-      self.scalar_type() == ScalarType::Double ||
+      b_self.scalar_type() == ScalarType::Double ||
       batch1.scalar_type() == ScalarType::Double ||
       batch2.scalar_type() == ScalarType::Double) {
     matmul(
@@ -455,7 +467,7 @@ Tensor& baddbmm_(
         batch1,
         batch2,
         at::Tensor(),
-        self,
+        b_self,
         beta.to<float>(),
         alpha.to<float>(),
         true,
@@ -465,7 +477,7 @@ Tensor& baddbmm_(
         self,
         batch1,
         batch2,
-        self,
+        b_self,
         at::Tensor(),
         beta.to<float>(),
         alpha.to<float>(),
@@ -533,9 +545,40 @@ Tensor& addbmm_out(
     Scalar beta,
     Scalar alpha) {
   checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::XPU);
-  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
-  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(
+      batch1.dim() == 3 && batch2.dim() == 3,
+      "Batch tensors should be 3D, got dimensions ",
+      batch1.dim(),
+      " and ",
+      batch2.dim());
+
+  Tensor self_;
+  if (&out != &self) {
+    std::tie(self_) =
+        expand_size(self, {batch1.size(1), batch2.size(2)}, "addbmm");
+  } else {
+    self_ = self;
+  }
+  TORCH_CHECK(
+      self_.dim() == 2,
+      "2D tensor expected, got ",
+      self_.dim(),
+      "D tensor for input");
+
+  int64_t batchnum = batch1.size(0);
+  int64_t m1d1 = batch1.size(1);
+  int64_t innerdim = batch1.size(2);
+  int64_t m2d2 = batch2.size(2);
+  TORCH_CHECK(batchnum == batch2.size(0), "equal number of batches expected");
+  TORCH_CHECK(
+      m1d1 == self_.size(0),
+      "first dimension of batch1  must match first dimension of input");
+  TORCH_CHECK(
+      m2d2 == self_.size(1),
+      "second dimension of batch2 must match second dimension of input");
+  TORCH_CHECK(
+      innerdim == batch2.size(1),
+      "second dimension of batch1 must match first dimension of batch2");
 
   Tensor b1;
   if (batch1.size(0) > 1) {
@@ -544,7 +587,7 @@ Tensor& addbmm_out(
     b1 = batch1.view({batch1.size(1), -1});
   }
   auto b2 = batch2.view({-1, batch2.size(2)});
-  at::AtenIpexTypeXPU::addmm_out(out, self, b1, b2, beta, alpha);
+  at::AtenIpexTypeXPU::addmm_out(out, self_, b1, b2, beta, alpha);
 
   return out;
 }
@@ -741,13 +784,32 @@ Tensor addmv(
     const Tensor& vec,
     at::Scalar beta,
     at::Scalar alpha) {
-  TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
-  TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(vec.dim() == 1, "expected 1D tensor");
-  TORCH_CHECK(mat.size(1) == vec.size(0));
+  Tensor self_ = self;
+  if (self.dim() == 0 || self.size(0) == 1) {
+    self_ = self.expand({mat.size(0)});
+  }
+
+  TORCH_CHECK(
+      (mat.dim() == 2 && vec.dim() == 1 && self_.dim() == 1),
+      "vector + matrix @ vector expected, got ",
+      self_.dim(),
+      ", ",
+      mat.dim(),
+      ", ",
+      vec.dim());
+  TORCH_CHECK(
+      (mat.size(1) == vec.size(0) && mat.size(0) == self_.size(0)),
+      "size mismatch, get ",
+      self_.size(0),
+      ", ",
+      mat.size(0),
+      "x",
+      mat.size(1),
+      ",",
+      vec.size(0));
 
   Tensor vec_v = vec.view({vec.size(0), 1});
-  Tensor self_v = self.view({self.size(0), 1});
+  Tensor self_v = self_.view({self_.size(0), 1});
   Tensor result = at::AtenIpexTypeXPU::addmm(self_v, mat, vec_v, beta, alpha);
   return result.view({mat.size(0)});
 }
@@ -758,10 +820,29 @@ Tensor& addmv_(
     const Tensor& vec,
     at::Scalar beta,
     at::Scalar alpha) {
-  TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
-  TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(vec.dim() == 1, "expected 1D tensor");
-  TORCH_CHECK(mat.size(1) == vec.size(0));
+  Tensor self_ = self;
+  if (self.dim() == 0 || self.size(0) == 1) {
+    self_ = self.expand({mat.size(0)});
+  }
+
+  TORCH_CHECK(
+      (mat.dim() == 2 && vec.dim() == 1 && self_.dim() == 1),
+      "vector + matrix @ vector expected, got ",
+      self_.dim(),
+      ", ",
+      mat.dim(),
+      ", ",
+      vec.dim());
+  TORCH_CHECK(
+      (mat.size(1) == vec.size(0) && mat.size(0) == self_.size(0)),
+      "size mismatch, get ",
+      self_.size(0),
+      ", ",
+      mat.size(0),
+      "x",
+      mat.size(1),
+      ",",
+      vec.size(0));
 
   Tensor vec_v = vec.view({vec.size(0), 1});
   Tensor self_v = self.view({self.size(0), 1});
