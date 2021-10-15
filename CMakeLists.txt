@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(ipex VERSION ${CMAKE_PROJECT_VERSION})
 
-set(IPEX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(IPEX_ROOT_DIR ${PROJECT_SOURCE_DIR})
 list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
 
 set(LINUX TRUE)
@@ -34,8 +34,8 @@ option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 
-include(${PROJECT_SOURCE_DIR}/cmake/BuildOptions.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/DPCPP.cmake)
+include(${IPEX_ROOT_DIR}/cmake/BuildOptions.cmake)
+include(${IPEX_ROOT_DIR}/cmake/DPCPP.cmake)
 
 # Need the torch package
 find_package(Torch REQUIRED)
