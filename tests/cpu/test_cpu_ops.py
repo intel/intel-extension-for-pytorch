@@ -1,6 +1,7 @@
 import unittest, copy
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import random
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
@@ -132,6 +133,207 @@ class CPUOPsTester(TestCase):
         self.assertTrue(ref_out.is_contiguous())
         self.assertEqual(out, ref_out)
         self.assertEqual(input.grad, ref_input.grad)
+
+    def test_batch_norm(self):
+        m = nn.BatchNorm2d(100)
+        x = torch.randn(20, 100, 35, 45)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = m(x1)
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = m(x2)
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = m(x3)
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.1)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_adaptive_avg_pool2d(self):
+        m = nn.AdaptiveAvgPool2d((5,7))
+        x = torch.randn(3, 64, 8, 9)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = m(x1)
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = m(x2)
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = m(x3)
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_copy(self):
+        x = torch.randn(3, 64, 8, 9)
+        y = torch.empty(3, 64, 8, 9)
+        y.copy_(x)
+        self.assertEqual(x, y)
+
+        # test channels last
+        y1 = torch.empty(3, 64, 8, 9).to(memory_format=torch.channels_last)
+        y1.copy_(x)
+        self.assertTrue(y1.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x, y1)
+
+        # test bfloat16
+        y2 = torch.empty(3, 64, 8, 9).bfloat16()
+        y2.copy_(x)
+        self.assertTrue(y2.dtype == torch.bfloat16)
+        self.assertEqual(x, y2, prec=0.01)
+
+    def test_max_pool2d(self):
+        m = nn.MaxPool2d((3, 2), stride=(2, 1))
+        x = torch.randn(20, 16, 50, 32)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = m(x1)
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = m(x2)
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = m(x3)
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.02)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad, prec=1e-4)
+
+    def test_upsample_nearest1d(self):
+        x = torch.randn(2, 2, 4)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = F.interpolate(x1, scale_factor = 2, mode='nearest')
+        y1.mean().backward()
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = F.interpolate(x3, scale_factor = 2, mode='nearest')
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_upsample_nearest2d(self):
+        x = torch.randn(2, 2, 4, 4)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = F.interpolate(x1, scale_factor = 2, mode='nearest')
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = F.interpolate(x2, scale_factor = 2, mode='nearest')
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = F.interpolate(x3, scale_factor = 2, mode='nearest')
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_upsample_nearest3d(self):
+        x = torch.randn(2, 2, 2, 4, 4)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = F.interpolate(x1, scale_factor = 2, mode='nearest')
+        y1.mean().backward()
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = F.interpolate(x3, scale_factor = 2, mode='nearest')
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_upsample_linear1d(self):
+        x = torch.randn(2, 2, 4)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = F.interpolate(x1, scale_factor = 2, mode='linear')
+        y1.mean().backward()
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = F.interpolate(x3, scale_factor = 2, mode='linear')
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_upsample_bilinear2d(self):
+        x = torch.randn(2, 2, 4, 4)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = F.interpolate(x1, scale_factor = 2, mode='bilinear')
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = F.interpolate(x2, scale_factor = 2, mode='bilinear')
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = F.interpolate(x3, scale_factor = 2, mode='bilinear')
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_upsample_trilinear3d(self):
+        x = torch.randn(2, 2, 2, 4, 4)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = F.interpolate(x1, scale_factor = 2, mode='trilinear')
+        y1.mean().backward()
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = F.interpolate(x3, scale_factor = 2, mode='trilinear')
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.02)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
 
 if __name__ == '__main__':
     test = unittest.main()

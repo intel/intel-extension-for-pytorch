@@ -16,9 +16,7 @@
 #include <vector>
 #include "ChannelShuffle.h"
 
-#include <torch/extension.h>
-#include "torch_ipex/csrc/autocast_mode.h"
-#include "torch_ipex/csrc/autocast_verbose.h"
+#include <torch/library.h>
 
 namespace torch_ipex {
 namespace cpu {
