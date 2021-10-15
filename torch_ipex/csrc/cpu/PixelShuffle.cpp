@@ -11,7 +11,9 @@
 #include <vector>
 #include "PixelShuffle.h"
 
-#include <torch/library.h>
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -522,7 +524,7 @@ torch::autograd::tensor_list PixelUnshuffleOp::backward(
       at::Tensor()};
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::pixel_shuffle"),
       TORCH_FN((&torch_ipex::cpu::pixel_shuffle)));

@@ -16,7 +16,10 @@
 #include <vector>
 #include "ChannelShuffle.h"
 
-#include <torch/library.h>
+#include <torch/extension.h>
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -357,7 +360,7 @@ at::Tensor channel_shuffle(const at::Tensor& self, int64_t groups) {
       self.has_names() ? self.names() : at::ArrayRef<at::Dimname>{});
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::channel_shuffle"),
       TORCH_FN((&torch_ipex::cpu::channel_shuffle)));

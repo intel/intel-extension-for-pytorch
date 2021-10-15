@@ -9,7 +9,7 @@
 #include <ATen/native/Pool.h>
 #include <ATen/native/cpu/utils.h>
 
-#include <torch/library.h>
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -852,7 +852,7 @@ at::Tensor max_pool2d_with_indices_backward_out_cpu(
   return gradInput;
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::max_pool2d_with_indices"),
       TORCH_FN((&torch_ipex::cpu::max_pool2d_with_indices_out_cpu)));

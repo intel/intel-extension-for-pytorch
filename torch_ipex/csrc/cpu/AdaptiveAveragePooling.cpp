@@ -7,7 +7,7 @@
 
 #include "AdaptiveAveragePooling.h"
 
-#include <torch/library.h>
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -643,7 +643,7 @@ at::Tensor adaptive_avg_pool2d_backward_cpu(
   return grad_input;
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::_adaptive_avg_pool2d"),
       TORCH_FN((&torch_ipex::cpu::adaptive_avg_pool2d_cpu)));

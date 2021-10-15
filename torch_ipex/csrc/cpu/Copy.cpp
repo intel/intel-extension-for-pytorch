@@ -20,7 +20,7 @@
 
 #include "Copy.h"
 
-#include <torch/library.h>
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -727,7 +727,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
   return self;
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::copy_"), TORCH_FN((&torch_ipex::cpu::copy_)));
 }

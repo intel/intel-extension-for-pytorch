@@ -16,7 +16,7 @@
 
 #include <vector>
 
-#include <torch/library.h>
+#include "torch_ipex/csrc/library.h"
 
 static const int MIOPEN_DIM_MAX = 5;
 
@@ -2145,7 +2145,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu(
       });
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::native_batch_norm"),
       TORCH_FN((&torch_ipex::cpu::batch_norm_cpu)));

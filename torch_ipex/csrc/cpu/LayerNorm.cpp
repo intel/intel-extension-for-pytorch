@@ -1,6 +1,7 @@
 #include "LayerNorm.h"
 #include <torch/extension.h>
 #include "mkldnn/MKLDNNCommon.h"
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -203,7 +204,7 @@ at::Tensor layer_norm(
 namespace {
 
 // replace aten::layer_norm with ipex layer_norm.
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::layer_norm"),
       TORCH_FN((&torch_ipex::cpu::layer_norm)));

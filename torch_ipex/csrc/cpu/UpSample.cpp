@@ -14,7 +14,7 @@
 
 #include "UpSample.h"
 
-#include <torch/library.h>
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -2012,7 +2012,7 @@ at::Tensor upsample_trilinear3d_backward_out_cpu(
   return grad_input;
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::upsample_nearest1d"),
       TORCH_FN((&torch_ipex::cpu::upsample_nearest1d_out_cpu)));
