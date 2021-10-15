@@ -8,7 +8,6 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <intrinsic/ipex_intrinsic.h>
-#include <jit/fusion_pass.h>
 #include <runtime/Memory.h>
 #include <utils/Settings.h>
 #include "Event.h"

@@ -108,8 +108,6 @@ if (USE_SCRATCHPAD_MODE)
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_SCRATCHPAD_MODE")
 endif()
 
-# Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
-set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};CL_TARGET_OPENCL_VERSION=220")
 if(USE_ONEDPL)
     find_package(oneDPL)
     target_link_libraries(ipex_gpu PUBLIC oneDPL)
@@ -120,8 +118,7 @@ if(USE_ONEDPL)
     # Refer to oneAPI TBB release note:
     # https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-threading-building-blocks-release-notes.html
     # We must set below two flags to bypass TBB checking by GCC with libstdc++ 9 and libstdc++ 10
-    # Related Jira:
-    # https://jira.devtools.intel.com/browse/ONEDPL-245?focusedCommentId=12217329&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-12217329
+    # Related Jira: https://jira.devtools.intel.com/browse/ONEDPL-245
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};PSTL_USE_PARALLEL_POLICIES=0")
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};_GLIBCXX_USE_TBB_PAR_BACKEND=0")
 endif()
