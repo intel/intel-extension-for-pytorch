@@ -9,6 +9,7 @@
 #include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
+#include <torch/csrc/jit/passes/graph_rewrite_helper.h>
 #include <torch/csrc/jit/passes/remove_dropout.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
@@ -283,18 +284,6 @@ public:
 
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
-    {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
-    {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
-    {{aten::conv2d, aten::add}, ipex::conv2d_sum},
-    {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
-    {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
-    {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")},
-     ipex::conv2d_sum_relu},
-
-    {{aten::linear, aten::add}, ipex::linear_add},
-    {{aten::linear, aten::relu}, ipex::linear_relu},
-    {{aten::linear, aten::gelu}, ipex::linear_gelu},
-    {{aten::linear, Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},
     {{aten::matmul, aten::div}, ipex::matmul_div},
     // 3d ops
     {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
@@ -304,56 +293,40 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
     {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")},
      ipex::conv3d_sum_relu},
-    //
-    //
-    // for n-dims weight case.
-    {{ipex::convolution_nd_weight_base, aten::relu}, ipex::conv2d_relu},
-    {{ipex::convolution_nd_weight_base, Symbol::fromQualString("aten::relu_")},
-     ipex::conv2d_relu},
-    {{ipex::convolution_nd_weight_base, aten::add}, ipex::conv2d_sum},
-    {{ipex::convolution_nd_weight_base, aten::add_}, ipex::conv2d_sum},
-
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
   RemoveProfileNodesAndSpecializeTypes(graph);
-  RemoveTensorTypeSpecializations(graph);
-  // Replace _convolution with conv2d or conv3d
-  graph_rewrite::replaceConvolutionWithAtenConv(graph);
-
   // remove dropout;
   torch::jit::removeDropout(graph);
 
-  // Fuse conv with eltwise operator
-  graph_rewrite::FuseConvolutionWithEltwise(graph);
+  // Replace _convolution with conv2d or conv3d
+  graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 
-  // Fuse conv with eltwise operator: n-D weight case.
-  graph_rewrite::FuseConvolutionWithEltwiseNDWeight(graph);
+  // convolution fusion
+  graph_rewrite::insertPrePackedConv2dOp(graph);
+  graph_rewrite::fuseConvWithEltwise(graph);
+  graph_rewrite::fuseConvAddRelu(graph);
+
+  // linear fusion
+  graph_rewrite::insertPrePackedLinearOp(graph);
+  graph_rewrite::fuseLinearWithEltwise(graph);
+  graph_rewrite::fuseLinearAddRelu(graph);
+  RemoveTensorTypeSpecializations(graph);
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
-
   // Pattern based fusion was lack of alias analysis
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);
   OpFuser(graph->block(), graph).run();
-
-  // replace aten conv with ipex conv
-  graph_rewrite::replaceAtenConvolutionWithIpexConv(graph);
-
   // replace aten conv_transpose with ipex conv_transpose
   graph_rewrite::replaceAtenTransposeConvolutionWithIpexTransposeConv(graph);
 
   // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
-
-  // replace aten::linear with ipex linear
-  graph_rewrite::replaceAtenLinearWithIpexLinear(graph);
-  
   // replace aten::softmax with ipex::softmax
-  graph_rewrite::replaceAtenLinearWithIpexSoftmax(graph);
-
-  graph_rewrite::replaceAtenLayerNormWithIpexLayerNorm(graph);
+  graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);

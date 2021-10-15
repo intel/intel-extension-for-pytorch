@@ -2,11 +2,12 @@
 #include "version.h"
 #include "jit/codegen/onednn/interface.h"
 
+#include <ATen/native/quantized/cpu/quant_utils.h>
 #include <c10/core/Device.h>
 #include <c10/core/Layout.h>
 #include <c10/util/Optional.h>
 #include <torch/csrc/utils/pybind.h>
-#include <ATen/native/quantized/cpu/quant_utils.h>
+#include <torch/csrc/utils/python_stub.h>
 
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
@@ -51,8 +52,9 @@ void InitIpexModuleBindings(py::module m) {
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {
     at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
-    return py::reinterpret_steal<py::object>(
-        THPDtype_New(current_dtype, scalarTypeName(current_dtype)));
+    auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
+    Py_INCREF(dtype);
+    return py::reinterpret_steal<py::object>(dtype);
   });
   m.def("set_autocast_dtype", [](py::object dtype) {
     at::ScalarType target_dtype =

@@ -1,6 +1,5 @@
 #include "Linear.h"
 #include "mkldnn/MKLDNNCommon.h"
-#include "WeightPrepack.h"
 
 namespace torch_ipex {
 namespace cpu {

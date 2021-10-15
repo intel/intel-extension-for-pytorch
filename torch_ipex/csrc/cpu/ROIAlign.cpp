@@ -5,6 +5,7 @@
 #include "ExtendOPs.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/library.h"
 namespace torch_ipex {
 
 template <typename T>
@@ -671,7 +672,7 @@ at::Tensor AtenIpexTypeExt::ROIAlign_forward(
   return IPEXROIAlignOp::_forward(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
 }
 
-TORCH_LIBRARY_IMPL(torchvision, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(torchvision, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("torchvision::roi_align"),
       TORCH_FN((&torch_ipex::roi_align_forward_kernel)));

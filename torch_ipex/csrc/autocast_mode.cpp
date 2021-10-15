@@ -1,6 +1,9 @@
 #include "autocast_mode.h"
 #include "autocast_kernel.hpp"
 #include "autocast_verbose.h"
+
+#include "library.h"
+
 #include <exception>
 #include <iostream>
 
@@ -154,13 +157,17 @@ struct CPU_WrapFunction_<DtypeCastPolicy::promote, Redispatch, F, Ret,
 
 #define TUPLE_FOUR_TENSORS std::tuple<Tensor, Tensor, Tensor, Tensor>
 
-#define MAKE_REGISTER_FUNC(FUNC, NAME, SIG, CAST_POLICY)                       \
-  TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {                                   \
-    m.impl(TORCH_SELECTIVE_NAME("aten::" NAME),                                \
-           &CPU_WrapFunction<DtypeCastPolicy::CAST_POLICY, SIG, SIG,           \
-                             &FUNC>::type::call);                              \
-  }                                                                            \
-  template <> std::string get_op_name<SIG, FUNC>() { return NAME; }
+#define MAKE_REGISTER_FUNC(FUNC, NAME, SIG, CAST_POLICY)                   \
+  IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {                          \
+    m.impl(                                                                \
+        TORCH_SELECTIVE_NAME("aten::" NAME),                               \
+        &CPU_WrapFunction<DtypeCastPolicy::CAST_POLICY, SIG, SIG, &FUNC>:: \
+            type::call);                                                   \
+  }                                                                        \
+  template <>                                                              \
+  std::string get_op_name<SIG, FUNC>() {                                   \
+    return NAME;                                                           \
+  }
 
 // user_defined_dtype a.k.a WhiteList
 MAKE_REGISTER_FUNC(ADD_NS(conv1d), "conv1d",
@@ -194,12 +201,6 @@ MAKE_REGISTER_FUNC(ADD_NS(conv_transpose2d), "conv_transpose2d.input",
                           const c10::optional<Tensor> &, IntArrayRef,
                           IntArrayRef, IntArrayRef, int64_t, IntArrayRef),
                    user_defined_dtype)
-MAKE_REGISTER_FUNC(ADD_NS(layer_norm), "layer_norm",
-                   Tensor(const Tensor &, IntArrayRef,
-                          const c10::optional<Tensor> &,
-                          const c10::optional<Tensor> &, double, bool),
-                   user_defined_dtype)
-
 // fp32 cast policy a.k.a BlackList
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool1d), "avg_pool1d",
                    Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
@@ -562,7 +563,7 @@ MAKE_REGISTER_FUNC(ADD_NS(index_copy), "index_copy.dimname",
 #undef TUPLE_FOUR_TENSORS
 #undef MAKE_REGISTER_FUNC
 
-TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   // for int8 path
   m.impl(TORCH_SELECTIVE_NAME("aten::conv2d"),
          TORCH_FN((&torch_ipex::autocast::conv2d)));

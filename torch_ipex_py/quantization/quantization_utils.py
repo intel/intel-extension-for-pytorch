@@ -1,9 +1,11 @@
 import torch
 import functools
 import warnings
+import copy
 import numpy as np
 import intel_extension_for_pytorch._C as core
 from .. import conf
+from .. import utils
 
 def _get_default_recipe(configures):
     # For int8 quantization, will save the date after doing calibration step,
@@ -164,12 +166,18 @@ class _quantization_int8(object):
         return decorate_autocast
 
 def convert(model, conf, inputs):
+    # pre-conver model's parameters dtype if it has conv, linear
+    # and Embedding for bfloat16 path.
+    model_ = model
+    if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+        model_ = utils._convert_module_data_type(copy.deepcopy(model), torch.bfloat16)
+
     core.disable_jit_opt()
     core._jit_set_llga_enabled(True)
     torch._C._jit_set_profiling_mode(True)
     torch._C._jit_set_profiling_executor(True)
     with torch.no_grad(), _quantization_int8():
-        trace_model = torch.jit.trace(model, inputs, check_trace=False)
+        trace_model = torch.jit.trace(model_, inputs, check_trace=False)
     trace_model = torch.jit.freeze(trace_model)
 
     return trace_model

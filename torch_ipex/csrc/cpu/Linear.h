@@ -10,17 +10,17 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor linear_impl(
+void linear_kernel_output(
     const at::Tensor& self,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const ideep::attr_t& attr);
-
-at::Tensor linear_inplace_impl(
-    const at::Tensor& self,
-    const at::Tensor& weight,
+    const ideep::tensor& mkldnn_weight,
     const at::Tensor& bias,
     at::Tensor& output,
+    const ideep::attr_t& attr);
+
+at::Tensor linear_kernel(
+    const at::Tensor& self,
+    const ideep::tensor& mkldnn_weight,
+    const at::Tensor& bias,
     const ideep::attr_t& attr);
 
 // IPEX customized linear OP with n-D packed weight
@@ -48,29 +48,6 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs);
 };
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
-    const at::Tensor& input,
-    const at::Tensor& grad_output,
-    const at::Tensor& weight,
-    const int64_t out_features,
-    const int64_t in_features,
-    std::array<bool,3> output_mask);
-
-at::Tensor linear_forward_impl(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    const int64_t out_features,
-    const int64_t in_features,
-    const at::Tensor& bias,
-    const ideep::attr_t& attr);
-
-at::Tensor ipex_linear(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    const int64_t out_features,
-    const int64_t in_features,
-    const c10::optional<at::Tensor>& bias_opt);
 
 }  // namespace cpu
 }  // namespace torch_ipex

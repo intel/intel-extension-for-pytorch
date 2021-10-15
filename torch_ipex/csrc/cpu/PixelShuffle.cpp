@@ -10,8 +10,10 @@
 #include <numeric>
 #include <vector>
 #include "PixelShuffle.h"
+
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/library.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -454,7 +456,7 @@ at::Tensor PixelShuffleOp::_forward(
     const at::Tensor& self,
     int64_t upscale_factor) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelShuffleOp::_forward", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("PixelShuffleOp::_forward", std::vector<c10::IValue>({}));
 #endif
   return pixel_shuffle_cpu(self, upscale_factor);
 }
@@ -464,7 +466,7 @@ at::Tensor PixelShuffleOp::forward(
     const at::Tensor& self,
     int64_t upscale_factor) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelShuffleOp::forward", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("PixelShuffleOp::forward", std::vector<c10::IValue>({}));
 #endif
   at::AutoNonVariableTypeMode g;
   ctx->saved_data["upscale_factor"] = upscale_factor;
@@ -476,7 +478,7 @@ torch::autograd::tensor_list PixelShuffleOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelShuffleOp::backward", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("PixelShuffleOp::backward", std::vector<c10::IValue>({}));
 #endif
   at::Tensor grad_output = grad_outputs[0];
   int64_t upscale_factor = ctx->saved_data["upscale_factor"].toInt();
@@ -490,8 +492,7 @@ at::Tensor PixelUnshuffleOp::_forward(
     const at::Tensor& self,
     int64_t downscale_factor) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
-      "PixelUnshuffleOp::_forward", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("PixelUnshuffleOp::_forward", std::vector<c10::IValue>({}));
 #endif
   return pixel_unshuffle_cpu(self, downscale_factor);
 }
@@ -501,8 +502,7 @@ at::Tensor PixelUnshuffleOp::forward(
     const at::Tensor& self,
     int64_t downscale_factor) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
-      "PixelUnshuffleOp::forward", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("PixelUnshuffleOp::forward", std::vector<c10::IValue>({}));
 #endif
   at::AutoNonVariableTypeMode g;
   ctx->saved_data["downscale_factor"] = downscale_factor;
@@ -514,8 +514,7 @@ torch::autograd::tensor_list PixelUnshuffleOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
-      "PixelUnshuffleOp::backward", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("PixelUnshuffleOp::backward", std::vector<c10::IValue>({}));
 #endif
   at::Tensor grad_output = grad_outputs[0];
   int64_t downscale_factor = ctx->saved_data["downscale_factor"].toInt();
@@ -525,7 +524,7 @@ torch::autograd::tensor_list PixelUnshuffleOp::backward(
       at::Tensor()};
 }
 
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::pixel_shuffle"),
       TORCH_FN((&torch_ipex::cpu::pixel_shuffle)));

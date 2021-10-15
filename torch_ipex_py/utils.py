@@ -40,8 +40,7 @@ def _convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
     module_convert_list = [torch.nn.Conv2d,
                            torch.nn.Linear,
-                           torch.nn.Embedding,
-                           torch.nn.LayerNorm]
+                           torch.nn.Embedding]
     for module_cls in module_convert_list:
         if isinstance(module, module_cls):
             weight_data = module.weight.detach().clone().to(dtype)
@@ -118,7 +117,7 @@ def optimize(
     remove_dropout=None):
     r"""
     Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
-    conversation for Convolution, Linear, Embedding, and layerNorm. there also has a weight prepack for
+    conversation for Convolution, Linear, Embedding. there also has a weight prepack for
     Convoluttion and Linear for better performance.
 
     Args:
@@ -182,11 +181,11 @@ def optimize(
     # convert optimizer for training case.
     params_attr = {}
     #TODO: add option master_weight for bf16 case
-    if dtype == torch.bfloat16 and model.training:
+    if dtype == torch.bfloat16:
         optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, params_attr)
 
     #TODO enable inference weight prepack as default.
-    if opt_properties.weights_prepack and model.training:
+    if opt_properties.weights_prepack:
         optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, params_attr)
 
     # TODO: model list, optimizer list.
