@@ -32,6 +32,8 @@
 
 #define IS_FLOAT32(scalar_t) (std::is_same<scalar_t, float>::value)
 
+#define IS_DOUBLE(scalar_t) (std::is_same<scalar_t, double>::value)
+
 #define IS_INT(scalar_t) (std::is_same<scalar_t, int>::value)
 
 #define IS_INT64(scalar_t) (std::is_same<scalar_t, int64_t>::value)

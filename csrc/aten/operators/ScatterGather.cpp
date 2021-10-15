@@ -327,7 +327,7 @@ void ScatterFill(
 template <typename scalar_t>
 typename std::enable_if<
     IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) ||
-        IS_INT64(scalar_t),
+        IS_INT64(scalar_t) || IS_DOUBLE(scalar_t),
     void>::type
 ScatterAdd(
     Tensor& tensor,
@@ -437,14 +437,16 @@ ScatterAdd(
 template <typename scalar_t>
 typename std::enable_if<
     !(IS_FLOAT32(scalar_t) || IS_BFLOAT16(scalar_t) || IS_INT(scalar_t) ||
-      IS_INT64(scalar_t)),
+      IS_INT64(scalar_t) || IS_DOUBLE(scalar_t)),
     void>::type
 ScatterAdd(
     Tensor& tensor,
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
-  TORCH_CHECK(0, "scatter add only supports float, bfloat16, and int type");
+  TORCH_CHECK(
+      0,
+      "scatter add only supports float, bfloat16, int, int64 and double type");
 }
 
 #undef RUN
