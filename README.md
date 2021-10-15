@@ -69,6 +69,8 @@ python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-s
 
 ### Install Extension by compiling from source
 
+**NOTE** The master branch target to fit PyTorch 1.10 now. Please clone PyTorch 1.10 branch and then build from source first.
+
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 cd intel-extension-for-pytorch
