@@ -9,6 +9,8 @@ enum IPEX_API XPU_BACKEND { XB_GPU = 0, XB_CPU = 1, XB_AUTO = 2, XB_MAX = 3 };
 
 class IPEX_API Settings final {
  public:
+  Settings();
+
   static Settings& I(); // Singleton
 
   int get_verbose_level() const;
@@ -49,16 +51,6 @@ class IPEX_API Settings final {
   bool is_double_disabled() const;
 
  private:
-  Settings()
-      : verbose_level(0),
-        warning_level(0),
-        xpu_backend(XPU_BACKEND::XB_GPU),
-        force_sync_exec_enabled(false),
-        event_profiling_enabled(true),
-        tile_partition_enabled(true),
-        onednn_layout_enabled(false),
-        tf32_mode_enabled(false) {}
-
   int verbose_level;
   int warning_level;
   XPU_BACKEND xpu_backend;
