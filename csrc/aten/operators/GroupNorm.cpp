@@ -196,7 +196,7 @@ void ComputeInternalGradientsDPCPPKernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto local_size = dpcppMaxWorkGroupSize(dev_id);
-  auto global_size = ((total_size + local_size - 1) / local_size) * local_size;
+  auto global_size = total_size * local_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
         DPCPP::nd_range<1>(
@@ -239,17 +239,326 @@ void ComputeGradOutputCoeffientDPCPPKernel(
   auto total_threads = N * C;
   auto cgf = DPCPP_Q_CGF(cgh) {
     cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_threads), DPCPP::range<1>(group)),
-        [=](DPCPP::nd_item<1> itemId) {
-          auto id = itemId.get_global_linear_id();
-          const int64_t ng = id / (C / group);
-          const int64_t c = id % C;
-          c1[id] = static_cast<T_ACC>(rstd[ng]) *
+        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
+          auto nc = itemId.get_id(0);
+
+          const int64_t ng = nc / (C / group);
+          const int64_t c = nc % C;
+          c1[nc] = static_cast<T_ACC>(rstd[ng]) *
               (gamma == nullptr ? T_ACC(1) : static_cast<T_ACC>(gamma[c]));
         });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename T>
+void ComputeBackwardFusedParamsDPCPPKernel(
+    int64_t N,
+    int64_t C,
+    int64_t HxW,
+    int64_t group,
+    const T* mean,
+    const T* rstd,
+    const T* gamma,
+    const acc_type<T>* ds,
+    const acc_type<T>* db,
+    acc_type<T>* c2,
+    acc_type<T>* c3) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto local_size = dpcppMaxWorkGroupSize(dev_id);
+  auto total_threads = N * local_size;
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        DPCPP::nd_range<2>(
+            DPCPP::range<2>(total_threads, group),
+            DPCPP::range<2>(local_size, 1)),
+        [=](DPCPP::nd_item<2> itemId) {
+          using T_ACC = acc_type<T>;
+          auto G = group;
+          auto D = C / G;
+          auto local_id = itemId.get_local_id(0);
+          auto n = itemId.get_group(0);
+          auto g = itemId.get_group(1);
+          auto group_id = itemId.get_group();
+          auto ng = n * G + g;
+          T_ACC sum1 = 0;
+          T_ACC sum2 = 0;
+          for (int64_t i = local_id; i < D; i += local_size) {
+            auto index = ng * D + i;
+            auto c = g * D + i;
+            const T_ACC gamma_v =
+                gamma == nullptr ? T_ACC(1) : static_cast<T_ACC>(gamma[c]);
+            sum1 += ds[index] * gamma_v;
+            sum2 += db[index] * gamma_v;
+          }
+          sum1 = sycl::reduce_over_group(
+              group_id, sum1, cl::sycl::ext::oneapi::plus<>());
+          sum2 = sycl::reduce_over_group(
+              group_id, sum2, cl::sycl::ext::oneapi::plus<>());
+          if (local_id == 0) {
+            const T_ACC s = T_ACC(1) / static_cast<T_ACC>(D * HxW);
+            const T_ACC x = (sum2 * static_cast<T_ACC>(mean[ng]) - sum1) *
+                static_cast<T_ACC>(rstd[ng]) * static_cast<T_ACC>(rstd[ng]) *
+                static_cast<T_ACC>(rstd[ng]) * s;
+            c2[ng] = x;
+            c3[ng] = -x * static_cast<T_ACC>(mean[ng]) -
+                sum2 * static_cast<T_ACC>(rstd[ng]) * s;
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename T>
+void GroupNormBackwardDPCPPKernel(
+    int64_t N,
+    int64_t C,
+    int64_t HxW,
+    int64_t group,
+    const T* dY,
+    const T* X,
+    const acc_type<T>* c1,
+    const acc_type<T>* c2,
+    const acc_type<T>* c3,
+    T* dX) {
+  using T_ACC = acc_type<T>;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto local_size = dpcppMaxWorkGroupSize(dev_id);
+  if (HxW < local_size) {
+    auto total_threads =
+        ((N * C * HxW + local_size - 1) / local_size) * local_size;
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      cgh.parallel_for(
+          DPCPP::nd_range<1>(
+              DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
+          [=](DPCPP::nd_item<1> itemId) {
+            auto index = itemId.get_global_linear_id();
+            if (index < N * C * HxW) {
+              auto nc = index / HxW;
+              auto ng = nc / (C / group);
+              dX[index] = c1[nc] * static_cast<T_ACC>(dY[index]) +
+                  c2[ng] * static_cast<T_ACC>(X[index]) + c3[ng];
+            }
+          });
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  } else {
+    auto total_threads = N * C * local_size;
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      cgh.parallel_for(
+          DPCPP::nd_range<1>(
+              DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
+          [=](DPCPP::nd_item<1> itemId) {
+            auto local_id = itemId.get_local_id(0);
+            auto group_id = itemId.get_group(0);
+            auto D = C / group;
+            auto ng = group_id / D;
+            for (int64_t hw = local_id; hw < HxW; hw += local_size) {
+              auto index = group_id * HxW + hw;
+              dX[index] = c1[group_id] * static_cast<T_ACC>(dY[index]) +
+                  c2[ng] * static_cast<T_ACC>(X[index]) + c3[ng];
+            }
+          });
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  }
+}
+
+template <typename T>
+void GammaBetaBackwardDPCPPKernel(
+    int64_t N,
+    int64_t C,
+    int64_t group,
+    const T* mean,
+    const T* rstd,
+    const acc_type<T>* ds,
+    const acc_type<T>* db,
+    T* dgamma,
+    T* dbeta) {
+  using T_ACC = acc_type<T>;
+  // if (N < 512) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto local_size = dpcppMaxWorkGroupSize(dev_id);
+  auto total_threads = ((C + local_size - 1) / local_size) * local_size;
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_threads), DPCPP::range<1>(local_size)),
+        [=](DPCPP::nd_item<1> itemId) {
+          auto index = itemId.get_global_linear_id();
+          if (index < C) {
+            auto G = group;
+            auto D = C / G;
+            T_ACC sum1 = 0;
+            T_ACC sum2 = 0;
+            for (int64_t n = 0; n < N; ++n) {
+              auto nc = n * C + index;
+              auto ng = n * G + index / D;
+              sum1 += (dgamma == nullptr)
+                  ? T_ACC(0)
+                  : ((ds[nc] - db[nc] * static_cast<T_ACC>(mean[ng])) *
+                     static_cast<T_ACC>(rstd[ng]));
+              sum2 += (dbeta == nullptr) ? T_ACC(0) : db[nc];
+            }
+            if (dgamma != nullptr) {
+              dgamma[index] = sum1;
+            }
+            if (dbeta != nullptr) {
+              dbeta[index] = sum2;
+            }
+          }
+        });
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  // Optimazed kernel for N size larger than 512
+  /*} else {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto local_size = dpcppMaxWorkGroupSize(dev_id);
+    const int64_t B = ((C + kReduceTileSize - 1) / kReduceTileSize) *
+  kReduceTileSize; constexpr int kThreadX = kReduceTileSize; constexpr int
+  kThreadY = kReduceTileSize / 2; cgh.parallel_for( DPCPP::nd_range<2>(
+          DPCPP::range<2>(B, kThreadY), DPCPP::range<2>(kThreadX, kThreadY)),
+      [=](DPCPP::nd_item<2> itemId) {
+    const int64_t c = blockIdx.x * blockDim.x + threadIdx.x;
+    T_ACC dg_sum1 = 0;
+    T_ACC dg_sum2 = 0;
+    T_ACC db_sum1 = 0;
+    T_ACC db_sum2 = 0;
+    if (c < C) {
+      const int64_t G = group;
+      const int64_t D = C / G;
+      for (int64_t n = threadIdx.y; n < N; n += blockDim.y * 2) {
+        const int64_t n1 = n;
+        const int64_t n2 = n + blockDim.y;
+        const int64_t nc1 = n1 * C + c;
+        const int64_t nc2 = n2 * C + c;
+        const int64_t ng1 = n1 * G + c / D;
+        const int64_t ng2 = n2 * G + c / D;
+        dg_sum1 += dgamma == nullptr
+            ? T_ACC(0)
+            : ((ds[nc1] - db[nc1] * static_cast<T_ACC>(mean[ng1])) *
+              static_cast<T_ACC>(rstd[ng1]));
+        db_sum1 += dbeta == nullptr ? T_ACC(0) : db[nc1];
+        if (n2 < N) {
+          dg_sum2 += dgamma == nullptr
+              ? T_ACC(0)
+              : ((ds[nc2] - db[nc2] * static_cast<T_ACC>(mean[ng2])) *
+                static_cast<T_ACC>(rstd[ng2]));
+          db_sum2 += dbeta == nullptr ? T_ACC(0) : db[nc2];
+        }
+      }
+    }
+    sum1 = sycl::reduce_over_group(group_id, sum1,
+  cl::sycl::ext::oneapi::plus<>()) sum2 = sycl::reduce_over_group(group_id,
+  sum2, cl::sycl::ext::oneapi::plus<>()) if (threadIdx.x == 0) { const int64_t
+  c = blockIdx.x * blockDim.x + threadIdx.y; if (c < C) { if (dgamma !=
+  nullptr) { dgamma[c] = sum1;
+        }
+        if (dbeta != nullptr) {
+          dbeta[c] = sum2;
+        }
+      }
+    }
+    sum1 = sycl::reduce_over_group(group_id, sum1,
+  cl::sycl::ext::oneapi::plus<>()) sum2 = sycl::reduce_over_group(group_id,
+  sum2, cl::sycl::ext::oneapi::plus<>()) if (threadIdx.x == 0) { const int64_t
+  c = blockIdx.x * blockDim.x + threadIdx.y + blockDim.y; if (c < C) { if
+  (dgamma != nullptr) { dgamma[c] = sum1;
+        }
+        if (dbeta != nullptr) {
+          dbeta[c] = sum2;
+        }
+      }
+    }
+  }*/
+}
+
+template <typename T>
+void GroupNormBackwardKernelImplInternal(
+    const Tensor& dY,
+    const Tensor& X,
+    const Tensor& mean,
+    const Tensor& rstd,
+    const Tensor& gamma,
+    int64_t N,
+    int64_t C,
+    int64_t HxW,
+    int64_t group,
+    Tensor* dX,
+    Tensor* dgamma,
+    Tensor* dbeta) {
+  using T_ACC = acc_type<T>;
+  const int64_t G = group;
+  TORCH_CHECK(dY.numel() == N * C * HxW);
+  TORCH_CHECK(X.numel() == N * C * HxW);
+  TORCH_CHECK(mean.numel() == N * G);
+  TORCH_CHECK(rstd.numel() == N * G);
+  TORCH_CHECK(!gamma.defined() || gamma.numel() == C);
+
+  if (N == 0) {
+    return;
+  }
+
+  const T* dY_data = dY.data_ptr<T>();
+  const T* X_data = X.data_ptr<T>();
+  const T* mean_data = mean.data_ptr<T>();
+  const T* rstd_data = rstd.data_ptr<T>();
+  const T* gamma_data = gamma.defined() ? gamma.data_ptr<T>() : nullptr;
+  T* dX_data = dX->defined() ? dX->data_ptr<T>() : nullptr;
+  const auto kAccType = X.scalar_type() == kHalf ? kFloat : X.scalar_type();
+  Tensor ds = at::empty({N, C}, X.options().dtype(kAccType));
+  Tensor db = at::empty({N, C}, X.options().dtype(kAccType));
+  T_ACC* ds_data = ds.data_ptr<T_ACC>();
+  T_ACC* db_data = db.data_ptr<T_ACC>();
+
+  ComputeInternalGradientsDPCPPKernel<T>(
+      N * C, HxW, dY_data, X_data, ds_data, db_data);
+
+  if (dX_data != nullptr) {
+    Tensor c1 = at::empty({N, C}, X.options().dtype(kAccType));
+    Tensor c2 = at::empty({N, G}, X.options().dtype(kAccType));
+    Tensor c3 = at::empty({N, G}, X.options().dtype(kAccType));
+    T_ACC* c1_data = c1.data_ptr<T_ACC>();
+    T_ACC* c2_data = c2.data_ptr<T_ACC>();
+    T_ACC* c3_data = c3.data_ptr<T_ACC>();
+
+    ComputeGradOutputCoeffientDPCPPKernel<T>(
+        N, C, G, rstd_data, gamma_data, c1_data);
+
+    ComputeBackwardFusedParamsDPCPPKernel<T>(
+        N,
+        C,
+        HxW,
+        G,
+        mean_data,
+        rstd_data,
+        gamma_data,
+        ds_data,
+        db_data,
+        c2_data,
+        c3_data);
+
+    GroupNormBackwardDPCPPKernel<T>(
+        N, C, HxW, G, dY_data, X_data, c1_data, c2_data, c3_data, dX_data);
+  }
+  if (dgamma->defined() || dbeta->defined()) {
+    T* dgamma_data = dgamma->defined() ? dgamma->data_ptr<T>() : nullptr;
+    T* dbeta_data = dbeta->defined() ? dbeta->data_ptr<T>() : nullptr;
+    GammaBetaBackwardDPCPPKernel<T>(
+        N,
+        C,
+        G,
+        mean_data,
+        rstd_data,
+        ds_data,
+        db_data,
+        dgamma_data,
+        dbeta_data);
+  }
 }
 
 void GroupNormKernelImpl(
@@ -298,8 +607,15 @@ void GroupNormBackwardKernelImpl(
     Tensor* dX,
     Tensor* dgamma,
     Tensor* dbeta) {
-  std::cout << "Groupnorm backward is not implemented yet";
-  return;
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      X.scalar_type(),
+      "GroupNormBackwardKernelImpl",
+      [&]() {
+        GroupNormBackwardKernelImplInternal<scalar_t>(
+            dY, X, mean, rstd, gamma, N, C, HxW, group, dX, dgamma, dbeta);
+      });
 }
 
 std::tuple<Tensor, Tensor, Tensor> native_group_norm(
