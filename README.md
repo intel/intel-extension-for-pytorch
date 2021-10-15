@@ -292,11 +292,11 @@ int main(int argc, const char* argv[]) {
     std::cerr << "error loading the model\n"; 
     return -1; 
   } 
-std::vector<torch::jit::IValue> inputs; 
-// make sure input data are converted to channels last format
-inputs.push_back(torch::ones({1, 3, 224, 224}).to(c10::MemoryFormat::ChannelsLast)); 
+  std::vector<torch::jit::IValue> inputs; 
+  // make sure input data are converted to channels last format
+  inputs.push_back(torch::ones({1, 3, 224, 224}).to(c10::MemoryFormat::ChannelsLast)); 
  
-at::Tensor output = module.forward(inputs).toTensor(); 
+  at::Tensor output = module.forward(inputs).toTensor(); 
  
   return 0; 
 } 
