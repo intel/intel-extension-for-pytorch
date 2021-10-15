@@ -56,6 +56,14 @@ if(NOT INTEL_SYCL_VERSION)
   message(FATAL_ERROR "Can NOT find SYCL file path!")
 endif()
 
+set(SYCL_COMPILER_VERSION)
+file(READ ${INTEL_SYCL_VERSION} version_contents)
+string(REGEX MATCHALL "__SYCL_COMPILER_VERSION +[0-9]+" VERSION_LINE "${version_contents}")
+list(LENGTH VERSION_LINE ver_line_num)
+if (${ver_line_num} EQUAL 1)
+  string(REGEX MATCHALL "[0-9]+" SYCL_COMPILER_VERSION "${VERSION_LINE}")
+endif()
+
 get_filename_component(SYCL_INCLUDE_DIR "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
 
 find_library(SYCL_LIBRARY
@@ -67,6 +75,19 @@ if(NOT SYCL_LIBRARY)
     message(FATAL_ERROR "SYCL library not found")
 endif()
 
+set(SYCL_DRIVER_VERSION)
+find_program(OCLOC_EXEC ocloc)
+if(OCLOC_EXEC)
+  set(drv_ver_path "${IPEX_ROOT_DIR}/csrc/aten/generated")
+  set(drv_ver_file "${drv_ver_path}/OCL_DRIVER_VERSION")
+  file(REMOVE ${drv_ver_file})
+  execute_process(COMMAND ${OCLOC_EXEC} query OCL_DRIVER_VERSION WORKING_DIRECTORY ${drv_ver_path})
+  if(EXISTS ${drv_ver_file})
+    file(READ ${drv_ver_file} drv_ver_contents)
+    string(STRIP ${drv_ver_contents} SYCL_DRIVER_VERSION)
+  endif()
+endif()
+
 # Find LevelZero
 find_path(LevelZero_INCLUDE_DIR
         NAMES level_zero/ze_api.h
@@ -74,6 +95,14 @@ find_path(LevelZero_INCLUDE_DIR
 find_library(LevelZero_LIBRARY
         NAMES ze_loader
         PATH_SUFFIXES x86_64_linux_gnu lib lib/x64 lib64)
+
+set(SYCL_LEVEL_ZERO_VERSION)
+if(LevelZero_LIBRARY)
+  get_filename_component(level_zero_lib ${LevelZero_LIBRARY} REALPATH)
+  string(REGEX MATCHALL "so(\.[0-9]+)+$" lz_lib_str "${level_zero_lib}")
+  string(REGEX MATCHALL "[0-9]+.*$" lz_lib_ver "${lz_lib_str}")
+  string(STRIP ${lz_lib_ver} SYCL_LEVEL_ZERO_VERSION)
+endif()
 
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -D__STRICT_ANSI__")
