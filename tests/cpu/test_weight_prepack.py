@@ -14,6 +14,7 @@ import torch
 import intel_extension_for_pytorch as ipex
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
+from intel_extension_for_pytorch.optim import Lamb
 
 class TestPrepackCases(TestCase):
     def _test_convolution_training_base(self, dim):
@@ -166,8 +167,8 @@ class TestPrepackCases(TestCase):
         model = model.to(memory_format=torch.channels_last).train()
 
         x = torch.randn(64, 3, 224, 224).to(memory_format=torch.channels_last)
-        optimizer_options = [Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
-        options = itertools.product([torch.float32, torch.bfloat16], optimizer_options)
+        optimizer_options = [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
+        options = itertools.product([torch.float, torch.bfloat16], optimizer_options)
         for dtype, optimizer in options:
             origin_x = x.clone()
             ipex_x = x.clone()
@@ -201,17 +202,22 @@ class TestPrepackCases(TestCase):
             for var_name in origin_model_state:
                 self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name])
             origin_model1 = copy.deepcopy(model).train()
-            origin_optimizer1 = optimizer(origin_model1.parameters(), lr=0.01)
+            origin_optimizer1 = optimizer(origin_model1.parameters(), lr=lr)
             origin_checkpoint = torch.load('origin_checkpoint.pth')
             origin_model1.load_state_dict(origin_checkpoint['model_state_dict'])
             origin_optimizer1.load_state_dict(origin_checkpoint['optimizer_state_dict'])
             origin_model2 = copy.deepcopy(model)
-            origin_optimizer2 = optimizer(origin_model2.parameters(), lr=0.01)
+            origin_optimizer2 = optimizer(origin_model2.parameters(), lr=lr)
             ipex_checkpoint = torch.load('ipex_checkpoint.pth')
             origin_model2.load_state_dict(ipex_checkpoint['model_state_dict'])
             origin_optimizer2.load_state_dict(ipex_checkpoint['optimizer_state_dict'])
             self.assertEqual(origin_model1.weight, origin_model2.weight)
-            # check momentum_buffer works.
+            # check state_buffer works.
+            origin_optimizer_state = origin_optimizer1.state_dict()
+            origin_optimizer2_state = origin_optimizer2.state_dict()
+            for var_name in origin_optimizer_state:
+                if var_name == 'state':
+                    self.assertEqual(origin_optimizer_state[var_name], origin_optimizer2_state[var_name], rtol=1e-2, atol=5e-02)
             ipex_model, ipex_optimizer = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # train second step for origin.
@@ -288,9 +294,9 @@ class TestPrepackCases(TestCase):
                     loss2.backward()
                     ipex_optimizer2.step()
             self.assertEqual(y, y1)
-            self.assertEqual(y1, y2, rtol=1e-4, atol=1e-3)
+            self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1) # FP32: packed mkldnn vs plain mkl
             self.assertEqual(loss, loss1)
-            self.assertEqual(loss1, loss2, rtol=1e-5, atol=1e-3)
+            self.assertEqual(loss1, loss2, rtol=1e-2, atol=1e-1) # FP32: packed mkldnn vs plain mkl
 
 
     @skipIfNoTorchVision
@@ -334,8 +340,8 @@ class TestPrepackCases(TestCase):
                     # ipex path
                     y2 = ipex_model(x2)
                     loss2 = y2.sum()
-                self.assertEqual(y1, y2)
-                self.assertEqual(loss1, loss2)
+                self.assertEqual(y1, y2, rtol=1e-3, atol=1e-1)
+                self.assertEqual(loss1, loss2, rtol=1e-3, atol=1e-1)
 
     def test_linear_training(self):
         linear_module = torch.nn.Linear

@@ -16,7 +16,7 @@ static inline scalar_t acc_vec(const at::vec::Vectorized<scalar_t>& v) {
   return std::accumulate(arr.cbegin(), arr.cend(), scalar_t(0));
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename grad_t>
 void lamb_fused_step_kernel(
     const at::Tensor& param,
     const at::Tensor& exp_avg,
@@ -142,7 +142,7 @@ void lamb_fused_step_kernel(
 }
 
 template <>
-void lamb_fused_step_kernel<at::BFloat16>(
+void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
     const at::Tensor& param,
     const at::Tensor& exp_avg,
     const at::Tensor& exp_avg_sq,
@@ -311,6 +311,188 @@ void lamb_fused_step_kernel<at::BFloat16>(
   });
 }
 
+template <>
+void lamb_fused_step_kernel<float, at::BFloat16>(
+    const at::Tensor& param,
+    const at::Tensor& exp_avg,
+    const at::Tensor& exp_avg_sq,
+    const at::Tensor& grad,
+    const at::Tensor& param2,
+    int64_t step,
+    double beta1,
+    double beta2,
+    double learning_rate,
+    double weight_decay,
+    double eps) {
+  TORCH_CHECK(
+      param.scalar_type() == at::kFloat,
+      "lamb_fused_step_kernel: expect param to be at::Float");
+  TORCH_CHECK(
+      grad.scalar_type() == at::kBFloat16,
+      "lamb_fused_step_kernel: expect grad to be at::BFloat16");
+  TORCH_CHECK(
+      exp_avg.scalar_type() == at::kFloat,
+      "lamb_fused_step_kernel: expect exp_avg to be float32");
+  TORCH_CHECK(
+      exp_avg_sq.scalar_type() == at::kFloat,
+      "lamb_fused_step_kernel: expect exp_avg_sq to be float32");
+  TORCH_CHECK(
+      param2.scalar_type() == at::kBFloat16,
+      "lamb_fused_step_kernel: expect param2 to be at::BFloat16");
+
+  float* param_data = param.data_ptr<float>();
+  float* exp_avg_data = exp_avg.data_ptr<float>();
+  float* exp_avg_sq_data = exp_avg_sq.data_ptr<float>();
+  at::BFloat16* grad_data = grad.data_ptr<at::BFloat16>();
+  at::BFloat16* param2_data = param2.data_ptr<at::BFloat16>();
+
+  double bias_correction1 = 1 - std::pow(beta1, step);
+  double bias_correction2 = 1 - std::pow(beta2, step);
+
+  int num_threads = at::get_num_threads();
+  float param_norm_acc[num_threads];
+  float rtw_norm_acc[num_threads];
+  std::fill_n(&param_norm_acc[0], num_threads, float(0));
+  std::fill_n(&rtw_norm_acc[0], num_threads, float(0));
+
+  // for float32 path, we can reuse grad to store adam_step
+  // but for bfloat16 path, this can't be done since grad is in bfloat16
+  // and we want to keep adam_step to be float32
+  int64_t numel = param.numel();
+  at::Tensor workspace = at::empty({numel}, exp_avg.options());
+  float* workspace_data = workspace.data_ptr<float>();
+
+  using bVec = at::vec::Vectorized<at::BFloat16>;
+  using fVec = at::vec::Vectorized<float>;
+
+  int64_t grain_size = 512;
+
+  at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
+    int tid = at::get_thread_num();
+
+    // local pointers
+    float* param_ptr = param_data + begin;
+    float* exp_avg_ptr = exp_avg_data + begin;
+    float* exp_avg_sq_ptr = exp_avg_sq_data + begin;
+    at::BFloat16* grad_ptr = grad_data + begin;
+    float* workspace_ptr = workspace_data + begin;
+
+    const int64_t size = end - begin;
+
+    // local sum for param_norm and rtw_norm
+    fVec sum1_fvec = fVec(float(0));
+    fVec sum2_fvec = fVec(float(0));
+    float sum1_val = float(0);
+    float sum2_val = float(0);
+
+    int64_t d = 0;
+    for (; d < size - (size % bVec::size()); d += bVec::size()) {
+      bVec grad_bvec = bVec::loadu(grad_ptr + d);
+      fVec grad_fvec, grad_fvec2;
+      std::tie(grad_fvec, grad_fvec2) = convert_bfloat16_float(grad_bvec);
+
+      fVec exp_avg_fvec = fVec::loadu(exp_avg_ptr + d) * fVec(float(beta1)) +
+          grad_fvec * fVec(float(1 - beta1));
+      fVec exp_avg_sq_fvec =
+          fVec::loadu(exp_avg_sq_ptr + d) * fVec(float(beta2)) +
+          grad_fvec * grad_fvec * fVec(float(1 - beta2));
+      fVec adam_step_fvec = exp_avg_fvec / fVec(float(bias_correction1)) /
+          ((exp_avg_sq_fvec / fVec(float(bias_correction2))).sqrt() +
+           fVec(float(eps)));
+
+      fVec exp_avg_fvec2 =
+          fVec::loadu(exp_avg_ptr + d + fVec::size()) * fVec(float(beta1)) +
+          grad_fvec2 * fVec(float(1 - beta1));
+      fVec exp_avg_sq_fvec2 =
+          fVec::loadu(exp_avg_sq_ptr + d + fVec::size()) * fVec(float(beta2)) +
+          grad_fvec2 * grad_fvec2 * fVec(float(1 - beta2));
+      fVec adam_step_fvec2 = exp_avg_fvec2 / fVec(float(bias_correction1)) /
+          ((exp_avg_sq_fvec2 / fVec(float(bias_correction2))).sqrt() +
+           fVec(float(eps)));
+
+      exp_avg_fvec.store(exp_avg_ptr + d);
+      exp_avg_fvec2.store(exp_avg_ptr + d + fVec::size());
+      exp_avg_sq_fvec.store(exp_avg_sq_ptr + d);
+      exp_avg_sq_fvec2.store(exp_avg_sq_ptr + d + fVec::size());
+
+      fVec param_fvec = fVec::loadu(param_ptr + d);
+      fVec param_fvec2 = fVec::loadu(param_ptr + d + fVec::size());
+
+      adam_step_fvec = adam_step_fvec + param_fvec * fVec(float(weight_decay));
+      adam_step_fvec2 =
+          adam_step_fvec2 + param_fvec2 * fVec(float(weight_decay));
+      adam_step_fvec.store(workspace_ptr + d);
+      adam_step_fvec2.store(workspace_ptr + d + fVec::size());
+
+      sum1_fvec += param_fvec * param_fvec;
+      sum1_fvec += param_fvec2 * param_fvec2;
+      sum2_fvec += adam_step_fvec * adam_step_fvec;
+      sum2_fvec += adam_step_fvec2 * adam_step_fvec2;
+    }
+    for (; d < size; d++) {
+      float grad_val = float(grad_ptr[d]);
+      exp_avg_ptr[d] = exp_avg_ptr[d] * beta1 + grad_val * (1 - beta1);
+      exp_avg_sq_ptr[d] =
+          exp_avg_sq_ptr[d] * beta2 + grad_val * grad_val * (1 - beta2);
+      float adam_step_val = (exp_avg_ptr[d] / bias_correction1) /
+          (std::sqrt(exp_avg_sq_ptr[d] / bias_correction2) + eps);
+
+      float param_val = param_ptr[d];
+      adam_step_val += param_val * weight_decay;
+      workspace_ptr[d] = adam_step_val;
+
+      sum1_val += param_val * param_val;
+      sum2_val += adam_step_val * adam_step_val;
+    }
+    sum1_val += acc_vec(sum1_fvec);
+    sum2_val += acc_vec(sum2_fvec);
+
+    param_norm_acc[tid] = sum1_val;
+    rtw_norm_acc[tid] = sum2_val;
+  });
+
+  float param_norm_sum = float(0);
+  float rtw_norm_sum = float(0);
+  for (int64_t tid = 0; tid < num_threads; tid++) {
+    param_norm_sum += param_norm_acc[tid];
+    rtw_norm_sum += rtw_norm_acc[tid];
+  }
+  float true_ratio = std::sqrt(param_norm_sum) / std::sqrt(rtw_norm_sum);
+
+  // update param
+  at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
+    // local pointers
+    float* param_ptr = param_data + begin;
+    at::BFloat16* param2_ptr = param2_data + begin;
+    float* workspace_ptr = workspace_data + begin;
+
+    const int64_t size = end - begin;
+
+    int64_t d = 0;
+    for (; d < size - (size % bVec::size()); d += bVec::size()) {
+      fVec param_fvec = fVec::loadu(param_ptr + d);
+      fVec param_fvec2 = fVec::loadu(param_ptr + d + fVec::size());
+
+      param_fvec -= fVec::loadu(workspace_ptr + d) *
+          fVec(float(learning_rate * true_ratio));
+      param_fvec2 -= fVec::loadu(workspace_ptr + d + fVec::size()) *
+          fVec(float(learning_rate * true_ratio));
+
+      param_fvec.store(param_ptr + d);
+      param_fvec2.store(param_ptr + d + fVec::size());
+      // sync float param to bfloat16
+      bVec param2_bvec = convert_float_bfloat16(param_fvec, param_fvec2);
+      param2_bvec.store(param2_ptr + d);
+    }
+    for (; d < size; d++) {
+      float param_val = param_ptr[d];
+      param_val -= workspace_ptr[d] * learning_rate * true_ratio;
+      param_ptr[d] = param_val;
+      param2_ptr[d] = at::BFloat16(param_val);
+    }
+  });
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
     const at::Tensor& param_,
     const at::Tensor& exp_avg_,
@@ -346,14 +528,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
   TORCH_CHECK(param_.sizes() == exp_avg_sq_.sizes(),
       "Expect param and exp_avg_sq_ have the same sizes, param sizes: ",
       param_.sizes(), "; exp_avg_sq sizes: ", exp_avg_sq_.sizes());
-
-  if (param_.scalar_type() == at::ScalarType::BFloat16) {
-    TORCH_CHECK(param_.sizes() == param2_.sizes(),
-        "Expect param and bfloat16 trail have the same sizes, param sizes: ",
-        param_.sizes(), "; bfloat16 trail sizes: ", param2_.sizes());
-  } else {
-    TORCH_CHECK(param2_.numel() == 0, "Expect bfloat16 trail to be empty");
-  }
+  TORCH_CHECK(
+      param2_.numel() == 0 || param_.sizes() == param2_.sizes(),
+      "Expect param and param2_ have the same sizes, param sizes: ",
+      param_.sizes(),
+      "; param2_ sizes: ",
+      param2_.sizes());
 
   auto param = param_.contiguous();
   auto exp_avg = exp_avg_.contiguous();
@@ -361,16 +541,64 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
   auto grad = grad_.contiguous();
   auto param2 = param2_.contiguous();
 
-  auto dtype = param_.scalar_type();
-  if (at::ScalarType::Float == dtype){
-    lamb_fused_step_kernel<float>(
-      param, exp_avg, exp_avg_sq, grad, param2, step, beta1, beta2, learning_rate, weight_decay, eps);
-  } else if (at::ScalarType::Double == dtype) {
-    lamb_fused_step_kernel<double>(
-      param, exp_avg, exp_avg_sq, grad, param2, step, beta1, beta2, learning_rate, weight_decay, eps);
-  } else if (at::ScalarType::BFloat16 == dtype) {
-    lamb_fused_step_kernel<at::BFloat16>(
-      param, exp_avg, exp_avg_sq, grad, param2, step, beta1, beta2, learning_rate, weight_decay, eps);
+  auto grad_dtype = grad_.scalar_type();
+  auto param_dtype = param_.scalar_type();
+  if (at::ScalarType::Float == grad_dtype) {
+    lamb_fused_step_kernel<float, float>(
+        param,
+        exp_avg,
+        exp_avg_sq,
+        grad,
+        param2,
+        step,
+        beta1,
+        beta2,
+        learning_rate,
+        weight_decay,
+        eps);
+  } else if (at::ScalarType::Double == grad_dtype) {
+    lamb_fused_step_kernel<double, double>(
+        param,
+        exp_avg,
+        exp_avg_sq,
+        grad,
+        param2,
+        step,
+        beta1,
+        beta2,
+        learning_rate,
+        weight_decay,
+        eps);
+  } else if (
+      at::ScalarType::BFloat16 == grad_dtype &&
+      at::ScalarType::BFloat16 == param_dtype) {
+    lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
+        param,
+        exp_avg,
+        exp_avg_sq,
+        grad,
+        param2,
+        step,
+        beta1,
+        beta2,
+        learning_rate,
+        weight_decay,
+        eps);
+  } else if (
+      at::ScalarType::BFloat16 == grad_dtype &&
+      at::ScalarType::Float == param_dtype) {
+    lamb_fused_step_kernel<float, at::BFloat16>(
+        param,
+        exp_avg,
+        exp_avg_sq,
+        grad,
+        param2,
+        step,
+        beta1,
+        beta2,
+        learning_rate,
+        weight_decay,
+        eps);
   } else {
     TORCH_CHECK(false, "expect bfloat16 or float or double param");
   }
