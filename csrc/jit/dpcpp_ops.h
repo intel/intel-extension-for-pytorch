@@ -6,7 +6,7 @@
 
 namespace torch {
 namespace jit {
-namespace dpcpp {
+namespace xpu {
 
 at::Tensor matmul_fusion_variants(
     at::Tensor& accumul1,
@@ -169,6 +169,6 @@ at::Tensor trans_addmm_dropout(
     bool train,
     bool inplace);
 
-} // namespace dpcpp
+} // namespace xpu
 } // namespace jit
 } // namespace torch

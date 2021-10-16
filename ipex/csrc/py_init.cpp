@@ -10,7 +10,7 @@ namespace py = pybind11;
 
 static std::vector<PyMethodDef> methods;
 
-void torch_ipex_init(pybind11::module& m) {
+void ipex_init(pybind11::module& m) {
   m.doc() = "PyTorch Extension for Intel XPU";
   init_module(m);
 

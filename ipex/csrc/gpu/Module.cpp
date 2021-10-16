@@ -317,7 +317,7 @@ static void register_xpu_device_properties(PyObject* module) {
 }
 
 static void register_inference_mode(PyObject* module) {
-  // Add _DeviceProperties class to torch_ipex._C
+  // Add _DeviceProperties class to ipex._C
   auto m = py::handle(module).cast<py::module>();
   py::class_<InferenceMode>(m, "_InferenceMode").def(py::init<bool>());
 }

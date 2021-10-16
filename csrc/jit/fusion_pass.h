@@ -10,12 +10,11 @@ namespace jit {
 struct RegisterPreFusionPass {
   RegisterPreFusionPass(GraphPass p);
 };
-} // namespace jit
-} // namespace torch
 
-namespace torch_ipex {
-namespace jit {
+namespace xpu {
 using torch::jit::Graph;
 void FusionPass(std::shared_ptr<Graph>& graph);
+} // namespace xpu
+
 } // namespace jit
-} // namespace torch_ipex
+} // namespace torch

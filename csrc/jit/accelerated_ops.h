@@ -8,49 +8,48 @@ namespace jit {
 // XXX: PyTorch does not support nesting namespace
 // And the alias analysis is not working for namespace other than aten ...
 // So we fake some op namespaces to workaround that.
-namespace dpcpp {
-static auto reorder_sym = Symbol::fromQualString("dpcpp::reorder");
-static auto batch_norm_sym = Symbol::fromQualString("dpcpp::batch_norm");
-static auto conv2d_relu_sym = Symbol::fromQualString("dpcpp::conv2d_relu");
-static auto conv2d_sum_sym = Symbol::fromQualString("dpcpp::conv2d_sum");
+namespace xpu {
+static auto reorder_sym = Symbol::fromQualString("xpu::reorder");
+static auto batch_norm_sym = Symbol::fromQualString("xpu::batch_norm");
+static auto conv2d_relu_sym = Symbol::fromQualString("xpu::conv2d_relu");
+static auto conv2d_sum_sym = Symbol::fromQualString("xpu::conv2d_sum");
 static auto conv2d_relu_sum_sym =
-    Symbol::fromQualString("dpcpp::conv2d_relu_sum");
+    Symbol::fromQualString("xpu::conv2d_relu_sum");
 static auto conv2d_sum_relu_sym =
-    Symbol::fromQualString("dpcpp::conv2d_sum_relu");
-static auto conv2d_sigmoid_sym =
-    Symbol::fromQualString("dpcpp::conv2d_sigmoid");
-static auto matmul_add_sym = Symbol::fromQualString("dpcpp::matmul_add");
-static auto t_matmul_sym = Symbol::fromQualString("dpcpp::t_matmul");
-static auto trans_matmul_sym = Symbol::fromQualString("dpcpp::trans_matmul");
-static auto t_matmul_add_sym = Symbol::fromQualString("dpcpp::t_matmul_add");
+    Symbol::fromQualString("xpu::conv2d_sum_relu");
+static auto conv2d_sigmoid_sym = Symbol::fromQualString("xpu::conv2d_sigmoid");
+static auto matmul_add_sym = Symbol::fromQualString("xpu::matmul_add");
+static auto t_matmul_sym = Symbol::fromQualString("xpu::t_matmul");
+static auto trans_matmul_sym = Symbol::fromQualString("xpu::trans_matmul");
+static auto t_matmul_add_sym = Symbol::fromQualString("xpu::t_matmul_add");
 static auto t_matmul_add_dropout_sym =
-    Symbol::fromQualString("dpcpp::t_matmul_add_dropout");
+    Symbol::fromQualString("xpu::t_matmul_add_dropout");
 static auto t_matmul_add_add_sym =
-    Symbol::fromQualString("dpcpp::t_matmul_add_add");
+    Symbol::fromQualString("xpu::t_matmul_add_add");
 static auto t_matmul_add_gelu_sym =
-    Symbol::fromQualString("dpcpp::t_matmul_add_gelu");
+    Symbol::fromQualString("xpu::t_matmul_add_gelu");
 static auto trans_matmul_div_sym =
-    Symbol::fromQualString("dpcpp::trans_matmul_div");
+    Symbol::fromQualString("xpu::trans_matmul_div");
 static auto trans_matmul_scale_add_sym =
-    Symbol::fromQualString("dpcpp::trans_matmul_scale_add");
-static auto mul_add_sym = Symbol::fromQualString("dpcpp::mul_add");
+    Symbol::fromQualString("xpu::trans_matmul_scale_add");
+static auto mul_add_sym = Symbol::fromQualString("xpu::mul_add");
 static auto q_conv2d_sum_relu_sym =
-    Symbol::fromQualString("dpcpp::q_conv2d_sum_relu");
-static auto t_addmm_sym = Symbol::fromQualString("dpcpp::t_addmm");
+    Symbol::fromQualString("xpu::q_conv2d_sum_relu");
+static auto t_addmm_sym = Symbol::fromQualString("xpu::t_addmm");
 static auto t_addmm_dropout_sym =
-    Symbol::fromQualString("dpcpp::t_addmm_dropout");
-static auto t_addmm_relu_sym = Symbol::fromQualString("dpcpp::t_addmm_relu");
+    Symbol::fromQualString("xpu::t_addmm_dropout");
+static auto t_addmm_relu_sym = Symbol::fromQualString("xpu::t_addmm_relu");
 static auto t_addmm_sigmoid_sym =
-    Symbol::fromQualString("dpcpp::t_addmm_sigmoid");
+    Symbol::fromQualString("xpu::t_addmm_sigmoid");
 static auto dequant_pixelshuffle_sym =
-    Symbol::fromQualString("dpcpp::dequant_pixelshuffle");
+    Symbol::fromQualString("xpu::dequant_pixelshuffle");
 static auto dequant_pixelshuffle_quant_sym =
-    Symbol::fromQualString("dpcpp::dequant_pixelshuffle_quant");
+    Symbol::fromQualString("xpu::dequant_pixelshuffle_quant");
 
 // Fold weights of batch_norm with conv2d's
-static auto fold_weight_sym = Symbol::fromQualString("dpcpp::fold_weight");
-static auto fold_bias_sym = Symbol::fromQualString("dpcpp::fold_bias");
-} // namespace dpcpp
+static auto fold_weight_sym = Symbol::fromQualString("xpu::fold_weight");
+static auto fold_bias_sym = Symbol::fromQualString("xpu::fold_bias");
+} // namespace xpu
 
 #if 0
 Operation createDNNL_reorder(const Node *node);

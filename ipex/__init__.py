@@ -22,8 +22,8 @@ def _find_dpcpp_home():
 
 def _here_paths():
     here = os.path.abspath(__file__)
-    torch_ipex_path = os.path.dirname(here)
-    return torch_ipex_path
+    ipex_path = os.path.dirname(here)
+    return ipex_path
 
 
 def include_paths():
@@ -33,8 +33,8 @@ def include_paths():
     Returns:
         A list of include path strings.
     '''
-    torch_ipex_path = _here_paths()
-    lib_include = os.path.join(torch_ipex_path, 'include')
+    ipex_path = _here_paths()
+    lib_include = os.path.join(ipex_path, 'include')
     paths = [
         lib_include,
         # os.path.join(lib_include, 'more')
@@ -49,8 +49,8 @@ def library_paths():
     Returns:
         A list of library path strings.
     '''
-    torch_ipex_path = _here_paths()
-    lib_path = os.path.join(torch_ipex_path, 'lib')
+    ipex_path = _here_paths()
+    lib_path = os.path.join(ipex_path, 'lib')
     paths = [
         lib_path,
     ]

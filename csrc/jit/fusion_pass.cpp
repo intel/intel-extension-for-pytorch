@@ -23,8 +23,9 @@ struct hash<std::pair<Symbol, Symbol>> {
 };
 } // namespace std
 
-namespace torch_ipex {
+namespace torch {
 namespace jit {
+namespace xpu {
 
 //
 // The main goal of MKL-DNN fusion is to limit bandwidth wasting.
@@ -170,7 +171,7 @@ class OpFuser {
 
   Node* createBatchNormFoldWeight(Node* conv2d, Node* batch_norm) {
     auto g = conv2d->owningGraph();
-    auto newNode = g->create(dpcpp::fold_weight_sym);
+    auto newNode = g->create(xpu::fold_weight_sym);
     newNode->setScope(conv2d->scope());
 
     // We need following parameters
@@ -190,7 +191,7 @@ class OpFuser {
 
   Node* createBatchNormFoldBias(Node* conv2d, Node* batch_norm) {
     auto g = conv2d->owningGraph();
-    auto newNode = g->create(dpcpp::fold_bias_sym);
+    auto newNode = g->create(xpu::fold_bias_sym);
     newNode->setScope(conv2d->scope());
 
     // We need following information
@@ -382,55 +383,54 @@ class OpFuser {
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
     // RN50/RCAN: conv + relu
-    {{aten::conv2d, aten::relu}, dpcpp::conv2d_relu_sym},
+    {{aten::conv2d, aten::relu}, xpu::conv2d_relu_sym},
     {{aten::conv2d, Symbol::fromQualString("aten::relu_")},
-     dpcpp::conv2d_relu_sym},
+     xpu::conv2d_relu_sym},
     // RN50/RCAN: conv + add + relu
-    {{dpcpp::conv2d_sum_sym, aten::relu}, dpcpp::conv2d_sum_relu_sym},
-    {{dpcpp::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")},
-     dpcpp::conv2d_sum_relu_sym},
+    {{xpu::conv2d_sum_sym, aten::relu}, xpu::conv2d_sum_relu_sym},
+    {{xpu::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")},
+     xpu::conv2d_sum_relu_sym},
     // RN50/RCAN: conv + add
-    {{aten::conv2d, aten::add}, dpcpp::conv2d_sum_sym},
-    {{aten::conv2d, aten::add_}, dpcpp::conv2d_sum_sym},
+    {{aten::conv2d, aten::add}, xpu::conv2d_sum_sym},
+    {{aten::conv2d, aten::add_}, xpu::conv2d_sum_sym},
     // RCAN: mul + add
-    {{aten::mul, aten::add_}, dpcpp::mul_add_sym},
+    {{aten::mul, aten::add_}, xpu::mul_add_sym},
     // RN50/RCAN INT8: conv + add + relu
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("quantized::add_relu")},
-     dpcpp::q_conv2d_sum_relu_sym},
+     xpu::q_conv2d_sum_relu_sym},
     // DLRM: linear with bias + relu/sigmoid
-    {{aten::t, aten::addmm}, dpcpp::t_addmm_sym},
-    {{dpcpp::t_addmm_sym, aten::relu}, dpcpp::t_addmm_relu_sym},
-    {{dpcpp::t_addmm_sym, aten::sigmoid}, dpcpp::t_addmm_sigmoid_sym},
+    {{aten::t, aten::addmm}, xpu::t_addmm_sym},
+    {{xpu::t_addmm_sym, aten::relu}, xpu::t_addmm_relu_sym},
+    {{xpu::t_addmm_sym, aten::sigmoid}, xpu::t_addmm_sigmoid_sym},
     // BERT: linear no bias + add standalone bias + add
-    {{aten::t, aten::matmul}, dpcpp::t_matmul_sym},
-    {{dpcpp::t_matmul_sym, aten::add}, dpcpp::t_matmul_add_sym},
-    {{dpcpp::t_matmul_sym, Symbol::fromQualString("aten::add_")},
-     dpcpp::t_matmul_add_sym},
-    {{dpcpp::t_matmul_add_sym, aten::add}, dpcpp::t_matmul_add_add_sym},
-    {{dpcpp::t_matmul_add_sym, aten::gelu}, dpcpp::t_matmul_add_gelu_sym},
-    {{dpcpp::t_matmul_add_sym, Symbol::fromQualString("aten::dropout_")},
-     dpcpp::t_matmul_add_dropout_sym},
-    {{dpcpp::t_addmm_sym, Symbol::fromQualString("aten::dropout_")},
-     dpcpp::t_addmm_dropout_sym},
+    {{aten::t, aten::matmul}, xpu::t_matmul_sym},
+    {{xpu::t_matmul_sym, aten::add}, xpu::t_matmul_add_sym},
+    {{xpu::t_matmul_sym, Symbol::fromQualString("aten::add_")},
+     xpu::t_matmul_add_sym},
+    {{xpu::t_matmul_add_sym, aten::add}, xpu::t_matmul_add_add_sym},
+    {{xpu::t_matmul_add_sym, aten::gelu}, xpu::t_matmul_add_gelu_sym},
+    {{xpu::t_matmul_add_sym, Symbol::fromQualString("aten::dropout_")},
+     xpu::t_matmul_add_dropout_sym},
+    {{xpu::t_addmm_sym, Symbol::fromQualString("aten::dropout_")},
+     xpu::t_addmm_dropout_sym},
     // BERT: matmul(m1, m2.t()) * scalar + add
     {{Symbol::fromQualString("aten::transpose"),
       Symbol::fromQualString("aten::matmul")},
-     dpcpp::trans_matmul_sym},
-    {{dpcpp::trans_matmul_sym, Symbol::fromQualString("aten::div")},
-     dpcpp::trans_matmul_div_sym},
-    {{dpcpp::trans_matmul_div_sym, Symbol::fromQualString("aten::add")},
-     dpcpp::trans_matmul_scale_add_sym},
+     xpu::trans_matmul_sym},
+    {{xpu::trans_matmul_sym, Symbol::fromQualString("aten::div")},
+     xpu::trans_matmul_div_sym},
+    {{xpu::trans_matmul_div_sym, Symbol::fromQualString("aten::add")},
+     xpu::trans_matmul_scale_add_sym},
     // matmul(m1, m2) + add (bias or post_sum)
-    {{Symbol::fromQualString("aten::matmul"), aten::add_},
-     dpcpp::matmul_add_sym},
+    {{Symbol::fromQualString("aten::matmul"), aten::add_}, xpu::matmul_add_sym},
     {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")},
-     dpcpp::conv2d_sigmoid_sym},
+     xpu::conv2d_sigmoid_sym},
     {{Symbol::fromQualString("aten::dequantize"), aten::pixel_shuffle},
-     dpcpp::dequant_pixelshuffle_sym},
-    {{dpcpp::dequant_pixelshuffle_sym,
+     xpu::dequant_pixelshuffle_sym},
+    {{xpu::dequant_pixelshuffle_sym,
       Symbol::fromQualString("aten::quantize_per_tensor")},
-     dpcpp::dequant_pixelshuffle_quant_sym},
+     xpu::dequant_pixelshuffle_quant_sym},
 };
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
@@ -443,17 +443,14 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   ConstantPropagation(graph);
 }
 
-} // namespace jit
-} // namespace torch_ipex
+} // namespace xpu
 
-namespace torch {
-namespace jit {
 RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
   registerPrePass(std::move(p));
 }
 
 static RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
-  torch_ipex::jit::FusionPass(g);
+  xpu::FusionPass(g);
 });
 
 } // namespace jit

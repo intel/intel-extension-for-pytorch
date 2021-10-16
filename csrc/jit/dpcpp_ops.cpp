@@ -7,11 +7,12 @@
 
 #include <oneDNN/oneDNN.h>
 
+using namespace xpu::oneDNN;
+
 namespace torch {
 namespace jit {
-namespace dpcpp {
+namespace xpu {
 
-using namespace xpu::oneDNN;
 typedef enum {
   undef = 0,
   with_sum = MatmulAttr::kind_with_sum,
@@ -753,6 +754,6 @@ at::Tensor fusion_amdd(
       p, d_p, buf, weight_decay, momentum, dampening, lr);
 }
 
-} // namespace dpcpp
+} // namespace xpu
 } // namespace jit
 } // namespace torch
