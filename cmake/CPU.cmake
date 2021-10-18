@@ -178,14 +178,16 @@ set(DPCPP_SRCS)
 set(DPCPP_COMMON_SRCS)
 set(DPCPP_CPU_SRCS)
 set(DPCPP_JIT_SRCS)
+set(DPCPP_RUNTIME_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/quantization)
 add_subdirectory(${DPCPP_ROOT}/jit)
 add_subdirectory(${DPCPP_ROOT}/cpu)
+add_subdirectory(${DPCPP_ROOT}/cpu/runtime)
 
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
+set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_RUNTIME_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
 #link_directories(${PYTORCH_INSTALL_DIR}/lib)

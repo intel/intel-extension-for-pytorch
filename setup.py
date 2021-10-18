@@ -350,7 +350,8 @@ def pyi_module():
     main_compile_args = ['-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI))]
     main_libraries = ['intel-ext-pt-cpu']
     main_link_args = ['-ltorch_python']
-    main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp")]
+    main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp"),
+                    os.path.join("torch_ipex", "csrc", "python", "TaskModule.cpp")]
 
     include_dirs = [
         ".",
