@@ -52,6 +52,7 @@ using key_t = std::string;
 #endif
 
 const scale_t IDEEP_DEF_SCALE {1.0f};
+const std::vector<int32_t> DIL_DEF_ZERO_POINT{0};
 
 enum lowp_kind {
   u8s8 = 0,
