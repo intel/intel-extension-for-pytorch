@@ -89,7 +89,7 @@ void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_gelu;
+  IpexSubgraphRewriter rewriter_relu, rewriter_gelu;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
   auto linear_relu_rstring = CodeTemplate(R"(
@@ -132,7 +132,7 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2;
+  IpexSubgraphRewriter rewriter_add_v1, rewriter_add_v2;
   std::array<std::string, 2> add_operators = {"add", "add_"};
 
   // linear   Y

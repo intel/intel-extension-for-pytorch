@@ -5,7 +5,7 @@
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
-#include <torch/csrc/jit/passes/subgraph_rewrite.h>
+#include "subgraph_rewrite.h"
 
 namespace torch {
 namespace jit {
@@ -22,6 +22,9 @@ c10::optional<IValue> getIValue(
     const std::string& name,
     const std::unordered_map<const Value*, Value*>& match_vmap,
     const std::unordered_map<std::string, Value*>& vmap);
+
+void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
+
 void replaceAtenTransposeConvolutionWithIpexTransposeConv(
     std::shared_ptr<Graph>& graph);
 void FuseShuffle(std::shared_ptr<Graph>& graph);

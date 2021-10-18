@@ -90,7 +90,7 @@ void insertPrePackedConv2dOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
+  IpexSubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
       rewriter_elu, rewriter_swish, rewriter_silu;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
@@ -232,7 +232,7 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
+  IpexSubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
   std::array<std::string, 2> add_operators = {"add", "add_"};
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
