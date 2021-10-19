@@ -28,8 +28,7 @@ class SimpleNet_v2(torch.nn.Module):
 
     def forward(self, x):
         x1 = self.conv(x)
-        for i in range(50):
-            x1 = self.conv2(x1)
+        x1 = self.conv2(x1)
         y = torch.flatten(x1, start_dim=1)
         return y
 
@@ -40,7 +39,7 @@ class TestCoreBinding(TestCase):
         model.eval()
         x = torch.rand(64, 64, 3, 3)
 
-        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        cpu_pool = ipex.cpu.runtime.CPUPool([1, 2, 3, 4])
         @ipex.cpu.runtime.pin(cpu_pool)
         def test(model, x):
             return model(x)
@@ -56,13 +55,12 @@ class TestCoreBinding(TestCase):
         model.eval()
         x = torch.rand(64, 64, 3, 3)
 
-        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        cpu_pool = ipex.cpu.runtime.CPUPool([1, 2, 3, 4])
         with ipex.cpu.runtime.pin(cpu_pool):
             y_runtime = model(x)
 
         y = model(x)
         self.assertEqual(y, y_runtime)
-
 
 class TestRuntimeAPI(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
@@ -117,187 +115,6 @@ class TestRuntimeAPI(TestCase):
         y_runtime_future = task(model, x)
         y_runtime = y_runtime_future.get()
         self.assertEqual(y, y_runtime)
-
-class TestJitRuntimeAPI(JitTestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_trace_module(self):
-        model = SimpleNet()
-        model.eval()
-        x = torch.rand(64, 64, 3, 3)
-
-        # Calculate the reference result
-        trace_mode = torch.jit.trace(model, x)
-        y = trace_mode(x)
-
-        # Create task
-        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        task = ipex.cpu.runtime.Task(trace_mode, cpu_pool)
-
-        # Task submit and get
-        y_runtime_future = task(x)
-        y_runtime = y_runtime_future.get()
-        self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_sync_trace_module(self):
-        model = SimpleNet()
-        model.eval()
-        x = torch.rand(64, 64, 3, 3)
-
-        # Calculate the reference result
-        trace_mode = torch.jit.trace(model, x)
-        y = trace_mode(x)
-
-        # Create task
-        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        task = ipex.cpu.runtime.Task(trace_mode, cpu_pool)
-
-        # Task sync run
-        y_runtime = task.run_sync(x)
-        self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_bf16_task_core_bind(self):
-        model = SimpleNet()
-        model.eval()
-        x = torch.rand(64, 64, 3, 3)
-
-        # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-            trace_mode = torch.jit.trace(model, x)
-        y = trace_mode(x)
-
-        # Create task
-        cpu_pool = ipex.cpu.runtime.CPUPool([0, 1, 2, 3])
-        task = ipex.cpu.runtime.Task(trace_mode, cpu_pool)
-
-        # Task submit and wait
-        for i in range(100):
-            y_runtime_future = task(x)
-            y_runtime = y_runtime_future.get()
-        self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_task_multi_submission(self):
-        model = SimpleNet()
-        model.eval()
-        x = torch.rand(64, 64, 3, 3)
-
-        # Calculate the reference result
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-            trace_mode = torch.jit.trace(model, x)
-        y = trace_mode(x)
-
-        # Create task
-        cpu_pool = ipex.cpu.runtime.CPUPool([0, 1, 2, 3])
-        task = ipex.cpu.runtime.Task(trace_mode, cpu_pool)
-
-        # Submit task 3 times, then wait for result
-        y_runtime = []
-        y_runtime_future = []
-        for i in range(3):
-            y_runtime_future.append(task(x))
-        for item in y_runtime_future:
-            y_runtime.append(item.get())
-
-        self.assertEqual(y, y_runtime[0])
-        self.assertEqual(y, y_runtime[1])
-        self.assertEqual(y, y_runtime[2])
-
-class TestLLGARuntimeAPI(JitLlgaTestCase):
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    @llga_test_env
-    def test_int8_simpleNet_task_core_bind(self):
-        with torch.no_grad():
-            model = SimpleNet_v2()
-            model.eval()
-            x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
-
-            # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
-            y = m_llga(x)
-
-            # Create task
-            cpu_pool = ipex.cpu.runtime.CPUPool([0, 1, 2, 3])
-            task = ipex.cpu.runtime.Task(m_llga, cpu_pool)
-
-            # Task submit and wait
-            for i in range(100):
-                y_runtime_future = task(x)
-                y_runtime = y_runtime_future.get()
-            self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    @llga_test_env
-    def test_int8_rn50_per_tensor_symmetric_calibration_qscheme_task_core_bind(self):
-        with torch.no_grad():
-            model = models.__dict__["resnet50"]()
-            model.eval()
-            x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
-
-            # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
-            y = m_llga(x)
-
-            # Create task
-            cpu_pool = ipex.cpu.runtime.CPUPool([0, 1, 2, 3])
-            task = ipex.cpu.runtime.Task(m_llga, cpu_pool)
-
-            # Task submit and wait
-            for i in range(100):
-                y_runtime_future = task(x)
-                y_runtime = y_runtime_future.get()
-            self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    @llga_test_env
-    def test_int8_rn50_default_calibration_qscheme_task_core_bind(self):
-        with torch.no_grad():
-            model = models.__dict__["resnet50"]()
-            model.eval()
-            x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
-
-            # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True)
-            y = m_llga(x)
-
-            # Create task
-            cpu_pool = ipex.cpu.runtime.CPUPool([0, 1, 2, 3])
-            task = ipex.cpu.runtime.Task(m_llga, cpu_pool)
-
-            # Task submit and wait
-            for i in range(100):
-                y_runtime_future = task(x)
-                y_runtime = y_runtime_future.get()
-            self.assertEqual(y, y_runtime)
-
-
-    # @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    # @llga_test_env
-    # def test_int8_rn50_task_core_bind_v2(self):
-    #     model = models.__dict__["resnet50"]()
-
-    #     model.eval()
-    #     x = torch.randn(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
-
-    #     model = optimization.fuse(model, inplace=True)
-    #     conf = ipex.QuantConf("/pytorch/leslie/runtime/rn50/frameworks.ai.pytorch.cpu-models/examples/imagenet/resnet50_configure_sym.json")
-
-    #     model = ipex.quantization.convert(model, conf, x)
-    #     with torch.no_grad():
-    #         y = model(x)
-    #         print(model.graph_for(x))
-    #     print("running int8 evalation step\n")
-
-    #     # Create task
-    #     cpu_pool = ipex.cpu.runtime.CPUPool([0, 1, 2, 3])
-    #     task = ipex.cpu.runtime.Task(model, cpu_pool)
-
-    #     print("start to run the task")
-    #     # Task submit and wait
-    #     for i in range(1000):
-    #         y_runtime_future = task(x)
-    #         y_runtime = y_runtime_future.wait()
 
 if __name__ == '__main__':
     test = unittest.main()
