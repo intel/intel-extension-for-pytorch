@@ -154,13 +154,14 @@ def _optimizer_fusion(optimizer, master_weight_split):
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
     setattr(optimizer, 'fused', True)
+    if not hasattr(optimizer, 'params_attr'):
+        setattr(optimizer, 'params_attr', {})
     if isinstance(optimizer, Lamb):
         # lamb is ipex customized optimizer, does not to patch "step" method
         return optimizer
     try:
         step = OPTIMIZER_FUSED_STEP_MAPPING[type(optimizer)]
         if not hasattr(optimizer, '_original_step'):
-            # May 
             setattr(optimizer, '_original_step', optimizer.step)
         setattr(optimizer, 'step', types.MethodType(step, optimizer))
     except KeyError:

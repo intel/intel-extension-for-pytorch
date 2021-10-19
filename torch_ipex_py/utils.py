@@ -84,6 +84,7 @@ class _Properties(object):
         # optimizer opt conig
         self.split_master_weight_for_bf16 = None
         self.fuse_update_step = None
+        self.auto_kernel_selection = None
 
 # O0 properties
 class _O0:
@@ -94,6 +95,7 @@ class _O0:
         properties.remove_dropout = False
         properties.split_master_weight_for_bf16 = False
         properties.fuse_update_step = False
+        properties.auto_kernel_selection = False
         return properties
 
 
@@ -106,6 +108,7 @@ class _O1:
         properties.remove_dropout = True
         properties.split_master_weight_for_bf16 = True
         properties.fuse_update_step = True
+        properties.auto_kernel_selection = False
         return properties
 
 opt_levels = {"O0": _O0(),
@@ -121,7 +124,8 @@ def optimize(
     weights_prepack=None,
     remove_dropout=None,
     split_master_weight_for_bf16=None,
-    fuse_update_step=None):
+    fuse_update_step=None,
+    auto_kernel_selection=None):
     r"""
     Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
     conversation for Convolution, Linear, Embedding. there also has a weight prepack for
@@ -144,7 +148,10 @@ def optimize(
         split_master_weight_for_bf16: whether choose split master weight update for BF16 training which can
             save memory compare with master weight update solution, not support all optimizers
         fuse_update_step: whether choose fused params update for training which have better performance,
-        not support all optimizers
+           not support all optimizers
+        [experimental] auto_kernel_selection: Different backend may have different performance on different
+            dtypes/shapes. Default value is False. IPEX will try to optimize the kernel selection for 
+            better performance if set this value to True. But may have regressions at current stage.
 
     """
 
@@ -173,6 +180,8 @@ def optimize(
         opt_properties.split_master_weight_for_bf16 = split_master_weight_for_bf16
     if fuse_update_step is not None:
         opt_properties.fuse_update_step = fuse_update_step
+    if auto_kernel_selection is not None:
+        opt_properties.auto_kernel_selection = auto_kernel_selection
 
     if inplace:
         optimized_model = model
@@ -215,7 +224,8 @@ def optimize(
         optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
     if opt_properties.weights_prepack:
-        optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, params_attr)
+        optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(
+          optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
     # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model

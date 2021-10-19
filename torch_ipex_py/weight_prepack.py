@@ -175,9 +175,18 @@ IPEX_WEIGHT_PREPACK_MODULE = {
     torch.nn.Conv2d,
 }
 
-def _weight_prepack_with_ipex(module, optimizer, params_attr):
-    def convert(m):
-        if type(m) in IPEX_WEIGHT_PREPACK_MODULE:
+def _should_prepack(module, auto_kernel_selection):
+    if type(module) not in IPEX_WEIGHT_PREPACK_MODULE:
+        return False
+    elif isinstance(module, torch.nn.Linear) and not auto_kernel_selection and module.weight.dtype is torch.float:
+        # For now we simply distinguish "mkl" and "mkldnn" backend by "weight prepack"
+        # Does not prepack Linear for FP32 to choose "mkl" backend
+        return False
+    return True
+
+def _weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
+    def convert(m, auto_kernel_selection):
+        if _should_prepack(m, auto_kernel_selection):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
@@ -226,13 +235,13 @@ def _weight_prepack_with_ipex(module, optimizer, params_attr):
         else:
             return m
 
-    def convert_rec(m):
-        new_m = convert(m)
+    def convert_rec(m, auto_kernel_selection):
+        new_m = convert(m, auto_kernel_selection)
         for name, sub_m in m.named_children():
-            setattr(new_m, name, convert_rec(sub_m))
+            setattr(new_m, name, convert_rec(sub_m, auto_kernel_selection))
         return new_m
 
-    opt_model, opt_optmizer, params_attr = convert_rec(module), optimizer, params_attr
+    opt_model, opt_optmizer, params_attr = convert_rec(module, auto_kernel_selection), optimizer, params_attr
     if optimizer is not None:
         setattr(optimizer, 'params_attr', params_attr)
         patch_load_state_dict(optimizer)
