@@ -104,6 +104,15 @@ if(LevelZero_LIBRARY)
   string(STRIP ${lz_lib_ver} SYCL_LEVEL_ZERO_VERSION)
 endif()
 
+# Find the OpenCL library from the SYCL distribution
+# XXX: Fetch OpenCL for oneDNN only
+find_library(OpenCL_LIBRARY
+        NAMES "OpenCL"
+        HINTS ${sycl_root_hints}
+        PATH_SUFFIXES lib
+        NO_DEFAULT_PATH)
+set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
+
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-unnamed-lambda")
