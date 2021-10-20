@@ -2,7 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
-
+import tempfile
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -14,9 +14,10 @@ class TestTorchMethod(TestCase):
         save = torch.randn(2, 2)
         print("save: ", save)
         save = save.to('xpu')
-        torch.save(save, 'tensor.pt')
+        ckpt = tempfile.NamedTemporaryFile()
+        torch.save(save, ckpt.name)
 
-        load = torch.load('tensor.pt', map_location=xpu_device)
-        print("torch.load('tensor.pt', map_location=xpu_device): ", load.to(cpu_device))
+        load = torch.load(ckpt.name, map_location=xpu_device)
+        print("torch.load(ckpt.name, map_location=xpu_device): ", load.to(cpu_device))
 
         self.assertEqual(save.to(cpu_device), load.to(cpu_device))

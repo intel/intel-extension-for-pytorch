@@ -2,6 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import tempfile
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -13,8 +14,9 @@ class TestTorchMethod(TestCase):
         print(x.storage())
 
         module = torch.nn.Conv2d(16, 16, 32, 32).to(dpcpp_device)
-        torch.save(module, "./temp.pt")
-        module2 = torch.load("./temp.pt")
+        ckpt = tempfile.NamedTemporaryFile()
+        torch.save(module, ckpt.name)
+        module2 = torch.load(ckpt.name)
 
     def test_storage_bfloat(self, dtype=torch.bfloat16):
         x = torch.ones(10, device=dpcpp_device, dtype=dtype)
