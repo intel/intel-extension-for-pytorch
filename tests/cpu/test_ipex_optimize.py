@@ -5,21 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 import unittest
 import itertools
 import copy
-
-class TestModule(torch.nn.Module):
-    def __init__(self):
-        super(TestModule, self).__init__()
-        self.linear = torch.nn.Linear(5, 10)
-        self.conv = torch.nn.Conv2d(1, 10, 5, 1)
-        self.bn = torch.nn.BatchNorm2d(num_features=10)
-        self.embeddingbag = torch.nn.EmbeddingBag(10, 3, mode='sum')
-
-    def forward(self, x, y, indices, offsets):
-        x = self.conv(x)
-        x = self.bn(x)
-        y = self.linear(y)
-        z = self.embeddingbag(indices, offsets)
-        return x + y
+from common_utils import TestModule
 
 class ConvBatchNorm(torch.nn.Module):
     def __init__(self,):

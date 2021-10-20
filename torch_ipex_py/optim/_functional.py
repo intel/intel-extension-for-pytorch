@@ -160,6 +160,8 @@ def sgd_impl(
             float_d_p = d_p.float()
             if param.dtype == torch.bfloat16:
                 float_param = torch.ops.torch_ipex.cat_bfloat16_float(param, param2)
+            else:
+                float_param = param.float()
 
         if weight_decay != 0:
             float_d_p = float_d_p.add(float_param, alpha=weight_decay)
