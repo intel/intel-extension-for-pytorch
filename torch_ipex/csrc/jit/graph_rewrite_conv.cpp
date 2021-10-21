@@ -20,21 +20,31 @@ void insertPrePackedConv2dOp(Block* b) {
       auto graph = n->owningGraph();
       auto prepack_node = graph->create(
           Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
-      IValue input_size_value(n->inputs()
-                                  .at(0)
-                                  ->type()
-                                  ->cast<TensorType>()
-                                  ->sizes()
-                                  .concrete_sizes());
+      auto input_size_option = n->inputs()
+                                   .at(0)
+                                   ->type()
+                                   ->cast<TensorType>()
+                                   ->sizes()
+                                   .concrete_sizes();
+      // if can't get input shape info, will not do weight prepack.
+      if (!(input_size_option.has_value() &&
+            input_size_option.value().size() == 4)) {
+        continue;
+      }
+      IValue input_size_value(input_size_option.value());
       if (n->kind() == aten::conv2d) {
-        auto weight_size = n->inputs()
-                               .at(1)
-                               ->type()
-                               ->cast<TensorType>()
-                               ->sizes()
-                               .concrete_sizes()
-                               .value();
-        ;
+        auto weight_size_option = n->inputs()
+                                      .at(1)
+                                      ->type()
+                                      ->cast<TensorType>()
+                                      ->sizes()
+                                      .concrete_sizes();
+        // weight has not shape info, will not do weight prapacked.
+        if (!(weight_size_option.has_value() &&
+              weight_size_option.value().size() == 4)) {
+          continue;
+        }
+        auto weight_size = weight_size_option.value();
         std::vector<int64_t> k_size = {weight_size[2], weight_size[3]};
         // w_is_channels_last is invaild, there will has a check the memory
         // format at convolution kernel side.

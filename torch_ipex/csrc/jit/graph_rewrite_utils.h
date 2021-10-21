@@ -28,27 +28,30 @@ auto fuse_add_filter_v1 =
       auto add_node = match.values_map.at(vmap.at("res"))->node();
       bool accumu_same_used = accumu_use_check(add_node, accumu);
       // accumu is used by other ops or it is a constant,i
-      // we can't write it inplace.
       if (accumu_same_used || accumu->node()->kind() == prim::Constant ||
           !accumu->type()->cast<TensorType>()) {
         return false;
       }
       // check inputs of add have same shapes.
-      auto size1 = add_node->inputs()
-                       .at(0)
-                       ->type()
-                       ->cast<TensorType>()
-                       ->sizes()
-                       .concrete_sizes()
-                       .value();
-      auto size2 = add_node->inputs()
-                       .at(1)
-                       ->type()
-                       ->cast<TensorType>()
-                       ->sizes()
-                       .concrete_sizes()
-                       .value();
-      if (size1 != size2) {
+      auto size1_option = add_node->inputs()
+                              .at(0)
+                              ->type()
+                              ->cast<TensorType>()
+                              ->sizes()
+                              .concrete_sizes();
+      auto size2_option = add_node->inputs()
+                              .at(1)
+                              ->type()
+                              ->cast<TensorType>()
+                              ->sizes()
+                              .concrete_sizes();
+      // if we can't get the shape info, we can't do inplace fusion.
+      if (!size1_option.has_value() || !size2_option.has_value()) {
+        return false;
+      }
+      auto size1_vec = size1_option.value();
+      auto size2_vec = size2_option.value();
+      if (size1_vec.empty() || size2_vec.empty() || size1_vec != size2_vec) {
         return false;
       }
       return true;
@@ -66,26 +69,31 @@ auto fuse_add_filter_v2 =
       bool accumu_same_used = accumu_use_check(add_node, accumu);
       // accumu is used by other ops or it is a constant,
       // we can't write it inplace.
+
       if (accumu_same_used || accumu->node()->kind() == prim::Constant ||
           !accumu->type()->cast<TensorType>()) {
         return false;
       }
       // check inputs of add have same shapes.
-      auto size1 = add_node->inputs()
-                       .at(0)
-                       ->type()
-                       ->cast<TensorType>()
-                       ->sizes()
-                       .concrete_sizes()
-                       .value();
-      auto size2 = add_node->inputs()
-                       .at(1)
-                       ->type()
-                       ->cast<TensorType>()
-                       ->sizes()
-                       .concrete_sizes()
-                       .value();
-      if (size1 != size2) {
+      auto size1_option = add_node->inputs()
+                              .at(0)
+                              ->type()
+                              ->cast<TensorType>()
+                              ->sizes()
+                              .concrete_sizes();
+      auto size2_option = add_node->inputs()
+                              .at(1)
+                              ->type()
+                              ->cast<TensorType>()
+                              ->sizes()
+                              .concrete_sizes();
+      // if we can't get the shape info, we can't do inplace fusion.
+      if (!size1_option.has_value() || !size2_option.has_value()) {
+        return false;
+      }
+      auto size1_vec = size1_option.value();
+      auto size2_vec = size2_option.value();
+      if (size1_vec.empty() || size2_vec.empty() || size1_vec != size2_vec) {
         return false;
       }
       // alpha is optional
