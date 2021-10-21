@@ -3,7 +3,7 @@ import functools
 import warnings
 import numpy as np
 import intel_extension_for_pytorch as ipex
-from .runtime_utils import get_core_list_of_socket_id
+from .runtime_utils import get_core_list_of_node_id
 
 class CPUPool(object):
     def __init__(self, core_ids: list = None, node_id: int = None):
@@ -16,25 +16,8 @@ class CPUPool(object):
             self.core_ids = core_ids
         else:
             assert node_id is not None, "Neither core_ids or node_id has been implemented"
-            self.core_ids = get_core_list_of_socket_id(node_id)
+            self.core_ids = get_core_list_of_node_id(node_id)
         self.cpu_pool = ipex._C.CPUPool(self.core_ids)
-
-class Task(object):
-    def __init__(self, module, cpu_pool: CPUPool):
-        self.cpu_pool = cpu_pool
-        assert type(self.cpu_pool) is CPUPool
-        if isinstance(module, torch.jit.ScriptModule):
-            self._task = ipex._C.TaskModule(module._c, self.cpu_pool.core_ids, True)
-        else:
-            self._task = ipex._C.TaskModule(module, self.cpu_pool.core_ids)
-
-    def __call__(self, *args, **kwargs):
-        # async execution
-        return self._task.run_async(*args, **kwargs)
-
-    def run_sync(self, *args, **kwargs):
-        # sync execution
-        return self._task.run_sync(*args, **kwargs)
 
 class pin(object):
     def __init__(self, cpu_pool: CPUPool):

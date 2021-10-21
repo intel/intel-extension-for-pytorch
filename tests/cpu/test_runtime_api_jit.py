@@ -40,12 +40,12 @@ class TestJitRuntimeAPI(JitTestCase):
         x = torch.rand(64, 64, 3, 3)
 
         # Calculate the reference result
-        trace_mode = torch.jit.trace(model, x)
-        y = trace_mode(x)
+        trace_model = torch.jit.trace(model, x)
+        y = trace_model(x)
 
         # Create task
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        task = ipex.cpu.runtime.Task(trace_mode, cpu_pool)
+        task = ipex.cpu.runtime.Task(trace_model, cpu_pool)
 
         # Task submit and get
         y_runtime_future = task(x)
@@ -117,6 +117,25 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime[1])
         self.assertEqual(y, y_runtime[2])
 
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_multi_stream_bf16_module(self):
+        model = SimpleNet()
+        model.eval()
+        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        x = torch.rand(batch_size, 64, 3, 3)
+
+        # Calculate the reference result
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            trace_model = torch.jit.trace(model, x)
+        y = trace_model(x)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=2, cpu_pool=cpu_pool)
+
+        y_runtime = multi_stream_model(x)
+        self.assertEqual(y, y_runtime)
+
 class TestLLGARuntimeAPI(JitLlgaTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     @llga_test_env
@@ -128,48 +147,6 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
 
             # Calculate the reference result
             graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
-            y = m_llga(x)
-
-            # Create task
-            cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-            task = ipex.cpu.runtime.Task(m_llga, cpu_pool)
-
-            # Task submit and wait
-            y_runtime_future = task(x)
-            y_runtime = y_runtime_future.get()
-            self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    @llga_test_env
-    def test_int8_rn50_per_tensor_symmetric_calibration_qscheme_task_core_bind(self):
-        with torch.no_grad():
-            model = models.__dict__["resnet50"]()
-            model.eval()
-            x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
-
-            # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
-            y = m_llga(x)
-
-            # Create task
-            cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-            task = ipex.cpu.runtime.Task(m_llga, cpu_pool)
-
-            # Task submit and wait
-            y_runtime_future = task(x)
-            y_runtime = y_runtime_future.get()
-            self.assertEqual(y, y_runtime)
-
-    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    @llga_test_env
-    def test_int8_rn50_default_calibration_qscheme_task_core_bind(self):
-        with torch.no_grad():
-            model = models.__dict__["resnet50"]()
-            model.eval()
-            x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
-
-            # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True)
             y = m_llga(x)
 
             # Create task

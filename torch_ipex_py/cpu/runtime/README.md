@@ -7,6 +7,31 @@ Intel® Extension for PyTorch\* Runtime extension: Runtime CPU Pool with thread 
 Intel® Extension for PyTorch\* Runtime extension rely on `iomp` to bind the thread to cores. If you want to use it in your application, please run models with extra flag: `LD_PRELOAD=$LD_PRELOAD:$PATH/libiomp5.so  python model_script.py`.
 
 ## Use Cases
+### Example of multi Stream Module
+Runtime extension support weight-sharing multi-stream inference on CPU. You just need to convert the original model into multi stream object and run the new multi stream object as normal.
+```
+class SimpleNet(torch.nn.Module):
+    def __init__(self):
+        super(SimpleNet, self).__init__()
+        self.conv = torch.nn.Conv2d(64, 128, (3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+
+    def forward(self, x):
+        x1 = self.conv(x)
+        y = torch.flatten(x1, start_dim=1)
+        return y
+
+model = SimpleNet()
+model.eval()
+# batchsize must be divisible by instance number.
+# instance number equals to cores_per_socket//cores_per_instance.
+x = torch.rand(batchsize, 64, 3, 3)
+
+# Convert the model into multi_Stream_model
+cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+multi_Stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=2, cpu_pool=cpu_pool)
+y = multi_Stream_model(x)
+```
+
 ### Example of Python API without Task
 Runtime extension provides API of `ipex.cpu.runtime.pin` to a CPU Pool for binding physical cores. We can use it without the async task feature. There are 2 different ways to use `ipex.cpu.runtime.pin`: use `decorator` or use `with` context.
 #### Use the decorator

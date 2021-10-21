@@ -38,14 +38,11 @@ class TestCoreBinding(TestCase):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
-
         cpu_pool = ipex.cpu.runtime.CPUPool([1, 2, 3, 4])
         @ipex.cpu.runtime.pin(cpu_pool)
         def test(model, x):
             return model(x)
-
         y_runtime = test(model, x)
-
         y = model(x)
         self.assertEqual(y, y_runtime)
 
@@ -54,11 +51,9 @@ class TestCoreBinding(TestCase):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
-
         cpu_pool = ipex.cpu.runtime.CPUPool([1, 2, 3, 4])
         with ipex.cpu.runtime.pin(cpu_pool):
             y_runtime = model(x)
-
         y = model(x)
         self.assertEqual(y, y_runtime)
 
@@ -114,6 +109,23 @@ class TestRuntimeAPI(TestCase):
         # Task submit and wait
         y_runtime_future = task(model, x)
         y_runtime = y_runtime_future.get()
+        self.assertEqual(y, y_runtime)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_multi_stream_module(self):
+        model = SimpleNet()
+        model.eval()
+        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        x = torch.rand(batch_size, 64, 3, 3)
+
+        # Calculate the reference result
+        y = model(x)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=2, cpu_pool=cpu_pool)
+
+        y_runtime = multi_stream_model(x)
         self.assertEqual(y, y_runtime)
 
 if __name__ == '__main__':

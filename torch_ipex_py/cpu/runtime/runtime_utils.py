@@ -1,13 +1,13 @@
 import subprocess
 
-def get_sockets():
+def get_num_nodes():
     return int(subprocess.check_output('lscpu | grep Socket | awk \'{print $2}\'', shell=True))
 
-def get_cores_per_socket():
+def get_num_cores_per_node():
     return int(subprocess.check_output('lscpu | grep Core | awk \'{print $4}\'', shell=True))
 
-def get_core_list_of_socket_id(socket_id):
-    sockets = get_sockets()
-    assert socket_id < sockets, "input socket_id:{0} must less than system sockets:{1}".format(socket_id, sockets)
-    cores_per_socket = get_cores_per_socket()
-    return list(range(cores_per_socket * socket_id, cores_per_socket * (socket_id + 1)))
+def get_core_list_of_node_id(node_id):
+    num_of_nodes = get_num_nodes()
+    assert node_id < num_of_nodes, "input node_id:{0} must less than system number of nodes:{1}".format(node_id, num_of_nodes)
+    num_cores_per_node = get_num_cores_per_node()
+    return list(range(num_cores_per_node * node_id, num_cores_per_node * (node_id + 1)))
