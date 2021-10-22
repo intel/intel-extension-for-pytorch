@@ -243,9 +243,7 @@ class DPCPPBuild(BuildExtension, object):
 
             build_options = {
                 # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
-                # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
                 'CMAKE_BUILD_TYPE': build_type,
-                # The value cannot be easily obtained in CMakeLists.txt.
                 'CMAKE_PREFIX_PATH': cmake_prefix_path,
                 'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.absolute()), "ipex"]),
                 'CMAKE_INSTALL_LIBDIR': 'lib',
@@ -258,7 +256,11 @@ class DPCPPBuild(BuildExtension, object):
             my_env = os.environ.copy()
             for var, val in my_env.items():
                 if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
-                    build_options[var] = val
+                    if var == 'CMAKE_PREFIX_PATH':
+                        # Do NOT overwrite this path. Append into the list, instead.
+                        build_options[var] += ';' + val
+                    else:
+                        build_options[var] = val
 
             cc, cxx = _get_complier()
             defines(cmake_args, CMAKE_C_COMPILER=cc)
