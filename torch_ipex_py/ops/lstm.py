@@ -41,7 +41,7 @@ class IpexLSTM(torch.nn.LSTM):
             hx = self.permute_hidden(hx, sorted_indices)
 
         self.check_forward_args(input, hx, batch_sizes)
-        result = torch.ops.torch_ipex.lstm(input, hx, self._flat_weights, self.bias, self.num_layers,
+        result = torch.ops.torch_ipex.ipex_lstm(input, hx, self._flat_weights, self.bias, self.num_layers,
                         self.dropout, self.training, self.bidirectional, self.batch_first)
         output = result[0]
         hidden = result[1:]

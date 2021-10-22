@@ -1,3 +1,4 @@
+#include "RNN.h"
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/InitialTensorOptions.h>
@@ -5,13 +6,16 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
+#include <torch/extension.h>
 #include "ExtendOPs.h"
 #include "WeightPack.h"
 #include "mkldnn/MKLDNNCommon.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
+#include "torch_ipex/csrc/utils.h"
 
 namespace torch_ipex {
+namespace cpu {
 
 struct RNNParams {
   ideep::rnn_kind mode;
@@ -32,13 +36,8 @@ struct RNNParams {
             bool bidirectional, bool batch_first_, bool train_) {
     mode = static_cast<ideep::rnn_kind>(mode_);
     batch_first = batch_first_;
-    if (batch_first) {
-      seq_length = input.size(1);
-      mini_batch = input.size(0);
-    } else {
-      seq_length = input.size(0);
-      mini_batch = input.size(1);
-    }
+    seq_length = input.size(0);
+    mini_batch = input.size(1);
     input_size = input.size(2);
     hidden_size = hidden_size_;
     num_directions = bidirectional ? 2 : 1;
@@ -93,24 +92,6 @@ struct RNNParams {
     return {{1, 1, mini_batch, hidden_size}, dtype, format::ldnc};
   }
 };
-
-ideep::tensor::data_type get_mkldnn_dtype(at::ScalarType type) {
-  switch (type) {
-  case at::ScalarType::Float:
-    return ideep::tensor::data_type::f32;
-  case at::ScalarType::QInt32:
-    return ideep::tensor::data_type::s32;
-  case at::ScalarType::QInt8:
-    return ideep::tensor::data_type::s8;
-  case at::ScalarType::QUInt8:
-  case at::ScalarType::Byte:
-    return ideep::tensor::data_type::u8;
-  case at::ScalarType::BFloat16:
-    return ideep::tensor::data_type::bf16;
-  default:
-    TORCH_CHECK(false, "get_mkldnn_dtype: unsupported data type");
-  }
-}
 
 std::vector<int64_t> _hidden_size(const RNNParams &rnn) {
   return {rnn.num_layers * rnn.num_directions, rnn.mini_batch, rnn.hidden_size};
@@ -167,22 +148,79 @@ at::Tensor _shuffle_bias(const at::Tensor &bias_ih, const at::Tensor &bias_hh,
   return bias_ih + bias_hh;
 };
 
-at::Tensor mkldnn_rnn_layer(at::Tensor &hy_, at::Tensor &cy_,
-                            const at::Tensor &input, at::TensorList weights,
-                            const at::Tensor &hx_, const at::Tensor &cx_,
-                            bool reverse, const RNNParams &rnn) {
-  TORCH_CHECK(weights.size() == 2 || weights.size() == 4);
+namespace {
 
+// Helpers for working with different hidden types.
+std::tuple<at::Tensor, at::Tensor> unpack_hidden(const at::Tensor& hidden) {
+  return std::make_tuple(hidden, at::Tensor{});
+}
+
+std::tuple<at::Tensor, at::Tensor> unpack_hidden(
+    const std::tuple<at::Tensor, at::Tensor>& hidden) {
+  return hidden;
+}
+
+template <typename hidden_type>
+hidden_type pack_hidden(const at::Tensor& hx, const at::Tensor& cx) {
+  static_assert(
+      std::is_same<hidden_type, void>::value,
+      "pack_hidden not implemented for this type");
+  AT_ERROR("NOT IMPLEMENTED");
+}
+
+template <>
+at::Tensor pack_hidden<at::Tensor>(const at::Tensor& hx, const at::Tensor& cx) {
+  AT_ASSERT(cx.numel() == 0);
+  return hx;
+}
+
+template <>
+std::tuple<at::Tensor, at::Tensor> pack_hidden<
+    std::tuple<at::Tensor, at::Tensor>>(
+    const at::Tensor& hx,
+    const at::Tensor& cx) {
+  return std::make_tuple(hx, cx);
+}
+
+} // anonymous namespace
+
+std::vector<at::Tensor> lstm_kernel(
+    const at::Tensor& input,
+    const at::Tensor& w0,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    const at::Tensor& w3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    bool reverse,
+    at::IntArrayRef batch_sizes,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool bidirectional,
+    bool batch_first,
+    bool train) {
+  RNNParams rnn(
+      input,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      bidirectional,
+      batch_first,
+      train);
   auto output_size = _output_size</*is_single_direction*/ true>(rnn);
   auto output = at::empty(output_size, input.options());
+  auto hy_ = at::empty(hx_.sizes(), hx_.options());
+  auto cy_ = at::empty(cx_.sizes(), cx_.options());
 
-  bool has_bias = weights.size() == 4;
-  auto weight_ih = _shuffle_weight(weights[0], rnn.mode);
-  auto weight_hh = _shuffle_weight(weights[1], rnn.mode);
+  auto weight_ih = _shuffle_weight(w0, rnn.mode);
+  auto weight_hh = _shuffle_weight(w1, rnn.mode);
 
-  auto bias = has_bias ? _shuffle_bias(weights[2], weights[3], rnn.mode)
-                       : at::zeros({rnn.num_bias_gates * rnn.hidden_size},
-                                   weight_ih.options());
+  auto bias = has_biases
+      ? _shuffle_bias(w2, w3, rnn.mode)
+      : at::zeros({rnn.num_bias_gates * rnn.hidden_size}, weight_ih.options());
 
   // per layer input size
   int64_t input_size = input.size(2);
@@ -202,8 +240,8 @@ at::Tensor mkldnn_rnn_layer(at::Tensor &hy_, at::Tensor &cy_,
   auto cy = torch_ipex::cpu::itensor_view_from_dense(
       cy_, rnn.dst_iter_c_desc(get_mkldnn_dtype(cy_.scalar_type())));
 
-  ideep::tensor w1, w2;
-  std::tie(w1, w2) = torch_ipex::cpu::get_lstm_packed_weight(
+  ideep::tensor w1_, w2_;
+  std::tie(w1_, w2_) = torch_ipex::cpu::get_lstm_packed_weight(
       weight_ih,
       weight_hh,
       input_size,
@@ -214,11 +252,490 @@ at::Tensor mkldnn_rnn_layer(at::Tensor &hy_, at::Tensor &cy_,
       hx,
       cx,
       b,
+      reverse,
+      train);
+
+  std::vector<at::Tensor> result;
+  if (train) {
+    at::Tensor workspace = at::Tensor();
+    auto pd = ideep::lstm_forward_training::prepare(
+        x, hx, cx, w1_, w2_, b, y, hy, cy, reverse);
+    workspace = torch_ipex::cpu::empty_aten_tensor_from_desc(
+        pd.workspace_desc(), input.options().dtype(at::kByte));
+    ideep::tensor mkldnn_workspace;
+    mkldnn_workspace.init(
+        pd.workspace_desc(), workspace.template data_ptr<uint8_t>());
+    ideep::lstm_forward_training::compute(
+        pd, x, hx, cx, w1_, w2_, b, mkldnn_workspace, y, hy, cy, reverse);
+    result.reserve(4);
+    result.push_back(output);
+    result.push_back(hy_);
+    result.push_back(cy_);
+    result.push_back(workspace);
+  } else {
+    ideep::lstm_forward_inference::compute(
+        x, hx, cx, w1_, w2_, b, y, hy, cy, reverse);
+    result.reserve(3);
+    result.push_back(output);
+    result.push_back(hy_);
+    result.push_back(cy_);
+  }
+  return result;
+}
+
+std::vector<at::Tensor> ipex_lstm_layer_forward(
+    const at::Tensor& input,
+    const at::Tensor& w0,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    const at::Tensor& w3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    bool reverse,
+    at::IntArrayRef batch_sizes,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool bidirectional,
+    bool batch_first,
+    bool train) {
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::cpu::ipex_lstm_layer_forward\n");
+#endif
+  return lstm_kernel(
+      input,
+      w0,
+      w1,
+      w2,
+      w3,
+      hx_,
+      cx_,
+      reverse,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      has_biases,
+      bidirectional,
+      batch_first,
+      train);
+}
+
+std::vector<at::Tensor> IPEXLSTMOp::_forward(
+    const at::Tensor& input,
+    const at::Tensor& w0,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    const at::Tensor& w3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    bool reverse,
+    at::IntArrayRef batch_sizes,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool bidirectional,
+    bool batch_first,
+    bool train) {
+  at::AutoNonVariableTypeMode g;
+#if defined(IPEX_DISP_OP)
+  printf("IPEXLSTMOp::_forward\n");
+#endif
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::ipex_lstm_layer", "")
+                       .typed<decltype(ipex_lstm_layer)>();
+  return op.call(
+      input,
+      w0,
+      w1,
+      w2,
+      w3,
+      hx_,
+      cx_,
+      reverse,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      has_biases,
+      bidirectional,
+      batch_first,
+      train);
+}
+
+std::vector<at::Tensor> IPEXLSTMOp::forward(
+    torch::autograd::AutogradContext* ctx,
+    const at::Tensor& input,
+    const at::Tensor& w0,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    const at::Tensor& w3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    bool reverse,
+    at::IntArrayRef batch_sizes,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool bidirectional,
+    bool batch_first,
+    bool train) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IPEXLSTMOp::forward", std::vector<c10::IValue>({}));
+#endif
+#if defined(IPEX_DISP_OP)
+  printf("IPEXLSTMOp::forward\n");
+#endif
+  ctx->saved_data["reverse"] = reverse;
+  ctx->saved_data["mode"] = mode;
+  ctx->saved_data["hidden_size"] = hidden_size;
+  ctx->saved_data["num_layers"] = num_layers;
+  ctx->saved_data["has_biases"] = has_biases;
+  ctx->saved_data["train"] = train;
+  ctx->saved_data["bidirectional"] = bidirectional;
+  ctx->saved_data["batch_first"] = batch_first;
+  auto outputs = _forward(
+      input,
+      w0,
+      w1,
+      w2,
+      w3,
+      hx_,
+      cx_,
+      reverse,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      has_biases,
+      bidirectional,
+      batch_first,
+      train);
+
+  if (train) {
+    ctx->save_for_backward(
+        {input,
+         w0,
+         w1,
+         w2,
+         w3,
+         hx_,
+         cx_,
+         outputs[0],
+         outputs[1],
+         outputs[2],
+         outputs[3]});
+  }
+  return outputs;
+}
+
+torch::autograd::tensor_list IPEXLSTMOp::backward(
+    torch::autograd::AutogradContext* ctx,
+    torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IPEXLSTMOp::backward", std::vector<c10::IValue>({}));
+#endif
+#if defined(IPEX_DISP_OP)
+  printf("IPEXLSTMOp::backward\n");
+#endif
+  auto saved = ctx->get_saved_variables();
+  at::Tensor input = saved[0];
+  at::Tensor w0 = saved[1];
+  at::Tensor w1 = saved[2];
+  at::Tensor w2 = saved[3];
+  at::Tensor w3 = saved[4];
+  at::Tensor hx = saved[5];
+  at::Tensor cx = saved[6];
+  at::Tensor output = saved[7];
+  at::Tensor hy = saved[8];
+  at::Tensor cy = saved[9];
+  at::Tensor workspace = saved[10];
+  bool reverse = ctx->saved_data["reverse"].toBool();
+  int64_t mode = ctx->saved_data["mode"].toInt();
+  int64_t hidden_size = ctx->saved_data["hidden_size"].toInt();
+  int64_t num_layers = ctx->saved_data["num_layers"].toInt();
+  bool has_biases = ctx->saved_data["has_biases"].toBool();
+  bool train = ctx->saved_data["train"].toBool();
+  bool bidirectional = ctx->saved_data["bidirectional"].toBool();
+  bool batch_first = ctx->saved_data["batch_first"].toBool();
+  at::Tensor grad_output = grad_outputs[0].contiguous();
+  at::Tensor grad_hy = grad_outputs[1].contiguous();
+  at::Tensor grad_cy = grad_outputs[2].contiguous();
+  static auto op =
+      torch::Dispatcher::singleton()
+          .findSchemaOrThrow("torch_ipex::ipex_lstm_layer_backward", "")
+          .typed<decltype(ipex_lstm_layer_backward)>();
+  std::vector<at::Tensor> grad_inputs = op.call(
+      input,
+      w0,
+      w1,
+      w2,
+      w3,
+      hx,
+      cx,
+      output,
+      hy,
+      cy,
+      grad_output,
+      grad_hy,
+      grad_cy,
+      reverse,
+      mode,
+      hidden_size,
+      num_layers,
+      has_biases,
+      train,
+      bidirectional,
+      /*batch_sizes*/ {},
+      batch_first,
+      workspace);
+  return {
+      grad_inputs[0],
+      grad_inputs[1],
+      grad_inputs[2],
+      grad_inputs[3],
+      grad_inputs[4],
+      grad_inputs[5],
+      grad_inputs[6],
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor()};
+}
+
+std::vector<at::Tensor> ipex_lstm_layer(
+    const at::Tensor& input,
+    const at::Tensor& weight0,
+    const at::Tensor& weight1,
+    const at::Tensor& weight2,
+    const at::Tensor& weight3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    bool reverse,
+    at::IntArrayRef batch_sizes,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool bidirectional,
+    bool batch_first,
+    bool train) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "torch_ipex::cpu::ipex_lstm_layer", std::vector<c10::IValue>({}));
+#endif
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::cpu::ipex_lstm_layer\n");
+#endif
+  if (at::GradMode::is_enabled()) {
+    return IPEXLSTMOp::apply(
+        input,
+        weight0,
+        weight1,
+        weight2,
+        weight3,
+        hx_,
+        cx_,
+        reverse,
+        batch_sizes,
+        mode,
+        hidden_size,
+        num_layers,
+        has_biases,
+        bidirectional,
+        batch_first,
+        train);
+  }
+  return IPEXLSTMOp::_forward(
+      input,
+      weight0,
+      weight1,
+      weight2,
+      weight3,
+      hx_,
+      cx_,
+      reverse,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      has_biases,
+      bidirectional,
+      batch_first,
+      train);
+}
+
+std::vector<at::Tensor> ipex_lstm_layer_backward(
+    const at::Tensor& input,
+    const at::Tensor& weight0,
+    const at::Tensor& weight1,
+    const at::Tensor& weight2,
+    const at::Tensor& weight3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_tmp,
+    const at::Tensor& output,
+    const at::Tensor& hy_,
+    const at::Tensor& cy_,
+    const at::Tensor& grad_output,
+    const at::Tensor& grad_hy,
+    const at::Tensor& grad_cy,
+    bool reverse,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool train,
+    bool bidirectional,
+    at::IntArrayRef batch_sizes,
+    bool batch_first,
+    const at::Tensor& workspace) {
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::cpu::ipex_lstm_layer_backward\n");
+#endif
+  RNNParams rnn(
+      input,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      bidirectional,
+      batch_first,
+      train);
+  auto output_size = _output_size</*is_single_direction*/ true>(rnn);
+
+  auto weight_ih = _shuffle_weight(weight0, rnn.mode);
+  auto weight_hh = _shuffle_weight(weight1, rnn.mode);
+  auto bias = has_biases
+      ? _shuffle_bias(weight2, weight3, rnn.mode)
+      : at::zeros({rnn.num_bias_gates * rnn.hidden_size}, weight_ih.options());
+
+  at::Tensor cx_;
+  if (hx_.storage().unsafeGetStorageImpl() ==
+      cx_tmp.storage().unsafeGetStorageImpl()) {
+    cx_ = at::clone(cx_tmp);
+  } else {
+    cx_ = cx_tmp;
+  }
+
+  // per layer input size
+  int64_t input_size = input.size(2);
+  auto x = torch_ipex::cpu::itensor_view_from_dense(
+      input,
+      rnn.src_layer_desc(input_size, get_mkldnn_dtype(input.scalar_type())));
+  auto hx = torch_ipex::cpu::itensor_view_from_dense(
+      hx_, rnn.src_iter_desc(get_mkldnn_dtype(hx_.scalar_type())));
+  auto cx = torch_ipex::cpu::itensor_view_from_dense(
+      cx_, rnn.src_iter_c_desc(get_mkldnn_dtype(cx_.scalar_type())));
+  auto w1 = torch_ipex::cpu::itensor_view_from_dense(
+      weight_ih,
+      rnn.weights_layer_desc(
+          input_size, get_mkldnn_dtype(weight_ih.scalar_type())));
+  auto w2 = torch_ipex::cpu::itensor_view_from_dense(
+      weight_hh,
+      rnn.weights_iter_desc(get_mkldnn_dtype(weight_hh.scalar_type())));
+  auto b = torch_ipex::cpu::itensor_view_from_dense(
+      bias, rnn.bias_desc(get_mkldnn_dtype(bias.scalar_type())));
+  auto y = torch_ipex::cpu::itensor_view_from_dense(
+      output, rnn.dst_layer_desc(get_mkldnn_dtype(output.scalar_type())));
+  auto hy = torch_ipex::cpu::itensor_view_from_dense(
+      hy_, rnn.dst_iter_desc(get_mkldnn_dtype(hy_.scalar_type())));
+  auto cy = torch_ipex::cpu::itensor_view_from_dense(
+      cy_, rnn.dst_iter_c_desc(get_mkldnn_dtype(cy_.scalar_type())));
+
+  // Create diff_* ATen tensor and corresponding ideep tensor as fp32
+  auto diff_x_ =
+      at::empty(input.sizes(), input.options().dtype(at::ScalarType::Float));
+  auto diff_hx_ =
+      at::empty(hx_.sizes(), hx_.options().dtype(at::ScalarType::Float));
+  auto diff_cx_ =
+      at::empty(cx_.sizes(), cx_.options().dtype(at::ScalarType::Float));
+  auto diff_w1_ = at::empty(
+      weight_ih.sizes(), weight_ih.options().dtype(at::ScalarType::Float));
+  auto diff_w2_ = at::empty(
+      weight_hh.sizes(), weight_hh.options().dtype(at::ScalarType::Float));
+  auto diff_b_ =
+      at::empty(bias.sizes(), bias.options().dtype(at::ScalarType::Float));
+
+  auto diff_x = torch_ipex::cpu::itensor_view_from_dense(
+      diff_x_, rnn.src_layer_desc(input_size, ideep::tensor::data_type::f32));
+  auto diff_hx = torch_ipex::cpu::itensor_view_from_dense(
+      diff_hx_, rnn.src_iter_desc(ideep::tensor::data_type::f32));
+  auto diff_cx = torch_ipex::cpu::itensor_view_from_dense(
+      diff_cx_, rnn.src_iter_c_desc(ideep::tensor::data_type::f32));
+  auto diff_w1 = torch_ipex::cpu::itensor_view_from_dense(
+      diff_w1_,
+      rnn.weights_layer_desc(input_size, ideep::tensor::data_type::f32));
+  auto diff_w2 = torch_ipex::cpu::itensor_view_from_dense(
+      diff_w2_, rnn.weights_iter_desc(ideep::tensor::data_type::f32));
+  auto diff_b = torch_ipex::cpu::itensor_view_from_dense(
+      diff_b_, rnn.bias_desc(ideep::tensor::data_type::f32));
+
+  // Convert grad_y, grad_hy, grad_cy to fp32 in non-fp32 backward
+  ideep::tensor diff_y, diff_hy, diff_cy;
+  at::Tensor grad_y_, grad_hy_, grad_cy_;
+  if (input.scalar_type() != at::ScalarType::Float) {
+    grad_y_ = at::empty(
+        grad_output.sizes(),
+        grad_output.options().dtype(at::ScalarType::Float));
+    grad_y_.copy_(grad_output);
+    grad_hy_ = at::empty(
+        grad_hy.sizes(), grad_hy.options().dtype(at::ScalarType::Float));
+    grad_hy_.copy_(grad_hy);
+    grad_cy_ = at::empty(
+        grad_cy.sizes(), grad_cy.options().dtype(at::ScalarType::Float));
+    grad_cy_.copy_(grad_cy);
+
+    diff_y = torch_ipex::cpu::itensor_view_from_dense(
+        grad_y_, rnn.dst_layer_desc(get_mkldnn_dtype(grad_y_.scalar_type())));
+    diff_hy = torch_ipex::cpu::itensor_view_from_dense(
+        grad_hy_, rnn.dst_iter_desc(get_mkldnn_dtype(grad_hy_.scalar_type())));
+    diff_cy = torch_ipex::cpu::itensor_view_from_dense(
+        grad_cy_, rnn.dst_iter_desc(get_mkldnn_dtype(grad_cy_.scalar_type())));
+  } else {
+    diff_y = torch_ipex::cpu::itensor_view_from_dense(
+        grad_output, rnn.dst_layer_desc(ideep::tensor::data_type::f32));
+    diff_hy = torch_ipex::cpu::itensor_view_from_dense(
+        grad_hy, rnn.dst_iter_desc(ideep::tensor::data_type::f32));
+    diff_cy = torch_ipex::cpu::itensor_view_from_dense(
+        grad_cy, rnn.dst_iter_desc(ideep::tensor::data_type::f32));
+  }
+
+  auto forward_hint = ideep::lstm_forward_training::prepare(
+      x, hx, cx, w1, w2, b, y, hy, cy, reverse);
+  ideep::tensor mkldnn_workspace;
+  mkldnn_workspace.init(
+      forward_hint.workspace_desc(), workspace.template data_ptr<uint8_t>());
+  ideep::lstm_backward::compute(
+      forward_hint,
+      x,
+      hx,
+      cx,
+      w1,
+      w2,
+      b,
+      y,
+      hy,
+      cy,
+      diff_y,
+      diff_hy,
+      diff_cy,
+      mkldnn_workspace,
+      diff_x,
+      diff_hx,
+      diff_cx,
+      diff_w1,
+      diff_w2,
+      diff_b,
       reverse);
-
-  ideep::lstm_forward::compute(x, hx, cx, w1, w2, b, y, hy, cy, reverse);
-
-  return output;
+  return {diff_x_, diff_w1_, diff_w2_, diff_b_, diff_b_, diff_hx_, diff_cx_};
 }
 
 // MKLDNN RNN integration notes:
@@ -239,13 +756,24 @@ at::Tensor mkldnn_rnn_layer(at::Tensor &hy_, at::Tensor &cy_,
 // TODO: a. training with dropout
 //   b. padded sequence input support
 //
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-mkldnn_rnn(const at::Tensor &input_, at::TensorList weight,
-           int64_t weight_stride0, const at::Tensor &hx_, const at::Tensor &cx_,
-           int64_t mode, int64_t hidden_size, int64_t num_layers,
-           bool batch_first, double dropout_p, bool train, bool bidirectional,
-           at::IntArrayRef batch_sizes) {
-  TORCH_CHECK(!train || dropout_p == 0.0, "mkldnn_rnn doesn't support dropout");
+std::tuple<at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn(
+    const at::Tensor& input_,
+    at::TensorList weight,
+    int64_t weight_stride0,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool batch_first,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    at::IntArrayRef batch_sizes) {
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::cpu::mkldnn_rnn\n");
+#endif
   TORCH_CHECK(batch_sizes.size() == 0,
               "mkldnn_rnn doesn't support packed input");
   if (static_cast<ideep::rnn_kind>(mode) != ideep::rnn_kind::LSTM) {
@@ -253,89 +781,76 @@ mkldnn_rnn(const at::Tensor &input_, at::TensorList weight,
                 "mkldnn_rnn: illegal defined cx for non-LSTM RNN");
   }
 
-  RNNParams fn(input_, batch_sizes, mode, hidden_size, num_layers,
-               bidirectional, batch_first, train);
-
   auto input = input_;
-  if (batch_first && !fn.is_input_packed()) {
+  bool is_input_packed = batch_sizes.size() != 0;
+  if (batch_first && !is_input_packed) {
     input = input.transpose(0, 1);
   }
   input = input.contiguous();
 
   auto hx = hx_.contiguous();
-  auto cx = cx_.defined() ? cx_.contiguous() : at::Tensor();
+  auto cx = cx_.contiguous();
 
-  auto hy = at::empty(_hidden_size(fn), hx.options());
-  // NB: Not allowed to return undefined tensors
-  auto cy = cx.defined() ? at::empty(_hidden_size(fn), cx.options())
-                         : at::empty({0}, hx.options());
+  at::MatrixRef<at::Tensor> weights{
+      weight, static_cast<size_t>(weight_stride0)};
 
-  at::MatrixRef<at::Tensor> weights{weight,
-                                    static_cast<size_t>(weight_stride0)};
-
-  auto num_directions = fn.num_directions;
+  auto num_directions = bidirectional ? 2 : 1;
   auto layer_input = input;
+  std::vector<at::Tensor> layer_output(num_directions);
+  std::vector<at::Tensor> layer_hy(num_layers * num_directions);
+  std::vector<at::Tensor> layer_cy(num_layers * num_directions);
   for (int64_t layer = 0; layer < num_layers; layer++) {
-    std::vector<at::Tensor> layer_output(num_directions);
     for (int64_t direction = 0; direction < num_directions; direction++) {
       auto index = layer * num_directions + direction;
       auto layer_weights = weights[index];
+      TORCH_CHECK(layer_weights.size() == 2 || layer_weights.size() == 4);
       auto layer_hx = hx[index];
-      auto layer_hy = hy[index];
-      auto layer_cx = cx.defined() ? cx[index] : at::Tensor();
-      auto layer_cy =
-          cx.defined() ? cy[index] : at::empty({0}, input.options());
+      auto layer_cx = cx[index];
       auto reverse = (direction > 0);
-      layer_output[direction] =
-          mkldnn_rnn_layer(layer_hy, layer_cy, layer_input, layer_weights,
-                           layer_hx, layer_cx, reverse, fn);
+      static auto op = torch::Dispatcher::singleton()
+                           .findSchemaOrThrow("torch_ipex::ipex_lstm_layer", "")
+                           .typed<decltype(ipex_lstm_layer)>();
+      auto outputs = op.call(
+          layer_input,
+          layer_weights[0],
+          layer_weights[1],
+          has_biases
+              ? layer_weights[2]
+              : at::zeros(layer_weights[0].sizes(), layer_weights[0].options()),
+          has_biases
+              ? layer_weights[3]
+              : at::zeros(layer_weights[1].sizes(), layer_weights[1].options()),
+          layer_hx,
+          layer_cx,
+          reverse,
+          batch_sizes,
+          mode,
+          hidden_size,
+          num_layers,
+          has_biases,
+          bidirectional,
+          batch_first,
+          train);
+      layer_output[direction] = outputs[0];
+      layer_hy[index] = outputs[1];
+      layer_cy[index] = outputs[2];
     }
+
     layer_input = num_directions == 1
-                      ? layer_output[0]
-                      : at::cat(layer_output, /*output_channels*/ -1);
+        ? layer_output[0]
+        : at::cat(layer_output, /*output_channels*/ -1);
+    if (dropout_p != 0 && train && layer < num_layers - 1) {
+      layer_input = at::dropout(layer_input, dropout_p, /*train=*/true);
+    }
   }
   auto output = layer_input;
-
-  if (batch_first && !fn.is_input_packed()) {
-    output.transpose_(0, 1);
+  auto hy = at::stack(layer_hy, 0);
+  auto cy = at::stack(layer_cy, 0);
+  if (batch_first && !is_input_packed) {
+    output = output.transpose(0, 1);
   }
-
-  return std::make_tuple(output, hy, cy, at::Tensor());
+  return std::make_tuple(output, hy, cy);
 }
-
-namespace {
-
-// Helpers for working with different hidden types.
-std::tuple<at::Tensor, at::Tensor> unpack_hidden(const at::Tensor &hidden) {
-  return std::make_tuple(hidden, at::Tensor{});
-}
-
-std::tuple<at::Tensor, at::Tensor>
-unpack_hidden(const std::tuple<at::Tensor, at::Tensor> &hidden) {
-  return hidden;
-}
-
-template <typename hidden_type>
-hidden_type pack_hidden(const at::Tensor &hx, const at::Tensor &cx) {
-  static_assert(std::is_same<hidden_type, void>::value,
-                "pack_hidden not implemented for this type");
-  AT_ERROR("NOT IMPLEMENTED");
-}
-
-template <>
-at::Tensor pack_hidden<at::Tensor>(const at::Tensor &hx, const at::Tensor &cx) {
-  AT_ASSERT(cx.numel() == 0);
-  return hx;
-}
-
-template <>
-std::tuple<at::Tensor, at::Tensor>
-pack_hidden<std::tuple<at::Tensor, at::Tensor>>(const at::Tensor &hx,
-                                                const at::Tensor &cx) {
-  return std::make_tuple(hx, cx);
-}
-
-} // anonymous namespace
 
 template <typename hidden_type>
 std::pair<at::Tensor, hidden_type>
@@ -343,80 +858,166 @@ mkldnn_impl(const at::Tensor &input, const hidden_type &hidden,
             at::TensorList params, bool has_biases, ideep::rnn_kind mode,
             int64_t num_layers, double dropout_p, bool train,
             bool bidirectional, bool batch_first) {
-
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::cpu::mkldnn_impl\n");
+#endif
   at::Tensor hx, cx;
   std::tie(hx, cx) = unpack_hidden(hidden);
   int64_t hidden_size = hx.size(2);
-
-  // mkldnn_output = std::tuple<output, hy, cy, workspace>
-  auto mkldnn_output =
-      mkldnn_rnn(input, params, has_biases ? 4 : 2, hx, cx,
-                 static_cast<int>(mode), hidden_size, num_layers, batch_first,
-                 dropout_p, train, bidirectional, /*batch_sizes*/ {});
-
+  auto mkldnn_output = mkldnn_rnn(
+      input,
+      params,
+      has_biases ? 4 : 2,
+      hx,
+      cx,
+      static_cast<int>(mode),
+      hidden_size,
+      num_layers,
+      has_biases,
+      batch_first,
+      dropout_p,
+      train,
+      bidirectional,
+      /*batch_sizes*/ {});
   return {std::get<0>(mkldnn_output),
           pack_hidden<hidden_type>(std::get<1>(mkldnn_output),
                                    std::get<2>(mkldnn_output))};
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor>
-AtenIpexTypeExt::lstm(const at::Tensor &input, std::vector<at::Tensor> hx,
-                      std::vector<at::Tensor> params, bool has_biases,
-                      int64_t num_layers, double dropout_p, bool train,
-                      bool bidirectional, bool batch_first) {
-#if defined(IPEX_DISP_OP)
-  printf("IpexExternal::lstm\n");
-#endif
+} // namespace cpu
+} // namespace torch_ipex
+
+namespace torch_ipex {
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::ipex_lstm(
+    const at::Tensor& input,
+    std::vector<at::Tensor> hx,
+    std::vector<at::Tensor> params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::lstm", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("AtenIpexTypeExt::ipex_lstm", std::vector<c10::IValue>({}));
 #endif
-  auto result = mkldnn_impl(input, std::make_tuple(hx[0], hx[1]), params,
-                            has_biases, ideep::rnn_kind::LSTM, num_layers,
-                            dropout_p, train, bidirectional, batch_first);
+#if defined(IPEX_DISP_OP)
+  printf("AtenIpexTypeExt::ipex_lstm\n");
+#endif
+  auto result = cpu::mkldnn_impl(
+      input,
+      std::make_tuple(hx[0], hx[1]),
+      params,
+      has_biases,
+      ideep::rnn_kind::LSTM,
+      num_layers,
+      dropout_p,
+      train,
+      bidirectional,
+      batch_first);
   auto output = result.first;
   auto hy = std::get<0>(result.second);
   auto cy = std::get<1>(result.second);
-
   return std::make_tuple(output, hy, cy);
 }
-
 } // namespace torch_ipex
 
 namespace {
-static auto dispatch = torch::RegisterOperators().op(
-    "torch_ipex::lstm", &torch_ipex::AtenIpexTypeExt::lstm);
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "ipex_lstm(Tensor input, Tensor[] hx, Tensor[] params, bool has_biases, int num_layers, float dropout_p, bool train, bool bidirectional, bool batch_first) -> (Tensor, Tensor, Tensor)",
+      torch_ipex::AtenIpexTypeExt::ipex_lstm);
+  m.impl(
+      "ipex_lstm",
+      c10::DispatchKey::CPU,
+      torch_ipex::AtenIpexTypeExt::ipex_lstm);
+  m.def(
+      "ipex_lstm_layer(Tensor input, Tensor weight0, Tensor weight1, Tensor weight2, Tensor weight3, Tensor hx_, Tensor cx_, bool reverse, int[] batch_sizes, int mode, int hidden_size, int num_layers, bool has_biases, bool bidirectional, bool batch_first, bool train) -> Tensor[]");
+  m.impl(
+      "ipex_lstm_layer",
+      c10::DispatchKey::Autograd,
+      torch_ipex::cpu::ipex_lstm_layer);
+  m.impl(
+      "ipex_lstm_layer",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::ipex_lstm_layer_forward);
+  m.def(
+      "ipex_lstm_layer_backward(Tensor input, Tensor weight1, Tensor weight2, Tensor weight3, Tensor weight4, Tensor hx_, Tensor cx_tmp, Tensor output, Tensor hy_, Tensor cy_, Tensor grad_output, Tensor grad_hy, Tensor grad_cy, bool reverse, int mode, int hidden_size, int num_layers, bool has_biases, bool train, bool bidirectional, int[] batch_sizes, bool batch_first, Tensor workspace) -> Tensor[]");
+  m.impl(
+      "ipex_lstm_layer_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::ipex_lstm_layer_backward);
 }
+} // namespace
 
 namespace torch_ipex {
 namespace autocast {
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor>
-lstm(const at::Tensor &input, std::vector<at::Tensor> hx,
-     std::vector<at::Tensor> params, bool has_biases, int64_t num_layers,
-     double dropout_p, bool train, bool bidirectional, bool batch_first) {
+std::vector<at::Tensor> ipex_lstm_layer(
+    const at::Tensor& input,
+    const at::Tensor& weight0,
+    const at::Tensor& weight1,
+    const at::Tensor& weight2,
+    const at::Tensor& weight3,
+    const at::Tensor& hx_,
+    const at::Tensor& cx_,
+    bool reverse,
+    at::IntArrayRef batch_sizes,
+    int64_t mode,
+    int64_t hidden_size,
+    int64_t num_layers,
+    bool has_biases,
+    bool bidirectional,
+    bool batch_first,
+    bool train) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::lstm", "")
-                       .typed<decltype(lstm)>();
+                       .findSchemaOrThrow("torch_ipex::ipex_lstm_layer", "")
+                       .typed<decltype(ipex_lstm_layer)>();
 #if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("lstm");
+  verbose::OpNameGuard op_name("ipex_lstm_layer");
+#endif
+#if defined(IPEX_DISP_OP)
+  printf("torch_ipex::autocast::ipex_lstm_layer\n");
 #endif
   auto target_type = get_autocast_dtype();
   // only have bf16 support now, keep fp32 for other target_type
-  bool cast_to_bfloat16 =
-      !at::GradMode::is_enabled() && at::kBFloat16 == target_type;
+  bool cast_to_bfloat16 = at::kBFloat16 == target_type;
   auto casted_input =
       cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, input) : input;
-
-  auto casted_hx = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, hx) : hx;
-  auto casted_params =
-      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, params) : params;
-  return op.call(casted_input, casted_hx, casted_params, has_biases, num_layers,
-                 dropout_p, train, bidirectional, batch_first);
+  auto casted_hx_ =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, hx_) : hx_;
+  auto casted_cx_ =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, cx_) : cx_;
+  auto casted_weight0 =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight0) : weight0;
+  auto casted_weight1 =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight1) : weight1;
+  auto casted_weight2 =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight2) : weight2;
+  auto casted_weight3 =
+      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight3) : weight3;
+  return op.call(
+      casted_input,
+      casted_weight0,
+      casted_weight1,
+      casted_weight2,
+      casted_weight3,
+      casted_hx_,
+      casted_cx_,
+      reverse,
+      batch_sizes,
+      mode,
+      hidden_size,
+      num_layers,
+      has_biases,
+      bidirectional,
+      batch_first,
+      train);
 }
 
 TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl("lstm", torch_ipex::autocast::lstm);
+  m.impl("ipex_lstm_layer", torch_ipex::autocast::ipex_lstm_layer);
 }
 
 } // namespace autocast

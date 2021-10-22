@@ -272,7 +272,7 @@ ideep::tensor get_linear_packed_weight(
 
 bool is_packed(const at::Tensor& weight) {
   auto cached_weight = read_cached_weights(weight);
-  return cached_weight.is_empty();
+  return !cached_weight.is_empty();
 }
 
 std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
@@ -286,7 +286,23 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
     const ideep::tensor& src_iter,
     const ideep::tensor& src_iter_c,
     const ideep::tensor& bias,
-    const bool reverse) {
+    const bool reverse,
+    const bool train) {
+  // TODO: This is a workaround. In training, weight prepack is not enabled
+  // Will remove this when weight prepack is enabled.
+  if (train) {
+    auto w1 = itensor_view_from_dense(
+        weight_ih,
+        {{1, 1, input_size, num_gates, hidden_size},
+         get_mkldnn_dtype(weight_ih.scalar_type()),
+         ideep::format_tag::ldgoi});
+    auto w2 = itensor_view_from_dense(
+        weight_hh,
+        {{1, 1, hidden_size, num_gates, hidden_size},
+         get_mkldnn_dtype(weight_hh.scalar_type()),
+         ideep::format_tag::ldgoi});
+    return std::make_tuple(w1, w2);
+  }
   auto cached_weight_ih = read_cached_weights(weight_ih);
   auto cached_weight_hh = read_cached_weights(weight_hh);
   bool all_in_cache =
@@ -309,16 +325,29 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
          ideep::format_tag::ldgoi});
 
     ideep::tensor::desc packed_desc_ih, packed_desc_hh;
-    std::tie(packed_desc_ih, packed_desc_hh) =
-        ideep::lstm_forward::expected_weights_desc(
-            output_sizes,
-            src_layer,
-            src_iter,
-            src_iter_c,
-            w1,
-            w2,
-            bias,
-            reverse);
+    if (train) {
+      std::tie(packed_desc_ih, packed_desc_hh) =
+          ideep::lstm_forward_training::expected_weights_desc(
+              output_sizes,
+              src_layer,
+              src_iter,
+              src_iter_c,
+              w1,
+              w2,
+              bias,
+              reverse);
+    } else {
+      std::tie(packed_desc_ih, packed_desc_hh) =
+          ideep::lstm_forward_inference::expected_weights_desc(
+              output_sizes,
+              src_layer,
+              src_iter,
+              src_iter_c,
+              w1,
+              w2,
+              bias,
+              reverse);
+    }
 
     // Don't pack when the weight is of rnn_packed format
     // When the weight is of rnn_packed format, if the seq_lens of

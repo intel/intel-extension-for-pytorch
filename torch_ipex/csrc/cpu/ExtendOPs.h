@@ -45,6 +45,17 @@ class AtenIpexTypeExt {
     int64_t sampling_ratio,
     bool aligned);
 
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
+      const at::Tensor& input,
+      std::vector<at::Tensor> hx,
+      std::vector<at::Tensor> params,
+      bool has_biases,
+      int64_t num_layers,
+      double dropout_p,
+      bool train,
+      bool bidirectional,
+      bool batch_first);
+
   /// \brief Perform non-maximum suppression.
   ///
   /// \param dets: predicted loc in ltrb format for one batchsize, size [number_boxes, 4], for example: [200, 4].
@@ -166,9 +177,6 @@ class AtenIpexTypeExt {
                         const at::Tensor& dboxes_xywh,
                         const double scale_xy,
                         const double scale_wh);
-  static std::tuple<at::Tensor, at::Tensor, at::Tensor> lstm(
-      const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
-      int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
   static at::Tensor cumsum(at::Tensor &result, const at::Tensor &self,
                            int64_t dim, c10::optional<at::ScalarType> dtype);
 };

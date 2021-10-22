@@ -72,7 +72,8 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
     const ideep::tensor& src_iter,
     const ideep::tensor& src_iter_c,
     const ideep::tensor& bias,
-    const bool reverse);
+    const bool reverse,
+    const bool train);
 
 bool is_packed(const at::Tensor& weight);
 
