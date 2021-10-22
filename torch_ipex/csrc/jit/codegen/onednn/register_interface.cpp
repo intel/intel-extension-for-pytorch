@@ -13,6 +13,7 @@ bool canFuseNode(const Node* node) {
       node->kind() == Symbol::aten("quantize_per_channel") ||
       node->kind() == Symbol::aten("dequantize") ||
       node->kind() == Symbol::aten("_convolution") ||
+      node->kind() == Symbol::aten("add") ||
       node->kind() ==
           Symbol::fromQualString("torch_ipex::convolution_forward") ||
       node->kind() == Symbol::fromQualString("torch_ipex::ipex_linear"));

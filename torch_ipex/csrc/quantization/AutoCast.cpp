@@ -369,6 +369,16 @@ at::Tensor& add_tensor_(
     at::Tensor& input,
     const at::Tensor& other,
     const at::Scalar& alpha) {
+  // if add has one scalar tensor or not float, bfloat16 dtype, we will not do
+  // int8 path.
+  if (input.ndimension() == 0 || other.ndimension() == 0 ||
+      !(input.scalar_type() == at::kFloat ||
+        input.scalar_type() == at::kBFloat16) ||
+      !(other.scalar_type() == at::kFloat ||
+        other.scalar_type() == at::kBFloat16)) {
+    input.add_(other, alpha);
+    return input;
+  }
   // always add id, but not compute scales or insert quant and dequant.
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
@@ -384,6 +394,15 @@ at::Tensor add_tensor(
     const at::Tensor& input,
     const at::Tensor& other,
     const at::Scalar& alpha) {
+  // if add has one scalar tensor or not float, bfloat16 dtype, we will not do
+  // int8 path.
+  if (input.ndimension() == 0 || other.ndimension() == 0 ||
+      !(input.scalar_type() == at::kFloat ||
+        input.scalar_type() == at::kBFloat16) ||
+      !(other.scalar_type() == at::kFloat ||
+        other.scalar_type() == at::kBFloat16)) {
+    return at::add(input, other, alpha);
+  }
   // always add id, but not compute scales or insert quant and dequant.
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (torch_ipex::check_int8_calibration()) {
