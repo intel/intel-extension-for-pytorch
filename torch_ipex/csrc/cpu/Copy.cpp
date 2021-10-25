@@ -11,6 +11,7 @@
 #include <ATen/native/quantized/Copy.h>
 #include <ATen/native/quantized/affine_quantizer.h>
 #include <ATen/quantized/Quantizer.h>
+#include <ATen/record_function.h>
 #include <c10/util/TypeCast.h>
 
 #ifdef USE_FBGEMM

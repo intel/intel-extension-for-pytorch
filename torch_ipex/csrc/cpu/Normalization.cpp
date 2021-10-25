@@ -8,6 +8,7 @@
 #include <ATen/cpu/vec/functional.h>
 #include <ATen/cpu/vec/vec.h>
 #include <ATen/native/cpu/utils.h>
+#include <ATen/record_function.h>
 
 #include <ATen/detail/CUDAHooksInterface.h>
 #include <ATen/native/TensorIterator.h>

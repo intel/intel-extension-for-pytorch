@@ -4,6 +4,7 @@
 #include <ATen/Parallel.h>
 #include <ATen/cpu/vec/vec.h>
 #include <ATen/native/cpu/utils.h>
+#include <ATen/record_function.h>
 
 #include "AdaptiveAveragePooling.h"
 

@@ -8,6 +8,7 @@
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/Pool.h>
 #include <ATen/native/cpu/utils.h>
+#include <ATen/record_function.h>
 
 #include "torch_ipex/csrc/library.h"
 
