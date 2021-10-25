@@ -384,6 +384,23 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::mha_scores_calc(Tensor q, Tensor k, Tensor rel_qk, Scalar alpha, "
+        "Scalar dim_per_head, int softmax_dim, ScalarType ? dtype) -> Tensor",
+        [](Stack& stack) {
+          auto result = AtenIpexJITDev::dil_mha_scores_calc(
+              peek(stack, 0, 7).toTensor(),
+              peek(stack, 1, 7).toTensor(),
+              peek(stack, 2, 7).toTensor(),
+              peek(stack, 3, 7).toScalar(),
+              peek(stack, 4, 7).toScalar(),
+              peek(stack, 5, 7).toInt(),
+              peek(stack, 6, 7));
+          drop(stack, 7);
+          pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::softmax(Tensor self, int dim, ScalarType ? dtype) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack *stack) {

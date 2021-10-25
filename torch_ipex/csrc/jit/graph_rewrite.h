@@ -28,6 +28,7 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
 void replaceAtenTransposeConvolutionWithIpexTransposeConv(
     std::shared_ptr<Graph>& graph);
 void FuseShuffle(std::shared_ptr<Graph>& graph);
+void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
 
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph);
