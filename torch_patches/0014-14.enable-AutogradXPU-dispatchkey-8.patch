@@ -1,7 +1,7 @@
-From a01331930ac946e19233dab55222dc1ae9d4287d Mon Sep 17 00:00:00 2001
+From 7ee70da6ecee4a80dd07207e6f7c93d6a3c474f4 Mon Sep 17 00:00:00 2001
 From: xiaolil1 <xiaoli.liu@intel.com>
 Date: Thu, 1 Jul 2021 16:20:32 +0800
-Subject: [PATCH 14/14] 14.enable AutogradXPU dispatchkey (#8)
+Subject: [PATCH 14/17] 14.enable AutogradXPU dispatchkey (#8)
 
 ---
  aten/src/ATen/core/VariableFallbackKernel.cpp | 4 ++++

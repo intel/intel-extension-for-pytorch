@@ -1,7 +1,7 @@
-From 4071ed47809fd3f237c63a8d94bbbdc941363737 Mon Sep 17 00:00:00 2001
+From f9e34d4db1ee12887c1af0b36516b6b4fe1a096f Mon Sep 17 00:00:00 2001
 From: wuhuikx <hui.h.wu@intel.com>
 Date: Fri, 11 Jun 2021 15:15:39 +0800
-Subject: [PATCH 09/14] 9.Support fused_dropout with XPU backend (#3)
+Subject: [PATCH 09/17] 9.Support fused_dropout with XPU backend (#3)
 
 ---
  aten/src/ATen/native/Dropout.cpp | 2 +-

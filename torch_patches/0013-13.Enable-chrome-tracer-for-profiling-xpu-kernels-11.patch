@@ -1,7 +1,7 @@
-From 9a9b46dc0feea76da55e03d1c1d17084d0322453 Mon Sep 17 00:00:00 2001
+From d914ce06f839351f182a631402bd6f7866263ccc Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Tue, 6 Jul 2021 16:17:51 +0800
-Subject: [PATCH 13/14] 13.Enable chrome tracer for profiling xpu kernels (#11)
+Subject: [PATCH 13/17] 13.Enable chrome tracer for profiling xpu kernels (#11)
 
 Co-authored-by: Xunsong, Huang <xunsong.huang@intel.com>
 ---

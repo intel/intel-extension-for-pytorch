@@ -1,7 +1,7 @@
-From 728e67bee3f17e08fad65dc2fa7b20e583d33bd6 Mon Sep 17 00:00:00 2001
+From 7e7fa60d19ef9e231dcac541f71d22fc14c9722b Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Thu, 29 Oct 2020 21:49:28 +0800
-Subject: [PATCH 01/14] 1.Add intel XPU changes which are already in master
+Subject: [PATCH 01/17] 1.Add intel XPU changes which are already in master
  pytorch.
 
 ---

@@ -1,7 +1,7 @@
-From d10668eea8ebefee17be1e993f8b814c7e74be79 Mon Sep 17 00:00:00 2001
+From 60e513b65271d0a7184dcae2dbd6f8e45baa4e06 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Thu, 4 Mar 2021 20:59:55 +0800
-Subject: [PATCH 07/14] 7.Add API for intel XPU to register new tensor type.
+Subject: [PATCH 07/17] 7.Add API for intel XPU to register new tensor type.
 
 ---
  setup.py                            |   1 +

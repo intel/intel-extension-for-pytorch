@@ -1,7 +1,7 @@
-From 388bc4eda39f758f0001ecc05cd61f571c31441d Mon Sep 17 00:00:00 2001
+From 0b882e441dd8c6914bc622146b94f9bd5560708d Mon Sep 17 00:00:00 2001
 From: Ye Ting <ting.ye@intel.com>
 Date: Mon, 11 Jan 2021 23:11:01 +0800
-Subject: [PATCH 05/14] 5.Add intel XPU JIT support
+Subject: [PATCH 05/17] 5.Add intel XPU JIT support
 
 ---
  c10/core/Device.h                          |  5 ++++

@@ -1,0 +1,580 @@
+From 0ecf0b5b952a8e4e08006eacf5d933d6c79ae7fe Mon Sep 17 00:00:00 2001
+From: KevinYuk <kevin.yu@intel.com>
+Date: Thu, 21 Oct 2021 16:18:04 +0800
+Subject: [PATCH 17/17] 17. channels last 1d support for 3D tensor, enable
+ conv1d for channels last 1d feature, enable conv weights pollution for 3D
+ tensor weight (#18)
+
+* channels last 1d support for 3D tensor
+
+* enable conv1d for channels last 1d feature and enable conv weights pollution for 3D tensor weight
+
+* code clean
+
+* code clean
+
+* bypass contiguous conversation for xpu
+
+* add test case for channels last 1d feature
+---
+ aten/src/ATen/native/Convolution.cpp      |  2 +-
+ aten/src/ATen/templates/Functions.h       |  3 ++
+ aten/src/ATen/templates/TensorBody.h      |  8 ++-
+ c10/core/MemoryFormat.h                   | 65 ++++++++++++++++++++++-
+ c10/core/TensorImpl.cpp                   | 36 ++++++++++++-
+ c10/core/TensorImpl.h                     | 59 ++++++++++++++++----
+ test/test_sparse.py                       | 13 +++--
+ test/test_torch.py                        | 32 ++++++++++-
+ torch/csrc/utils/tensor_memoryformats.cpp |  1 +
+ torch/nn/modules/module.py                |  2 +-
+ 10 files changed, 201 insertions(+), 20 deletions(-)
+
+diff --git a/aten/src/ATen/native/Convolution.cpp b/aten/src/ATen/native/Convolution.cpp
+index aa3a2debfe..f28c0a811a 100644
+--- a/aten/src/ATen/native/Convolution.cpp
++++ b/aten/src/ATen/native/Convolution.cpp
+@@ -650,7 +650,7 @@ at::Tensor _convolution(
+ 
+   if (k == 3) {
+     // avoid accidentally going through NHWC for permuted 3d input.
+-    if (!input_is_mkldnn) {
++    if (!input_is_mkldnn && !input.is_xpu()) {
+       input = input.contiguous();
+     }
+     params.view1d_as_2d();
+diff --git a/aten/src/ATen/templates/Functions.h b/aten/src/ATen/templates/Functions.h
+index 81e46642ad..9a72e507b7 100644
+--- a/aten/src/ATen/templates/Functions.h
++++ b/aten/src/ATen/templates/Functions.h
+@@ -46,6 +46,9 @@ namespace {
+   inline std::vector<int64_t> zero_sizes(const TensorOptions& options) {
+     if (options.has_memory_format()) {
+       auto memory_format = *options.memory_format_opt();
++      if (at::MemoryFormat::ChannelsLast1d == memory_format) {
++        return {0, 0, 0};
++      }
+       if (at::MemoryFormat::ChannelsLast == memory_format) {
+         return {0, 0, 0, 0};
+       }
+diff --git a/aten/src/ATen/templates/TensorBody.h b/aten/src/ATen/templates/TensorBody.h
+index f6f48f1a08..04aeb8e451 100644
+--- a/aten/src/ATen/templates/TensorBody.h
++++ b/aten/src/ATen/templates/TensorBody.h
+@@ -232,7 +232,13 @@ class CAFFE2_API Tensor {
+     // Setting channels_last_strides_exact_match to true forces function to
+     // check 0,1 - sized dimension strides.
+     if (!is_mkldnn() && !is_sparse()) {
+-      if (impl_->is_strides_like_channels_last()) {
++      if (impl_->is_strides_like_channels_last_1d()) {
++        if (!channels_last_strides_exact_match ||
++            get_channels_last_strides_1d(sizes()) == strides()) {
++          return at::MemoryFormat::ChannelsLast1d;
++        }
++      }
++      else if (impl_->is_strides_like_channels_last()) {
+         if (!channels_last_strides_exact_match ||
+             get_channels_last_strides_2d(sizes()) == strides()) {
+           return at::MemoryFormat::ChannelsLast;
+diff --git a/c10/core/MemoryFormat.h b/c10/core/MemoryFormat.h
+index e25814cd07..c44f91c03c 100644
+--- a/c10/core/MemoryFormat.h
++++ b/c10/core/MemoryFormat.h
+@@ -24,7 +24,7 @@
+ 
+ 
+ namespace c10 {
+-enum class MemoryFormat : int8_t { Contiguous, Preserve, ChannelsLast, ChannelsLast3d };
++enum class MemoryFormat : int8_t { Contiguous, Preserve, ChannelsLast1d, ChannelsLast, ChannelsLast3d };
+ 
+ // If you are seeing this, it means that this call site was not checked if
+ // the memory format could be preserved, and it was switched to old default
+@@ -43,6 +43,8 @@ inline std::ostream& operator<<(
+       return stream << "Preserve";
+     case MemoryFormat::Contiguous:
+       return stream << "Contiguous";
++    case MemoryFormat::ChannelsLast1d:
++      return stream << "ChannelsLast1d";
+     case MemoryFormat::ChannelsLast:
+       return stream << "ChannelsLast";
+     case MemoryFormat::ChannelsLast3d:
+@@ -53,6 +55,23 @@ inline std::ostream& operator<<(
+ }
+ 
+ // Note: Hardcoded the channel last stride indices here to get better performance
++inline std::vector<int64_t> get_channels_last_strides_1d(IntArrayRef sizes) {
++  std::vector<int64_t> strides(sizes.size());
++  switch (sizes.size()) {
++    case 3:
++      strides[1] = 1;
++      strides[2] = sizes[1];
++      strides[0] = strides[2] * sizes[2];
++      return strides;
++    case 2:
++      strides[0] = 1;
++      strides[1] = sizes[0];
++      return strides;
++    default:
++      TORCH_INTERNAL_ASSERT(false, "ChannelsLast1d doesn't support size ", sizes.size());
++  }
++}
++
+ inline std::vector<int64_t> get_channels_last_strides_2d(IntArrayRef sizes) {
+   std::vector<int64_t> strides(sizes.size());
+   switch (sizes.size()) {
+@@ -102,6 +121,38 @@ inline std::vector<int64_t> get_channels_last_strides_3d(IntArrayRef sizes) {
+ // performance.
+ // 2. No error check in helper function, caller ensures the correctness of the input
+ // 3. All helper functions have similar comments, only 1st helper function is commented here.
++inline bool is_channels_last_strides_1d_s3(const IntArrayRef sizes, const IntArrayRef strides) {
++  int64_t min = 0;
++  // special case for trivial C dimension. default to NCL
++  if (strides[1]==0) {
++    return false;
++  }
++  // loop strides indices
++  for (auto& d : {1, 2, 0}) {
++    if (sizes[d] == 0) {
++      return false;
++    }
++    if (strides[d] < min) {
++      return false;
++    }
++    // Fallback to NCL as default layout for ambiguous cases
++    // This is the flaw of implicit memory_format from strides.
++    // N11 tensor with identical strides for size 1 dimension;
++    // Two cases could lead us here:
++    // a. N11 contiguous Tensor ([N,1,1]@[1,1,1])
++    // b. N1L contiguous Tensor sliced on the L-dimension. ([N,1,1]@[L,L,L])
++    if (d==0 && min==strides[1]) {
++      return false;
++    }
++
++    min = strides[d];
++    if (sizes[d] > 1) {
++      min *= sizes[d];
++    }
++  }
++  return true;
++}
++
+ inline bool is_channels_last_strides_2d_s4(const IntArrayRef sizes, const IntArrayRef strides) {
+   int64_t min = 0;
+   // special case for trivial C dimension. default to NCHW
+@@ -212,6 +263,18 @@ inline bool is_channels_last_strides_3d_s5(const IntArrayRef sizes, const IntArr
+ // This is a general problem for all the is_channels_last_strides_xd implementation.
+ // Please check the helper functions (is_channels_last_strides_*d_s*) for more details.
+ 
++inline bool is_channels_last_strides_1d(const IntArrayRef sizes, const IntArrayRef strides) {
++  switch (sizes.size()) {
++    case 3:
++      return is_channels_last_strides_1d_s3(sizes, strides);
++    case 2:
++      // TODO dim == 2 case will be enabled once it is fully tested
++      return false;
++    default:
++      return false;
++  }
++}
++
+ inline bool is_channels_last_strides_2d(const IntArrayRef sizes, const IntArrayRef strides) {
+   switch (sizes.size()) {
+     case 4:
+diff --git a/c10/core/TensorImpl.cpp b/c10/core/TensorImpl.cpp
+index 8702ed4fde..0d898abff8 100644
+--- a/c10/core/TensorImpl.cpp
++++ b/c10/core/TensorImpl.cpp
+@@ -107,6 +107,31 @@ bool TensorImpl::compute_contiguous() const {
+   return is_contiguous;
+ }
+ 
++bool TensorImpl::compute_channels_last_contiguous_1d() const {
++  // Please don't combine these code, constant array is used here to let
++  // compiler fully unroll the loop to get better performance
++  switch (sizes_.size()) {
++    case 3:
++      {
++        int64_t expected = 1;
++        for (auto& d : {1, 2, 0}) {
++          if (sizes_[d] != 1) {
++            if (strides_[d] != expected) {
++              return false;
++            }
++            expected *= sizes_[d];
++          }
++        }
++        return true;
++      }
++    case 2:
++      // TODO dim == 2 case will be enabled once it is fully tested
++      return false;
++    default:
++      return false;
++  }
++}
++
+ bool TensorImpl::compute_channels_last_contiguous_2d() const {
+   // Please don't combine these code, constant array is used here to let
+   // compiler fully unroll the loop to get better performance
+@@ -157,6 +182,10 @@ bool TensorImpl::compute_channels_last_contiguous_3d() const {
+   }
+ }
+ 
++bool TensorImpl::compute_strides_like_channels_last_1d() const {
++  return is_channels_last_strides_1d(sizes_, strides_);
++}
++
+ bool TensorImpl::compute_strides_like_channels_last_2d() const {
+   return is_channels_last_strides_2d(sizes_, strides_);
+ }
+@@ -225,7 +254,10 @@ bool TensorImpl::is_contiguous(at::MemoryFormat memory_format) const {
+ #ifdef DEBUG
+   AT_ASSERT(compute_contiguous() == is_contiguous_);
+ #endif
+-  if (memory_format == at::MemoryFormat::ChannelsLast) {
++  if (memory_format == at::MemoryFormat::ChannelsLast1d) {
++      return is_channels_last_1d_contiguous_;
++  }
++  else if (memory_format == at::MemoryFormat::ChannelsLast) {
+       return is_channels_last_contiguous_;
+   }
+   else if (memory_format == at::MemoryFormat::ChannelsLast3d) {
+@@ -300,8 +332,10 @@ void TensorImpl::copy_tensor_metadata(
+   dest_impl->device_opt_ = src_impl->device_opt_;
+   dest_impl->key_set_ = src_impl->key_set_;
+   dest_impl->is_contiguous_ = src_impl->is_contiguous_;
++  dest_impl->is_channels_last_1d_contiguous_ = src_impl->is_channels_last_1d_contiguous_;
+   dest_impl->is_channels_last_contiguous_ = src_impl->is_channels_last_contiguous_;
+   dest_impl->is_channels_last_3d_contiguous_ = src_impl->is_channels_last_3d_contiguous_;
++  dest_impl->is_channels_last_1d_ = src_impl->is_channels_last_1d_;
+   dest_impl->is_channels_last_ = src_impl->is_channels_last_;
+   dest_impl->is_channels_last_3d_ = src_impl->is_channels_last_3d_;
+   dest_impl->is_non_overlapping_and_dense_ = src_impl->is_non_overlapping_and_dense_;
+diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
+index 5a39bd7ce6..7d7a8990e4 100644
+--- a/c10/core/TensorImpl.h
++++ b/c10/core/TensorImpl.h
+@@ -1407,6 +1407,13 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+         }
+         break;
+       }
++      case MemoryFormat::ChannelsLast1d: {
++        TORCH_CHECK(
++            dim() == 3,
++            "required rank 3 tensor to use channels_last format");
++        set_sizes_and_strides(sizes(), get_channels_last_strides_1d(sizes()));
++        break;
++      }
+       case MemoryFormat::ChannelsLast: {
+         TORCH_CHECK(
+             dim() == 4,
+@@ -1432,6 +1439,10 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     refresh_contiguous();
+   }
+ 
++  bool is_strides_like_channels_last_1d() const {
++    return is_channels_last_1d_;
++  }
++
+   bool is_strides_like_channels_last() const {
+     return is_channels_last_;
+   }
+@@ -1520,10 +1531,14 @@ private:
+    */
+   bool compute_contiguous() const;
+ 
++  bool compute_channels_last_contiguous_1d() const;
++
+   bool compute_channels_last_contiguous_2d() const;
+ 
+   bool compute_channels_last_contiguous_3d() const;
+ 
++  bool compute_strides_like_channels_last_1d() const;
++
+   bool compute_strides_like_channels_last_2d() const;
+ 
+   bool compute_strides_like_channels_last_3d() const;
+@@ -1545,31 +1560,47 @@ protected:
+   void refresh_contiguous() {
+     is_contiguous_ = compute_contiguous();
+     // Note:
+-    // Dim 0, 1, 2 will never be a channels last 2d/3d format
++    // Dim 0, 1  will never be a channels last 1d/2d/3d format
++    // Dim 2+ is possibly be a channels last 1d format (Dim 3 only at this point)
+     // Dim 3+ is possibly be a channels last 2d format (Dim 4 only at this point)
+     // Dim 4+ is possibly be a channels last 3d format (Dim 5 only at this point)
+     switch (dim()) {
++       case 3:
++        is_channels_last_1d_contiguous_ = compute_channels_last_contiguous_1d();
++        is_channels_last_contiguous_ = false;
++        is_channels_last_3d_contiguous_ = false;
++        is_channels_last_1d_ = compute_strides_like_channels_last_1d();
++        is_channels_last_ = false;
++        is_channels_last_3d_ = false;
++        is_non_overlapping_and_dense_ = is_contiguous_ || is_channels_last_1d_contiguous_ || compute_non_overlapping_and_dense();
++        break;
+       case 4:
+-        is_channels_last_contiguous_ = compute_channels_last_contiguous_2d();
++        is_channels_last_1d_contiguous_ = compute_channels_last_contiguous_1d();
++        is_channels_last_contiguous_ = !is_channels_last_1d_contiguous_ && compute_channels_last_contiguous_2d();
+         is_channels_last_3d_contiguous_ = false;
+-        is_channels_last_ = compute_strides_like_channels_last_2d();
++        is_channels_last_1d_ = !is_channels_last_contiguous_ && compute_strides_like_channels_last_1d();
++        is_channels_last_ = !is_channels_last_1d_ && compute_strides_like_channels_last_2d();
+         is_channels_last_3d_ = false;
+-        is_non_overlapping_and_dense_ = is_contiguous_ || is_channels_last_contiguous_ || compute_non_overlapping_and_dense();
++        is_non_overlapping_and_dense_ = is_contiguous_ || is_channels_last_1d_contiguous_ || is_channels_last_contiguous_ || compute_non_overlapping_and_dense();
+         break;
+       case 5:
+-        is_channels_last_contiguous_ = compute_channels_last_contiguous_2d();
+-        is_channels_last_3d_contiguous_ = !is_channels_last_contiguous_ && compute_channels_last_contiguous_3d();
++        is_channels_last_1d_contiguous_ = compute_channels_last_contiguous_1d();
++        is_channels_last_contiguous_ = !is_channels_last_1d_contiguous_ && compute_channels_last_contiguous_2d();
++        is_channels_last_3d_contiguous_ = !is_channels_last_1d_contiguous_ && !is_channels_last_contiguous_ && compute_channels_last_contiguous_3d();
++        is_channels_last_1d_ = !is_channels_last_contiguous_ && !is_channels_last_3d_contiguous_ && compute_strides_like_channels_last_1d();
+         is_channels_last_ = !is_channels_last_3d_contiguous_ && compute_strides_like_channels_last_2d();
+-        is_channels_last_3d_ = !is_channels_last_ && compute_strides_like_channels_last_3d();
+-        is_non_overlapping_and_dense_ = is_contiguous_ || is_channels_last_contiguous_ || is_channels_last_3d_contiguous_|| compute_non_overlapping_and_dense();
++        is_channels_last_3d_ = !is_channels_last_1d_ && !is_channels_last_ && compute_strides_like_channels_last_3d();
++        is_non_overlapping_and_dense_ = is_contiguous_ || is_channels_last_1d_contiguous_ || is_channels_last_contiguous_ || is_channels_last_3d_contiguous_|| compute_non_overlapping_and_dense();
+         break;
+       default:
++        is_channels_last_1d_contiguous_ = false;
+         is_channels_last_contiguous_ = false;
+         is_channels_last_3d_contiguous_ = false;
+-        // is_channels_last_ and is_channels_last_3d_ are suggested memory_format.
++        // is_channels_last_1d_, is_channels_last_ and is_channels_last_3d_ are suggested memory_format.
+         // Being channels_last_contiguous doesn't necessarily mean the tensor is
+         // strided like channels_last: for strides on channel dimension could suggest
+         // desired memory_layout, but it doesn't affect memory storage
++        is_channels_last_1d_ = false;
+         is_channels_last_ = false;
+         is_channels_last_3d_ = false;
+         is_non_overlapping_and_dense_ = is_contiguous_ || compute_non_overlapping_and_dense();
+@@ -1686,6 +1717,16 @@ protected:
+   // should pack this into a bitfield.
+   bool is_contiguous_ = true;
+ 
++  // Tensor is stored in the channels last 1d memory format, when dimensions
++  // order is (N)CL and C-strides < L-strides (< N-strides)
++  // (If size of any dimension is equal to 1, this dimension strides value
++  // is not taken into account).
++  bool is_channels_last_1d_ = false;
++
++  // Channels last contiguous tensor is channel last tensor which occupies
++  // contiguous memory block.
++  bool is_channels_last_1d_contiguous_ = false;
++
+   // Tensor is stored in the channels last 2d memory format, when dimensions
+   // order is (N)CHW and C-strides < W-strides < H-strides (< N-strides)
+   // (If size of any dimension is equal to 1, this dimension strides value
+diff --git a/test/test_sparse.py b/test/test_sparse.py
+index 2a0e76afe3..ba6d8823fe 100644
+--- a/test/test_sparse.py
++++ b/test/test_sparse.py
+@@ -1609,8 +1609,11 @@ class TestSparse(TestCase):
+         test_shape([2, 3, 4], [0, 4, 5, 6], [9, 12])
+ 
+         sparse_tensor, _, _ = self._gen_sparse(len([2, 3]), 9, [2, 3] + [5, 6])
+-        data = (sparse_tensor, sparse_tensor, sparse_tensor, sparse_tensor.unsqueeze(0))
+-        mem_formats = [torch.channels_last, torch.contiguous_format, torch.preserve_format, torch.channels_last_3d]
++        data = (sparse_tensor, sparse_tensor, sparse_tensor,
++                sparse_tensor.to_dense().reshape([2 * 3, 5, 6]).to_sparse(), sparse_tensor.unsqueeze(0))
++        mem_formats = [torch.channels_last, torch.contiguous_format, torch.preserve_format,
++                       torch.channels_last_1d, torch.channels_last_3d]
++        print("\n")
+         for x, mem_format in zip(data, mem_formats):
+ 
+             with self.assertRaisesRegex(RuntimeError, "memory format option is only supported by strided tensors"):
+@@ -1646,8 +1649,10 @@ class TestSparse(TestCase):
+         self.assertEqual(result.dense_dim(), sparse_tensor.dense_dim())
+ 
+         sparse_tensor, _, _ = self._gen_sparse(len([2, 3]), 9, [2, 3] + [5, 6])
+-        data = (sparse_tensor, sparse_tensor, sparse_tensor, sparse_tensor.unsqueeze(0))
+-        mem_formats = [torch.channels_last, torch.contiguous_format, torch.preserve_format, torch.channels_last_3d]
++        data = (sparse_tensor, sparse_tensor, sparse_tensor,
++                sparse_tensor.to_dense().reshape([2 * 3, 5, 6]).to_sparse(), sparse_tensor.unsqueeze(0))
++        mem_formats = [torch.channels_last, torch.contiguous_format, torch.preserve_format,
++                       torch.channels_last_1d, torch.channels_last_3d]
+         for x, mem_format in zip(data, mem_formats):
+ 
+             with self.assertRaisesRegex(RuntimeError, "memory format option is only supported by strided tensors"):
+diff --git a/test/test_torch.py b/test/test_torch.py
+index ec5f2a47f0..6bf18ed367 100644
+--- a/test/test_torch.py
++++ b/test/test_torch.py
+@@ -4277,6 +4277,7 @@ tensor([[[1.+1.j, 1.+1.j, 1.+1.j,  ..., 1.+1.j, 1.+1.j, 1.+1.j],
+                 self.assertTrue(y.is_contiguous(memory_format=memory_format))
+                 self.assertEqual(y, x)
+ 
++            test_helper(torch.randn(4, 3, 8), torch.channels_last_1d)
+             test_helper(torch.randn(4, 3, 8, 8), torch.channels_last)
+             test_helper(torch.randn(4, 3, 8, 8, 8), torch.channels_last_3d)
+ 
+@@ -4286,6 +4287,7 @@ tensor([[[1.+1.j, 1.+1.j, 1.+1.j,  ..., 1.+1.j, 1.+1.j, 1.+1.j],
+                 alias.fill_(7)
+                 self.assertEqual(x, alias)
+ 
++            test_helper(torch.randn(4, 8, 3).permute(0, 2, 1), torch.channels_last_1d)
+             test_helper(torch.randn(4, 8, 8, 3).permute(0, 3, 1, 2), torch.channels_last)
+             test_helper(torch.randn(4, 8, 8, 8, 3).permute(0, 4, 1, 2, 3), torch.channels_last_3d)
+ 
+@@ -4296,6 +4298,7 @@ tensor([[[1.+1.j, 1.+1.j, 1.+1.j,  ..., 1.+1.j, 1.+1.j, 1.+1.j],
+                 x = torch.empty(dim2, memory_format=memory_format)
+                 self.assertTrue(x.is_contiguous(memory_format=memory_format))
+ 
++            test_helper((3), (3, 3, 3), torch.channels_last_1d)
+             test_helper((3, 3), (3, 3, 3, 3), torch.channels_last)
+             test_helper((3, 3, 3), (3, 3, 3, 3, 3), torch.channels_last_3d)
+ 
+@@ -14815,6 +14818,11 @@ class TestTorchDeviceType(TestCase):
+         _test_serialization(BytesIOContext)
+ 
+     def test_memory_format_preserved_after_permute(self, device):
++        x = torch.randn(4, 3, 8, device=device)
++        nwc = x.contiguous(memory_format=torch.channels_last_1d)
++        y = nwc.permute(0, 2, 1).permute(0, 2, 1)
++        self.assertTrue(y.is_contiguous(memory_format=torch.channels_last_1d))
++
+         x = torch.randn(4, 3, 8, 8, device=device)
+         nhwc = x.contiguous(memory_format=torch.channels_last)
+         y = nhwc.permute(0, 1, 3, 2).permute(0, 1, 3, 2)
+@@ -14838,6 +14846,7 @@ class TestTorchDeviceType(TestCase):
+             flat.resize_as_(xc, memory_format=torch.preserve_format)
+             self.assertTrue(flat.is_contiguous(memory_format=memory_format))
+ 
++        test_helper((10, 3, 32), torch.channels_last_1d, device)
+         test_helper((10, 3, 32, 32), torch.channels_last, device)
+         test_helper((3, 10, 3, 32, 32), torch.channels_last_3d, device)
+ 
+@@ -14847,6 +14856,7 @@ class TestTorchDeviceType(TestCase):
+             flat.resize_(shape, memory_format=memory_format)
+             self.assertTrue(flat.is_contiguous(memory_format=memory_format))
+ 
++        test_helper((10, 3, 32), 10 * 3 * 32, torch.channels_last_1d, device)
+         test_helper((10, 3, 32, 32), 10 * 3 * 32 * 32, torch.channels_last, device)
+         test_helper((3, 10, 3, 32, 32), 3 * 10 * 3 * 32 * 32, torch.channels_last_3d, device)
+ 
+@@ -14920,6 +14930,7 @@ class TestTorchDeviceType(TestCase):
+             with self.assertRaises(RuntimeError):
+                 z = torch.empty_like(sparse, memory_format=torch.preserve_format)
+ 
++        test_helper(torch.randn(4, 3, 8, device=device), torch.channels_last_1d)
+         test_helper(torch.randn(4, 3, 8, 8, device=device), torch.channels_last)
+         test_helper(torch.randn(4, 3, 8, 8, 8, device=device), torch.channels_last_3d)
+ 
+@@ -14929,6 +14940,8 @@ class TestTorchDeviceType(TestCase):
+         self.assertEqual(x.size(), x_rep.size())
+         self.assertEqual(x.stride(), x_rep.stride())
+         self.assertEqual(x.is_contiguous(), x_rep.is_contiguous())
++        self.assertEqual(
++            x.is_contiguous(memory_format=torch.channels_last_1d), x_rep.is_contiguous(memory_format=torch.channels_last_1d))
+         self.assertEqual(x.is_contiguous(memory_format=torch.channels_last), x_rep.is_contiguous(memory_format=torch.channels_last))
+         self.assertEqual(
+             x.is_contiguous(memory_format=torch.channels_last_3d), x_rep.is_contiguous(memory_format=torch.channels_last_3d))
+@@ -15086,6 +15099,11 @@ class TestTorchDeviceType(TestCase):
+                     result.is_contiguous(memory_format=torch.contiguous_format),
+                     "result of the '{}' is not in '{}' format".format(inspect.getsource(fn).strip(), torch.contiguous_format))
+ 
++        _test_helper(
++            torch.randn((4, 3, 8), device=device).contiguous(memory_format=torch.channels_last_1d),
++            abs(torch.randn((4, 3, 8), device=device)) + 1,
++            torch.randn((1, 3, 1), device=device).contiguous(memory_format=torch.channels_last_1d),
++            torch.channels_last_1d)
+         _test_helper(
+             torch.randn((4, 3, 8, 8), device=device).contiguous(memory_format=torch.channels_last),
+             abs(torch.randn((4, 3, 8, 8), device=device)) + 1,
+@@ -16081,12 +16099,16 @@ class TestTorchDeviceType(TestCase):
+     def _test_memory_format_transformations(self, device, input_generator_fn, transformation_fn,
+                                             memory_format, compare_data=True, default_is_preserve=False):
+ 
+-        assert(memory_format == torch.channels_last or memory_format == torch.channels_last_3d)
++        assert(memory_format == torch.channels_last_1d or 
++               memory_format == torch.channels_last or
++               memory_format == torch.channels_last_3d)
+ 
+         # xc is a channels last tensor
+         xc = input_generator_fn(device)
+         # xc is not memory dense, but looks like channels last
+-        if memory_format == torch.channels_last:
++        if memory_format == torch.channels_last_1d:
++            xc = xc[..., ::2]
++        elif memory_format == torch.channels_last:
+             xc = xc[..., ::2, ::2]
+         else:
+             xc = xc[..., ::2, ::2, ::2]
+@@ -16135,6 +16157,7 @@ class TestTorchDeviceType(TestCase):
+             return tensor.to(dtype=torch.float64, **kwargs)
+ 
+         formats_shapes = (
++            (torch.channels_last_1d, (4, 3, 8)),
+             (torch.channels_last, (4, 3, 8, 8)),
+             (torch.channels_last_3d, (4, 3, 8, 8, 8)))
+ 
+@@ -16152,6 +16175,7 @@ class TestTorchDeviceType(TestCase):
+             return tensor.to(torch.float64, **kwargs)
+ 
+         formats_shapes = (
++            (torch.channels_last_1d, (4, 3, 8)),
+             (torch.channels_last, (4, 3, 8, 8)),
+             (torch.channels_last_3d, (4, 3, 8, 8, 8)))
+ 
+@@ -16169,6 +16193,7 @@ class TestTorchDeviceType(TestCase):
+             return tensor.clone(**kwargs)
+ 
+         formats_shapes = (
++            (torch.channels_last_1d, (4, 3, 8)),
+             (torch.channels_last, (4, 3, 8, 8)),
+             (torch.channels_last_3d, (4, 3, 8, 8, 8)))
+ 
+@@ -16207,6 +16232,7 @@ class TestTorchDeviceType(TestCase):
+             lambda t, **kwargs: torch.empty_like(t, **kwargs)]
+ 
+         formats_shapes = (
++            (torch.channels_last_1d, (4, 3, 8)),
+             (torch.channels_last, (4, 3, 8, 8)),
+             (torch.channels_last_3d, (4, 3, 8, 8, 8)))
+ 
+@@ -16234,6 +16260,7 @@ class TestTorchDeviceType(TestCase):
+             shortcuts += ['bfloat16']
+ 
+         formats_shapes = (
++            (torch.channels_last_1d, (4, 3, 8)),
+             (torch.channels_last, (4, 3, 8, 8)),
+             (torch.channels_last_3d, (4, 3, 8, 8, 8)))
+ 
+@@ -16261,6 +16288,7 @@ class TestTorchDeviceType(TestCase):
+             return tensor.cuda(**kwargs)
+ 
+         formats_shapes = (
++            (torch.channels_last_1d, (4, 3, 8)),
+             (torch.channels_last, (4, 3, 8, 8)),
+             (torch.channels_last_3d, (4, 3, 8, 8, 8)))
+ 
+diff --git a/torch/csrc/utils/tensor_memoryformats.cpp b/torch/csrc/utils/tensor_memoryformats.cpp
+index 9eb8f413db..3868c6f75b 100644
+--- a/torch/csrc/utils/tensor_memoryformats.cpp
++++ b/torch/csrc/utils/tensor_memoryformats.cpp
+@@ -30,6 +30,7 @@ void initializeMemoryFormats() {
+ 
+   _ADD_MEMORY_FORMAT(at::MemoryFormat::Preserve, "preserve_format");
+   _ADD_MEMORY_FORMAT(at::MemoryFormat::Contiguous, "contiguous_format");
++  _ADD_MEMORY_FORMAT(at::MemoryFormat::ChannelsLast1d, "channels_last_1d");
+   _ADD_MEMORY_FORMAT(at::MemoryFormat::ChannelsLast, "channels_last");
+   _ADD_MEMORY_FORMAT(at::MemoryFormat::ChannelsLast3d, "channels_last_3d");
+ 
+diff --git a/torch/nn/modules/module.py b/torch/nn/modules/module.py
+index 33161763a0..9d8771ff94 100644
+--- a/torch/nn/modules/module.py
++++ b/torch/nn/modules/module.py
+@@ -621,7 +621,7 @@ class Module:
+                                 'dtypes, but got desired dtype={}'.format(dtype))
+ 
+         def convert(t):
+-            if convert_to_format is not None and t.dim() == 4:
++            if convert_to_format is not None and (t.dim() == 4 or t.dim() == 3):
+                 return t.to(device, dtype if t.is_floating_point() else None, non_blocking, memory_format=convert_to_format)
+             return t.to(device, dtype if t.is_floating_point() else None, non_blocking)
+ 
+-- 
+2.25.1
+

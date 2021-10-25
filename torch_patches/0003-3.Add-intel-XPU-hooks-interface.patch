@@ -1,7 +1,7 @@
-From 905c94e95c10eed2e66b3cffbf3b2fd0f85adfa6 Mon Sep 17 00:00:00 2001
+From 61f953257de96464a1cb9f3c392f14db42a0c6cc Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Fri, 6 Nov 2020 00:12:49 +0800
-Subject: [PATCH 03/14] 3.Add intel XPU hooks interface
+Subject: [PATCH 03/17] 3.Add intel XPU hooks interface
 
 ---
  aten/src/ATen/Context.h                    | 57 ++++++++++++---

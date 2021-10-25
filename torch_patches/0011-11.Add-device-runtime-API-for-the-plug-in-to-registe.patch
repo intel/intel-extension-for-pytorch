@@ -1,7 +1,7 @@
-From 22d852d8ffee0c3d5773c8fa89c42b7addc27666 Mon Sep 17 00:00:00 2001
+From d3705765f23be5837483547c1642149270406d76 Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Tue, 6 Jul 2021 16:14:03 +0800
-Subject: [PATCH 11/14] 11.Add device runtime API for the plug-in to register
+Subject: [PATCH 11/17] 11.Add device runtime API for the plug-in to register
  platform python module into torch (#59857) (#12)
 
 Summary:

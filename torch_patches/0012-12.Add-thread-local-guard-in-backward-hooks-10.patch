@@ -1,7 +1,7 @@
-From a299a171814486e4a8b77d79ba698998e0d2326f Mon Sep 17 00:00:00 2001
+From 85d5016e2ea7922b6a72fd9ca23db7017bfc7685 Mon Sep 17 00:00:00 2001
 From: chengjunlu <chengjun.lu@intel.com>
 Date: Tue, 6 Jul 2021 16:17:11 +0800
-Subject: [PATCH 12/14] 12.Add thread local guard in backward hooks (#10)
+Subject: [PATCH 12/17] 12.Add thread local guard in backward hooks (#10)
 
 ---
  torch/csrc/autograd/engine.cpp | 12 ++++++++----

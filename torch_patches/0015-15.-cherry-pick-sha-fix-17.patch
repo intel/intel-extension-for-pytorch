@@ -1,0 +1,92 @@
+From 212d762832f49725ac4017beefbf09424d4bba3b Mon Sep 17 00:00:00 2001
+From: Kim <kimyangbaochen@vip.qq.com>
+Date: Wed, 1 Sep 2021 15:52:44 +0800
+Subject: [PATCH 15/17] 15. cherry pick sha fix (#17)
+
+* tools: Move sha check to else statement (#50773)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/50773
+
+Moves the sha check for version generation to the else clause
+since it was causing issues for users building pytorch when the .git
+directory was not present and PYTORCH_BUILD_VERSION was already set
+
+Test Plan:
+CI
+
+Closes https://github.com/pytorch/pytorch/issues/50730
+Signed-off-by: Eli Uriegas <eliuriegas@fb.com>
+
+Reviewed By: janeyx99
+
+Differential Revision: D25963486
+
+Pulled By: seemethere
+
+fbshipit-source-id: ce1b315f878d074f2ffb6b658d59cbd13150f27f
+
+* Fix the missing parameter in get_sha function (#51290)
+
+Summary:
+get_sha() function didn't pass in the pytorch_root argument, so subprocess.check_output always raise exception since pytorch_root is not defined, thus always return 'Unknown'.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/51290
+
+Reviewed By: soumith
+
+Differential Revision: D26219051
+
+Pulled By: malfet
+
+fbshipit-source-id: fee2c4f5fdfc61983559eec1600b9accb344c527
+
+Co-authored-by: Eli Uriegas <eliuriegas@fb.com>
+Co-authored-by: Gemfield <gemfield@civilnet.cn>
+---
+ tools/generate_torch_version.py | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/tools/generate_torch_version.py b/tools/generate_torch_version.py
+index 8129f38eb0..e45ce3acb1 100644
+--- a/tools/generate_torch_version.py
++++ b/tools/generate_torch_version.py
+@@ -4,7 +4,7 @@ import subprocess
+ from pathlib import Path
+ from distutils.util import strtobool
+ 
+-def get_sha():
++def get_sha(pytorch_root):
+     try:
+         return subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=pytorch_root).decode('ascii').strip()
+     except Exception:
+@@ -13,8 +13,6 @@ def get_sha():
+ def get_torch_version(sha=None):
+     pytorch_root = Path(__file__).parent.parent
+     version = open('version.txt', 'r').read().strip()
+-    if sha is None:
+-        sha = get_sha()
+ 
+     if os.getenv('PYTORCH_BUILD_VERSION'):
+         assert os.getenv('PYTORCH_BUILD_NUMBER') is not None
+@@ -23,6 +21,8 @@ def get_torch_version(sha=None):
+         if build_number > 1:
+             version += '.post' + str(build_number)
+     elif sha != 'Unknown':
++        if sha is None:
++            sha = get_sha(pytorch_root)
+         version += '+' + sha[:7]
+     return version
+ 
+@@ -40,7 +40,7 @@ if __name__ == "__main__":
+ 
+     pytorch_root = Path(__file__).parent.parent
+     version_path = pytorch_root / "torch" / "version.py"
+-    sha = get_sha()
++    sha = get_sha(pytorch_root)
+     version = get_torch_version(sha)
+ 
+     with open(version_path, 'w') as f:
+-- 
+2.25.1
+
