@@ -12,6 +12,7 @@
 
 #include "Loops.h"
 #include "comm/AccumulateType.h"
+#include "comm/PSTLFunctions.h"
 #include "comm/Pointwise.h"
 
 #ifdef USE_ONEDPL
@@ -206,8 +207,7 @@ static inline void sparse_packed_add_kernel(
         });
     auto zipped_uniqueOffsets =
         oneapi::dpl::make_zip_iterator(indices1D, uniqueOffsets);
-    auto newEnd = std::unique(
-        policy,
+    auto newEnd = at::AtenIpexTypeXPU::unique(
         zipped_uniqueOffsets,
         zipped_uniqueOffsets + nnz,
         [](auto lhs, auto rhs) {
