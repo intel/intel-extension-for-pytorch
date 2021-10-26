@@ -17,6 +17,8 @@ _default_tolerances = {
     'float16': (1e-3, 1e-3),  # This may need to be changed
 }
 
+bn_m = {1 : nn.BatchNorm1d, 2 : nn.BatchNorm2d, 3 : nn.BatchNorm3d}
+
 def _get_default_tolerance(a, b=None) -> Tuple[float, float]:
     if b is None:
         dtype = str(a.dtype).split('.')[-1]  # e.g. "float32"
@@ -213,10 +215,10 @@ class TestCustomerOps(TestCase):
 class TestBatchNorm(TestCase):
     def test_batch_norm(self):
         class M(nn.Module):
-            def __init__(self):
+            def __init__(self, conv, bn):
                 super(M, self).__init__()
-                self.conv = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-                self.bn = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+                self.conv = conv(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+                self.bn = bn(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
 
             def forward(self, x):
                 x = self.conv(x)
@@ -224,26 +226,35 @@ class TestBatchNorm(TestCase):
                 x.relu_()
                 return x
 
-        # make fall through for batch_norm for autocast case.
-        x = torch.randn(1, 3, 224, 224)
-        model = M()
-        # test training case.
-        model.train()
-        with torch.cpu.amp.autocast():
-            y = model(x)
+        conv_m = {1 : nn.Conv1d, 2 : nn.Conv2d, 3 : nn.Conv3d}
+        input_size = {1 : [50], 2 : [50, 50], 3 : [50, 50, 50]}
+        for dim in [1, 2, 3]:
+            # make fall through for batch_norm for autocast case.
+            x = torch.randn([1, 3] + input_size[dim])
 
-        self.assertEqual(y.dtype, torch.bfloat16)
-        # test inference case.
-        model.eval()
-        with torch.cpu.amp.autocast():
-            y = model(x)
-        self.assertEqual(y.dtype, torch.bfloat16)
+            model = M(conv_m[dim], bn_m[dim])
+            # test training case.
+            model.train()
+            with torch.cpu.amp.autocast():
+                y = model(x)
 
-    def _test_batch_norm(self, bn):
+            self.assertEqual(y.dtype, torch.bfloat16)
+            # test inference case.
+            model.eval()
+            with torch.cpu.amp.autocast():
+                y = model(x)
+            self.assertEqual(y.dtype, torch.bfloat16)
+
+    def _test_batch_norm(self, bn, dim=2):
         m = copy.deepcopy(bn)
         m_autocast = copy.deepcopy(bn)
         m_bf16 = copy.deepcopy(bn)
-        input = torch.randn(20, 100, 35, 45)
+        input_size = [20, 100, 35]
+        if dim == 2:
+            input_size += [45]
+        if dim == 3:
+            input_size += [45, 10]
+        input = torch.randn(input_size)
         x = input.clone().detach().requires_grad_()
         x_autocast = input.clone().detach().requires_grad_()
         x_bf16 = input.clone().detach().bfloat16().requires_grad_()
@@ -266,34 +277,42 @@ class TestBatchNorm(TestCase):
 
         # channels last
         m1_autocast = copy.deepcopy(bn)
-        x1_autocast = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+
+        if dim == 2:
+            x1_autocast = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        else:
+            x1_autocast = input.clone().detach().requires_grad_()
         with torch.cpu.amp.autocast():
             y1_autocast = m1_autocast(x1_autocast)
             y1_autocast.mean().backward()
-        self.assertTrue(y1_autocast.is_contiguous(memory_format=torch.channels_last))
-        self.assertTrue(x1_autocast.grad.is_contiguous(memory_format=torch.channels_last))
+        if dim == 2:
+            self.assertTrue(y1_autocast.is_contiguous(memory_format=torch.channels_last))
+            self.assertTrue(x1_autocast.grad.is_contiguous(memory_format=torch.channels_last))
         self.assertEqual(y, y1_autocast)
         self.assertEqual(x.grad, x1_autocast.grad)
         self.assertEqual(m.weight.grad, m1_autocast.weight.grad)
         self.assertEqual(m.bias.grad, m1_autocast.bias.grad)
 
     def test_batch_norm_train(self):
-        bn = nn.BatchNorm2d(100).train()
-        bn.weight.data = torch.randn(100)
-        bn.bias.data = torch.randn(100)
-        self._test_batch_norm(bn)
+        for dim in [1, 2, 3]:
+            bn = bn_m[dim](100).train()
+            bn.weight.data = torch.randn(100)
+            bn.bias.data = torch.randn(100)
+            self._test_batch_norm(bn, dim = dim)
 
     def test_batch_norm_eval(self):
-        bn = nn.BatchNorm2d(100).eval()
-        bn.weight.data = torch.randn(100)
-        bn.bias.data = torch.randn(100)
-        self._test_batch_norm(bn)
+        for dim in [1, 2, 3]:
+            bn = bn_m[dim](100).eval()
+            bn.weight.data = torch.randn(100)
+            bn.bias.data = torch.randn(100)
+            self._test_batch_norm(bn, dim = dim)
 
     def test_batch_norm_untrack_running_stats(self):
-        bn = nn.BatchNorm2d(100, track_running_stats=False)
-        bn.weight.data = torch.randn(100)
-        bn.bias.data = torch.randn(100)
-        self._test_batch_norm(bn)
+        for dim in [1, 2, 3]:
+            bn = bn_m[dim](100, track_running_stats=False)
+            bn.weight.data = torch.randn(100)
+            bn.bias.data = torch.randn(100)
+            self._test_batch_norm(bn, dim = dim)
 
 class M(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
