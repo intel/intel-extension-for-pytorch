@@ -93,5 +93,27 @@ at::Tensor linear_weight_unpack(
     const bool original_weight_transposed,
     c10::optional<at::ScalarType> dtype);
 
+ideep::tensor get_conv_transpose2d_packed_weight(
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    at::IntArrayRef weight_size,
+    int64_t groups,
+    bool weight_is_channels_last,
+    bool weight_packed,
+    bool use_channels_last,
+    at::IntArrayRef input_size,
+    const ideep::attr_t& attr);
+
+at::Tensor conv_transpose2d_weight_pack(
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    c10::optional<at::ScalarType> dtype);
+
 } // namespace cpu
 } // namespace torch_ipex

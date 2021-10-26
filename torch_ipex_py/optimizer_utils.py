@@ -142,6 +142,19 @@ def patch_state_dict(optimizer):
                                     params_attr['weight_transposed'],
                                     unpack_dtype)
                                 pass
+                            elif params_attr['op'] is torch.nn.ConvTranspose2d:
+                                state_value = torch.ops.torch_ipex.conv_transpose2d_weight_unpack(
+                                    state_value,
+                                    params_attr['stride'],
+                                    params_attr['padding'],
+                                    params_attr['output_padding'],
+                                    params_attr['groups'],
+                                    params_attr['dilation'],
+                                    params_attr['kernel_size'],
+                                    params_attr['out_channels'],
+                                    params_attr['in_channels'],
+                                    params_attr['weight_channels_last'],
+                                    unpack_dtype)                                
                             else:
                                 assert False, "unsupported op to unpack"
                         v2[state_key] = state_value

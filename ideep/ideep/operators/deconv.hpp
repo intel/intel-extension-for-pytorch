@@ -45,8 +45,9 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
         padding_l, padding_r, groups, attr, aalgorithm, aprop_kind, aengine);
   }
 
+  template <bool channels_last = false>
   static tensor::desc expected_weights_desc(
-      const dims& weights_dims,   // [i, o, ...]
+      const dims& weights_dims, // [i, o, ...]
       data_type dtype = data_type::f32,
       const dims& strides = {1, 1},
       const dims& padding_l = {0, 0},
@@ -58,7 +59,6 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
       const dims& src_dims = dims(),
       const attr_t& attr = attr_t(),
       const engine& aengine = engine::cpu_engine()) {
-
     auto src_size = weights_dims.size(); // weights_dims is 4 for conv2d and 5 for conv3d
     auto grouped = groups > 1;
     auto weights_dims_g =
@@ -112,6 +112,11 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
     tensor::desc src_desc(x_dims, x_dtype);
     tensor::desc dst_desc(y_dims, y_dtype);
 
+    if (channels_last) {
+      src_desc = src_desc.to_format(5 == src_size ? tag::ndhwc : tag::nhwc);
+      dst_desc = dst_desc.to_format(5 == src_size ? tag::ndhwc : tag::nhwc);
+    }
+
     auto pd = get_primitive_desc</*with_bias=*/false>(
         src_desc, weights_desc, tensor::desc(), dst_desc, strides, dilates_,
         padding_l, padding_r, attr_t(), aalgorithm, aprop_kind);
@@ -119,11 +124,11 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
     // embed group info into weights_desc
     if (grouped) {
       // [g, o, i/g, ...] -> [g, i/g, o, ...]
-      return tensor::desc(pd.weights_desc(), groups).transpose(1, 2);
+      return tensor::desc(pd.weights_desc(), groups);
     } else {
       // [o, i, ...] -> [i, o, ...]
-      return tensor::desc(pd.weights_desc(), groups).transpose(0, 1);
-    } 
+      return tensor::desc(pd.weights_desc(), groups);
+    }
   }
 
   template <bool with_bias>
@@ -354,21 +359,27 @@ private:
     // embed group info into diff_weights_desc
     auto expected_diff_weights_desc =
         tensor::desc(pd.diff_weights_desc(), groups);
-    diff_weights.reinit_if_possible(expected_diff_weights_desc);
+
+    tensor expected_diff_weights;
+    expected_diff_weights.init(expected_diff_weights_desc);
 
     if (with_diff_bias) {
       diff_bias.reinit_if_possible(pd.diff_bias_desc());
-      super(pd).execute(stream::default_stream(),
-                        {{DNNL_ARG_DIFF_DST, expected_diff_dst},
-                         {DNNL_ARG_SRC, expected_src},
-                         {DNNL_ARG_DIFF_WEIGHTS, diff_weights},
-                         {DNNL_ARG_DIFF_BIAS, diff_bias}});
+      super(pd).execute(
+          stream::default_stream(),
+          {{DNNL_ARG_DIFF_DST, expected_diff_dst},
+           {DNNL_ARG_SRC, expected_src},
+           {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights},
+           {DNNL_ARG_DIFF_BIAS, diff_bias}});
     } else {
-      super(pd).execute(stream::default_stream(),
-                        {{DNNL_ARG_DIFF_DST, expected_diff_dst},
-                         {DNNL_ARG_SRC, expected_src},
-                         {DNNL_ARG_DIFF_WEIGHTS, diff_weights}});
+      super(pd).execute(
+          stream::default_stream(),
+          {{DNNL_ARG_DIFF_DST, expected_diff_dst},
+           {DNNL_ARG_SRC, expected_src},
+           {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights}});
     }
+
+    diff_weights.feed_from(expected_diff_weights);
 
     // recover output dims to align with pytorch
     if (groups > 1) {

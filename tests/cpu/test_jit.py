@@ -939,16 +939,33 @@ class Tester(TestCase):
             prec=0.02)
 
     def test_output_conv_transpose2d(self):
+        # TODO: O0 and O1 should both have ipex_prepack::deconvolution_run
+        # when weight cache is enabled for deconv
         self._test_output(
             ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
             torch.randn(20, 16, 50, 100),
             kind_in_graph="ipex::conv_transpose2d",
-            kind_not_in_graph="aten::conv_transpose2d")
+            kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O0"])
         self._test_output_bf16(
             ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
             torch.randn(20, 16, 50, 100),
             kind_in_graph="ipex::conv_transpose2d",
             kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O0"],
+            prec=0.02)
+        self._test_output(
+            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
+            torch.randn(20, 16, 50, 100),
+            kind_in_graph="torch_ipex::conv_transpose2d",
+            kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O1"])
+        self._test_output_bf16(
+            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
+            torch.randn(20, 16, 50, 100),
+            kind_in_graph="torch_ipex::conv_transpose2d",
+            kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O1"],
             prec=0.02)
 
     def test_output_linear_relu(self):

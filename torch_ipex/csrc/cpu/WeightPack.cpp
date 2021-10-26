@@ -489,6 +489,215 @@ void sync_master_weight_to_bf16(
   w_bf16.feed_from(w_master);
 }
 
+static ideep::tensor::desc get_conv_transpose2d_expected_weights_desc(
+    const ideep::tensor::dims& weights_dims,
+    ideep::tensor::data_type w_dtype = ideep::data_type::f32,
+    const ideep::tensor::dims& strides = {1, 1},
+    const ideep::tensor::dims& padding_l = {0, 0},
+    const ideep::tensor::dims& padding_r = {0, 0},
+    const ideep::tensor::dims& dilates = {1, 1},
+    int groups = 1,
+    bool channels_last = false,
+    ideep::algorithm aalgorithm = ideep::algorithm::deconvolution_direct,
+    ideep::data_type x_dtype = ideep::data_type::f32,
+    const ideep::dims& src_dims = ideep::tensor::dims(),
+    const ideep::attr_t& attr = ideep::attr_t()) {
+  if (channels_last) {
+    return ideep::convolution_transpose_forward::expected_weights_desc<true>(
+        weights_dims,
+        w_dtype,
+        strides,
+        padding_l,
+        padding_r,
+        dilates,
+        groups,
+        aalgorithm,
+        ideep::prop_kind::forward,
+        src_dims,
+        attr);
+  } else {
+    return ideep::convolution_transpose_forward::expected_weights_desc<false>(
+        weights_dims,
+        w_dtype,
+        strides,
+        padding_l,
+        padding_r,
+        dilates,
+        groups,
+        aalgorithm,
+        ideep::prop_kind::forward,
+        src_dims,
+        attr);
+  }
+}
+
+at::Tensor conv_transpose2d_weight_pack(
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    c10::optional<at::ScalarType> dtype) {
+  auto weight_ = IS_CONTIGUOUS_ANY(weight)
+      ? weight
+      : weight.contiguous(weight.suggest_memory_format());
+  bool is_channels_last =
+      weight_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
+  auto w = itensor_view_from_dense(weight_);
+
+  // get the format give data type.
+  ideep::data_type desc_dtype =
+      dtype.has_value() ? get_mkldnn_dtype(dtype.value()) : w.get_data_type();
+
+  // TODO: adjust padding_r
+  auto expected_desc = get_conv_transpose2d_expected_weights_desc(
+      w.get_dims(),
+      desc_dtype,
+      {stride.begin(), stride.end()},
+      {padding.begin(), padding.end()},
+      {padding.begin(), padding.end()},
+      {dilation.begin(), dilation.end()},
+      groups,
+      is_channels_last);
+
+  auto weight_dtype = w.get_data_type();
+  expected_desc = expected_desc.to_type(weight_dtype);
+  auto output = empty_aten_tensor_from_desc(expected_desc, weight.options());
+  ideep::tensor y;
+  if (ideep::data_type::f32 == weight_dtype) {
+    y.init(expected_desc, output.template data_ptr<float>());
+  } else {
+    y.init(expected_desc, output.template data_ptr<c10::BFloat16>());
+  }
+
+  w.transpose_(0, 1);
+  auto w_transpose = w.make_grouped_weights(groups, true);
+  y.feed_from(w_transpose);
+  return output;
+}
+
+ideep::tensor get_conv_transpose2d_packed_weight(
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    at::IntArrayRef weight_size,
+    int64_t groups,
+    bool weight_is_channels_last,
+    bool weight_packed,
+    bool use_channels_last,
+    at::IntArrayRef input_size,
+    const ideep::attr_t& attr) {
+  auto data_type = weight.scalar_type();
+  ideep::tensor packed_weight;
+  if (weight_packed) {
+    // TODO: adjust padding_r
+    // restore packed weight
+    auto packed_desc_dummy_input = get_conv_transpose2d_expected_weights_desc(
+        weight_size.vec(),
+        get_mkldnn_dtype(data_type),
+        stride.vec(),
+        padding.vec(),
+        padding.vec(),
+        dilation.vec(),
+        groups,
+        weight_is_channels_last);
+
+    if (data_type == at::ScalarType::Float) {
+      packed_weight.init(
+          packed_desc_dummy_input, weight.template data_ptr<float>());
+    } else {
+      packed_weight.init(
+          packed_desc_dummy_input, weight.template data_ptr<c10::BFloat16>());
+    }
+  }
+  if (input_size.empty()) {
+    return packed_weight;
+  }
+  // TODO: weight cache in JIT will enter the below path
+  // get packed_desc using real data
+  auto packed_desc_real_input = get_conv_transpose2d_expected_weights_desc(
+      weight_size.vec(),
+      get_mkldnn_dtype(data_type),
+      stride.vec(),
+      padding.vec(),
+      padding.vec(),
+      dilation.vec(),
+      groups,
+      use_channels_last,
+      ideep::algorithm::deconvolution_direct,
+      get_mkldnn_dtype(data_type),
+      input_size.vec(),
+      attr);
+  ideep::tensor expected_packed_weight{packed_desc_real_input};
+  if (weight_packed) {
+    // weight has been packed which using dummpy input,
+    // reoder to the packed weight to expected_packed_weight using
+    // packed_desc_real_input.
+    expected_packed_weight.feed_from(packed_weight);
+    return expected_packed_weight;
+  }
+  auto memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
+                                         : at::MemoryFormat::Contiguous;
+  auto weight_ = weight.contiguous(memory_format);
+  ideep::tensor w = itensor_view_from_dense(weight_);
+  expected_packed_weight.feed_from(w);
+  return expected_packed_weight;
+}
+
+at::Tensor conv_transpose2d_weight_unpack(
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    at::IntArrayRef kernel_size,
+    int64_t output_channel,
+    int64_t input_channel,
+    bool is_channels_last,
+    c10::optional<at::ScalarType> dtype) {
+  std::vector<int64_t> origin_weight_dims;
+  origin_weight_dims.push_back(input_channel);
+  origin_weight_dims.push_back(output_channel / groups);
+  for (auto& s : kernel_size) {
+    origin_weight_dims.push_back(s);
+  }
+  auto weight_dtype = get_mkldnn_dtype(weight.scalar_type());
+  // get the format given data type.
+  ideep::data_type desc_dtype =
+      dtype.has_value() ? get_mkldnn_dtype(dtype.value()) : weight_dtype;
+  auto expected_desc = get_conv_transpose2d_expected_weights_desc(
+      {origin_weight_dims.begin(), origin_weight_dims.end()},
+      desc_dtype,
+      {stride.begin(), stride.end()},
+      {padding.begin(), padding.end()},
+      {padding.begin(), padding.end()},
+      {dilation.begin(), dilation.end()},
+      groups,
+      is_channels_last);
+  expected_desc = expected_desc.to_type(weight_dtype);
+  ideep::tensor blocked_weight;
+  if (ideep::data_type::f32 == weight_dtype) {
+    blocked_weight.init(expected_desc, weight.template data_ptr<float>());
+  } else {
+    blocked_weight.init(
+        expected_desc, weight.template data_ptr<c10::BFloat16>());
+  }
+
+  // init output.
+  at::Tensor result = at::empty(origin_weight_dims, weight.options());
+  if (is_channels_last) {
+    result = result.to(at::MemoryFormat::ChannelsLast);
+  }
+  auto y = itensor_view_from_dense(result);
+  y.transpose_(0, 1);
+  y = y.make_grouped_weights(groups, true);
+  y.feed_from(blocked_weight);
+  return result;
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -510,6 +719,12 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "sync_master_weight_to_bf16(Tensor master_weight, Tensor bf16_weight) -> ()",
       torch_ipex::cpu::sync_master_weight_to_bf16);
+  m.def(
+      "conv_transpose2d_weight_pack(Tensor weight, int[] stride, int[] padding, int[] output_padding, int groups, int[] dilation, ScalarType? dtype=None) -> Tensor",
+      torch_ipex::cpu::conv_transpose2d_weight_pack);
+  m.def(
+      "conv_transpose2d_weight_unpack(Tensor weight, int[] stride, int[] padding, int[] output_padding, int groups, int[] dilation, int[] kernel_size, int output_channel, int input_channel, bool is_channels_last, ScalarType? dtype=None) -> Tensor",
+      torch_ipex::cpu::conv_transpose2d_weight_unpack);
 }
 
 } // namespace
