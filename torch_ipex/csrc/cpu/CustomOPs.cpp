@@ -6,6 +6,7 @@
 #include "Matmul.h"
 #include "Pooling.h"
 #include "Softmax.h"
+#include "torch_ipex/csrc/jit/cpu/kernels/AddSoftmax.hpp"
 #include "torch_ipex/csrc/utils.h"
 
 #include <ATen/Context.h>
@@ -89,7 +90,7 @@ at::Tensor  AtenIpexJITDev::dil_matmul_div(
   auto dim_tensor2 = tensor2.dim();
   if (dim_tensor1 == dim_tensor2 && dim_tensor1 >= 3) {
     float scale = 1.0f / div_input.to<float>();
-    return bmm_impl(tensor1, tensor2, out, ideep::attr_t(), scale);
+    return bmm_impl(tensor1, tensor2, out, ideep::attr_t(), {}, scale);
   } else {
     return AtenIpexJITDev::dil_matmul_div(tensor1, tensor2, out, at::native::wrapped_scalar_tensor(div_input));
   }
@@ -208,6 +209,59 @@ at::Tensor AtenIpexJITDev::dil_max_pool2d(
       dilation,
       ceil_mode,
       ideep::algorithm::pooling_max);
+}
+
+/**
+ * We tried to fuse Div+Matmul+Add+Softmax as a signel operator. But
+ * the oneDNN matmul performance with binary postop is poor, then we splited
+ * the fusion into two parts - Div+Matmul and Add+Softmax. When the oneDNN
+ * fixes the performance issue, we can directly leverage oneDNN's
+ * implementation.
+ **/
+at::Tensor AtenIpexJITDev::dil_mha_scores_calc(
+    const at::Tensor& q,
+    const at::Tensor& k,
+    const at::Tensor& rel_kv,
+    const at::Scalar& alpha,
+    const at::Scalar& dim_per_head,
+    const int64_t& softmax_dim,
+    const at::IValue& dtype) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION(
+      "AtenIpexJITDev::dil_mha_scores_calc", std::vector<c10::IValue>({}));
+#endif
+  auto _dim_per_head = dim_per_head.to<float>();
+  auto _alpha = alpha.to<float>();
+  auto qk = at::Tensor();
+
+  auto q_dim = q.dim();
+  auto k_dim = k.dim();
+  if (q_dim == k_dim && q_dim >= 3) {
+    qk =
+        bmm_impl(q, k, at::Tensor(), ideep::attr_t(), {}, 1.0f / _dim_per_head);
+  } else {
+    auto _q = at::div(q, _dim_per_head);
+    qk = at::matmul(_q, k);
+  }
+
+  // Only support last dimension
+  bool is_last_dim = (softmax_dim == -1);
+  // Only support the non-last-dimension broadcast
+  bool not_last_dim_broadcast = (rel_kv.size(rel_kv.ndimension() - 1) != 1);
+  // Only support >=2D
+  bool not_one_dim = q_dim >= 2;
+  // Only support 64byte aligned
+  bool aligned_64_bytes = rel_kv.size(rel_kv.ndimension() - 1) % 16 == 0;
+  // Only support contiguous tensor
+  bool is_contiguous = rel_kv.is_contiguous() && qk.is_contiguous();
+  if (is_last_dim && not_last_dim_broadcast && not_one_dim &&
+      aligned_64_bytes && is_contiguous && (q.dtype() == at::kFloat) &&
+      dtype.isNone() && _alpha == 1.0f) {
+    return jit::cpu::kernels::AddSoftmax(qk, rel_kv);
+  } else {
+    qk = at::add(qk, rel_kv, _alpha);
+    return dil_softmax(qk, softmax_dim, dtype);
+  }
 }
 
 //Dispatch softmax to oneDNN path for jit inference

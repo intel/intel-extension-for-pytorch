@@ -81,11 +81,12 @@ class JitLlgaTestCase(JitTestCase):
         return scripted, graph
 
     def checkTrace(self, m, x, freeze=True, *args, **kwargs):
-        m.eval()
+        if isinstance(m, torch.nn.Module):
+            m.eval()
         with torch.no_grad(), \
                 torch._jit_internal._disable_emit_hooks():
             traced = torch.jit.trace(m, x)
-            if freeze:
+            if isinstance(traced, torch.nn.Module) and freeze:
                 traced = torch.jit.freeze(traced)
             warmup_forward(traced, *x)
             fwd_graph = traced.graph_for(*x)

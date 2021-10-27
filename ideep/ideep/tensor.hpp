@@ -505,6 +505,18 @@ class tensor : public memory {
     reset_internal(adesc, aengine, buffer_.get());
   }
 
+  void zero_init(
+      const desc& adesc,
+      const engine& aengine = engine::cpu_engine()) {
+    void* data = aengine.malloc(adesc.get_size());
+    memset(data, 0, adesc.get_size());
+    buffer_.reset(data, aengine.free);
+    scale_.reset();
+    zero_point_.reset();
+    eng_ = aengine;
+    reset_internal(adesc, aengine, buffer_.get());
+  }
+
   // format_tag, buffer
   void init(const dims &adims, data_type adata_type, format_tag aformat_tag,
               void *ahandle, const engine &aengine = engine::cpu_engine()) {

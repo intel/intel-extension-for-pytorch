@@ -76,6 +76,15 @@ class AtenIpexJITDev {
                                     at::IntArrayRef padding,
                                     at::IntArrayRef dilation, bool ceil_mode);
 
+   static at::Tensor dil_mha_scores_calc(
+       const at::Tensor& q,
+       const at::Tensor& k,
+       const at::Tensor& rel_kv,
+       const at::Scalar& alpha,
+       const at::Scalar& dim_per_head,
+       const int64_t& softmax_dim,
+       const at::IValue& dtype);
+
    static at::Tensor dil_softmax(const at::Tensor &input, const int64_t dim,
                                  const at::IValue &dtype);
 

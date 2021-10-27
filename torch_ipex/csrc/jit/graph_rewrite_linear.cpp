@@ -18,13 +18,17 @@ void insertPrePackedLinearOp(Block* b) {
       auto graph = n->owningGraph();
       auto prepack_node = graph->create(
           Symbol::fromQualString("ipex_prepack::linear_prepack"), 1);
-      auto input_size = n->inputs()
-                            .at(0)
-                            ->type()
-                            ->cast<TensorType>()
-                            ->sizes()
-                            .concrete_sizes()
-                            .value();
+      auto input_size_option = n->inputs()
+                                   .at(0)
+                                   ->type()
+                                   ->cast<TensorType>()
+                                   ->sizes()
+                                   .concrete_sizes();
+      if (!(input_size_option.has_value() &&
+            input_size_option.value().size() >= 2)) {
+        continue;
+      }
+      auto input_size = input_size_option.value();
       int64_t b_size = std::accumulate(
                            input_size.begin(),
                            input_size.end(),
@@ -34,13 +38,17 @@ void insertPrePackedLinearOp(Block* b) {
       IValue batch_size_value(b_size);
       auto batch_size = graph->insertConstant(batch_size_value);
       if (n->kind() == aten::linear) {
-        auto weight_size = n->inputs()
-                               .at(1)
-                               ->type()
-                               ->cast<TensorType>()
-                               ->sizes()
-                               .concrete_sizes()
-                               .value();
+        auto weight_size_option = n->inputs()
+                                      .at(1)
+                                      ->type()
+                                      ->cast<TensorType>()
+                                      ->sizes()
+                                      .concrete_sizes();
+        if (!(weight_size_option.has_value() &&
+              weight_size_option.value().size() == 2)) {
+          continue;
+        }
+        auto weight_size = weight_size_option.value();
         int64_t o_channel = weight_size[0];
         int64_t i_channel = weight_size[1];
         IValue weight_is_prepacked_value(false),
@@ -89,7 +97,7 @@ void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_gelu;
+  IpexSubgraphRewriter rewriter_relu, rewriter_gelu;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
   auto linear_relu_rstring = CodeTemplate(R"(
@@ -132,7 +140,7 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2;
+  IpexSubgraphRewriter rewriter_add_v1, rewriter_add_v2;
   std::array<std::string, 2> add_operators = {"add", "add_"};
 
   // linear   Y

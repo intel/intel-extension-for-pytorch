@@ -1,4 +1,4 @@
-FILE(GLOB _CPU_SRCS *.cpp codegen/onednn/*.cpp)
+FILE(GLOB _CPU_SRCS *.cpp codegen/onednn/*.cpp cpu/kernels/*.cpp)
 LIST(APPEND DPCPP_JIT_SRCS ${_CPU_SRCS})
 
 # Pass to parent

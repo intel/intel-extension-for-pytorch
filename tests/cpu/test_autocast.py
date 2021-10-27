@@ -17,6 +17,8 @@ _default_tolerances = {
     'float16': (1e-3, 1e-3),  # This may need to be changed
 }
 
+bn_m = {1 : nn.BatchNorm1d, 2 : nn.BatchNorm2d, 3 : nn.BatchNorm3d}
+
 def _get_default_tolerance(a, b=None) -> Tuple[float, float]:
     if b is None:
         dtype = str(a.dtype).split('.')[-1]  # e.g. "float32"
@@ -213,10 +215,10 @@ class TestCustomerOps(TestCase):
 class TestBatchNorm(TestCase):
     def test_batch_norm(self):
         class M(nn.Module):
-            def __init__(self):
+            def __init__(self, conv, bn):
                 super(M, self).__init__()
-                self.conv = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-                self.bn = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+                self.conv = conv(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+                self.bn = bn(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
 
             def forward(self, x):
                 x = self.conv(x)
@@ -224,26 +226,35 @@ class TestBatchNorm(TestCase):
                 x.relu_()
                 return x
 
-        # make fall through for batch_norm for autocast case.
-        x = torch.randn(1, 3, 224, 224)
-        model = M()
-        # test training case.
-        model.train()
-        with torch.cpu.amp.autocast():
-            y = model(x)
+        conv_m = {1 : nn.Conv1d, 2 : nn.Conv2d, 3 : nn.Conv3d}
+        input_size = {1 : [50], 2 : [50, 50], 3 : [50, 50, 50]}
+        for dim in [1, 2, 3]:
+            # make fall through for batch_norm for autocast case.
+            x = torch.randn([1, 3] + input_size[dim])
 
-        self.assertEqual(y.dtype, torch.bfloat16)
-        # test inference case.
-        model.eval()
-        with torch.cpu.amp.autocast():
-            y = model(x)
-        self.assertEqual(y.dtype, torch.bfloat16)
+            model = M(conv_m[dim], bn_m[dim])
+            # test training case.
+            model.train()
+            with torch.cpu.amp.autocast():
+                y = model(x)
 
-    def _test_batch_norm(self, bn):
+            self.assertEqual(y.dtype, torch.bfloat16)
+            # test inference case.
+            model.eval()
+            with torch.cpu.amp.autocast():
+                y = model(x)
+            self.assertEqual(y.dtype, torch.bfloat16)
+
+    def _test_batch_norm(self, bn, dim=2):
         m = copy.deepcopy(bn)
         m_autocast = copy.deepcopy(bn)
         m_bf16 = copy.deepcopy(bn)
-        input = torch.randn(20, 100, 35, 45)
+        input_size = [20, 100, 35]
+        if dim == 2:
+            input_size += [45]
+        if dim == 3:
+            input_size += [45, 10]
+        input = torch.randn(input_size)
         x = input.clone().detach().requires_grad_()
         x_autocast = input.clone().detach().requires_grad_()
         x_bf16 = input.clone().detach().bfloat16().requires_grad_()
@@ -266,34 +277,42 @@ class TestBatchNorm(TestCase):
 
         # channels last
         m1_autocast = copy.deepcopy(bn)
-        x1_autocast = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+
+        if dim == 2:
+            x1_autocast = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        else:
+            x1_autocast = input.clone().detach().requires_grad_()
         with torch.cpu.amp.autocast():
             y1_autocast = m1_autocast(x1_autocast)
             y1_autocast.mean().backward()
-        self.assertTrue(y1_autocast.is_contiguous(memory_format=torch.channels_last))
-        self.assertTrue(x1_autocast.grad.is_contiguous(memory_format=torch.channels_last))
+        if dim == 2:
+            self.assertTrue(y1_autocast.is_contiguous(memory_format=torch.channels_last))
+            self.assertTrue(x1_autocast.grad.is_contiguous(memory_format=torch.channels_last))
         self.assertEqual(y, y1_autocast)
         self.assertEqual(x.grad, x1_autocast.grad)
         self.assertEqual(m.weight.grad, m1_autocast.weight.grad)
         self.assertEqual(m.bias.grad, m1_autocast.bias.grad)
 
     def test_batch_norm_train(self):
-        bn = nn.BatchNorm2d(100).train()
-        bn.weight.data = torch.randn(100)
-        bn.bias.data = torch.randn(100)
-        self._test_batch_norm(bn)
+        for dim in [1, 2, 3]:
+            bn = bn_m[dim](100).train()
+            bn.weight.data = torch.randn(100)
+            bn.bias.data = torch.randn(100)
+            self._test_batch_norm(bn, dim = dim)
 
     def test_batch_norm_eval(self):
-        bn = nn.BatchNorm2d(100).eval()
-        bn.weight.data = torch.randn(100)
-        bn.bias.data = torch.randn(100)
-        self._test_batch_norm(bn)
+        for dim in [1, 2, 3]:
+            bn = bn_m[dim](100).eval()
+            bn.weight.data = torch.randn(100)
+            bn.bias.data = torch.randn(100)
+            self._test_batch_norm(bn, dim = dim)
 
     def test_batch_norm_untrack_running_stats(self):
-        bn = nn.BatchNorm2d(100, track_running_stats=False)
-        bn.weight.data = torch.randn(100)
-        bn.bias.data = torch.randn(100)
-        self._test_batch_norm(bn)
+        for dim in [1, 2, 3]:
+            bn = bn_m[dim](100, track_running_stats=False)
+            bn.weight.data = torch.randn(100)
+            bn.bias.data = torch.randn(100)
+            self._test_batch_norm(bn, dim = dim)
 
 class M(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
@@ -314,7 +333,7 @@ class TestLSTM(TestCase):
             "bias": [False, True],
             "empty_state": [False, True],
             "batch_first": [False, True],
-            "dropout": [0, 1],
+            "dropout": [0, 0.4, 0.7, 1],
             "batch_size": [1, 2],
             "seq_len": [1, 3]
         }
@@ -333,52 +352,71 @@ class TestLSTM(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        with torch.set_grad_enabled(training):
-            params_list = self._lstm_params_list()
-            for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
-                # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
-                if dropout > 0 and num_layers == 1:
-                    continue
 
-                num_directions = 2 if bidirectional else 1
+        params_list = self._lstm_params_list()
+        for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
+            # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
+            if dropout > 0 and num_layers == 1:
+                continue
 
-                if batch_first:
-                    input = torch.randn(batch_size, seq_len, input_size)
+            num_directions = 2 if bidirectional else 1
+
+            if batch_first:
+                input = torch.randn(batch_size, seq_len, input_size)
+            else:
+                input = torch.randn(seq_len, batch_size, input_size)
+            h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+            c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+
+            input_cpu = input.clone().requires_grad_(training)
+            h_cpu = h.clone().requires_grad_(training)
+            c_cpu = c.clone().requires_grad_(training)
+
+            model_cpu = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+            model_cpu.train() if training else model_cpu.eval()
+
+            input_ipex = input.clone().requires_grad_(training)
+            h_ipex = h.clone().requires_grad_(training)
+            c_ipex = c.clone().requires_grad_(training)
+            model_ipex = copy.deepcopy(model_cpu)
+            model_ipex.train() if training else model_ipex.eval()
+            ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
+
+            with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
+                if empty_state:
+                    torch.manual_seed(rand_seed)
+                    y_cpu, hy_cpu = self._cast_dtype(model_cpu, bf16)(self._cast_dtype(input_cpu, bf16))
+
+                    torch.manual_seed(rand_seed)
+                    y_ipex, hy_ipex = model_ipex(input_ipex)
+
                 else:
-                    input = torch.randn(seq_len, batch_size, input_size)
-                h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
-                c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+                    torch.manual_seed(rand_seed)
+                    y_cpu, hy_cpu = self._cast_dtype(model_cpu, bf16)(self._cast_dtype(input_cpu, bf16), (self._cast_dtype(h_cpu, bf16), self._cast_dtype(c_cpu, bf16)))
 
-                input_ipex = copy.deepcopy(input)
-                h_ipex = copy.deepcopy(h)
-                c_ipex = copy.deepcopy(c)
+                    torch.manual_seed(rand_seed)
+                    y_ipex, hy_ipex = model_ipex(input_ipex, (h_ipex, c_ipex))
+                self.assertEqual(y_cpu, y_ipex, prec=prec)
+                self.assertEqual(hy_cpu[0], hy_ipex[0], prec=prec)
+                self.assertEqual(hy_cpu[1], hy_ipex[1], prec=prec)
 
-                model = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
-                model.train() if training else model.eval()
+                if training:
+                    y_cpu.sum().backward(retain_graph=True)
+                    y_ipex.sum().backward(retain_graph=True)
+                    self.assertEqual(input_ipex.grad, input_cpu.grad, prec=prec)
+                    self.assertEqual(model_ipex.lstm.weight_ih_l0.grad, model_cpu.lstm.weight_ih_l0.grad, prec=prec)
+                    self.assertEqual(model_ipex.lstm.weight_hh_l0.grad, model_cpu.lstm.weight_hh_l0.grad, prec=prec)
+                    if bias:
+                        self.assertEqual(model_ipex.lstm.bias_ih_l0.grad, model_cpu.lstm.bias_ih_l0.grad, prec=prec)
+                        self.assertEqual(model_ipex.lstm.bias_hh_l0.grad, model_cpu.lstm.bias_hh_l0.grad, prec=prec)
+                    if not empty_state:
+                        hy_cpu[0].sum().backward(retain_graph=True)
+                        hy_ipex[0].sum().backward(retain_graph=True)
+                        self.assertEqual(h_ipex.grad, h_cpu.grad, prec=prec)
 
-                model_ipex = copy.deepcopy(model)
-                model_ipex.train() if training else model_ipex.eval()
-                ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
-
-                with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
-                    if empty_state:
-                        y, hy = self._cast_dtype(model, bf16)(self._cast_dtype(input, bf16))
-                        y_ipex, hy_ipex = model_ipex(input)
-                    else:
-                        y, hy = self._cast_dtype(model, bf16)(self._cast_dtype(input, bf16), (self._cast_dtype(h, bf16), self._cast_dtype(c, bf16)))
-                        y_ipex, hy_ipex = model_ipex(input, (h, c))
-
-                if not training and bf16:
-                    self.assertEqual(input_ipex.dtype, torch.float)
-                    self.assertEqual(h_ipex.dtype, torch.float)
-                    self.assertEqual(c_ipex.dtype, torch.float)
-
-                    self.assertEqual(y_ipex.dtype, torch.bfloat16)
-                    self.assertEqual(hy_ipex[0].dtype, torch.bfloat16)
-                    self.assertEqual(hy_ipex[1].dtype, torch.bfloat16)
-                self.assertEqual(y, y_ipex, prec=prec)
-                self.assertEqual(hy[0], hy_ipex[0], prec=prec)
-                self.assertEqual(hy[1], hy_ipex[1], prec=prec)
+                        hy_cpu[1].sum().backward(retain_graph=True)
+                        hy_ipex[1].sum().backward(retain_graph=True)
+                        self.assertEqual(c_ipex.grad, c_cpu.grad, prec=prec)
 
     def _test_lstm_pack_padded_sequence(self):
         embedding_dim = 1024
@@ -418,15 +456,14 @@ class TestLSTM(TestCase):
         self.assertEqual(hidden_out[0], hidden_out_ipex[0])
         self.assertEqual(hidden_out[1], hidden_out_ipex[1])
 
-    def test_lstm_inference(self):
+    def test_lstm_op(self):
         self._test_lstm(training=False, bf16=False)
 
         self._test_lstm(training=False, bf16=True, prec=2e-2)
 
         self._test_lstm(training=True, bf16=False)
 
-        # TODO: autocast does not support LSTM bf16 training
-        # self._test_lstm(training=True, bf16=True)
+        self._test_lstm(training=True, bf16=True, prec=5e-2)
 
     def test_lstm_pack_padded_sequence(self):
         self._test_lstm_pack_padded_sequence()

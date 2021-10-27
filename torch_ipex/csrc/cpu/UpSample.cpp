@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-
 #include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/Parallel.h>
@@ -7,6 +6,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/UpSample.h>
 #include <ATen/native/cpu/utils.h>
+#include <ATen/record_function.h>
 #include <c10/util/accumulate.h>
 
 #include <math.h>

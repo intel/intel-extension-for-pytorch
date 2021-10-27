@@ -172,6 +172,12 @@ def get_package_dir():
 def get_package_lib_dir():
     return os.path.join(get_package_dir(), "lib")
 
+def get_cpp_test_dir():
+    project_root_dir = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(project_root_dir, 'tests', 'cpu', 'cpp')
+
+def get_cpp_test_build_dir():
+    return os.path.join(get_build_type_dir(), 'tests', 'cpu', 'cpp')
 
 def get_src_py_and_dst():
     ret = []
@@ -315,6 +321,17 @@ class IPEXCPPLibBuild(build_clib, object):
         else:
             check_call(['make'] + build_args, cwd=build_type_dir, env=env)
 
+        if _check_env_flag("ENABLE_CPP_TEST"):
+            cpp_test_dir = get_cpp_test_dir()
+            cpp_test_build_dir = get_cpp_test_build_dir()
+            if not os.path.exists(cpp_test_build_dir):
+                Path(cpp_test_build_dir).mkdir(parents=True, exist_ok=True)
+            cmake_args += ['-DPROJECT_DIR=' + project_dir]
+            check_call([self.cmake, cpp_test_dir] + cmake_args, cwd=cpp_test_build_dir, env=env)
+            if use_ninja:
+                check_call(['ninja'] + build_args, cwd=cpp_test_build_dir, env=env)
+            else:
+                check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
 
 class IPEXExtBuild(build_ext, object):
     def run(self):
@@ -350,7 +367,8 @@ def pyi_module():
     main_compile_args = ['-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI))]
     main_libraries = ['intel-ext-pt-cpu']
     main_link_args = ['-ltorch_python']
-    main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp")]
+    main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp"),
+                    os.path.join("torch_ipex", "csrc", "python", "TaskModule.cpp")]
 
     include_dirs = [
         ".",

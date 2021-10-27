@@ -7,7 +7,7 @@ import warnings
 from .ops.lstm import IpexLSTM
 from .weight_prepack import _weight_prepack_with_ipex
 from .weight_cast import _weight_dtype_convert_with_ipex
-from .optimizer_utils import _ipex_optimizer
+from .optimizer_utils import _optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 import intel_extension_for_pytorch._C as core
 
 def _replace_dropout_with_identity(model):
@@ -23,32 +23,38 @@ def _replace_dropout_with_identity(model):
 def _replace_lstm_with_ipex_lstm(model):
     # replace lstm with ipex lstm during inference
     # does not support the case where model itself is torch.nn.LSTM
-    if not model.training:
-        for child_name, child in model.named_children():
-            if isinstance(child, torch.nn.LSTM):
-                assert hasattr(child, "weight_ih_l0"), "torch.nn.LSTM should have weight_ih_l0"
-                ipex_lstm = IpexLSTM(child.input_size, child.hidden_size,
-                    child.num_layers, child.bias, child.batch_first,
-                    child.dropout, child.bidirectional, child.proj_size,
-                    child.weight_ih_l0.device, child.weight_ih_l0.dtype)
-                ipex_lstm.__dict__ = copy.deepcopy(child.__dict__)
-                setattr(model, child_name, ipex_lstm)
-            else:
-                _replace_lstm_with_ipex_lstm(child)
+    for child_name, child in model.named_children():
+        if isinstance(child, torch.nn.LSTM):
+            assert hasattr(child, "weight_ih_l0"), "torch.nn.LSTM should have weight_ih_l0"
+            ipex_lstm = IpexLSTM(child.input_size, child.hidden_size,
+                child.num_layers, child.bias, child.batch_first,
+                child.dropout, child.bidirectional, child.proj_size,
+                child.weight_ih_l0.device, child.weight_ih_l0.dtype)
+            ipex_lstm.__dict__ = copy.deepcopy(child.__dict__)
+            setattr(model, child_name, ipex_lstm)
+        else:
+            _replace_lstm_with_ipex_lstm(child)
 
 def _convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
     module_convert_list = [torch.nn.Conv2d,
                            torch.nn.Linear,
-                           torch.nn.Embedding]
+                           torch.nn.Embedding,
+                           torch.nn.LSTM]
     for module_cls in module_convert_list:
         if isinstance(module, module_cls):
-            weight_data = module.weight.detach().clone().to(dtype)
-            module.weight.data = weight_data
-            if hasattr(module, 'bias') and module.bias is not None:
-                bias_data = module.bias.detach().clone().to(dtype)
-                module.bias.data = bias_data
-            break
+            if module_cls is torch.nn.LSTM:
+                for name, param in module.named_parameters():
+                    getattr(module, name)
+                    casted_data = getattr(getattr(module, name), "data").detach().clone().to(dtype)
+                    setattr(getattr(module, name), "data", casted_data)
+            else:
+                weight_data = module.weight.detach().clone().to(dtype)
+                module.weight.data = weight_data
+                if hasattr(module, 'bias') and module.bias is not None:
+                    bias_data = module.bias.detach().clone().to(dtype)
+                    module.bias.data = bias_data
+                break
     for child in module.children():
         _convert_module_data_type(child, dtype)
     return module
@@ -76,31 +82,38 @@ class _Properties(object):
 
     """
     def __init__(self):
-        self.opt_level=None,
-        self.conv_bn_folding=None,
-        self.weights_prepack=None,
-        self.master_weight=None
-        self.remove_dropout=None
+        self.opt_level = None
+        self.conv_bn_folding = None
+        self.weights_prepack = None
+        self.remove_dropout = None
+        # optimizer opt conig
+        self.split_master_weight_for_bf16 = None
+        self.fuse_update_step = None
+        self.auto_kernel_selection = None
 
 # O0 properties
 class _O0:
     def __call__(self, properties):
-        properties.opt_level="O0"
-        properties.conv_bn_folding=False
-        properties.weights_prepack=False
-        properties.remove_dropout=False
-        #properties.master_weight=False
+        properties.opt_level = "O0"
+        properties.conv_bn_folding = False
+        properties.weights_prepack = False
+        properties.remove_dropout = False
+        properties.split_master_weight_for_bf16 = False
+        properties.fuse_update_step = False
+        properties.auto_kernel_selection = False
         return properties
 
 
 # O1 properties
 class _O1:
     def __call__(self, properties):
-        properties.opt_level="O1"
-        properties.conv_bn_folding=True
-        properties.weights_prepack=True
-        properties.remove_dropout=True
-        #properties.master_weight=True
+        properties.opt_level = "O1"
+        properties.conv_bn_folding = True
+        properties.weights_prepack = True
+        properties.remove_dropout = True
+        properties.split_master_weight_for_bf16 = True
+        properties.fuse_update_step = True
+        properties.auto_kernel_selection = False
         return properties
 
 opt_levels = {"O0": _O0(),
@@ -114,7 +127,10 @@ def optimize(
     inplace=False,
     conv_bn_folding=None,
     weights_prepack=None,
-    remove_dropout=None):
+    remove_dropout=None,
+    split_master_weight_for_bf16=None,
+    fuse_update_step=None,
+    auto_kernel_selection=None):
     r"""
     Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
     conversation for Convolution, Linear, Embedding. there also has a weight prepack for
@@ -133,6 +149,14 @@ def optimize(
         weights_prepack: whether do weight prepack for convolution and linear to avoid OneDNN weight reorder.
             the default value is None(only workd for training model, the inference model is not optimized well).
         remove_dropout: whether remove dropout from model, it only works for inference model, the default value is None.
+            the default value is True(only workd for training model, the inference model is not optimized well).
+        split_master_weight_for_bf16: whether choose split master weight update for BF16 training which can
+            save memory compare with master weight update solution, not support all optimizers
+        fuse_update_step: whether choose fused params update for training which have better performance,
+           not support all optimizers
+        [experimental] auto_kernel_selection: Different backend may have different performance on different
+            dtypes/shapes. Default value is False. IPEX will try to optimize the kernel selection for 
+            better performance if set this value to True. But may have regressions at current stage.
 
     """
 
@@ -145,7 +169,7 @@ def optimize(
     if level not in opt_levels:
         raise RuntimeError(
             "Unexpected optimization level {}. ".format(level) +
-             "Options are 'O0', 'O1'.")
+            "Options are 'O0', 'O1'.")
     else:
         opt_properties = opt_levels[level](opt_properties)
 
@@ -157,6 +181,12 @@ def optimize(
         opt_properties.weights_prepack = weights_prepack
     if remove_dropout is not None:
         opt_properties.remove_dropout = remove_dropout
+    if split_master_weight_for_bf16 is not None:
+        opt_properties.split_master_weight_for_bf16 = split_master_weight_for_bf16
+    if fuse_update_step is not None:
+        opt_properties.fuse_update_step = fuse_update_step
+    if auto_kernel_selection is not None:
+        opt_properties.auto_kernel_selection = auto_kernel_selection
 
     if inplace:
         optimized_model = model
@@ -171,28 +201,45 @@ def optimize(
             except:
                 warnings.warn("Conv BatchNorm folding failed during the optimize process.")
         if opt_properties.remove_dropout:
-            try:
+            try :
                 optimized_model = optimization.remove_dropout(optimized_model)
             except:
                 warnings.warn("Failed to remove the Dropout module during the optimize process.")
         if dtype == torch.bfloat16:
             optimized_model = _convert_module_data_type(optimized_model, torch.bfloat16)
 
+    if opt_properties.split_master_weight_for_bf16 and dtype is torch.bfloat16:
+        if not opt_properties.fuse_update_step:
+            opt_properties.split_master_weight_for_bf16 = False
+            warninig.warn(
+                "IPEX does not non-fused split master weight for bf16 training," +
+                "have reset split_master_weight_for_bf16 flag to False." + 
+                "If you want to use split_master_weight_for_bf16." + 
+                "Please set both split_master_weight_for_bf16 and fuse_update_step to True")
+        elif type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST:
+            opt_properties.split_master_weight_for_bf16 = False
+            opt_properties.fuse_update_step = False
+            warnings.warn(
+                "IPEX does not support fused/fused split update for" + str(type(optimizer)) +
+                "will use non-fused master weight update for bf16 training")
+
     # convert optimizer for training case.
     params_attr = {}
-    #TODO: add option master_weight for bf16 case
     if dtype == torch.bfloat16:
-        optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(optimized_model, optimized_optimizer, params_attr)
-
-    #TODO enable inference weight prepack as default.
+        optimized_model, optimized_optimizer, params_attr = _weight_dtype_convert_with_ipex(
+            optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
     if opt_properties.weights_prepack:
-        optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(optimized_model, optimized_optimizer, params_attr)
-
+        optimized_model, optimized_optimizer, params_attr = _weight_prepack_with_ipex(
+          optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
     # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model
-    else:
-        return optimized_model, optimized_optimizer
+
+    # with an optimizer
+    if opt_properties.fuse_update_step:
+        optimized_optimizer = _optimizer_fusion(
+            optimized_optimizer, opt_properties.split_master_weight_for_bf16)
+    return optimized_model, optimized_optimizer
 
 
 VERBOSE_OFF = 0
@@ -223,7 +270,7 @@ class verbose(object):
         return False
 
 try:
-    verbose_torch=torch.backends.mkldnn.verbose
+    verbose_torch = torch.backends.mkldnn.verbose
     torch.backends.mkldnn.verbose = verbose
 except:
     pass

@@ -1446,3 +1446,32 @@ def  int8_calibration(model, data, dir):
             with ipex.AutoMixPrecision(conf, running_mode="calibration"):
                 model(x)
     conf.save(dir)
+
+class TestModule(torch.nn.Module):
+    def __init__(self):
+        super(TestModule, self).__init__()
+        self.linear = torch.nn.Linear(5, 10)
+        self.conv = torch.nn.Conv2d(1, 10, 5, 1)
+        self.bn = torch.nn.BatchNorm2d(num_features=10)
+        self.embeddingbag = torch.nn.EmbeddingBag(10, 10, mode='sum')
+        self.input = (
+            torch.ones(10, 1, 5, 5),
+            torch.ones(10, 5),
+            torch.arange(0, 9).long(),
+            torch.arange(0, 9).long())
+
+    def forward(self, x, y, indices, offsets):
+        x = self.conv(x)
+        x = self.bn(x)
+        y = self.linear(y)
+        z = self.embeddingbag(indices, offsets)
+        return x + y + z
+
+    def attach_grad(self, dtype=torch.float):
+        # Instead of .sum().backward(), attach grad to parameters directly can help to check optimizer's correctness
+        self.linear.weight.grad = torch.ones(self.linear.weight.shape).to(dtype)
+        self.linear.bias.grad = torch.ones(self.linear.bias.shape).to(dtype)
+        self.conv.weight.grad = torch.ones(self.conv.weight.shape).to(dtype)
+        self.linear.bias.grad = torch.ones(self.conv.bias.shape).to(dtype)
+        self.embeddingbag.weight.grad = torch.ones(self.embeddingbag.weight.shape).to(dtype)
+        self.bn.weight.grad = torch.ones(self.bn.weight.shape)

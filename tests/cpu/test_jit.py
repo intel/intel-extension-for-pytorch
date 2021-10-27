@@ -485,6 +485,18 @@ class MatmulDiv(nn.Module):
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
+class MHAScoresCalculation(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(MHAScoresCalculation, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, bias):
+        mat1 = mat1 / math.sqrt(self.dim_per_head)
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        scores = qk + bias
+        return self.softmax(scores)
+
 class AtenSoftmaxRepalce(nn.Module):
     def __init__(self, dim=-1):
         super(AtenSoftmaxRepalce, self).__init__()
@@ -603,6 +615,67 @@ class Tester(TestCase):
         self.assertTrue(all(n.kind() != node for n in freeze_graph.nodes()))
         #  prepack op need note in none freeze model
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+
+    def test_mha_scores_calculation(self):
+        mat1 = torch.randn(56, 16, 384, 384)
+        mat2 = torch.randn(56, 16, 384, 384)
+        bias = torch.randn(56, 16, 384, 384)
+
+        for softmax_dim in [0, 1, 2, -1]:
+            mha = MHAScoresCalculation(4, softmax_dim)
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha, (mat1, mat2, bias))
+                mha_jit.eval()
+
+                res_ref = mha(mat1, mat2, bias)
+                res_jit = mha_jit(mat1, mat2, bias)
+                self.assertEqual(res_ref, res_jit)
+
+                mat1 = torch.randn(1, 1, 2, 3)
+                mat2 = torch.randn(1, 1, 16, 3)
+                bias = torch.randn(1, 1, 2, 16)
+                res_ref = mha(mat1, mat2, bias)
+                res_jit = mha_jit(mat1, mat2, bias)
+                self.assertEqual(res_ref, res_jit)
+
+                mat1 = torch.randn(1, 1, 2, 3)
+                mat2 = torch.randn(1, 1, 32, 3)
+                bias = torch.randn(1, 1, 2, 32)
+                res_ref = mha(mat1, mat2, bias)
+                res_jit = mha_jit(mat1, mat2, bias)
+                self.assertEqual(res_ref, res_jit)
+
+                mat1 = torch.randn(1, 1, 2, 3)
+                mat2 = torch.randn(1, 1, 33, 3)
+                bias = torch.randn(1, 1, 2, 33)
+                res_ref = mha(mat1, mat2, bias)
+                res_jit = mha_jit(mat1, mat2, bias)
+                self.assertEqual(res_ref, res_jit)
+
+                mat1 = torch.randn(2, 3, 4, 6)
+                mat2 = torch.randn(2, 3, 6, 6)
+                bias = torch.randn(2, 3, 4, 6)
+                res_ref = mha(mat1, mat2, bias)
+                res_jit = mha_jit(mat1, mat2, bias)
+                self.assertEqual(res_ref, res_jit)
+
+                # Test broadcast
+                mat1 = torch.randn(2, 3, 4, 10)
+                mat2 = torch.randn(2, 3, 16, 10)
+                bias = torch.randn(1, 1, 1, 16)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                bias = torch.randn(4, 16)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                bias = torch.randn(3, 1, 1)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                bias = torch.randn(2, 1, 1, 1)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                bias = torch.randn(3, 4, 16)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                bias = torch.randn(2, 1, 1, 16)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                bias = torch.randn(2, 1, 4, 16)
+                self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
 
     def test_conv2d_fusion(self):
         batch_size = 32
@@ -866,16 +939,33 @@ class Tester(TestCase):
             prec=0.02)
 
     def test_output_conv_transpose2d(self):
+        # TODO: O0 and O1 should both have ipex_prepack::deconvolution_run
+        # when weight cache is enabled for deconv
         self._test_output(
             ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
             torch.randn(20, 16, 50, 100),
             kind_in_graph="ipex::conv_transpose2d",
-            kind_not_in_graph="aten::conv_transpose2d")
+            kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O0"])
         self._test_output_bf16(
             ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
             torch.randn(20, 16, 50, 100),
             kind_in_graph="ipex::conv_transpose2d",
             kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O0"],
+            prec=0.02)
+        self._test_output(
+            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
+            torch.randn(20, 16, 50, 100),
+            kind_in_graph="torch_ipex::conv_transpose2d",
+            kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O1"])
+        self._test_output_bf16(
+            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
+            torch.randn(20, 16, 50, 100),
+            kind_in_graph="torch_ipex::conv_transpose2d",
+            kind_not_in_graph="aten::conv_transpose2d",
+            levels=["O1"],
             prec=0.02)
 
     def test_output_linear_relu(self):

@@ -20,21 +20,31 @@ void insertPrePackedConv2dOp(Block* b) {
       auto graph = n->owningGraph();
       auto prepack_node = graph->create(
           Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
-      IValue input_size_value(n->inputs()
-                                  .at(0)
-                                  ->type()
-                                  ->cast<TensorType>()
-                                  ->sizes()
-                                  .concrete_sizes());
+      auto input_size_option = n->inputs()
+                                   .at(0)
+                                   ->type()
+                                   ->cast<TensorType>()
+                                   ->sizes()
+                                   .concrete_sizes();
+      // if can't get input shape info, will not do weight prepack.
+      if (!(input_size_option.has_value() &&
+            input_size_option.value().size() == 4)) {
+        continue;
+      }
+      IValue input_size_value(input_size_option.value());
       if (n->kind() == aten::conv2d) {
-        auto weight_size = n->inputs()
-                               .at(1)
-                               ->type()
-                               ->cast<TensorType>()
-                               ->sizes()
-                               .concrete_sizes()
-                               .value();
-        ;
+        auto weight_size_option = n->inputs()
+                                      .at(1)
+                                      ->type()
+                                      ->cast<TensorType>()
+                                      ->sizes()
+                                      .concrete_sizes();
+        // weight has not shape info, will not do weight prapacked.
+        if (!(weight_size_option.has_value() &&
+              weight_size_option.value().size() == 4)) {
+          continue;
+        }
+        auto weight_size = weight_size_option.value();
         std::vector<int64_t> k_size = {weight_size[2], weight_size[3]};
         // w_is_channels_last is invaild, there will has a check the memory
         // format at convolution kernel side.
@@ -90,7 +100,7 @@ void insertPrePackedConv2dOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
+  IpexSubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
       rewriter_elu, rewriter_swish, rewriter_silu;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
@@ -232,7 +242,7 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
+  IpexSubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
   std::array<std::string, 2> add_operators = {"add", "add_"};
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 

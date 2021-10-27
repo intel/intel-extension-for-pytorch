@@ -13,8 +13,9 @@ namespace cpu {
 at::Tensor bmm_impl(
     const at::Tensor& tensor1,
     const at::Tensor& tensor2,
-    at::Tensor  out,    
+    at::Tensor out,
     const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& postop_tensors,
     const float dst_coeff = 1.0f);
 
 }  // namespace cpu

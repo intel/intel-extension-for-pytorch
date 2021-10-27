@@ -1,25 +1,11 @@
 import torch
 import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch.weight_prepack import _IPEXLinear as _IPEXLinear, _IPEXConv2d as _IPEXConv2d
 from torch.testing._internal.common_utils import TestCase
 import unittest
 import itertools
 import copy
-
-class TestModule(torch.nn.Module):
-    def __init__(self):
-        super(TestModule, self).__init__()
-        self.linear = torch.nn.Linear(5, 10)
-        self.conv = torch.nn.Conv2d(1, 10, 5, 1)
-        self.bn = torch.nn.BatchNorm2d(num_features=10)
-        self.embeddingbag = torch.nn.EmbeddingBag(10, 3, mode='sum')
-
-    def forward(self, x, y, indices, offsets):
-        x = self.conv(x)
-        x = self.bn(x)
-        y = self.linear(y)
-        z = self.embeddingbag(indices, offsets)
-        return x + y
-
+from common_utils import TestModule
 
 class ConvBatchNorm(torch.nn.Module):
     def __init__(self,):
@@ -44,59 +30,62 @@ class TestOptimizeCases(TestCase):
             # TODO check weight_prepack.
 
     def test_optimize_inplace_behavior_eval_mode(self):
-          M_ori = TestModule()
-          options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
-          for dtype, level in options:
-              # non-inplace
-              M = copy.deepcopy(M_ori).eval()
-              opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=False)
-              self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
-              self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
-              self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
+        M_ori = TestModule()
+        options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
+        for dtype, level in options:
+            # non-inplace
+            M = copy.deepcopy(M_ori).eval()
+            opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=False)
+            self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
+            self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
+            self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
 
-              # inplace
-              M = copy.deepcopy(M_ori).eval()
-              opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
-              # fused part cannot be inplaced
-              if level == "O1":
-                  self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
-                  self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
-              # non optimized part should be inplaced
-              self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
+            # inplace
+            M = copy.deepcopy(M_ori).eval()
+            opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
+            # After ConvBN folding,  opt_M will be Graph Module while the M is original nn.Module which they
+            # share parameters. But the changes on Graph Module cannot be reflected on original module. So 
+            # only the un-opitimized  weight will use same mem buffer with original module.
+            # While dtype = float, ipex.optimize will choose mkl backend and does not prepack weight
+            if level == "O1":
+                self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
+                self.assertTrue(dtype is torch.float or M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
+            # un-optimized part should be inplaced
+            self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
 
     def test_optimize_inplace_behavior_training_mode_with_optimizer(self):
-          M_ori = TestModule()
-          options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
-          for dtype, level in options:
-              # non-inplace
-              M = copy.deepcopy(M_ori).train()
-              sgd = torch.optim.SGD(M.parameters(), lr=0.1)
-              opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=False)
-              self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
-              self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
-              self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
-              if level == "O1":
-                  self.assertEqual(M.linear.weight.dtype, torch.float)
-                  self.assertEqual(M.conv.weight.dtype, torch.float)
-                  self.assertEqual(M.embeddingbag.weight.dtype, torch.float)
-                  self.assertEqual(M.bn.weight.dtype, torch.float)
-                  self.assertEqual(opt_M.linear.weight.dtype, dtype)
-                  self.assertEqual(opt_M.conv.weight.dtype, dtype)
-                  self.assertEqual(opt_M.embeddingbag.weight.dtype, dtype)
-                  self.assertEqual(opt_M.bn.weight.dtype, torch.float)
+        M_ori = TestModule()
+        options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
+        for dtype, level in options:
+            # non-inplace
+            M = copy.deepcopy(M_ori).train()
+            sgd = torch.optim.SGD(M.parameters(), lr=0.1)
+            opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=False)
+            self.assertTrue(M.linear.weight.data_ptr() != opt_M.linear.weight.data_ptr())
+            self.assertTrue(M.conv.weight.data_ptr() != opt_M.conv.weight.data_ptr())
+            self.assertTrue(M.embeddingbag.weight.data_ptr() != opt_M.embeddingbag.weight.data_ptr())
+            if level == "O1":
+                self.assertEqual(M.linear.weight.dtype, torch.float)
+                self.assertEqual(M.conv.weight.dtype, torch.float)
+                self.assertEqual(M.embeddingbag.weight.dtype, torch.float)
+                self.assertEqual(M.bn.weight.dtype, torch.float)
+                self.assertEqual(opt_M.linear.weight.dtype, dtype)
+                self.assertEqual(opt_M.conv.weight.dtype, dtype)
+                self.assertEqual(opt_M.embeddingbag.weight.dtype, dtype)
+                self.assertEqual(opt_M.bn.weight.dtype, torch.float)
 
-              # inplace
-              M = copy.deepcopy(M_ori).train()
-              sgd = torch.optim.SGD(M.parameters(), lr=0.1)
-              opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=True)
-              self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
-              self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
-              self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
-              if level == "O1":
-                  self.assertEqual(M.linear.weight.dtype, dtype)
-                  self.assertEqual(M.conv.weight.dtype, dtype)
-                  self.assertEqual(M.embeddingbag.weight.dtype, dtype)
-                  self.assertEqual(M.bn.weight.dtype, torch.float)
+            # inplace
+            M = copy.deepcopy(M_ori).train()
+            sgd = torch.optim.SGD(M.parameters(), lr=0.1)
+            opt_M, _ = ipex.optimize(M, dtype=dtype, optimizer=sgd, level=level, inplace=True)
+            self.assertTrue(M.linear.weight.data_ptr() == opt_M.linear.weight.data_ptr())
+            self.assertTrue(M.conv.weight.data_ptr() == opt_M.conv.weight.data_ptr())
+            self.assertTrue(M.embeddingbag.weight.data_ptr() == opt_M.embeddingbag.weight.data_ptr())
+            if level == "O1":
+                self.assertEqual(M.linear.weight.dtype, dtype)
+                self.assertEqual(M.conv.weight.dtype, dtype)
+                self.assertEqual(M.embeddingbag.weight.dtype, dtype)
+                self.assertEqual(M.bn.weight.dtype, torch.float)
 
     def _test_tensor_convert(self, tensor, bf16_tensor):
         top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(tensor)
@@ -119,6 +108,22 @@ class TestOptimizeCases(TestCase):
         # nc11 channel-last case
         tensor = torch.rand(128, 256, 1, 1).to(memory_format=torch.channels_last)
         self._test_tensor_convert(tensor, tensor.bfloat16())
+
+    def test_module_conversion(self):
+        M_ori = TestModule()
+        options = itertools.product([torch.bfloat16, torch.float32], ["O0", "O1"], [True, False])
+        for dtype, level, auto_kernel_selection in options:
+            sgd = torch.optim.SGD(M_ori.parameters(), lr=0.1)
+            opt_M, _ = ipex.optimize(M_ori, dtype=dtype, optimizer=sgd, level=level, auto_kernel_selection=auto_kernel_selection)
+            if level == "O0":
+                self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
+                self.assertTrue(isinstance(opt_M.conv, torch.nn.Conv2d))
+            elif dtype is torch.float32 and not auto_kernel_selection:
+              self.assertTrue(isinstance(opt_M.linear, torch.nn.Linear))
+              self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
+            else:
+              self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
+              self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
 
 if __name__ == '__main__':
     test = unittest.main()

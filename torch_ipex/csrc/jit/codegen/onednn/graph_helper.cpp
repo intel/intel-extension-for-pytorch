@@ -70,6 +70,10 @@ Operator makeEltwiseOp(Node* node, opkind kind) {
 Operator makeBinaryOp(Node* node, opkind kind) {
   REQ(node->input(0)->type()->isSubtypeOf(TensorType::get()) &&
       node->input(1)->type()->isSubtypeOf(TensorType::get()))
+
+  auto dim0 = getDimensions(node->input(0));
+  REQ(dim0.has_value() && dim0.value() != 0);
+
   return Operator(node, kind).setInput(0, 1).setOutput(0);
 }
 

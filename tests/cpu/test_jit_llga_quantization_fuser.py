@@ -196,6 +196,24 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul'])
         self.checkPatterns(graph, patterns)
 
+    @llga_test_env
+    def test_add_scalar_input(self):
+        class M(torch.nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                x_shape = x.size()[0]
+                y = x_shape + 2
+                return y
+        
+        # input[0] to add being scalar is unsupported
+        x = torch.randn(3, 3)
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="add_scalar_input", qscheme=torch.per_tensor_affine)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+        self.assertGraphContainsExactly(graph, "aten::add", 1)
+
 class TestFusionPattern(JitLlgaTestCase):
     @llga_test_env
     def test_conv2d_eltwise(self):

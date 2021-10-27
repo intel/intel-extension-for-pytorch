@@ -335,5 +335,55 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
 
+    def test_avg_pool2d(self):
+        m = nn.AvgPool2d((3, 2), stride=(2, 1))
+        x = torch.randn(20, 16, 50, 32)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = m(x1)
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = m(x2)
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = m(x3)
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad)
+
+    def test_adaptive_max_pool2d(self):
+        m = nn.AdaptiveMaxPool2d((5,7))
+        x = torch.randn(3, 64, 8, 9)
+        x1 = x.clone().detach().requires_grad_()
+        y1 = m(x1)
+        y1.mean().backward()
+
+        # test channels last
+        x2 = x.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = m(x2)
+        y2.mean().backward()
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(y1, y2)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().bfloat16().requires_grad_()
+        y3 = m(x3)
+        y3.mean().backward()
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y1, y3, prec=0.01)
+        self.assertTrue(x3.grad.dtype == torch.bfloat16)
+        self.assertEqual(x1.grad, x3.grad, prec=0.001)
+
 if __name__ == '__main__':
     test = unittest.main()

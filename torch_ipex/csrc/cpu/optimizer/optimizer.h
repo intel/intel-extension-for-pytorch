@@ -25,10 +25,21 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
     double weight_decay,
     double lr_decay,
     double eps);
-void packed_add
-    (at::Tensor &top_half,
-      at::Tensor &bot_half,
-      const at::Tensor &grad,
-      double alpha);
+void packed_add(
+    at::Tensor& top_half,
+    at::Tensor& bot_half,
+    const at::Tensor& grad,
+    double alpha);
+void sgd_fused_step(
+    at::Tensor& param_,
+    const at::Tensor& grad_,
+    at::Tensor& momentum_buf_,
+    at::Tensor& param2_,
+    double momentum,
+    double learning_rate,
+    double weight_decay,
+    double dampening,
+    bool nesterov);
+
 } // namespace cpu
 } // namespace torch_ipex

@@ -178,17 +178,19 @@ set(DPCPP_SRCS)
 set(DPCPP_COMMON_SRCS)
 set(DPCPP_CPU_SRCS)
 set(DPCPP_JIT_SRCS)
+set(DPCPP_RUNTIME_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/quantization)
 add_subdirectory(${DPCPP_ROOT}/jit)
 add_subdirectory(${DPCPP_ROOT}/cpu)
+add_subdirectory(${DPCPP_ROOT}/cpu/runtime)
 
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
+set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_RUNTIME_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
-#link_directories(${PYTORCH_INSTALL_DIR}/lib)
+link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
@@ -206,10 +208,6 @@ endif()
 
 add_dependencies(${PLUGIN_NAME} dnnl_graph)
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
-link_directories(${PYTORCH_INSTALL_DIR}/lib)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
 install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

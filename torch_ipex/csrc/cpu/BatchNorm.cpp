@@ -248,9 +248,13 @@ at::Tensor batch_norm(const at::Tensor &input,
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("torch_ipex::batch_norm", std::vector<c10::IValue>({}));
 #endif
+  // Only 2d bfloat16 training calling onednn path, and this path will be
+  // discarded after aten batchnorm optimized well.
   if (weight_opt.has_value() && weight_opt.value().defined() &&
       bias_opt.has_value() && bias_opt.value().defined() &&
-      !torch::jit::tracer::isTracing()) {
+      !torch::jit::tracer::isTracing() && input.ndimension() == 4 && train &&
+      input.scalar_type() == at::kBFloat16 &&
+      weight_opt.value().scalar_type() == at::kFloat) {
     return IPEXBatchNormOp::apply(input, weight_opt.value(), bias_opt.value(),
                                   running_mean_opt, running_var_opt, train,
                                   momentum, eps);

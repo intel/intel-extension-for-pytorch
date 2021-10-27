@@ -1,4 +1,5 @@
 #include "jit/codegen/onednn/interface.h"
+#include <oneapi/dnnl/dnnl_graph.hpp>
 #include "jit/codegen/onednn/defer_size_check.h"
 #include "jit/codegen/onednn/fusion_group_name.h"
 #include "jit/codegen/onednn/graph_fuser.h"
@@ -83,6 +84,14 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
     IpexQuantFusion(g);
     GRAPH_DUMP("After IpexQuantFusion. End of IPEX optimization pass", g);
   }
+}
+
+void setLlgaWeightCacheEnabled(bool enabled) {
+  dnnl::graph::set_constant_cache(enabled);
+}
+
+bool getLlgaWeightCacheEnabled() {
+  return dnnl::graph::get_constant_cache();
 }
 
 } // namespace onednn
