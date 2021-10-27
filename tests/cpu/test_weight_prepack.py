@@ -294,9 +294,9 @@ class TestPrepackCases(TestCase):
                     loss2.backward()
                     ipex_optimizer2.step()
             self.assertEqual(y, y1)
-            self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1) # FP32: packed mkldnn vs plain mkl
+            self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1)  # FP32: packed mkldnn vs plain mkl
             self.assertEqual(loss, loss1)
-            self.assertEqual(loss1, loss2, rtol=1e-2, atol=1e-1) # FP32: packed mkldnn vs plain mkl
+            self.assertEqual(loss1, loss2, rtol=1e-2, atol=1e-1)  # FP32: packed mkldnn vs plain mkl
 
 
     @skipIfNoTorchVision
@@ -353,7 +353,7 @@ class TestPrepackCases(TestCase):
         options = itertools.product(out_feature, [True, False], input_shapes)
         for out_features, bias, x_shape in options:
             in_features = x_shape[-1]
-            x = torch.randn(x_shape, dtype=torch.float32)
+            x = torch.randn(x_shape, dtype=torch.float32) * 0.1
             model = torch.nn.Linear(in_features, out_features, bias=bias).float().train()
             for dtype in [torch.float32, torch.bfloat16]:
                 x1 = x.clone().requires_grad_()
@@ -422,7 +422,7 @@ class TestPrepackCases(TestCase):
             "bias": [True, False],
             "stride": [1, 2],
             "padding": [1, 2],
-            "output_padding": [0], # TODO: fix output_padding == 2 and etc.
+            "output_padding": [0],  # TODO: fix output_padding == 2 and etc.
             "groups": [1, 2],
             "dilation": [1, 2],
         }      
@@ -489,9 +489,9 @@ class TestPrepackCases(TestCase):
         torch.manual_seed(0)
         for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
             if (output_padding < stride or output_padding < dilation) \
-                    and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
-                    and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
-                    and ((input_depth - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0):
+                    and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
+                    and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
+                    and ((input_depth - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0):
 
                 ic = input_channel_per_group * groups
                 oc = output_channel_per_group * groups
@@ -521,8 +521,7 @@ class TestPrepackCases(TestCase):
                         origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                         ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                         x1 = x.clone().requires_grad_()
-                        x2 = x.clone().requires_grad_()
-                        
+                        x2 = x.clone().requires_grad_()                        
                         with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                             y1 = origin_model(x1)
                             loss1 = y1.sum()
@@ -535,7 +534,7 @@ class TestPrepackCases(TestCase):
                             loss2.backward()
                             ipex_optimizer.step()
                             self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1)
-                            self.assertEqual(loss1, loss2, rtol=1e-1, atol=1e-1) # TODO: 1e-2 cannot pass, check it
+                            self.assertEqual(loss1, loss2, rtol=1e-1, atol=1e-1)  # TODO: 1e-2 cannot pass, check it
                             self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-1)
                             if bias:
                                 self.assertEqual(origin_model.deconv.bias.grad, ipex_model.deconv.bias.grad.float())

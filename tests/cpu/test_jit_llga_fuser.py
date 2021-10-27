@@ -257,8 +257,8 @@ class TestOp(JitLlgaTestCase):
             return x.matmul(y)
 
         # TODO: support all shapes combination
-        x = torch.randn(8, 128, 768)
-        y = torch.randn(768, 3072)
+        x = torch.randn(8, 128, 368)
+        y = torch.randn(368, 3072)
         graph, _ = self.checkTrace(forward_matmul, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 

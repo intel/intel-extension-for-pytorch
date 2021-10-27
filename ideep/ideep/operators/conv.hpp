@@ -517,8 +517,16 @@ private:
     auto& pd = param.pd;
     auto scratchpad = param.scratchpad;
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
-    auto expected_weights = weights.make_grouped_weights(param.groups)
-                                .reorder_if_differ_in(pd.weights_desc());
+    tensor expected_weights;
+    // it will be removed after block format reorder performance improved.
+    if (!weights.get_desc().is_plain() &&
+        weights.get_desc() != pd.weights_desc()) {
+      auto temp = weights.to_public(nullptr, weights.get_data_type());
+      expected_weights = temp.reorder_if_differ_in(pd.weights_desc());
+    } else {
+      expected_weights = weights.make_grouped_weights(param.groups)
+                             .reorder_if_differ_in(pd.weights_desc());
+    }
 
     auto expected_dst_desc = pd.dst_desc();
     tensor expected_dst;
