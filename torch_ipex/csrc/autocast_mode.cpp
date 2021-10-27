@@ -446,9 +446,25 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_cond), "linalg_cond",
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_cond), "linalg_cond.p_str",
                    Tensor(const Tensor &, c10::string_view), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(linalg_matrix_rank), "linalg_matrix_rank",
-                   Tensor(const Tensor &, const c10::optional<double>, bool),
-                   fp32)
+MAKE_REGISTER_FUNC(
+    ADD_NS(linalg_matrix_rank),
+    "linalg_matrix_rank",
+    Tensor(const Tensor&, double, bool),
+    fp32)
+MAKE_REGISTER_FUNC(
+    ADD_NS(linalg_matrix_rank),
+    "linalg_matrix_rank.atol_rtol_tensor",
+    Tensor(
+        const Tensor&,
+        const c10::optional<at::Tensor>&,
+        const c10::optional<at::Tensor>&,
+        bool),
+    fp32)
+MAKE_REGISTER_FUNC(
+    ADD_NS(linalg_matrix_rank),
+    "linalg_matrix_rank.atol_rtol_float",
+    Tensor(const Tensor&, c10::optional<double>, c10::optional<double>, bool),
+    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_matrix_rank), "linalg_matrix_rank.tol_tensor",
                    Tensor(const Tensor &, const Tensor &, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(linalg_solve), "linalg_solve",
