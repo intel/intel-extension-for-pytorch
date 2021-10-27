@@ -59,7 +59,7 @@ void init_runtime_ext() {
 }
 
 void _pin_cpu_cores(const std::vector<int32_t>& cpu_core_list) {
-  if (!iomp_symbol_loaded) {
+  if (!is_runtime_ext_enabled()) {
     throw std::runtime_error(
         "Didn't preload IOMP before using the runtime API");
   }

@@ -7,7 +7,6 @@ from torch.testing._internal.jit_utils import JitTestCase
 import time, sys
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 from test_jit_llga_quantization_fuser import llga_test_env
-import torchvision.models as models
 import torch.fx.experimental.optimization as optimization
 
 class SimpleNet(torch.nn.Module):
