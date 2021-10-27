@@ -22,8 +22,8 @@
 
 cmake_minimum_required(VERSION 3.4.3)
 
-if (NOT MKLDPCPP_FOUND)
-set(MKLDPCPP_FOUND OFF)
+if (NOT ONEMKL_FOUND)
+set(ONEMKL_FOUND OFF)
 
 set(mkl_dpcpp_root_hint)
 if(DEFINED MKL_DPCPP_ROOT)
@@ -100,7 +100,7 @@ if(MKL_DPCPP_HEADER)
     message(STATUS "Intel MKL DPCPP library: ${ONEMKL_THREADS_LIBRARY}")
 
     list(APPEND ONEMKL_SHARED_LIBS ${ONEMKL_SYCL_LIBRARY} ${ONEMKL_ILP64_LIBRARY} ${ONEMKL_CORE_LIBRARY} ${ONEMKL_THREADS_LIBRARY})
-    set(MKLDPCPP_FOUND ON)
+    set(ONEMKL_FOUND ON)
     message(STATUS "Intel oneMKL found.")
 else()
   message(WARNING "Intel oneMKL not found. No DPCPP MKL support")
