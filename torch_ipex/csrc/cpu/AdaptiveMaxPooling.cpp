@@ -5,6 +5,7 @@
 #include <ATen/cpu/vec/vec.h>
 #include <ATen/native/AdaptivePooling.h>
 #include <ATen/native/cpu/utils.h>
+#include <ATen/record_function.h>
 #include <c10/util/irange.h>
 
 #include "AdaptiveMaxPooling.h"

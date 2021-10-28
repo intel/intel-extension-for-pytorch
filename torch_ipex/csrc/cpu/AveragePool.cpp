@@ -6,6 +6,7 @@
 #include <ATen/cpu/vec/vec.h>
 #include <ATen/native/Pool.h>
 #include <ATen/native/cpu/utils.h>
+#include <ATen/record_function.h>
 #include <c10/util/irange.h>
 
 #include "torch_ipex/csrc/library.h"
