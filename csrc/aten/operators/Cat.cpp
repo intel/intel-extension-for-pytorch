@@ -10,6 +10,7 @@
 #include "comm/ATDispatch.h"
 
 #include <core/Memory.h>
+#include <core/MemoryFormat.h>
 #include <intrinsic/ipex_intrinsic.h>
 #include <oneDNN/oneDNN.h>
 #include <tensor/Context.h>
@@ -301,6 +302,9 @@ static void cat(
   TORCH_CHECK(numInputs > 0, "invalid number of inputs");
   TORCH_CHECK(dimension >= 0, "invalid dimension");
 
+  Tensor first_tensor = inputs[0];
+  auto ft_smf = first_tensor.suggest_memory_format();
+
   std::vector<int64_t> size(nDims);
 
   int64_t cat_dim_size = 0;
@@ -320,7 +324,7 @@ static void cat(
     }
     size[dim] = result_dim_size;
   }
-  result.resize_(size);
+  result.resize_(size, ft_smf);
 
   const bool all32BitIndexable =
       std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
@@ -365,7 +369,7 @@ static void single_cat(
   std::vector<int64_t> size(1);
   size[0] = numInputs;
 
-  result.resize_(size);
+  result.resize_(size, inputs[0].suggest_memory_format());
 
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
@@ -401,16 +405,11 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
   TORCH_CHECK(numInputs > 0, "invalid number of inputs");
   TORCH_CHECK(dimension >= 0, "invalid dimension");
 
-  bool first_tensor_is_channel_last = false;
+  bool first_tensor_is_channels_last = false;
   Tensor first_tensor = inputs[0];
   auto ft_ndim = first_tensor.ndimension();
-  if (4 == ft_ndim || 5 == ft_ndim) {
-    first_tensor_is_channel_last = (4 == ft_ndim)
-        ? (!first_tensor.is_contiguous() &&
-           first_tensor.is_contiguous(at::MemoryFormat::ChannelsLast))
-        : (!first_tensor.is_contiguous() &&
-           first_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d));
-  }
+  auto ft_smf = first_tensor.suggest_memory_format();
+  first_tensor_is_channels_last = is_smf_channels_last(first_tensor);
 
   std::vector<Tensor> cat_tensors;
   int64_t cat_dim_size = 0;
@@ -422,12 +421,8 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
     check_shape_except_dim(notSkippedTensor, tensor, dimension);
     cat_dim_size += tensor.size(dimension);
     auto ndim = tensor.ndimension();
-    if (true == first_tensor_is_channel_last) {
-      // Now only support ndim == 4 or 5
-      TORCH_CHECK(4 == ndim || 5 == ndim, "ndim must be 4 or 5");
-      Tensor cl_tensor = (4 == ndim)
-          ? tensor.contiguous(at::MemoryFormat::ChannelsLast)
-          : tensor.contiguous(at::MemoryFormat::ChannelsLast3d);
+    if (true == first_tensor_is_channels_last) {
+      Tensor cl_tensor = tensor.contiguous(get_cl_tag_by_ndim(ndim));
       cat_tensors.push_back(cl_tensor);
     } else {
       // only support ndim == 1, 2, 3, 6 for nchw format
@@ -447,17 +442,7 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
     size[dim] = result_dim_size;
   }
   memory::dims output_dims = size;
-  output.resize_(size);
-
-  if (4 == ft_ndim &&
-      cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    output = output.contiguous(at::MemoryFormat::ChannelsLast);
-  }
-
-  if (5 == ft_ndim &&
-      cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    output = output.contiguous(at::MemoryFormat::ChannelsLast3d);
-  }
+  output.resize_(size, ft_smf);
 
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -473,12 +458,7 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
     memory::dims input_tz = dims;
     auto data_t = get_onednn_dtype(cat_tensors[i]);
     auto ndim = cat_tensors[i].ndimension();
-    bool is_channels_last = false;
-    if (4 == ndim || 5 == ndim) {
-      is_channels_last = (4 == ndim)
-          ? cat_tensors[i].is_contiguous(at::MemoryFormat::ChannelsLast)
-          : cat_tensors[i].is_contiguous(at::MemoryFormat::ChannelsLast3d);
-    }
+    bool is_channels_last = is_smf_channels_last(first_tensor);
     auto format_plain = get_dnnl_default_format(ndim, is_channels_last);
 
     memory::desc tensor_md;
@@ -499,13 +479,8 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
   }
 
   auto data_t = get_onednn_dtype(cat_tensors[0]);
-  bool ft_is_channels_last = false;
-  if (4 == ft_ndim || 5 == ft_ndim) {
-    ft_is_channels_last = (4 == ft_ndim)
-        ? cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast)
-        : cat_tensors[0].is_contiguous(at::MemoryFormat::ChannelsLast3d);
-  }
-  auto format_plain = get_dnnl_default_format(ft_ndim, ft_is_channels_last);
+  auto format_plain =
+      get_dnnl_default_format(ft_ndim, first_tensor_is_channels_last);
   auto output_md = memory::desc(output_dims, data_t, format_plain);
   auto concat_pd = concat::primitive_desc(
       output_md, static_cast<int>(dimension), cat_tensors_md, engine);

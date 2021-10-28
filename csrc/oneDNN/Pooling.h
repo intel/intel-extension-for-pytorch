@@ -20,6 +20,15 @@ namespace oneDNN {
 
 using alg = dnnl::algorithm;
 
+static inline bool onednn_pool_use_channels_last(const at::Tensor& input) {
+  const auto ndim = input.ndimension();
+  if (2 == ndim) {
+    return false;
+  }
+
+  return is_smf_channels_last(input);
+}
+
 template <alg alg_kind>
 static at::Tensor pooling(
     at::Tensor& dst,
@@ -188,19 +197,20 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   memory::dims stride;
   memory::dims padding;
 
+  auto ndim = src.ndimension();
+
   if (srcDepth == 0) {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast)
-        ? memory::format_tag::nhwc
-        : memory::format_tag::nchw;
+    format = onednn_pool_use_channels_last(src)
+        ? (3 == ndim ? memory::format_tag::nwc : memory::format_tag::nhwc)
+        : (3 == ndim ? memory::format_tag::ncw : memory::format_tag::nchw);
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
-        ? memory::format_tag::ndhwc
-        : memory::format_tag::ncdhw;
+    format = onednn_pool_use_channels_last(src) ? memory::format_tag::ndhwc
+                                                : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
     kernel = {kD, kH, kW};
@@ -242,8 +252,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
 
   memory src_usr_m, dst_usr_m;
   if (!Settings::I().is_onednn_layout_enabled() ||
-      src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-      src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+      onednn_pool_use_channels_last(src)) {
     src_usr_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
     dst_usr_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
   } else {
@@ -273,8 +282,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     at::Tensor idx_;
     memory idx_m;
     if (!Settings::I().is_onednn_layout_enabled() ||
-        src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-        src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+        onednn_pool_use_channels_last(src)) {
       idx_ = at::empty({dst_tz}, at::TensorOptions(at::kXPU).dtype(at::kInt));
       idx_m = dpcpp_onednn_memory(idx_md, engine, idx_.data_ptr());
     } else {
@@ -300,8 +308,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
          {DNNL_ARG_WORKSPACE, idx_m}});
 
     if (!Settings::I().is_onednn_layout_enabled() ||
-        src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-        src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+        onednn_pool_use_channels_last(src)) {
       dtype_convert_by_scalar(
           idx.data_ptr<int64_t>(), idx_.data_ptr<int32_t>(), idx_.numel());
     } else {
@@ -504,10 +511,11 @@ static at::Tensor pooling_backward(
   memory::dims stride;
   memory::dims padding;
 
+  auto ndim = diff_dst.ndimension();
   if (diff_src_depth == 0) {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast)
-        ? memory::format_tag::nhwc
-        : memory::format_tag::nchw;
+    format = onednn_pool_use_channels_last(diff_dst)
+        ? (3 == ndim ? memory::format_tag::nwc : memory::format_tag::nhwc)
+        : (3 == ndim ? memory::format_tag::ncw : memory::format_tag::nchw);
 
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
@@ -515,7 +523,7 @@ static at::Tensor pooling_backward(
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+    format = onednn_pool_use_channels_last(diff_dst)
         ? memory::format_tag::ndhwc
         : memory::format_tag::ncdhw;
     diff_src_tz = {
@@ -569,8 +577,7 @@ static at::Tensor pooling_backward(
   auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
   memory diff_src_usr_m, diff_dst_usr_m, idx_usr_m;
   if (!Settings::I().is_onednn_layout_enabled() ||
-      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+      onednn_pool_use_channels_last(diff_dst)) {
     diff_dst_usr_m = dpcpp_onednn_memory(
         {diff_dst_tz, data_t, format}, engine, diff_dst.data_ptr());
 

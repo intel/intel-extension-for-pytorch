@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/core/grad_mode.h>
+#include <core/MemoryFormat.h>
 
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
@@ -99,45 +100,57 @@ static inline memory::dims compatible_dilation(IntArrayRef& dilation) {
 }
 
 static inline memory::format_tag conv_src_fmt(
-    int64_t ndim,
-    bool is_channels_last = false) {
+    const int64_t ndim,
+    const bool is_channels_last = false) {
   if (!is_channels_last) {
-    return (ndim == 4)
-        ? memory::format_tag::nchw
-        : ((ndim == 5) ? memory::format_tag::ncdhw : memory::format_tag::undef);
+    return (ndim == 3)
+        ? memory::format_tag::ncw
+        : ((ndim == 4) ? memory::format_tag::nchw
+                       : ((ndim == 5) ? memory::format_tag::ncdhw
+                                      : memory::format_tag::undef));
   } else {
-    return (ndim == 4)
-        ? memory::format_tag::nhwc
-        : ((ndim == 5) ? memory::format_tag::ndhwc : memory::format_tag::undef);
+    return (ndim == 3)
+        ? memory::format_tag::nwc
+        : ((ndim == 4) ? memory::format_tag::nhwc
+                       : ((ndim == 5) ? memory::format_tag::ndhwc
+                                      : memory::format_tag::undef));
   }
 }
 
 static inline memory::format_tag conv_wgh_fmt(
-    int64_t ndim,
-    bool grouped = false,
-    bool is_channels_last = false) {
+    const int64_t ndim,
+    const bool grouped = false,
+    const bool is_channels_last = false) {
   if (!is_channels_last) {
-    return (ndim == 4)
-        ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw)
-        : ((ndim == 5) ? (grouped ? memory::format_tag::goidhw
-                                  : memory::format_tag::oidhw)
-                       : memory::format_tag::undef);
+    return (ndim == 3)
+        ? (grouped ? memory::format_tag::goiw : memory::format_tag::oiw)
+        : (ndim == 4)
+            ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw)
+            : ((ndim == 5) ? (grouped ? memory::format_tag::goidhw
+                                      : memory::format_tag::oidhw)
+                           : memory::format_tag::undef);
   } else {
-    return (ndim == 4)
-        ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi)
-        : ((ndim == 5) ? (grouped ? memory::format_tag::godhwi
-                                  : memory::format_tag::odhwi)
-                       : memory::format_tag::undef);
+    return (ndim == 3)
+        ? (grouped ? memory::format_tag::gowi : memory::format_tag::owi)
+        : (ndim == 4)
+            ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi)
+            : ((ndim == 5) ? (grouped ? memory::format_tag::godhwi
+                                      : memory::format_tag::odhwi)
+                           : memory::format_tag::undef);
   }
 }
 
 static inline memory::dims compatible_wgh_dims(
-    int64_t ndim,
-    int64_t groups,
-    int64_t oc,
-    int64_t ic,
-    IntArrayRef wsizes) {
-  if (ndim == 4) {
+    const int64_t ndim,
+    const int64_t groups,
+    const int64_t oc,
+    const int64_t ic,
+    const IntArrayRef wsizes) {
+  if (ndim == 3) {
+    auto kw = wsizes[2];
+    return (groups != 1) ? memory::dims({groups, oc / groups, ic / groups, kw})
+                         : memory::dims({oc, ic, kw});
+  } else if (ndim == 4) {
     auto kh = wsizes[2];
     auto kw = wsizes[3];
     return (groups != 1)
@@ -165,11 +178,7 @@ static inline bool onednn_conv_use_channels_last(
   // Otherwise, output will be in channels last memory format.
   auto input_sug_mem_fmt = input.suggest_memory_format();
   auto wgh_sug_mem_fmt = weight.suggest_memory_format();
-  return (
-      (at::MemoryFormat::ChannelsLast == input_sug_mem_fmt) ||
-      (at::MemoryFormat::ChannelsLast3d == input_sug_mem_fmt) ||
-      (at::MemoryFormat::ChannelsLast == wgh_sug_mem_fmt) ||
-      (at::MemoryFormat::ChannelsLast3d == wgh_sug_mem_fmt));
+  return (is_smf_channels_last(input) || is_smf_channels_last(weight));
 }
 
 static at::Tensor convolution(
@@ -186,7 +195,6 @@ static at::Tensor convolution(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
   auto ndim = src.ndimension();
-
   auto dst_tz =
       conv_dst_tz(ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
   if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
@@ -196,7 +204,10 @@ static at::Tensor convolution(
                                  : device(kXPU).dtype(kQInt8);
     }
     if (onednn_conv_use_channels_last(src, wgh)) {
-      dst_opt = dst_opt.memory_format(at::MemoryFormat::ChannelsLast);
+      TORCH_CHECK(
+          3 == ndim || 4 == ndim || 5 == ndim,
+          "convolution only supports 3D, 4D, 5D tensor");
+      dst_opt = dst_opt.memory_format(get_cl_tag_by_ndim(ndim));
     }
 
     dst = at::empty(dst_tz, dst_opt);
@@ -225,9 +236,11 @@ static at::Tensor convolution(
   auto oc = dst_tz[1];
 
   auto fmt_any = memory::format_tag::any;
+  // 3D: n/c/w (n/w/c)
   // 4D: n/c/h/w (n/h/w/c)
   // 5D: n/c/d/h/w (n/d/h/w/c)
   auto fmt_src = conv_src_fmt(ndim, onednn_conv_use_channels_last(src, wgh));
+  // 3D: (g)o/i/w ((g)o/w/i)
   // 4D: (g)o/i/h/w ((g)o/h/w/i)
   // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
   auto fmt_wgh =
@@ -361,10 +374,11 @@ static at::Tensor convolution(
     } else {
       auto expected_dst_md = conv_forward_pd.dst_desc();
       auto plain_dst_md = memory::desc({dst_tz}, dst_data_t, fmt_src);
+      auto mem_fmt = get_cl_tag_by_ndim(ndim);
       auto dst_opt = onednn_conv_use_channels_last(src, wgh)
           // src.options() is just used to fill dst_opt. can also be
           // any other tensor to do this
-          ? src.options().memory_format(at::MemoryFormat::ChannelsLast)
+          ? src.options().memory_format(mem_fmt)
           : src.options();
       if (expected_dst_md != plain_dst_md) {
         dst = empty_opaque_tensor(expected_dst_md, dst_opt, c10::nullopt);

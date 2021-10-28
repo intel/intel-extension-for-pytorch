@@ -33,9 +33,14 @@ Tensor dpcpp_convolution_backward_input(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
+  auto ndim = grad_output.ndimension();
+  TORCH_CHECK(
+      3 == ndim || 4 == ndim || 5 == ndim,
+      "convolution bwd input only supports 3D, 4D, 5D tensor");
+  auto gy_cl_tag = get_cl_tag_by_ndim(ndim);
   // smf: suggest memory format
   auto smf = onednn_conv_use_channels_last(grad_output, weight)
-      ? at::MemoryFormat::ChannelsLast
+      ? gy_cl_tag
       : at::MemoryFormat::Contiguous;
   auto grad_input = at::empty(input_size, grad_output.options(), smf);
 
@@ -43,7 +48,6 @@ Tensor dpcpp_convolution_backward_input(
     return grad_input;
   }
 
-  auto ndim = grad_input.ndimension();
   auto ic = grad_input.size(1);
   auto oc = grad_output.size(1);
 
@@ -245,8 +249,13 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
+  auto ndim = grad_output.ndimension();
+  TORCH_CHECK(
+      3 == ndim || 4 == ndim || 5 == ndim,
+      "convolution bwd wgh only supports 3D, 4D, 5D tensor");
+  auto gy_cl_tag = get_cl_tag_by_ndim(ndim);
   auto smf = onednn_conv_use_channels_last(input, grad_output)
-      ? at::MemoryFormat::ChannelsLast
+      ? gy_cl_tag
       : at::MemoryFormat::Contiguous;
 
   Tensor grad_bias;
@@ -259,7 +268,6 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
     return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
   }
 
-  auto ndim = input.ndimension();
   auto ic = input.size(1);
   auto oc = grad_output.size(1);
 
@@ -774,17 +782,20 @@ Tensor _convolution_out(
     int64_t groups_,
     ConvAttr attr) {
   auto output = output_r;
-  auto input = input_r.is_contiguous() ||
-          input_r.is_contiguous(at::MemoryFormat::ChannelsLast)
+  auto ndim = input_r.ndimension();
+  TORCH_CHECK(
+      3 == ndim || 4 == ndim || 5 == ndim,
+      "convolution only supports 3D, 4D, 5D tensor");
+  auto mem_fmt = get_cl_tag_by_ndim(ndim);
+  auto input = input_r.is_contiguous() || input_r.is_contiguous(mem_fmt)
       ? input_r
       : onednn_conv_use_channels_last(input_r, weight_r)
-          ? input_r.contiguous(at::MemoryFormat::ChannelsLast)
+          ? input_r.contiguous(mem_fmt)
           : input_r.contiguous();
-  auto weight = weight_r.is_contiguous() ||
-          weight_r.is_contiguous(at::MemoryFormat::ChannelsLast)
+  auto weight = weight_r.is_contiguous() || weight_r.is_contiguous(mem_fmt)
       ? weight_r
       : onednn_conv_use_channels_last(input_r, weight_r)
-          ? weight_r.contiguous(at::MemoryFormat::ChannelsLast)
+          ? weight_r.contiguous(mem_fmt)
           : weight_r.contiguous();
   auto bias = bias_r;
   auto k = weight.ndimension();
@@ -805,12 +816,6 @@ Tensor _convolution_out(
   params.groups = groups_;
 
   check_shape_forward(input, weight, bias, params, true);
-
-  if (k == 3) {
-    params.view1d_as_2d();
-    input = view4d(input);
-    weight = view4d(weight);
-  }
 
   Tensor output_;
 
@@ -835,10 +840,6 @@ Tensor _convolution_out(
         params.dilation,
         params.groups,
         attr);
-
-    if (k == 3) {
-      output_ = view3d(output_);
-    }
   }
 
   return output_;
@@ -1040,23 +1041,22 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   // oneDNN can revice non-contiguous input if we define the stride in input_md,
   // for now, we contiguous the input before oneDNN.
   auto input_ndim = input.ndimension();
-  Tensor input_ = 4 == input_ndim
-      ? (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast
-             ? input.contiguous(at::MemoryFormat::ChannelsLast)
-             : input.contiguous())
-      : (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d
-             ? input.contiguous(at::MemoryFormat::ChannelsLast3d)
-             : input.contiguous());
+  TORCH_CHECK(
+      3 == input_ndim || 4 == input_ndim || 5 == input_ndim,
+      "convolution bwd only supports 3D, 4D, 5D tensor");
+  auto cl_tag = get_cl_tag_by_ndim(input_ndim);
+  // try best to make sure that suggest memory format is propagated
+  Tensor input_ = (grad_output.suggest_memory_format() == cl_tag ||
+                   input.suggest_memory_format() == cl_tag ||
+                   weight.suggest_memory_format() == cl_tag)
+      ? input.contiguous(cl_tag)
+      : input.contiguous();
 
-  auto ndim = grad_output.ndimension();
-  // grad_output_ should be polluted by input
-  Tensor grad_output_ = 4 == ndim
-      ? (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast
-             ? grad_output.contiguous(at::MemoryFormat::ChannelsLast)
-             : grad_output.contiguous())
-      : (input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d
-             ? grad_output.contiguous(at::MemoryFormat::ChannelsLast3d)
-             : grad_output.contiguous());
+  Tensor grad_output_ = (grad_output.suggest_memory_format() == cl_tag ||
+                         input.suggest_memory_format() == cl_tag ||
+                         weight.suggest_memory_format() == cl_tag)
+      ? grad_output.contiguous(cl_tag)
+      : grad_output.contiguous();
 
   Tensor grad_input, grad_weight, grad_bias;
 

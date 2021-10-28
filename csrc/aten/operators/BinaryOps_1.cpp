@@ -82,15 +82,26 @@ Tensor& add_out(
     const Tensor& _other,
     Scalar alpha) {
   Tensor self = _self, other = _other;
+  const auto ndim = _self.ndimension();
+  auto cl_tag = at::MemoryFormat::ChannelsLast;
+  if (3 == ndim || 4 == ndim || 5 == ndim) {
+    cl_tag = get_cl_tag_by_ndim(ndim);
+  }
+  // 1. onednn kernel
   if (_self.is_xpu() && _other.is_xpu() && 1.0 == alpha.to<float>() &&
       _self.defined() && _other.defined() &&
       _self.scalar_type() == _other.scalar_type() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
       xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
+      /* Herein, still use actual memory format to do judgement,
+       * because suggest memory format may be not the same as
+       * actual memory format. If use suggest memory format for
+       * onednn pass judgement, may cause reorder for non-contiguous
+       * tensor. However, for non-contigous tensor should use
+       * TensorIterator pass below. */
       ((_self.is_contiguous() && _other.is_contiguous()) ||
-       (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
-        _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
+       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -99,11 +110,12 @@ Tensor& add_out(
       !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
-  } else if (
+  }
+  // 2. naive kernel
+  else if (
       _self.is_xpu() && _other.is_xpu() && _self.sizes() == _other.sizes() &&
       ((_self.is_contiguous() && _other.is_contiguous()) ||
-       (_self.is_contiguous(MemoryFormat::ChannelsLast) &&
-        _other.is_contiguous(MemoryFormat::ChannelsLast))) &&
+       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
       _self.scalar_type() == _other.scalar_type()) {
     // propogate block format in case: alpha != 1
     if (!DPCPPTensorContext::is_plain(result) ||
@@ -125,8 +137,9 @@ Tensor& add_out(
         auto _res = at::AtenIpexTypeXPU::empty_opaque_tensor(
             tar_md, result.options(), c10::nullopt);
 
-        if (result.is_same(_self))
+        if (result.is_same(_self)) {
           xpu::oneDNN::reorder(result, _res);
+        }
 
         // result is alias, have to write back
         auto tar_r_ctx = DPCPPTensorContext::release_tensor_ctx(_res);
@@ -166,29 +179,44 @@ Tensor& add_out(
               op);
         });
     return result;
-  } else {
+  }
+  // 3. TensorIterator kernel
+  else {
     // loops
     // use inplace conversion not to break alias property "Tensor& result"
     result = to_plain_if_needed_(result);
     self = to_plain_if_needed(_self);
     other = to_plain_if_needed(_other);
+
+    auto iter = TensorIterator::binary_op(result, self, other);
+    impl::alpha_check(iter, alpha);
+    impl::add_kernel_dpcpp(iter, alpha);
+    TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
+
+    auto smf = _self.suggest_memory_format();
+    if (is_channels_last(smf)) {
+      if (!result.is_contiguous(smf)) {
+        result.contiguous(smf);
+      }
+    }
+
+    return result;
   }
-
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::alpha_check(iter, alpha);
-  impl::add_kernel_dpcpp(iter, alpha);
-  TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
-
-  return result;
 }
 
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   Tensor result, self, other;
+  const auto ndim = _self.ndimension();
+  auto cl_tag = at::MemoryFormat::ChannelsLast;
+  if (3 == ndim || 4 == ndim || 5 == ndim) {
+    cl_tag = get_cl_tag_by_ndim(ndim);
+  }
   if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
       xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
-      _self.is_contiguous() && _other.is_contiguous() &&
+      ((_self.is_contiguous() && _other.is_contiguous()) ||
+       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -200,12 +228,19 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   } else {
     self = to_plain_if_needed(_self);
     other = to_plain_if_needed(_other);
-  }
 
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::alpha_check(iter, alpha);
-  impl::add_kernel_dpcpp(iter, alpha);
-  return iter.output();
+    auto iter = TensorIterator::binary_op(result, self, other);
+    impl::alpha_check(iter, alpha);
+    impl::add_kernel_dpcpp(iter, alpha);
+    auto smf = _self.suggest_memory_format();
+    if (is_channels_last(smf)) {
+      if (!(iter.output().is_contiguous(smf))) {
+        iter.output().contiguous(smf);
+      }
+    }
+
+    return iter.output();
+  }
 }
 
 Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
@@ -287,19 +322,26 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
         _self.options(),
         alpha.to<float>(),
         0,
-        MemoryFormat::Contiguous);
+        _self.suggest_memory_format());
     xpu::oneDNN::bin<dnnl::algorithm::binary_add, dnnl::algorithm::binary_mul>(
         result, _self, _other, _post);
     return result;
   } else {
     self = to_plain_if_needed(_self);
     other = to_plain_if_needed(_other);
-  }
 
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::alpha_check(iter, alpha);
-  impl::add_kernel_dpcpp(iter, alpha);
-  return iter.output();
+    auto iter = TensorIterator::binary_op(result, self, other);
+    impl::alpha_check(iter, alpha);
+    impl::add_kernel_dpcpp(iter, alpha);
+    auto smf = _self.suggest_memory_format();
+    if (is_channels_last(smf)) {
+      if (!(iter.output().is_contiguous(smf))) {
+        iter.output().contiguous(smf);
+      }
+    }
+
+    return iter.output();
+  }
 }
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

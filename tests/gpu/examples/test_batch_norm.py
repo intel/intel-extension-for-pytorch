@@ -179,3 +179,111 @@ class TestNNMethod(TestCase):
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+    def test_channels_last_1d_fwd_and_bwd(self, dtype=torch.float):
+        shapes = [(1, 2, 3), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
+                  (4, 1, 1), (1, 4, 4)]
+        for shape in shapes:
+            print("\n================== test shape: ", shape, "==================")
+            N, C, W = shape[0], shape[1], shape[2]
+            bn = nn.BatchNorm1d(C)
+            x_i = torch.randn([N, C, W], device=cpu_device)
+            grad_i = torch.randn([N, C, W], device=cpu_device)
+
+            x_dpcpp_i = x_i.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+            grad_dpcpp_i = grad_i.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+
+            x_cpu = Variable(x_i, requires_grad=True)
+            grad_cpu = Variable(grad_i, requires_grad=True)
+
+            y_cpu1 = bn(x_cpu)
+            y_cpu = bn(y_cpu1)
+
+            y_cpu.backward(grad_cpu)
+
+            print("x_cpu = ", y_cpu)
+            print("x_cpu.grad = ", x_cpu.grad)
+
+            x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+            grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+            bn.to(dpcpp_device)
+
+            y_dpcpp1 = bn(x_dpcpp)
+            y_dpcpp = bn(y_dpcpp1)
+
+            y_dpcpp.backward(grad_dpcpp)
+
+            if 1 == y_dpcpp.shape[1] or 1 == y_dpcpp.shape[2] or \
+               (1 == y_dpcpp.shape[1] and 1 == y_dpcpp.shape[2]):
+                self.assertEqual(y_dpcpp.is_contiguous(), True)
+                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+            else:
+                self.assertEqual(y_dpcpp.is_contiguous(), False)
+                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
+
+            if 1 == x_dpcpp.grad.shape[1] or 1 == x_dpcpp.grad.shape[2] or \
+               (1 == x_dpcpp.grad.shape[1] and 1 == x_dpcpp.grad.shape[2]):
+                self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
+                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last_1d), True)
+            else:
+                self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
+                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last_1d), True)
+
+            print("y_dpcpp = ", y_dpcpp.cpu())
+            print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+            self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+    def test_channels_last_fwd_and_bwd(self, dtype=torch.float):
+        shapes = [(1, 2, 3, 3), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
+                  (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
+        for shape in shapes:
+            print("\n================== test shape: ", shape, "==================")
+            N, C, H, W = shape[0], shape[1], shape[2], shape[3]
+            bn = nn.BatchNorm2d(C)
+            x_i = torch.randn([N, C, H, W], device=cpu_device)
+            grad_i = torch.randn([N, C, H, W], device=cpu_device)
+
+            x_dpcpp_i = x_i.to(dpcpp_device).to(memory_format=torch.channels_last)
+            grad_dpcpp_i = grad_i.to(dpcpp_device).to(memory_format=torch.channels_last)
+
+            x_cpu = Variable(x_i, requires_grad=True)
+            grad_cpu = Variable(grad_i, requires_grad=True)
+
+            y_cpu1 = bn(x_cpu)
+            y_cpu = bn(y_cpu1)
+
+            y_cpu.backward(grad_cpu)
+
+            print("x_cpu = ", y_cpu)
+            print("x_cpu.grad = ", x_cpu.grad)
+
+            x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+            grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+            bn.to(dpcpp_device)
+
+            y_dpcpp1 = bn(x_dpcpp)
+            y_dpcpp = bn(y_dpcpp1)
+
+            y_dpcpp.backward(grad_dpcpp)
+
+            if 1 == y_dpcpp.shape[1] or (1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3]) or \
+               (1 == y_dpcpp.shape[1] and 1 == y_dpcpp.shape[2] and 1 == y_dpcpp.shape[3]):
+                self.assertEqual(y_dpcpp.is_contiguous(), True)
+                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
+            else:
+                self.assertEqual(y_dpcpp.is_contiguous(), False)
+                self.assertEqual(y_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
+
+            if 1 == x_dpcpp.grad.shape[1] or (1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3]) or \
+               (1 == x_dpcpp.grad.shape[1] and 1 == x_dpcpp.grad.shape[2] and 1 == x_dpcpp.grad.shape[3]):
+                self.assertEqual(x_dpcpp.grad.is_contiguous(), True)
+                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True)
+            else:
+                self.assertEqual(x_dpcpp.grad.is_contiguous(), False)
+                self.assertEqual(x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True)
+
+            print("y_dpcpp = ", y_dpcpp.cpu())
+            print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+            self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))

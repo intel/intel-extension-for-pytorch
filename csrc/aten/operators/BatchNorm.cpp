@@ -9,7 +9,8 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 static inline at::Tensor condition_contiguous(const at::Tensor& t) {
-  if (t.defined() && !t.is_contiguous(at::MemoryFormat::ChannelsLast))
+  if (t.defined() && !t.is_contiguous(at::MemoryFormat::ChannelsLast1d) &&
+      !t.is_contiguous(at::MemoryFormat::ChannelsLast))
     return t.contiguous();
   return t;
 }

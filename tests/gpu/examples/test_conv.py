@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -264,6 +265,130 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(real.cpu(), ref)
 
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    def test_channels_last_1d_fwd(self, dtype=torch.float):
+        shapes = [(2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
+                  (4, 1, 1), (1, 4, 4), (1, 4, 1)]
+        for shape in shapes:
+            print("\n====== test shape: ", shape, "======")
+            N, C, H, W = shape[0], shape[1], 1, shape[2]
+            x = torch.ones(N, C, H, W, dtype=torch.float)
+            conv_ic, conv_oc, conv_ks = C, 5, 3
+            w = torch.ones(conv_oc, conv_ic, conv_ks, conv_ks, dtype=torch.float)
+            # cpu doesn't support channels last 1d, so we use conv2d to simulate conv1d here
+            conv = torch.nn.Conv2d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, padding=1, bias=False)
+            conv.weight.data = w
+            conv = conv.to(memory_format=torch.channels_last)
+            ref = conv(x)
+            # convert 4D tensor to 3D tensor here to make comparison below happy
+            ref = ref.view(ref.shape[0], ref.shape[1], ref.shape[3])
+
+            N, C, L = shape[0], shape[1], shape[2]
+            x = torch.ones(N, C, L, dtype=torch.float)
+            conv_ic, conv_oc, conv_ks = C, 5, 3
+            w = torch.ones(conv_oc, conv_ic, conv_ks, dtype=torch.float)
+            conv = torch.nn.Conv1d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, padding=1, bias=False)
+            conv.weight.data = w
+            conv = conv.to(memory_format=torch.channels_last_1d)
+
+            for test_weight_pollution in [False, True]:
+                print("\n---test_weight_pollution: ", test_weight_pollution)
+                if not test_weight_pollution:
+                    x = x.to(memory_format=torch.channels_last_1d).to("xpu")
+                else:
+                    x = x.to(memory_format=torch.contiguous_format).to("xpu")
+                w = w.to("xpu")
+                conv.weight.data = w
+                conv = conv.to(memory_format=torch.channels_last_1d)
+                print("input.is_contiguous(): ", x.is_contiguous())
+                print("input.is_contiguous(memory_format=torch.channels_last_1d): ",
+                      x.is_contiguous(memory_format=torch.channels_last_1d))
+                print("conv.weight.data.is_contiguous(): ", conv.weight.data.is_contiguous())
+                print("conv.weight.data.is_contiguous(memory_format=torch.channels_last_1d): ",
+                      conv.weight.data.is_contiguous(memory_format=torch.channels_last_1d))
+                real = conv(x)
+
+                print(real.shape)
+                print(real.stride())
+                print("real is CF: ", real.is_contiguous())
+                print("real is CL: ", real.is_contiguous(memory_format=torch.channels_last_1d))
+                if 1 == real.shape[1] or (1 == real.shape[2]) or \
+                   (1 == real.shape[1] and 1 == real.shape[2]):
+                    self.assertEqual(real.is_contiguous(), True)
+                    self.assertEqual(real.is_contiguous(memory_format=torch.channels_last_1d), True)
+                else:
+                    self.assertEqual(real.is_contiguous(), False)
+                    self.assertEqual(real.is_contiguous(memory_format=torch.channels_last_1d), True)
+                print(real.contiguous().cpu())
+
+                self.assertEqual(real.contiguous().cpu(), ref)
+
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    def test_channels_last_1d_bwd(self, dtype=torch.float):
+        shapes = [(1, 7, 15000), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
+                  (4, 1, 1), (1, 4, 4), (1, 4, 1)]
+        for shape in shapes:
+            print("\n================== test shape: ", shape, "==================")
+            N, C, H, W = shape[0], shape[1], 1, shape[2]
+            x_cpu = torch.randn([N, C, H, W], dtype=dtype, device=cpu_device, requires_grad=True)
+
+            for test_weight_pollution in [False, True]:
+                x_cpu = x_cpu.to(memory_format=torch.channels_last)
+                conv_ic, conv_oc, conv_ks = C, 5, 1
+                grad_cpu = torch.full([N, conv_oc, H, W], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
+                w = torch.ones(conv_oc, conv_ic, conv_ks, conv_ks, dtype=torch.float)
+                # cpu doesn't support channels last 1d, so we use conv2d to simulate conv1d here
+                conv_cpu = nn.Conv2d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, bias=True)
+                conv_cpu.weight.data = w
+                conv_cpu.bias.data.fill_(0.01)
+                y_cpu = conv_cpu(x_cpu)
+                y_cpu.backward(grad_cpu)
+                y_cpu_gw = conv_cpu.weight.grad.detach().clone()
+                # convert 4D tensor to 3D tensor here to make comparison below happy
+                y_cpu = y_cpu.view(y_cpu.shape[0], y_cpu.shape[1], y_cpu.shape[3])
+                y_cpu_gw = y_cpu_gw.view(y_cpu_gw.shape[0], y_cpu_gw.shape[1], y_cpu_gw.shape[3])
+                conv_cpu.zero_grad()
+
+                x_dpcpp = x_cpu.view(x_cpu.shape[0], x_cpu.shape[1], x_cpu.shape[3])
+                x_dpcpp = x_dpcpp.to(dpcpp_device).requires_grad_()
+                x_dpcpp = x_dpcpp.to(memory_format=torch.channels_last_1d)
+                print("\n---test_weight_pollution: ", test_weight_pollution)
+                grad_dpcpp = grad_cpu.view(grad_cpu.shape[0], grad_cpu.shape[1], grad_cpu.shape[3])
+                if not test_weight_pollution:
+                    grad_dpcpp = grad_dpcpp.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+                else:
+                    grad_dpcpp = grad_dpcpp.to(dpcpp_device).to(memory_format=torch.contiguous_format)
+
+                w = torch.ones(conv_oc, conv_ic, conv_ks, dtype=torch.float)
+                conv_dpcpp = nn.Conv1d(conv_ic, conv_oc, kernel_size=conv_ks, stride=1, bias=True)
+                conv_dpcpp.weight.data = w
+                conv_dpcpp.bias.data.fill_(0.01)
+                conv_dpcpp = conv_dpcpp.to(dpcpp_device).to(memory_format=torch.channels_last_1d)
+                y_dpcpp = conv_dpcpp(x_dpcpp)
+                print("y_dpcpp.shape: ", y_dpcpp.shape)
+                print("y_dpcpp.is_contiguous(): ", y_dpcpp.is_contiguous())
+                print("y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
+                      y_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+                print("grad_dpcpp.shape: ", grad_dpcpp.shape)
+                print("grad_dpcpp.is_contiguous(): ", grad_dpcpp.is_contiguous())
+                print("grad_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
+                      grad_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+                print("x_dpcpp.shape: ", x_dpcpp.shape)
+                print("x_dpcpp.is_contiguous(): ", x_dpcpp.is_contiguous())
+                print("x_dpcpp.is_contiguous(memory_format=torch.channels_last_1d): ",
+                      x_dpcpp.is_contiguous(memory_format=torch.channels_last_1d))
+                y_dpcpp.backward(grad_dpcpp)
+                y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
+                print("y_dpcpp_gw.shape: ", y_dpcpp_gw.shape)
+                print("y_dpcpp_gw.is_contiguous(): ", y_dpcpp_gw.is_contiguous())
+                print("y_dpcpp_gw.is_contiguous(memory_format=torch.channels_last_1d): ",
+                      y_dpcpp_gw.is_contiguous(memory_format=torch.channels_last_1d))
+                conv_dpcpp.zero_grad()
+
+                self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)
+                self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
+
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_channels_last_fwd(self, dtype=torch.float):
         shapes = [(2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
@@ -310,6 +435,7 @@ class TestNNMethod(TestCase):
 
                 self.assertEqual(real.contiguous().cpu(), ref)
 
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_channels_last_bwd(self, dtype=torch.float):
         shapes = [(1, 7, 1, 15000), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]

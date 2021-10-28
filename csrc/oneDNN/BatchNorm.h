@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 
+#include <core/MemoryFormat.h>
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <operators/Utils.h>
@@ -9,6 +10,7 @@
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+
 #include "Reorder.h"
 #include "Utils.h"
 
@@ -21,8 +23,17 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace oneDNN {
 
+static inline bool onednn_bn_use_channels_last(const at::Tensor& input) {
+  const auto ndim = input.ndimension();
+  if (2 == ndim) {
+    return false;
+  }
+
+  return is_smf_channels_last(input);
+}
+
 static inline memory::format_tag bn_src_format(const at::Tensor& t) {
-  auto is_channels_last = t.is_contiguous(at::MemoryFormat::ChannelsLast);
+  auto is_channels_last = onednn_bn_use_channels_last(t);
   auto ndim = t.ndimension();
   if (ndim == 2) {
     return memory::format_tag::nc;
@@ -107,16 +118,21 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_normalization(
       batch_normalization_forward::primitive_desc(bn_fwd_desc, engine);
 #endif
 
+  auto ndim = src.ndimension();
+  auto src_cl_mfmt = at::MemoryFormat::ChannelsLast;
+  if (3 == ndim || 4 == ndim || 5 == ndim) {
+    src_cl_mfmt = get_cl_tag_by_ndim(ndim);
+  }
+
   at::Tensor dst;
   auto dst_md = bn_fwd_pd.dst_desc();
   if (!src_ctx.is_plain()) {
-    dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
-        ? empty_opaque_tensor(
-              dst_md, src.options(), at::MemoryFormat::ChannelsLast)
+    dst = onednn_bn_use_channels_last(src)
+        ? empty_opaque_tensor(dst_md, src.options(), src_cl_mfmt)
         : empty_opaque_tensor(dst_md, src.options(), c10::nullopt);
   } else {
-    dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
-        ? at::empty_like(src, src.options(), at::MemoryFormat::ChannelsLast)
+    dst = onednn_bn_use_channels_last(src)
+        ? at::empty_like(src, src.options(), src_cl_mfmt)
         : at::empty_like(src);
   }
 
