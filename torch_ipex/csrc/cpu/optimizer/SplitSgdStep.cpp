@@ -97,6 +97,7 @@ void packed_add(at::Tensor &top_half_, at::Tensor &bot_half_,
 
     at::parallel_for(0, len, 64, [&](int64_t start, int64_t end) {
       int64_t i = start;
+#if defined(CPU_AVX512)
       auto alpha_vec = _mm512_set1_ps(alpha_);
       for (; i < end - 31; i+=32) {
         auto bot0 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i));
@@ -124,6 +125,16 @@ void packed_add(at::Tensor &top_half_, at::Tensor &bot_half_,
         bot_half_ptr[i] = p16.s[0];
         top_half_ptr[i] = p16.s[1];
       }
+#else
+      for (; i < end; i++) {
+        packed_bf16 p16 = {};
+        p16.s[0] = bot_half_ptr[i];
+        p16.s[1] = top_half_ptr[i];
+        p16.f += alpha_ * (float)(value_ptr[i]);
+        bot_half_ptr[i] = p16.s[0];
+        top_half_ptr[i] = p16.s[1];
+      }
+#endif
     });
   }
 

@@ -1,8 +1,11 @@
 #pragma once
 
+#include <string>
+
 namespace torch_ipex {
 
-extern const char IPEX_GITREV[];
-extern const char TORCH_GITREV[];
+extern const std::string IPEX_GITREV;
+extern const std::string TORCH_GITREV;
+extern const std::string IPEX_AVX_VERSION;
 
 } // namespace torch_ipex

@@ -1,6 +1,19 @@
 INCLUDE(CheckCSourceRuns)
 INCLUDE(CheckCXXSourceRuns)
 
+SET(AVX2_CODE "
+  #include <immintrin.h>
+
+  int main()
+  {
+    __m256i a = {0};
+    a = _mm256_abs_epi16(a);
+    __m256i x;
+    _mm256_extract_epi64(x, 0); // we rely on this in our AVX2 code
+    return 0;
+  }
+")
+
 SET(AVX512_CODE "
   #include <stdint.h>
   #include <immintrin.h>
@@ -54,6 +67,9 @@ MACRO(CHECK_SSE lang type flags)
 
   MARK_AS_ADVANCED(${lang}_${type}_FOUND ${lang}_${type}_FLAGS)
 ENDMACRO()
+
+CHECK_SSE(C "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
+CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
 
 CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
 CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")

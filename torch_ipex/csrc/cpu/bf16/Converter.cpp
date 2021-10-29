@@ -4,13 +4,8 @@
 #include <ATen/Parallel.h>
 #include <torch/extension.h>
 
-#if defined(CPU_AVX512)
 #define BF16_2_FP32(dst, src, len) cvt_bf16_to_fp32(dst, src, len)
 #define FP32_2_BF16(dst, src, len) cvt_fp32_to_bf16(dst, src, len)
-#else
-#define BF16_2_FP32(dst, src, len)
-#define FP32_2_BF16(dst, src, len)
-#endif
 
 namespace torch_ipex {
 namespace cpu {

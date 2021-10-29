@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+
 #if defined(CPU_AVX512)
 #include <immintrin.h>
 // Conversion from BF16 to FP32
@@ -44,6 +45,20 @@ inline void cvt_fp32_to_bf16(at::BFloat16 *dst, const float *src, int len) {
     auto mask = (1 << (len - i )) - 1;
     auto f32 = _mm512_maskz_loadu_ps(mask, src + i);
     _mm256_mask_storeu_epi16(dst + i, mask, cvt_fp32_to_bf16(f32));
+  }
+}
+
+#else // Not AVX512
+
+inline void cvt_bf16_to_fp32(float* dst, const at::BFloat16* src, int len) {
+  for (int j = 0; j < len; j++) {
+    *(dst + j) = *(src + j);
+  }
+}
+
+inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
+  for (int j = 0; j < len; j++) {
+    *(dst + j) = *(src + j);
   }
 }
 #endif

@@ -37,6 +37,7 @@
 #include "cpu/ExtendOPs.h"
 #include "cpu/runtime/CPUPool.h"
 #include "cpu/runtime/TaskExecutor.h"
+#include "cpu/utils/CPUISA.h"
 #include "python/TaskModule.h"
 
 namespace torch_ipex {
@@ -45,12 +46,24 @@ namespace {
 py::object GetRevisions() {
   auto py_dict = py::dict();
   py_dict["ipex"] = std::string(IPEX_GITREV);
-  py_dict["torch"] = std::string(TORCH_GITREV);
-  return py_dict;
+  py_dict["avx"] = std::string(TORCH_GITREV);
+  py_dict["torch"] = std::string(IPEX_AVX_VERSION);
+  return std::move(py_dict);
 }
 
 void InitIpexModuleBindings(py::module m) {
   m.def("_get_git_revs", []() { return GetRevisions(); });
+
+  // Check CPU ISA
+  m.def("_does_support_avx2", []() {
+    using namespace torch_ipex::cpu::utils;
+    return CPUISA::info().does_support_avx2();
+  });
+  m.def("_does_support_avx512", []() {
+    using namespace torch_ipex::cpu::utils;
+    return CPUISA::info().does_support_avx512();
+  });
+
   m.def("mkldnn_set_verbose", &torch_ipex::verbose::_mkldnn_set_verbose);
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {

@@ -281,6 +281,7 @@ AtenIpexTypeExt::interaction_backward(const at::Tensor &grad_out,
 }
 
 namespace cpu {
+#if defined(CPU_AVX512)
 static inline void _interaction_s8s8_scale_s32s8_128(
     int8_t *out, size_t M, const float *__attribute__((aligned(64))) scales,
     __m512i *convert_to_s16_buf, __m512i *cat_buf) {
@@ -316,6 +317,7 @@ static inline void _interaction_s8s8_scale_s32s8_128(
   reduce_add_s32x16x16_with_scales_and_mask_store(out + off, mask,
                                                   cat_buf + off, scale_m512);
 }
+#endif
 
 static inline void
 _interaction_s8s8_scale_s32s8(int8_t *out,
@@ -387,6 +389,7 @@ at::Tensor AtenIpexJITDev::dil_qinteraction(const std::vector<at::Tensor> input,
       int8_t *out_ptr = &out_data[i * out_data_line_len];
       int8_t *flat_buf = (int8_t *)(out_ptr + vector_size);
       auto row_len = i * vector_size;
+#if defined(CPU_AVX512)
       if (vector_size == 128) {
         int k = 0;
         for (; k < vector_nums - 1; k += 2) {
@@ -402,15 +405,16 @@ at::Tensor AtenIpexJITDev::dil_qinteraction(const std::vector<at::Tensor> input,
                                dense_scale);
         _interaction_s8s8_scale_s32s8_128(flat_buf, vector_nums, out_in_scales,
                                           convert_to_s16_buf, cat_buf);
-      } else {
-        for (int k = 0; k < vector_nums; k++) {
-          input_addr[k] = &input_data[k][row_len];
-        }
-        scale_and_move_ker(out_ptr, &input_data[0][i * vector_size],
-                           dense_scale, vector_size);
-        _interaction_s8s8_scale_s32s8(flat_buf, input_addr, vector_nums,
-                                      vector_size, out_in_scales);
       }
+      continue;
+#endif
+      for (int k = 0; k < vector_nums; k++) {
+        input_addr[k] = &input_data[k][row_len];
+      }
+      scale_and_move_ker(
+          out_ptr, &input_data[0][i * vector_size], dense_scale, vector_size);
+      _interaction_s8s8_scale_s32s8(
+          flat_buf, input_addr, vector_nums, vector_size, out_in_scales);
     }
   });
 
