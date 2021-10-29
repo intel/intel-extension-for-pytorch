@@ -6,8 +6,9 @@
 #include <ATen/ExpandUtils.h>
 #include <ATen/Parallel.h>
 #include <c10/util/SmallVector.h>
-
 #include <limits>
+
+#include "cpu/bf16/vec/vec_type_cvt.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -15,9 +16,39 @@ namespace kernel {
 namespace vec {
 namespace vec512 {
 
-#define VEC_512_FP32_CAP (16)
-#define VEC_512_FP32_BYTES_WIDTH (64)
-#define FP32_BYTES_WIDTH (4)
+__m512 _load_f32_data(const float* data_base) {
+  return _mm512_load_ps(data_base);
+}
+
+__m512 _load_f32_data(const at::BFloat16* data_base) {
+  return cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)data_base));
+}
+
+__m512 _maskz_load_f32_data(const float* data_base, __mmask16 mask) {
+  return _mm512_maskz_load_ps(mask, data_base);
+}
+
+__m512 _maskz_load_f32_data(const at::BFloat16* data_base, __mmask16 mask) {
+  return cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, (__m256i*)data_base));
+}
+
+void _store_data(float* data_base, __m512 a) {
+  _mm512_store_ps(data_base, a);
+}
+
+void _store_data(at::BFloat16* data_base, __m512 a) {
+  auto vec_bf16_out = cvt_fp32_to_bf16(a);
+  _mm256_store_si256((__m256i*)data_base, vec_bf16_out);
+}
+
+void _mask_store_data(float* data_base, __m512 a, __mmask16 mask) {
+  _mm512_mask_store_ps(data_base, mask, a);
+}
+
+void _mask_store_data(at::BFloat16* data_base, __m512 a, __mmask16 mask) {
+  auto vec_bf16_out = cvt_fp32_to_bf16(a);
+  _mm256_mask_storeu_epi16(data_base, mask, vec_bf16_out);
+}
 
 inline std::vector<int64_t> _adjust_strides(
     const at::Tensor& src,
@@ -47,44 +78,6 @@ inline std::vector<int64_t> _adjust_strides(
   return adjusted_stride;
 }
 
-static inline uint32_t _cal_head_padding(const float* addr) {
-  uint64_t time_64 = ((uint64_t)addr) / VEC_512_FP32_BYTES_WIDTH;
-  return (((uint64_t)addr) - time_64 * VEC_512_FP32_BYTES_WIDTH) /
-      FP32_BYTES_WIDTH;
-}
-
-static inline uint32_t _cal_valid_data_num(
-    const uint32_t& head_padding,
-    const uint32_t& dim_size) {
-  return std::min(VEC_512_FP32_CAP - head_padding, (uint32_t)dim_size);
-}
-
-static inline uint32_t _cal_tail_padding(
-    const uint32_t& dim_size,
-    const uint32_t& head_padding,
-    const uint32_t& valid_data_num) {
-  return VEC_512_FP32_CAP - head_padding - valid_data_num;
-}
-
-/**
- * Check if the start address is aligned or not. If the start address is not
- * 64 bytes aligned, we will pad head to align 64bytes and then pad tail to
- * fill 64bytes.
- */
-static inline bool _padding_alignment(
-    const float* a,
-    const uint32_t& size,
-    uint32_t& valid_data_num,
-    __mmask16& loading_mask) {
-  uint32_t head_padding = _cal_head_padding(a);
-  if (head_padding == 0)
-    return false;
-
-  valid_data_num = _cal_valid_data_num(head_padding, (uint32_t)size);
-  uint32_t tail_padding = _cal_tail_padding(size, head_padding, valid_data_num);
-  loading_mask = ((1 << valid_data_num) - 1) << tail_padding;
-  return true;
-}
 
 inline int64_t _calc_element_offset(
     const int64_t& outer_loop_idx,
@@ -165,9 +158,10 @@ inline __m512 _dil_exp_kernel(__m512 vec_src) {
   return vec_res;
 }
 
+template <typename scalar_t>
 inline void _dil_add_reduce_max_fusion_kernel(
-    const float* a,
-    const float* b,
+    const scalar_t* a,
+    const scalar_t* b,
     const int& size,
     float* out,
     float& max) {
@@ -177,23 +171,10 @@ inline void _dil_add_reduce_max_fusion_kernel(
   auto vec_b = vec_ps_min;
   auto vec_out = vec_ps_min;
 
-  // Check if the start address is not aligned. If the start address is not
-  // 64bytes aligned, we will pad head to align 64bytes and then pad tail to
-  // fill 64bytes.
-  uint32_t valid_data_num = 0;
-  __mmask16 loading_mask = {};
-  if (_padding_alignment(a, size, valid_data_num, loading_mask)) {
-    vec_a = _mm512_maskz_expandloadu_ps(loading_mask, a);
-    vec_b = _mm512_mask_expandloadu_ps(vec_ps_min, loading_mask, b);
-    vec_out = _mm512_add_ps(vec_a, vec_b);
-    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
-    _mm512_mask_compressstoreu_ps(out, loading_mask, vec_out);
-  }
-
-  int i = valid_data_num;
+  int i = 0;
   for (; i <= size - 16; i += 16) {
-    vec_a = _mm512_load_ps(a + i);
-    vec_b = _mm512_load_ps(b + i);
+    vec_a = _load_f32_data(a + i);
+    vec_b = _load_f32_data(b + i);
     vec_out = _mm512_add_ps(vec_a, vec_b);
     vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
     _mm512_store_ps(out + i, vec_out);
@@ -201,10 +182,10 @@ inline void _dil_add_reduce_max_fusion_kernel(
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    vec_a = _mm512_mask_load_ps(vec_ps_min_tail, mask, a + i);
-    vec_b = _mm512_maskz_load_ps(mask, b + i);
+    vec_a = _maskz_load_f32_data(a + i, mask);
+    vec_b = _maskz_load_f32_data(b + i, mask);
     vec_out = _mm512_add_ps(vec_a, vec_b);
-    vec_ps_min = _mm512_max_ps(vec_out, vec_ps_min);
+    vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
     _mm512_mask_store_ps(out + i, mask, vec_out);
   }
 
@@ -223,18 +204,7 @@ inline void _dil_exp_reduce_sum_fusion_kernel(
   __m512 vec_a = {};
   __m512 vec_out = {};
 
-  // The start address is not aligned
-  uint32_t valid_data_num = 0;
-  __mmask16 loading_mask = {};
-  if (_padding_alignment(a, size, valid_data_num, loading_mask)) {
-    vec_a = _mm512_maskz_expandloadu_ps(loading_mask, a);
-    vec_out = _mm512_sub_ps(vec_a, vec_max);
-    vec_out = _dil_exp_kernel(vec_out);
-    vec_sum = _mm512_mask_add_ps(vec_sum, loading_mask, vec_sum, vec_out);
-    _mm512_mask_compressstoreu_ps(out, loading_mask, vec_out);
-  }
-
-  int i = valid_data_num;
+  int i = 0;
   for (; i <= size - 16; i += 16) {
     vec_a = _mm512_load_ps(a + i);
     vec_out = _mm512_sub_ps(vec_a, vec_max);
@@ -256,36 +226,28 @@ inline void _dil_exp_reduce_sum_fusion_kernel(
   val = _mm512_reduce_add_ps(vec_sum);
 }
 
+template <typename scalar_t>
 inline void _dil_normalization_kernel(
     const float* a,
     const float& sum,
     const int& size,
-    float* out) {
+    scalar_t* out) {
   auto vec_sum = _mm512_set1_ps(sum);
   __m512 vec_a = {};
   __m512 vec_out = {};
 
-  // The start address is not aligned
-  uint32_t valid_data_num = 0;
-  __mmask16 loading_mask = {};
-  if (_padding_alignment(a, size, valid_data_num, loading_mask)) {
-    vec_a = _mm512_maskz_expandloadu_ps(loading_mask, a);
-    vec_out = _mm512_div_ps(vec_a, vec_sum);
-    _mm512_mask_compressstoreu_ps(out, loading_mask, vec_out);
-  }
-
-  int i = valid_data_num;
+  int i = 0;
   for (; i <= size - 16; i += 16) {
     auto vec_a = _mm512_load_ps(a + i);
     auto vec_out = _mm512_div_ps(vec_a, vec_sum);
-    _mm512_store_ps(out + i, vec_out);
+    _store_data(out + i, vec_out);
   }
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
     auto vec_a = _mm512_maskz_load_ps(mask, a + i);
     auto vec_out = _mm512_div_ps(vec_a, vec_sum);
-    _mm512_mask_store_ps(out + i, mask, vec_out);
+    _mask_store_data(out + i, vec_out, mask);
   }
 }
 
@@ -300,14 +262,16 @@ inline void _dil_normalization_kernel(
  * - The input tensors are contiguous
  * - The number of the input tensor dimension should be >=2
  * - Only the second input tensor is brodcastable
+ * - The datatype for inpusts(a,b) and output are same.
  *
  * @param[in] a a contiguous tensor to be added
  * @param[in] b a tensor to be added while it should be broadcastable
  * @return The tensor stores the result of @code softmax(a + b) @endcode
  */
+template <typename scalar_t>
 at::Tensor dil_add_softmax(const at::Tensor& a, const at::Tensor& b) {
-  float* a_data_base = a.data_ptr<float>();
-  float* b_data_base = b.data_ptr<float>();
+  scalar_t* a_data_base = a.data_ptr<scalar_t>();
+  scalar_t* b_data_base = b.data_ptr<scalar_t>();
 
   // Check if the tensor needs to be broadcasted
   auto infered_size = a.sizes().vec();
@@ -315,10 +279,9 @@ at::Tensor dil_add_softmax(const at::Tensor& a, const at::Tensor& b) {
   if (need_broadcast) {
     infered_size = at::infer_size(a.sizes(), b.sizes());
   }
-
+  at::Tensor output = at::empty_like(a);
   // Create an new tensor to store the output
-  auto output = at::empty_like(a);
-  float* output_data_base = output.data_ptr<float>();
+  scalar_t* output_data_base = output.data_ptr<scalar_t>();
 
   // Calculate the strides for the input tensor
   std::vector<int64_t> b_adjusted_strides = _adjust_strides(b, infered_size);
@@ -345,6 +308,8 @@ at::Tensor dil_add_softmax(const at::Tensor& a, const at::Tensor& b) {
   at::parallel_for(0, outer_size, grain_size, [&](int64_t begin, int64_t end) {
     float val = 0.0;
     int64_t b_offset = 0;
+    at::Tensor tmp_out = at::empty({dim_size});
+    float* tmp_out_ptr = tmp_out.data_ptr<float>();
     for (int64_t i = begin; i < end; i++) {
       if (need_broadcast) {
         b_offset =
@@ -352,37 +317,29 @@ at::Tensor dil_add_softmax(const at::Tensor& a, const at::Tensor& b) {
       } else {
         b_offset = i * dim_size;
       }
-
       // Add a and b and get the maximum value:
       //    output_data = a + b
       //    val = max(output_data)
-      _dil_add_reduce_max_fusion_kernel(
+      _dil_add_reduce_max_fusion_kernel<scalar_t>(
           a_data_base + i * dim_size,
           b_data_base + b_offset,
           dim_size,
-          output_data_base + i * dim_size,
+          tmp_out_ptr,
           val);
       // Calculate the e^x and get the sum value:
       //    output_data = output_data - max(output_data)
       //    output_data = e^(output_data)
       //    val = sum(output_data)
       _dil_exp_reduce_sum_fusion_kernel(
-          output_data_base + i * dim_size,
-          dim_size,
-          output_data_base + i * dim_size,
-          val);
+          tmp_out_ptr, dim_size, tmp_out_ptr, val);
       // Calculat the normalization [e^x / sum(e^x)]:
       //    output_data = output_data / sum(output_data)
-      _dil_normalization_kernel(
-          output_data_base + i * dim_size,
-          val,
-          dim_size,
-          output_data_base + i * dim_size);
+      _dil_normalization_kernel<scalar_t>(
+          tmp_out_ptr, val, dim_size, output_data_base + i * dim_size);
     }
   });
-
   return output;
-}
+} // dil_add_softmax
 
 } // namespace vec512
 } // namespace vec

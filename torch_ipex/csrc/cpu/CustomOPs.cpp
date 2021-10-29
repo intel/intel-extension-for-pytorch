@@ -255,8 +255,7 @@ at::Tensor AtenIpexJITDev::dil_mha_scores_calc(
   // Only support contiguous tensor
   bool is_contiguous = rel_kv.is_contiguous() && qk.is_contiguous();
   if (is_last_dim && not_last_dim_broadcast && not_one_dim &&
-      aligned_64_bytes && is_contiguous && (q.dtype() == at::kFloat) &&
-      dtype.isNone() && _alpha == 1.0f) {
+      aligned_64_bytes && is_contiguous && dtype.isNone() && _alpha == 1.0f) {
     return jit::cpu::kernels::AddSoftmax(qk, rel_kv);
   } else {
     qk = at::add(qk, rel_kv, _alpha);

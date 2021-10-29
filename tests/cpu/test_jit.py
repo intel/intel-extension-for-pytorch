@@ -617,6 +617,14 @@ class Tester(TestCase):
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
     def test_mha_scores_calculation(self):
+        def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
+            mat1_bf16 = mat1.to(torch.bfloat16)
+            mat2_bf16 = mat2.to(torch.bfloat16)
+            bias_bf16 = bias.to(torch.bfloat16)
+            res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
+            res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
+            self.assertEqual(res_ref, res_jit, prec=prec)
+
         mat1 = torch.randn(56, 16, 384, 384)
         mat2 = torch.randn(56, 16, 384, 384)
         bias = torch.randn(56, 16, 384, 384)
@@ -630,6 +638,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
                 mat2 = torch.randn(1, 1, 16, 3)
@@ -637,6 +646,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
                 mat2 = torch.randn(1, 1, 32, 3)
@@ -644,6 +654,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
                 mat2 = torch.randn(1, 1, 33, 3)
@@ -651,6 +662,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(2, 3, 4, 6)
                 mat2 = torch.randn(2, 3, 6, 6)
@@ -658,24 +670,32 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 # Test broadcast
                 mat1 = torch.randn(2, 3, 4, 10)
                 mat2 = torch.randn(2, 3, 16, 10)
                 bias = torch.randn(1, 1, 1, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(3, 1, 1)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 1, 1)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(3, 4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 1, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
     def test_conv2d_fusion(self):
         batch_size = 32
