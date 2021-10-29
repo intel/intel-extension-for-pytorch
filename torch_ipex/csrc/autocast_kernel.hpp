@@ -35,6 +35,91 @@ at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::
 
 at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_size);
 
+at::Tensor avg_pool2d(
+    const at::Tensor& input,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    bool ceil_mode,
+    bool count_include_pad,
+    c10::optional<int64_t> divisor_override);
+
+std::tuple<at::Tensor, at::Tensor> adaptive_max_pool2d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size);
+
+at::Tensor upsample_nearest1d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size,
+    c10::optional<double> scales);
+
+at::Tensor upsample_nearest1d_vec(
+    const at::Tensor& input,
+    c10::optional<at::IntArrayRef> output_size,
+    c10::optional<at::ArrayRef<double>> scale_factors);
+
+at::Tensor upsample_nearest2d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w);
+
+at::Tensor upsample_nearest2d_vec(
+    const at::Tensor& input,
+    c10::optional<at::IntArrayRef> output_size,
+    c10::optional<at::ArrayRef<double>> scale_factors);
+
+at::Tensor upsample_nearest3d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size,
+    c10::optional<double> scales_d,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w);
+
+at::Tensor upsample_nearest3d_vec(
+    const at::Tensor& input,
+    c10::optional<at::IntArrayRef> output_size,
+    c10::optional<at::ArrayRef<double>> scale_factors);
+
+at::Tensor upsample_linear1d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size,
+    bool align_corners,
+    c10::optional<double> scales);
+
+at::Tensor upsample_linear1d_vec(
+    const at::Tensor& input,
+    c10::optional<at::IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<at::ArrayRef<double>> scale_factors);
+
+at::Tensor upsample_bilinear2d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size,
+    bool align_corners,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w);
+
+at::Tensor upsample_bilinear2d_vec(
+    const at::Tensor& input,
+    c10::optional<at::IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<at::ArrayRef<double>> scale_factors);
+
+at::Tensor upsample_trilinear3d(
+    const at::Tensor& input,
+    at::IntArrayRef output_size,
+    bool align_corners,
+    c10::optional<double> scales_d,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w);
+
+at::Tensor upsample_trilinear3d_vec(
+    const at::Tensor& input,
+    c10::optional<at::IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<at::ArrayRef<double>> scale_factors);
+
 at::Tensor relu(const at::Tensor& input);
 
 at::Tensor& relu_(at::Tensor& input);

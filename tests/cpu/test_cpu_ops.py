@@ -159,6 +159,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = m(x4)
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
+
     def test_adaptive_avg_pool2d(self):
         m = nn.AdaptiveAvgPool2d((5,7))
         x = torch.randn(3, 64, 8, 9)
@@ -183,6 +192,15 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y1, y3, prec=0.01)
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = m(x4)
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
 
     def test_copy(self):
         x = torch.randn(3, 64, 8, 9)
@@ -227,6 +245,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad, prec=1e-4)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = m(x4)
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
+
     def test_upsample_nearest1d(self):
         x = torch.randn(2, 2, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -241,6 +268,15 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y1, y3, prec=0.01)
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = F.interpolate(x4, scale_factor = 2, mode='nearest')
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
 
     def test_upsample_nearest2d(self):
         x = torch.randn(2, 2, 4, 4)
@@ -266,6 +302,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = F.interpolate(x4, scale_factor = 2, mode='nearest')
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
+
     def test_upsample_nearest3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -281,6 +326,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = F.interpolate(x4, scale_factor = 2, mode='nearest')
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
+
     def test_upsample_linear1d(self):
         x = torch.randn(2, 2, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -295,6 +349,15 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y1, y3, prec=0.01)
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = F.interpolate(x4, scale_factor = 2, mode='linear')
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
 
     def test_upsample_bilinear2d(self):
         x = torch.randn(2, 2, 4, 4)
@@ -320,6 +383,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = F.interpolate(x4, scale_factor = 2, mode='bilinear')
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
+
     def test_upsample_trilinear3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -334,6 +406,15 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y1, y3, prec=0.02)
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = F.interpolate(x4, scale_factor = 2, mode='trilinear')
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
 
     def test_avg_pool2d(self):
         m = nn.AvgPool2d((3, 2), stride=(2, 1))
@@ -360,6 +441,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = m(x4)
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
+
     def test_adaptive_max_pool2d(self):
         m = nn.AdaptiveMaxPool2d((5,7))
         x = torch.randn(3, 64, 8, 9)
@@ -384,6 +474,15 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y1, y3, prec=0.01)
         self.assertTrue(x3.grad.dtype == torch.bfloat16)
         self.assertEqual(x1.grad, x3.grad, prec=0.001)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                x4 = x.clone().detach().to(datatype).requires_grad_()
+                y4 = m(x4)
+                y4.mean().backward()
+                self.assertTrue(y4.dtype == datatype)
+                self.assertTrue(x4.grad.dtype == datatype)
 
 if __name__ == '__main__':
     test = unittest.main()

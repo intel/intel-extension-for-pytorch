@@ -150,7 +150,6 @@ class AutocastCPUTestLists(object):
             ("linalg_lstsq", (dummy_bf16[1][0], dummy_bf16[1][0])),
         ]
         self.nn_fp32 = [
-            ("avg_pool2d", dummy_bf16[2], {"kernel_size": (3, 2), "stride": (1, 1)}),
             ("avg_pool3d", dummy_bf16[3], {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)}),
             ("binary_cross_entropy", (torch.rand((n, n), device=dev, dtype=torch.bfloat16),) +
                                      (torch.rand((n, n), device=dev, dtype=torch.bfloat16),)),
@@ -183,7 +182,6 @@ class AutocastCPUTestLists(object):
             ("symeig", (torch.randn(10, 10).to(torch.bfloat16), True)),
             ("triangular_solve", (torch.randn(10, 10).to(torch.bfloat16), torch.randn(10, 10).to(torch.bfloat16))),
             ("adaptive_max_pool1d", (torch.randn(100, 100, 100).to(torch.bfloat16), 13)),
-            ("adaptive_max_pool2d", (torch.randn(100, 100, 100).to(torch.bfloat16), (13, 13))),
             ("adaptive_max_pool3d", (torch.randn(100, 100, 100, 100).to(torch.bfloat16), (13, 13, 13))),
         ]
         self.nn_fp32_multi_output = [
