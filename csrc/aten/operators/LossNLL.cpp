@@ -886,7 +886,7 @@ Tensor nll_loss_backward(
     int64_t reduction,
     int64_t ignore_index,
     const Tensor& total_weight) {
-  auto grad_input = at::zeros_like(self, c10::MemoryFormat::Contiguous);
+  auto grad_input = at::empty_like(self, c10::MemoryFormat::Contiguous);
 
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
@@ -916,7 +916,7 @@ Tensor& nll_loss2d_backward_out(
     int64_t ignore_index,
     const Tensor& total_weight) {
   impl::spatial_class_nll_criterion_shape_check(self, target, weight);
-  grad_input.resize_(self.sizes()).fill_(0);
+  grad_input.resize_(self.sizes()).zero_();
 
   if (weight.defined()) {
     TORCH_CHECK(
