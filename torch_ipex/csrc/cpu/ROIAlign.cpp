@@ -694,6 +694,37 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
 namespace torch_ipex {
 namespace autocast {
 
+at::Tensor roi_align_autocast(
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torchvision::roi_align", "")
+                       .typed<decltype(roi_align_forward_kernel)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("roi_align");
+#endif
+  return op.call(
+      cpu_cached_cast(at::kFloat, input),
+      cpu_cached_cast(at::kFloat, rois),
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      sampling_ratio,
+      aligned);
+}
+
+IPEX_TORCH_LIBRARY_IMPL(torchvision, AutocastCPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torchvision::roi_align"),
+      TORCH_FN((&torch_ipex::autocast::roi_align_autocast)));
+}
+
 at::Tensor ROIAlign_forward(
     const at::Tensor& input,
     const at::Tensor& rois,
@@ -712,10 +743,11 @@ at::Tensor ROIAlign_forward(
   return op.call(cpu_cached_cast(at::kFloat, input), cpu_cached_cast(at::kFloat, rois), spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned);
 }
 
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
-  m.impl("ROIAlign_forward", torch_ipex::autocast::ROIAlign_forward);
+IPEX_TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::ROIAlign_forward"),
+      TORCH_FN((&torch_ipex::autocast::ROIAlign_forward)));
 }
 
 } // namespace autocast
 } // namespace torch_ipex
-

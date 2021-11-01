@@ -4,9 +4,8 @@ import warnings
 import torch
 try:
     import torchvision
-    HAS_TORCHVISION = True
 except ImportError:
-    HAS_TORCHVISION = False
+    pass  # skip if torchvision is not available
 
 from .version import __version__, __ipex_avx_version__
 

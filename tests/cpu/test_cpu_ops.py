@@ -6,6 +6,13 @@ import random
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 
+try:
+    import torchvision
+    HAS_TORCHVISION = True
+except ImportError:
+    HAS_TORCHVISION = False
+skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+
 class CPUOPsTester(TestCase):
 
     def test_channelshuffle(self):
@@ -483,6 +490,18 @@ class CPUOPsTester(TestCase):
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
+
+    @skipIfNoTorchVision
+    def test_torchvision_nms(self):
+        num_boxes = 50
+        boxes = torch.rand(num_boxes, 4)
+        boxes[:, 2:] += boxes[:, :2]
+        scores = torch.randn(num_boxes)
+        y1 = torchvision.ops.nms(boxes, scores, 0.5)
+        with torch.cpu.amp.autocast():
+            y2 = torchvision.ops.nms(boxes.bfloat16(), scores.bfloat16(), 0.5)
+            self.assertEqual(y1, y2)
+
 
 if __name__ == '__main__':
     test = unittest.main()

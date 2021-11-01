@@ -7,6 +7,13 @@ from intel_extension_for_pytorch.nn import RoIAlign
 import numpy as np
 import math
 
+try:
+    import torchvision
+    HAS_TORCHVISION = True
+except ImportError:
+    HAS_TORCHVISION = False
+skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+
 def bilinear_interpolate(data, y, x, snap_border=False):
     height, width = data.shape
 
@@ -40,6 +47,10 @@ def bilinear_interpolate(data, y, x, snap_border=False):
 
 def fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False):
     return RoIAlign((pool_h, pool_w), spatial_scale=spatial_scale,
+                        sampling_ratio=sampling_ratio, aligned=aligned)(x, rois)
+
+def torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False):
+    return torchvision.ops.RoIAlign((pool_h, pool_w), spatial_scale=spatial_scale,
                         sampling_ratio=sampling_ratio, aligned=aligned)(x, rois)
 
 def expected_fn(in_data, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False,
@@ -81,7 +92,7 @@ def expected_fn(in_data, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-
 
 class RoIAlignTester(TestCase):
 
-    def test_forward(self):
+    def test_roialign(self):
         pool_size = 5
         # n_channels % (pool_size ** 2) == 0 required for PS opeartions.
         n_channels = 2 * (pool_size ** 2)
@@ -120,6 +131,60 @@ class RoIAlignTester(TestCase):
         self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
         self.assertTrue(torch.allclose(gt_x.grad.to(x2.dtype), x2.grad, rtol=1e-5, atol=1e-5))
 
+        #test autocast
+        with torch.cpu.amp.autocast():
+            x3 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
+            y3 = fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y3.mean().backward()
+            self.assertTrue(y3.dtype == torch.float32)
+            self.assertTrue(x2.grad.dtype == torch.float32)
+
+    @skipIfNoTorchVision
+    def test_torchvision_roialign(self):
+        pool_size = 5
+        # n_channels % (pool_size ** 2) == 0 required for PS opeartions.
+        n_channels = 2 * (pool_size ** 2)
+        x = torch.rand(2, n_channels, 10, 10)
+        x1 = x.clone().requires_grad_()
+        gt_x = x.clone().requires_grad_()
+        rois = torch.tensor([[0, 0, 0, 9, 9],  # format is (xyxy)
+                             [0, 0, 5, 4, 9],
+                             [0, 5, 5, 9, 9],
+                             [1, 0, 0, 9, 9]],
+                            dtype=torch.float32)
+
+        pool_h, pool_w = pool_size, pool_size
+        y1 = torchvision_fn(x1, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+        # the following should be true whether we're running an autocast test or not.
+        gt_y = expected_fn(gt_x, rois, pool_h, pool_w, spatial_scale=1,
+                                sampling_ratio=-1)
+        self.assertTrue(y1.dtype == torch.float32)
+        self.assertTrue(torch.allclose(gt_y.to(y1.dtype), y1, rtol=1e-5, atol=1e-5))
+
+        gt_y.mean().backward()
+        y1.mean().backward()
+        self.assertTrue(x1.grad.dtype == torch.float32)
+        self.assertTrue(torch.allclose(gt_x.grad.to(x1.dtype), x1.grad, rtol=1e-5, atol=1e-5))
+
+        # test channels last
+        x2 = x.clone().to(memory_format=torch.channels_last).requires_grad_()
+        y2 = torchvision_fn(x2, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+        self.assertTrue(y2.dtype == torch.float32)
+        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+        self.assertTrue(torch.allclose(gt_y.to(y2.dtype), y2, rtol=1e-5, atol=1e-5))
+
+        y2.mean().backward()
+        self.assertTrue(x2.grad.dtype == torch.float32)
+        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+        self.assertTrue(torch.allclose(gt_x.grad.to(x2.dtype), x2.grad, rtol=1e-5, atol=1e-5))
+
+        #test autocast
+        with torch.cpu.amp.autocast():
+            x3 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
+            y3 = torchvision_fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y3.mean().backward()
+            self.assertTrue(y3.dtype == torch.float32)
+            self.assertTrue(x2.grad.dtype == torch.float32)
 
 if __name__ == '__main__':
     test = unittest.main()
