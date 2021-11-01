@@ -76,12 +76,19 @@ Tensor& mul_(Tensor& self, Scalar other) {
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   Tensor _self = self, _other = other;
+  const auto ndim = _self.ndimension();
+  auto cl_tag = at::MemoryFormat::ChannelsLast;
+  if (3 == ndim || 4 == ndim || 5 == ndim) {
+    cl_tag = get_cl_tag_by_ndim(ndim);
+  }
+
   if (_self.defined() && _other.defined() && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
       _self.scalar_type() == _other.scalar_type() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.is_contiguous() &&
-      _other.is_contiguous() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
+      ((_self.is_contiguous() && _other.is_contiguous()) ||
+       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -98,12 +105,19 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
 
 Tensor div(const Tensor& self, const Tensor& other) {
   Tensor result, _self = self, _other = other;
+  const auto ndim = _self.ndimension();
+  auto cl_tag = at::MemoryFormat::ChannelsLast;
+  if (3 == ndim || 4 == ndim || 5 == ndim) {
+    cl_tag = get_cl_tag_by_ndim(ndim);
+  }
+
   if (_self.defined() && _other.defined() && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
       _self.scalar_type() == _other.scalar_type() &&
       xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) && _self.is_contiguous() &&
-      _other.is_contiguous() &&
+      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
+      ((_self.is_contiguous() && _other.is_contiguous()) ||
+       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
