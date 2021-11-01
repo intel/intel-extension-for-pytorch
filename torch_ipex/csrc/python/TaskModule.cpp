@@ -6,10 +6,12 @@ namespace runtime {
 py::object FutureTensor::get() {
   CHECK(this->script_module_initialized_ ^ this->module_initialized_);
   if (this->script_module_initialized_) {
+    c10::IValue res;
     {
       pybind11::gil_scoped_release no_gil_guard;
-      return torch::jit::toPyObject(this->future_script_tensor.get());
+      res = this->future_script_tensor.get();
     }
+    return torch::jit::toPyObject(std::move(res));
   } else {
     CHECK(this->module_initialized_);
     {
@@ -55,7 +57,10 @@ TaskModule::TaskModule(
   this->module_initialized_ = true;
 }
 
-TaskModule::~TaskModule() {}
+TaskModule::~TaskModule() {
+  pybind11::gil_scoped_release no_gil_guard;
+  this->task_executor->stop_executor();
+}
 
 std::unique_ptr<FutureTensor> TaskModule::run_async(
     py::args&& args,
