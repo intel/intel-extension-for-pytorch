@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .optimizer_utils import refresh_optimizer_params_after_cast, patch_step_for_master_weight_training, patch_load_state_dict
+from intel_extension_for_pytorch.optim import _optimizer_utils
 import types
 
 # IPEX does not cast all module parameters for acc reason, such as BN
@@ -36,7 +36,7 @@ def _save_to_state_dict(self, destination, prefix, keep_vars):
     if hasattr(self, 'bias') and self.bias is not None:
         self.bias = temp_bias
 
-def _weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split):
+def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight_split):
 
     def cast_attr(m, attr, master_weight_split, params_attr, optimizer):
         # cast weight/bias for BF16 dtype
@@ -55,7 +55,7 @@ def _weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weigh
         # while master weight split, key is m.weight/bias, if not split, key is m.master_weight/master_bias
         attr_name = attr if master_weight_split else 'master_' + attr
         params_attr[getattr(m, attr_name)] = params_attr.pop(float_param)
-        refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer)
+        _optimizer_utils.refresh_optimizer_params_after_cast(m, attr, float_param, master_weight_split, optimizer)
 
     def convert(m):
         if type(m) in IPEX_WEIGHT_CAST_MODULE:
@@ -79,9 +79,9 @@ def _weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weigh
     casted_model, casted_optimizer, params_attr = convert_rec(module), optimizer, params_attr
 
     if optimizer is not None:
-        patch_load_state_dict(casted_optimizer)
+        _optimizer_utils.patch_load_state_dict(casted_optimizer)
         setattr(casted_optimizer, 'params_attr', params_attr)
         if not master_weight_split:
-            patch_step_for_master_weight_training(casted_optimizer)
+            _optimizer_utils.patch_step_for_master_weight_training(casted_optimizer)
 
     return casted_model, casted_optimizer, params_attr

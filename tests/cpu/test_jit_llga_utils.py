@@ -24,11 +24,11 @@ def llga_test_env(func):
         torch._C._jit_set_profiling_mode(True)
         torch._C._jit_set_profiling_executor(True)
 
-        ipex.core._jit_set_llga_enabled(True)
-        ipex.core.disable_jit_opt()
+        ipex._C._jit_set_llga_enabled(True)
+        ipex._C.disable_jit_opt()
         func(*args)
-        ipex.core.enable_jit_opt()
-        ipex.core._jit_set_llga_enabled(False)
+        ipex._C.enable_jit_opt()
+        ipex._C._jit_set_llga_enabled(False)
     return wrapTheFunction
 
 def all_backward_graphs(module):
@@ -120,13 +120,13 @@ class JitLlgaTestCase(JitTestCase):
     def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine, int8_bf16=False):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
-            conf = ipex.QuantConf(qscheme=qscheme)
+            conf = ipex.quantization.QuantConf(qscheme=qscheme)
             # fold conv bn
             if folding:
                 model = optimization.fuse(model)
 
             if remove_dropout:
-                ipex.utils._replace_dropout_with_identity(model)
+                ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
 
             # do calibration
             with ipex.quantization.calibrate(conf):
@@ -138,7 +138,7 @@ class JitLlgaTestCase(JitTestCase):
                 # TODO: remove the serialization and test it in another separate UT once IPEX supported
                 # directly using the conf for int8 path
                 conf.save(path)
-                conf = ipex.QuantConf(path)
+                conf = ipex.quantization.QuantConf(path)
 
                 # jit trace to insert quant/dequant
                 if int8_bf16:

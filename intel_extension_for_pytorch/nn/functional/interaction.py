@@ -1,7 +1,5 @@
 import torch
-from torch import nn
 from torch.autograd import Function
-import intel_extension_for_pytorch._C as core
 
 def interaction(*args):
     # Current pytorch dose not support vector<Tensor> input for c++ custom function
@@ -24,3 +22,4 @@ class InteractionFunc(Function):
         args = ctx.saved_tensors
         grad_in = torch.ops.torch_ipex.interaction_backward(grad_out.contiguous(), args)
         return tuple(grad_in)
+

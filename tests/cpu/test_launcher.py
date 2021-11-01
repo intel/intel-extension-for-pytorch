@@ -2,7 +2,7 @@ import unittest
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import time, sys
-from intel_extension_for_pytorch.launch import  *
+from intel_extension_for_pytorch.cpu.launch import *
 import os
 import glob
 

@@ -2,7 +2,8 @@ import torch
 import copy
 import types
 import warnings
-from .optim import sgd_step, adagrad_step, Lamb
+from ._functional import sgd_step, adagrad_step
+from ._lamb import Lamb
 
 IPEX_FUSED_OPTIMIZER_LIST = [
     torch.optim.SGD,
@@ -11,7 +12,7 @@ IPEX_FUSED_OPTIMIZER_LIST = [
 ]
 
 OPTIMIZER_FUSED_STEP_MAPPING = {
-    torch.optim.SGD: sgd_step, 
+    torch.optim.SGD: sgd_step,
     torch.optim.Adagrad: adagrad_step,
 }
 
@@ -154,7 +155,7 @@ def patch_state_dict(optimizer):
                                     params_attr['out_channels'],
                                     params_attr['in_channels'],
                                     params_attr['weight_channels_last'],
-                                    unpack_dtype)                                
+                                    unpack_dtype)
                             else:
                                 assert False, "unsupported op to unpack"
                         v2[state_key] = state_value
@@ -162,7 +163,7 @@ def patch_state_dict(optimizer):
     setattr(optimizer, '_original_state_dict', optimizer.state_dict)
     setattr(optimizer, 'state_dict', types.MethodType(get_optimizer_unpacked_state_dict, optimizer))
 
-def _optimizer_fusion(optimizer, master_weight_split):
+def optimizer_fusion(optimizer, master_weight_split):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """

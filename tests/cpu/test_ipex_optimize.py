@@ -1,6 +1,6 @@
 import torch
 import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.weight_prepack import _IPEXLinear as _IPEXLinear, _IPEXConv2d as _IPEXConv2d
+from intel_extension_for_pytorch.nn.utils._weight_prepack import _IPEXLinear as _IPEXLinear, _IPEXConv2d as _IPEXConv2d
 from torch.testing._internal.common_utils import TestCase
 import unittest
 import itertools
@@ -44,7 +44,7 @@ class TestOptimizeCases(TestCase):
             M = copy.deepcopy(M_ori).eval()
             opt_M = ipex.optimize(M, dtype=dtype, level=level, inplace=True)
             # After ConvBN folding,  opt_M will be Graph Module while the M is original nn.Module which they
-            # share parameters. But the changes on Graph Module cannot be reflected on original module. So 
+            # share parameters. But the changes on Graph Module cannot be reflected on original module. So
             # only the un-opitimized  weight will use same mem buffer with original module.
             # While dtype = float, ipex.optimize will choose mkl backend and does not prepack weight
             if level == "O1":

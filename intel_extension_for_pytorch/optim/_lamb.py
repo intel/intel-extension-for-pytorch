@@ -1,5 +1,5 @@
 import torch
-from . import _functional as F
+from ._functional import lamb_impl
 
 
 class Lamb(torch.optim.Optimizer):
@@ -88,7 +88,7 @@ class Lamb(torch.optim.Optimizer):
                     state_steps.append(state['step'])
 
             beta1, beta2 = group['betas']
-            F.lamb_impl(
+            lamb_impl(
                 params_with_grad,
                 grads,
                 exp_avgs,

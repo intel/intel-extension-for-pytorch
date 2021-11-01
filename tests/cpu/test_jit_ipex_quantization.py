@@ -93,7 +93,7 @@ class TestIpexOps(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.f = ipex.interaction
+                self.f = ipex.nn.functional.interaction
 
             def forward(self, *x):
                 x = self.f(*x)

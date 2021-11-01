@@ -39,9 +39,9 @@ class TestThroughputBenchmark(JitLlgaTestCase):
 
             graph, m_llga, m_cpu = self.prepareModel(m, [x])
 
-            ipex.core._jit_set_llga_enabled(False)
+            ipex._C._jit_set_llga_enabled(False)
             module_result = m_cpu(x)
-            ipex.core._jit_set_llga_enabled(True)
+            ipex._C._jit_set_llga_enabled(True)
 
             bench = ThroughputBenchmark(m_llga)
             bench.add_input(x)

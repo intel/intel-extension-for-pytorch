@@ -14,7 +14,7 @@ import torch
 import intel_extension_for_pytorch as ipex
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
-from intel_extension_for_pytorch.optim import Lamb
+from intel_extension_for_pytorch.optim._lamb import Lamb
 
 class TestPrepackCases(TestCase):
     def _test_convolution_training_base(self, dim):
@@ -425,7 +425,7 @@ class TestPrepackCases(TestCase):
             "output_padding": [0],  # TODO: fix output_padding == 2 and etc.
             "groups": [1, 2],
             "dilation": [1, 2],
-        }      
+        }
 
         # TODO: fix output_padding for both CPU and IPEX
         # params_dict = {
@@ -483,7 +483,7 @@ class TestPrepackCases(TestCase):
                 self.deconv = torch.nn.ConvTranspose3d(ic, oc, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, groups=groups, bias=bias, dilation=dilation)
 
             def forward(self, x):
-                return self.deconv(x)        
+                return self.deconv(x)
 
         params_list = self._deconv_params_list()
         torch.manual_seed(0)
@@ -521,7 +521,7 @@ class TestPrepackCases(TestCase):
                         origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                         ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                         x1 = x.clone().requires_grad_()
-                        x2 = x.clone().requires_grad_()                        
+                        x2 = x.clone().requires_grad_()
                         with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                             y1 = origin_model(x1)
                             loss1 = y1.sum()

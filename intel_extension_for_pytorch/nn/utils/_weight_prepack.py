@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-import intel_extension_for_pytorch as ipex
 import warnings
-from .optimizer_utils import pack_optimizer_params_and_states, patch_state_dict, patch_load_state_dict
+
+from intel_extension_for_pytorch import optim
 
 class _IPEXConvNd(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
@@ -267,7 +267,7 @@ class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
             self.out_channels,
             self.in_channels,
             self.weight_channels_last,
-            unpack_dtype)        
+            unpack_dtype)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
@@ -288,7 +288,7 @@ def _should_prepack(module, auto_kernel_selection):
         return False
     return True
 
-def _weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
+def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
     def convert(m, auto_kernel_selection):
         if _should_prepack(m, auto_kernel_selection):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
@@ -321,7 +321,7 @@ def _weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_select
                                               'groups': new_m.groups, 'out_channels': new_m.out_channels, \
                                               'in_channels': new_m.in_channels, \
                                               'output_padding': new_m.output_padding, \
-                                              'weight_channels_last': new_m.weight_channels_last})             
+                                              'weight_channels_last': new_m.weight_channels_last})
             if 'bf16_param' in params_attr[weight]:
                 params_attr[weight]['bf16_param'] = new_m.weight
             elif 'trail' in params_attr[weight]:
@@ -342,7 +342,7 @@ def _weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_select
                     if bias in params_attr:
                         params_attr[new_bias] = params_attr.pop(bias)
             # replace optimizer's param with prepacked param, also prepack its state.
-            pack_optimizer_params_and_states(
+            optim._optimizer_utils.pack_optimizer_params_and_states(
                 optimizer, params_pair, params_attr, m.weight.dtype)
             return new_m
         else:
@@ -357,6 +357,6 @@ def _weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_select
     opt_model, opt_optmizer, params_attr = convert_rec(module, auto_kernel_selection), optimizer, params_attr
     if optimizer is not None:
         setattr(optimizer, 'params_attr', params_attr)
-        patch_load_state_dict(optimizer)
-        patch_state_dict(optimizer)
+        optim._optimizer_utils.patch_load_state_dict(optimizer)
+        optim._optimizer_utils.patch_state_dict(optimizer)
     return opt_model, opt_optmizer, params_attr

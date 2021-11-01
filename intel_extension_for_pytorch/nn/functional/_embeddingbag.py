@@ -4,7 +4,7 @@ import warnings
 
 torch_embedding_bag = torch.embedding_bag
 
-def embeddingbag(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset, padding_idx):
+def _embeddingbag(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset, padding_idx):
     if core.embedding_bag_fast_path_sum(weights, per_sample_weights, mode, padding_idx):
         ret = torch.ops.torch_ipex.embedding_bag(weights, indices, offsets, sparse, include_last_offset)
         # torch.embedding_bag expected 4 Tensor returned
@@ -15,4 +15,4 @@ def embeddingbag(weights, indices, offsets, scale_grad_by_freq, mode, sparse, pe
         ret = torch_embedding_bag(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset, padding_idx)
     return ret
 
-torch.embedding_bag = embeddingbag
+torch.embedding_bag = _embeddingbag

@@ -4,8 +4,7 @@ import warnings
 import copy
 import numpy as np
 import intel_extension_for_pytorch._C as core
-from .. import conf
-from .. import utils
+from .. import nn
 
 def _get_default_recipe(configures):
     # For int8 quantization, will save the date after doing calibration step,
@@ -170,7 +169,7 @@ def convert(model, conf, inputs):
     # and Embedding for bfloat16 path.
     model_ = model
     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
-        model_ = utils._convert_module_data_type(copy.deepcopy(model), torch.bfloat16)
+        model_ = nn.utils._model_convert.convert_module_data_type(copy.deepcopy(model), torch.bfloat16)
 
     core.disable_jit_opt()
     core._jit_set_llga_enabled(True)

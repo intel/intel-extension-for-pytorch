@@ -25,7 +25,7 @@ class TestInteractionCases(TestCase):
     def test_interaction(self):
         def interact_fusion(x, ly):
             A = [x] + ly
-            R = ipex.interaction(*A)
+            R = ipex.nn.functional.interaction(*A)
             return R
 
         def interact_features(x, ly):

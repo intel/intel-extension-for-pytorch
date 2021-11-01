@@ -62,7 +62,7 @@ import torch.fx.experimental.optimization as optimization
 import copy
 
 import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch import core
+import intel_extension_for_pytorch._C as core
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn

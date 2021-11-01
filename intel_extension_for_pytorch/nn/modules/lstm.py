@@ -2,7 +2,7 @@ import torch
 from torch.nn.utils.rnn import PackedSequence
 
 # This is a solution to swap the lstm module with the ipex counterpart
-# and will upstream this operator to PyTorch when oneDNN support 
+# and will upstream this operator to PyTorch when oneDNN support
 # bias and src_iter_c in bf16 in bf16 inference. Will keep this
 # for better support of blocked-format weight, e.g. for training.
 
@@ -11,7 +11,7 @@ class IpexLSTM(torch.nn.LSTM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    # port from torch/nn/modules/rnn.py 
+    # port from torch/nn/modules/rnn.py
     # replace the _VF.lstm with torch.ops.torch_ipex.lstm when the input is not PackedSequence
     def forward(self, input, hx=None):  # noqa: F811
         orig_input = input

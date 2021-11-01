@@ -4,7 +4,8 @@ import torch.nn as nn
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import time, sys
-from intel_extension_for_pytorch import batch_score_nms, parallel_scale_back_batch, nms, rpn_nms, box_head_nms
+from intel_extension_for_pytorch.nn.functional import batch_score_nms, \
+    parallel_scale_back_batch, nms, rpn_nms, box_head_nms
 import torch.nn.functional as F
 import os
 

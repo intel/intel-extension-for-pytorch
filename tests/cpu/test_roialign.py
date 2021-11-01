@@ -2,7 +2,7 @@ import unittest, copy
 import torch
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
-from intel_extension_for_pytorch import RoIAlign
+from intel_extension_for_pytorch.nn import RoIAlign
 
 import numpy as np
 import math

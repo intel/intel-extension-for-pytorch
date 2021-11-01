@@ -7,21 +7,18 @@ try:
     HAS_TORCHVISION = True
 except ImportError:
     HAS_TORCHVISION = False
+
 from .version import __version__, __ipex_avx_version__
-from .conf import *
-from .amp import *
-from .launch import *
-import intel_extension_for_pytorch._C as core
-from .ops import *
-from .utils import *
-from .weight_prepack import *
-from .optimizer_utils import *
-from .weight_cast import *
-from .optim import *
-from .quantization import *
-from .cpu import *
+
+from . import cpu
+from . import quantization
+from . import nn
+
+from .utils import verbose
+from .frontend import optimize
 
 def check_avx_isa(binary_isa):
+    import intel_extension_for_pytorch._C as core
     err_msg = "The extension binary is {} while the current machine does not support it."
     if binary_isa == "AVX2":
         if not core._does_support_avx2():

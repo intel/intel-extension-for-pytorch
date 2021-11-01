@@ -50,7 +50,7 @@ class TestOptimizers(TestCase):
         M = TestModule()
         options = itertools.product([torch.bfloat16], [(0.1, 0.111), (0.9, 0.999)], [0, 1e-8], [0, 0.1], [False])
         for dtype, betas, eps, weight_decay, fused in options:
-            lamb = ipex.optim.Lamb(
+            lamb = ipex.optim._lamb.Lamb(
               M.parameters(), lr=0.001, betas=betas, eps=eps,
               weight_decay=weight_decay, fused=fused)
             self._test_update(M, lamb, dtype)

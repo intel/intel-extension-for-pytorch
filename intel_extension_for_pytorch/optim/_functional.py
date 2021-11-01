@@ -9,7 +9,7 @@ def _make_sparse(grad, grad_indices, values):
         return torch.empty_like(grad)
     return torch.sparse_coo_tensor(grad_indices, values, size)
 
-def adagrad_impl(
+def _adagrad_impl(
     params: List[Tensor],
     grads: List[Tensor],
     state_sums: List[Tensor],
@@ -33,7 +33,7 @@ def adagrad_impl(
                 param2 = attr[param]['trail']
             if 'bf16_param' in attr[param]:
                 assert param.dtype is torch.float
-                param2 = attr[param][bf16_param]  
+                param2 = attr[param][bf16_param]
         if fused and not param.is_sparse:
             torch.ops.torch_ipex.adagrad_fused_step(
                 param,
@@ -99,7 +99,7 @@ def adagrad_step(self, closure=None):
                 # record the step after step update
                 state_steps.append(state['step'])
 
-        adagrad_impl(
+        _adagrad_impl(
             params_with_grad,
             grads,
             state_sums,
@@ -113,7 +113,7 @@ def adagrad_step(self, closure=None):
 
     return loss
 
-def sgd_impl(
+def _sgd_impl(
     params: List[Tensor],
     d_p_list: List[Tensor],
     attr: dict,
@@ -139,7 +139,7 @@ def sgd_impl(
                 param2 = attr[param]['trail']
             if 'bf16_param' in attr[param]:
                 assert param.dtype is torch.float
-                param2 = attr[param][bf16_param]  
+                param2 = attr[param][bf16_param]
 
         # first iter will init momentum_buffer, not fused on 1st iter
         if fused and not param.is_sparse and momentum_buffer_list[i] is not None:
@@ -227,7 +227,7 @@ def sgd_step(self, closure=None):
                 else:
                     momentum_buffer_list.append(state['momentum_buffer'])
 
-        sgd_impl(
+        _sgd_impl(
             params_with_grad,
             d_p_list,
             self.params_attr,
@@ -277,7 +277,7 @@ def lamb_impl(
                 param2 = attr[param]['trail']
             if 'bf16_param' in attr[param]:
                 assert param.dtype is torch.float
-                param2 = attr[param][bf16_param]  
+                param2 = attr[param][bf16_param]
         if fused:
             torch.ops.torch_ipex.lamb_fused_step(
                 param,

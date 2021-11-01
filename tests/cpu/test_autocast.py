@@ -77,10 +77,10 @@ class TestAutocastWithJit(TestCase):
     def test_generate_autocast_jit_trace_model(self):
         def test_generate_autocast_jit_trace_model(model, x):
             model.eval()
-            ipex.core.disable_jit_opt()
+            ipex._C.disable_jit_opt()
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
-            ipex.core.enable_jit_opt()
+            ipex._C.enable_jit_opt()
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model2 = torch.jit.trace(model, x.clone())
         for i in range(self.models.__len__()):
@@ -89,13 +89,13 @@ class TestAutocastWithJit(TestCase):
     def test_nchw_autocast_jit_trace_model(self):
         def test_nchw_autocast_jit_trace_model(model, x):
             model.eval()
-            ipex.core.disable_jit_opt()
+            ipex._C.disable_jit_opt()
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone())
                 y2 = model(x.clone())
-            ipex.core.enable_jit_opt()
+            ipex._C.enable_jit_opt()
             torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
         for i in range(self.models.__len__()):
             test_nchw_autocast_jit_trace_model(self.models[i], self.inputs[i])
@@ -103,13 +103,13 @@ class TestAutocastWithJit(TestCase):
     def test_nhwc_autocast_jit_trace_model(self):
         def test_nhwc_autocast_jit_trace_model(model, x):
             model.eval()
-            ipex.core.disable_jit_opt()
+            ipex._C.disable_jit_opt()
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x.to(memory_format=torch.channels_last))
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone().to(memory_format=torch.channels_last))
                 y2 = model(x.clone().to(memory_format=torch.channels_last))
-            ipex.core.enable_jit_opt()
+            ipex._C.enable_jit_opt()
             torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
         for i in range(self.models.__len__()):
             if self.inputs[i].size().__len__() == 5:
@@ -121,13 +121,13 @@ class TestCustomerOps(TestCase):
     def test_interaction_op(self):
         def interact_fusion(x, ly):
             A = [x] + ly
-            R = ipex.interaction(*A)
+            R = ipex.nn.functional.interaction(*A)
             return R
 
         def interact_fusion_autocast(x, ly):
             A = [x] + ly
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-                R = ipex.interaction(*A)
+                R = ipex.nn.functional.interaction(*A)
             return R
 
         dtypes = [torch.float32]
@@ -380,7 +380,7 @@ class TestLSTM(TestCase):
             c_ipex = c.clone().requires_grad_(training)
             model_ipex = copy.deepcopy(model_cpu)
             model_ipex.train() if training else model_ipex.eval()
-            ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
+            ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
 
             with torch.cpu.amp.autocast(enabled=bf16, dtype=torch.bfloat16):
                 if empty_state:
@@ -444,7 +444,7 @@ class TestLSTM(TestCase):
         model = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
 
         model_ipex = copy.deepcopy(model)
-        ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
+        ipex.nn.utils._model_convert.replace_lstm_with_ipex_lstm(model_ipex)
 
         lstm_out, hidden_out = model(embeds, (hidden_0, hidden_1))
         lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
