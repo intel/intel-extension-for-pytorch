@@ -93,6 +93,9 @@ def _install_requirements():
 
 
 def _build_installation_dependency():
+    if _check_env_flag('DEBUG'):
+        return []
+
     install_requires = []
     TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-linux_x86_64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
     if IS_DARWIN:
@@ -119,8 +122,8 @@ def _build_installation_dependency():
         except Exception:
             pass
 
-        install_requires.append(TORCH_URL)
-        return install_requires
+    install_requires.append(TORCH_URL)
+    return install_requires
 
 
 # from https://github.com/pytorch/pytorch/blob/master/tools/setup_helpers/__init__.py
@@ -400,7 +403,7 @@ class IPEXCPPLibBuild(build_clib, object):
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
 
-        if _check_env_flag("IPEX_PROFILE_OP"):
+        if os.getenv("IPEX_PROFILE_OP", "") != "0":
             cmake_args += ['-DIPEX_PROFILE_OP=1']
 
         if _check_env_flag("USE_SYCL"):
