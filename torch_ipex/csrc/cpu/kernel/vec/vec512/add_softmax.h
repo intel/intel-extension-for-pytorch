@@ -159,9 +159,10 @@ inline __m512 _dil_exp_kernel(__m512 vec_src) {
 }
 
 template <typename scalar_t>
-inline void _dil_add_reduce_max_fusion_kernel(
+inline void _dil_div_add_reduce_max_fusion_kernel(
     const scalar_t* a,
     const scalar_t* b,
+    const float& dim_per_head,
     const int& size,
     float* out,
     float& max) {
@@ -172,10 +173,11 @@ inline void _dil_add_reduce_max_fusion_kernel(
   auto vec_out = vec_ps_min;
 
   int i = 0;
+  auto vec_r_dim_per_head = _mm512_set1_ps(1.0 / dim_per_head);
   for (; i <= size - 16; i += 16) {
     vec_a = _load_f32_data(a + i);
     vec_b = _load_f32_data(b + i);
-    vec_out = _mm512_add_ps(vec_a, vec_b);
+    vec_out = _mm512_fmadd_ps(vec_a, vec_r_dim_per_head, vec_b);
     vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
     _mm512_store_ps(out + i, vec_out);
   }
@@ -184,7 +186,7 @@ inline void _dil_add_reduce_max_fusion_kernel(
     __mmask16 mask = (1 << (size - i)) - 1;
     vec_a = _maskz_load_f32_data(a + i, mask);
     vec_b = _maskz_load_f32_data(b + i, mask);
-    vec_out = _mm512_add_ps(vec_a, vec_b);
+    vec_out = _mm512_fmadd_ps(vec_a, vec_r_dim_per_head, vec_b);
     vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
     _mm512_mask_store_ps(out + i, mask, vec_out);
   }
@@ -252,7 +254,8 @@ inline void _dil_normalization_kernel(
 }
 
 /**
- * @brief Fuse the add operator and softmax operator.
+ * @brief Fuse the div (div scalar or mul 1/scalar) add operator and softmax
+ * operator. softmax(alpah * a + b)
  *
  * @attention
  * There are some assumptions for this operator.
@@ -269,7 +272,10 @@ inline void _dil_normalization_kernel(
  * @return The tensor stores the result of @code softmax(a + b) @endcode
  */
 template <typename scalar_t>
-at::Tensor dil_add_softmax(const at::Tensor& a, const at::Tensor& b) {
+at::Tensor dil_div_add_softmax(
+    const at::Tensor& a,
+    const at::Tensor& b,
+    const float& dim_per_head) {
   scalar_t* a_data_base = a.data_ptr<scalar_t>();
   scalar_t* b_data_base = b.data_ptr<scalar_t>();
 
@@ -320,9 +326,10 @@ at::Tensor dil_add_softmax(const at::Tensor& a, const at::Tensor& b) {
       // Add a and b and get the maximum value:
       //    output_data = a + b
       //    val = max(output_data)
-      _dil_add_reduce_max_fusion_kernel<scalar_t>(
+      _dil_div_add_reduce_max_fusion_kernel<scalar_t>(
           a_data_base + i * dim_size,
           b_data_base + b_offset,
+          dim_per_head,
           dim_size,
           tmp_out_ptr,
           val);
