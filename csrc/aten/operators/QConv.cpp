@@ -272,8 +272,10 @@ at::Tensor q_conv2d_sum_relu(
       groups,
       attr);
 
-  accumu.set_quantizer_(dpcpp_make_per_tensor_affine_quantizer(
-      sum_scale, sum_zero_point, accumu.scalar_type()));
+  set_quantizer_(
+      accumu,
+      dpcpp_make_per_tensor_affine_quantizer(
+          sum_scale, sum_zero_point, accumu.scalar_type()));
 
   return accumu;
 }

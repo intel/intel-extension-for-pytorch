@@ -13,7 +13,7 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
       int64_t zero_point)
       : AffineQuantizer(scalar_type), scale_(scale), zero_point_(zero_point) {}
 
-  Tensor quantize(Tensor rtensor) override {
+  Tensor quantize(const Tensor& rtensor) override {
     TORCH_CHECK(
         rtensor.scalar_type() == kFloat,
         "quantize only works on Float Tensor.");
@@ -23,13 +23,13 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
             .dtype(scalar_type_)
             .memory_format(rtensor.suggest_memory_format()),
         intrusive_from_this());
-    rtensor = rtensor.contiguous(rtensor.suggest_memory_format());
+    auto rtensor_contig = rtensor.contiguous(rtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::quantize_tensor_per_tensor_affine(
-        qtensor, rtensor, scale_, zero_point_);
+        qtensor, rtensor_contig, scale_, zero_point_);
   }
 
-  Tensor dequantize(Tensor qtensor) override {
+  Tensor dequantize(const Tensor& qtensor) override {
     if (!qtensor.is_quantized()) {
       return qtensor;
     }
@@ -39,10 +39,10 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
         qtensor.options()
             .dtype(at::kFloat)
             .memory_format(qtensor.suggest_memory_format()));
-    qtensor = qtensor.contiguous(qtensor.suggest_memory_format());
+    auto qtensor_contig = qtensor.contiguous(qtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::dequantize_tensor_per_tensor_affine(
-        rtensor, qtensor, scale_, zero_point_);
+        rtensor, qtensor_contig, scale_, zero_point_);
   }
 
   QScheme qscheme() const override {
@@ -101,7 +101,7 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
     return axis_;
   }
 
-  Tensor quantize(Tensor rtensor) override {
+  Tensor quantize(const Tensor& rtensor) override {
     TORCH_CHECK(
         rtensor.scalar_type() == kFloat,
         "quantize only works on Float Tensor.");
@@ -113,13 +113,13 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
             .memory_format(rtensor.suggest_memory_format()),
         intrusive_from_this());
 
-    rtensor = rtensor.contiguous(rtensor.suggest_memory_format());
+    auto rtensor_contig = rtensor.contiguous(rtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::quantize_tensor_per_channel_affine(
-        qtensor, rtensor, scales_, zero_points_, axis_);
+        qtensor, rtensor_contig, scales_, zero_points_, axis_);
   }
 
-  Tensor dequantize(Tensor qtensor) override {
+  Tensor dequantize(const Tensor& qtensor) override {
     if (!qtensor.is_quantized()) {
       return qtensor;
     }
@@ -129,10 +129,10 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
         qtensor.options()
             .dtype(at::kFloat)
             .memory_format(qtensor.suggest_memory_format()));
-    qtensor = qtensor.contiguous(qtensor.suggest_memory_format());
+    auto qtensor_contig = qtensor.contiguous(qtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::dequantize_tensor_per_channel_affine(
-        rtensor, qtensor, scales_, zero_points_, axis_);
+        rtensor, qtensor_contig, scales_, zero_points_, axis_);
   }
 
   bool equalTo(QuantizerPtr other) override {
