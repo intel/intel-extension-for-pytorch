@@ -38,14 +38,15 @@ void insertPrePackedLinearOp(Block* b) {
       IValue batch_size_value(b_size);
       auto batch_size = graph->insertConstant(batch_size_value);
       if (n->kind() == aten::linear) {
-        auto weight_size_option = n->inputs()
-                                      .at(1)
-                                      ->type()
-                                      ->cast<TensorType>()
-                                      ->sizes()
-                                      .concrete_sizes();
+        auto tt = n->inputs().at(1)->type()->cast<TensorType>();
+        auto weight_size_option = tt->sizes().concrete_sizes();
         if (!(weight_size_option.has_value() &&
               weight_size_option.value().size() == 2)) {
+          continue;
+        }
+        auto weight_dtype_option = tt->scalarType();
+        if (!(weight_dtype_option.has_value() &&
+              weight_dtype_option.value() == at::ScalarType::BFloat16)) {
           continue;
         }
         auto weight_size = weight_size_option.value();

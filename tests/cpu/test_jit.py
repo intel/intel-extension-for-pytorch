@@ -54,6 +54,7 @@ import random
 import unittest
 from functools import reduce
 import warnings
+import itertools
 
 import torch
 import torch.nn as nn
@@ -988,11 +989,45 @@ class Tester(TestCase):
             levels=["O1"],
             prec=0.02)
 
+    def test_linear_auto_kernel_selection_fp32(self):
+        x = torch.rand(32, 3)
+        options = itertools.product(['O0', 'O1'], [True, False])
+        for level, auto_select_kernel in options:
+            model = LinearRelu(3, 32, bias=True).eval()
+            model = ipex.optimize(model, dtype=torch.float32, level=level, auto_kernel_selection=auto_select_kernel)
+            with torch.no_grad():
+                traced_model = torch.jit.trace(model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                y = traced_model(x)
+                trace_graph = traced_model.graph_for(x)
+
+                if auto_select_kernel and level == 'O1':
+                    # for 'O1' and auto_select_kernel is True, we will use ipex linear
+                    self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+                else:
+                    # for 'O1' and auto_select_kernel is false or 'O0', we will use mkl linear
+                    self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
+
+    def test_linear_auto_kernel_selection_bf16(self):
+        x = torch.rand(32, 3)
+        options = itertools.product(['O0', 'O1'], [True, False])
+        for level, auto_select_kernel in options:
+            model = LinearRelu(3, 32, bias=True).eval()
+            model = ipex.optimize(model, dtype=torch.bfloat16, level=level, auto_kernel_selection=auto_select_kernel)
+            with torch.cpu.amp.autocast(), torch.no_grad():
+                traced_model = torch.jit.trace(model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                y = traced_model(x)
+                trace_graph = traced_model.graph_for(x)
+
+                # for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
+                self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+
     def test_output_linear_relu(self):
         self._test_output(
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_relu_run")
+            kind_in_graph="aten::linear")
         self._test_output_bf16(
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
@@ -1001,7 +1036,7 @@ class Tester(TestCase):
         self._test_output(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_relu_run")
+            kind_in_graph="aten::linear")
         self._test_output_bf16(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
@@ -1012,37 +1047,42 @@ class Tester(TestCase):
         self._test_output(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_add_run")
+            kind_in_graph="aten::linear")
 
     def test_output_linear_reshape_relu(self):
         self._test_output(
             Linear_Reshape_Relu(3, 32,(64,16),bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_run")
+            kind_in_graph="aten::linear")
 
     def test_output_linear_sigmoid(self):
         self._test_output(
             LinearSigmoid(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_run")
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSigmoid(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_run",
+            prec=0.02)
 
     def test_output_linear_bn(self):
         self._test_output(
             LinearBn(2 ,32, 32, bias=True),
             torch.rand(1, 1, 32, 32),
-            kind_in_graph="ipex_prepack::linear_run")
+            kind_in_graph="aten::linear")
 
     def test_output_linear_reshape_bn(self):
         self._test_output(
             Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True),
             torch.rand(1, 1, 32, 32),
-            kind_in_graph="ipex_prepack::linear_run")
+            kind_in_graph="aten::linear")
 
     def test_output_linear_gelu(self):
         self._test_output(
             LinearGelu(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_gelu_run")
+            kind_in_graph="aten::linear")
         self._test_output_bf16(
             LinearGelu(3, 32, bias=True),
             torch.rand(32, 3),
@@ -1051,7 +1091,7 @@ class Tester(TestCase):
         self._test_output(
             LinearGelu(3, 32, bias=False),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_gelu_run")
+            kind_in_graph="aten::linear")
         self._test_output_bf16(
             LinearGelu(3, 32, bias=False),
             torch.rand(32, 3),

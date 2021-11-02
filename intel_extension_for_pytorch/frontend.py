@@ -71,7 +71,7 @@ opt_levels = {"O0": _O0(),
 
 def optimize(
     model,
-    dtype=torch.bfloat16,
+    dtype=torch.float,
     optimizer=None,
     level="O1",
     inplace=False,
@@ -89,7 +89,7 @@ def optimize(
     Args:
         model: (torch.nn.Module): user model to do optimization.
         dtype: it can be torch.float or torch.bfloat16, it will do model's parameters data dtype cast if
-            dtype is torch.bfloat16, the default value is torch.bfloat16.
+            dtype is torch.bfloat16, the default value is torch.float.
         optimizer: (optim.Optimizer), user optimzizer to do optimization, suach as split-sgd, the default
             value is None, it means for inference case.
         level: can be 'O0' or 'O1', do nothing for 'O0', just return the origin model and optimizer,
