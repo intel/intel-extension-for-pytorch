@@ -9,10 +9,11 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 static inline at::Tensor condition_contiguous(const at::Tensor& t) {
-  if (t.defined() && !t.is_contiguous(at::MemoryFormat::ChannelsLast1d) &&
-      !t.is_contiguous(at::MemoryFormat::ChannelsLast))
+  if (t.defined() && !is_smf_channels_last(t)) {
     return t.contiguous();
-  return t;
+  }
+
+  return t.contiguous(get_cl_tag_by_ndim(t.ndimension()));
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(

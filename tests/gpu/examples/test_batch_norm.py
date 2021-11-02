@@ -4,6 +4,7 @@ from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -180,6 +181,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d")
     def test_channels_last_1d_fwd_and_bwd(self, dtype=torch.float):
         shapes = [(1, 2, 3), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4)]

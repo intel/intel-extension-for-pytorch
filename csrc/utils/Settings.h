@@ -48,6 +48,8 @@ class IPEX_API Settings final {
 
   bool is_onemkl_enabled() const;
 
+  bool is_channels_last_1d_enabled() const;
+
   bool is_double_disabled() const;
 
  private:

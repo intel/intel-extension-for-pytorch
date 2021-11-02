@@ -141,6 +141,10 @@ if (USE_ONEMKL)
     endif()
 endif()
 
+if (USE_CHANNELS_LAST_1D)
+    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_CHANNELS_LAST_1D")
+endif()
+
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
     target_link_libraries(ipex_gpu_core PRIVATE ${ONEDNN_LIBRARIES})

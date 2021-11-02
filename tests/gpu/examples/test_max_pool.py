@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import pytest
 
 import numpy
 
@@ -40,6 +41,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d")
     def test_channels_last_1d_fwd_and_bwd(self, dtype=torch.float):
         shapes = [(2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]

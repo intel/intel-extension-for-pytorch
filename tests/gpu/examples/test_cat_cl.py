@@ -3,12 +3,14 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d(), reason="doesn't enable channels last 1d")
     def test_cat_1d_array(self, dtype=torch.float):
         shapes = [(8, 7, 2), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]

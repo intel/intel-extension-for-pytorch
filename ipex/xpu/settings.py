@@ -25,6 +25,9 @@ def has_onedpl():
 def has_onemkl():
     return _C._is_onemkl_enabled()
 
+def has_channels_last_1d():
+    return _C._is_channels_last_1d_enabled()
+
 def has_double_dtype():
     return not _C._is_double_disabled()
 

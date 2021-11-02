@@ -440,6 +440,10 @@ void init_module(pybind11::module& m) {
   m.def(
       "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
 
+  m.def("_is_channels_last_1d_enabled", []() {
+    return Settings::I().is_channels_last_1d_enabled();
+  });
+
   m.def("_is_double_disabled", []() {
     return Settings::I().is_double_disabled();
   });
