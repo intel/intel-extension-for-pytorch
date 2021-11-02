@@ -236,13 +236,7 @@ at::Tensor AtenIpexJITDev::dil_mha_scores_calc(
 
   auto q_dim = q.dim();
   auto k_dim = k.dim();
-  if (q_dim == k_dim && q_dim >= 3) {
-    qk =
-        bmm_impl(q, k, at::Tensor(), ideep::attr_t(), {}, 1.0f / _dim_per_head);
-  } else {
-    auto _q = at::div(q, _dim_per_head);
-    qk = at::matmul(_q, k);
-  }
+  qk = at::matmul(q, k);
 
   // Only support last dimension
   bool is_last_dim = (softmax_dim == -1);
@@ -256,8 +250,9 @@ at::Tensor AtenIpexJITDev::dil_mha_scores_calc(
   bool is_contiguous = rel_kv.is_contiguous() && qk.is_contiguous();
   if (is_last_dim && not_last_dim_broadcast && not_one_dim &&
       aligned_64_bytes && is_contiguous && dtype.isNone() && _alpha == 1.0f) {
-    return jit::cpu::kernels::AddSoftmax(qk, rel_kv);
+    return jit::cpu::kernels::DivAddSoftmax(qk, rel_kv, _dim_per_head);
   } else {
+    qk = at::div(qk, dim_per_head);
     qk = at::add(qk, rel_kv, _alpha);
     return dil_softmax(qk, softmax_dim, dtype);
   }
