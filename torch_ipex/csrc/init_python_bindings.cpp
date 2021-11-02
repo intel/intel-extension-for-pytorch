@@ -43,16 +43,18 @@
 namespace torch_ipex {
 namespace {
 
-py::object GetRevisions() {
+py::object GetBinaryInfo() {
   auto py_dict = py::dict();
-  py_dict["ipex"] = std::string(IPEX_GITREV);
-  py_dict["avx"] = std::string(TORCH_GITREV);
-  py_dict["torch"] = std::string(IPEX_AVX_VERSION);
+  py_dict["__version__"] = std::string(__version__);
+  py_dict["__gitrev__"] = std::string(__gitrev__);
+  py_dict["__avx_version__"] = std::string(__avx_version__);
+  py_dict["__torch_gitrev__"] = std::string(__torch_gitrev__);
+  py_dict["__mode__"] = std::string(__mode__);
   return std::move(py_dict);
 }
 
 void InitIpexModuleBindings(py::module m) {
-  m.def("_get_git_revs", []() { return GetRevisions(); });
+  m.def("_get_binary_info", []() { return GetBinaryInfo(); });
 
   // Check CPU ISA
   m.def("_does_support_avx2", []() {
