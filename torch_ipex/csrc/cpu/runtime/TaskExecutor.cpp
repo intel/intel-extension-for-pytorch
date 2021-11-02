@@ -49,13 +49,24 @@ std::queue<std::function<void()>>& TaskExecutor::get_tasks() {
   return this->tasks;
 }
 
-TaskExecutor::~TaskExecutor() {
+void TaskExecutor::stop_executor() {
+  bool should_wait_worker_join = false;
   {
     std::unique_lock<std::mutex> lock(this->worker_mutex);
-    this->stop = true;
+    if (this->stop == false) {
+      should_wait_worker_join = true;
+      this->stop = true;
+    }
   }
-  this->worker_condition.notify_all();
-  this->worker->join();
+  if (should_wait_worker_join) {
+    this->worker_condition.notify_all();
+    this->worker->join();
+  }
+  return;
+}
+
+TaskExecutor::~TaskExecutor() {
+  this->stop_executor();
 }
 
 } // namespace runtime

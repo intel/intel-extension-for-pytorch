@@ -29,6 +29,7 @@ class TaskExecutor {
   std::condition_variable& get_condition();
   bool is_stop();
   std::queue<std::function<void()>>& get_tasks();
+  void stop_executor();
   ~TaskExecutor();
 
  private:
@@ -42,6 +43,16 @@ class TaskExecutor {
 
   // Executor' thread_pool
   std::vector<int32_t> cpu_core_list;
+
+  // Put the deleted function in the private.
+  TaskExecutor(const TaskExecutor& task_executor) =
+      delete; // Not support copy or move construtor.
+  TaskExecutor(TaskExecutor&& task_executor) =
+      delete; // Not support copy or move construtor.
+  TaskExecutor& operator=(const TaskExecutor& task_executor) =
+      delete; // Not support copy or move construtor.
+  TaskExecutor& operator=(TaskExecutor&& task_executor) =
+      delete; // Not support copy or move construtor.
 };
 
 } // namespace runtime
