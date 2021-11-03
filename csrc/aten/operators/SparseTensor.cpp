@@ -148,10 +148,10 @@ Tensor coalesce(const Tensor& self) {
 
   // indices will be modified by Thrust, so we have to clone or use new storage
   // here.
-  LongTensor indices1D = flatten_indices(self._indices(), self.sizes(), true);
+  Tensor indices1D = flatten_indices(self._indices(), self.sizes(), true);
 
-  LongTensor origIndices = at::empty({nnz}, self._indices().options());
-  LongTensor uniqueOffsets = at::empty({nnz}, self._indices().options());
+  Tensor origIndices = at::empty({nnz}, self._indices().options());
+  Tensor uniqueOffsets = at::empty({nnz}, self._indices().options());
 
   auto origIndices_ptr = origIndices.data_ptr<int64_t>();
   auto uniqueOffsets_ptr = uniqueOffsets.data_ptr<int64_t>();
@@ -206,14 +206,14 @@ Tensor coalesce(const Tensor& self) {
         });
   }
 
-  LongTensor newIndices;
+  Tensor newIndices;
   if (sparse_dim == 1) {
     newIndices = indices1D;
   } else {
     newIndices = at::empty({sparse_dim, newNnz}, origIndices.options());
     for (int64_t d = sparse_dim - 1; d >= 0; d--) {
       // NB: Not a select, so I can preserve the outer dimension
-      LongTensor indicesSlice = newIndices.narrow(0, d, 1);
+      Tensor indicesSlice = newIndices.narrow(0, d, 1);
       // Note for the porting guide: THCTensor_(copy) does NOT do normal
       // broadcasting logic; instead, it will blast the elements from one
       // to the other so long as the numel is the same
@@ -246,7 +246,7 @@ Tensor sparse_mask(const Tensor& self, const Tensor& mask) {
   if (mask._nnz() == 0) {
     return r.zero_();
   }
-  LongTensor mask_indices = mask._indices();
+  Tensor mask_indices = mask._indices();
   Tensor mask_values = mask._values();
   Tensor r_values = at::empty(mask_values.sizes(), r._values().options());
   alias_into_sparse(
@@ -259,7 +259,7 @@ Tensor sparse_mask(const Tensor& self, const Tensor& mask) {
 
   // Get a flattened sparse indices, similar to NOTE [ Flatten Sparse Indices ].
   // Keeping this implementation because it is faster than flatten_indices()
-  LongTensor indices = at::zeros({mask._nnz()}, mask_indices.options());
+  Tensor indices = at::zeros({mask._nnz()}, mask_indices.options());
   for (int64_t d = 0; d < mask.sparse_dim(); d++) {
     indices.mul_(mask.size(d));
     // This used to use a buffer but I deoptimized it

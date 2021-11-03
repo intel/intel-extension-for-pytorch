@@ -249,11 +249,11 @@ Tensor packed_add(
       "packed_add", std::vector<c10::IValue>({top_half, bot_half, grad}));
   if (grad.is_sparse()) {
     Tensor values = grad._values();
-    LongTensor indices = grad._indices();
+    Tensor indices = grad._indices();
     int64_t nDim = top_half.dim();
     int64_t nDimI = grad.sparse_dim();
     const int64_t nnz = grad._nnz();
-    LongTensor indices1D = flatten_indices(indices, grad.sizes(), 0);
+    Tensor indices1D = flatten_indices(indices, grad.sizes(), 0);
     int64_t view_rows = 1;
     int64_t view_columns = 1;
     for (int i = 0; i < nDimI; i++) {
@@ -268,7 +268,7 @@ Tensor packed_add(
     values = values.contiguous();
     int64_t stride = at::prod_intlist(values.sizes().slice(1));
 
-    LongTensor uniqueOffsets = at::empty({nnz}, indices.options());
+    Tensor uniqueOffsets = at::empty({nnz}, indices.options());
     Tensor new_indices, origIndices;
     std::tie(new_indices, origIndices) =
         at::AtenIpexTypeXPU::sort(indices1D, 0, false);

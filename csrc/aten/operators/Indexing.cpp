@@ -1096,7 +1096,7 @@ Tensor& index_copy_(
 
   TORCH_CHECK_INDEX(
       index.scalar_type() == ScalarType::Long,
-      "index_copy_(): Expected LongTensor for index");
+      "index_copy_(): Expected Tensor for index");
   // Check that source and destination slices have the same size
   auto selfSlicedSizes = self.sizes().vec();
   if (selfSlicedSizes.size() > 0) {
