@@ -8,6 +8,18 @@
 namespace torch_ipex {
 namespace cpu {
 
+at::Tensor conv_transpose2d_kernel_impl(
+    const at::Tensor& input,
+    const ideep::tensor& w,
+    const c10::optional<at::Tensor>& bias_opt,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    at::IntArrayRef origin_weight_dims,
+    const ideep::attr_t& attr);
+
 at::Tensor convolution_transpose_impl(
     const at::Tensor& input,
     const at::Tensor& weight,

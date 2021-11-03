@@ -642,7 +642,10 @@ ideep::tensor get_conv_transpose2d_packed_weight(
                                          : at::MemoryFormat::Contiguous;
   auto weight_ = weight.contiguous(memory_format);
   ideep::tensor w = itensor_view_from_dense(weight_);
-  expected_packed_weight.feed_from(w);
+  w.transpose_(0, 1);
+  auto w_transpose = w.make_grouped_weights(groups, true);
+
+  expected_packed_weight.feed_from(w_transpose);
   return expected_packed_weight;
 }
 

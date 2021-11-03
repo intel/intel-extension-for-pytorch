@@ -960,34 +960,68 @@ class Tester(TestCase):
             prec=0.02)
 
     def test_output_conv_transpose2d(self):
-        # TODO: O0 and O1 should both have ipex_prepack::deconvolution_run
-        # when weight cache is enabled for deconv
-        self._test_output(
-            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
-            torch.randn(20, 16, 50, 100),
-            kind_in_graph="ipex::conv_transpose2d",
-            kind_not_in_graph="aten::conv_transpose2d",
-            levels=["O0"])
-        self._test_output_bf16(
-            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
-            torch.randn(20, 16, 50, 100),
-            kind_in_graph="ipex::conv_transpose2d",
-            kind_not_in_graph="aten::conv_transpose2d",
-            levels=["O0"],
-            prec=0.02)
-        self._test_output(
-            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
-            torch.randn(20, 16, 50, 100),
-            kind_in_graph="torch_ipex::conv_transpose2d",
-            kind_not_in_graph="aten::conv_transpose2d",
-            levels=["O1"])
-        self._test_output_bf16(
-            ConvTranspose2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2)),
-            torch.randn(20, 16, 50, 100),
-            kind_in_graph="torch_ipex::conv_transpose2d",
-            kind_not_in_graph="aten::conv_transpose2d",
-            levels=["O1"],
-            prec=0.02)
+        def _deconv_params_list():
+            params_dict = {
+                "input_height": [12],
+                "input_width": [12],
+                "input_depth": [12],
+                "input_channel_per_group": [15],
+                "output_channel_per_group": [3],
+                "kernel_size": [3],
+                "bias": [True, False],
+                "stride": [1, 2],
+                "padding": [1, 2],
+                "output_padding": [0],  # TODO: fix output_padding  >1.
+                "groups": [1, 2],
+                "dilation": [1, 2],
+            }  
+
+            params_list = []
+
+            for key, value in params_dict.items():
+                params_list.append(value)
+            return params_list
+
+        params_list = _deconv_params_list()
+
+        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
+            if (output_padding < stride or output_padding < dilation) \
+                    and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
+                    and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
+                    and ((input_depth - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0):
+
+                ic = input_channel_per_group * groups
+                oc = output_channel_per_group * groups
+
+                x = torch.randn(2, ic, input_height, input_width)
+                model = ConvTranspose2d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation)
+
+                self._test_output(
+                    model,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                    kind_not_in_graph="aten::conv_transpose2d",
+                    levels=["O0"])
+                self._test_output_bf16(
+                    model,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                    kind_not_in_graph="aten::conv_transpose2d",
+                    levels=["O0"],
+                    prec=0.02)
+                self._test_output(
+                    model,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                    kind_not_in_graph="torch_ipex::conv_transpose2d",
+                    levels=["O1"])
+                self._test_output_bf16(
+                    model,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                    kind_not_in_graph="torch_ipex::conv_transpose2d",
+                    levels=["O1"],
+                    prec=0.02)
 
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)

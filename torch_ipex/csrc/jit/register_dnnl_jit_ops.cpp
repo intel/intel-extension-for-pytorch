@@ -4,6 +4,7 @@
 #include <torch/csrc/jit/runtime/operator.h>
 
 #include "ConvPacked.h"
+#include "ConvTransposePacked.h"
 #include "LinearPacked.h"
 #include "OpContext.h"
 #include "torch_ipex/csrc/cpu/CustomOPs.h"
@@ -25,6 +26,7 @@ at::Tensor toOptionalTensor(const IValue& v) {
 using namespace torch_ipex::cpu;
 using namespace torch_ipex::cpu::detail::convolution;
 using namespace torch_ipex::cpu::detail::linear;
+using namespace torch_ipex::cpu::detail::conv_transpose2d;
 // Convolution Fusion Ops
 
 #define CONV_ARGS \
@@ -215,27 +217,21 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
-
     Operator(
-        "ipex::conv_transpose2d(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] output_padding, int groups, int[2] dilation) -> Tensor",
+        "ipex_prepack::conv_transpose2d_run(Tensor input, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext W_prepack) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            auto result = AtenIpexJITDev::dil_conv_transpose2d(
-                (std::move(peek(stack, 0, 8))).toTensor(),
-                (std::move(peek(stack, 1, 8))).toTensor(),
-                toOptionalTensor(std::move(peek(stack, 2, 8))),
-                (std::move(peek(stack, 3, 8))).toIntVector(),
-                (std::move(peek(stack, 4, 8))).toIntVector(),
-                (std::move(peek(stack, 5, 8))).toIntVector(),
-                (std::move(peek(stack, 6, 8))).toInt(),
-                (std::move(peek(stack, 7, 8))).toIntVector());
-            drop(stack, 8);
+            auto result = conv_transpose2d_run(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 2);
             pack(stack, std::move(result));
             return 0;
           };
         },
         aliasAnalysisFromSchema()),
-
     Operator(
         "ipex_prepack::linear_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) -> Tensor",

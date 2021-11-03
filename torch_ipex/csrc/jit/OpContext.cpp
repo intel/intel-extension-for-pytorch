@@ -1,5 +1,6 @@
 #include "OpContext.h"
 #include "ConvPacked.h"
+#include "ConvTransposePacked.h"
 #include "LinearPacked.h"
 
 namespace torch_ipex {
@@ -89,6 +90,56 @@ at::Tensor& IpexLinearOpContext::run(
     at::Tensor& accumu,
     const ideep::attr_t& attr) {
   return torch_ipex::cpu::detail::linear::run(op_context_, input, accumu, attr);
+}
+
+c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
+    create_context(
+        at::Tensor&& weight,
+        c10::optional<at::Tensor>&& bias,
+        std::vector<int64_t>&& stride,
+        std::vector<int64_t>&& padding,
+        std::vector<int64_t>&& output_padding,
+        std::vector<int64_t>&& dilation,
+        std::vector<int64_t>&& kernel_size,
+        int64_t groups,
+        int64_t output_channel,
+        bool weight_is_channels_last,
+        bool weight_is_packed,
+        std::vector<int64_t>&& input_size) {
+  auto op_context = torch_ipex::cpu::detail::conv_transpose2d::create(
+      weight,
+      bias,
+      stride,
+      padding,
+      output_padding,
+      dilation,
+      kernel_size,
+      groups,
+      output_channel,
+      weight_is_channels_last,
+      weight_is_packed,
+      input_size);
+  return c10::make_intrusive<IpexConvTransposeOpContext>(
+      std::move(weight),
+      std::move(bias),
+      std::move(stride),
+      std::move(padding),
+      std::move(output_padding),
+      std::move(dilation),
+      std::move(kernel_size),
+      std::move(input_size),
+      groups,
+      output_channel,
+      weight_is_channels_last,
+      weight_is_packed,
+      std::move(op_context));
+}
+
+at::Tensor IpexConvTransposeOpContext::run(
+    const at::Tensor& input,
+    const ideep::attr_t& attr) {
+  return torch_ipex::cpu::detail::conv_transpose2d::run(
+      op_context_, input, attr);
 }
 
 } // namespace cpu
