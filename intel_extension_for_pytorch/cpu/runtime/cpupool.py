@@ -6,6 +6,13 @@ import intel_extension_for_pytorch as ipex
 from .runtime_utils import get_core_list_of_node_id
 
 class CPUPool(object):
+    r"""An abstraction of a pool of CPU cores to be used for intra-op parallelism.
+        Args:
+            core_ids (list): A list of CPU cores' id used for intra-op parallelism.
+            node_id (int): A numa node id with all CPU cores among this numa node. node_id doesn't work if input parameter of core_ids exist.
+        Returns:
+            CPUPool: New created object with type of CPUPool.
+    """
     def __init__(self, core_ids: list = None, node_id: int = None):
         if core_ids is not None:
             if node_id is not None:
@@ -20,6 +27,12 @@ class CPUPool(object):
         self.cpu_pool = ipex._C.CPUPool(self.core_ids)
 
 class pin(object):
+    r"""Apply the given CPU pool to the master thread that runs the scoped code region or the function/method def.
+        Args:
+            cpu_pool (CPUPool): A object with type CPUPool includes all the CPU cores used by following operations.
+        Returns:
+            pin: New created object with type of pin which can be used as `with` context or function decorator.
+    """
     def __init__(self, cpu_pool: CPUPool):
         self.cpu_pool = cpu_pool
         ipex._C.init_runtime_ext()
@@ -40,4 +53,10 @@ class pin(object):
         return decorate_pin
 
 def is_runtime_ext_enabled():
+    r"""Helper function to check whether runtime extension is enabled or not.
+        Args:
+            None
+        Returns:
+            bool: Whether the runtime exetension is enabled or not.
+    """
     return ipex._C.is_runtime_ext_enabled() == 1
