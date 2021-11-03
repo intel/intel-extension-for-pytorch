@@ -1247,7 +1247,7 @@ Tensor& argmax_out(
 
 Tensor argmax(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   Tensor result = at::empty({0}, self.options().dtype(at::kLong));
-  return argmax_out(result, self, dim, keepdims);
+  return at::AtenIpexTypeXPU::argmax_out(result, self, dim, keepdims);
 }
 
 Tensor& argmin_out(
@@ -1275,7 +1275,7 @@ Tensor& argmin_out(
 
 Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   Tensor result = at::empty({0}, self.options().dtype(at::kLong));
-  return argmin_out(result, self, dim, keepdims);
+  return at::AtenIpexTypeXPU::argmin_out(result, self, dim, keepdims);
 }
 
 void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
