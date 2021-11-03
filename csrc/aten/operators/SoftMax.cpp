@@ -71,8 +71,148 @@ struct SoftMaxBackwardEpilogue {
   const AccumT sum;
 };
 
-// It is naive implementation for the softmax. Not optimized if the dim_size is
-// small.
+// It is naive implementation for the softmax with dim_stride=1.
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename outscalar_t,
+    template <typename, typename, typename>
+    class Epilogue>
+void softmax_lastdim_fwd_kernel(
+    scalar_t* in_data,
+    outscalar_t* out_data,
+    TensorInfo<scalar_t, uint64_t> outer_info,
+    size_t dim_size,
+    size_t dim_stride,
+    size_t outer_size,
+    size_t local_size) {
+  RECORD_FUNCTION("softmax_lastdim_fwd_kernel", {});
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  DPCPP::range<1> global_range(outer_size * local_size);
+  DPCPP::range<1> local_range(local_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto local_acc_max = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
+    auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(global_range, local_range),
+        [=](DPCPP::nd_item<1> item_id) {
+          size_t local_id = item_id.get_local_id(0);
+          auto group_id = item_id.get_group(0);
+          auto data_offset =
+              IndexToOffset<scalar_t, uint64_t>::get(group_id, outer_info);
+          auto in_ptr = in_data + data_offset;
+          auto out_ptr = out_data + data_offset;
+
+          // get max
+          auto max_input = in_ptr[local_id];
+          for (uint32_t i = local_id + local_size; i < dim_size;
+               i += local_size) {
+            max_input = Numerics<scalar_t>::max(max_input, in_ptr[i]);
+          }
+          // to accscalar_t
+          local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
+          simple_reduce(
+              item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
+                return Numerics<accscalar_t>::max(a, b);
+              });
+
+          // get sum
+          auto sum_input = static_cast<accscalar_t>(0);
+          for (size_t i = local_id; i < dim_size; i += local_size) {
+            // (NOTE) This arithmetic convension is to avoid dp_global_ptr cast
+            auto in_value = static_cast<accscalar_t>(in_ptr[i]);
+            sum_input +=
+                Numerics<accscalar_t>::exp(in_value - local_acc_max[0]);
+          }
+          local_acc_sum[local_id] = sum_input;
+          simple_reduce(
+              item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+                return a + b;
+              });
+
+          Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(
+              local_acc_max[0], local_acc_sum[0]);
+          for (size_t i = local_id; i < dim_size; i += local_size) {
+            out_ptr[i] = epilogue(in_ptr[i]);
+          }
+        });
+  };
+
+  // launch kernel
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename outscalar_t,
+    template <typename, typename, typename>
+    class Epilogue>
+void softmax_fwd_kernel(
+    scalar_t* in_data,
+    scalar_t* out_data,
+    size_t dim_size,
+    size_t dim_stride,
+    size_t outer_size,
+    size_t local_size) {
+  RECORD_FUNCTION("softmax_fwd_kernel", {});
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  size_t group_num = (dim_stride + local_size - 1) / local_size;
+  DPCPP::range<2> global_range(outer_size, group_num * local_size);
+  DPCPP::range<2> local_range(1, local_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    cgh.parallel_for(
+        DPCPP::nd_range<2>(global_range, local_range),
+        [=](DPCPP::nd_item<2> item_id) {
+          size_t local_id = item_id.get_local_id(1);
+          auto group_id_bs = item_id.get_group(0);
+          auto group_id_plane = item_id.get_group(1);
+          auto in_ptr = in_data + group_id_bs * dim_size * dim_stride +
+              group_id_plane * local_size;
+          auto out_ptr = out_data + group_id_bs * dim_size * dim_stride +
+              group_id_plane * local_size;
+
+          if (group_id_plane * local_size + local_id < dim_stride) {
+            auto max_input = in_ptr[local_id];
+            for (uint32_t i = 1; i < dim_size; ++i) {
+              int64_t offset = i * dim_stride + local_id;
+              auto in_value = in_ptr[offset];
+              max_input = max_input > in_value ? max_input : in_value;
+            }
+
+            auto sum_input = static_cast<accscalar_t>(0);
+            for (uint32_t i = 0; i < dim_size; ++i) {
+              int64_t offset = i * dim_stride + local_id;
+              sum_input +=
+                  Numerics<accscalar_t>::exp(in_ptr[offset] - max_input);
+            }
+
+            Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(
+                max_input, sum_input);
+
+            for (size_t i = 0; i < dim_size; ++i) {
+              int64_t offset = i * dim_stride + local_id;
+              out_ptr[offset] = epilogue(in_ptr[offset]);
+            }
+          }
+        });
+  };
+
+  // launch kernel
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+// softmax = exp(x) / sum(exp(x))
+// to ensuare the exp(x) in range of [0, 1], we use exp(x - max_x)
+// then softmax = exp(x) / (exp(max_x) * sum(exp(x - max_x)))
+// all the kernels for softmax fwd follow this flowchar:
+// 1. get the max_x value in the target dim
+// 2. get the sum(exp(x - max_x)) value in the target dim
+// 3. get softmax value for each element
+// We have differnet kernels for softmax fwd because we consider different
+// cases like what CPU does:
+// 1. target dim is the last dim: softmax_lastdim_fwd_kernel
+// 2. target dim is not the last dim: softmax_fwd_kernel
 template <
     typename scalar_t,
     typename accscalar_t,
@@ -86,92 +226,58 @@ void SpatialSoftMaxForward(
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  size_t local_size = dpcppMaxWorkGroupSize(dev_id);
-  local_size = std::min(local_size, dim_size);
-  size_t global_size = outer_size * local_size;
+  size_t wgroup_size = dpcppMaxWorkGroupSize(dev_id);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = input;
-    auto out_data = output;
-    auto local_acc_max = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
-    auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
-    cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
-        [=](DPCPP::nd_item<1> item_id) {
-          size_t local_id = item_id.get_local_id(0);
-          auto group_id = item_id.get_group(0);
-          auto data_offset =
-              IndexToOffset<scalar_t, uint64_t>::get(group_id, outer_info);
-          auto in_ptr = in_data + data_offset;
-          auto out_ptr = out_data + data_offset;
-          // get max
-          auto max_input = in_ptr[0];
-          for (uint32_t i = local_id; i < dim_size; i += local_size) {
-            max_input =
-                Numerics<scalar_t>::max(max_input, in_ptr[i * dim_stride]);
-          }
-          // to accscalar_t
-          local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
-
-          simple_reduce(
-              item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
-                return Numerics<accscalar_t>::max(a, b);
-              });
-
-          // get sum
-          auto sum_input = static_cast<accscalar_t>(0);
-          for (size_t i = local_id; i < dim_size; i += local_size) {
-            // (NOTE) This arithmetic convension is to avoid dp_global_ptr cast
-            auto in_data = static_cast<accscalar_t>(in_ptr[i * dim_stride]);
-            sum_input += Numerics<accscalar_t>::exp(in_data - local_acc_max[0]);
-          }
-          local_acc_sum[local_id] = sum_input;
-
-          simple_reduce(
-              item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
-                return a + b;
-              });
-
-          Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(
-              local_acc_max[0], local_acc_sum[0]);
-
-          for (size_t i = local_id; i < dim_size; i += local_size) {
-            out_ptr[i * dim_stride] = epilogue(in_ptr[i * dim_stride]);
-          }
-        });
-  };
-
-  // launch kernel
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  if (dim_stride == 1) {
+    // The wgroup_size is decide on the dim_size
+    // Since binary-tree reduce is used in softmax_lastdim_fwd_kernel, if the
+    // dim_size is small, larger workgroup_size will make computation resource
+    // wasting. If dim_size is very large, smaller workgroup_size will make each
+    // workitem for_loop many times for internal reduce. Thus, different
+    // workgroup_size will be used for different reduce cases.
+    if (dim_size < 1024) {
+      wgroup_size = 64;
+    } else if (dim_size < 2048) {
+      wgroup_size = 128;
+    } else if (dim_size < 4096) {
+      wgroup_size = 256;
+    } else if (dim_size < 8192) {
+      wgroup_size = 512;
+    }
+    size_t local_size = std::min(wgroup_size, dim_size);
+    softmax_lastdim_fwd_kernel<scalar_t, accscalar_t, outscalar_t, Epilogue>(
+        input,
+        output,
+        outer_info,
+        dim_size,
+        dim_stride,
+        outer_size,
+        local_size);
+  } else {
+    size_t local_size = std::min(wgroup_size, dim_stride);
+    softmax_fwd_kernel<scalar_t, accscalar_t, outscalar_t, Epilogue>(
+        input, output, dim_size, dim_stride, outer_size, local_size);
+  }
 }
 
-// It is naive implementation for the softmax. Not optimized if the dim_size is
-// small.
 template <
     typename scalar_t,
     typename accscalar_t,
     typename outscalar_t,
     template <typename, typename, typename>
     class Epilogue>
-void SpatialSoftMaxBackward(
+void softmax_lastdim_bwd_kernel(
     scalar_t* gradInput,
     const outscalar_t* output,
     const outscalar_t* gradOutput,
     TensorInfo<scalar_t, uint64_t> outer_info,
-    size_t outer_size,
     size_t dim_size,
-    size_t dim_stride) {
+    size_t dim_stride,
+    size_t outer_size,
+    size_t local_size) {
+  RECORD_FUNCTION("softmax_lastdim_bwd_kernel", {});
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  // Because of softmax backward using reduce, 512(max) WG size may cause much
-  // work-item waste(1/2 + 1/4 + 1/8) in tree reduction and is harmful to
-  // occupancy. Thus, 64 is chosen here to set as WG size. In addition, SLM has
-  // 65 banks in ATS and 64 here is extremely avoidable for bank conflict. 64 is
-  // both compatible for Gen9 and Gen12.
-  size_t local_size = 64;
-  local_size = std::min(local_size, dim_size);
   size_t global_size = outer_size * local_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -218,6 +324,119 @@ void SpatialSoftMaxBackward(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename outscalar_t,
+    template <typename, typename, typename>
+    class Epilogue>
+void host_softmax_bwd_kernel(
+    scalar_t* gradInput,
+    const outscalar_t* output,
+    const outscalar_t* gradOutput,
+    size_t dim_size,
+    size_t dim_stride,
+    size_t outer_size,
+    size_t local_size) {
+  RECORD_FUNCTION("host_softmax_bwd_kernel", {});
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  size_t group_num = (dim_stride + local_size - 1) / local_size;
+  DPCPP::range<2> global_range(outer_size, group_num * local_size);
+  DPCPP::range<2> local_range(1, local_size);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto gradInput_data = gradInput;
+    auto output_data = output;
+    auto gradOutput_data = gradOutput;
+
+    cgh.parallel_for(
+        DPCPP::nd_range<2>(global_range, local_range),
+        [=](DPCPP::nd_item<2> item_id) {
+          size_t local_id = item_id.get_local_id(1);
+          auto group_id_bs = item_id.get_group(0);
+          auto group_id_plane = item_id.get_group(1);
+          auto gradInput_ptr = gradInput_data +
+              group_id_bs * dim_size * dim_stride + group_id_plane * local_size;
+          auto output_ptr = output_data + group_id_bs * dim_size * dim_stride +
+              group_id_plane * local_size;
+          auto gradOutput_ptr = gradOutput_data +
+              group_id_bs * dim_size * dim_stride + group_id_plane * local_size;
+
+          if (group_id_plane * local_size + local_id < dim_stride) {
+            auto thread_sum = static_cast<accscalar_t>(0);
+            for (size_t i = 0; i < dim_size; ++i) {
+              size_t offset = i * dim_stride + local_id;
+              thread_sum += static_cast<accscalar_t>(
+                  gradOutput_ptr[i * dim_stride + local_id]);
+            }
+
+            Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(thread_sum);
+            for (size_t i = 0; i < dim_size; ++i) {
+              size_t offset = i * dim_stride + local_id;
+              gradInput_ptr[offset] =
+                  epilogue(gradOutput_ptr[offset], output_ptr[offset]);
+            }
+          }
+        });
+  };
+
+  // launch kernel
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+// The same as forward path, we implemented two softmax bwd kernel to handle
+// different cases.
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename outscalar_t,
+    template <typename, typename, typename>
+    class Epilogue>
+void SpatialSoftMaxBackward(
+    scalar_t* gradInput,
+    const outscalar_t* output,
+    const outscalar_t* gradOutput,
+    TensorInfo<scalar_t, uint64_t> outer_info,
+    size_t outer_size,
+    size_t dim_size,
+    size_t dim_stride) {
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  size_t wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+
+  if (dim_stride == 1) {
+    // The same situation as forward kernel
+    if (dim_size < 1024) {
+      wgroup_size = 64;
+    } else if (dim_size < 2048) {
+      wgroup_size = 128;
+    } else if (dim_size < 4096) {
+      wgroup_size = 256;
+    } else if (dim_size < 8192) {
+      wgroup_size = 512;
+    }
+    size_t local_size = std::min(wgroup_size, dim_size);
+    softmax_lastdim_bwd_kernel<scalar_t, accscalar_t, outscalar_t, Epilogue>(
+        gradInput,
+        output,
+        gradOutput,
+        outer_info,
+        dim_size,
+        dim_stride,
+        outer_size,
+        local_size);
+  } else {
+    size_t local_size = std::min(wgroup_size, dim_stride);
+    host_softmax_bwd_kernel<scalar_t, accscalar_t, outscalar_t, Epilogue>(
+        gradInput,
+        output,
+        gradOutput,
+        dim_size,
+        dim_stride,
+        outer_size,
+        local_size);
+  }
+}
+
 } // namespace impl
 
 template <template <typename, typename, typename> class Epilogue>
@@ -246,7 +465,7 @@ Tensor host_softmax(
         [&] {
           auto dim_stride = input.stride(dim);
           auto dim_size = input.size(dim);
-          auto outer_numel = input.numel() / dim_size;
+          size_t outer_numel = input.numel() / (dim_stride * dim_size);
           TensorInfo<scalar_t, uint64_t> outer_info =
               getTensorInfo<scalar_t, uint64_t>(input);
           outer_info.reduceDim(dim);
@@ -300,7 +519,7 @@ Tensor host_softmax_backward(
         using outscalar_t = scalar_t;
         auto dim_stride = output.stride(dim);
         auto dim_size = output.size(dim);
-        auto outer_numel = output.numel() / dim_size;
+        auto outer_numel = output.numel() / (dim_size * dim_stride);
         TensorInfo<outscalar_t, uint64_t> outer_info =
             getTensorInfo<outscalar_t, uint64_t>(output);
         outer_info.reduceDim(dim);
@@ -506,6 +725,7 @@ Tensor _softmax_backward_onednn(
   return gI;
 }
 
+// We now use DPCPP softmax fwd kernel instead of oneDNN softmax fwd kernel
 Tensor _softmax(
     const Tensor& input,
     const int64_t dim,
@@ -523,6 +743,7 @@ Tensor _softmax(
   }
 }
 
+// We now use DPCPP softmax bwd kernel instead of oneDNN softmax bwd kernel
 Tensor _softmax_backward_data(
     const Tensor& grad,
     const Tensor& output,
