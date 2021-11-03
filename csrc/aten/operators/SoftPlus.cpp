@@ -36,8 +36,9 @@ Tensor& softplus_out(
           return (
               a * b > t
                   ? a
-                  : Numerics<scalar_t>::log1p(Numerics<scalar_t>::exp(a * b)) /
-                      b);
+                  : scalar_t(
+                        Numerics<float>::log1p(Numerics<float>::exp(a * b)) /
+                        b));
         });
       });
 
