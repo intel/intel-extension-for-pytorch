@@ -198,6 +198,40 @@ class TestOp(JitLlgaTestCase):
         self.checkPatterns(graph, patterns)
 
     @llga_test_env
+    def test_strided_bmm_int8_in_bf16_out(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.num_attention_heads = 16
+                self.attention_head_size = 4
+
+            def forward(self, x, y):
+                new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                x = x.view(*new_x_shape)
+                z1 = x.permute(0, 2, 1, 3)
+
+                new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                y = y.view(*new_y_shape2)
+                z2 = y.permute(0, 2, 1, 3)
+                
+                # inputs to matmul has been permuted or transposed, thus are strided tensor
+                return torch.matmul(z1, z2.transpose(-1, -2))
+        m = M()
+        x = torch.randn(2, 3, 64)
+        y = torch.randn(2, 3, 64)
+
+        patterns = [
+                ["aten::to", "aten::quantize_per_tensor"],
+                ["aten::to", "aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::to", "aten::matmul"],
+        ]
+
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, config_name="strided_bmm_int8_in_bf16_out", qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
+        self.checkPatterns(graph, patterns)
+
+    @llga_test_env
     def test_add_scalar_input(self):
         class M(torch.nn.Module):
             def __init__(self):
@@ -613,6 +647,40 @@ class TestFusionPattern(JitLlgaTestCase):
         # single aten::to won't be rewritten by llga backend
         self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)  
+
+    @llga_test_env
+    def test_strided_bmm_div_int8_in_bf16_out(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.num_attention_heads = 16
+                self.attention_head_size = 4
+
+            def forward(self, x, y):
+                new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                x = x.view(*new_x_shape)
+                z1 = x.permute(0, 2, 1, 3)
+
+                new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                y = y.view(*new_y_shape2)
+                z2 = y.permute(0, 2, 1, 3)
+                
+                # inputs to matmul has been permuted or transposed, thus are strided tensor
+                return torch.matmul(z1, z2.transpose(-1, -2)) / 0.4
+        m = M()
+        x = torch.randn(2, 3, 64)
+        y = torch.randn(2, 3, 64)
+
+        patterns = [
+                ["aten::to", "aten::quantize_per_tensor"],
+                ["aten::to", "aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::to", "aten::matmul", "aten::div"],
+        ]
+
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, config_name="strided_bmm_int8_in_bf16_out", qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
+        self.checkPatterns(graph, patterns)
 
     @llga_test_env
     def test_split_dequant_to(self):
