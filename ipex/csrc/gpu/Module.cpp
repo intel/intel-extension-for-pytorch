@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/tensor/python_tensor.h>
 
-#include <autograd/InferenceMode.h>
+// #include <autograd/InferenceMode.h>
 #include <core/Allocator.h>
 #include <core/Device.h>
 #include <core/Generator.h>
@@ -319,7 +319,7 @@ static void register_xpu_device_properties(PyObject* module) {
 static void register_inference_mode(PyObject* module) {
   // Add _DeviceProperties class to ipex._C
   auto m = py::handle(module).cast<py::module>();
-  py::class_<InferenceMode>(m, "_InferenceMode").def(py::init<bool>());
+  py::class_<c10::InferenceMode>(m, "_InferenceMode").def(py::init<bool>());
 }
 
 static void bindGetDeviceProperties(PyObject* module) {

@@ -3,7 +3,7 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
 
-#include <autograd/InferenceMode.h>
+// #include <autograd/InferenceMode.h>
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Utils.h>
@@ -341,7 +341,7 @@ static inline void matmul(
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
     onoff |= Settings::I().is_onednn_layout_enabled();
-    onoff &= InferenceMode::is_enabled();
+    onoff &= c10::InferenceMode::is_enabled();
     return onoff;
   }();
 
