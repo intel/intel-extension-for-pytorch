@@ -6,8 +6,7 @@ from setuptools.command.build_clib import build_clib
 from setuptools.command.egg_info import egg_info
 
 from subprocess import check_call, check_output
-from setuptools import setup, Extension, distutils
-from setuptools.command.build_ext import build_ext
+from setuptools import setup, distutils
 from distutils.version import LooseVersion
 from sysconfig import get_paths
 
@@ -28,7 +27,7 @@ import re
 import pkg_resources
 
 TORCH_VERSION = '1.10.0'
-TORCH_IPEX_VERSION = '1.10.0'
+TORCH_IPEX_VERSION = '1.10.0+cpu'
 PYTHON_VERSION = sys.version_info
 
 IS_WINDOWS = (platform.system() == 'Windows')
@@ -43,9 +42,11 @@ except Exception:
 
 try:
     import torch
+    from torch.utils.cpp_extension import BuildExtension, CppExtension
 except ImportError as e:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch==' + TORCH_VERSION + '+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
     import torch
+    from torch.utils.cpp_extension import BuildExtension, CppExtension
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -179,13 +180,13 @@ def get_git_head_sha(base_dir):
 
 
 def get_build_version(ipex_git_sha):
-    version = os.getenv('TORCH_IPEX_VERSION', TORCH_IPEX_VERSION)
+    ipex_version = os.getenv('TORCH_IPEX_VERSION', TORCH_IPEX_VERSION)
     if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
         try:
-            version += '+' + ipex_git_sha[:7]
+            ipex_version += '+' + ipex_git_sha[:7]
         except Exception:
             pass
-    return version
+    return ipex_version
 
 
 def create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha, ipex_avx_version):
@@ -387,13 +388,13 @@ class IPEXCPPLibBuild(build_clib, object):
             Path(output_lib_path).mkdir(parents=True, exist_ok=True)
 
         cmake_args = [
-            '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
             '-DCMAKE_INSTALL_PREFIX=' + os.path.abspath(output_lib_path),
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DIPEX_AVX_VERSION=' + get_avx_version(),
+            '-DGLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
@@ -446,7 +447,7 @@ class IPEXCPPLibBuild(build_clib, object):
             else:
                 check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
 
-class IPEXExtBuild(build_ext, object):
+class IPEXExtBuild(BuildExtension):
     def run(self):
         self.run_command('build_clib')
 
@@ -475,15 +476,13 @@ def make_relative_rpath(path):
 
 
 def pyi_module():
-    main_compile_args = ['-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI))]
     main_libraries = ['intel-ext-pt-cpu']
-    main_link_args = ['-ltorch_python']
     main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp"),
                     os.path.join("torch_ipex", "csrc", "python", "TaskModule.cpp")]
 
     include_dirs = [
-        ".",
-        os.path.join("torch_ipex", "csrc"),
+        os.path.realpath("."),
+        os.path.realpath(os.path.join("torch_ipex", "csrc")),
         os.path.join(pytorch_install_dir, "include"),
         os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
 
@@ -491,7 +490,6 @@ def pyi_module():
         "lib",
         os.path.join(pytorch_install_dir, "lib")]
 
-    extra_link_args = []
     extra_compile_args = [
         '-Wall',
         '-Wextra',
@@ -511,15 +509,15 @@ def pyi_module():
         # https://bugs.llvm.org/show_bug.cgi?id=21629
         '-Wno-missing-braces']
 
-    C_ext = Extension(
+    C_ext = CppExtension(
         "intel_extension_for_pytorch._C",
         libraries=main_libraries,
         sources=main_sources,
         language='c++',
-        extra_compile_args=main_compile_args + extra_compile_args,
+        extra_compile_args=extra_compile_args,
         include_dirs=include_dirs,
         library_dirs=library_dirs,
-        extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+        extra_link_args=[make_relative_rpath('lib')])
     return C_ext
 
 
