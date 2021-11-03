@@ -523,7 +523,7 @@ def pyi_module():
 
 setup(
     name='intel_extension_for_pytorch',
-    version=version,
+    version=ipex_build_version,
     description='Intel Extension for PyTorch',
     url='https://github.com/intel/intel-extension-for-pytorch',
     author='Intel/PyTorch Dev Team',
