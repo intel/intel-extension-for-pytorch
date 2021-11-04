@@ -957,7 +957,8 @@ Tensor inverse(const Tensor& self) {
 
 Tensor& inverse_out(Tensor& out, const Tensor& self) {
   if (self.size(-1) == 0) {
-    return out.resize_as_(self);
+    out.resize_as_(self);
+    return out;
   }
   out.copy_(at::AtenIpexTypeXPU::inverse(self));
   return out;
@@ -1110,7 +1111,8 @@ Tensor orgqr(const Tensor& self, const Tensor& input2) {
 
 Tensor& orgqr_out(Tensor& out, const Tensor& self, const Tensor& input2) {
   if (self.size(-1) == 0) {
-    return out.resize_as_(self);
+    out.resize_as_(self);
+    return out;
   }
   out.copy_(at::AtenIpexTypeXPU::orgqr(self, input2));
   return out;
@@ -1154,7 +1156,8 @@ Tensor& ormqr_out(
     bool left,
     bool transpose) {
   if (self.size(-1) == 0) {
-    return out.resize_as_(input3);
+    out.resize_as_(input3);
+    return out;
   }
   out.resize_as_(input3).copy_(
       at::AtenIpexTypeXPU::ormqr(self, input2, input3, left, transpose));
