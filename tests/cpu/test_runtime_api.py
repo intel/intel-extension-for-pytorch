@@ -56,6 +56,21 @@ class TestCoreBinding(TestCase):
         y = model(x)
         self.assertEqual(y, y_runtime)
 
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_nested_with_function_result(self):
+        model = torch.nn.Softmax(dim=-1)
+        model.eval()
+        x = torch.rand(100, 8276)
+        cpu_pool = ipex.cpu.runtime.CPUPool([1, 2])
+        cpu_pool2 = ipex.cpu.runtime.CPUPool([3, 4])
+        with ipex.cpu.runtime.pin(cpu_pool):
+            y_runtime = model(x)
+            with ipex.cpu.runtime.pin(cpu_pool2):
+                y_runtime = model(x)
+            y_runtime = model(x)
+        y = model(x)
+        self.assertEqual(y, y_runtime)
+
 class TestRuntimeAPI(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     def test_module_result(self):

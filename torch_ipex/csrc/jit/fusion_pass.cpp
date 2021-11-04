@@ -317,6 +317,10 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   graph_rewrite::insertPrePackedLinearOp(graph);
   graph_rewrite::fuseLinearWithEltwise(graph);
   graph_rewrite::fuseLinearAddRelu(graph);
+
+  // deconvolution fusion
+  graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
+
   RemoveTensorTypeSpecializations(graph);
 
   // Fuse operators as shuffle
@@ -325,8 +329,6 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);
   OpFuser(graph->block(), graph).run();
-  // replace aten conv_transpose with ipex conv_transpose
-  graph_rewrite::replaceAtenTransposeConvolutionWithIpexTransposeConv(graph);
 
   // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);

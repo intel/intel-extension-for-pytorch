@@ -5,17 +5,8 @@ from distutils.command.install import install
 from setuptools.command.build_clib import build_clib
 from setuptools.command.egg_info import egg_info
 
-try:
-    import torch
-except ImportError as e:
-    print('Unable to import torch. Error:')
-    print('\t', e)
-    print('You need to install pytorch first.')
-    sys.exit(1)
-
 from subprocess import check_call, check_output
-from setuptools import setup, Extension, distutils
-from setuptools.command.build_ext import build_ext
+from setuptools import setup, distutils
 from distutils.version import LooseVersion
 from sysconfig import get_paths
 
@@ -31,6 +22,31 @@ import subprocess
 import sys
 from pathlib import Path
 import warnings
+import urllib.request
+import re
+import pkg_resources
+
+TORCH_VERSION = '1.10.0'
+TORCH_IPEX_VERSION = '1.10.0+cpu'
+PYTHON_VERSION = sys.version_info
+
+IS_WINDOWS = (platform.system() == 'Windows')
+IS_DARWIN = (platform.system() == 'Darwin')
+IS_LINUX = (platform.system() == 'Linux')
+
+try:
+    from packaging import version
+except Exception:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'packaging'])
+    from packaging import version
+
+try:
+    import torch
+    from torch.utils.cpp_extension import BuildExtension, CppExtension
+except ImportError as e:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch==' + TORCH_VERSION + '+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
+    import torch
+    from torch.utils.cpp_extension import BuildExtension, CppExtension
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,8 +54,80 @@ python_include_dir = get_paths()['include']
 package_name = "intel_extension_for_pytorch"
 short_package_name = "torch_ipex"
 
-# from https://github.com/pytorch/pytorch/blob/master/tools/setup_helpers/__init__.py
 
+def _install_requirements():
+    installed_raw = {pkg for pkg in pkg_resources.working_set}
+    installed = {}
+    for i in installed_raw:
+        installed[i.key] = i.version
+
+    requires = {}
+    requires_raw = {}
+    try:
+        with open('requirements.txt', 'r') as reader:
+            for line in reader.readlines():
+                line_raw = line.replace('\n', '')
+                line = line_raw.replace('=', '')
+                tmp = re.split('[=<>]', line)
+                if len(tmp) == 2:
+                    requires[tmp[0]] = tmp[1]
+                else:
+                    requires[tmp[0]] = ''
+                requires_raw[tmp[0]] = line_raw
+    except Exception:
+        pass
+
+    restart = False
+    for k in requires.keys():
+        if k in installed.keys():
+            if requires[k] != '' and version.parse(installed[k]) < version.parse(requires[k]):
+                subprocess.check_call([sys.executable, '-m', 'pip', 'install', requires_raw[k]])
+                if k == 'wheel':
+                    restart = True
+        else:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', k])
+            if k == 'wheel':
+                restart = True
+        if restart:
+            os.execv(sys.executable, ['python'] + sys.argv)
+            exit(1)
+
+
+def _build_installation_dependency():
+    if _check_env_flag('DEBUG'):
+        return []
+
+    install_requires = []
+    TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-linux_x86_64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
+    if IS_DARWIN:
+        TORCH_URL = 'torch=={}'.format(TORCH_VERSION)
+    else:
+        OS_VER = 'linux_x86_64'
+        if IS_WINDOWS:
+            TORCH_URL = 'torch @ https://download.pytorch.org/whl/cpu/torch-{0}%2Bcpu-cp{1}{2}-cp{1}{2}-win_amd64.whl'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor)
+            OS_VER = 'win_amd64'
+
+        try:
+            fp = urllib.request.urlopen('https://download.pytorch.org/whl/torch_stable.html', timeout=30)
+            cont_bytes = fp.read()
+            cont = cont_bytes.decode('utf8').replace('\n', '')
+            fp.close()
+
+            lines = re.split(r'<br>', cont)
+
+            for line in lines:
+                matches = re.match('<a href="(cpu\/torch-{0}.*cp{1}{2}.*{3}.*)">(.*)<\/a>'.format(TORCH_VERSION, PYTHON_VERSION.major, PYTHON_VERSION.minor, OS_VER), line)
+                if matches and len(matches.groups()) == 2:
+                    TORCH_URL = 'torch @ https://download.pytorch.org/whl/{}'.format(matches.group(2))
+                    break
+        except Exception:
+            pass
+
+    install_requires.append(TORCH_URL)
+    return install_requires
+
+
+# from https://github.com/pytorch/pytorch/blob/master/tools/setup_helpers/__init__.py
 
 def which(thefile):
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
@@ -92,16 +180,16 @@ def get_git_head_sha(base_dir):
 
 
 def get_build_version(ipex_git_sha):
-    version = os.getenv('TORCH_IPEX_VERSION', '1.10.0')
+    ipex_version = os.getenv('TORCH_IPEX_VERSION', TORCH_IPEX_VERSION)
     if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
         try:
-            version += '+' + ipex_git_sha[:7]
+            ipex_version += '+' + ipex_git_sha[:7]
         except Exception:
             pass
-    return version
+    return ipex_version
 
 
-def create_version_files(base_dir, version, ipex_git_sha, torch_git_sha, ipex_avx_version):
+def create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha, ipex_avx_version):
     def write_buffer_to_file(file_path, buffer):
         write_buffer_flag = True
         if os.path.exists(file_path):
@@ -116,22 +204,28 @@ def create_version_files(base_dir, version, ipex_git_sha, torch_git_sha, ipex_av
                 f.write(buffer)
                 f.close()
 
-    print('Building Intel Extension for PyTorch. Version: {}'.format(version))
+    print('Building Intel Extension for PyTorch. Version: {}'.format(ipex_build_version))
     py_version_path = os.path.join(base_dir, package_name, 'version.py')
     cpp_version_path = os.path.join(base_dir, short_package_name, 'csrc', 'version.cpp')
 
     py_buffer = "# Autogenerated file, do not edit!\n"
-    py_buffer += "__version__ = '{}'\n".format(version)
-    py_buffer += "__ipex_gitrev__ = '{}'\n".format(ipex_git_sha)
-    py_buffer += "__ipex_avx_version__ = '{}'\n".format(ipex_avx_version)
+    py_buffer += "__version__ = '{}'\n".format(ipex_build_version)
+    py_buffer += "__gitrev__ = '{}'\n".format(ipex_git_sha)
+    py_buffer += "__avx_version__ = '{}'\n".format(ipex_avx_version)
     py_buffer += "__torch_gitrev__ = '{}'\n".format(torch_git_sha)
+    mode_str = "release"
+    if _check_env_flag('DEBUG'):
+        mode_str = "debug"
+    py_buffer += "__mode__ = '{}'\n".format(mode_str)
 
     c_buffer = '// Autogenerated file, do not edit!\n'
     c_buffer += '#include "torch_ipex/csrc/version.h"\n\n'
     c_buffer += 'namespace torch_ipex {\n\n'
-    c_buffer += 'const std::string IPEX_GITREV = "{}";\n'.format(ipex_git_sha)
-    c_buffer += 'const std::string IPEX_AVX_VERSION = "{}";\n'.format(ipex_avx_version)
-    c_buffer += 'const std::string TORCH_GITREV = "{}";\n\n'.format(torch_git_sha)
+    c_buffer += 'const std::string __version__ = "{}";\n'.format(version)
+    c_buffer += 'const std::string __gitrev__ = "{}";\n'.format(ipex_git_sha)
+    c_buffer += 'const std::string __avx_version__ = "{}";\n'.format(ipex_avx_version)
+    c_buffer += 'const std::string __torch_gitrev__ = "{}";\n\n'.format(torch_git_sha)
+    c_buffer += 'const std::string __mode__ = "{}";\n\n'.format(mode_str)
     c_buffer += '}  // namespace torch_ipex\n'
 
     write_buffer_to_file(py_version_path, py_buffer)
@@ -294,13 +388,13 @@ class IPEXCPPLibBuild(build_clib, object):
             Path(output_lib_path).mkdir(parents=True, exist_ok=True)
 
         cmake_args = [
-            '-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
             '-DCMAKE_INSTALL_PREFIX=' + os.path.abspath(output_lib_path),
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DIPEX_AVX_VERSION=' + get_avx_version(),
+            '-DGLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
@@ -310,7 +404,7 @@ class IPEXCPPLibBuild(build_clib, object):
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
 
-        if _check_env_flag("IPEX_PROFILE_OP"):
+        if os.getenv("IPEX_PROFILE_OP", "") != "0":
             cmake_args += ['-DIPEX_PROFILE_OP=1']
 
         if _check_env_flag("USE_SYCL"):
@@ -353,7 +447,7 @@ class IPEXCPPLibBuild(build_clib, object):
             else:
                 check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
 
-class IPEXExtBuild(build_ext, object):
+class IPEXExtBuild(BuildExtension):
     def run(self):
         self.run_command('build_clib')
 
@@ -362,17 +456,14 @@ class IPEXExtBuild(build_ext, object):
         self.library_dirs.append(os.path.relpath(get_package_lib_dir()))
         super(IPEXExtBuild, self).run()
 
+# Install requirements for building
+_install_requirements()
 
 # Generate version info (ipex.__version__)
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
-version = get_build_version(ipex_git_sha)
+ipex_build_version = get_build_version(ipex_git_sha)
 ipex_avx_version = get_avx_version()
-create_version_files(base_dir, version, ipex_git_sha, torch_git_sha, ipex_avx_version)
-
-# PyTorch installed library
-IS_WINDOWS = (platform.system() == 'Windows')
-IS_DARWIN = (platform.system() == 'Darwin')
-IS_LINUX = (platform.system() == 'Linux')
+create_version_files(base_dir, ipex_build_version, ipex_git_sha, torch_git_sha, ipex_avx_version)
 
 
 def make_relative_rpath(path):
@@ -385,15 +476,13 @@ def make_relative_rpath(path):
 
 
 def pyi_module():
-    main_compile_args = ['-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI))]
     main_libraries = ['intel-ext-pt-cpu']
-    main_link_args = ['-ltorch_python']
     main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp"),
                     os.path.join("torch_ipex", "csrc", "python", "TaskModule.cpp")]
 
     include_dirs = [
-        ".",
-        os.path.join("torch_ipex", "csrc"),
+        os.path.realpath("."),
+        os.path.realpath(os.path.join("torch_ipex", "csrc")),
         os.path.join(pytorch_install_dir, "include"),
         os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
 
@@ -401,7 +490,6 @@ def pyi_module():
         "lib",
         os.path.join(pytorch_install_dir, "lib")]
 
-    extra_link_args = []
     extra_compile_args = [
         '-Wall',
         '-Wextra',
@@ -421,24 +509,25 @@ def pyi_module():
         # https://bugs.llvm.org/show_bug.cgi?id=21629
         '-Wno-missing-braces']
 
-    C_ext = Extension(
+    C_ext = CppExtension(
         "intel_extension_for_pytorch._C",
         libraries=main_libraries,
         sources=main_sources,
         language='c++',
-        extra_compile_args=main_compile_args + extra_compile_args,
+        extra_compile_args=extra_compile_args,
         include_dirs=include_dirs,
         library_dirs=library_dirs,
-        extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+        extra_link_args=[make_relative_rpath('lib')])
     return C_ext
 
 
 setup(
     name='intel_extension_for_pytorch',
-    version=version,
+    version=ipex_build_version,
     description='Intel Extension for PyTorch',
     url='https://github.com/intel/intel-extension-for-pytorch',
     author='Intel/PyTorch Dev Team',
+    install_requires=_build_installation_dependency(),
     libraries=[('intel-ext-pt-cpu', {'sources': list()})],
     packages=[
         'intel_extension_for_pytorch'],

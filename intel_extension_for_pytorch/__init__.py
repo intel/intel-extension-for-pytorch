@@ -7,7 +7,7 @@ try:
 except ImportError:
     pass  # skip if torchvision is not available
 
-from .version import __version__, __ipex_avx_version__
+from .version import __version__, __avx_version__
 
 from . import cpu
 from . import quantization
@@ -28,4 +28,4 @@ def check_avx_isa(binary_isa):
     else:
         sys.exit("The extension only supports AVX2 and AVX512 now. The binary is not a correct version.")
 
-check_avx_isa(__ipex_avx_version__)
+check_avx_isa(__avx_version__)

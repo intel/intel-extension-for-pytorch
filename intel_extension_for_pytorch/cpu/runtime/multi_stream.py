@@ -4,10 +4,15 @@ import intel_extension_for_pytorch as ipex
 from .cpupool import CPUPool
 
 class MultiStreamModule(nn.Module):
-    r"""MultiStreamModule supports multi stream throughput running method.
-        Args: `model` the input model.
-              `num_streams` how instances we want to run.
-              `cpu_pool` CPUPool type includes all the cores used to run multi stream inference.
+    r"""MultiStreamModule supports inference with multi stream throughput mode.
+        If the number of cores inside cpu_pool is divisible by num_streams, the cores will be allocated equally to each stream.
+        If the number of cores inside cpu_pool is not divisible by num_streams with remainder N, one extra core will be allocated to the first N streams.
+        Args:
+            model (torch.jit.ScriptModule or torch.nn.Module): The input model.
+            num_streams (int): The number of instances to run.
+            cpu_pool (CPUPool): A object with type CPUPool includes all the CPU cores used to run multi stream inference.
+        Returns:
+            MultiStreamModule: New created object with type of MultiStreamModule.
     """
     def __init__(self, model, num_streams: int, cpu_pool: CPUPool):
         super(MultiStreamModule, self).__init__()
@@ -15,12 +20,17 @@ class MultiStreamModule(nn.Module):
         core_list = cpu_pool.core_ids
         self.num_streams = num_streams
         self.cores_per_instance = core_list.__len__() // self.num_streams
-        assert core_list.__len__() % self.cores_per_instance == 0, "the cores number:{0} in node:{1} are not divisible by cores_per_instance:{2}".format(core_list.__len__(), node_id, cores_per_instance)
+        num_stream_allocated_extra_core = core_list.__len__() % self.num_streams
         self.tasks = []
+        start_core_list_idx = 0
+        end_core_list_idx = 0
         for j in range(self.num_streams):
-            start_core_id = core_list[j*self.cores_per_instance]
-            end_core_id = start_core_id + self.cores_per_instance
-            self.tasks.append(ipex.cpu.runtime.Task(model, ipex.cpu.runtime.CPUPool(range(start_core_id, end_core_id))))
+            if j < num_stream_allocated_extra_core:
+                end_core_list_idx += (self.cores_per_instance + 1)
+            else:
+                end_core_list_idx += self.cores_per_instance
+            self.tasks.append(ipex.cpu.runtime.Task(model, ipex.cpu.runtime.CPUPool(core_list[start_core_list_idx:end_core_list_idx])))
+            start_core_list_idx = end_core_list_idx
 
     def forward(self, inputs):
         # Ensure each instance has input offload

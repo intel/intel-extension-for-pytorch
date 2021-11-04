@@ -35,54 +35,18 @@ std::vector<int64_t> conv_input_size(
   return input_size;
 }
 
-at::Tensor convolution_transpose_impl(
+at::Tensor conv_transpose2d_kernel_impl(
     const at::Tensor& input,
-    const at::Tensor& weight,
+    const ideep::tensor& w,
     const c10::optional<at::Tensor>& bias_opt,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef output_padding,
     int64_t groups,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
-    int64_t output_channel,
-    bool weight_channels_last,
-    bool weight_prepacked) {
-  ideep::tensor w;
-  std::vector<int64_t> origin_weight_dims;
-  std::vector<int64_t> output_sizes;
-  if (weight_prepacked) {
-    origin_weight_dims.push_back(input.size(1));
-    origin_weight_dims.push_back(output_channel / groups);
-    for (auto& s : kernel_size) {
-      origin_weight_dims.push_back(s);
-    }
-
-    w = get_conv_transpose2d_packed_weight(
-        weight,
-        stride,
-        padding,
-        dilation,
-        origin_weight_dims,
-        groups,
-        weight_channels_last,
-        weight_prepacked,
-        weight_channels_last,
-        {},
-        ideep::attr_t());
-  } else {
-    for (auto& s : weight.sizes()) {
-      origin_weight_dims.push_back(s);
-    }
-
-    w = itensor_from_tensor(weight);
-    // mkldnn transposed convolution has weight in logical order of OIHW or
-    // OIDHW, while PyTorch has IOHW or IODHW, `._tranpose()` switches strides
-    // (no memory copy).
-    w.transpose_(0, 1);
-  }
-
-  output_sizes = conv_input_size(
+    at::IntArrayRef origin_weight_dims,
+    const ideep::attr_t& attr) {
+  std::vector<int64_t> output_sizes = conv_input_size(
       input.sizes(),
       origin_weight_dims,
       padding,
@@ -140,6 +104,65 @@ at::Tensor convolution_transpose_impl(
     TORCH_INTERNAL_ASSERT(y.get_desc().is_nhwc());
     return output;
   }
+}
+
+at::Tensor convolution_transpose_impl(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias_opt,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    at::IntArrayRef kernel_size,
+    int64_t output_channel,
+    bool weight_channels_last,
+    bool weight_prepacked) {
+  ideep::tensor w;
+  std::vector<int64_t> origin_weight_dims;
+  if (weight_prepacked) {
+    origin_weight_dims.push_back(input.size(1));
+    origin_weight_dims.push_back(output_channel / groups);
+    for (auto& s : kernel_size) {
+      origin_weight_dims.push_back(s);
+    }
+
+    w = get_conv_transpose2d_packed_weight(
+        weight,
+        stride,
+        padding,
+        dilation,
+        origin_weight_dims,
+        groups,
+        weight_channels_last,
+        weight_prepacked,
+        weight_channels_last,
+        {},
+        ideep::attr_t());
+  } else {
+    for (auto& s : weight.sizes()) {
+      origin_weight_dims.push_back(s);
+    }
+
+    w = itensor_from_tensor(weight);
+    // mkldnn transposed convolution has weight in logical order of OIHW or
+    // OIDHW, while PyTorch has IOHW or IODHW, `._tranpose()` switches strides
+    // (no memory copy).
+    w.transpose_(0, 1);
+  }
+
+  return conv_transpose2d_kernel_impl(
+      input,
+      w,
+      bias_opt,
+      stride,
+      padding,
+      output_padding,
+      groups,
+      dilation,
+      origin_weight_dims,
+      ideep::attr_t());
 }
 
 at::Tensor conv_transpose2d_forward(

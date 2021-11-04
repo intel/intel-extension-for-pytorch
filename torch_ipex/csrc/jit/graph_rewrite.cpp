@@ -353,22 +353,6 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   rewriter_max_pool2d.runOnGraph(graph);
 }
 
-void replaceAtenTransposeConvolutionWithIpexTransposeConv(
-    std::shared_ptr<Graph>& graph) {
-  std::string conv_transpose2d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %output_padding:int[], %groups:int, %dilation:int[]):
-        %r = aten::conv_transpose2d(%a, %w, %b, %stride, %padding, %output_padding, %groups, %dilation)
-        return (%r) )";
-  std::string ipex_conv_transpose2d = R"(
-  graph(%a, %w, %b, %stride:int[], %padding:int[], %output_padding:int[], %groups:int, %dilation:int[]):
-    %r = ipex::conv_transpose2d(%a, %w, %b, %stride, %padding, %output_padding, %groups, %dilation)
-    return (%r) )";
-  IpexSubgraphRewriter rewriter_conv_transpose2d;
-  rewriter_conv_transpose2d.RegisterRewritePattern(
-      conv_transpose2d, ipex_conv_transpose2d);
-  rewriter_conv_transpose2d.runOnGraph(graph);
-}
-
 // replace aten::softmax to ipex::softmax during jit pass
 // there is better performanc for ipex::softmax with oneDNN than aten::softmax
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {

@@ -70,11 +70,11 @@ class TestOp(JitLlgaTestCase):
             x = torch.rand(1, in_channels * g, spatial, spatial)
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-    
+
     @llga_test_env
     def test_bn2d(self):
         m = nn.BatchNorm2d(32).eval()
-        # single bn: 
+        # single bn:
         # If use the default initialization:
         # m.weight = 1, m.running_var = 1
         # m.bias = 0, m.running_mean = 0
@@ -94,7 +94,7 @@ class TestOp(JitLlgaTestCase):
         x = torch.rand(1, 32, 28, 28)
         graph, _ = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-    
+
     @llga_test_env
     def test_eltwise(self):
         class M(nn.Module):
@@ -111,7 +111,7 @@ class TestOp(JitLlgaTestCase):
             x = torch.rand(1, 32, 28, 28)
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-    
+
     @llga_test_env
     def test_max_pool2d(self):
         for [
@@ -138,7 +138,7 @@ class TestOp(JitLlgaTestCase):
             x = torch.rand(1, 4, spatial, spatial)
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-    
+
     @llga_test_env
     def test_avg_pool2d(self):
         for [
@@ -191,7 +191,7 @@ class TestOp(JitLlgaTestCase):
             x = torch.rand(8, 12, 12, 12)
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-    
+
     @llga_test_env
     def test_linear(self):
         for bias in [True, False]:
@@ -222,7 +222,7 @@ class TestOp(JitLlgaTestCase):
         for x, y in self._gen_binary_inputs():
             graph, _ = self.checkTrace(forward_add, [x, y])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-    
+
     @llga_test_env
     def test_add_scalar(self):
         def add_scalar(x):
@@ -231,7 +231,7 @@ class TestOp(JitLlgaTestCase):
         x = torch.rand(32, 32)
         graph, _ = self.checkTrace(add_scalar, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-    
+
     @llga_test_env
     @unittest.skipIf(True, 'Disable mul due to bad performance')
     def test_mul(self):
@@ -241,7 +241,7 @@ class TestOp(JitLlgaTestCase):
         for x, y in self._gen_binary_inputs():
             graph, _ = self.checkTrace(forward_mul, [x, y])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-    
+
     @llga_test_env
     def test_identity_binary(self):
         def forward(x):
@@ -269,7 +269,7 @@ class TestOp(JitLlgaTestCase):
         x = torch.randn(2, 5, 10, 10)
         graph, _ = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-    
+
     @llga_test_env
     @unittest.skipIf(True, 'Enable once cat is supported')
     def test_cat(self):
@@ -315,7 +315,7 @@ class TestOp(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::matmul'])
-    
+
     @llga_test_env
     def test_to(self):
         class M(nn.Module):
@@ -379,7 +379,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::' + eltwise_fn_name])
                 # test if relu is fused into the fusion group
                 self.assertFused(graph, ['aten::' + eltwise])
-    
+
     @llga_test_env
     def test_conv2d_bn(self):
         class M(nn.Module):
@@ -398,7 +398,7 @@ class TestFusionPattern(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::_convolution', 'aten::batch_norm'])
-    
+
     @llga_test_env
     def test_conv2d_bn_relu(self):
         class M(nn.Module):
@@ -419,7 +419,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::_convolution', 'aten::batch_norm',
                                  'aten::relu'])
-    
+
     @llga_test_env
     def test_bn2d_eltwise(self):
         class M(nn.Module):
@@ -440,7 +440,7 @@ class TestFusionPattern(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
             self.assertFused(graph, ['aten::' + eltwise])
-    
+
     @llga_test_env
     def test_linear_eltwise(self):
         class M(nn.Module):
@@ -502,7 +502,7 @@ class TestFusionPattern(JitLlgaTestCase):
             y = torch.rand(1, 32, 16, 16, requires_grad=False)
             graph, _ = self.checkTrace(m, [x, y])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
-    
+
     @llga_test_env
     def test_wildcard(self):
         class M(nn.Module):
@@ -518,11 +518,11 @@ class TestFusionPattern(JitLlgaTestCase):
 
         # The pattern is as the following:
         #      conv
-        #     |    \    
+        #     |    \
         # eltwise   \
         #    |       \
         #  ListConstruct
-        # 
+        #
         # The output of conv is used by a wildcard op: ListConstruct.
         # Thus conv-eltwise cannot be selected into the same Partition.
         m = M()
@@ -533,6 +533,7 @@ class TestFusionPattern(JitLlgaTestCase):
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
+    @llga_test_env
     def _test_vision(self, model_name):
         m = getattr(torchvision.models, model_name)().eval()
         x = torch.rand(1, 3, 224, 224) / 10
