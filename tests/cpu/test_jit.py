@@ -506,6 +506,22 @@ class AtenSoftmaxRepalce(nn.Module):
     def forward(self, x):
         return self.softmax(x)
 
+class AddLayerNorm(torch.nn.Module):
+    def __init__(self, dim=32):
+        super(AddLayerNorm, self).__init__()
+        self.layernorm = torch.nn.LayerNorm(dim)
+    def forward(self, x, y):
+        x = torch.add(x,y)
+        return self.layernorm(x)
+
+class AddLayerNorm_v1(torch.nn.Module):
+    def __init__(self, dim=32):
+        super(AddLayerNorm_v1, self).__init__()
+        self.layernorm = torch.nn.LayerNorm(dim)
+    def forward(self, x, y, z):
+        x = x + y + z
+        return self.layernorm(x)
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, levels=['O0','O1']):
@@ -541,7 +557,6 @@ class Tester(TestCase):
                 # conv relu fusion, conv sum fusion or conv sum relu fusion
                 trace_graph = trace_fused_model.graph_for(x)
                 fused_tresult = trace_fused_model(x)
-
             self.assertEqual(result, fused_tresult)
 
             # check if the fused node exists in the graph
@@ -616,6 +631,43 @@ class Tester(TestCase):
         self.assertTrue(all(n.kind() != node for n in freeze_graph.nodes()))
         #  prepack op need note in none freeze model
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+    
+    def test_add_layernorm(self):
+        bs = 56
+        seq_len = 384
+        dim = 768
+        a = torch.randn(bs, seq_len, dim)
+        b = torch.randn(bs, seq_len, dim)
+        model = AddLayerNorm(dim)
+        jit_model = torch.jit.trace(model,(a, b))
+        trace_graph = jit_model.graph_for(a, b)
+        jit_res = jit_model(a, b)
+        ori_res = model(a, b)
+        self.assertEqual(jit_res, ori_res)
+        node = "ipex::add_layernorm"
+        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+        
+        a_bf16 = a.to(torch.bfloat16)
+        b_bf16 = b.to(torch.bfloat16)
+        with torch.cpu.amp.autocast():
+            ori_res = model(a_bf16, b_bf16)
+            model_jit = jit_model = torch.jit.trace(model,(a, b))
+            trace_graph = jit_model.graph_for(a, b)
+            jit_res = jit_model(a_bf16, b_bf16)
+            node = "ipex::add_layernorm"
+            self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+            self.assertEqual(jit_res, ori_res, prec=5e-2)
+
+        model = AddLayerNorm_v1(dim)
+        c = torch.randn(bs, seq_len, dim)
+        jit_model = torch.jit.trace(model,(a, b, c))
+        trace_graph = jit_model.graph_for(a, b, c)
+        jit_res = jit_model(a, b, c)
+        ori_res = model(a, b, c)
+        self.assertEqual(jit_res, ori_res)
+        node = "ipex::add_layernorm"
+        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+
 
     def test_mha_scores_calculation(self):
         def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):

@@ -310,6 +310,21 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
   rewriter_shuffle_2d.runOnGraph(graph);
 }
 
+void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
+  std::string aten_add_layernorm = R"(
+      graph(%add_a, %add_b, %alpha, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
+        %s = aten::add(%add_a, %add_b, %alpha)
+        %r = aten::layer_norm(%s, %shape, %w, %b, %eps, %cudnn_enable)
+        return (%r) )";
+  std::string fused_add_layernorm = R"(
+      graph(%add_a, %add_b, %alpha, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
+        %r = ipex::add_layernorm(%add_a, %add_b, %alpha, %shape, %w, %b, %eps, %cudnn_enable)
+        return (%r) )";
+  SubgraphRewriter rewriter_aten;
+  rewriter_aten.RegisterRewritePattern(aten_add_layernorm, fused_add_layernorm);
+  rewriter_aten.runOnGraph(graph);
+}
+
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
   std::string div_matmul_add_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):

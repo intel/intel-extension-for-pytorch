@@ -318,6 +318,8 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   graph_rewrite::fuseLinearWithEltwise(graph);
   graph_rewrite::fuseLinearAddRelu(graph);
 
+  // fuse add+layernorm
+  graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
   graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
 

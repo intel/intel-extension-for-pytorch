@@ -24,7 +24,6 @@ c10::optional<IValue> getIValue(
     const std::unordered_map<std::string, Value*>& vmap);
 
 void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
-
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
@@ -41,6 +40,8 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
 void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph);
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
+
+void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTranspose2dOp(std::shared_ptr<Graph>& graph);
 

@@ -88,6 +88,16 @@ class AtenIpexJITDev {
                                  at::IntArrayRef view_shape, int64_t dim0,
                                  int64_t dim1);
 
+   static at::Tensor dil_add_layernorm(
+       const at::Tensor& input,
+       const at::Tensor& b,
+       int alpha,
+       at::IntArrayRef normalized_shape,
+       const c10::optional<at::Tensor>& weight_opt,
+       const c10::optional<at::Tensor>& bias_opt,
+       float eps,
+       bool cuda_enable);
+
    // int8 op
    static at::Tensor dil_qembeddingbag(
        const at::Tensor weight,
