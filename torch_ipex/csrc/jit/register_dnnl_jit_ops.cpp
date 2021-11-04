@@ -469,6 +469,27 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::add_layernorm(Tensor a, Tensor b, int alpha, int[] normalized_shape, Tensor ? "
+        "weight_opt, Tensor ? bias_opt, float eps, bool cuda_enable) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = AtenIpexJITDev::dil_add_layernorm(
+                (std::move(peek(stack, 0, 8))).toTensor(),
+                (std::move(peek(stack, 1, 8))).toTensor(),
+                (std::move(peek(stack, 2, 8))).toInt(),
+                (std::move(peek(stack, 3, 8))).toIntVector(),
+                toOptionalTensor(std::move(peek(stack, 4, 8))),
+                toOptionalTensor(std::move(peek(stack, 5, 8))),
+                (std::move(peek(stack, 6, 8))).toDouble(),
+                (std::move(peek(stack, 7, 8))).toBool());
+            drop(stack, 8);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 
 });
 } // namespace jit
