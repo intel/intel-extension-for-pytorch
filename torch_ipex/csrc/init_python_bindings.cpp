@@ -271,6 +271,16 @@ void InitIpexModuleBindings(py::module m) {
         py::cast<std::vector<int32_t>>(core_list));
     return;
   });
+  m.def("get_current_cpu_pool", []() {
+    return std::make_shared<torch_ipex::runtime::CPUPool>(
+        torch_ipex::runtime::get_cpu_pool_from_mask_affinity());
+  });
+  m.def(
+      "set_cpu_pool",
+      [](std::shared_ptr<torch_ipex::runtime::CPUPool> cpu_pool) {
+        torch_ipex::runtime::set_mask_affinity_from_cpu_pool((*cpu_pool));
+        return;
+      });
 }
 }  // namespace
 using namespace torch::jit;

@@ -39,10 +39,11 @@ class pin(object):
 
     def __enter__(self):
         assert type(self.cpu_pool) is CPUPool
+        self.previous_cpu_pool = ipex._C.get_current_cpu_pool()
         ipex._C.pin_cpu_cores(self.cpu_pool.core_ids)
 
     def __exit__(self, *args):
-        pass
+        ipex._C.set_cpu_pool(self.previous_cpu_pool)
 
     # Support decorator
     def __call__(self, func):

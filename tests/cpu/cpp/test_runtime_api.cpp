@@ -13,13 +13,33 @@ TEST(TestRuntimeAPI, TestMainThreadCoreBind) {
         << "Skip TestRuntimeAPI::TestMainThreadCoreBind. Didn't preload IOMP.";
   }
   at::Tensor input_tensor = at::rand({100, 8276});
-  // Get the reference result
+  // Get the reference result.
   auto res_ref = at::softmax(input_tensor, -1);
-  // Ping CPU Cores
+  // Get current cpu_pool information.
+  torch_ipex::runtime::CPUPool previous_cpu_pool =
+      torch_ipex::runtime::get_cpu_pool_from_mask_affinity();
+  // Ping CPU Cores.
   std::vector<int32_t> cpu_core_list({0});
   torch_ipex::runtime::_pin_cpu_cores(cpu_core_list);
   auto res = at::softmax(input_tensor, -1);
   ASSERT_VARIABLE_EQ(res, res_ref);
+  // restore the cpu pool information.
+  torch_ipex::runtime::set_mask_affinity_from_cpu_pool(previous_cpu_pool);
+}
+
+TEST(TestRuntimeAPI, TestWithCPUPool) {
+  if (!torch_ipex::runtime::is_runtime_ext_enabled()) {
+    GTEST_SKIP()
+        << "Skip TestRuntimeAPI::TestWithCPUPool. Didn't preload IOMP.";
+  }
+  at::Tensor input_tensor = at::rand({100, 8276});
+  std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
+  {
+    torch_ipex::runtime::WithCPUPool with_cpu_pool(std::move(cpu_pool));
+    auto res = at::softmax(input_tensor, -1);
+  }
+  auto res_ = at::softmax(input_tensor, -1);
 }
 
 TEST(TestRuntimeTaskAPI, TestNativeTorchOperation) {
