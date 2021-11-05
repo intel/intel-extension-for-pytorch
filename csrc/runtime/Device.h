@@ -8,7 +8,7 @@
 namespace xpu {
 namespace dpcpp {
 
-using DeviceId = int16_t;
+using DeviceId = at::DeviceIndex;
 
 int dpcppGetDeviceCount(int* deviceCount);
 
