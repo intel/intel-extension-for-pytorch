@@ -105,7 +105,8 @@ static inline void mvlgamma_check(const Tensor& self, int64_t p) {
 Tensor mvlgamma(const Tensor& self, int64_t p) {
 #ifdef USE_ONEMKL
   mvlgamma_check(self, p);
-  Tensor args = native::arange(-p / 2. + 0.5, 0.5, 0.5, self.options());
+  Tensor range = at::empty({0}, self.options());
+  Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
   args = args.add(self.unsqueeze(-1));
 
   return args.lgamma_().sum(-1).add_(p * (p - 1) * std::log(M_PI) / 4.);
@@ -117,7 +118,8 @@ Tensor mvlgamma(const Tensor& self, int64_t p) {
 Tensor& mvlgamma_(Tensor& self, int64_t p) {
 #ifdef USE_ONEMKL
   mvlgamma_check(self, p);
-  Tensor args = native::arange(-p / 2. + 0.5, 0.5, 0.5, self.options());
+  Tensor range = at::empty({0}, self.options());
+  Tensor args = at::arange_out(range, -p / 2. + 0.5, 0.5, 0.5);
   args = args.add(self.unsqueeze(-1));
 
   return self.copy_(
