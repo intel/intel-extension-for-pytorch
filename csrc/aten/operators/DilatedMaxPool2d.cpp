@@ -73,6 +73,7 @@ void max_pool2d_with_indices_out_template(
   const auto outputWidth = pooling_output_shape<int64_t>(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
+  auto memory_format = input_.suggest_memory_format();
   pool2d_shape_check(
       input_,
       kH,
@@ -87,7 +88,8 @@ void max_pool2d_with_indices_out_template(
       inputHeight,
       inputWidth,
       outputHeight,
-      outputWidth);
+      outputWidth,
+      memory_format);
 
   /* get contiguous input */
   Tensor input = input_;
@@ -198,6 +200,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const auto outputWidth_for_shape_check = pooling_output_shape<int64_t>(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
+  auto memory_format = input_.suggest_memory_format();
   max_pool2d_backward_shape_check(
       input,
       gradOutput_,
@@ -215,7 +218,8 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       inputHeight,
       inputWidth,
       outputHeight_for_shape_check,
-      outputWidth_for_shape_check);
+      outputWidth_for_shape_check,
+      memory_format);
 
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,

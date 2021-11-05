@@ -65,6 +65,7 @@ void avg_pool2d_out_template(
   const auto outputWidth =
       pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, 1, ceil_mode);
 
+  auto memory_format = input_.suggest_memory_format();
   pool2d_shape_check(
       input_,
       kH,
@@ -79,7 +80,8 @@ void avg_pool2d_out_template(
       inputHeight,
       inputWidth,
       outputHeight,
-      outputWidth);
+      outputWidth,
+      memory_format);
 
   Tensor input = input_;
   if (is_smf_channels_last(input_)) {
@@ -194,6 +196,7 @@ Tensor& avg_pool2d_backward_out_template(
   const auto outputHeight =
       pooling_output_shape<int64_t>(inputHeight, kH, padH, dH, 1, ceil_mode);
 
+  auto memory_format = input.suggest_memory_format();
   avg_pool2d_backward_shape_check(
       input,
       gradOutput_,
@@ -208,7 +211,8 @@ Tensor& avg_pool2d_backward_out_template(
       inputHeight,
       inputWidth,
       outputHeight,
-      outputWidth);
+      outputWidth,
+      memory_format);
 
   if (count_include_pad) {
     ::xpu::oneDNN::pooling_backward<
