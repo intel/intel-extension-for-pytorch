@@ -34,6 +34,7 @@ option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
 option(BUILD_SEPARATE_OPS "Build each operator in separate library" ON)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
+option(USE_HOOKS "Use XPU Hooks in build. Should turn off it for 1.10 rebase" OFF)
 
 if (BUILD_STATS)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")
@@ -125,6 +126,7 @@ function (print_configuration_summary)
 
     message(STATUS "  BUILD_NO_CLANGFORMAT  : ${BUILD_NO_CLANGFORMAT}")
     message(STATUS "  BUILD_SEPARATE_OPS    : ${BUILD_SEPARATE_OPS}")
+    message(STATUS "  USE_HOOKS             : ${USE_HOOKS}")
 
     message(STATUS "")
 endfunction()
