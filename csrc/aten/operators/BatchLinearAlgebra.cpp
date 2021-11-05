@@ -1310,7 +1310,7 @@ std::tuple<Tensor, Tensor> triangular_solve(
   Tensor self_broadcasted, A_broadcasted;
   std::tie(self_broadcasted, A_broadcasted) =
       native::_linalg_broadcast_batch_dims(self, A, "triangular_solve");
-  return at::_triangular_solve_helper(
+  return at::AtenIpexTypeXPU::_triangular_solve_helper(
       self_broadcasted, A_broadcasted, upper, transpose, unitriangular);
 }
 
@@ -1324,7 +1324,8 @@ std::tuple<Tensor&, Tensor&> triangular_solve_out(
     bool unitriangular) {
   Tensor result_tmp, clone_A_tmp;
   std::tie(result_tmp, clone_A_tmp) =
-      at::_triangular_solve_helper(self, A, upper, transpose, unitriangular);
+      at::AtenIpexTypeXPU::_triangular_solve_helper(
+          self, A, upper, transpose, unitriangular);
   result.resize_as_(result_tmp).copy_(result_tmp);
   clone_A.resize_as_(clone_A_tmp).copy_(clone_A_tmp);
   return std::tuple<Tensor&, Tensor&>(result, clone_A);
