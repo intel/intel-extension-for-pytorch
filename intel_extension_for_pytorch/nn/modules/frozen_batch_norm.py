@@ -5,14 +5,22 @@ class FrozenBatchNorm2d(nn.Module):
     """
     BatchNorm2d where the batch statistics and the affine parameters
     are fixed
+
+    Args:
+        num_features: :math:`C` from an expected input of size
+            :math:`(N, C, H, W)`
+
+    Shape:
+        - Input: :math:`(N, C, H, W)`
+        - Output: :math:`(N, C, H, W)` (same shape as input)
     """
 
-    def __init__(self, n):
+    def __init__(self, num_features):
         super(FrozenBatchNorm2d, self).__init__()
-        self.register_buffer("weight", torch.ones(n))
-        self.register_buffer("bias", torch.zeros(n))
-        self.register_buffer("running_mean", torch.zeros(n))
-        self.register_buffer("running_var", torch.ones(n))
+        self.register_buffer("weight", torch.ones(num_features))
+        self.register_buffer("bias", torch.zeros(num_features))
+        self.register_buffer("running_mean", torch.zeros(num_features))
+        self.register_buffer("running_var", torch.ones(num_features))
 
-    def forward(self, x):
-        return torch.ops.torch_ipex.frozen_batch_norm(x, self.weight, self.bias, self.running_mean, self.running_var)
+    def forward(self, input):
+        return torch.ops.torch_ipex.frozen_batch_norm(input, self.weight, self.bias, self.running_mean, self.running_var)
