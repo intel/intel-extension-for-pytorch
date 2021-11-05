@@ -147,7 +147,7 @@ Tensor bincount_template(
     TORCH_CHECK(0, "minlength should be >= 0");
   }
   if (self.dim() == 1 && self.numel() == 0) {
-    return native::zeros({minlength}, device(kXPU).dtype(kLong));
+    return at::zeros({minlength}, device(kXPU).dtype(kLong));
   }
   if (self.dim() != 1 ||
       (!std::is_same<input_t, uint8_t>::value &&
@@ -167,11 +167,11 @@ Tensor bincount_template(
   // alloc output counter on GPU
   Tensor output;
   if (has_weights) {
-    output = native::zeros({nbins}, weights.options());
+    output = at::zeros({nbins}, weights.options());
     auto ret = dpcpp_tensor_histogram<weights_t, input_t, true>(
         output, self, weights, nbins, minvalue, maxvalue);
   } else {
-    output = native::zeros({nbins}, device(DeviceType::XPU).dtype(kLong));
+    output = at::zeros({nbins}, device(DeviceType::XPU).dtype(kLong));
     auto ret = dpcpp_tensor_histogram<
         typename c10::impl::ScalarTypeToCPPType<kLong>::type,
         input_t,
