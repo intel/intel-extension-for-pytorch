@@ -77,7 +77,7 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
     TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
     IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
     IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
+    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf, skipIfSpecificVersions
 
 device = 'cpu:0'
 SIZE = 100
@@ -775,7 +775,7 @@ class Tester(TestCase):
             ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex_prepack::convolution_swish_run",
-            prec=0.02)
+            prec=0.05)
         self._test_output(
             ConvSiluOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -793,7 +793,7 @@ class Tester(TestCase):
             ConvSiluInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex_prepack::convolution_swish_run",
-            prec=0.02)
+            prec=0.05)
         self._test_output(
             ConvSigmoidOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -820,7 +820,7 @@ class Tester(TestCase):
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex_prepack::convolution_hardtanh_run",
-            prec=0.02)
+            prec=0.05)
         self._test_output(
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -829,7 +829,7 @@ class Tester(TestCase):
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex_prepack::convolution_hardtanh_run",
-            prec=0.02)
+            prec=0.05)
         self._test_output(
             ConvElu(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),

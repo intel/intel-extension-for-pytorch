@@ -37,7 +37,7 @@ class LayerNormTester(TestCase):
             y2_bf16 = trace_model(x)
             self.assertEqual(y1_bf16.dtype, torch.bfloat16)
             self.assertEqual(y2_bf16.dtype, torch.bfloat16)
-            self.assertEqual(y1_bf16, y2_bf16)
+            self.assertEqual(y1_bf16, y2_bf16, prec=0.03)
 
             # layernorm input is fp32
             model = M2().eval()

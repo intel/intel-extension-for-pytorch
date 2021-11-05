@@ -3,7 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
-from common_utils import TestCase
+from common_utils import TestCase, skipIfSpecificVersions
 import time
 import sys
 import itertools
@@ -59,9 +59,10 @@ class TestFunction(TestCase):
 class TestAutocastWithJit(TestCase):
     def setUp(self):
         super(TestAutocastWithJit, self).setUp()
+        self.bn_conv_bn_model = BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1)
+        self.bn_conv_bn_input = torch.randn(32, 3, 64, 64)
         self.models = [
             Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1),
-            BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
@@ -70,9 +71,25 @@ class TestAutocastWithJit(TestCase):
             Linear_Reshape_Bn(2, 32, 32, (1, 1, 64, 16), bias=True)]
         self.inputs = [
             torch.randn(32, 3, 64, 64), torch.randn(32, 3, 64, 64),
-            torch.randn(32, 3, 64, 64), torch.randn(32, 3, 32, 32, 32),
-            torch.randn(32, 3, 64, 64), torch.rand(32, 3, 64, 64),
-            torch.rand(1, 1, 32, 32), torch.rand(1, 1, 32, 32)]
+            torch.randn(32, 3, 32, 32, 32), torch.randn(32, 3, 64, 64),
+            torch.rand(32, 3, 64, 64), torch.rand(1, 1, 32, 32),
+            torch.rand(1, 1, 32, 32)]
+
+    # will fail with PyTorch release 1.10
+    @skipIfSpecificVersions
+    def test_batchnorm_conv_batchnorm_jit_trace_model(self):
+        def test_autocast_jit_trace_model(model, x, channels_last:bool):
+            model.eval()
+            ipex.core.disable_jit_opt()
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+                traced_model = torch.jit.trace(model, x.to(memory_format=torch.channels_last)) if channels_last else torch.jit.trace(model, x)
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+                y = traced_model(x.clone().to(memory_format=torch.channels_last)) if channels_last else traced_model(x.clone())
+                y2 = model(x.clone().to(memory_format=torch.channels_last)) if channels_last else model(x.clone())
+            ipex.core.enable_jit_opt()
+            torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
+        test_autocast_jit_trace_model(self.bn_conv_bn_model, self.bn_conv_bn_input, False)
+        test_autocast_jit_trace_model(self.bn_conv_bn_model, self.bn_conv_bn_input, True)
 
     def test_generate_autocast_jit_trace_model(self):
         def test_generate_autocast_jit_trace_model(model, x):

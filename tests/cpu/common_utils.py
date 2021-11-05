@@ -320,6 +320,15 @@ def skipIfNoLapack(fn):
             fn(*args, **kwargs)
     return wrapper
 
+def skipIfSpecificVersions(fn):
+    import re
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if re.findall('[\d+\.\d]*',torch.__version__)[0] in ['1.10.0',]:
+            raise unittest.SkipTest('PyTorch 1.10.0')
+        else:
+            fn(*args, **kwargs)
+    return wrapper
 
 def skipIfNotRegistered(op_name, message):
     """Wraps the decorator to hide the import of the `core`.
