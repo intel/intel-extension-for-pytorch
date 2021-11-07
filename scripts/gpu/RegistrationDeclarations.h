@@ -1038,9 +1038,9 @@ Tensor renorm(const Tensor & self, Scalar p, int64_t dim, Scalar maxnorm); // at
 Tensor & renorm_(Tensor & self, Scalar p, int64_t dim, Scalar maxnorm); // aten::renorm_(Tensor(a!) self, Scalar p, int dim, Scalar maxnorm) -> Tensor(a!)
 Tensor & renorm_out(Tensor & out, const Tensor & self, Scalar p, int64_t dim, Scalar maxnorm); // aten::renorm.out(Tensor self, Scalar p, int dim, Scalar maxnorm, *, Tensor(a!) out) -> Tensor(a!)
 Tensor repeat(const Tensor & self, IntArrayRef repeats); // aten::repeat(Tensor self, int[] repeats) -> Tensor
-Tensor repeat_interleave(const Tensor & repeats); // aten::repeat_interleave.Tensor(Tensor repeats) -> Tensor
-Tensor repeat_interleave(const Tensor & self, const Tensor & repeats, c10::optional<int64_t> dim); // aten::repeat_interleave.self_Tensor(Tensor self, Tensor repeats, int? dim=None) -> Tensor
-Tensor repeat_interleave(const Tensor & self, int64_t repeats, c10::optional<int64_t> dim); // aten::repeat_interleave.self_int(Tensor self, int repeats, int? dim=None) -> Tensor
+Tensor repeat_interleave(const Tensor & repeats, c10::optional<int64_t> output_size); // aten::repeat_interleave.Tensor(Tensor repeats, ? output_size=None) -> Tensor
+Tensor repeat_interleave(const Tensor & self, const Tensor & repeats, c10::optional<int64_t> dim, c10::optional<int64_t> output_size); // aten::repeat_interleave.self_Tensor(Tensor self, Tensor repeats, int? dim=None, int? output_size=None) -> Tensor
+Tensor repeat_interleave(const Tensor & self, int64_t repeats, c10::optional<int64_t> dim, c10::optional<int64_t> output_size); // aten::repeat_interleave.self_int(Tensor self, int repeats, int? dim=None, int? output_size=None) -> Tensor
 Tensor replication_pad1d(const Tensor & self, IntArrayRef padding); // aten::replication_pad1d(Tensor self, int[2] padding) -> Tensor
 Tensor replication_pad1d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::replication_pad1d_backward(Tensor grad_output, Tensor self, int[2] padding) -> Tensor
 Tensor & replication_pad1d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::replication_pad1d_backward.grad_input(Tensor grad_output, Tensor self, int[2] padding, *, Tensor(a!) grad_input) -> Tensor(a!)

@@ -57,8 +57,13 @@ static void repeat_interleave_dpcpp_kernel(
 
 } // namespace impl
 
-Tensor repeat_interleave(const Tensor& repeat) {
-  return repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);
+template <typename index_t>
+Tensor repeat_interleave(
+    const Tensor& repeat,
+    c10::optional<int64_t> output_size) {
+  return repeat_interleave_common<
+      index_t,
+      impl::repeat_interleave_dpcpp_kernel>(repeat, output_size);
 }
 
 } // namespace AtenIpexTypeXPU
