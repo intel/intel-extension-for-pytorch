@@ -80,13 +80,13 @@ class TestAutocastWithJit(TestCase):
     def test_batchnorm_conv_batchnorm_jit_trace_model(self):
         def test_autocast_jit_trace_model(model, x, channels_last:bool):
             model.eval()
-            ipex.core.disable_jit_opt()
+            ipex._C.disable_jit_opt()
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x.to(memory_format=torch.channels_last)) if channels_last else torch.jit.trace(model, x)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone().to(memory_format=torch.channels_last)) if channels_last else traced_model(x.clone())
                 y2 = model(x.clone().to(memory_format=torch.channels_last)) if channels_last else model(x.clone())
-            ipex.core.enable_jit_opt()
+            ipex._C.enable_jit_opt()
             torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
         test_autocast_jit_trace_model(self.bn_conv_bn_model, self.bn_conv_bn_input, False)
         test_autocast_jit_trace_model(self.bn_conv_bn_model, self.bn_conv_bn_input, True)
