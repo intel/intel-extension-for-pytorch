@@ -435,17 +435,18 @@ class IPEXCPPLibBuild(build_clib, object):
         else:
             check_call(['make'] + build_args, cwd=build_type_dir, env=env)
 
-        if _check_env_flag("ENABLE_CPP_TEST"):
-            cpp_test_dir = get_cpp_test_dir()
-            cpp_test_build_dir = get_cpp_test_build_dir()
-            if not os.path.exists(cpp_test_build_dir):
-                Path(cpp_test_build_dir).mkdir(parents=True, exist_ok=True)
-            cmake_args += ['-DPROJECT_DIR=' + project_dir]
-            check_call([self.cmake, cpp_test_dir] + cmake_args, cwd=cpp_test_build_dir, env=env)
-            if use_ninja:
-                check_call(['ninja'] + build_args, cwd=cpp_test_build_dir, env=env)
-            else:
-                check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
+        # Build the CPP UT
+        cpp_test_dir = get_cpp_test_dir()
+        cpp_test_build_dir = get_cpp_test_build_dir()
+        if not os.path.exists(cpp_test_build_dir):
+            Path(cpp_test_build_dir).mkdir(parents=True, exist_ok=True)
+        cmake_args += ['-DPROJECT_DIR=' + project_dir]
+        cmake_args += ['-DCPP_TEST_BUILD_DIR=' + cpp_test_build_dir]
+        check_call([self.cmake, cpp_test_dir] + cmake_args, cwd=cpp_test_build_dir, env=env)
+        if use_ninja:
+            check_call(['ninja'] + build_args, cwd=cpp_test_build_dir, env=env)
+        else:
+            check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
 
 class IPEXExtBuild(BuildExtension):
     def run(self):
