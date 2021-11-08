@@ -9,9 +9,9 @@ The configurations are mainly around the following perspectives. Italic values a
 
 # Usage of launch script
 
-The *launch* script is provided as a module of torch_ipex. You can take advantage of it with the following command:
+The *launch* script is provided as a module of *intel_extension_for_pytorch*. You can take advantage of it with the following command:
 ```
-python -m torch_ipex.launch [knobs] <your_pytorch_script> [args]
+python -m intel_extension_for_pytorch.launch [knobs] <your_pytorch_script> [args]
 ```
 
 Available knobs are listed below:
@@ -73,7 +73,7 @@ __Note:__ GIF files below intend to show CPU usage ONLY. Please do NOT induct pe
 ### I. Use all physical cores
 
 ```
-python -m torch_ipex.launch --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched physical core number of threads on all physical cores.
@@ -106,7 +106,7 @@ $ cat logs/run_20210712212258_instances.log
 ### II. Use all cores including logical cores
 
 ```
-python -m torch_ipex.launch --use_logical_core --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --use_logical_core --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all cores, including logical cores.
@@ -139,7 +139,7 @@ $ cat logs/run_20210712223308_instances.log
 ### III. Use physical cores on 1 socket
 
 ```
-python -m torch_ipex.launch --socket_id 1 --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --socket_id 1 --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same socket.
@@ -172,7 +172,7 @@ $ cat logs/run_20210712214504_instances.log
 ### IV. Use your designated number of cores
 
 ```
-python -m torch_ipex.launch --ninstances 1 --ncore_per_instance 10 --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --ninstances 1 --ncore_per_instance 10 --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on other 9 physical cores.
@@ -206,7 +206,7 @@ $ cat logs/run_20210712220928_instances.log
 ### V. Throughput mode
 
 ```
-python -m torch_ipex.launch --throughput_mode --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --throughput_mode --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 2 main worker threads were launched on 2 socket respectively, then they launched threads on other physical cores.
@@ -240,7 +240,7 @@ $ cat logs/run_20210712221150_instances.log
 ### VI. Latency mode
 
 ```
-python -m torch_ipex.launch --latency_mode --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --latency_mode --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 4 cores are used for each instance.
@@ -293,7 +293,7 @@ $ cat logs/run_20210712221415_instances.log
 ### VII. Your designated number of instances
 
 ```
-python -m torch_ipex.launch --ninstances 4 --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --ninstances 4 --log_path ./logs launch_example.py
 ```
 
 CPU usage is shown as below. 4 main worker thread were launched, then they launched threads on all other physical cores.
@@ -337,7 +337,7 @@ Memory allocator influences performance sometime. If users do not designate desi
 __Note:__ You can set your favorite value to *MALLOC_CONF* before running the *launch* script if you do not want to use its default setting.
 
 ```
-python -m torch_ipex.launch --enable_jemalloc --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --enable_jemalloc --log_path ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -357,7 +357,7 @@ you can confirm usage in log file:
 ### TCMalloc
 
 ```
-python -m torch_ipex.launch --enable_tcmalloc --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --enable_tcmalloc --log_path ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -376,7 +376,7 @@ you can confirm usage in log file:
 ### Default memory allocator
 
 ```
-python -m torch_ipex.launch --use_default_allocator --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --use_default_allocator --log_path ./logs launch_example.py
 ```
 
 you can confirm usage in log file:
@@ -402,7 +402,7 @@ Generally, Intel OpenMP library brings better performance. Thus, in the *launch*
 It is, however, not always that Intel OpenMP library brings better performance comparing to GNU OpenMP library. In this case, you can use knob ```--disable_iomp``` to switch active OpenMP library to the GNU one.
 
 ```
-python -m torch_ipex.launch --disable_iomp --log_dir ./logs launch_example.py
+python -m intel_extension_for_pytorch.launch --disable_iomp --log_path ./logs launch_example.py
 ```
 
 you can confirm usage in log file:

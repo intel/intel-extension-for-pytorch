@@ -251,7 +251,7 @@ class Launcher():
                                .format("JeMalloc", "jemalloc", expanduser("~")))
             else:
                 logger.info("Use JeMallocl memory allocator")
-                self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000")
+                self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto")
 
         elif use_default_allocator:
             pass
