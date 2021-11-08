@@ -9,6 +9,7 @@
 #include "jit/codegen/onednn/prepare_binary.h"
 #include "jit/codegen/onednn/prepare_dequant.h"
 #include "jit/codegen/onednn/quantization_patterns.h"
+#include "jit/codegen/onednn/revert_constant_propagation_on_weight.h"
 
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/common_subexpression_elimination.h>
@@ -62,7 +63,20 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
     PrepareDequantForLLGA(g);
     GRAPH_DUMP("After PrepareDequantForLLGA. Before DeferSizeCheck", g);
     DeferSizeCheck(g);
-    GRAPH_DUMP("After DeferSizeCheck. Before CreateLlgaSubgraphs", g);
+    GRAPH_DUMP(
+        "After DeferSizeCheck. Before RevertConstantPropagationOnWeight", g);
+
+    // TODO: this is a workaround due to lack of
+    // https://github.com/pytorch/pytorch/pull/63991 in PyTorch 1.10. With
+    // PyTorch 1.10, constant_fp32_weight -> quant -> dequant will be folded to
+    // constant_fp32_weight. This pass will transform constant_fp32_weight back
+    // to be constant_int8_weight -> dequant Remove this pass once 63991 is
+    // landed in PyTorch 1.10.1
+    RevertConstantPropagationOnWeight(g);
+    GRAPH_DUMP(
+        "After RevertConstantPropagationOnWeight. Before CreateLlgaSubgraphs",
+        g);
+
     // CreateLlgaSubgraphs must be placed after all the preparation passes above
     CreateLlgaSubgraphs(g);
     GRAPH_DUMP("After CreateLlgaSubgraphs. Before PropagateLayout", g);
