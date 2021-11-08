@@ -27,6 +27,8 @@ import urllib.request
 import re
 
 TORCH_VERSION = '1.10.0'
+TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
+
 TORCH_IPEX_VERSION = '1.10.0+cpu'
 PYTHON_VERSION = sys.version_info
 
@@ -44,9 +46,8 @@ try:
     import torch
     from torch.utils.cpp_extension import BuildExtension, CppExtension
 except ImportError as e:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'torch==' + TORCH_VERSION + '+cpu', '-f', 'https://download.pytorch.org/whl/torch_stable.html'])
-    import torch
-    from torch.utils.cpp_extension import BuildExtension, CppExtension
+    print("Unable to import torch from the local environment.")
+    raise e
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -94,7 +95,7 @@ def _install_requirements():
 
 
 def _build_installation_dependency():
-    if _check_env_flag('DEBUG'):
+    if os.getenv('TORCH_VERSION') is None:
         return []
 
     install_requires = []
@@ -261,12 +262,9 @@ def get_avx_version():
         avx_version = 'AVX512'
 
     if avx_version == '':
-        warnings.warn("""
-        You did not define the AVX version or specify the wrong AVX version.
-        The extension will build with AVX512 by default.
-        """)
         avx_version = 'AVX512'
 
+    print("The extension will be built with {}.".format(avx_version))
     return avx_version
 
 
