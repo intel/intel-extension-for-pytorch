@@ -72,6 +72,7 @@ import torch.nn.functional as F
 from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 from torch._six import inf, nan
+import re
 
 from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
     TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
@@ -1054,13 +1055,14 @@ class Tester(TestCase):
                     kind_in_graph="ipex_prepack::conv_transpose2d_run",
                     kind_not_in_graph="aten::conv_transpose2d",
                     levels=["O0"])
-                self._test_output_bf16(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="aten::conv_transpose2d",
-                    levels=["O0"],
-                    prec=0.02)
+                if not re.findall('[\d+\.\d]*',torch.__version__)[0] in ['1.10.0',]:
+                    self._test_output_bf16(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                        kind_not_in_graph="aten::conv_transpose2d",
+                        levels=["O0"],
+                        prec=0.02)
                 self._test_output(
                     model,
                     x,
