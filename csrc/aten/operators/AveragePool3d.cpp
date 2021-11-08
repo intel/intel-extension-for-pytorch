@@ -104,6 +104,7 @@ void avg_pool3d_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
+      "avg_pool3d_out_template()",
       /*check_input_size=*/true);
 
   if (input_.ndimension() == 4) {
@@ -270,7 +271,8 @@ Tensor& avg_pool3d_backward_out_template(
       iwidth,
       odepth,
       oheight,
-      owidth);
+      owidth,
+      "avg_pool3d_backward_out_template()");
 
   if (count_include_pad) {
     ::xpu::oneDNN::pooling_backward<

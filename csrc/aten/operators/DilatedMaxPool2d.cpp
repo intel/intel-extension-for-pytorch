@@ -200,7 +200,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const auto outputWidth_for_shape_check = pooling_output_shape<int64_t>(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
-  auto memory_format = input_.suggest_memory_format();
+  auto memory_format = input.suggest_memory_format();
   max_pool2d_backward_shape_check(
       input,
       gradOutput_,

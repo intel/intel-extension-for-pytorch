@@ -110,6 +110,7 @@ void max_pool3d_with_indices_out_template(
       outputDepth,
       outputHeight,
       outputWidth,
+      "max_pool3d_with_indices_out_template()",
       /*check_input_size=*/true);
 
   /* get contiguous input */
@@ -277,7 +278,8 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       gradInputWidth,
       gradOutputDepth,
       gradOutputHeight,
-      gradOutputWidth);
+      gradOutputWidth,
+      "max_pool3d_with_indices_backward_out_template()");
 
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
