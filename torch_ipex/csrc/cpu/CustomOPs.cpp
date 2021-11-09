@@ -1,7 +1,6 @@
 #include "torch_ipex/csrc/cpu/CustomOPs.h"
 #include "Conv.h"
 #include "ConvTranspose.h"
-#include "LayerNorm.h"
 #include "Linear.h"
 #include "Matmul.h"
 #include "Pooling.h"

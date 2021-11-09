@@ -695,6 +695,27 @@ MAKE_REGISTER_FUNC(ADD_NS(linalg_lstsq), "linalg_lstsq",
 MAKE_REGISTER_FUNC(ADD_NS(linalg_inv_ex), "linalg_inv_ex",
                    TUPLE_TWO_TENSORS(const Tensor &, bool), fp32)
 MAKE_REGISTER_FUNC(
+    ADD_NS(native_layer_norm), 
+    "native_layer_norm",
+    TUPLE_THREE_TENSORS(
+        const at::Tensor & , 
+        at::IntArrayRef, 
+        const c10::optional<at::Tensor> &, 
+        const c10::optional<at::Tensor> &, 
+        double), 
+    fp32)
+MAKE_REGISTER_FUNC(
+    ADD_NS(layer_norm), 
+    "layer_norm",
+    Tensor(
+        const at::Tensor &, 
+        at::IntArrayRef, 
+        const c10::optional<at::Tensor> &, 
+        const c10::optional<at::Tensor> &, 
+        double, 
+        bool), 
+    fp32)
+MAKE_REGISTER_FUNC(
     ADD_NS(special_i1),
     "special_i1",
     Tensor(const Tensor&),
