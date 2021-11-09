@@ -82,14 +82,28 @@ Tensor _sparse_coo_tensor_with_dims_and_tensors(
     const Tensor& values,
     const TensorOptions& options) {
   return at::native::new_with_dims_and_tensor_sparse(
-      sparse_dim, dense_dim, size, indices, values, options);
+      sparse_dim,
+      dense_dim,
+      size,
+      indices,
+      values,
+      options.dtype().toScalarType(),
+      options.layout(),
+      options.device(),
+      options.pinned_memory());
 }
 
 Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> memory_format) {
-  return at::native::empty_sparse(size, options, memory_format);
+  return at::native::empty_sparse(
+      size,
+      options.dtype().toScalarType(),
+      options.layout(),
+      options.device(),
+      options.pinned_memory(),
+      memory_format);
 }
 
 Tensor _indices(const Tensor& self) {
