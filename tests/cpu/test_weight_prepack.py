@@ -2,6 +2,7 @@ import unittest
 import itertools
 import copy
 import os
+from common_utils import skipIfSpecificVersions
 
 try:
     import torchvision
@@ -79,7 +80,6 @@ class TestPrepackCases(TestCase):
                 self.assertEqual(x1.grad, x2.grad, rtol=1e-4, atol=5e-02)
                 self.assertEqual(x1.grad, x3.grad, rtol=1e-4, atol=5e-02)
                 if bias:
-                    # TODO value difference is too large, need check 
                     self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad.float())
                     self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad.float())
 
@@ -102,6 +102,7 @@ class TestPrepackCases(TestCase):
                         self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=1e-2, atol=5e-02)
                         self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=1e-2, atol=5e-02)
 
+    @skipIfSpecificVersions
     def test_conv2d(self):
         self._test_convolution_training_base(dim=2)
         # TODO: add inference case.
@@ -163,6 +164,7 @@ class TestPrepackCases(TestCase):
                     self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=3e-2, atol=5e-02)
                     self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=3e-2, atol=5e-02)
 
+    @skipIfSpecificVersions
     def test_model_serialization(self):
         model = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         model = model.to(memory_format=torch.channels_last).train()
@@ -239,7 +241,6 @@ class TestPrepackCases(TestCase):
                 ipex_optimizer.zero_grad()
                 loss3.backward()
                 ipex_optimizer.step()
-            # TODO value difference is too large, need check 
             self.assertEqual(y1, y2, rtol=2e-2, atol=1e-03)
             self.assertEqual(y1, y3, rtol=1e-4, atol=5e-02)
             self.assertEqual(loss1, loss2, rtol=1e-5, atol=1e-05)
@@ -307,6 +308,7 @@ class TestPrepackCases(TestCase):
         self._test_imagenet_model(model)
 
     @skipIfNoTorchVision
+    @skipIfSpecificVersions
     def test_resnext50_32x4d(self):
         model = torchvision.models.resnet.resnext50_32x4d(pretrained=False)
         self._test_imagenet_model(model)
