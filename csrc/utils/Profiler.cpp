@@ -13,6 +13,7 @@
 
 using namespace torch::autograd::profiler;
 
+#if defined(USE_PROFILER)
 struct DPCPPEventStubImpl : public XPUEventStubBase {
  public:
   DPCPPEventStubImpl() = delete;
@@ -155,26 +156,35 @@ struct RegisterDPCPPMethods {
 };
 
 static RegisterDPCPPMethods reg;
+#endif
 
 bool is_profiler_enabled() {
+#if defined(USE_PROFILER)
   return (
       xpu::dpcpp::Settings::I().is_event_profiling_enabled() &&
       profilerEnabled());
+#else
+  return false;
+#endif
 }
 
 void dpcpp_mark(std::string name, DPCPP::event& event) {
+#if defined(USE_PROFILER)
   XPUEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
   mark_xpu(std::move(name), dpcpp_evt_stub);
+#endif
 }
 
 void dpcpp_mark(
     std::string name,
     DPCPP::event& start_event,
     DPCPP::event& end_event) {
+#if defined(USE_PROFILER)
   XPUEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
   mark_xpu(std::move(name), dpcpp_evt_stub);
+#endif
 }
 
 void dpcpp_log(std::string name, DPCPP::event& event) {
@@ -196,6 +206,8 @@ void reportMemoryUsage(
     void* ptr,
     int64_t alloc_size,
     at::DeviceIndex device_id) {
+#if defined(USE_PROFILER)
   c10::reportMemoryUsageToProfiler(
       ptr, alloc_size, c10::Device(c10::DeviceType::XPU, device_id));
+#endif
 }
