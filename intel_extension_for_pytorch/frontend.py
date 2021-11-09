@@ -47,7 +47,8 @@ class _O0:
         properties.opt_level = "O0"
         properties.conv_bn_folding = False
         properties.weights_prepack = False
-        properties.remove_dropout = False
+        properties.replace_dropout_with_identity = False
+        properties.optimize_lstm = False
         properties.split_master_weight_for_bf16 = False
         properties.fuse_update_step = False
         properties.auto_kernel_selection = False
@@ -60,7 +61,8 @@ class _O1:
         properties.opt_level = "O1"
         properties.conv_bn_folding = True
         properties.weights_prepack = True
-        properties.remove_dropout = True
+        properties.replace_dropout_with_identity = True
+        properties.optimize_lstm = True
         properties.split_master_weight_for_bf16 = True
         properties.fuse_update_step = True
         properties.auto_kernel_selection = False
@@ -77,36 +79,75 @@ def optimize(
     inplace=False,
     conv_bn_folding=None,
     weights_prepack=None,
-    remove_dropout=None,
+    replace_dropout_with_identity=None,
+    optimize_lstm=None,
     split_master_weight_for_bf16=None,
     fuse_update_step=None,
     auto_kernel_selection=None):
     r"""
-    Convert user to ipex optimzied model, ther will be do conv+bn folding, model's parameters data dtype
-    conversation for Convolution, Linear, Embedding. there also has a weight prepack for
-    Convoluttion and Linear for better performance.
+    Apply optimizations at the python frontend to the given model (nn.Module) and optimizer.If the optimizer is given,
+    optimization for training is assumed, otherwise, optimization for inference is assumed. The optimizations include
+    conv+bn folding (for inference only), weight prepacking and a lot more.
 
     Args:
-        model: (torch.nn.Module): user model to do optimization.
-        dtype: it can be torch.float or torch.bfloat16, it will do model's parameters data dtype cast if
-            dtype is torch.bfloat16, the default value is torch.float.
-        optimizer: (optim.Optimizer), user optimzizer to do optimization, suach as split-sgd, the default
-            value is None, it means for inference case.
-        level: can be 'O0' or 'O1', do nothing for 'O0', just return the origin model and optimizer,
-            'O1' will do ipex optimization as abrove said, the default value is 'O1'.
-        inplace: whether do inplace optimization, default value is None.
-        conv_bn_folding: whether do conv_bn folding, it only works for inference model, the default value is None.
-        weights_prepack: whether do weight prepack for convolution and linear to avoid OneDNN weight reorder.
-            the default value is None(only workd for training model, the inference model is not optimized well).
-        remove_dropout: whether remove dropout from model, it only works for inference model, the default value is None.
-            the default value is True(only workd for training model, the inference model is not optimized well).
-        split_master_weight_for_bf16: whether choose split master weight update for BF16 training which can
-            save memory compare with master weight update solution, not support all optimizers
-        fuse_update_step: whether choose fused params update for training which have better performance,
-           not support all optimizers
-        [experimental] auto_kernel_selection: Different backend may have different performance on different
+        model (torch.nn.Module): User model to do optimization.
+        dtype (torch.dtype): It can be torch.float(torch.float32) or torch.bfloat16,
+          it will do model's parameters data dtype cast if dtype is torch.bfloat16, the default value is torch.float.
+        optimizer (torch.optim.Optimizer), User optimzizer to do optimization, such as sgd, the default
+          value is None, it means for inference case.
+        level (string): Can be "O0" or "O1", do nothing for "O0", just return the origin model and optimizer.
+          "O1" will do ipex optimization: conv+bn folding, weights prepack, remove dropout(inferenc model),
+          split master wieght and fuse optimizer update step(training model), the optimization options can be
+          further overridden by explicit options below. The default value is "O1".
+        inplace (bool): Whether do inplace optimization, default value False.
+        conv_bn_folding (bool): Whether do conv_bn folding, it only works for inference model.
+          The default value is None, if has value, it will override the level's setting.
+        weights_prepack (bool): Whether do weight prepack for convolution and linear to avoid OneDNN weight reorder.
+          For OneDNN deep neural network library, in order to achieve better vectorization and cache reuse, onednn will use
+          blocked layout that splits one or several dimensions into the blocks of fixed size, so there will do prepack to avoid
+          online weight data format convertion which will reduce momory copy consumption, see more details about EneDNN data
+          mermory format: https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html. The default value is None,
+          if has value, it will override the level's setting.
+        replace_dropout_with_identity (bool): Whether replace nn.Dropout with nn.Identity, if replaced, the aten::dropout
+          won't be on the JIT graph, which may provide more fusion opportunites on the graph, it only works for inference
+          model. The default value is None, if has value, it will override the level's setting.
+        replace_lstm_with_ipex_lstm (bool): Whether replace nn.LSTM with IPEX LSTM which apply OneDNN kernel to get better
+          performance. The default value is None, if has value, it will override the level's setting.
+        split_master_weight_for_bf16 (bool): Whether choose split master weight update for BF16 training which can
+            save memory compare with master weight update solution, not support all optimizers.
+            The default value is None, if has value, it will override the level's setting.
+        fuse_update_step (bool): Whether choose fused params update for training which have better performance,
+           not support all optimizers. The default value is None, if has value, it will override the level's setting.
+        [experimental] auto_kernel_selection (bool): Different backend may have different performance on different
             dtypes/shapes. Default value is False. IPEX will try to optimize the kernel selection for
             better performance if set this value to True. But may have regressions at current stage.
+            The default value is None, if has value, it will override the level's setting.
+
+    Returns:
+        model and optimizer(given a optimizer) modified according to the 'level' or other user's setting. conv+bn folding may be
+        happend and dropout may be replaced by identity if model have for inference case, for convolutuon, linear and lstm, they will
+        be replaced by our custom ops(weight prepack for convolution and linear) for good performance. For bfloat16 case,
+        the parameters of convolution and linear will be bfloat16 dtype. For training case, and the optimizer states will changed to the
+        converted model's parameters to align with model's parameter's update at optimizer's step.
+
+    .. warning::
+
+        ipex.optimize deepcopy the origin model. If DDP comes before ipex.optimize, it just gets the origin model,
+        which is not the same as the one ipex.optimize returns. Therefore, some ops in DDP like allreduce will not be called
+        and may cause unpredictable accuracy loss in distributed model training.
+
+    Examples::
+
+        >>> # bfloat16 inference case.
+        >>> model = ...
+        >>> model.eval()
+        >>> optimized_model = ipex.optimize(model, dtype=torch.bfloat16)
+        >>> # running evaluation step.
+        >>> # bfloat16 training case.
+        >>> optimizer = ...
+        >>> model.train()
+        >>> optimized_model, optimized_optimizer = ipex.optimize(model, dtype=torch.bfloat16, optimizer=optimizer)
+        >>> # running training step.
 
     """
 
@@ -129,8 +170,10 @@ def optimize(
         opt_properties.conv_bn_folding = conv_bn_folding
     if weights_prepack is not None:
         opt_properties.weights_prepack = weights_prepack
-    if remove_dropout is not None:
-        opt_properties.remove_dropout = remove_dropout
+    if replace_dropout_with_identity is not None:
+        opt_properties.replace_dropout_with_identity = replace_dropout_with_identity
+    if optimize_lstm is not None:
+        opt_properties.optimize_lstm = optimize_lstm
     if split_master_weight_for_bf16 is not None:
         opt_properties.split_master_weight_for_bf16 = split_master_weight_for_bf16
     if fuse_update_step is not None:
@@ -150,14 +193,13 @@ def optimize(
                 optimized_model = optimization.fuse(optimized_model, inplace=inplace)
             except:
                 warnings.warn("Conv BatchNorm folding failed during the optimize process.")
-        if opt_properties.remove_dropout:
-            try :
-                optimized_model = optimization.remove_dropout(optimized_model)
-            except:
-                warnings.warn("Failed to remove the Dropout module during the optimize process.")
+        if opt_properties.replace_dropout_with_identity:
+            utils._model_convert.replace_dropout_with_identity(optimized_model)
         if dtype == torch.bfloat16:
             optimized_model = utils._model_convert.convert_module_data_type(optimized_model, torch.bfloat16)
 
+    if opt_properties.optimize_lstm:
+        utils._model_convert.replace_lstm_with_ipex_lstm(optimized_model)
     if opt_properties.split_master_weight_for_bf16 and dtype is torch.bfloat16:
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False

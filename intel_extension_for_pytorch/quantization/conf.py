@@ -10,6 +10,87 @@ qscheme_dict ={torch.per_tensor_affine:0,
                torch.torch.per_channel_affine_float_qparams:4}
 
 class QuantConf(object):
+    r"""
+    Configure setting for INT8 quantization flow.
+
+    Args:
+      configure_file (string): The INT8 configure file(.json file) to be loaded or saved.
+        The loaded or saved json file will be has the content like:
+        [
+            {
+                "id": 0,
+                "name": "conv2d",
+                "algorithm": "min_max",
+                "weight_granularity": "per_channel",
+                "input_scales": [
+                    0.01865844801068306
+                ],
+                "input_zero_points": [
+                    114
+                ],
+                "output_scales": [
+                    0.05267734453082085
+                ],
+                "output_zero_points": [
+                    132
+                ],
+                "weight_scales": [
+                    [
+                        0.0006843071314506233,
+                        0.0005326663958840072,
+                        0.00016389577649533749,
+                    ]
+                ],
+                "input_quantized_dtypes": [
+                    "uint8"
+                ],
+                "output_quantized_dtypes": [
+                    "uint8"
+                ],
+                "inputs_quantized": [
+                    true
+                ],
+                "outputs_quantized": [
+                    false
+                ],
+                "inputs_flow": [
+                    "conv2d.0.input"
+                ],
+                "outputs_flow": [
+                    "conv2d.0.output"
+               ]
+           }
+        ]
+
+        id: The number of quantized ops in the model running flow. Note: only limited ops are reordered,
+          such as convolution, linear or other ops.
+        name: Quantized OP's name.
+        algorithm: observe method for activation tensors during calibration. Only support min-max now, more methods will be support in future.
+        weight_granularity: Qscheme for weight quantizer for convolution and linear, can be per_channel or per_tesor,
+          user can manually set it before load existed configure file. The default value is uint8.
+        input_scales: Scales for inputs.
+        input_zero_points: Zero points for inputs.
+        output_scales": Scales for outputs.
+        output_zero_points: Zero points for outputs.
+        weight_scales: Scales for Weights.
+        input_quantized_dtypes: Quantized dtypes fot inputs, can be uint8 or int8, user can manually set it before load existed configure file. The default value is uint8.
+        output_quantized_dtypes: Quantized dtypes fot ouputs, can be uint8 or int8, user can manually set it before load existed configure file. The default value is uint8.
+        inputs_quantized: Whether inputs need quantized, can be true or false, user can manually set it before load existed configure file.
+        outputs_quantized: Whether output need quantized, can be true or false, user can manually set it before load existed configure file.
+        inputs_flow: Where the inputs are from, beacuse we only record limited ops, we can know which ops are adjacent by compare one inputs flow with others' output flow.
+        outputs_flow: Outputs flag for current op, which can be used to check which ops are adjacent.
+
+      qscheme (torch.qscheme): quantization scheme to be used(activation)
+
+    .. warning::
+
+        :attr:`qscheme` can only take one of the following options:
+
+        - ``torch.per_tensor_affine``
+        - ``torch.per_tensor_symmetric``
+
+    """
+
     def __init__(self, configure_file=None, qscheme=torch.per_tensor_affine):
         self.configure_file = configure_file
 

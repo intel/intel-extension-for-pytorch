@@ -95,6 +95,20 @@ def _get_default_recipe(configures):
     return default_configures
 
 class calibrate(object):
+    r"""
+
+    Enable quantiation calibration scope which will collect the scales and zero points of ops which can be quantized,
+    such as convolution, linear.
+
+    Args:
+        conf (quantization.QuantConf): Quantization's setting.
+        default_recipe (bool): Whether produce a default Quantization's setting, which will do a post-process to remove reduent quantizer,
+          which can be True of False. For example, conv+relu, quantizers are inserted before and after conv and relu, the data flow will be
+          like: quant->dequant->conv->quant->dequant->quant->dequant->relu->quant->dequant, if default_recipe is True, the data flow will be
+          converted to: quant->dequant->conv->relu->quant->dequant, the quantizers will not be inserted after conv's output and before relu's
+          input. The deault value is True.
+
+    """
     def __init__(self, conf, default_recipe=True):
         self.conf = conf
         self.default_recipe = default_recipe
@@ -165,6 +179,22 @@ class _quantization_int8(object):
         return decorate_autocast
 
 def convert(model, conf, inputs):
+    r"""
+    Convert an FP32 torch.nn.Module model to a quantized JIT ScriptModule according to the given quantization recipes in the quantization configuration conf.
+    The function will conduct a JIT trace with the given inputs. It will fail if the given model doesn't support JIT trace.
+
+    Args:
+        model (torch.nn.Module): The FP32 model to be convert.
+        conf (quantization.QuantConf): Quantization's setting.
+        inputs (tuple or torch.Tensor): A tuple of example inputs that are used for JIT trace of the given model.
+
+    Returns:
+        torch.jit.ScriptModule
+
+    """
+
+    assert isinstance(model, torch.nn.Module), "Only support nn.Module convert for quantization path"
+
     # pre-conver model's parameters dtype if it has conv, linear
     # and Embedding for bfloat16 path.
     model_ = model

@@ -26,7 +26,7 @@ class RoIAlign(nn.Module):
         self.aligned = aligned
 
     def forward(self, input: Tensor, rois: Tensor) -> Tensor:
-        return F.roi_align(input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.aligned)
+        return F._roi_align.roi_align(input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.aligned)
 
     def __repr__(self) -> str:
         tmpstr = self.__class__.__name__ + '('

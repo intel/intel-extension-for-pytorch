@@ -4,10 +4,15 @@ import torch.nn as nn
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import time, sys
-from intel_extension_for_pytorch.nn.functional import batch_score_nms, \
-    parallel_scale_back_batch, nms, rpn_nms, box_head_nms
 import torch.nn.functional as F
 import os
+
+def nms(dets, scores, threshold, sorted=False):
+    return torch.ops.torch_ipex.nms(dets, scores, threshold, sorted)
+batch_score_nms = torch.ops.torch_ipex.batch_score_nms
+parallel_scale_back_batch = torch.ops.torch_ipex.parallel_scale_back_batch
+rpn_nms = torch.ops.torch_ipex.rpn_nms
+box_head_nms = torch.ops.torch_ipex.box_head_nms
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
