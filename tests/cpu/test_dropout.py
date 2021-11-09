@@ -33,17 +33,16 @@ class DropoutTester(TestCase):
             self.assertEqual(x, y)
             FileCheck().check_not("aten::dropout").run(trace_model.graph)
 
-    def test_remove_dropout_fx(self):
+    def test_replace_dropout_with_identity(self):
         model = Net().eval()
         optimized_model = ipex.optimize(model)
-        self.assertTrue(isinstance(optimized_model, GraphModule))
-        all_formatted = "\n".join([n.format_node() for n in optimized_model.graph.nodes])
-        FileCheck().check_not("dropout").run(all_formatted)
-        # disable remove_dropout
-        optimized_model = ipex.optimize(model, remove_dropout=False)
-        self.assertTrue(isinstance(optimized_model, GraphModule))
-        all_formatted = "\n".join([n.format_node() for n in optimized_model.graph.nodes])
-        FileCheck().check("dropout").run(all_formatted)
+        x = torch.randn(2, 3)
+        named_children = dict(optimized_model.named_children())
+        self.assertTrue(isinstance(named_children['dropout'], torch.nn.Identity))
+
+        optimized_model = ipex.optimize(model, replace_dropout_with_identity=False)
+        named_children = dict(optimized_model.named_children())
+        self.assertTrue(isinstance(named_children['dropout'], torch.nn.Dropout))
 
 
 if __name__ == '__main__':

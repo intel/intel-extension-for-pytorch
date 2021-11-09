@@ -18,7 +18,7 @@ def _cat(tensors: List[Tensor], dim: int = 0) -> Tensor:
     return torch.cat(tensors, dim)
 
 
-def convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
+def _convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
     concat_boxes = _cat([b for b in boxes], dim=0)
     temp = []
     for i, b in enumerate(boxes):
@@ -28,7 +28,7 @@ def convert_boxes_to_roi_format(boxes: List[Tensor]) -> Tensor:
     return rois
 
 
-def check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
+def _check_roi_boxes_shape(boxes: Union[Tensor, List[Tensor]]):
     if isinstance(boxes, (list, tuple)):
         for _tensor in boxes:
             assert _tensor.size(1) == 4, \
@@ -77,11 +77,11 @@ def roi_align(
     Returns:
         Tensor[K, C, output_size[0], output_size[1]]: The pooled RoIs.
     """
-    check_roi_boxes_shape(boxes)
+    _check_roi_boxes_shape(boxes)
     rois = boxes
     output_size = _pair(output_size)
     if not isinstance(rois, torch.Tensor):
-        rois = convert_boxes_to_roi_format(rois)
+        rois = _convert_boxes_to_roi_format(rois)
     return torch.ops.torch_ipex.ROIAlign_forward(input, rois, spatial_scale,
                                            output_size[0], output_size[1],
                                            sampling_ratio, aligned)

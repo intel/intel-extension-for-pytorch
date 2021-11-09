@@ -1,3 +1,3 @@
-from .modules import FrozenBatchNorm2d, IpexLSTM, RoIAlign
+from .modules import FrozenBatchNorm2d
 from . import functional
 

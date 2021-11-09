@@ -2,7 +2,6 @@ import unittest, copy
 import torch
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
-from intel_extension_for_pytorch.nn import RoIAlign
 
 import numpy as np
 import math
@@ -46,7 +45,7 @@ def bilinear_interpolate(data, y, x, snap_border=False):
     return val
 
 def fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False):
-    return RoIAlign((pool_h, pool_w), spatial_scale=spatial_scale,
+    return ipex.nn.modules._roi_align.RoIAlign((pool_h, pool_w), spatial_scale=spatial_scale,
                         sampling_ratio=sampling_ratio, aligned=aligned)(x, rois)
 
 def torchvision_fn(x, rois, pool_h, pool_w, spatial_scale=1, sampling_ratio=-1, aligned=False):
