@@ -4,6 +4,7 @@
 
 #include "UpSample.h"
 
+#include <core/MemoryFormat.h>
 #include <oneDNN/oneDNN.h>
 
 using namespace dnnl;
@@ -46,22 +47,15 @@ static void upsample_linear_out_dpcpp_kernel(
       scales_d);
 
   Tensor input = input_;
-  if (!input_.is_contiguous() &&
-      input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    output.resize_(dst_dims, at::MemoryFormat::ChannelsLast);
-  } else if (
-      !input_.is_contiguous() &&
-      input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    output.resize_(dst_dims, at::MemoryFormat::ChannelsLast3d);
+  if (is_smf_channels_last(input_)) {
+    output.resize_(dst_dims, get_cl_tag_by_ndim(ndims));
   } else {
     input = input_.contiguous(input_.suggest_memory_format());
     output.resize_(dst_dims, input_.suggest_memory_format());
   }
 
-  auto data_format = get_dnnl_default_format(
-      ndims,
-      (input_.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-       input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto data_format =
+      get_dnnl_default_format(ndims, is_smf_channels_last(input_));
 
   memory::format_tag format_any = memory::format_tag::any;
   memory::data_type data_type = get_onednn_dtype(input);
@@ -144,24 +138,16 @@ static void upsample_linear_backward_out_dpcpp_kernel(
       scales_d);
 
   Tensor grad_output;
-  if (!grad_output_.is_contiguous() &&
-      grad_output_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    grad_input.resize_(src_dims, at::MemoryFormat::ChannelsLast);
-    grad_output = grad_output_.contiguous(at::MemoryFormat::ChannelsLast);
-  } else if (
-      !grad_output_.is_contiguous() &&
-      grad_output_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    grad_input.resize_(src_dims, at::MemoryFormat::ChannelsLast3d);
-    grad_output = grad_output_.contiguous(at::MemoryFormat::ChannelsLast3d);
+  if (is_smf_channels_last(grad_output_)) {
+    grad_input.resize_(src_dims, get_cl_tag_by_ndim(ndims));
+    grad_output = grad_output_.contiguous(get_cl_tag_by_ndim(ndims));
   } else {
     grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
     grad_output = grad_output_.contiguous(grad_output_.suggest_memory_format());
   }
 
-  auto data_format = get_dnnl_default_format(
-      ndims,
-      (grad_input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-       grad_input.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto data_format =
+      get_dnnl_default_format(ndims, is_smf_channels_last(grad_output_));
 
   memory::format_tag format_any = memory::format_tag::any;
   memory::data_type data_type = get_onednn_dtype(grad_output);
@@ -346,20 +332,9 @@ Tensor upsample_trilinear3d_backward(
     c10::optional<double> scales_w) {
   auto ndim = grad_output.ndimension();
   Tensor grad_input;
-  if (4 == ndim) {
-    grad_input = (!grad_output.is_contiguous() &&
-                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-        ? at::empty(
-              input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
-        : at::empty(input_size, grad_output.options());
-  } else if (5 == ndim) { // 5 == ndim
-    grad_input = (!grad_output.is_contiguous() &&
-                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))
-        ? at::empty(
-              input_size,
-              grad_output.options(),
-              at::MemoryFormat::ChannelsLast3d)
-        : at::empty(input_size, grad_output.options());
+  if (is_smf_channels_last(grad_output)) {
+    grad_input =
+        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
   } else {
     grad_input = at::empty(input_size, grad_output.options());
   }
@@ -393,20 +368,10 @@ Tensor upsample_trilinear3d_backward(
   auto ndim = grad_output.ndimension();
 
   Tensor grad_input;
-  if (4 == ndim) {
-    grad_input = (!grad_output.is_contiguous() &&
-                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-        ? at::empty(
-              input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
-        : at::empty(input_size, grad_output.options());
-  } else if (5 == ndim) { // 5 == ndim
-    grad_input = (!grad_output.is_contiguous() &&
-                  grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d))
-        ? at::empty(
-              input_size,
-              grad_output.options(),
-              at::MemoryFormat::ChannelsLast3d)
-        : at::empty(input_size, grad_output.options());
+
+  if (is_smf_channels_last(grad_output)) {
+    grad_input =
+        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
   } else {
     grad_input = at::empty(input_size, grad_output.options());
   }
@@ -522,12 +487,15 @@ Tensor upsample_bilinear2d_backward(
     bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  Tensor grad_input =
-      (!grad_output.is_contiguous() &&
-       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-      ? at::empty(
-            input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
-      : at::empty(input_size, grad_output.options());
+  auto ndim = grad_output.ndimension();
+  Tensor grad_input;
+  if (is_smf_channels_last(grad_output)) {
+    grad_input =
+        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
+  } else {
+    grad_input = at::empty(input_size, grad_output.options());
+  }
+
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
@@ -552,12 +520,15 @@ Tensor upsample_bilinear2d_backward(
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_h = get_scale_value(scale_factors, 0);
   auto scale_w = get_scale_value(scale_factors, 1);
-  Tensor grad_input =
-      (!grad_output.is_contiguous() &&
-       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-      ? at::empty(
-            input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
-      : at::empty(input_size, grad_output.options());
+  auto ndim = grad_output.ndimension();
+  Tensor grad_input;
+  if (is_smf_channels_last(grad_output)) {
+    grad_input =
+        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
+  } else {
+    grad_input = at::empty(input_size, grad_output.options());
+  }
+
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
@@ -659,12 +630,15 @@ Tensor upsample_linear1d_backward(
     IntArrayRef input_size,
     bool align_corners,
     c10::optional<double> scales) {
-  Tensor grad_input =
-      (!grad_output.is_contiguous() &&
-       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-      ? at::empty(
-            input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
-      : at::empty(input_size, grad_output.options());
+  auto ndim = grad_output.ndimension();
+  Tensor grad_input;
+  if (is_smf_channels_last(grad_output)) {
+    grad_input =
+        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
+  } else {
+    grad_input = at::empty(input_size, grad_output.options());
+  }
+
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
@@ -687,12 +661,15 @@ Tensor upsample_linear1d_backward(
     c10::optional<ArrayRef<double>> scale_factors) {
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_w = get_scale_value(scale_factors, 0);
-  Tensor grad_input =
-      (!grad_output.is_contiguous() &&
-       grad_output.is_contiguous(at::MemoryFormat::ChannelsLast))
-      ? at::empty(
-            input_size, grad_output.options(), at::MemoryFormat::ChannelsLast)
-      : at::empty(input_size, grad_output.options());
+  auto ndim = grad_output.ndimension();
+  Tensor grad_input;
+  if (is_smf_channels_last(grad_output)) {
+    grad_input =
+        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
+  } else {
+    grad_input = at::empty(input_size, grad_output.options());
+  }
+
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "
