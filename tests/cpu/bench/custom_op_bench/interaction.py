@@ -8,9 +8,9 @@ class Interaction(torch.nn.Module):
         super(Interaction, self).__init__()
 
     def forward(self, x):
-        return ipex.interaction(*x)
+        return ipex.nn.functional.interaction(*x)
 
-def inference_benchmark(num_instance, interact_module, dtype, result_dir):
+def inference_benchmark(num_instance, interact_module, dtype):
     inputs = []
     for i in range(0, 27):
         inputs.append(torch.randn([128, 128]).to(dtype))
@@ -23,15 +23,9 @@ def inference_benchmark(num_instance, interact_module, dtype, result_dir):
             num_warmup_iters=100,
             num_iters=1000 * num_instance,
         )
-    result = open(result_dir, 'a+')
-    result.writelines("*" * 50 + "\n")
-    result.writelines("dtype=%s, inference"%(dtype) + "\n")
-    result.writelines(stats.__str__())
-    result.write("\n")
-    result.close()
     print(stats)
 
-def training_benchmark(interact_module, dtype, result_dir):
+def training_benchmark(interact_module, dtype):
     import time
     inputs = []
     for i in range(0, 27):
@@ -47,13 +41,7 @@ def training_benchmark(interact_module, dtype, result_dir):
         y.backward()
     endT = time.time()
     avg_elapsed = (endT - startT)
-    result = open(result_dir, 'a+')
-    result.writelines("*" * 50 + "\n")
-    result.writelines("dtype=%s, training"%(dtype) + "\n")
-    result.write("Took {} ms in average to run {} FW+BW".format(avg_elapsed, "interaction"))
-    result.write("\n")
-    result.close()
-    print("Took {} ms in average to run {} FW+BW".format(avg_elapsed, "interaction"))
+    print("Took {} ms on average to run {} FW+BW".format(avg_elapsed, "interaction"))
 
 
 
@@ -64,14 +52,13 @@ def run():
     parser.add_argument("--num-instance", type=int, default=1)
     parser.add_argument("--bf16", action="store_true", default=False)
     parser.add_argument("--inference", action="store_true", default=False)
-    parser.add_argument("--result-dir", type=str, default="./logs/interaction-bench-onednn.log")
     args = parser.parse_args()
     dtype = torch.bfloat16 if args.bf16 else torch.float32
     interact_module = Interaction()
     if args.inference:
-        inference_benchmark(args.num_instance, interact_module, dtype, args.result_dir)
+        inference_benchmark(args.num_instance, interact_module, dtype)
     else:
-        training_benchmark(interact_module, dtype, args.result_dir)
+        training_benchmark(interact_module, dtype)
 
 if __name__ == "__main__":
     run()
