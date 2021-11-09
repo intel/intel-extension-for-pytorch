@@ -1,7 +1,7 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-title: "[RFC]"
+about: Submit a proposal/request for a new feature
+title: "[RFC] "
 labels: ipex-gpu
 assignees: gujinghui
 
