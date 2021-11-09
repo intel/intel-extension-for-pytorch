@@ -2,6 +2,7 @@
 #include <ATen/WrapDimUtils.h>
 
 #include <ATen/AtenIpexTypeXPU.h>
+#include <assert.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -734,7 +735,9 @@ std::tuple<at::Tensor, at::Tensor> topk(
     int64_t dim,
     bool largest,
     bool sorted) {
-  return at::native::topk(self, k, dim, largest, sorted);
+  TORCH_CHECK(false, "TopK is not supported for ipex with torch1.10.(to do)");
+  return std::make_tuple(self, self);
+  // return at::native::topk(self, k, dim, largest, sorted);
 }
 
 } // namespace AtenIpexTypeXPU
