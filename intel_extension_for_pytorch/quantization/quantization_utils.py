@@ -201,10 +201,6 @@ def convert(model, conf, inputs):
     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
         model_ = nn.utils._model_convert.convert_module_data_type(copy.deepcopy(model), torch.bfloat16)
 
-    core.disable_jit_opt()
-    core._jit_set_llga_enabled(True)
-    torch._C._jit_set_profiling_mode(True)
-    torch._C._jit_set_profiling_executor(True)
     with torch.no_grad(), _quantization_int8():
         trace_model = torch.jit.trace(model_, inputs, check_trace=False)
     trace_model = torch.jit.freeze(trace_model)

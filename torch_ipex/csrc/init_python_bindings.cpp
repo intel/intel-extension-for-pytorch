@@ -83,6 +83,12 @@ void InitIpexModuleBindings(py::module m) {
         &torch_ipex::autocast::is_quantization_enabled);
   m.def("set_quantization_enabled",
         &torch_ipex::autocast::set_quantization_enabled);
+  m.def(
+      "is_llga_fp32_bf16_enabled",
+      &torch_ipex::autocast::is_llga_fp32_bf16_enabled);
+  m.def(
+      "set_llga_fp32_bf16_enabled",
+      &torch_ipex::autocast::set_llga_fp32_bf16_enabled);
 
   m.def("autocast_increment_nesting",
         &torch_ipex::autocast::autocast_increment_nesting);
@@ -91,11 +97,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
 
   // llga path
-  m.def("_jit_set_llga_enabled", &torch::jit::RegisterLlgaFuseGraph::setEnabled);
-  m.def("_jit_llga_enabled", &torch::jit::RegisterLlgaFuseGraph::isEnabled);
-  m.def("_jit_llga_fuser", [](std::shared_ptr<torch::jit::Graph> g) {
-        return torch::jit::fuser::onednn::fuseGraph(g);
-  });
   m.def(
       "_jit_set_llga_weight_cache_enabled",
       &torch::jit::fuser::onednn::setLlgaWeightCacheEnabled);
@@ -288,12 +289,6 @@ using namespace torch::jit;
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
 
-  // // llga jit fusion pass
-  // torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
-  //   if (torch::jit::RegisterLlgaFuseGraph::isEnabled()) {
-  //     torch::jit::fuser::onednn::fuseGraph(g);
-  //   }
-  // });
   // jit fusion pass
   torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {

@@ -1,5 +1,6 @@
-#include <string>
 #include "fusion_pass.h"
+#include <string>
+#include "codegen/onednn/interface.h"
 #include "graph_rewrite.h"
 
 #include "cpu/CustomOPs.h"
@@ -8,6 +9,7 @@
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
+#include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/graph_rewrite_helper.h>
 #include <torch/csrc/jit/passes/remove_dropout.h>
@@ -295,8 +297,7 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
      ipex::conv3d_sum_relu},
 };
 
-void FusionPass(std::shared_ptr<Graph> &graph) {
-  RemoveProfileNodesAndSpecializeTypes(graph);
+void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // remove dropout;
   torch::jit::removeDropout(graph);
 
@@ -323,8 +324,6 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // deconvolution fusion
   graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
 
-  RemoveTensorTypeSpecializations(graph);
-
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
   // Pattern based fusion was lack of alias analysis
@@ -341,4 +340,27 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   ConstantPropagation(graph);
 }
 
+void FusionPass(std::shared_ptr<Graph>& graph) {
+  GRAPH_DUMP(
+      "Before RemoveProfileNodesAndSpecializeTypes. Beginning of "
+      "optimization pass",
+      graph);
+  RemoveProfileNodesAndSpecializeTypes(graph);
+
+  // LLGA fusion pass for int8
+  GRAPH_DUMP(
+      "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
+      graph);
+  fuser::onednn::fuseGraph(graph);
+  GRAPH_DUMP("After LLGA fusion pass. Before IPEXFusionPass", graph);
+
+  // IPEX fusion pass for fp32 and bf16
+  IPEXFusionPass(graph);
+  GRAPH_DUMP(
+      "After IPEXFusionPass. Before RemoveTensorTypeSpecializations", graph);
+
+  RemoveTensorTypeSpecializations(graph);
+  GRAPH_DUMP(
+      "After RemoveTensorTypeSpecializations. End of optimization pass", graph);
+}
 }} // namespace torch::jit

@@ -16,19 +16,17 @@ import intel_extension_for_pytorch as ipex
 
 LLGA_FUSION_GROUP = 'ipex::LlgaFusionGroup'
 
-# For LLGA UT, disable the PyTorch profiling executor and the IPEX JIT opt
-def llga_test_env(func):
+# For fp32 and bf16 LLGA UT only
+def llga_fp32_bf16_test_env(func):
     @wraps(func)
     def wrapTheFunction(*args):
         # make sure that the profiling mode is turned on
         torch._C._jit_set_profiling_mode(True)
         torch._C._jit_set_profiling_executor(True)
 
-        ipex._C._jit_set_llga_enabled(True)
-        ipex._C.disable_jit_opt()
+        ipex._C.set_llga_fp32_bf16_enabled(True)
         func(*args)
-        ipex._C.enable_jit_opt()
-        ipex._C._jit_set_llga_enabled(False)
+        ipex._C.set_llga_fp32_bf16_enabled(False)
     return wrapTheFunction
 
 def all_backward_graphs(module):

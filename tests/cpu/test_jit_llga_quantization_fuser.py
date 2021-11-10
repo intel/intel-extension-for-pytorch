@@ -3,7 +3,7 @@ import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_test_env
+from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 from torch.testing._internal.common_utils import TEST_SCIPY
 
 import intel_extension_for_pytorch as ipex
@@ -26,7 +26,6 @@ def get_eltwise_fn(name):
         raise NameError('Eltwise function %s not found' % name)
 
 class TestOp(JitLlgaTestCase):
-    @llga_test_env
     def test_conv2d_int8_in_f32_out(self):
         for [
                 spatial,
@@ -70,7 +69,6 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_int8_in_f32_out(self):
         for bias in [True, False]:
             x = torch.rand(32, 28)
@@ -85,7 +83,6 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::linear', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_int8_in_int8_out(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -114,7 +111,6 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::linear', 'aten::quantize_per_channel', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -141,7 +137,6 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::dequantize', 'aten::linear'])
                 self.checkPatterns(graph, patterns)                
 
-    @llga_test_env
     def test_max_pool2d(self):
         for [
                 spatial,
@@ -176,7 +171,6 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::max_pool2d'])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_bmm_int8_in_f32_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -197,7 +191,6 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_strided_bmm_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -231,7 +224,6 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_add_scalar_input(self):
         class M(torch.nn.Module):
             def __init__(self):
@@ -250,7 +242,6 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, "aten::add", 1)
 
 class TestFusionPattern(JitLlgaTestCase):
-    @llga_test_env
     def test_conv2d_eltwise(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn):
@@ -284,7 +275,6 @@ class TestFusionPattern(JitLlgaTestCase):
                         self.assertFused(graph, ['aten::_convolution', 'aten::' + eltwise, 'aten::quantize_per_channel', 'aten::dequantize'])
                         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_conv2d_bn(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -313,7 +303,6 @@ class TestFusionPattern(JitLlgaTestCase):
                     self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel', 'aten::dequantize'])
                     self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_conv2d_bn_relu(self):
         class M(nn.Module):
             def __init__(self):
@@ -338,7 +327,6 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel'])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_eltwise(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, bias):
@@ -372,7 +360,6 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::' + eltwise])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_conv2d_sum(self):
         class M(nn.Module):
             def __init__(self, bias=False):
@@ -411,7 +398,6 @@ class TestFusionPattern(JitLlgaTestCase):
                     self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
                     self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_dropout_sum(self):
         class M(nn.Module):
             def __init__(self):
@@ -439,7 +425,6 @@ class TestFusionPattern(JitLlgaTestCase):
             self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_dropout_sum_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -468,7 +453,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_linear_gelu_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -495,7 +479,6 @@ class TestFusionPattern(JitLlgaTestCase):
             self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::gelu'])
             self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_defer_size(self):
         class M(nn.Module):
             def __init__(self):
@@ -523,7 +506,6 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_wildcard(self):
         class M(nn.Module):
             def __init__(self):
@@ -549,14 +531,13 @@ class TestFusionPattern(JitLlgaTestCase):
         x = torch.rand(1, 32, 28, 28)
         patterns = [
                 ["aten::dequantize", "aten::_convolution"],
-                ["aten::relu"]
         ]
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="defer_size", qscheme=torch.per_tensor_affine)
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
-        self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel'])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertGraphContainsExactly(graph, "aten::relu", 1)
+        self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_bmm_div_scalar(self):
         class M(nn.Module):
             def __init__(self, div_value):
@@ -578,7 +559,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_bmm_div_identity(self):
         class M(nn.Module):
             def __init__(self, div_value):
@@ -602,7 +582,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_bmm_div_tensor(self):
         class M(nn.Module):
             def __init__(self):
@@ -624,7 +603,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_bmm_div_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -648,7 +626,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)  
 
-    @llga_test_env
     def test_strided_bmm_div_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -682,7 +659,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
         self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_split_dequant_to(self):
         class M(nn.Module):
             def __init__(self):
@@ -739,7 +715,6 @@ class TestFusionPattern(JitLlgaTestCase):
 
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')
-    @llga_test_env
     def test_view_permute(self):
         class M(nn.Module):
             def __init__(self):
@@ -763,7 +738,6 @@ class TestShapeFallback(JitLlgaTestCase):
             # Bailout get triggered here
             y2 = m(x2)
 
-    @llga_test_env
     def test_conv_reshape(self):
         class M(nn.Module):
             def __init__(self):
@@ -788,7 +762,6 @@ class TestShapeFallback(JitLlgaTestCase):
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
-    @llga_test_env
     def _test_vision(self, model_name):
         for memory_format in [torch.contiguous_format, torch.channels_last]:
             m = getattr(torchvision.models, model_name)().eval()

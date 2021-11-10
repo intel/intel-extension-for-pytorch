@@ -6,7 +6,6 @@ from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
 import time, sys
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
-from test_jit_llga_quantization_fuser import llga_test_env
 import torch.fx.experimental.optimization as optimization
 
 class SimpleNet(torch.nn.Module):
@@ -137,7 +136,6 @@ class TestJitRuntimeAPI(JitTestCase):
 
 class TestLLGARuntimeAPI(JitLlgaTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    @llga_test_env
     def test_int8_simpleNet_task_core_bind(self):
         with torch.no_grad():
             model = SimpleNet_v2()
