@@ -29,7 +29,26 @@ void mayConvertScalarInputToTensor(Node* node) {
     // tensor(42.0) : Float([])  -->  tensor([42.0]) : Float([1])
     auto unsqueezed = g->insert(aten::unsqueeze, {t, 0});
     node->replaceInput(1, unsqueezed);
+    // Add a mark here and convert tensor back to scalar later on for unfused
+    // add/div
+    node->i_(Symbol::attr("scalar"), true);
   }
+}
+
+void mayConvertTensorToScalarInput(Node* node) {
+  if (node->numAttributes() == 0) {
+    return;
+  }
+  TORCH_CHECK(
+      node->hasAttributeS("scalar"),
+      "add or div node with numAttributes != 0 must have attr: scalar");
+
+  auto unsqueeze_node = node->input(1)->node();
+  auto as_tensor_node = unsqueeze_node->input(0)->node();
+  auto scalar_value = as_tensor_node->input(0);
+  node->replaceInput(1, scalar_value);
+
+  node->removeAttributeS("scalar");
 }
 
 static void ConvertScalarToTensor(Block* block) {
@@ -40,6 +59,18 @@ static void ConvertScalarToTensor(Block* block) {
 
     if (node->kind() == aten::add || node->kind() == aten::div) {
       mayConvertScalarInputToTensor(node);
+    }
+  }
+}
+
+static void ConvertTensorToScalar(Block* block) {
+  for (auto node : block->nodes()) {
+    for (auto sub : node->blocks()) {
+      ConvertTensorToScalar(sub);
+    }
+
+    if (node->kind() == aten::add || node->kind() == aten::div) {
+      mayConvertTensorToScalarInput(node);
     }
   }
 }
@@ -94,6 +125,10 @@ void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   // TODO: after conv-bn folding, bias will become bias? (Optional) after this pass 
   // and will lose it when using mustNotBeNone to check Optional Bias
   // PropagateInputShapes(graph);
+}
+
+void RevertPrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
+  ConvertTensorToScalar(graph->block());
 }
 
 } // namespace onednn

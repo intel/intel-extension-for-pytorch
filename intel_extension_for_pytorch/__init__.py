@@ -14,7 +14,7 @@ from . import quantization
 from . import nn
 
 from .utils import verbose
-from .frontend import optimize
+from .frontend import optimize, enable_onednn_fusion
 
 def check_avx_isa(binary_isa):
     import intel_extension_for_pytorch._C as core

@@ -21,10 +21,18 @@ thread_local int nesting = 0;
 
 thread_local at::ScalarType current_target_dtype = at::kFloat;
 thread_local bool int8_enabled = false;
+thread_local bool llga_fp32_bf16_enabled = false;
 } // namespace
 
 bool is_quantization_enabled() { return int8_enabled; }
 void set_quantization_enabled(bool new_enabled) { int8_enabled = new_enabled; }
+
+bool is_llga_fp32_bf16_enabled() {
+  return llga_fp32_bf16_enabled;
+}
+void set_llga_fp32_bf16_enabled(bool new_enabled) {
+  llga_fp32_bf16_enabled = new_enabled;
+}
 
 at::ScalarType get_autocast_dtype() { return current_target_dtype; }
 

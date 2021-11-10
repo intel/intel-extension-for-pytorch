@@ -159,10 +159,11 @@ class Conv_Relu_Add(nn.Module):
         super(Conv_Relu_Add, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv2 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
 
     def forward(self, x):
-        return torch.add(F.relu(self.conv(x), inplace=True),self.conv(x))
+        return torch.add(F.relu(self.conv1(x), inplace=True),self.conv2(x))
 
 class Conv_Bn_Relu(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -527,7 +528,7 @@ class Tester(TestCase):
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, levels=['O0','O1']):
         modelName = model.__class__.__name__
         for level in levels:
-            core.disable_jit_opt()
+            ipex.enable_onednn_fusion(False)
             model = model.eval()
             # It will be removed after jit support conv_bn folding
             if level == 'O0':
@@ -547,7 +548,7 @@ class Tester(TestCase):
 
             self.assertEqual(result, tresult)
 
-            core.enable_jit_opt()
+            ipex.enable_onednn_fusion(True)
             with torch.no_grad():
                 trace_fused_model = torch.jit.trace(model, x)
                 trace_fused_model = torch.jit.freeze(trace_fused_model)
@@ -571,7 +572,7 @@ class Tester(TestCase):
     def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1']):
         modelName = model.__class__.__name__
         for level in levels:
-            core.enable_jit_opt()
+            ipex.enable_onednn_fusion(True)
             model = model.eval()
             # It will be removed after jit support conv_bn folding
             if level == 'O0':

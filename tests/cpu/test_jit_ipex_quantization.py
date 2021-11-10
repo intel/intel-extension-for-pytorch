@@ -5,13 +5,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing import FileCheck
 
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_test_env
+from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 
 import intel_extension_for_pytorch as ipex
 
 
 class TestIpexOps(JitLlgaTestCase):
-    @llga_test_env
     def test_adaptive_avg_pool2d(self):
         class M(nn.Module):
             def __init__(self):
@@ -29,7 +28,6 @@ class TestIpexOps(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
 
-    @llga_test_env
     def test_flatten_int8(self):
         class M(nn.Module):
             def __init__(self):
@@ -58,7 +56,6 @@ class TestIpexOps(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
             self.checkPatterns(graph, patterns)
 
-    @llga_test_env
     def test_flatten_fp32(self):
         class M(nn.Module):
             def __init__(self):
@@ -79,7 +76,6 @@ class TestIpexOps(JitLlgaTestCase):
                 .check("aten::flatten") \
                 .run(graph)
 
-    @llga_test_env
     def test_embeddingbag_int8(self):
         m = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
         input = torch.LongTensor([1,2,4,5,4,3,2,9])
@@ -88,7 +84,6 @@ class TestIpexOps(JitLlgaTestCase):
             graph = self.checkQuantizeTrace(m, [input, offsets], atol=1e-2, config_name="emb", qscheme=qscheme)
             self.assertGraphContainsExactly(graph, 'ipex::qembedding_bag', 1)
 
-    @llga_test_env
     def test_interaction_int8(self):
         class M(nn.Module):
             def __init__(self):

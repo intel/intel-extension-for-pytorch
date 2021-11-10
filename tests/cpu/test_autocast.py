@@ -77,10 +77,10 @@ class TestAutocastWithJit(TestCase):
     def test_generate_autocast_jit_trace_model(self):
         def test_generate_autocast_jit_trace_model(model, x):
             model.eval()
-            ipex._C.disable_jit_opt()
+            ipex.enable_onednn_fusion(False)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
-            ipex._C.enable_jit_opt()
+            ipex.enable_onednn_fusion(True)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model2 = torch.jit.trace(model, x.clone())
         for i in range(self.models.__len__()):
@@ -89,13 +89,13 @@ class TestAutocastWithJit(TestCase):
     def test_nchw_autocast_jit_trace_model(self):
         def test_nchw_autocast_jit_trace_model(model, x):
             model.eval()
-            ipex._C.disable_jit_opt()
+            ipex.enable_onednn_fusion(False)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone())
                 y2 = model(x.clone())
-            ipex._C.enable_jit_opt()
+            ipex.enable_onednn_fusion(True)
             torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
         for i in range(self.models.__len__()):
             test_nchw_autocast_jit_trace_model(self.models[i], self.inputs[i])
@@ -103,13 +103,13 @@ class TestAutocastWithJit(TestCase):
     def test_nhwc_autocast_jit_trace_model(self):
         def test_nhwc_autocast_jit_trace_model(model, x):
             model.eval()
-            ipex._C.disable_jit_opt()
+            ipex.enable_onednn_fusion(False)
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 traced_model = torch.jit.trace(model, x.to(memory_format=torch.channels_last))
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
                 y = traced_model(x.clone().to(memory_format=torch.channels_last))
                 y2 = model(x.clone().to(memory_format=torch.channels_last))
-            ipex._C.enable_jit_opt()
+            ipex.enable_onednn_fusion(True)
             torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
         for i in range(self.models.__len__()):
             if self.inputs[i].size().__len__() == 5:
