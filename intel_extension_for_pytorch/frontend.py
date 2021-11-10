@@ -233,7 +233,19 @@ def optimize(
             optimized_optimizer, opt_properties.split_master_weight_for_bf16)
     return optimized_model, optimized_optimizer
 
+
 def enable_onednn_fusion(enabled):
+    r"""
+    Enables or disables oneDNN fusion based on the parameter `enabled`.
+    The fusion pass will be enabled by default when intel_extension_for_pytorch is imported.
+
+    Examples::
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to enable the oneDNN fusion
+        >>> ipex.enable_onednn_fusion(True)
+        >>> # to disable the oneDNN fusion
+        >>> ipex.enable_onednn_fusion(False)
+    """
     if enabled:
         core.enable_jit_opt()
     else:
