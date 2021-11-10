@@ -27,35 +27,6 @@ Tensor dequantize_tensor_per_tensor_affine(
     const Tensor& qtensor,
     double scale,
     int64_t zero_point) {
-  auto q_eng =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
-  memory::dims q_dims = qtensor.dim() == 4
-      ? memory::dims(
-            {qtensor.size(0),
-             qtensor.size(1),
-             qtensor.size(2),
-             qtensor.size(3)})
-      : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
-                           : memory::dims({qtensor.size(0)});
-  memory::data_type q_dt = get_onednn_dtype(qtensor);
-  memory::format_tag q_fmt = qtensor.dim() == 4
-      ? memory::format_tag::nchw
-      : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
-
-  auto q_md = memory::desc(q_dims, q_dt, q_fmt);
-  auto q_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(qtensor);
-  auto q_m = q_ctx.is_plain()
-      ? dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr())
-      : dpcpp_onednn_memory({q_ctx.meta()}, q_eng, qtensor.data_ptr());
-
-  memory::dims r_dims = q_m.get_desc().dims();
-  memory::data_type r_dt = get_onednn_dtype(rtensor);
-  memory::format_tag r_fmt = r_dims.size() == 4
-      ? memory::format_tag::nchw
-      : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
-  engine r_eng = q_eng;
-  memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
-
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
   std::vector<float> scls = {static_cast<float>(scale)};
@@ -63,7 +34,7 @@ Tensor dequantize_tensor_per_tensor_affine(
 
   rattr.set_src_sc_and_zp(mask, scls, mask, zps);
 
-  Tensor rtensor_ = empty_opaque_tensor(r_md, rtensor.options(), c10::nullopt);
+  Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
   xpu::oneDNN::reorder(qtensor, rtensor_, rattr);
 
   return rtensor_;
