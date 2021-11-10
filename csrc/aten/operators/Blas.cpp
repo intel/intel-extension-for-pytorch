@@ -260,7 +260,6 @@ void matmul(
         ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)}
         : std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
   }
-  Tensor bc_po = po;
   if (po.defined() && beta != 0) {
     TORCH_CHECK(
         check_broadcast(po, result_shape),
@@ -268,9 +267,10 @@ void matmul(
         po.sizes(),
         " cannot broadcast to ",
         result_shape);
-    std::tie(bc_po) = expand_size(po, result_shape, "gemm_broadcast");
-    if (!result.is_same(bc_po))
-      result.resize_(result_shape).copy_(bc_po);
+    c10::MaybeOwned<Tensor> bc_po =
+        expand_size(po, result_shape, "gemm_broadcast");
+    if (!result.is_same(*bc_po))
+      result.resize_(result_shape).copy_(*bc_po);
   } else {
     result.resize_(result_shape);
   }

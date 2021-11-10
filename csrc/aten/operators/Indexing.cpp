@@ -647,9 +647,9 @@ void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
 
 template <typename scalar_t>
 void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
-  Tensor mask;
-  std::tie(mask) = expand_inplace(tensor, mask_, "masked_scatter_");
-  auto maskSize = mask.numel();
+  c10::MaybeOwned<Tensor> mask =
+      expand_inplace(tensor, mask_, "masked_scatter_");
+  auto maskSize = (*mask).numel();
   auto tensorSize = tensor.numel();
   auto srcSize = src.numel();
 
@@ -660,7 +660,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   // Determine our output size
   c10::optional<ScalarType> dtype;
-  auto totalElements = at::AtenIpexTypeXPU::sum(mask, dtype).item().to<int>();
+  auto totalElements = at::AtenIpexTypeXPU::sum(*mask, dtype).item().to<int>();
 
   // The number of `1` elements present in the mask must be <= the
   // number of elements available in `src`
@@ -668,12 +668,13 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     TORCH_CHECK(false, "source nElements must be == mask `1` elements");
   }
 
-  Tensor maskLong = at::empty({0}, mask.options().dtype(kLong));
-  maskLong.resize_(mask.sizes());
-  maskLong.copy_(mask);
+  Tensor maskLong = at::empty({0}, (*mask).options().dtype(kLong));
+  maskLong.resize_((*mask).sizes());
+  maskLong.copy_(*mask);
 
   // Use a prefix sum to determine the output locations of the masked elements
-  Tensor maskPrefixSum = at::empty(mask.sizes(), mask.options().dtype(kLong));
+  Tensor maskPrefixSum =
+      at::empty((*mask).sizes(), (*mask).options().dtype(kLong));
 
   auto maskLong_size = maskLong.numel() * (maskLong.dtype().itemsize());
   auto maskPrefixSum_size =
@@ -713,7 +714,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
     auto acc_src_data = contigSrc.data_ptr<scalar_t>();
-    auto acc_mask_data = mask.data_ptr<bool>();
+    auto acc_mask_data = (*mask).data_ptr<bool>();
     auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
     auto acc_tensor_data = tensor.data_ptr<scalar_t>();
 
@@ -1189,18 +1190,17 @@ Tensor trace(const Tensor& self) {
 }
 
 Tensor& masked_fill_(Tensor& self, const Tensor& mask_, Scalar value) {
-  Tensor mask;
-  std::tie(mask) = expand_inplace(self, mask_, "masked_fill_");
+  c10::MaybeOwned<Tensor> mask = expand_inplace(self, mask_, "masked_fill_");
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
       "MaskedFill",
       [&]() {
-        if (mask.dtype() == at::ScalarType::Byte) {
-          impl::MaskedFill<scalar_t>(self, mask, value);
+        if ((*mask).dtype() == at::ScalarType::Byte) {
+          impl::MaskedFill<scalar_t>(self, *mask, value);
         } else {
-          impl::MaskedFillBool<scalar_t>(self, mask, value);
+          impl::MaskedFillBool<scalar_t>(self, *mask, value);
         }
       });
   return self;
@@ -1224,14 +1224,14 @@ Tensor& masked_scatter_(
 }
 
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
-  Tensor b_self, b_mask;
+  c10::MaybeOwned<Tensor> b_self, b_mask;
   std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
       "MaskedSelect",
-      [&]() { impl::MaskedSelect<scalar_t>(out, b_self, b_mask); });
+      [&]() { impl::MaskedSelect<scalar_t>(out, *b_self, *b_mask); });
   return out;
 }
 

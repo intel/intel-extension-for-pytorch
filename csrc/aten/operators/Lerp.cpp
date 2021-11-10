@@ -46,15 +46,15 @@ Tensor& lerp_out(
     const Tensor& self,
     const Tensor& end,
     const Tensor& weight) {
-  Tensor b_self, b_end, b_weight;
+  c10::MaybeOwned<Tensor> b_self, b_end, b_weight;
   TORCH_CHECK(
       weight.dim() <= std::max(self.dim(), end.dim()),
       "weight should be of dimension max(self.dim(), end.dim()) or lesser");
   std::tie(b_self, b_end, b_weight) =
       expand_outplace(self, end, weight, "lerp_out");
-  out.resize_as_(b_self);
+  out.resize_as_(*b_self);
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
-    impl::lerp<scalar_t>(out, b_self, b_end, b_weight);
+    impl::lerp<scalar_t>(out, *b_self, *b_end, *b_weight);
   });
   return out;
 }
@@ -64,52 +64,52 @@ Tensor& lerp_out(
     const Tensor& self,
     const Tensor& end,
     Scalar weight) {
-  Tensor b_self, b_end;
+  c10::MaybeOwned<Tensor> b_self, b_end;
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_out");
-  out.resize_as_(b_self);
+  out.resize_as_(*b_self);
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
     impl::lerp<scalar_t>(
         out,
-        b_self,
-        b_end,
+        *b_self,
+        *b_end,
         wrapped_scalar_tensor(weight, at::kXPU).to(self.dtype()));
   });
   return out;
 }
 
 Tensor& lerp_(Tensor& self, const Tensor& end, const Tensor& weight) {
-  Tensor b_self, b_end, b_weight;
+  c10::MaybeOwned<Tensor> b_self, b_end, b_weight;
   std::tie(b_self, b_end, b_weight) =
       expand_outplace(self, end, weight, "lerp_");
   TORCH_CHECK(
-      b_self.sizes() == self.sizes(),
+      (*b_self).sizes() == self.sizes(),
       "output with shape ",
       self.sizes(),
       " doesn't match the broadcast shape ",
-      b_self.sizes());
+      (*b_self).sizes());
   TORCH_CHECK(
       weight.dim() <= std::max(self.dim(), end.dim()),
       "weight should be of dimension max(self.dim(), end.dim()) or lesser");
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
-    impl::lerp<scalar_t>(self, b_self, b_end, b_weight);
+    impl::lerp<scalar_t>(self, *b_self, *b_end, *b_weight);
   });
   return self;
 }
 
 Tensor& lerp_(Tensor& self, const Tensor& end, Scalar weight) {
-  Tensor b_self, b_end;
+  c10::MaybeOwned<Tensor> b_self, b_end;
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_");
   TORCH_CHECK(
-      b_self.sizes() == self.sizes(),
+      (*b_self).sizes() == self.sizes(),
       "output with shape ",
       self.sizes(),
       " doesn't match the broadcast shape ",
-      b_self.sizes());
+      (*b_self).sizes());
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
     impl::lerp<scalar_t>(
         self,
-        b_self,
-        b_end,
+        *b_self,
+        *b_end,
         wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
   });
   return self;
