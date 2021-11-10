@@ -289,7 +289,8 @@ class LinearAdd(nn.Module):
         self.linear1 = nn.Linear(in_channels, out_channels, **kwargs)
 
     def forward(self, x):
-        return torch.add(self.linear(x),self.linear1(x))
+        x1 = x.clone()
+        return torch.add(self.linear(x),self.linear1(x1))
 
 class Linear_Reshape_Relu(nn.Module):
     def __init__(self, in_channels, out_channels,dest_shape, **kwargs):
@@ -523,6 +524,21 @@ class AddLayerNorm_v1(torch.nn.Module):
         x = x + y + z
         return self.layernorm(x)
 
+class ModMultLinear(nn.Module):
+    def __init__(self, w1_dim, w2_dim):
+         super(ModMultLinear, self).__init__()
+         self.linear1 = nn.Linear(5, w1_dim)
+         self.linear2 = nn.Linear(5, w2_dim)
+         self.linear3 = nn.Linear(w1_dim, 5)
+         self.linear4 = nn.Linear(w1_dim, 5)
+
+    def forward(self, x):
+         res1 = self.linear1(x)
+         res2 = self.linear2(x)
+         res3 = self.linear3(res1)
+         res4 = self.linear4(res1)
+         return res1, res2, res3, res4
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, levels=['O0','O1']):
@@ -559,7 +575,6 @@ class Tester(TestCase):
                 trace_graph = trace_fused_model.graph_for(x)
                 fused_tresult = trace_fused_model(x)
             self.assertEqual(result, fused_tresult)
-
             # check if the fused node exists in the graph
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
@@ -632,7 +647,62 @@ class Tester(TestCase):
         self.assertTrue(all(n.kind() != node for n in freeze_graph.nodes()))
         #  prepack op need note in none freeze model
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-    
+
+    def test_concat_linear(self):
+        def check_op_count(graph_str, op_names=[]):
+            count = 0
+            node_list = graph_str.strip().split("\n")
+            for node in node_list:
+                for op_name in op_names:
+                  if op_name in node:
+                    count += 1
+            return count
+        origin_model = ModMultLinear(50, 60).eval()
+
+        test_val1 = torch.rand([50, 5])
+        # call mkl path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32)
+        ori_res = model(test_val1)
+        model_jit = torch.jit.trace(model,(test_val1))
+        graph_ori = str(model_jit.graph_for(test_val1))
+        linear_count_ori = check_op_count(graph_ori, ["aten::linear"])
+        self.assertEqual(linear_count_ori, 4)
+        model_jit = torch.jit.freeze(model_jit)
+        jit_res = model_jit(test_val1)
+        self.assertEqual(ori_res, jit_res)
+        graph_opt = str(model_jit.graph_for(test_val1))
+        linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
+        self.assertEqual(linear_count_ori, 2)
+        # call onednn path(fp32)
+        model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
+        ori_res = model(test_val1)
+        model_jit = torch.jit.trace(model,(test_val1))
+        graph_ori = str(model_jit.graph_for(test_val1))
+        linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
+        self.assertEqual(linear_count_ori, 4)
+        model_jit = torch.jit.freeze(model_jit)
+        jit_res = model_jit(test_val1)
+        self.assertEqual(ori_res, jit_res)
+        graph_opt = str(model_jit.graph_for(test_val1))
+        linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
+        self.assertEqual(linear_count_ori, 2)
+
+        model = ipex.optimize(origin_model, dtype=torch.bfloat16)
+        test_val1 = test_val1.bfloat16()
+        with torch.cpu.amp.autocast(), torch.no_grad():
+            ori_res = model(test_val1)
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            model_jit(test_val1)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res[1], jit_res[1])
+            linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
+            self.assertEqual(linear_count_ori, 2)
+
     def test_add_layernorm(self):
         bs = 56
         seq_len = 384
@@ -647,7 +717,7 @@ class Tester(TestCase):
         self.assertEqual(jit_res, ori_res)
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-        
+
         a_bf16 = a.to(torch.bfloat16)
         b_bf16 = b.to(torch.bfloat16)
         with torch.cpu.amp.autocast():
@@ -668,7 +738,6 @@ class Tester(TestCase):
         self.assertEqual(jit_res, ori_res)
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-
 
     def test_mha_scores_calculation(self):
         def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
@@ -1027,7 +1096,7 @@ class Tester(TestCase):
                 "output_padding": [0],  # TODO: fix output_padding  >1.
                 "groups": [1, 2],
                 "dilation": [1, 2],
-            }  
+            }
 
             params_list = []
 

@@ -237,7 +237,9 @@ at::Tensor ipex_linear(
 namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def("ipex_linear(Tensor input, Tensor weight, int out_features, int in_features, Tensor? bias_opt) -> Tensor", torch_ipex::cpu::ipex_linear);
+  m.def(
+      "ipex_linear(Tensor input, Tensor weight, int out_features, int in_features, Tensor? bias) -> Tensor",
+      torch_ipex::cpu::ipex_linear);
 }
 
 }

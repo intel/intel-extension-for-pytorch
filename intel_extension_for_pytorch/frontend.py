@@ -233,3 +233,8 @@ def optimize(
             optimized_optimizer, opt_properties.split_master_weight_for_bf16)
     return optimized_model, optimized_optimizer
 
+def enable_onednn_fusion(enabled):
+    if enabled:
+        core.enable_jit_opt()
+    else:
+        core.disable_jit_opt()

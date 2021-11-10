@@ -2,6 +2,7 @@
 #include "fusion_pass.h"
 #include "graph_rewrite.h"
 
+#include "concat_linear.h"
 #include "cpu/CustomOPs.h"
 #include "cpu/Pooling.h"
 
@@ -30,7 +31,6 @@ struct hash<std::pair<Symbol, Symbol>> {
 }
 
 namespace torch { namespace jit {
-
 //
 // The main goal of MKL-DNN fusion is to limit bandwidth wasting.
 // MKL-DNN provided post ops to fuse ops in its output stage
@@ -299,6 +299,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   RemoveProfileNodesAndSpecializeTypes(graph);
   // remove dropout;
   torch::jit::removeDropout(graph);
+
+  // concat multi-linear with same input
+  FrozenConcatLinear(graph);
 
   // Fuse the scores calculation(dim + matmul + (add)? + softmax) for
   // Multi-Head-Attention
