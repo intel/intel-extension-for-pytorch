@@ -389,20 +389,24 @@ struct ReduceOp {
       const dpcpp_local_ptr_pt<int>& last_wg_done_ptr,
       int* smem,
       const DPCPP::nd_item<2>& item_id) const {
-    item_id.barrier(dpcpp_global_and_local_fence);
+    // sync workloads above in WG
+    DPCPP::group_barrier(item_id.get_group());
+
+    // WGs sync. read-modify-write sync, using acquire_release ordering
+    dpcpp_atomic_ref_t<int> at_var(*(smem + item_id.get_group(1)));
     if (item_id.get_local_linear_id() == 0) {
-      dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr(
-          (dpcpp_global_ptr_pt<int>)smem);
-      DPCPP::atomic<int> at_var(sema_multi_ptr + item_id.get_group(1));
-      int prev_blocks_finished = at_var.fetch_add(1);
+      int prev_blocks_finished = at_var.fetch_add(
+          1, dpcpp_mem_odr_acq_rel
+          /* , default memory scope is device */);
 
       last_wg_done_ptr[0] =
           (prev_blocks_finished ==
            static_cast<int>(item_id.get_group_range(0) - 1));
     }
-    item_id.barrier(dpcpp_global_and_local_fence);
+
+    // ensure all WIs update the status `is_last_block_done`
+    DPCPP::group_barrier(item_id.get_group());
     bool is_last_block_done = last_wg_done_ptr[0];
-    item_id.barrier(dpcpp_global_and_local_fence);
     return is_last_block_done;
   }
 
