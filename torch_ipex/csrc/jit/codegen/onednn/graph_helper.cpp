@@ -1,6 +1,7 @@
-#include "torch_ipex/csrc/LlgaTensorImpl.h"
 #include "jit/codegen/onednn/graph_helper.h"
 #include "jit/codegen/onednn/fusion_group_name.h"
+#include "torch_ipex/csrc/LlgaTensorImpl.h"
+#include "torch_ipex/csrc/autocast_mode.h"
 
 #include <ATen/core/functional.h>
 #include <torch/csrc/jit/jit_log.h>
@@ -432,6 +433,29 @@ void mayAddListConstructIntoConcatPartition(
   }
 }
 
+// Currently, we only rewrite quantization partitions with LLGA.
+// TODO: remove this check in the future if we want to use LLGA for fp32 and
+// bf16
+bool shouldRewrite(dnnl::graph::partition partition) {
+  // TODO: debug feature to enable llga for fp32 and bf16
+  if (torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+    return true;
+  }
+
+  // check if the partition is quantization-related
+  auto opIds = partition.get_ops();
+  for (size_t opId : opIds) {
+    auto node_in_partition = Operator::getNode(opId);
+    if (node_in_partition->kind() == Symbol::aten("quantize_per_tensor") ||
+        node_in_partition->kind() == Symbol::aten("quantize_per_channel") ||
+        node_in_partition->kind() == Symbol::aten("dequantize")) {
+      return true;
+    }
+  }
+  GRAPH_DEBUG("Excluding non-quantization partition ", partition.get_id());
+  return false;
+}
+
 LlgaGraphHelper::LlgaGraphHelper(
     const std::shared_ptr<Graph>& graph,
     dnnl::graph::partition::policy policy) {
@@ -455,7 +479,7 @@ LlgaGraphHelper::LlgaGraphHelper(
   std::vector<dnnl::graph::partition> partitions = g.get_partitions(policy);
   // excluded unsupported Wildcard partitions
   for (size_t partId = 0; partId < partitions.size(); partId++) {
-    if (partitions[partId].is_supported())
+    if (partitions[partId].is_supported() && shouldRewrite(partitions[partId]))
       partitions_.push_back(partitions[partId]);
   }
 

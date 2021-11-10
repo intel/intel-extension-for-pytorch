@@ -6,5 +6,6 @@
 
 namespace torch { namespace jit {
 void FusionPass(std::shared_ptr<Graph>& graph);
+void IPEXFusionPass(std::shared_ptr<Graph>& graph);
 void FoldPrepackingOps(script::Module& m);
 }} // namespace torch::jit

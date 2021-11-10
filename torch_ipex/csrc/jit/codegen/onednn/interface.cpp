@@ -40,14 +40,10 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
   // TODO: add check on LlgaFusionGroup to ensure allShapesAreKnown on nodes to
   // fuse: torch/csrc/jit/passes/tensorexpr_fuser.cpp: allShapesAreKnown
   if (getProfilingMode()) {
-    GRAPH_DUMP("Before RemoveProfileNodesAndSpecializeTypes. Beginning of LLGA "
-               "optimization pass",
-               g);
-    RemoveProfileNodesAndSpecializeTypes(g);
     GRAPH_DUMP(
-        "After RemoveProfileNodesAndSpecializeTypes. Before mutation removal",
+        "Before mutation removal. Beginning of INT8 "
+        "optimization pass",
         g);
-
     RemoveTensorMutation(g);
     RemoveListMutation(g);
     GRAPH_DUMP("After mutation removal. Before DecomposeOps", g);
@@ -88,15 +84,14 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
     // Add shape guard for profiling mode and wipe the tensor type information
     // from the IR
     prepareFusionGroupAndGuardOutputs(g->block());
-    GRAPH_DUMP("After prepareFusionGroupAndGuardOutputs. Before "
-               "RemoveTensorTypeSpecializations",
-               g);
-    RemoveTensorTypeSpecializations(g);
     GRAPH_DUMP(
-        "After RemoveTensorTypeSpecializations. Before IPEX optimization pass",
+        "After prepareFusionGroupAndGuardOutputs. Before "
+        "RevertPrepareBinaryForLLGA",
         g);
+    RevertPrepareBinaryForLLGA(g);
+    GRAPH_DUMP("After RevertPrepareBinaryForLLGA. Before IpexQuantFusion", g);
     IpexQuantFusion(g);
-    GRAPH_DUMP("After IpexQuantFusion. End of IPEX optimization pass", g);
+    GRAPH_DUMP("After IpexQuantFusion. End of INT8 optimization pass", g);
   }
 }
 

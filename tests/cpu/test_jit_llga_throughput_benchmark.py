@@ -6,8 +6,8 @@ from torch.testing import assert_allclose
 from torch.testing._internal.common_utils import run_tests, TestCase
 
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
-from test_jit_llga_quantization_fuser import llga_test_env
 
 class LinearEltwise(torch.nn.Module):
     def __init__(self, D_in, H, D_out):
@@ -26,7 +26,6 @@ def freeze(model):
     return torch.jit._recursive.wrap_cpp_module(torch._C._freeze_module(model._c, preserveParameters=True))
 
 class TestThroughputBenchmark(JitLlgaTestCase):
-    @llga_test_env
     def test_linear_eltwise(self):
         with torch.no_grad():
             D_in = 10
@@ -39,9 +38,9 @@ class TestThroughputBenchmark(JitLlgaTestCase):
 
             graph, m_llga, m_cpu = self.prepareModel(m, [x])
 
-            ipex._C._jit_set_llga_enabled(False)
+            ipex.enable_onednn_fusion(False)
             module_result = m_cpu(x)
-            ipex._C._jit_set_llga_enabled(True)
+            ipex.enable_onednn_fusion(True)
 
             bench = ThroughputBenchmark(m_llga)
             bench.add_input(x)

@@ -25,6 +25,9 @@ namespace onednn {
 //
 void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph);
 
+// For unfused add/div, convert tensor input back to scalar input
+void RevertPrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph);
+
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
