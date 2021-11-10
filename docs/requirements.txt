@@ -1,0 +1,7 @@
+wheel
+sphinx
+sphinx_rtd_theme
+sphinx-markdown-tables
+sphinx_md
+sphinxemoji
+recommonmark

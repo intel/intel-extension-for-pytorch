@@ -3,12 +3,10 @@ from torch import nn
 
 class FrozenBatchNorm2d(nn.Module):
     """
-    BatchNorm2d where the batch statistics and the affine parameters
-    are fixed
+    BatchNorm2d where the batch statistics and the affine parameters are fixed
 
     Args:
-        num_features: :math:`C` from an expected input of size
-            :math:`(N, C, H, W)`
+        num_features: :math:`C` from an expected input of size :math:`(N, C, H, W)`
 
     Shape:
         - Input: :math:`(N, C, H, W)`

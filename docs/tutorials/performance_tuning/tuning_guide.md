@@ -1,4 +1,7 @@
-# Overview
+Performance Tuning Guide
+========================
+
+## Overview
 
 Intel Extension for PyTorch (IPEX) is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. To fully utilize the power of Intel® architecture and thus yield high performance, PyTorch, as well as IPEX, are powered by [oneAPI Deep Neural Network Library (oneDNN)](https://github.com/oneapi-src/oneDNN), an open-source cross-platform performance library of basic building blocks for deep learning applications. It is developed and optimized for Intel Architecture Processors, Intel Processor Graphics and Xe architecture-based Graphics.
 
@@ -23,11 +26,11 @@ Although by default primitives of PyTorch and IPEX are highly optimized, there a
     - TCMalloc
   - Denormal Number
 
-# Hardware Configuration
+## Hardware Configuration
 
 This section briefly instroduces structure of Intel CPUs, as well as concept of Non-Uniform Memory Access (NUMA), as background knowledges.
 
-## Intel CPU Structure
+### Intel CPU Structure
 
 There are a bunch of SKUs or families of Intel CPUs. In this article, Intel® Xeon® processor Scalable family is used as an example to show briefly what is Intel CPU, and how it works. Understanding these background knowledge is helpful to understand the optimization methodologies that Intel engineers recommend to use.
 
@@ -51,7 +54,7 @@ Figure 1.3 Typical two-socket configuration
 
 Figure 1.4 An ASUS Z11PA-D8 Intel® Xeon® server motherboard. It contains two sockets for Intel® Xeon® processor Scalable family CPUs.
 
-## Non-Uniform Memory Access (NUMA)
+### Non-Uniform Memory Access (NUMA)
 
 It is a good thing that more and more CPU cores are provided to users in one socket, because this brings more computation resources. However, this also brings memory access competitions. Program can stall because memory is busy to visit. To address this problem, Non-Uniform Memory Access (NUMA) was introduced. Comparing to Uniform Memory Access (UMA), in which scenario all memories are connected to all cores equally, NUMA tells memories into multiple groups. Certain number of memories are directly attached to one socket's integrated memory controller to become local memory of this socket. As described in the previous section, local memory access is much faster than remote memory access.
 
@@ -73,11 +76,11 @@ NUMA node1 CPU(s):   28-55,84-111
 ...
 ```
 
-# Software Configuration
+## Software Configuration
 
 This section introduces software configurations that helps to boost performance.
 
-## Numactl
+### Numactl
 
 Since NUMA largely influences memory access performance, this functionality should also be implemented in software side.
 
@@ -95,7 +98,7 @@ Assume core 0-3 are on socket 0, the following command binds script execution on
 
 [1] [Wikipedia - Non-uniform memory access](https://en.wikipedia.org/wiki/Non-uniform_memory_access)
 
-## OpenMP
+### OpenMP
 
 OpenMP is an implementation of multithreading, a method of parallelizing whereby a primary thread (a series of instructions executed consecutively) forks a specified number of sub-threads and the system divides a task among them. The threads then run concurrently, with the runtime environment allocating threads to different processors.[1] Figure 2.1 illustrates fork-join model of OpenMP execution.
 
@@ -109,7 +112,7 @@ GNU OpenMP (libgomp) is the default multi-threading library for both PyTorch and
 
 [1] [Wikipedia - OpenMP](https://en.wikipedia.org/wiki/OpenMP)
 
-### OMP_NUM_THREADS
+#### OMP_NUM_THREADS
 
 Environment variable OMP_NUM_THREADS sets the number of threads to use for parallel regions. By default, it is set to be number of available physical cores. It can be used alongwith numactl settings, as the following example. If cores 0-3 are on socket 0, this example command runs \<script\> on cores 0-3, with 4 OpenMP threads.
 
@@ -120,7 +123,7 @@ export OMP_NUM_THREADS=4
 numactl -C 0-3 --membind 0 python <script>
 ```
 
-### GNU OpenMP
+#### GNU OpenMP
 
 Beside OMP_NUM_THREADS, A couple of GNU OpenMP specific environment variables are commonly used to improve performance.
 
@@ -136,7 +139,7 @@ export OMP_PROC_BIND=CLOSE
 export OMP_SCHEDULE=STATIC
 ```
 
-### Intel OpenMP
+#### Intel OpenMP
 
 By default, PyTorch uses GNU OpenMP (GNU libgomp) for parallel computation. On Intel platforms, Intel OpenMP Runtime Library (libiomp) provides OpenMP API specification support. It sometimes brings more performance benefits compared to libgomp. Utilizing environment variable LD_PRELOAD can switch OpenMP library to libiomp:
 
@@ -156,7 +159,7 @@ A common usage scenario is that We would like consecutive threads to be bound cl
 export KMP_AFFINITY=granularity=fine,compact,1,0
 ```
 
-![KMP_AFFINITY=granularity=fine,compact,1,0](https://software.intel.com/content/dam/dita/develop/fortran-compiler-developer-guide-and-reference-07-13-2020/GUID-834A4CC5-BE33-4DD2-95FE-0ED923D446A1.jpg/_jcr_content/renditions/cq5dam.web.1280.1280.jpeg)
+![KMP_AFFINITY=granularity=fine,compact,1,0](../../../images/performance_tuning_guide/kmp_affinity.jpg)
 
 Figure 2.2 *KMP_AFFINITY=granularity=fine,compact,1,0* The OpenMP thread n+1 is bound to a thread context as close as possible to OpenMP thread n, but on a different core. Once each core has been assigned one OpenMP thread, the subsequent OpenMP threads are assigned to the available cores in the same order, but they are assigned on different thread contexts.
 
@@ -178,7 +181,7 @@ After completing the execution of a parallel region, threads wait for new parall
 export KMP_BLOCKTIME=0 (or 1)
 ```
 
-## Memory Allocator
+### Memory Allocator
 
 Memory allocator plays an important role from performance perspective as well. A more efficient memory usage reduces overhead on unnecessary memory allocations or destructions, and thus results in a faster execution. From practical experiences, for deep learning workloads, Jemalloc or TCMalloc can get better performance by reusing memory as much as possible than default malloc funtion.
 
@@ -188,9 +191,9 @@ It is as simple as adding path of Jemalloc/TCMalloc dynamic library to environme
 export LD_PRELOAD=<jemalloc.so/tcmalloc.so>:$LD_PRELOAD
 ```
 
-### Jemalloc
+#### Jemalloc
 
-[Jemalloc](https://github.com/jemalloc/jemalloc) is a general purpose malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support. 
+[Jemalloc](https://github.com/jemalloc/jemalloc) is a general purpose malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support. More detailed introduction of performance tuning with Jemalloc can be found at [Jemalloc tuning guide](https://android.googlesource.com/platform/external/jemalloc_new/+/6e6a93170475c05ebddbaf3f0df6add65ba19f01/TUNING.md)
 
 Getting Jemalloc is straight-forward.
 ```
@@ -201,7 +204,7 @@ make
 make install
 ```
 
-### TCMalloc
+#### TCMalloc
 
 [TCMalloc](https://github.com/google/tcmalloc) also features a couple of optimizations to speed up program executions. One of them is holding memory in caches to speed up access of commonly-used objects. Holding such caches even after deallocation also helps avoid costly system calls if such memory is later re-allocated. It is part of [gpertools](https://github.com/gperftools/gperftools), a collection of a high-performance multi-threaded malloc() implementation, plus some pretty nifty performance analysis tools.
 
@@ -216,7 +219,7 @@ make
 make install
 ```
 
-## Denormal Number
+### Denormal Number
 
 [Denormal number](https://en.wikipedia.org/wiki/Denormal_number) is used to store extremely small numbers which are close to 0. Computations with denormal numbers are remarkably slower than normalized number. To solve the low performance issue caused by denormal numbers, users can use the following PyTorch API function.
 

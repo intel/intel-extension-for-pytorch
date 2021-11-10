@@ -48,7 +48,23 @@ def roi_align(
     aligned: bool = False,
 ) -> Tensor:
     """
-    Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN.
+    Performs Region of Interest (RoI) Align operator with average pooling, as described in Mask R-CNN. It is optimized with parallelization and channels last support on the basis of the torchvision's roi_align.
+
+    The semantics of Intel® Extension for PyTorch* roi_align is exactly the same as that of torchvision. We override roi_align in the torchvision with Intel® Extension for PyTorch* roi_align via ATen op registration. It is activated when Intel® Extension for PyTorch* is imported from the Python frontend or when it is linked by a C++ program. It is fully transparent to users.
+
+    In certain cases, if you are using a self-implemented roi_align class or function that behave exactly the same as the ones in torchvision, please import the optimized one in Intel® Extension for PyTorch* as the following examples to get performance boost on Intel platforms.
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from intel_extension_for_pytorch import roi_align
+
+    or
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from intel_extension_for_pytorch import RoIAlign
 
     Args:
         input (Tensor[N, C, H, W]): The input tensor, i.e. a batch with ``N`` elements. Each element
