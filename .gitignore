@@ -30,6 +30,7 @@ dist/
 docs/src/**/*
 docs/cpp/build
 docs/cpp/source/api
+docs/_build
 log
 test/.coverage
 test/.hypothesis/

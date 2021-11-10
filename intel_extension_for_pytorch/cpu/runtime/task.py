@@ -6,13 +6,17 @@ import intel_extension_for_pytorch as ipex
 from .cpupool import CPUPool
 
 class Task(object):
-    r"""An abstraction of computation based on PyTorch module and is scheduled asynchronously.
-        Args:
-            model (torch.jit.ScriptModule or torch.nn.Module): The input module.
-            cpu_pool (CPUPool): A object with type CPUPool includes all the CPU cores used to run Task asynchronously.
-        Returns:
-            Task: New created object with type of Task.
+    r"""
+    An abstraction of computation based on PyTorch module and is scheduled asynchronously.
+
+    Args:
+        model (torch.jit.ScriptModule or torch.nn.Module): The input module.
+        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): An intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains all CPU cores used to run Task asynchronously.
+
+    Returns:
+        intel_extension_for_pytorch.cpu.runtime.Task: Generated intel_extension_for_pytorch.cpu.runtime.Task object.
     """
+
     def __init__(self, module, cpu_pool: CPUPool):
         self.cpu_pool = cpu_pool
         assert type(self.cpu_pool) is CPUPool
