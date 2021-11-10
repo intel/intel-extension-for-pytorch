@@ -1,5 +1,5 @@
-INCLUDE(CheckCSourceRuns)
-INCLUDE(CheckCXXSourceRuns)
+INCLUDE(CheckCSourceCompiles)
+INCLUDE(CheckCXXSourceCompiles)
 
 SET(AVX2_CODE "
   #include <immintrin.h>
@@ -15,15 +15,13 @@ SET(AVX2_CODE "
 ")
 
 SET(AVX512_CODE "
-  #include <stdint.h>
   #include <immintrin.h>
 
-  int main() {
-    __m256i src;
-    __mmask16 mask;
-    int16_t addr[16];
-    // detect avx512f, avx512bw and avx512vl.
-    _mm512_cvtepi16_epi32(_mm256_mask_loadu_epi16(src, mask, (void *)addr));
+  int main()
+  {
+    __m512i a = _mm512_set1_epi8(0);
+    __m512i b = a;
+    __mmask64 equality_mask = _mm512_cmp_epi8_mask(a, b, _MM_CMPINT_EQ);
     return 0;
   }
 ")
@@ -47,9 +45,9 @@ MACRO(CHECK_SSE lang type flags)
     IF(NOT ${lang}_${type}_FOUND)
       SET(CMAKE_REQUIRED_FLAGS ${__FLAG})
       IF(lang STREQUAL "CXX")
-        CHECK_CXX_SOURCE_RUNS("${${type}_CODE}" ${lang}_HAS_${type}_${__FLAG_I})
+        CHECK_C_SOURCE_COMPILES("${${type}_CODE}" ${lang}_HAS_${type}_${__FLAG_I})
       ELSE()
-        CHECK_C_SOURCE_RUNS("${${type}_CODE}" ${lang}_HAS_${type}_${__FLAG_I})
+        CHECK_C_SOURCE_COMPILES("${${type}_CODE}" ${lang}_HAS_${type}_${__FLAG_I})
       ENDIF()
       IF(${lang}_HAS_${type}_${__FLAG_I})
         SET(${lang}_${type}_FOUND TRUE CACHE BOOL "${lang} ${type} support")
@@ -71,8 +69,5 @@ ENDMACRO()
 CHECK_SSE(C "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
 CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
 
-CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
-CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
-
-CHECK_SSE(C "AVX512_BF16" " ;-mavx512f -mavx512bf16")
-CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512f -mavx512bf16")
+CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mfma;/arch:AVX512")
+CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mfma;/arch:AVX512")
