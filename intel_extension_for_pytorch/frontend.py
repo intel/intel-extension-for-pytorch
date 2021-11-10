@@ -217,7 +217,7 @@ def optimize(
 
     # convert optimizer for training case.
     params_attr = {}
-    if dtype == torch.bfloat16:
+    if dtype == torch.bfloat16 and model.training:
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
     if opt_properties.weights_prepack:

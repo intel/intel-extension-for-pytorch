@@ -75,6 +75,7 @@ def replace_dropout_with_identity(model):
 def convert_module_data_type(module, dtype):
     # convert weights(bias) of module to dtype to reduce dtype reorder
     module_convert_list = [torch.nn.Conv2d,
+                           torch.nn.ConvTranspose2d,
                            torch.nn.Linear,
                            torch.nn.Embedding,
                            torch.nn.LSTM]

@@ -29,6 +29,16 @@ class TestOptimizeCases(TestCase):
             self.assertTrue(any(n.kind() == "aten::batch_norm" for n in trace_graph.nodes()))
             # TODO check weight_prepack.
 
+    def test_optimize_bf16_model(self):
+        model = ConvBatchNorm()
+        optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
+        # model should not has master weight attr for infernence model.
+        self.assertTrue(not hasattr(optimized_model.conv, 'master_weight'))
+        # model should has master weight attr for infernence model.
+        sgd = torch.optim.SGD(model.parameters(), lr=0.1)
+        optimized_model, optimized_sgd = ipex.optimize(model.train(), optimizer=sgd, dtype=torch.bfloat16, split_master_weight_for_bf16=False)
+        self.assertTrue(hasattr(optimized_model.conv, 'master_weight'))
+
     def test_optimize_inplace_behavior_eval_mode(self):
         M_ori = TestModule()
         options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
