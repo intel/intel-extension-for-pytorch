@@ -302,7 +302,7 @@ Tensor triu_indices_dpcpp(
     int64_t col,
     int64_t offset,
     const TensorOptions& options) {
-  check_args(row, col, options);
+  check_args(row, col, options.layout());
 
   auto triu_size = row * col - get_tril_size(row, col, offset - 1);
   auto tensor =
@@ -340,7 +340,7 @@ Tensor tril_indices_dpcpp(
     int64_t col,
     int64_t offset,
     const TensorOptions& options) {
-  check_args(row, col, options);
+  check_args(row, col, options.layout());
 
   auto tril_size = get_tril_size(row, col, offset);
   auto tensor =
