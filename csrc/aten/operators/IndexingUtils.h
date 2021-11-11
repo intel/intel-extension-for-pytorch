@@ -56,7 +56,7 @@ static void checkIndexTensorTypes(TensorList indices) {
     if (tensor.defined()) {
       auto scalarType = tensor.scalar_type();
       if (scalarType != kLong && scalarType != kByte && scalarType != kBool) {
-        TORCH_CHECK_INDEX(
+        TORCH_CHECK(
             "tensors used as indices must be long, byte or bool tensors");
       }
     }
