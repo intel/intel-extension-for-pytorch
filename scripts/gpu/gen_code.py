@@ -347,8 +347,7 @@ BACKEND_FUNCTION_REGISTRATION = CodeTemplate("""\
 
 BACKEND_UNBOXEDONLY_FUNCTION_REGISTRATION = CodeTemplate("""\
   m.impl("${unqual_operator_name_with_overload}",
-  torch::dispatch(c10::DispatchKey::${Backend},
-  torch::CppFunction::makeUnboxedOnly(&${Type}_impl::${native_type_method_dispatch}))
+  TORCH_FN(${Type}_impl::${native_type_method_dispatch})
   );
 """)
 

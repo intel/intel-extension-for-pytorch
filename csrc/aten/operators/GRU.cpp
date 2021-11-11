@@ -385,11 +385,7 @@ std::tuple<Tensor, Tensor> gru_xpu(
 }
 
 TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl(
-      "gru.input",
-      torch::dispatch(
-          c10::DispatchKey::AutogradXPU,
-          torch::CppFunction::makeUnboxedOnly(&AtenIpexTypeXPU::gru_xpu)));
+  m.impl("gru.input", TORCH_FN(AtenIpexTypeXPU::gru_xpu));
 }
 
 } // namespace AtenIpexTypeXPU

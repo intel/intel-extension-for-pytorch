@@ -214,11 +214,7 @@ std::tuple<Tensor, Tensor, Tensor> lstm_xpu(
 }
 
 TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl(
-      "lstm.input",
-      torch::dispatch(
-          c10::DispatchKey::AutogradXPU,
-          torch::CppFunction::makeUnboxedOnly(&AtenIpexTypeXPU::lstm_xpu)));
+  m.impl("lstm.input", TORCH_FN(AtenIpexTypeXPU::lstm_xpu));
 }
 } // namespace AtenIpexTypeXPU
 } // namespace at

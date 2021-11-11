@@ -948,11 +948,7 @@ Tensor cdist(
 }
 
 TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl(
-      "cdist",
-      torch::dispatch(
-          c10::DispatchKey::AutogradXPU,
-          torch::CppFunction::makeUnboxedOnly(&AtenIpexTypeXPU::cdist)));
+  m.impl("cdist", TORCH_FN(AtenIpexTypeXPU::cdist));
 }
 
 } // namespace AtenIpexTypeXPU
