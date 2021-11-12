@@ -100,5 +100,14 @@ DPCPPGeneratorImpl* DPCPPGeneratorImpl::clone_impl() const {
   return gen;
 }
 
+void DPCPPGeneratorImpl::set_state(const c10::TensorImpl& new_state) {
+  AT_ERROR("set_state, not implemented ...");
+  return;
+}
+
+c10::intrusive_ptr<c10::TensorImpl> DPCPPGeneratorImpl::get_state() const {
+  AT_ERROR("get_state, not implemented ...");
+}
+
 } // namespace dpcpp
 } // namespace xpu
