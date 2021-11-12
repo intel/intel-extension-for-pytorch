@@ -31,12 +31,13 @@ class LayerNormTester(TestCase):
         with torch.cpu.amp.autocast(), torch.no_grad():
             x = torch.randn(20, 5, 10, 10)
             # layernorm input is bfloat16
+            # layernomr is in blacklist, so output is fp32
             model = M1().eval()
             trace_model = torch.jit.trace(model, x)
             y1_bf16 = model(x)
             y2_bf16 = trace_model(x)
-            self.assertEqual(y1_bf16.dtype, torch.bfloat16)
-            self.assertEqual(y2_bf16.dtype, torch.bfloat16)
+            self.assertEqual(y1_bf16.dtype, torch.float32)
+            self.assertEqual(y2_bf16.dtype, torch.float32)
             self.assertEqual(y1_bf16, y2_bf16, prec=0.03)
 
             # layernorm input is fp32
