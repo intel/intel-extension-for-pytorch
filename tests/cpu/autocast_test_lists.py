@@ -84,8 +84,6 @@ class AutocastCPUTestLists(object):
                                     torch.randn((n, n, n), device=dev, dtype=torch.float32))),
         ]
         self.torch_fp32 = [
-            ("avg_pool1d", dummy_bf16[2], {"kernel_size": 3, "stride": 1}),
-            ("binary_cross_entropy_with_logits", mat0_bf16 + (torch.rand((n, n), device=dev, dtype=torch.bfloat16),)),
             # ("instance_norm", dummy_bf16[2], {"weight": None, "bias": None, "running_mean": torch.rand((n), dtype=torch.float32),
             #                                   "running_var": torch.rand((n), dtype=torch.float32), "use_input_stats": False,
             #                                   "momentum": 0.1, "eps": 1e-5, "cudnn_enabled": False}),
@@ -170,8 +168,6 @@ class AutocastCPUTestLists(object):
         self.blacklist_non_float_output_pass_test = [
         ]
         self.torch_fp32_multi_output = [
-            ("cummax", (torch.randn(10).to(torch.bfloat16), 0)),
-            ("cummin", (torch.randn(10).to(torch.bfloat16), 0)),
             ("eig", (torch.randn(10, 10).to(torch.bfloat16), True)),
             ("geqrf", (torch.randn(10, 10).to(torch.bfloat16), )),
             ("lstsq", (torch.randn(10, 10).to(torch.bfloat16), torch.randn(10, 10).to(torch.bfloat16))),
@@ -181,7 +177,6 @@ class AutocastCPUTestLists(object):
             ("svd", (torch.randn(10, 10).to(torch.bfloat16), True)),
             ("symeig", (torch.randn(10, 10).to(torch.bfloat16), True)),
             ("triangular_solve", (torch.randn(10, 10).to(torch.bfloat16), torch.randn(10, 10).to(torch.bfloat16))),
-            ("adaptive_max_pool1d", (torch.randn(100, 100, 100).to(torch.bfloat16), 13)),
             ("adaptive_max_pool3d", (torch.randn(100, 100, 100, 100).to(torch.bfloat16), (13, 13, 13))),
         ]
         self.nn_fp32_multi_output = [

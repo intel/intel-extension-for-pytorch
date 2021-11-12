@@ -210,22 +210,12 @@ MAKE_REGISTER_FUNC(ADD_NS(conv_transpose2d), "conv_transpose2d.input",
                           IntArrayRef, IntArrayRef, int64_t, IntArrayRef),
                    user_defined_dtype)
 // fp32 cast policy a.k.a BlackList
-MAKE_REGISTER_FUNC(ADD_NS(avg_pool1d), "avg_pool1d",
-                   Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
-                          bool, bool),
-                   fp32)
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool3d), "avg_pool3d",
                    Tensor(const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef,
                           bool, bool, c10::optional<int64_t>),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(binary_cross_entropy), "binary_cross_entropy",
                    Tensor(const Tensor &, const Tensor &,
-                          const c10::optional<Tensor> &, int64_t),
-                   fp32)
-MAKE_REGISTER_FUNC(ADD_NS(binary_cross_entropy_with_logits),
-                   "binary_cross_entropy_with_logits",
-                   Tensor(const Tensor &, const Tensor &,
-                          const c10::optional<Tensor> &,
                           const c10::optional<Tensor> &, int64_t),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(polar), "polar",
@@ -499,14 +489,6 @@ MAKE_REGISTER_FUNC(ADD_NS(fake_quantize_per_tensor_affine),
                    "fake_quantize_per_tensor_affine",
                    Tensor(const Tensor &, double, int64_t, int64_t, int64_t),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(cummax), "cummax",
-                   TUPLE_TWO_TENSORS(const Tensor &, int64_t), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(cummax), "cummax.dimname",
-                   TUPLE_TWO_TENSORS(const Tensor &, at::Dimname), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(cummin), "cummin",
-                   TUPLE_TWO_TENSORS(const Tensor &, int64_t), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(cummin), "cummin.dimname",
-                   TUPLE_TWO_TENSORS(const Tensor &, at::Dimname), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(eig), "eig", TUPLE_TWO_TENSORS(const Tensor &, bool),
                    fp32)
 MAKE_REGISTER_FUNC(ADD_NS(geqrf), "geqrf", TUPLE_TWO_TENSORS(const Tensor &),
@@ -535,8 +517,6 @@ MAKE_REGISTER_FUNC(ADD_NS(fractional_max_pool3d), "fractional_max_pool3d",
                    TUPLE_TWO_TENSORS(const Tensor &, IntArrayRef, IntArrayRef,
                                      const Tensor &),
                    fp32)
-MAKE_REGISTER_FUNC(ADD_NS(adaptive_max_pool1d), "adaptive_max_pool1d",
-                   TUPLE_TWO_TENSORS(const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(adaptive_max_pool3d), "adaptive_max_pool3d",
                    TUPLE_TWO_TENSORS(const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(multilabel_margin_loss_forward),
