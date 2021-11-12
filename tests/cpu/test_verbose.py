@@ -10,7 +10,7 @@ class TestVerbose(TestCase):
         with subprocess.Popen('python -u {}/verbose.py --verbose-level=1'.format(loc), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
             for line in p.stdout.readlines():
                 line = str(line, 'utf-8').strip()
-                if line.startswith("dnnl_verbose"):
+                if line.startswith("onednn_verbose"):
                     num = num + 1
         assert num > 0, 'oneDNN verbose messages not found.'
 
@@ -20,7 +20,7 @@ class TestVerbose(TestCase):
         with subprocess.Popen('python -u {}/verbose.py --verbose-level=0'.format(loc), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
             for line in p.stdout.readlines():
                 line = str(line, 'utf-8').strip()
-                if line.startswith("dnnl_verbose"):
+                if line.startswith("onednn_verbose"):
                     num = num + 1
         assert num == 0, 'unexpected oneDNN verbose messages found.'
 
