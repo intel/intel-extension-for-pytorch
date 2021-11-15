@@ -85,58 +85,99 @@ def optimize(
     fuse_update_step=None,
     auto_kernel_selection=None):
     r"""
-    Apply optimizations at the python frontend to the given model (nn.Module) and optimizer.If the optimizer is given,
-    optimization for training is assumed, otherwise, optimization for inference is assumed. The optimizations include
-    conv+bn folding (for inference only), weight prepacking and a lot more.
+    Apply optimizations at Python frontend to the given model (nn.Module), as
+    well as the given optimizer (optional). If the optimizer is given,
+    optimizations will be applied for training. Otherwise, optimization will be
+    applied for inference. Optimizations include ``conv+bn`` folding (for
+    inference only), weight prepacking and so on.
+
+    Weight prepacking is a technique to accelerate performance of oneDNN
+    operators. In order to achieve better vectorization and cache reuse, onednn
+    uses a specific memory layout called ``blocked layout``. Although the
+    calculation itself with ``blocked layout`` is fast enough, from memory usage
+    perspective it has drawbacks. Running with the ``blocked layout``, oneDNN
+    splits one or several dimensions of data into blocks with fixed size each
+    time the operator is executed. More details information about oneDNN data
+    mermory format is available at `oneDNN manual <https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html>`_.
+    To reduce this overhead, data will be converted to predefined block shapes
+    prior to the execution of oneDNN operator execution. In runtime, if the data
+    shape matches oneDNN operator execution requirements, oneDNN won't perform
+    memory layout conversion but directly go to calculation. Through this
+    methodology, called ``weight prepacking``, it is possible to avoid runtime
+    weight data format convertion and thus increase performance.
 
     Args:
-        model (torch.nn.Module): User model to do optimization.
-        dtype (torch.dtype): It can be torch.float(torch.float32) or torch.bfloat16,
-          it will do model's parameters data dtype cast if dtype is torch.bfloat16, the default value is torch.float.
-        optimizer (torch.optim.Optimizer), User optimzizer to do optimization, such as sgd, the default
-          value is None, it means for inference case.
-        level (string): Can be "O0" or "O1", do nothing for "O0", just return the origin model and optimizer.
-          "O1" will do ipex optimization: conv+bn folding, weights prepack, remove dropout(inferenc model),
-          split master wieght and fuse optimizer update step(training model), the optimization options can be
-          further overridden by explicit options below. The default value is "O1".
-        inplace (bool): Whether do inplace optimization, default value False.
-        conv_bn_folding (bool): Whether do conv_bn folding, it only works for inference model.
-          The default value is None, if has value, it will override the level's setting.
-        weights_prepack (bool): Whether do weight prepack for convolution and linear to avoid OneDNN weight reorder.
-          For OneDNN deep neural network library, in order to achieve better vectorization and cache reuse, onednn will use
-          blocked layout that splits one or several dimensions into the blocks of fixed size, so there will do prepack to avoid
-          online weight data format convertion which will reduce momory copy consumption, see more details about EneDNN data
-          mermory format: https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html. The default value is None,
-          if has value, it will override the level's setting.
-        replace_dropout_with_identity (bool): Whether replace nn.Dropout with nn.Identity, if replaced, the aten::dropout
-          won't be on the JIT graph, which may provide more fusion opportunites on the graph, it only works for inference
-          model. The default value is None, if has value, it will override the level's setting.
-        replace_lstm_with_ipex_lstm (bool): Whether replace nn.LSTM with IPEX LSTM which apply OneDNN kernel to get better
-          performance. The default value is None, if has value, it will override the level's setting.
-        split_master_weight_for_bf16 (bool): Whether choose split master weight update for BF16 training which can
-            save memory compare with master weight update solution, not support all optimizers.
-            The default value is None, if has value, it will override the level's setting.
-        fuse_update_step (bool): Whether choose fused params update for training which have better performance,
-           not support all optimizers. The default value is None, if has value, it will override the level's setting.
-        [experimental] auto_kernel_selection (bool): Different backend may have different performance on different
-            dtypes/shapes. Default value is False. IPEX will try to optimize the kernel selection for
-            better performance if set this value to True. But may have regressions at current stage.
-            The default value is None, if has value, it will override the level's setting.
+        model (torch.nn.Module): User model to apply optimizations on.
+        dtype (torch.dtype): ``torch.float(torch.float32)`` or ``torch.bfloat16``.
+            Model parameters will be casted if dtype is ``torch.bfloat16``. The
+            default value is ``torch.float32``.
+        optimizer (torch.optim.Optimizer): User optimzizer to apply optimizations
+            on, such as SGD. The default value is ``None``, meaning inference case.
+        level (string): ``"O0"`` or ``"O1"``. No optimizations are applied with
+            ``"O0"``. The optimizer function just returns the original model and
+            optimizer. With ``"O1"``, the following optimizations are applied:
+            conv+bn folding, weights prepack, dropout removal (inferenc model),
+            master weight split and fused optimizer update step (training model).
+            The optimization options can be further overridden by setting the
+            following options explicitly. The default value is ``"O1"``.
+        inplace (bool): Whether to perform inplace optimization. Default value is
+            ``False``.
+        conv_bn_folding (bool): Whether to perform ``conv_bn`` folding. It only
+            works for inference model. The default value is ``None``. Explicitly
+            setting this knob overwrites the configuration set by ``level`` knob.
+        weights_prepack (bool): Whether to perform weight prepack for convolution
+            and linear to avoid oneDNN weights reorder. The default value is
+            ``None``. Explicitly setting this knob overwrites the configuration
+            set by ``level`` knob.
+        replace_dropout_with_identity (bool): Whether to replace ``nn.Dropout``
+            with ``nn.Identity``. If replaced, the ``aten::dropout`` won't be
+            included in the JIT graph. This may provide more fusion opportunites
+            on the graph. This only works for inference model. The default value
+            is ``None``. Explicitly setting this knob overwrites the configuration
+            set by ``level`` knob.
+        optimize_lstm (bool): Whether to replace ``nn.LSTM`` with ``IPEX LSTM``
+            which takes advantage of oneDNN kernels to get better performance.
+            The default value is ``None``. Explicitly setting this knob
+            overwrites the configuration set by ``level`` knob.
+        split_master_weight_for_bf16 (bool): Whether to split master weights
+            update for BF16 training. This saves memory comparing to master
+            weight update solution. Split master weights update methodology
+            doesn't support all optimizers. The default value is None. The
+            default value is ``None``. Explicitly setting this knob overwrites
+            the configuration set by ``level`` knob.
+        fuse_update_step (bool): Whether to use fused params update for training
+            which have better performance. It doesn't support all optimizers.
+            The default value is ``None``. Explicitly setting this knob
+            overwrites the configuration set by ``level`` knob.
+        auto_kernel_selection (bool) [experimental]: Different backends may have
+            different performances with different dtypes/shapes. Default value
+            is False. Intel® Extension for PyTorch* will try to optimize the
+            kernel selection for better performance if this knob is set to
+            ``True``. There might be regressions at current stage. The default
+            value is ``None``. Explicitly setting this knob overwrites the
+            configuration set by ``level`` knob.
 
     Returns:
-        model and optimizer(given a optimizer) modified according to the 'level' or other user's setting. conv+bn folding may be
-        happend and dropout may be replaced by identity if model have for inference case, for convolutuon, linear and lstm, they will
-        be replaced by our custom ops(weight prepack for convolution and linear) for good performance. For bfloat16 case,
-        the parameters of convolution and linear will be bfloat16 dtype. For training case, and the optimizer states will changed to the
-        converted model's parameters to align with model's parameter's update at optimizer's step.
+        Model and optimizer (if given) modified according to the ``level`` knob
+        or other user settings. ``conv+bn`` folding may take place and
+        ``dropout`` may be replaced by ``identity``. In inference scenarios,
+        convolutuon, linear and lstm will be replaced with the optimized
+        counterparts in Intel® Extension for PyTorch* (weight prepack for
+        convolution and linear) for good performance. In bfloat16 scenarios,
+        parameters of convolution and linear will be casted to bfloat16 dtype.
 
     .. warning::
 
-        ipex.optimize deepcopy the origin model. If DDP comes before ipex.optimize, it just gets the origin model,
-        which is not the same as the one ipex.optimize returns. Therefore, some ops in DDP like allreduce will not be called
-        and may cause unpredictable accuracy loss in distributed model training.
+        Please invoke ``optimize`` function before invoking DDP in distributed
+        training scenario.
 
-    Examples::
+        The ``optimize`` function deepcopys the original model. If DDP is invoked
+        before ``optimize`` function, DDP is applied on the origin model, rather
+        than the one returned from ``optimize`` function. In this case, some
+        operators in DDP, like allreduce, will not be invoked and thus may cause
+        unpredictable accuracy loss.
+
+    Examples:
 
         >>> # bfloat16 inference case.
         >>> model = ...
@@ -236,16 +277,23 @@ def optimize(
 
 def enable_onednn_fusion(enabled):
     r"""
-    Enables or disables oneDNN fusion based on the parameter `enabled`.
-    The fusion pass will be enabled by default when intel_extension_for_pytorch is imported.
+    Enables or disables oneDNN fusion functionality. If enabled, oneDNN
+    operators will be fused in runtime, when intel_extension_for_pytorch
+    is imported.
 
-    Examples::
+    Args:
+        enabled (bool): Whether to enable oneDNN fusion functionality or not.
+            Default value is ``true``.
+
+    Examples:
+
         >>> import intel_extension_for_pytorch as ipex
         >>> # to enable the oneDNN fusion
         >>> ipex.enable_onednn_fusion(True)
         >>> # to disable the oneDNN fusion
         >>> ipex.enable_onednn_fusion(False)
     """
+
     if enabled:
         core.enable_jit_opt()
     else:

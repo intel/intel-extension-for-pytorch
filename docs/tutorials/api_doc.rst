@@ -6,6 +6,7 @@ General
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
+.. autofunction:: enable_onednn_fusion
 .. autoclass:: verbose
 
 Quantization

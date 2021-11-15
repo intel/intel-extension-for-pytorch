@@ -94,7 +94,7 @@ Check more detailed information for `Split SGD <features/split_sgd.html>`_.
 Runtime Extension (Experimental)
 --------------------------------
 
-Intel® Extension for PyTorch* Runtime extension is a runtime CPU Pool with thread to physical core binding. It is built on top of CPU Pool, there is also an async task feature. Please note: Intel® Extension for PyTorch* Runtime extension is still in the POC stage. The API is subject to change.
+Intel® Extension for PyTorch* Runtime Extension provides a runtime CPU pool API to bind threads to cores. It also features async tasks. Please **note**: Intel® Extension for PyTorch* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at `API Documentation page <../api_doc.html>`_.
 
 Check more detailed information for `Runtime Extension <features/runtime_extension.html>`_.
 
