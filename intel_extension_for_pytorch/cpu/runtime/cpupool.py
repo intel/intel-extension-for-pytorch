@@ -11,10 +11,12 @@ class CPUPool(object):
 
     Args:
         core_ids (list): A list of CPU cores' ids used for intra-op parallelism.
-        node_id (int): A numa node id with all CPU cores on the numa node. ``node_id`` doesn't work if ``core_ids`` is set.
+        node_id (int): A numa node id with all CPU cores on the numa node.
+            ``node_id`` doesn't work if ``core_ids`` is set.
 
     Returns:
-        intel_extension_for_pytorch.cpu.runtime.CPUPool: Generated intel_extension_for_pytorch.cpu.runtime.CPUPool object.
+        intel_extension_for_pytorch.cpu.runtime.CPUPool: Generated
+        intel_extension_for_pytorch.cpu.runtime.CPUPool object.
     """
 
     def __init__(self, core_ids: list = None, node_id: int = None):
@@ -32,13 +34,18 @@ class CPUPool(object):
 
 class pin(object):
     r"""
-    Apply the given CPU pool to the master thread that runs the scoped code region or the function/method def.
+    Apply the given CPU pool to the master thread that runs the scoped code
+    region or the function/method def.
 
     Args:
-        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains all CPU cores used by the designated operations.
+        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool):
+            intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
+            all CPU cores used by the designated operations.
 
     Returns:
-        intel_extension_for_pytorch.cpu.runtime.pin: Generated intel_extension_for_pytorch.cpu.runtime.pin object which can be used as a `with` context or a function decorator.
+        intel_extension_for_pytorch.cpu.runtime.pin: Generated
+        intel_extension_for_pytorch.cpu.runtime.pin object which can be used
+        as a `with` context or a function decorator.
     """
 
     def __init__(self, cpu_pool: CPUPool):

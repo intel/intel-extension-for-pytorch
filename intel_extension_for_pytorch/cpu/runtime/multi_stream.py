@@ -7,17 +7,23 @@ class MultiStreamModule(nn.Module):
     r"""
     MultiStreamModule supports inference with multi-stream throughput mode.
 
-    If the number of cores inside ``cpu_pool`` is divisible by ``num_streams``, the cores will be allocated equally to each stream.
+    If the number of cores inside ``cpu_pool`` is divisible by ``num_streams``,
+    the cores will be allocated equally to each stream.
 
-    If the number of cores inside ``cpu_pool`` is not divisible by ``num_streams`` with remainder N, one extra core will be allocated to the first N streams.
+    If the number of cores inside ``cpu_pool`` is not divisible by
+    ``num_streams`` with remainder N, one extra core will be allocated to the
+    first N streams.
 
     Args:
         model (torch.jit.ScriptModule or torch.nn.Module): The input model.
         num_streams (int): Number of instances.
-        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): An intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains all CPU cores used to run multi-stream inference.
+        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): An
+            intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
+            all CPU cores used to run multi-stream inference.
 
     Returns:
-        intel_extension_for_pytorch.cpu.runtime.MultiStreamModule: Generated intel_extension_for_pytorch.cpu.runtime.MultiStreamModule object.
+        intel_extension_for_pytorch.cpu.runtime.MultiStreamModule: Generated
+        intel_extension_for_pytorch.cpu.runtime.MultiStreamModule object.
 
     :meta public:
     """

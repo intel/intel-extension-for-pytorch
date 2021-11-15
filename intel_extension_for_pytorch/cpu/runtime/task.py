@@ -7,14 +7,18 @@ from .cpupool import CPUPool
 
 class Task(object):
     r"""
-    An abstraction of computation based on PyTorch module and is scheduled asynchronously.
+    An abstraction of computation based on PyTorch module and is scheduled
+    asynchronously.
 
     Args:
         model (torch.jit.ScriptModule or torch.nn.Module): The input module.
-        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): An intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains all CPU cores used to run Task asynchronously.
+        cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): An
+            intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
+            all CPU cores used to run Task asynchronously.
 
     Returns:
-        intel_extension_for_pytorch.cpu.runtime.Task: Generated intel_extension_for_pytorch.cpu.runtime.Task object.
+        intel_extension_for_pytorch.cpu.runtime.Task: Generated
+        intel_extension_for_pytorch.cpu.runtime.Task object.
     """
 
     def __init__(self, module, cpu_pool: CPUPool):

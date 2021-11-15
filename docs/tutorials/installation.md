@@ -5,9 +5,11 @@ Installation Guide
 
 |Category|Content|
 |--|--|
-|Compiler|GCC version greater than 7|
+|Compiler|GCC version greater than 7\*|
 |Operator System|CentOS 7, RHEL 8, Ubuntu newer than 18.04|
 |Python|3.6, 3.7, 3.8, 3.9|
+
+\* Verified with GCC 7, 8 and 9.
 
 ## Install PyTorch (Optional)
 

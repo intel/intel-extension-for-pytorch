@@ -351,11 +351,13 @@ class MultiInstanceLauncher(Launcher):
                     logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
                     exit(-1)
             if args.latency_mode:
+                print('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --socket_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
                 args.ncore_per_instance = 4
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ninstances = len(cores) // args.ncore_per_instance
 
             if args.throughput_mode:
+                print('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --socket_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
                 args.ninstances = self.cpuinfo.socket_nums()
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
