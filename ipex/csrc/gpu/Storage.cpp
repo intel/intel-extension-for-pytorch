@@ -850,8 +850,11 @@ class THXPStorage_Bridge {
             &size)) {
       return nullptr;
     }
-    if (shared)
-      shared = TH_ALLOCATOR_MAPPED_SHARED;
+
+    if (shared) {
+      fprintf(
+          stderr, "TODO: map frontend `shared` to native dpc++ `shared`.\n");
+    }
     at::StorageImpl* storage =
         THXStorage_newWithMapping(filename, size, shared);
     return (PyObject*)THXStorage_New(storage);
