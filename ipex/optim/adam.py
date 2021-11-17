@@ -1,6 +1,6 @@
 import torch
 from torch.optim import optimizer
-from torch.optim import functional
+from torch.optim import _functional as functional
 
 
 class AdamMasterWeight(optimizer.Optimizer):
