@@ -143,16 +143,13 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto totalElements = src.numel();
-  auto num_groups = CeilDiv(totalElements, group_size);
-  auto total_items = num_groups * group_size;
-
-  auto tgt1_size = (tgt1.numel()) * (tgt1.itemsize());
-  auto tgt2_size = (tgt2.numel()) * (tgt2.itemsize());
-  auto src_size = totalElements * (src.itemsize());
 
   int64_t n = src.size(rdim);
   int64_t stride = src.stride(rdim);
   int64_t batch = totalElements / (n * stride);
+
+  auto num_groups = CeilDiv(totalElements / n, group_size);
+  auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<K>();
@@ -164,13 +161,10 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
       auto tgt1_ptr = tgt1_data;
       auto tgt2_ptr = tgt2_data;
 
-      for (int64_t linearIndex = item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += item.get_global_range()[0]) {
-        int64_t base_start = linearIndex % (batch * stride);
+      int64_t linearIndex = item.get_global_id(0);
+      if (linearIndex < totalElements / n) {
         int64_t start =
-            (base_start / stride) * n * stride + base_start % stride;
-
+            (linearIndex / stride) * n * stride + linearIndex % stride;
         std::pair<K, Index> acc = init;
         for (int64_t j = 0; j < n; ++j) {
           //
@@ -183,8 +177,8 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
           K data = src_ptr[start + j * stride];
           Index idx = j /* + TH_INDEX_BASE */;
           acc = binary_op(acc, std::make_pair<K, Index>((K)data, (Index)idx));
-          tgt1_ptr[base_start] = acc.first;
-          tgt2_ptr[base_start] = acc.second;
+          tgt1_ptr[linearIndex] = acc.first;
+          tgt2_ptr[linearIndex] = acc.second;
         }
       }
     };
