@@ -197,14 +197,14 @@ def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[st
 
     # Assumes that this file lives at PYTORCH_ROOT/tools/codegen/gen_backend_stubs.py
     pytorch_root = pathlib.Path(__file__).parent.parent.parent.absolute()
-    template_dir = os.path.join(pytorch_root, "aten/src/ATen/templates")
+    template_dir = os.path.join(pytorch_root, "tools/codegen/templates")
 
     def make_file_manager(install_dir: str) -> FileManager:
         return FileManager(install_dir=install_dir, template_dir=template_dir, dry_run=dry_run)
 
     fm = make_file_manager(output_dir)
 
-    native_yaml_path = os.path.join(pytorch_root, 'aten/src/ATen/native/native_functions.yaml')
+    native_yaml_path = os.path.join(pytorch_root, 'tools/codegen/yaml/native_functions.yaml')
     parsed_yaml = parse_native_yaml(native_yaml_path)
     native_functions, backend_indices = parsed_yaml.native_functions, parsed_yaml.backend_indices
     grouped_native_functions = get_grouped_native_functions(native_functions)
