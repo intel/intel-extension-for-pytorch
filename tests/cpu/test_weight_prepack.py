@@ -107,10 +107,15 @@ class TestPrepackCases(TestCase):
 
     def test_conv2d_nc11(self):
         # related issue: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/pull/86.
-        model = torch.nn.Conv2d(256, 324, kernel_size=(1, 1), stride=(1, 1), padding=(1, 1), bias=False)
-        model = model.to(memory_format=torch.channels_last).train()
-        x = torch.randn(32, 256, 1, 1).to(memory_format=torch.channels_last)
-        for dtype in [torch.float32, torch.bfloat16]:
+        options = itertools.product([torch.float, torch.bfloat16],
+                                    [1, 256], [1, 324],
+                                    [torch.contiguous_format, torch.channels_last])
+
+        for dtype, in_channels, out_channels, memory_format in options:
+            model = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=(1, 1), bias=False)
+            model = model.to(memory_format=memory_format).train()
+            x = torch.randn(32, in_channels, 1, 1).to(memory_format=memory_format)
+
             x1 = x.clone().requires_grad_()
             x2 = x.clone().requires_grad_()
             x3 = x.clone().requires_grad_()

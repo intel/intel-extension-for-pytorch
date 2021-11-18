@@ -69,13 +69,6 @@ void convolution_kernel_output(const at::Tensor &input,
         {padding.begin(), padding.end()}, groups, ideep::scale_t(),
         ideep::scale_t(), ideep::scale_t(), attr);
   }
-
-  if (!is_channels_last) {
-    output = mkldnn_to_dense(new_with_itensor_mkldnn(
-        std::move(mkldnn_output),
-        optTypeMetaToScalarType(input.options().dtype_opt()),
-        input.options().device_opt()));
-  }
 }
 
 at::Tensor convolution_kernel(const at::Tensor &input,
