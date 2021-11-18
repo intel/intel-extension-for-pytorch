@@ -506,6 +506,84 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::quantize_per_channel', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
+    def test_lift_up_quant(self):
+        class M(nn.Module):
+            def __init__(self, bias):
+                super(M, self).__init__()
+                self.linear = nn.Linear(28, 64, bias)
+                self.linear2 = nn.Linear(28, 64, bias=True)
+                self.num_attention_heads = 16
+                self.attention_head_size = 4
+
+            def forward(self, x, y):
+                x = self.linear(x)
+                new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                x = x.view(*new_x_shape)
+                z1 = x.permute(0, 2, 1, 3)
+
+                y = self.linear2(y)
+                new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                y = y.view(*new_y_shape2)
+                z2 = y.permute(0, 2, 1, 3)
+
+                return torch.matmul(z1, z2.transpose(-1, -2))
+
+        m = M(bias=True)
+        x = torch.randn(2, 3, 28)
+        y = torch.randn(2, 3, 28)
+
+        patterns = [
+            ["aten::dequantize", "aten::linear", "aten::quantize_per_tensor"],
+            ["aten::dequantize","aten::linear", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::matmul"]
+        ]
+
+        # TODO: test shape fallback
+        graph = self.checkQuantizeTrace(m, [x, y], atol=1e-1, config_name="lift_up_to_quant", qscheme=torch.per_tensor_affine)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::matmul'])
+        self.checkPatterns(graph, patterns)
+
+    def test_lift_up_to_quant(self):
+        class M(nn.Module):
+            def __init__(self, bias):
+                super(M, self).__init__()
+                self.linear = nn.Linear(28, 64, bias)
+                self.linear2 = nn.Linear(28, 64, bias=True)
+                self.num_attention_heads = 16
+                self.attention_head_size = 4
+
+            def forward(self, x, y):
+                x = self.linear(x)
+                new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                x = x.view(*new_x_shape)
+                z1 = x.permute(0, 2, 1, 3)
+
+                y = self.linear2(y)
+                new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+                y = y.view(*new_y_shape2)
+                z2 = y.permute(0, 2, 1, 3)
+
+                return torch.matmul(z1, z2.transpose(-1, -2))
+
+        m = M(bias=True)
+        x = torch.randn(2, 3, 28)
+        y = torch.randn(2, 3, 28)
+
+        patterns = [
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::linear", "aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::linear", "aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul"]
+        ]
+
+        # TODO: test shape fallback
+        graph = self.checkQuantizeTrace(m, [x, y], atol=1e-1, config_name="lift_up_to_quant", qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
+        self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::matmul'])
+        self.checkPatterns(graph, patterns)    
+
     def test_wildcard(self):
         class M(nn.Module):
             def __init__(self):
