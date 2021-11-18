@@ -1,0 +1,15 @@
+backend: XPU
+cpp_namespace: at
+class_name: AtenIpexTypeXPU
+use_out_as_primary: false
+device_guard: true
+supported:
+#  - empty_strided
+#   - copy_
+#  - abs_
+   - abs
+   - abs.out
+#  - sin
+#  - cos
+#  - asinh
+#  - asinh.out
