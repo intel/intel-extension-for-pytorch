@@ -64,6 +64,7 @@ function (print_configuration_summary)
     message(STATUS "  C++ compiler id       : ${CMAKE_CXX_COMPILER_ID}")
     message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
 
+    message(STATUS "  SYCL Language version : ${SYCL_LANGUAGE_VERSION}")
     message(STATUS "  SYCL Compiler version : ${SYCL_COMPILER_VERSION}")
     message(STATUS "  SYCL Driver version   : ${SYCL_DRIVER_VERSION}")
     message(STATUS "  SYCL LevelZero version: ${SYCL_LEVEL_ZERO_VERSION}")
@@ -74,8 +75,9 @@ function (print_configuration_summary)
     message(STATUS "  SYCL Compile flags    : ${IPEX_SYCL_KERNEL_FLAGS}")
     message(STATUS "  SYCL Linker options   : ${IPEX_SYCL_LINKER_FLAGS}")
 
+    message(STATUS "  Intel SYCL instance ID: ${SYCL_IMPLEMENTATION_ID}")
     message(STATUS "  Intel SYCL include    : ${SYCL_INCLUDE_DIR}")
-    message(STATUS "  Intel SYCL library    : ${SYCL_LIBRARY}")
+    message(STATUS "  Intel SYCL library    : ${SYCL_LIBRARY_DIR}")
 
     message(STATUS "  LevelZero include     : ${LevelZero_INCLUDE_DIR}")
     message(STATUS "  LevelZero library     : ${LevelZero_LIBRARY}")

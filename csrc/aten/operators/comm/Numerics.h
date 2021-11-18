@@ -2,9 +2,9 @@
 
 #include <ATen/ATen.h>
 
+#include <c10/util/Half.h>
 #include <utils/DPCPP.h>
 #include "General.h"
-#include "NumericLimits.h"
 
 template <typename T>
 struct Numerics {};
@@ -34,10 +34,10 @@ static inline T sgni(T z) {
 template <>
 struct Numerics<uint8_t> {
   static inline uint8_t lower_bound() {
-    return at::numeric_limits<uint8_t>::lower_bound();
+    return std::numeric_limits<uint8_t>::lowest();
   }
   static inline uint8_t upper_bound() {
-    return at::numeric_limits<uint8_t>::upper_bound();
+    return std::numeric_limits<uint8_t>::max();
   }
 
   static inline bool lt(uint8_t a, uint8_t b) {
@@ -91,10 +91,10 @@ struct Numerics<uint8_t> {
 template <>
 struct Numerics<bool> {
   static inline bool lower_bound() {
-    return at::numeric_limits<bool>::lower_bound();
+    return std::numeric_limits<bool>::lowest();
   }
   static inline bool upper_bound() {
-    return at::numeric_limits<bool>::upper_bound();
+    return std::numeric_limits<bool>::max();
   }
 
   static inline bool lt(bool a, bool b) {
@@ -141,10 +141,10 @@ struct Numerics<bool> {
 template <>
 struct Numerics<int8_t> {
   static inline int8_t lower_bound() {
-    return at::numeric_limits<int8_t>::lower_bound();
+    return std::numeric_limits<int8_t>::lowest();
   }
   static inline int8_t upper_bound() {
-    return at::numeric_limits<int8_t>::upper_bound();
+    return std::numeric_limits<int8_t>::max();
   }
 
   static inline bool lt(int8_t a, int8_t b) {
@@ -198,10 +198,10 @@ struct Numerics<int8_t> {
 template <>
 struct Numerics<int16_t> {
   static inline int16_t lower_bound() {
-    return at::numeric_limits<int16_t>::lower_bound();
+    return std::numeric_limits<int16_t>::lowest();
   }
   static inline int16_t upper_bound() {
-    return at::numeric_limits<int16_t>::upper_bound();
+    return std::numeric_limits<int16_t>::max();
   }
 
   static inline bool lt(int16_t a, int16_t b) {
@@ -244,11 +244,12 @@ struct Numerics<int16_t> {
   static inline int16_t pow(int16_t a, int16_t b) {
     return powi<int16_t>(a, b);
   }
-
   static inline bool isnan(int16_t a) {
     return false;
   }
-
+  static inline bool isinf(int8_t a) {
+    return false;
+  }
   static inline int16_t sgn(int16_t a) {
     return sgni<int16_t>(a);
   }
@@ -257,10 +258,10 @@ struct Numerics<int16_t> {
 template <>
 struct Numerics<int32_t> {
   static inline int32_t lower_bound() {
-    return at::numeric_limits<int32_t>::lower_bound();
+    return std::numeric_limits<int32_t>::lowest();
   }
   static inline int32_t upper_bound() {
-    return at::numeric_limits<int32_t>::upper_bound();
+    return std::numeric_limits<int32_t>::max();
   }
 
   static inline bool lt(int32_t a, int32_t b) {
@@ -303,11 +304,12 @@ struct Numerics<int32_t> {
   static inline int32_t pow(int32_t a, int32_t b) {
     return powi<int32_t>(a, b);
   }
-
   static inline bool isnan(int32_t a) {
     return false;
   }
-
+  static inline bool isinf(int8_t a) {
+    return false;
+  }
   static inline int32_t sgn(int32_t a) {
     return sgni<int32_t>(a);
   }
@@ -316,10 +318,10 @@ struct Numerics<int32_t> {
 template <>
 struct Numerics<int64_t> {
   static inline int64_t lower_bound() {
-    return at::numeric_limits<int64_t>::lower_bound();
+    return std::numeric_limits<int64_t>::lowest();
   }
   static inline int64_t upper_bound() {
-    return at::numeric_limits<int64_t>::upper_bound();
+    return std::numeric_limits<int64_t>::max();
   }
 
   static inline bool lt(int64_t a, int64_t b) {
@@ -362,11 +364,12 @@ struct Numerics<int64_t> {
   static inline int64_t pow(int64_t a, int64_t b) {
     return powi<int64_t>(a, b);
   }
-
   static inline bool isnan(int64_t a) {
     return false;
   }
-
+  static inline bool isinf(int8_t a) {
+    return false;
+  }
   static inline int64_t sgn(int64_t a) {
     return sgni<int64_t>(a);
   }
@@ -375,10 +378,10 @@ struct Numerics<int64_t> {
 template <>
 struct Numerics<at::Half> {
   static inline at::Half lower_bound() {
-    return at::numeric_limits<at::Half>::lower_bound();
+    return at::Half(0xFC00, at::Half::from_bits());
   }
   static inline at::Half upper_bound() {
-    return at::numeric_limits<at::Half>::upper_bound();
+    return at::Half(0x7C00, at::Half::from_bits());
   }
 
   static inline bool lt(at::Half a, at::Half b) {
@@ -476,7 +479,6 @@ struct Numerics<at::Half> {
   static inline at::Half round(float a) {
     return DPCPP::round(float(a));
   }
-
   static inline at::Half frac(at::Half a) {
     return a - DPCPP::trunc(float(a));
   }
@@ -501,14 +503,13 @@ struct Numerics<at::Half> {
   static inline at::Half sub(at::Half a, at::Half b) {
     return a - b;
   }
+
   static inline at::Half pow(at::Half a, at::Half b) {
     return DPCPP::pow(float(a), float(b));
   }
-
   static inline at::Half max(at::Half a, at::Half b) {
     return DPCPP::fmax(float(a), float(b));
   }
-
   static inline at::Half abs(at::Half a) {
     return DPCPP::fabs(float(a));
   }
@@ -518,19 +519,21 @@ struct Numerics<at::Half> {
   static inline bool isnan(at::Half a) {
     return DPCPP::isnan((float)a);
   }
-
+  static inline bool isinf(at::Half a) {
+    return DPCPP::isinf((float)a);
+  }
   static inline at::Half sgn(at::Half a) {
-    return sgni<at::Half>(a);
+    return DPCPP::sign((float)a);
   }
 };
 
 template <>
 struct Numerics<at::BFloat16> {
   static inline at::BFloat16 lower_bound() {
-    return at::numeric_limits<at::BFloat16>::lower_bound();
+    return at::BFloat16(0xFF80, at::BFloat16::from_bits());
   }
   static inline at::BFloat16 upper_bound() {
-    return at::numeric_limits<at::BFloat16>::upper_bound();
+    return at::BFloat16(0x7F80, at::BFloat16::from_bits());
   }
 
   static inline bool lt(at::BFloat16 a, at::BFloat16 b) {
@@ -669,18 +672,21 @@ struct Numerics<at::BFloat16> {
   static inline bool isnan(at::BFloat16 a) {
     return DPCPP::isnan((float)a);
   }
+  static inline bool isinf(at::BFloat16 a) {
+    return DPCPP::isinf((float)a);
+  }
   static inline at::BFloat16 sgn(at::BFloat16 a) {
-    return sgni<at::BFloat16>(a);
+    return DPCPP::sign((float)a);
   }
 };
 
 template <>
 struct Numerics<float> {
   static inline float lower_bound() {
-    return at::numeric_limits<float>::lower_bound();
+    return -std::numeric_limits<float>::infinity();
   }
   static inline float upper_bound() {
-    return at::numeric_limits<float>::upper_bound();
+    return std::numeric_limits<float>::infinity();
   }
 
   static inline bool lt(float a, float b) {
@@ -819,18 +825,21 @@ struct Numerics<float> {
   static inline bool isnan(float a) {
     return DPCPP::isnan(a);
   }
+  static inline bool isinf(float a) {
+    return DPCPP::isinf(a);
+  }
   static inline float sgn(float a) {
-    return sgni<float>(a);
+    return DPCPP::sign(a);
   }
 };
 
 template <>
 struct Numerics<double> {
   static inline double lower_bound() {
-    return at::numeric_limits<double>::lower_bound();
+    return -std::numeric_limits<double>::infinity();
   }
   static inline double upper_bound() {
-    return at::numeric_limits<double>::upper_bound();
+    return std::numeric_limits<double>::infinity();
   }
 
   static inline bool lt(double a, double b) {
@@ -968,8 +977,11 @@ struct Numerics<double> {
   static inline bool isnan(double a) {
     return DPCPP::isnan(a);
   }
+  static inline bool isinf(double a) {
+    return DPCPP::isinf(a);
+  }
   static inline double sgn(double a) {
-    return sgni<double>(a);
+    return DPCPP::sign(a);
   }
 };
 

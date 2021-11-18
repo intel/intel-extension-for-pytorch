@@ -89,6 +89,11 @@ if (NOT APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
 endif()
 
+# The fast-math will be enabled by default in ICX
+# We enable below flags here to be warn about NaN and Infinity,
+# which will be hidden by fast-math by default.
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-nans")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 

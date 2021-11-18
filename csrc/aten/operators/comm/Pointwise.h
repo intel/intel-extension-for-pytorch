@@ -344,7 +344,7 @@ struct TensorDigammaOp {
 
     auto x = scalar_cast<compute_type>(in);
     if (x == 0) {
-      out = scalar_cast<T>(INFINITY);
+      out = std::numeric_limits<T>::infinity();
       return;
     }
 
@@ -353,7 +353,7 @@ struct TensorDigammaOp {
 
     if (x < 0) {
       if (x_is_integer) {
-        out = scalar_cast<T>(INFINITY);
+        out = std::numeric_limits<T>::infinity();
         return;
       }
 
@@ -405,7 +405,7 @@ struct TensorDigammaOp {
 
     auto x = scalar_cast<compute_type>(v);
     if (x == 0) {
-      v = scalar_cast<T>(INFINITY);
+      v = std::numeric_limits<T>::infinity();
       return;
     }
 
@@ -414,7 +414,7 @@ struct TensorDigammaOp {
 
     if (x < 0) {
       if (x_is_integer) {
-        v = scalar_cast<T>(INFINITY);
+        v = std::numeric_limits<T>::infinity();
         return;
       }
 
@@ -473,7 +473,7 @@ struct TensorErfinvOp {
     if (DPCPP::fabs(x) == 1.0) {
       out = scalar_cast<T>(
           (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
-          (scalar_cast<double>(INFINITY)));
+          (std::numeric_limits<double>::infinity()));
       return;
     }
     if (DPCPP::fabs(x) <= 0.7) {
@@ -525,7 +525,7 @@ struct TensorErfinvOp {
     if (DPCPP::fabs(x) == 1.0) {
       v = scalar_cast<T>(
           (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
-          (scalar_cast<double>(INFINITY)));
+          (std::numeric_limits<double>::infinity()));
       return;
     }
     if (DPCPP::fabs(x) <= 0.7) {

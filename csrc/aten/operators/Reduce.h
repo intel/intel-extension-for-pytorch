@@ -569,8 +569,6 @@ static void launch_reduce_kernel(
   using output_t = typename R::out_t;
   auto& queue = dpcppGetCurrentQueue();
 
-  // This is a work-around because dpcpp_discard_w_mode doesn't work in some
-  // conditions
   dpcppMemsetAsync(reduction.dst0, 0, sizeof(output_t) * config.num_outputs);
   if (reduction.noutputs > 1) {
     dpcppMemsetAsync(reduction.dst1, 0, sizeof(output_t) * config.num_outputs);

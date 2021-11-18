@@ -14,7 +14,7 @@ namespace impl {
 
 template <typename scalar_t>
 static inline void embedding_backward_dpcpp_kernel(
-    int64_t* indices_data,
+    const Tensor& indices,
     const scalar_t* __restrict__ grad_data,
     scalar_t* __restrict__ grad_weight_data,
     int num_indices,
@@ -22,28 +22,18 @@ static inline void embedding_backward_dpcpp_kernel(
     int padding_idx,
     int numel_weights,
     bool scale_grad_by_freq) {
-  static const auto atomic_rw_mode = DPCPP::access::mode::atomic;
-  static const auto read_mode = DPCPP::access::mode::read;
-  static const auto write_mode = DPCPP::access::mode::write;
-  static const auto rw_mode = DPCPP::access::mode::discard_read_write;
-  static const auto gbuffer_target = DPCPP::access::target::global_buffer;
+  auto indices_contig = indices.contiguous();
+  auto indices_data = indices_contig.data_ptr<int64_t>();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   if (scale_grad_by_freq) {
     auto row_num_weights = numel_weights / stride;
-    DPCPP::buffer<uint32_t, 1> idx_cnt(
-        DPCPP::range<1>{(size_t)row_num_weights});
-
-    auto cgf_fill = DPCPP_Q_CGF(cgh) {
-      auto idx_cnt_acc = idx_cnt.get_access<rw_mode>(cgh);
-      cgh.template fill(idx_cnt_acc, static_cast<uint32_t>(0));
-    };
-    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_fill);
+    Tensor idx_counts = at::zeros(
+        {row_num_weights * sizeof(uint32_t)},
+        indices.options().dtype(at::kByte));
+    uint32_t* idx_cnt_ptr = static_cast<uint32_t*>(idx_counts.data_ptr());
 
     auto cgf_scale = DPCPP_Q_CGF(cgh) {
       auto idx_data = indices_data;
-      DPCPP::accessor<uint32_t, 1, rw_mode, gbuffer_target> idx_cnt_ptr(
-          idx_cnt, cgh, DPCPP::range<1>(row_num_weights), 0);
-
       cgh.parallel_for(DPCPP::range<1>(1), [=](DPCPP::item<1> item) {
         auto idx_ptr = idx_data;
         for (int i = 0; i < num_indices; ++i) {
@@ -54,7 +44,6 @@ static inline void embedding_backward_dpcpp_kernel(
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf_scale);
 
     auto cgf_scatter = DPCPP_Q_CGF(cgh) {
-      auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
       auto idx_data = indices_data;
       auto g_data = grad_data;
       auto gw_data = grad_weight_data;
@@ -67,7 +56,7 @@ static inline void embedding_backward_dpcpp_kernel(
         for (int nidx = 0; nidx < num_indices; nidx++) {
           auto idx = idx_ptr[nidx];
           gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
-              g_ptr[gid + nidx * stride] * 1.0 / (scalar_t)idx_cnt_acc[idx]);
+              g_ptr[gid + nidx * stride] * 1.0 / (scalar_t)idx_cnt_ptr[idx]);
         }
       });
     };
@@ -133,8 +122,6 @@ Tensor embedding_dense_backward_dpcpp(
   checkScalarType("embedding_backward", indices_arg, kLong);
   IsOnSameDevice("embedding_backward", grad_arg, indices_arg);
 
-  auto indices_contig = indices.contiguous();
-  auto indices_data = indices_contig.data_ptr<int64_t>();
   auto num_indices = indices.numel();
   auto grad = grad_.contiguous().view({num_indices, grad_.size(-1)});
   auto grad_weight = at::zeros({num_weights, grad_.size(-1)}, grad_.options());
@@ -147,7 +134,7 @@ Tensor embedding_dense_backward_dpcpp(
       "embedding_backward",
       [&]() {
         embedding_backward_dpcpp_kernel<scalar_t>(
-            indices_data,
+            indices,
             grad.data_ptr<scalar_t>(),
             grad_weight.data_ptr<scalar_t>(),
             static_cast<int>(num_indices),

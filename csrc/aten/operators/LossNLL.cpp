@@ -274,7 +274,6 @@ void ClassNLLCriterion_updateGradInput(
     int64_t global_size =
         ((batch_size + local_size - 1) / local_size) * local_size;
     bool has_weights = weights.defined() ? true : false;
-    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
     auto gradInput_stride_0 = gradInput.stride(0);
     auto gradInput_stride_1 = gradInput.stride(1);

@@ -26,34 +26,23 @@ cmake_minimum_required(VERSION 3.4.3)
 
 include(FindPackageHandleStandardArgs)
 
-set(sycl_root_hint)
-if(DEFINED DPCPP_ROOT)
-    set(sycl_root_hint ${DPCPP_ROOT})
-elseif(DEFINED ENV{DPCPP_ROOT})
-    set(sycl_root_hint $ENV{DPCPP_ROOT})
-endif()
-
-set(sycl_root_hints)
-if(sycl_root_hint)
-    list(APPEND sycl_root_hints ${sycl_root_hint})
-else()
-    list(APPEND sycl_root_hints ${SYCL_BUNDLE_ROOT})
-    list(APPEND sycl_root_hints $ENV{SYCL_BUNDLE_ROOT})
+find_package(IntelDPCPP REQUIRED)
+if(NOT IntelDPCPP_FOUND)
+  message(FATAL_ERROR "Cannot find IntelDPCPP compiler!")
 endif()
 
 # Try to find Intel SYCL version.hpp header
 find_file(INTEL_SYCL_VERSION
     NAMES version.hpp
     PATHS
-        ${sycl_root_hints}
+        ${SYCL_INCLUDE_DIR}
     PATH_SUFFIXES
-        include
-        include/CL/sycl
-        include/sycl/CL/sycl
+        sycl
+        sycl/CL/sycl
     NO_DEFAULT_PATH)
 
 if(NOT INTEL_SYCL_VERSION)
-  message(FATAL_ERROR "Can NOT find SYCL file path!")
+  message(FATAL_ERROR "Can NOT find SYCL version file!")
 endif()
 
 set(SYCL_COMPILER_VERSION)
@@ -64,24 +53,12 @@ if (${ver_line_num} EQUAL 1)
   string(REGEX MATCHALL "[0-9]+" SYCL_COMPILER_VERSION "${VERSION_LINE}")
 endif()
 
-get_filename_component(SYCL_INCLUDE_DIR "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
-
-find_library(SYCL_LIBRARY
-    NAMES "sycl"
-    HINTS ${sycl_root_hints}
-    PATH_SUFFIXES lib
-    NO_DEFAULT_PATH)
-if(NOT SYCL_LIBRARY)
-    message(FATAL_ERROR "SYCL library not found")
-endif()
-
 set(SYCL_DRIVER_VERSION)
 find_program(OCLOC_EXEC ocloc)
 if(OCLOC_EXEC)
-  set(drv_ver_path "${PROJECT_SOURCE_DIR}/csrc/aten/generated")
-  set(drv_ver_file "${drv_ver_path}/OCL_DRIVER_VERSION")
+  set(drv_ver_file "${PROJECT_BINARY_DIR}/OCL_DRIVER_VERSION")
   file(REMOVE ${drv_ver_file})
-  execute_process(COMMAND ${OCLOC_EXEC} query OCL_DRIVER_VERSION WORKING_DIRECTORY ${drv_ver_path})
+  execute_process(COMMAND ${OCLOC_EXEC} query OCL_DRIVER_VERSION WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
   if(EXISTS ${drv_ver_file})
     file(READ ${drv_ver_file} drv_ver_contents)
     string(STRIP ${drv_ver_contents} SYCL_DRIVER_VERSION)
@@ -108,40 +85,37 @@ endif()
 # XXX: Fetch OpenCL for oneDNN only
 find_library(OpenCL_LIBRARY
         NAMES "OpenCL"
-        HINTS ${sycl_root_hints}
-        PATH_SUFFIXES lib
+        HINTS ${SYCL_LIBRARY_DIR}
         NO_DEFAULT_PATH)
 set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl")
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS}")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-unnamed-lambda")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-early-optimizations")
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-early-optimizations")
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl")
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${SYCL_FLAGS}")
 if(BUILD_BY_PER_KERNEL)
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
 elseif(USE_AOT_DEVLIST)
-    set(SPIRV_OPT "spir64-unknown-unknown-sycldevice")
-    set(AOT_ARCH_OPT "spir64_gen-unknown-unknown-sycldevice")
-    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_source")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${AOT_ARCH_OPT}")
-    # FIXME: Provide revision ID to IGC for PVC platform to avoid AOT bug, only one device is passed if pvc in USE_AOT_DEVLIST
-    string(REGEX MATCHALL "[a-zA-Z0-9]+" DEV_LIST "${USE_AOT_DEVLIST}")
-    if("pvc" IN_LIST DEV_LIST OR "0xbd5" IN_LIST DEV_LIST)
-        list(LENGTH DEV_LIST length)
-        if (NOT ${length} EQUAL 1)
-          message(FATAL_ERROR "Cannot enable AOT for multiple devices if PVC is required in the device list!")
-        endif()
-        set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST} -revision_id 3'")
-    else()
-        set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
-    endif()
+    set(BACKEND_TARGET "spir64_gen")
+    set(SPIRV_TARGET "${BACKEND_TARGET},spir64")
+    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${BACKEND_TARGET}")
+    string(REGEX MATCHALL "[^,]+" DEV_LIST "${USE_AOT_DEVLIST}")
+    foreach(dev_name IN LISTS DEV_LIST)
+      ## FIXME: Provide revision ID to IGC for PVC platform to avoid AOT bug,
+      ## only one device is passed if pvc in USE_AOT_DEVLIST
+      if(dev_name STREQUAL "pvc" OR dev_name STREQUAL "0xbd5")
+        set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device pvc -revision_id 3'")
+      else()
+        set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${dev_name}'")
+      endif()
+    endforeach()
 else()
     # Use auto mode of device code split
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")

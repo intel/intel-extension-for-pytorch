@@ -46,7 +46,7 @@ static void initGlobalDevicePoolState() {
   // Enumerated root devices(GPU cards) from GPU Platform firstly.
   for (const auto& platform : plaform_list) {
 #ifdef USE_LEVEL_ZERO_ONLY
-    if (platform.get_backend() != DPCPP::backend::level_zero)
+    if (platform.get_backend() != DPCPP::backend::ext_oneapi_level_zero)
       continue;
 #else
     auto plat_name = platform.get_info<DPCPP::info::platform::name>();

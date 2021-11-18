@@ -132,8 +132,6 @@ void roll_dpcpp_kernel(
     int64_t size,
     int64_t stride,
     int64_t total_dims) {
-  static const auto write_mode = DPCPP::access::mode::discard_write;
-  static const auto read_mode = DPCPP::access::mode::read;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   auto offset = ((size - start) * stride);

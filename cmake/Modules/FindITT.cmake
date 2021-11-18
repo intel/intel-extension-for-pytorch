@@ -31,18 +31,19 @@ FIND_PATH(ITT_INCLUDE_DIR
           HINTS ${ITT_ROOT} $ENV{ITT_ROOT}
           PATH_SUFFIXES include)
 
+if (NOT ITT_INCLUDE_DIR)
+    MESSAGE(WARNING "ITT headers not found!")
+    return()
+endif (NOT ITT_INCLUDE_DIR)
+
 # Find ITT
 FIND_LIBRARY(ITT_LIBRARY
              NAMES ittnotify
              HINTS ${ITT_ROOT} $ENV{ITT_ROOT}
              PATH_SUFFIXES lib/x64 lib lib64)
 
-if (NOT ITT_INCLUDE_DIR)
-    MESSAGE(WARNING "ITT headers not found!")
-endif (NOT ITT_INCLUDE_DIR)
-
 if (NOT ITT_LIBRARY)
-    SET(ITT_LIBRARY ittnotify)
+    SET(ITT_LIBRARY "ittnotify" CACHE STRING "ITT library name" FORCE)
 endif (NOT ITT_LIBRARY)
 
 INCLUDE(FindPackageHandleStandardArgs)

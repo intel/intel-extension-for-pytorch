@@ -8,6 +8,7 @@
 #include "Loops.h"
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -196,8 +197,10 @@ Tensor histc_template(
     maxvalue = maxvalue + 1;
   }
   TORCH_CHECK(
-      !(std::isinf(minvalue) || std::isinf(maxvalue) || std::isnan(minvalue) ||
-        std::isnan(maxvalue)),
+      !(Numerics<input_t>::isinf(minvalue) ||
+        Numerics<input_t>::isinf(maxvalue) ||
+        Numerics<input_t>::isnan(minvalue) ||
+        Numerics<input_t>::isnan(maxvalue)),
       "range of [",
       minvalue,
       ", ",

@@ -71,7 +71,7 @@ void ctc_loss_log_alpha_kernel(
     int64_t __tg_target_stride,
     int64_t __batch_size,
     int64_t __BLANK) {
-  scalar_t neginf = -INFINITY;
+  scalar_t neginf = -std::numeric_limits<scalar_t>::infinity();
 
   int64_t __lp_input_stride = log_probs.stride(0);
   int64_t __lp_batch_stride = log_probs.stride(1);
@@ -291,7 +291,7 @@ void ctc_loss_backward_log_beta_kernel(
     int64_t __tg_target_stride,
     int64_t __batch_size,
     int64_t __BLANK) {
-  scalar_t neginf = -INFINITY;
+  scalar_t neginf = -std::numeric_limits<scalar_t>::infinity();
 
   int64_t __lp_input_stride = log_probs.stride(0);
   int64_t __lp_batch_stride = log_probs.stride(1);
@@ -572,7 +572,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
       scalar_t nll = neg_log_likelihood_ptr[b];
       scalar_t gr = grad_out_ptr[b * grad_out_batch_stride];
 
-      if (zero_infinity && nll == INFINITY)
+      if (zero_infinity && Numerics<scalar_t>::isinf(nll))
         return;
 
       for (int64_t t = 0; t < input_length; t++) {
@@ -625,7 +625,7 @@ void ctc_loss_backward_collect_kernel(
     int64_t num_labels,
     int64_t BLANK,
     bool zero_infinity) {
-  scalar_t neginf = -INFINITY;
+  scalar_t neginf = -std::numeric_limits<scalar_t>::infinity();
 
   int64_t gr_input_stride = gradient.stride(0);
   int64_t gr_batch_stride = gradient.stride(1);
@@ -719,7 +719,8 @@ void ctc_loss_backward_collect_kernel(
       for (int64_t c = 0; c < num_labels; c++) {
         scalar_t& res = gradient_ptr
             [gr_batch_offset + t * gr_input_stride + gr_char_stride * c];
-        if (t < input_length && (!zero_infinity || nll != INFINITY)) {
+        if (t < input_length &&
+            (!zero_infinity || !Numerics<scalar_t>::isinf(nll))) {
           scalar_t lp = log_probs_ptr
               [lp_batch_offset + t * lp_input_stride + lp_char_stride * c];
           res = (Numerics<scalar_t>::exp(lp) -
@@ -928,7 +929,7 @@ Tensor ctc_loss_backward_template(
     const Tensor& log_alpha,
     int64_t BLANK,
     bool zero_infinity) {
-  scalar_t neginf = -INFINITY;
+  scalar_t neginf = -std::numeric_limits<scalar_t>::infinity();
   using target_t =
       typename std::conditional<target_scalar_type == kInt, int, int64_t>::type;
   int64_t batch_size = log_probs.size(1);
@@ -1023,7 +1024,8 @@ Tensor ctc_loss_backward_template(
     grad *= grad_out.view({1, batch_size, 1});
     if (zero_infinity) {
       grad = at::where(
-          neg_log_likelihood.view({1, batch_size, 1}) == Scalar(INFINITY),
+          neg_log_likelihood.view({1, batch_size, 1}) ==
+              Scalar(std::numeric_limits<scalar_t>::infinity()),
           at::zeros({}, grad.options()),
           grad);
     }

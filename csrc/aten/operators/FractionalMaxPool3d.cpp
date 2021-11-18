@@ -5,7 +5,6 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
-#include "comm/NumericLimits.h"
 
 using namespace xpu::dpcpp;
 
@@ -98,7 +97,7 @@ void fractional_max_pool3d_out_frame(
             outputSizeW,
             poolSizeW);
 
-        scalar_t maxVal = at::numeric_limits<scalar_t>::lowest();
+        scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
         int64_t maxIndex = -1;
 
         for (int64_t t = poolT; t < poolT + poolSizeT; ++t) {

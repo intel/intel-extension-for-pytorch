@@ -30,7 +30,7 @@ static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
   int i = 0;
   accscalar_t a, b, k, s, t, w;
   if (x == 1.0) {
-    return static_cast<scalar_t>(INFINITY);
+    return std::numeric_limits<scalar_t>::infinity();
   }
 
   if (x < 1.0) {
@@ -40,7 +40,7 @@ static inline scalar_t zeta(scalar_t _x, scalar_t _q) {
 
   if (q <= 0.0) {
     if (q_is_integer) {
-      return static_cast<scalar_t>(INFINITY);
+      return std::numeric_limits<scalar_t>::infinity();
     } else {
       std::numeric_limits<scalar_t>::quiet_NaN();
     }
@@ -101,14 +101,14 @@ static inline scalar_t calc_digamma(scalar_t in) {
 
   accscalar_t x = static_cast<accscalar_t>(in);
   if (x == 0) {
-    return static_cast<scalar_t>(INFINITY);
+    return std::numeric_limits<scalar_t>::infinity();
   }
 
   bool x_is_integer = x == DPCPP::floor(x);
   accscalar_t result = 0;
   if (x < 0) {
     if (x_is_integer) {
-      return static_cast<scalar_t>(INFINITY);
+      return std::numeric_limits<scalar_t>::infinity();
     }
     // Rounding errors in tan's input can really affect the output
     // for extreme values, so we always perform this computation in double.

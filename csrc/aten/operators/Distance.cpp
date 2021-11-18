@@ -344,7 +344,7 @@ void pdist_forward(Tensor& result, const Tensor& self, double p) {
         } else if (p == 2.0) {
           pdist_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
               result, self, n, m, p, n2, n2_squared_minus_1);
-        } else if (std::isinf(p)) {
+        } else if (Numerics<scalar_t>::isinf(p)) {
           pdist_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
               result, self, n, m, p, n2, n2_squared_minus_1);
         } else {
@@ -415,7 +415,7 @@ void pdist_backward(
               p,
               n2,
               n2_squared_minus_1);
-        } else if (std::isinf(p)) {
+        } else if (Numerics<scalar_t>::isinf(p)) {
           pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
               buffer,
               grad,
@@ -596,7 +596,7 @@ static Tensor cdist_forward(
                 r1 * r2,
                 r1 * m,
                 r2 * m);
-          } else if (std::isinf(p)) {
+          } else if (Numerics<scalar_t>::isinf(p)) {
             cdist_forward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
                 result,
                 x1_expanded,
@@ -771,7 +771,7 @@ static Tensor cdist_backward(
               r1 * r2,
               r1 * m,
               r2 * m);
-        } else if (std::isinf(p)) {
+        } else if (Numerics<scalar_t>::isinf(p)) {
           cdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
               buffer,
               grad,

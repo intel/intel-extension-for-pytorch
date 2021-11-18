@@ -10,7 +10,6 @@ device = sycl_device
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_dropout(self):
         p = 0.2
         input = torch.Tensor(1000)

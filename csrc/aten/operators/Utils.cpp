@@ -152,7 +152,7 @@ DT_CONVERT_EXPLICIT_BI_INST(at::BFloat16, float);
 
 DPCPP_HOST DPCPP::event dpcpp_q_barrier(DPCPP::queue& q) {
 #ifdef USE_QUEUE_BARRIER
-  return q.submit_barrier();
+  return q.ext_oneapi_submit_barrier();
 #else
   auto cgf = [&](DPCPP::handler& cgh) { cgh.single_task([=]() {}); };
   return q.submit(cgf);
@@ -163,7 +163,7 @@ DPCPP_HOST DPCPP::event dpcpp_q_barrier(
     DPCPP::queue& q,
     std::vector<DPCPP::event>& events) {
 #ifdef USE_QUEUE_BARRIER
-  return q.submit_barrier(events);
+  return q.ext_oneapi_submit_barrier(events);
 #else
   auto cgf = [&](DPCPP::handler& cgh) {
     cgh.depends_on(events);

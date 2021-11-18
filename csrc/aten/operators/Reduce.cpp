@@ -564,12 +564,14 @@ static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
     dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormZeroOps<acc_t>(), 0);
   } else if (p == static_cast<float>(1)) {
     dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormOneOps<acc_t>(), 0);
-  } else if (p == static_cast<float>(INFINITY)) {
-    dpcpp_reduce_kernel<scalar_t, out_t>(
-        iter, AbsMaxOps<acc_t>(), std::numeric_limits<acc_t>::min());
-  } else if (p == static_cast<float>(-INFINITY)) {
-    dpcpp_reduce_kernel<scalar_t, out_t>(
-        iter, AbsMinOps<acc_t>(), std::numeric_limits<acc_t>::max());
+  } else if (Numerics<float>::isinf(p)) {
+    if (p < std::numeric_limits<float>::lowest()) {
+      dpcpp_reduce_kernel<scalar_t, out_t>(
+          iter, AbsMinOps<acc_t>(), std::numeric_limits<acc_t>::max());
+    } else {
+      dpcpp_reduce_kernel<scalar_t, out_t>(
+          iter, AbsMaxOps<acc_t>(), std::numeric_limits<acc_t>::min());
+    }
   } else {
     dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormOps<acc_t>{acc_t(p)}, 0);
   }
@@ -662,8 +664,8 @@ void _min_max_values_kernel_dpcpp_impl(TensorIterator& iter) {
       iter,
       MinMaxOps<scalar_t, scalar_t, int32_t>{},
       std::pair<scalar_t, scalar_t>(
-          at::numeric_limits<scalar_t>::upper_bound(),
-          at::numeric_limits<scalar_t>::lower_bound()));
+          std::numeric_limits<scalar_t>::max(),
+          std::numeric_limits<scalar_t>::lowest()));
 }
 
 void aminmax_kernel(TensorIterator& iter) {

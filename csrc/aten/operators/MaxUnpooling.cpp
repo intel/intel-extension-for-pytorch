@@ -5,7 +5,6 @@
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
-#include "comm/NumericLimits.h"
 #include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;

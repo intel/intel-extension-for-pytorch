@@ -16,8 +16,8 @@ namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 int binary_search_for_multinomial(
-    DPCPP::global_ptr<scalar_t> cumdist,
-    DPCPP::global_ptr<scalar_t> dist,
+    scalar_t* cumdist,
+    scalar_t* dist,
     int size,
     scalar_t val) {
   int start = 0;

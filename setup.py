@@ -59,11 +59,10 @@ ipex_examples = os.path.join(base_dir, 'tests/gpu/examples')
 
 
 def _get_complier():
-    if not os.getenv("DPCPP_ROOT") is None:
-        # dpcpp build
-        return "clang", "clang++"
-    else:
+    if shutil.which('clang') is None or shutil.which('clang++') is None:
         raise RuntimeError("Failed to find compiler path from DPCPP_ROOT")
+    # dpcpp build
+    return "clang", "clang++"
 
 
 def _check_env_flag(name, default=''):
@@ -333,7 +332,7 @@ def get_c_module():
         "ipex._C",
         libraries=main_libraries,
         sources=main_sources,
-        language='c',
+        language='c++',
         extra_compile_args=main_compile_args + extra_compile_args,
         include_dirs=include_dirs,
         library_dirs=library_dirs,

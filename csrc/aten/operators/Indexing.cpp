@@ -583,8 +583,6 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     if (size > 0) {
       int64_t strideSelf = dst.dim() == 0 ? 1 : dst.stride(0);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
-      static const auto write_mode = DPCPP::access::mode::discard_write;
-      static const auto read_mode = DPCPP::access::mode::read;
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
@@ -612,8 +610,6 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       int64_t stride0 = dst.stride(0);
       int64_t stride1 = dst.stride(1);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
-      static const auto write_mode = DPCPP::access::mode::discard_write;
-      static const auto read_mode = DPCPP::access::mode::read;
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {

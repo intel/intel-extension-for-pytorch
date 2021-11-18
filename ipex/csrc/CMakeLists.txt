@@ -34,6 +34,7 @@ endif()
 
 message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
 target_include_directories(ipex_python PUBLIC ${pybind11_INCLUDE_DIRS})
+target_link_directories(ipex_python PUBLIC ${SYCL_LIBRARY_DIR})
 
 if (USE_ITT)
     target_compile_definitions(ipex_python PUBLIC USE_ITT)
