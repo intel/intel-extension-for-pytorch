@@ -157,11 +157,20 @@ at::Tensor conv2d_weight_pack(
     at::IntArrayRef dilation,
     int64_t groups,
     c10::optional<at::ScalarType> dtype) {
+  bool is_channels_last = false;
+  // Align python frontend, we only use ChannelsLast if weight is contiguous
+  // and weight format is ChannelsLast.
+  // Note: for weight, we prefer to usr ChannelsLast if the weight format can be
+  // treated as MemoryFormat::ChannelsLast and MemoryFormat::Contiguous. For
+  // convolution input, if it can be treated as MemoryFormat::ChannelsLast and
+  // MemoryFormat::Contiguous, the prefer format use MemoryFormat::Contiguous.
+  if (weight.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    is_channels_last = true;
+  }
+
   auto weight_ = IS_CONTIGUOUS_ANY(weight)
       ? weight
       : weight.contiguous(weight.suggest_memory_format());
-  bool is_channels_last =
-      weight_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
   auto w = itensor_view_from_dense(weight_);
   // get the format give data type.
   ideep::data_type desc_dtype =
