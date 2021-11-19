@@ -73,7 +73,7 @@ opt_levels = {"O0": _O0(),
 
 def optimize(
     model,
-    dtype=torch.float,
+    dtype=None,
     optimizer=None,
     level="O1",
     inplace=False,
@@ -108,9 +108,13 @@ def optimize(
 
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
-        dtype (torch.dtype): ``torch.float(torch.float32)`` or ``torch.bfloat16``.
-            Model parameters will be casted if dtype is ``torch.bfloat16``. The
-            default value is ``torch.float32``.
+        dtype (torch.dtype): Only works for ``torch.bfloat16``.
+            Model parameters will be casted to ``torch.bfloat16`` if dtype is set to
+            ``torch.bfloat16``. The default value is None.
+            Note: Data type conversion is only applied to ``nn.Conv2d``, ``nn.Linear``
+            and ``nn.ConvTranspose2d`` for both training and inference cases. For
+            inference mode, additional data type conversion is applied to the weights
+            of ``nn.Embedding`` and ``nn.LSTM``.
         optimizer (torch.optim.Optimizer): User optimzizer to apply optimizations
             on, such as SGD. The default value is ``None``, meaning inference case.
         level (string): ``"O0"`` or ``"O1"``. No optimizations are applied with
@@ -241,10 +245,10 @@ def optimize(
 
     if opt_properties.optimize_lstm:
         utils._model_convert.replace_lstm_with_ipex_lstm(optimized_model)
-    if opt_properties.split_master_weight_for_bf16 and dtype is torch.bfloat16:
+    if model.training and opt_properties.split_master_weight_for_bf16 and dtype is torch.bfloat16:
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
-            warninig.warn(
+            warnings.warn(
                 "IPEX does not non-fused split master weight for bf16 training," +
                 "have reset split_master_weight_for_bf16 flag to False." +
                 "If you want to use split_master_weight_for_bf16." +
