@@ -290,7 +290,7 @@ def _should_prepack(module, auto_kernel_selection):
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
     def convert(m, auto_kernel_selection):
-        if _should_prepack(m, auto_kernel_selection):
+        if _should_prepack(m, auto_kernel_selection) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}

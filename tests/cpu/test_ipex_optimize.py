@@ -39,6 +39,22 @@ class TestOptimizeCases(TestCase):
         optimized_model, optimized_sgd = ipex.optimize(model.train(), optimizer=sgd, dtype=torch.bfloat16, split_master_weight_for_bf16=False)
         self.assertTrue(hasattr(optimized_model.conv, 'master_weight'))
 
+
+    def test_optimize_unsupport_dtype_conversion(self):
+        class Conv(torch.nn.Module):
+            def __init__(self,):
+                super(Conv, self).__init__()
+                self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+
+        def forward(self, x):
+            return self.conv(x)
+
+        model = Conv().half()
+        with self.assertWarnsRegex(UserWarning,
+                                   "WARNING: Can't convert model's parameters dtype"):
+            optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
+
+
     def test_optimize_inplace_behavior_eval_mode(self):
         M_ori = TestModule()
         options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])

@@ -1,5 +1,7 @@
 import torch
 import copy
+import warnings
+
 from torch.nn.utils.rnn import PackedSequence
 
 class _LSTM(torch.nn.LSTM):
@@ -83,16 +85,26 @@ def convert_module_data_type(module, dtype):
         if isinstance(module, module_cls):
             if module_cls is torch.nn.LSTM:
                 for name, param in module.named_parameters():
-                    getattr(module, name)
-                    casted_data = getattr(getattr(module, name), "data").detach().clone().to(dtype)
-                    setattr(getattr(module, name), "data", casted_data)
+                    ori_data = getattr(getattr(module, name), "data")
+                    ori_data_dtype = ori_data.dtype
+                    if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
+                        casted_data = ori_data.detach().clone().to(dtype)
+                        setattr(getattr(module, name), "data", casted_data)
+                    else:
+                        warnings.warn(f"WARNING: Can't convert model's parameters dtyep from {ori_data_dtype} to {dtype}")
+                        break
             else:
-                weight_data = module.weight.detach().clone().to(dtype)
-                module.weight.data = weight_data
-                if hasattr(module, 'bias') and module.bias is not None:
-                    bias_data = module.bias.detach().clone().to(dtype)
-                    module.bias.data = bias_data
-                break
+                ori_data_dtype = module.weight.dtype
+                # Assume weight and bias have same dtype, only need check weight dtype here.
+                if ori_data_dtype == torch.float or ori_data_dtype == torch.bfloat16:
+                    weight_data = module.weight.detach().clone().to(dtype)
+                    module.weight.data = weight_data
+                    if hasattr(module, 'bias') and module.bias is not None:
+                        bias_data = module.bias.detach().clone().to(dtype)
+                        module.bias.data = bias_data
+                else:
+                    warnings.warn(f"WARNING: Can't convert model's parameters dtype from {ori_data_dtype} to {dtype}")
+            break
     for child in module.children():
         convert_module_data_type(child, dtype)
     return module
