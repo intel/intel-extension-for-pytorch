@@ -11,7 +11,8 @@
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<2> {
+template <int kSpatialDim>
+struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {
   PackedConvWeightQDPCPP(
       Tensor weight,
       c10::optional<at::Tensor> bias,
@@ -79,7 +80,7 @@ struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<2> {
     return groups_;
   }
 
-  static c10::intrusive_ptr<ConvPackedParamsBase<2>> prepack(
+  static c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> prepack(
       at::Tensor weight,
       c10::optional<at::Tensor> bias,
       torch::List<int64_t> stride,

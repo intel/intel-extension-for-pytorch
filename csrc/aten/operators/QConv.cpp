@@ -22,7 +22,7 @@ at::Tensor q_conv2d(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP*>(packed_weight.get());
+  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
 
   at::Tensor weight = pack_ptr->weight;
   at::Tensor bias;
@@ -71,7 +71,7 @@ at::Tensor q_conv2d_relu(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP*>(packed_weight.get());
+  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
 
   at::Tensor weight = pack_ptr->weight;
   at::Tensor bias;
@@ -120,9 +120,113 @@ at::Tensor q_conv2d_relu(
   return output;
 }
 
+at::Tensor q_conv3d(
+    Tensor input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<3>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
+
+  at::Tensor weight = pack_ptr->weight;
+  at::Tensor bias;
+  if (pack_ptr->bias.has_value())
+    bias = pack_ptr->bias.value();
+  auto padding = pack_ptr->padding();
+  auto stride = pack_ptr->stride();
+  auto groups = pack_ptr->groups();
+  auto dilation = pack_ptr->dilation();
+
+  ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
+
+  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
+  Tensor output = _empty_affine_quantized(
+      conv_dst_tz(
+          input.ndimension(),
+          input.sizes(),
+          weight.sizes(),
+          padding.vec(),
+          stride.vec(),
+          dilation.vec()),
+      device(kXPU).dtype(kQInt8),
+      output_scale,
+      output_zero_point,
+      mfmt);
+
+  output = convolution(
+      output,
+      input,
+      weight,
+      bias,
+      padding.vec(),
+      stride.vec(),
+      dilation.vec(),
+      groups,
+      attr);
+  return output;
+}
+
+at::Tensor q_conv3d_relu(
+    Tensor input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<3>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<3>*>(packed_weight.get());
+
+  at::Tensor weight = pack_ptr->weight;
+  at::Tensor bias;
+
+  if (pack_ptr->bias.has_value())
+    bias = pack_ptr->bias.value();
+  auto padding = pack_ptr->padding();
+  auto stride = pack_ptr->stride();
+  auto groups = pack_ptr->groups();
+  auto dilation = pack_ptr->dilation();
+
+  ConvAttr attr = {
+      1.f,
+      0.f,
+      0.f,
+      static_cast<float>(output_scale),
+      ConvAttr::kind_with_relu};
+
+  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
+
+  Tensor output = _empty_affine_quantized(
+      conv_dst_tz(
+          input.ndimension(),
+          input.sizes(),
+          weight.sizes(),
+          padding.vec(),
+          stride.vec(),
+          dilation.vec()),
+      device(kXPU).dtype(kQUInt8),
+      output_scale,
+      output_zero_point,
+      mfmt);
+
+  output = convolution(
+      output,
+      input,
+      weight,
+      bias,
+      padding.vec(),
+      stride.vec(),
+      dilation.vec(),
+      groups,
+      attr);
+
+  return output;
+}
+
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
   m.impl("quantized::conv2d.new", q_conv2d);
   m.impl("quantized::conv2d_relu.new", q_conv2d_relu);
+  m.impl("quantized::conv3d.new", q_conv3d);
+  m.impl("quantized::conv3d_relu.new", q_conv3d_relu);
 }
 
 } // namespace AtenIpexTypeQuantizedXPU
@@ -137,7 +241,7 @@ at::Tensor q_conv2d_sum_relu(
     double sum_scale,
     int64_t sum_zero_point) {
   auto pack_ptr =
-      dynamic_cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP*>(
+      dynamic_cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<2>*>(
           packed_weight.get());
 
   at::Tensor weight = pack_ptr->weight;
