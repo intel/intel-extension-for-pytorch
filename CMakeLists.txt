@@ -19,7 +19,7 @@ set(CMAKE_GENERATOR "Unix Makefiles")
 # The options to build ipex
 include(CMakeDependentOption)
 option(USE_ONEMKL "Use oneMKL BLAS" ON)
-option(USE_CHANNELS_LAST_1D "Use channels last 1d" ON)
+option(USE_CHANNELS_LAST_1D "Use channels last 1d" OFF)
 option(USE_PERSIST_STREAM "Use persistent oneDNN stream" ON)
 option(USE_SCRATCHPAD_MODE "Use oneDNN scratchpad mode" ON)
 option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK, instead of oneDNN itself" OFF)
