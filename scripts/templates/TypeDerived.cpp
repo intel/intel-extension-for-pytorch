@@ -9,16 +9,20 @@ namespace at {
 
 namespace ${Type}_impl {
 
+#if 0
 ${type_derived_method_definitions}
+# endif
 
 }  // namespace ${Type}_impl
 
 namespace ${Type} {
 
 
+# if 0
 TORCH_LIBRARY_IMPL(aten, ${Backend}, m) {
 ${wrapper_registrations}
 }
+# endif
 
 }  // namespace ${Type}
 
