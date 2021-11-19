@@ -30,18 +30,17 @@ void bernoulli_distr_kernel(
     std::pair<uint64_t, uint64_t> seeds) {
   RECORD_FUNCTION("bernoulliDistr", {});
   auto& sycl_queue = dpcppGetCurrentQueue();
-  auto self_info = getTensorInfo<scalar_t, uint64_t>(self);
-  self_info.collapseDims();
 
   // generate bernoulli distribution
-  auto rand_ptr = rand.data_ptr<int32_t>();
+  // oneMKL generator only surpport int32_t and uint32_t datatype
+  int32_t* rand_ptr = rand.data_ptr<int32_t>();
   int64_t numel = self.numel();
   std::initializer_list<std::uint64_t> seed = {seeds.first, 0, seeds.second};
   float val = static_cast<float>(accscalar_t(1) - p);
 
 #ifdef USE_ONEMKL
   oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
-  oneapi::mkl::rng::bernoulli<scalar_t> distr(val);
+  oneapi::mkl::rng::bernoulli<int32_t> distr(val);
   auto e = oneapi::mkl::rng::generate(distr, engine, numel, rand_ptr);
   dpcpp_log("dpcpp_kernel", e);
   DPCPP_E_SYNC_FOR_DEBUG(e);
@@ -54,7 +53,8 @@ Tensor bernoulliDistr_impl(
     const Tensor& self,
     double p,
     c10::optional<Generator> gen_) {
-  at::Tensor rand = at::empty_like(self, self.suggest_memory_format());
+  at::Tensor rand = at::empty(
+      self.sizes(), self.options().dtype(kInt), self.suggest_memory_format());
   int64_t nelem = self.numel();
   // empty tensors should not get here, but just in case, avoid FPE
   if (nelem == 0)
@@ -84,7 +84,7 @@ Tensor bernoulliDistr_impl(
   return rand;
 }
 
-template <typename scalar_t, typename accscalar_t>
+template <typename scalar_t, typename accscalar_t, typename rscalar_t>
 void fused_dropout_kernel(
     const Tensor& self,
     const Tensor& rand,
@@ -94,7 +94,7 @@ void fused_dropout_kernel(
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto self_info = getTensorInfo<scalar_t, uint64_t>(self);
   self_info.collapseDims();
-  auto rand_ptr = rand.data_ptr<scalar_t>();
+  rscalar_t* rand_ptr = rand.data_ptr<rscalar_t>();
   int64_t numel = self.numel();
 
   accscalar_t pinv = accscalar_t(1) / p;
@@ -131,30 +131,6 @@ void fused_dropout_kernel(
   };
 
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
-}
-
-std::tuple<Tensor, Tensor> _fused_dropout_impl(
-    const Tensor& self,
-    const Tensor& rand,
-    double p) {
-  Tensor ret = at::empty_like(self, self.suggest_memory_format());
-  Tensor mask = at::empty(
-      self.sizes(), self.options().dtype(kByte), self.suggest_memory_format());
-
-  // TODO: Should add path for not satisfy canUse32BitIndexMath
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "fused_dropout_kernel",
-      [&] {
-        using accscalar_t = DiscreteDistributionType<scalar_t>::type;
-        accscalar_t pa = (accscalar_t)(p);
-        impl::fused_dropout_kernel<scalar_t, accscalar_t>(
-            self, rand, ret, mask, pa);
-      });
-
-  return std::tuple<Tensor, Tensor>(ret, mask);
 }
 
 template <typename scalar_t, typename accscalar_t>
@@ -207,15 +183,33 @@ std::tuple<Tensor, Tensor> _fused_dropout(
     const Tensor& self,
     double p,
     c10::optional<Generator> gen_) {
-#ifdef USE_ONEMKL
-  Tensor rand = bernoulliDistr_impl(self, p, gen_);
-#else
-  at::Tensor rand = at::empty_like(self, self.suggest_memory_format());
-  rand.bernoulli_(1 - p);
-  rand.div_(1 - p);
-#endif
+  Tensor ret = at::empty_like(self, self.suggest_memory_format());
+  Tensor mask = at::empty(
+      self.sizes(), self.options().dtype(kByte), self.suggest_memory_format());
 
-  return impl::_fused_dropout_impl(self, rand, p);
+  // TODO: Should add path for not satisfy canUse32BitIndexMath
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "fused_dropout_kernel",
+      [&] {
+        using accscalar_t = DiscreteDistributionType<scalar_t>::type;
+        accscalar_t pa = (accscalar_t)(p);
+#ifdef USE_ONEMKL
+        Tensor rand = bernoulliDistr_impl(self, p, gen_);
+        impl::fused_dropout_kernel<scalar_t, accscalar_t, int32_t>(
+            self, rand, ret, mask, pa);
+#else
+        at::Tensor rand = at::empty_like(self, self.suggest_memory_format());
+        rand.bernoulli_(1 - p);
+        rand.div_(1 - p);
+        impl::fused_dropout_kernel<scalar_t, accscalar_t, scalar_t>(
+            self, rand, ret, mask, pa);
+#endif
+      });
+
+  return std::tuple<Tensor, Tensor>(ret, mask);
 }
 
 Tensor _masked_scale(const Tensor& self, const Tensor& mask, double scale) {
