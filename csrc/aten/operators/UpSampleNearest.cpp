@@ -22,7 +22,7 @@ static void upsample_nearest_out_dpcpp_kernel(
     const double& scales_w = 0.0,
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
-  auto input = input_.contiguous();
+  auto input = input_.contiguous(input_.suggest_memory_format());
 
   auto strm = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kXPU, current_device());
@@ -46,11 +46,10 @@ static void upsample_nearest_out_dpcpp_kernel(
       scales_h,
       scales_d);
 
-  output.resize_(dst_dims);
+  output.resize_(dst_dims, input_.suggest_memory_format());
 
-  memory::format_tag data_format = ndims == 5
-      ? memory::format_tag::ncdhw
-      : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
+  auto data_format =
+      get_dnnl_default_format(ndims, is_smf_channels_last(input_));
   memory::format_tag format_any = memory::format_tag::any;
   memory::data_type data_type = get_onednn_dtype(input);
 
@@ -110,7 +109,8 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
     const double& scales_w = 0.0,
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
-  auto grad_output = grad_output_.contiguous();
+  auto grad_output =
+      grad_output_.contiguous(grad_output_.suggest_memory_format());
 
   auto strm = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kXPU, current_device());
@@ -133,11 +133,10 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
       scales_h,
       scales_d);
 
-  grad_input.resize_(src_dims);
+  grad_input.resize_(src_dims, grad_output_.suggest_memory_format());
 
-  memory::format_tag data_format = ndims == 5
-      ? memory::format_tag::ncdhw
-      : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
+  auto data_format =
+      get_dnnl_default_format(ndims, is_smf_channels_last(grad_output_));
   memory::format_tag format_any = memory::format_tag::any;
   memory::data_type data_type = get_onednn_dtype(grad_output);
 
