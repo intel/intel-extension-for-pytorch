@@ -6,6 +6,7 @@
 #include "jit/codegen/onednn/guard_shape.h"
 #include "jit/codegen/onednn/kernel.h"
 #include "jit/codegen/onednn/layout_propagation.h"
+#include "jit/codegen/onednn/lift_up_quant.h"
 #include "jit/codegen/onednn/prepare_binary.h"
 #include "jit/codegen/onednn/prepare_dequant.h"
 #include "jit/codegen/onednn/quantization_patterns.h"
@@ -54,10 +55,16 @@ void fuseGraph(std::shared_ptr<Graph> &g) {
         "After PrepareBinaryForLLGA. Before EliminateCommonSubexpression", g);
     EliminateCommonSubexpression(g);
     GRAPH_DUMP(
-        "After EliminateCommonSubexpression. Before PrepareDequantForLLGA", g);
+        "After EliminateCommonSubexpression. Before SaveDequantInformation", g);
+    // SaveDequantInformation must be placed before LiftUpQuant
+    SaveDequantInformation(g);
+    GRAPH_DUMP("After SaveDequantInformation. Before PrepareDequantForLLGA", g);
     // PrepareDequantForLLGA must be placed after EliminateCommonSubexpression
     PrepareDequantForLLGA(g);
-    GRAPH_DUMP("After PrepareDequantForLLGA. Before DeferSizeCheck", g);
+    GRAPH_DUMP("After PrepareDequantForLLGA. Before LiftUpQuant", g);
+    // LiftUpQuant must be place before DeferSizeCheck
+    LiftUpQuant(g);
+    GRAPH_DUMP("After LiftUpQuant. Before DeferSizeCheck", g);
     DeferSizeCheck(g);
     GRAPH_DUMP(
         "After DeferSizeCheck. Before RevertConstantPropagationOnWeight", g);

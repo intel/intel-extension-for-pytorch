@@ -1,5 +1,7 @@
 #include <torch/csrc/jit/ir/alias_analysis.h>
 
+#include "jit/codegen/onednn/utils.h"
+
 namespace torch {
 namespace jit {
 namespace fuser {
@@ -25,28 +27,36 @@ class SizeCheckMover {
     // %sz = aten::size(%c)
     //       ^-- move size check after relu as it preserves input shape
     //
+    // Also support moving multiple aten::size connected to the same node
+    // %b = aten::dequantize(%a)
+    // %c = aten::linear(%b, %weight, %bias)
+    // %sz1 = aten::size(%c, %0)
+    // %sz2 = aten::size(%c, %1)
+    // %d = aten::quantize_per_tensor(%c, %scale, %zp, %dtype)
+    // ->
+    // %b = aten::dequantize(%a)
+    // %c = aten::linear(%b, %weight, %bias)
+    // %d = aten::quantize_per_tensor(%c, %scale, %zp, %dtype)
+    // %sz1 = aten::size(%d, %0) <--defer size after quantize_per_tensor
+    // %sz2 = aten::size(%d, %1) <--defer size after quantize_per_tensor
     if (node->kind() != aten::size)
       return false;
 
     auto* input = node->input(0);
     auto& uses = input->uses();
-    bool onlyUsedByShapePreserveOp =
-        uses.size() > 1 &&
+    bool onlyUsedByShapePreserveOp = uses.size() > 1 &&
         std::all_of(uses.begin(), uses.end(), [node](auto& u) {
-            return u.user == node ||
-              // TODO: register more shape preserved op
-              u.user->kind() == Symbol::aten("relu") ||
-              u.user->kind() == Symbol::aten("sigmoid") ||
-              u.user->kind() == Symbol::aten("quantize_per_tensor") ||
-              u.user->kind() == Symbol::aten("quantize_per_channel");
-
-        });
+                                       return u.user == node ||
+                                           u.user->kind() == aten::size ||
+                                           utils::isEltwiseOp(u.user);
+                                     });
 
     if (!onlyUsedByShapePreserveOp)
       return false;
 
     for (const auto& use : uses) {
-      if (use.user == node)
+      // skip the node itself and aten::size
+      if (use.user == node || use.user->kind() == aten::size)
         continue;
       auto shapePreserveOp = use.user;
       if (aliasDb.moveAfterTopologicallyValid(node, shapePreserveOp)) {
