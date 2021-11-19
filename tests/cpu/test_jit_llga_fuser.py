@@ -348,6 +348,23 @@ class TestOp(JitLlgaTestCase):
         x = torch.rand(5, 28)
         self.assertEqual(m(x), traced(x))
 
+    @llga_fp32_bf16_test_env
+    def test_unsupported_dtype(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                x = torch.fft.fftn(x)
+                x = torch.abs(x)
+                return x
+
+        x = torch.rand(10, 10, dtype=torch.complex64)
+        m = M()
+        graph, traced = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+        self.assertGraphContainsExactly(graph, "aten::abs", 1)
+
 class TestFusionPattern(JitLlgaTestCase):
     @llga_fp32_bf16_test_env
     def test_conv2d_eltwise(self):
