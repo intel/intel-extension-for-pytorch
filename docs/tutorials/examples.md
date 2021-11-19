@@ -5,53 +5,125 @@ Examples
 
 ### Single-instance Training
 
-#### Float32
+#### Code Changes Highlight
+
+```
+...
+import torch
+import intel_extension_for_pytorch as ipex
+...
+model = Model()
+criterion = ...
+optimizer = ...
+model.train()
+# For Float32
+model, optimizer = ipex.optimize(model, optimizer=optimizer)
+# For BFloat16
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+...
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+data = data.to(memory_format=torch.channels_last)
+optimizer.zero_grad()
+output = model(data)
+...
+```
+
+#### Complete - Float32
+
 
 ```
 import torch
-import torch.nn as nn
-# Import intel_extension_for_pytorch
+import torchvision
 import intel_extension_for_pytorch as ipex
 
-model = Model()
-model.set_state_dict(torch.load(PATH))
-optimizer.set_state_dict(torch.load(PATH))
-# Invoke optimize function against the model object and optimizer object
-model, optimizer = ipex.optimize(model, optimizer, dtype=torch.float32)
+LR = 0.001
+DOWNLOAD = True
+DATA = 'datasets/cifar10/'
 
-for images, label in train_loader():
+transform = torchvision.transforms.Compose([
+    torchvision.transforms.Resize((224, 224)),
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+train_dataset = torchvision.datasets.CIFAR10(
+        root=DATA,
+        train=True,
+        transform=transform,
+        download=DOWNLOAD,
+)
+train_loader = torch.utils.data.DataLoader(
+        dataset=train_dataset,
+        batch_size=128
+)
+
+model = torchvision.models.resnet50()
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
+model.train()
+model, optimizer = ipex.optimize(model, optimizer=optimizer)
+
+for batch_idx, (data, target) in enumerate(train_loader):
     # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
-    images = images.to(memory_format=torch.channels_last)
-    loss = criterion(model(images), label)
+    data = data.to(memory_format=torch.channels_last)
+    optimizer.zero_grad()
+    output = model(data)
+    loss = criterion(output, target)
     loss.backward()
     optimizer.step()
-torch.save(model.state_dict(), PATH)
-torch.save(optimizer.state_dict(), PATH)
+    print(batch_idx)
+torch.save({
+     'model_state_dict': model.state_dict(),
+     'optimizer_state_dict': optimizer.state_dict(),
+     }, 'checkpoint.pth')
 ```
 
-#### BFloat16
+#### Complete - BFloat16
 
 ```
 import torch
-import torch.nn as nn
-# Import intel_extension_for_pytorch
+import torchvision
 import intel_extension_for_pytorch as ipex
 
-model = Model()
-model.set_state_dict(torch.load(PATH))
-optimizer.set_state_dict(torch.load(PATH))
-# Invoke optimize function against the model object and optimizer object with data type set to torch.bfloat16
-model, optimizer = ipex.optimize(model, optimizer, dtype=torch.bfloat16)
+LR = 0.001
+DOWNLOAD = True
+DATA = 'datasets/cifar10/'
 
-for images, label in train_loader():
+transform = torchvision.transforms.Compose([
+    torchvision.transforms.Resize((224, 224)),
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+train_dataset = torchvision.datasets.CIFAR10(
+        root=DATA,
+        train=True,
+        transform=transform,
+        download=DOWNLOAD,
+)
+train_loader = torch.utils.data.DataLoader(
+        dataset=train_dataset,
+        batch_size=128
+)
+
+model = torchvision.models.resnet50()
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
+model.train()
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
+
+for batch_idx, (data, target) in enumerate(train_loader):
+    optimizer.zero_grad()
     with torch.cpu.amp.autocast():
         # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
-        images = images.to(memory_format=torch.channels_last)
-        loss = criterion(model(images), label)
+        data = data.to(memory_format=torch.channels_last)
+        output = model(data)
+        loss = criterion(output, target)
     loss.backward()
     optimizer.step()
-torch.save(model.state_dict(), PATH)
-torch.save(optimizer.state_dict(), PATH)
+    print(batch_idx)
+torch.save({
+     'model_state_dict': model.state_dict(),
+     'optimizer_state_dict': optimizer.state_dict(),
+     }, 'checkpoint.pth')
 ```
 
 ### Distributed Training
