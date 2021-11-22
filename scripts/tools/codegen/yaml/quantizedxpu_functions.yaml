@@ -17,7 +17,7 @@ supported:
   - copy_
   - dequantize.self
 #  - empty.memory_format	# different signature
-#  - empty_strided	# different signature
+  - empty_strided
   - equal
 #  - int_repr	# different signature
 #  - leaky_relu	# different signature

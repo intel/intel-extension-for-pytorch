@@ -557,7 +557,13 @@ Tensor empty(
 Tensor empty_strided(
     IntArrayRef size,
     IntArrayRef stride,
-    const TensorOptions& options) {
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   return at::impl::empty_strided_dpcpp(size, stride, options);
 }
 } // namespace AtenIpexTypeQuantizedXPU
