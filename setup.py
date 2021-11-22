@@ -1,4 +1,55 @@
 #!/usr/bin/env python
+
+# Welcome to the Intel Extension for PyTorch setup.py.
+#
+# Environment variables you are probably interested in:
+#
+#   DEBUG
+#     build with -O0 and -g (debug symbols)
+#
+#   RELEASE
+#     build with optimization level -O2
+#
+#   REL_WITH_DEB_INFO
+#     build with optimization level -O2 and -g (debug symbols)
+#
+#   CFLAGS
+#     flags to apply to both C and C++ files to be compiled (a quirk of setup.py
+#     which we have faithfully adhered to in our build system is that CFLAGS
+#     also applies to C++ files (unless CXXFLAGS is set), in contrast to the
+#     default behavior of autogoo and cmake build systems.)
+#
+#   CC
+#     the C/C++ compiler to use
+#
+# Environment variables for feature toggles:
+#
+#   USE_CXX11_ABI
+#     controls _GLIBCXX_USE_CXX11_ABI whether the declarations in the c++ library headers use the old or new ABI.
+#     https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_macros.html
+#
+#   AVX2=1
+#     build the extension with the AVX2
+#
+#   AVX512=1
+#     build the extension with the AVX512(Default). Its priority is higher than AVX2.
+#
+#   IPEX_DISP_OP=1
+#     output the extension operators name for debug purpose
+#
+#   IPEX_PROFILE_OP=1
+#     Record the extension operators for profiling
+#
+# Environment variables we respect (these environment variables are
+# conventional and are often understood/set by other software.)
+#
+#   TORCH_VERSION
+#     specify the PyTorch version to depend on
+#
+#   TORCH_IPEX_VERSION
+#     specify the extension version literal
+#
+
 from __future__ import print_function
 from distutils.command.build_py import build_py
 from distutils.command.install import install
@@ -48,6 +99,8 @@ try:
 except ImportError as e:
     print("Unable to import torch from the local environment.")
     raise e
+
+USE_CXX11_ABI = torch._C._GLIBCXX_USE_CXX11_ABI
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -253,6 +306,15 @@ def get_build_type():
 
     return build_type
 
+def get_cxxabi_version():
+    global USE_CXX11_ABI
+    if os.getenv('USE_CXX11_ABI', '') != '':
+        if _check_env_flag('USE_CXX11_ABI'):
+            USE_CXX11_ABI = 1
+        else:
+            USE_CXX11_ABI = 0
+
+    return USE_CXX11_ABI
 
 def get_avx_version():
     avx_version = ''
@@ -392,7 +454,7 @@ class IPEXCPPLibBuild(build_clib, object):
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DIPEX_AVX_VERSION=' + get_avx_version(),
-            '-DGLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
+            '-DGLIBCXX_USE_CXX11_ABI=' + str(int(get_cxxabi_version())),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
