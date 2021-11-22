@@ -10,435 +10,215 @@
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
+#include "comm/ScalarOps.h"
 
 using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
-
-template <typename T, typename TOut>
-struct TensorLTOp {
-  inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::lt(out, in);
-  }
-
-  inline void operator()(TOut& out, T& a, T& b) const {
-    out = ScalarConvert<bool, TOut>::to(Numerics<T>::lt(a, b));
-  }
-};
-
-template <typename T, typename TOut>
-struct TensorGTOp {
-  inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::gt(out, in);
-  }
-
-  inline void operator()(TOut& out, T& a, T& b) const {
-    out = ScalarConvert<bool, TOut>::to(Numerics<T>::gt(a, b));
-  }
-};
-
-template <typename T, typename TOut>
-struct TensorLEOp {
-  inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::le(out, in);
-  }
-
-  inline void operator()(TOut& out, T& a, T& b) const {
-    out = ScalarConvert<bool, TOut>::to(Numerics<T>::le(a, b));
-  }
-};
-
-template <typename T, typename TOut>
-struct TensorGEOp {
-  inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::ge(out, in);
-  }
-
-  inline void operator()(TOut& out, T& a, T& b) const {
-    out = ScalarConvert<bool, TOut>::to(Numerics<T>::ge(a, b));
-  }
-};
-
-template <typename T, typename TOut>
-struct TensorEQOp {
-  inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::eq(out, in);
-  }
-
-  void operator()(TOut& out, T& a, T& b) const {
-    out = ScalarConvert<bool, TOut>::to(Numerics<T>::eq(a, b));
-  }
-};
-
-template <typename T, typename TOut>
-struct TensorNEOp {
-  inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::ne(out, in);
-  }
-
-  inline void operator()(TOut& out, T& a, T& b) const {
-    out = ScalarConvert<bool, TOut>::to(Numerics<T>::ne(a, b));
-  }
-};
-
-template <typename ScalarTypeOut, typename ScalarType, class Op>
-void logicalTensor(
-    Tensor& self_,
-    const Tensor& src1,
-    const Tensor& src2,
-    Op op) {
-  auto iter = TensorIterator::comparison_op(self_, src1, src2);
-
-  dpcpp_kernel_for_tensor_iter(iter, [=](ScalarType src1, ScalarType src2) {
-    ScalarTypeOut ret;
-    op(ret, src1, src2);
-    return ret;
-  });
-}
-
-template <typename scalar_t>
-void ltTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {
-  logicalTensor<bool, scalar_t>(
-      self_, src1, src2, TensorLTOp<scalar_t, bool>());
-}
-
-template <typename scalar_t>
-void gtTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {
-  logicalTensor<bool, scalar_t>(
-      self_, src1, src2, TensorGTOp<scalar_t, bool>());
-}
-
-template <typename scalar_t>
-void leTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {
-  logicalTensor<bool, scalar_t>(
-      self_, src1, src2, TensorLEOp<scalar_t, bool>());
-}
-
-template <typename scalar_t>
-void geTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {
-  logicalTensor<bool, scalar_t>(
-      self_, src1, src2, TensorGEOp<scalar_t, bool>());
-}
-
-template <typename scalar_t>
-void eqTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {
-  logicalTensor<bool, scalar_t>(
-      self_, src1, src2, TensorEQOp<scalar_t, bool>());
-}
-
-template <typename scalar_t>
-void neTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {
-  logicalTensor<bool, scalar_t>(
-      self_, src1, src2, TensorNEOp<scalar_t, bool>());
-}
-
-#if COMPARE_PORTED
-void THDPCPPTensor_(neTensor)(
-    THDPCPPState* state,
-    THSyclBoolTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<bool, scalar_t>(
-      state, self_, src1, src2, TensorNEOp<scalar_t, bool>());
-}
-
-void THDPCPPTensor_(ltTensorT)(
-    THDPCPPState* state,
-    THDPCPPTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<scalar_t, scalar_t>(
-      state, self_, src1, src2, TensorLTOp<scalar_t, scalar_t>());
-}
-
-void THDPCPPTensor_(gtTensorT)(
-    THDPCPPState* state,
-    THDPCPPTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<scalar_t, scalar_t>(
-      state, self_, src1, src2, TensorGTOp<scalar_t, scalar_t>());
-}
-
-void THDPCPPTensor_(leTensorT)(
-    THDPCPPState* state,
-    THDPCPPTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<scalar_t, scalar_t>(
-      state, self_, src1, src2, TensorLEOp<scalar_t, scalar_t>());
-}
-
-void THDPCPPTensor_(geTensorT)(
-    THDPCPPState* state,
-    THDPCPPTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<scalar_t, scalar_t>(
-      state, self_, src1, src2, TensorGEOp<scalar_t, scalar_t>());
-}
-#endif
-
-// void eqTensorT(Tensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
-// {
-//   THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
-//                                 TensorEQOp<scalar_t,
-//                                 scalar_t>());
-// }
-
-#if COMPARE_PORTED
-void THDPCPPTensor_(neTensorT)(
-    THDPCPPState* state,
-    THDPCPPTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<scalar_t, scalar_t>(
-      state, self_, src1, src2, TensorNEOp<scalar_t, scalar_t>());
-}
-
-void THDPCPPTensor_(ltTensorByte)(
-    THDPCPPState* state,
-    THSyclByteTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<unsigned char, scalar_t>(
-      state, self_, src1, src2, TensorLTOp<scalar_t, unsigned char>());
-}
-
-void THDPCPPTensor_(gtTensorByte)(
-    THDPCPPState* state,
-    THSyclByteTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<unsigned char, scalar_t>(
-      state, self_, src1, src2, TensorGTOp<scalar_t, unsigned char>());
-}
-
-void THDPCPPTensor_(leTensorByte)(
-    THDPCPPState* state,
-    THSyclByteTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<unsigned char, scalar_t>(
-      state, self_, src1, src2, TensorLEOp<scalar_t, unsigned char>());
-}
-
-void THDPCPPTensor_(geTensorByte)(
-    THDPCPPState* state,
-    THSyclByteTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<unsigned char, scalar_t>(
-      state, self_, src1, src2, TensorGEOp<scalar_t, unsigned char>());
-}
-#endif
-
-// void THDPCPPTensor_(eqTensorByte)(THDPCPPState *state, THSyclByteTensor
-// *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
-// {
-//   THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1,
-//   src2));
-//   THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
-//                                              TensorEQOp<scalar_t,
-//                                              unsigned char>());
-// }
-
-#if COMPARE_PORTED
-void THDPCPPTensor_(neTensorByte)(
-    THDPCPPState* state,
-    THSyclByteTensor* self_,
-    THDPCPPTensor* src1,
-    THDPCPPTensor* src2) {
-  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THDPCPP_logicalTensor<unsigned char, scalar_t>(
-      state, self_, src1, src2, TensorNEOp<scalar_t, unsigned char>());
-}
-#endif
-} // namespace impl
-
-Tensor& lt_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  at::lt_out(out, self, new_other);
-  return out;
-}
-
-Tensor lt(const Tensor& self, Scalar other_) {
-  auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  return at::lt_out(result, self, new_other);
-}
-
-Tensor& lt_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+void lt_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "ltTensor",
-      [&]() { impl::ltTensor<scalar_t>(out, self, other); });
+      at::ScalarType::Bool,
+      iter.common_dtype(),
+      "lt_dpcpp",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
+          return Numerics<scalar_t>::lt(a, b);
+        });
+      });
+}
 
+void gt_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      iter.common_dtype(),
+      "gt_dpcpp",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
+          return Numerics<scalar_t>::gt(a, b);
+        });
+      });
+}
+
+void ge_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      iter.common_dtype(),
+      "ge_dpcpp",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
+          return Numerics<scalar_t>::ge(a, b);
+        });
+      });
+}
+
+void le_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      iter.common_dtype(),
+      "le_dpcpp",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
+          return Numerics<scalar_t>::le(a, b);
+        });
+      });
+}
+
+void eq_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      iter.common_dtype(),
+      "eq_dpcpp",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
+          return Numerics<scalar_t>::eq(a, b);
+        });
+      });
+}
+
+void ne_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      iter.common_dtype(),
+      "ne_dpcpp",
+      [&]() {
+        dpcpp_kernel_with_scalars(iter, [=](scalar_t a, scalar_t b) -> bool {
+          return Numerics<scalar_t>::ne(a, b);
+        });
+      });
+}
+
+} // namespace impl
+
+/*=========================== lt ==========================*/
+
+Tensor& lt_out(Tensor& out, const Tensor& self, const Tensor& other) {
+  auto iter = TensorIterator::comparison_op(out, self, other);
+  impl::lt_kernel_dpcpp(iter);
   return out;
 }
 
 Tensor lt(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::lt_out(result, self, other);
+  return at::AtenIpexTypeXPU::lt_out(result, self, other);
 }
 
-Tensor& gt_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  at::gt_out(out, self, new_other);
+Tensor& lt_out(Tensor& out, const Tensor& self, Scalar other_) {
+  at::AtenIpexTypeXPU::lt_out(out, self, wrapped_scalar_tensor(other_));
   return out;
 }
 
-Tensor gt(const Tensor& self, Scalar other_) {
+Tensor lt(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  at::gt_out(result, self, new_other);
-  return result;
+  return at::AtenIpexTypeXPU::lt_out(
+      result, self, wrapped_scalar_tensor(other_));
 }
 
-Tensor& gt_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "gtTensor",
-      [&]() { impl::gtTensor<scalar_t>(out, self, other); });
+/*=========================== gt ==========================*/
 
+Tensor& gt_out(Tensor& out, const Tensor& self, const Tensor& other) {
+  auto iter = TensorIterator::comparison_op(out, self, other);
+  impl::gt_kernel_dpcpp(iter);
   return out;
 }
 
 Tensor gt(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::gt_out(result, self, other);
+  return at::AtenIpexTypeXPU::gt_out(result, self, other);
 }
 
-Tensor& ge_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  at::ge_out(out, self, new_other);
+Tensor& gt_out(Tensor& out, const Tensor& self, Scalar other_) {
+  at::AtenIpexTypeXPU::gt_out(out, self, wrapped_scalar_tensor(other_));
   return out;
 }
 
-Tensor ge(const Tensor& self, Scalar other_) {
+Tensor gt(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  return at::ge_out(result, self, new_other);
+  return at::AtenIpexTypeXPU::gt_out(
+      result, self, wrapped_scalar_tensor(other_));
 }
 
-Tensor& ge_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  Tensor b_self, b_other;
-  std::tie(b_self, b_other) = expand_outplace(self, other);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "geTensor",
-      [&]() { impl::geTensor<scalar_t>(out, b_self, b_other); });
+/*=========================== ge ==========================*/
 
+Tensor& ge_out(Tensor& out, const Tensor& self, const Tensor& other) {
+  auto iter = TensorIterator::comparison_op(out, self, other);
+  impl::ge_kernel_dpcpp(iter);
   return out;
 }
 
 Tensor ge(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::ge_out(result, self, other);
+  return at::AtenIpexTypeXPU::ge_out(result, self, other);
 }
 
-Tensor& le_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  at::le_out(out, self, new_other);
+Tensor& ge_out(Tensor& out, const Tensor& self, Scalar other_) {
+  at::AtenIpexTypeXPU::ge_out(out, self, wrapped_scalar_tensor(other_));
   return out;
 }
 
-Tensor le(const Tensor& self, Scalar other_) {
+Tensor ge(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  return at::le_out(result, self, new_other);
+  return at::AtenIpexTypeXPU::ge_out(
+      result, self, wrapped_scalar_tensor(other_));
 }
 
-Tensor& le_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "leTensor",
-      [&]() { impl::leTensor<scalar_t>(out, self, other); });
+/*=========================== le ==========================*/
 
+Tensor& le_out(Tensor& out, const Tensor& self, const Tensor& other) {
+  auto iter = TensorIterator::comparison_op(out, self, other);
+  impl::le_kernel_dpcpp(iter);
   return out;
 }
 
 Tensor le(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::le_out(result, self, other);
+  return at::AtenIpexTypeXPU::le_out(result, self, other);
 }
 
-Tensor& eq_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  return at::eq_out(out, self, new_other);
+Tensor& le_out(Tensor& out, const Tensor& self, Scalar other_) {
+  at::AtenIpexTypeXPU::le_out(out, self, wrapped_scalar_tensor(other_));
+  return out;
 }
 
-Tensor eq(const Tensor& self, Scalar other_) {
+Tensor le(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  return at::eq_out(result, self, new_other);
+  return at::AtenIpexTypeXPU::le_out(
+      result, self, wrapped_scalar_tensor(other_));
 }
+
+/*=========================== eq ==========================*/
 
 Tensor& eq_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      at::ScalarType::Bool,
-      self.scalar_type(),
-      "eqTensor",
-      [&]() { impl::eqTensor<scalar_t>(out, self, other); });
-
+  auto iter = TensorIterator::comparison_op(out, self, other);
+  impl::eq_kernel_dpcpp(iter);
   return out;
 }
 
 Tensor eq(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::eq_out(result, self, other);
+  return at::AtenIpexTypeXPU::eq_out(result, self, other);
+}
+Tensor& eq_out(Tensor& out, const Tensor& self, Scalar other_) {
+  return at::AtenIpexTypeXPU::eq_out(out, self, wrapped_scalar_tensor(other_));
+}
+
+Tensor eq(const Tensor& self, Scalar other_) {
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  return at::AtenIpexTypeXPU::eq_out(
+      result, self, wrapped_scalar_tensor(other_));
 }
 
 bool equal(const Tensor& self, const Tensor& other) {
@@ -453,38 +233,28 @@ bool equal(const Tensor& self, const Tensor& other) {
   return min_.to<bool>() != 0;
 }
 
-Tensor& ne_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  at::ne_out(out, self, new_other);
-  return out;
-}
-
-Tensor ne(const Tensor& self, Scalar other_) {
-  auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other.resize_as_(self).fill_(other_).toType(self.scalar_type());
-  return at::ne_out(result, self, new_other);
-}
+/*=========================== ne ==========================*/
 
 Tensor& ne_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "neTensor",
-      [&]() { impl::neTensor<scalar_t>(out, self, other); });
-
+  auto iter = TensorIterator::comparison_op(out, self, other);
+  impl::ne_kernel_dpcpp(iter);
   return out;
 }
 
 Tensor ne(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::ne_out(result, self, other);
+  return at::AtenIpexTypeXPU::ne_out(result, self, other);
+}
+
+Tensor& ne_out(Tensor& out, const Tensor& self, Scalar other_) {
+  at::AtenIpexTypeXPU::ne_out(out, self, wrapped_scalar_tensor(other_));
+  return out;
+}
+
+Tensor ne(const Tensor& self, Scalar other_) {
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  return at::AtenIpexTypeXPU::ne_out(
+      result, self, wrapped_scalar_tensor(other_));
 }
 
 } // namespace AtenIpexTypeXPU
