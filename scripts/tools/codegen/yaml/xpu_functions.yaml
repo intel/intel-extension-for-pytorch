@@ -1,8 +1,613 @@
 backend: XPU
 cpp_namespace: at
 class_name: AtenIpexTypeXPU
-use_out_as_primary: false
+use_out_as_primary: true
 device_guard: true
 supported:
-  - empty_strided
+  - _adaptive_avg_pool2d
+  - _adaptive_avg_pool2d_backward
+  - _aminmax
+  - _aminmax.dim
+  - _cat
+#  - _cat.out	# different signature
+  - _cdist_backward
+  - _cdist_forward
+  - _ctc_loss
+  - _ctc_loss_backward
+#  - _cumprod	# different schema
+#  - _cumprod.out	# different schema
+#  - _cumsum	# different schema
+#  - _cumsum.out	# different schema
+#  - _embedding_bag	# different schema
+#  - _embedding_bag_dense_backward	# different schema
+#  - _empty_affine_quantized	# different signature
+#  - _empty_per_channel_affine_quantized	# different signature
+#  - _fft_with_size.norm_modes	# different schema
+#  - _fused_dropout	# different signature
+#  - _index_put_impl_	# different signature
+  - _inverse_helper
+  - _local_scalar_dense
+  - _log_softmax
+  - _log_softmax_backward_data
+#  - _lu_solve_helper	# different schema
+#  - _lu_with_info	# different schema
+#  - _make_per_channel_quantized_tensor	# different signature
+#  - _make_per_tensor_quantized_tensor	# different signature
+  - _pdist_backward
+  - _pdist_forward
+#  - _qr_helper	# different schema
+  - _s_where
+  - _softmax
+  - _softmax_backward_data
+  - _solve_helper
+#  - _std	# different schema
+#  - _svd_helper	# different schema
+  - _symeig_helper
+#  - _triangular_solve_helper	# different schema
+  - _unique
+  - _unique2
+#  - _var	# different schema
+#  - abs.out	# different signature
+#  - acos.out	# different signature
+#  - adaptive_avg_pool2d.out	# different signature
+#  - adaptive_avg_pool3d	# dispatch is False
+#  - adaptive_avg_pool3d.out	# different signature
+#  - adaptive_avg_pool3d_backward	# different schema
+#  - adaptive_avg_pool3d_backward.grad_input	# different signature
+  - adaptive_max_pool2d
+#  - adaptive_max_pool2d.out	# different signature
+  - adaptive_max_pool2d_backward
+#  - adaptive_max_pool2d_backward.grad_input	# different signature
+  - adaptive_max_pool3d
+#  - adaptive_max_pool3d.out	# different signature
+  - adaptive_max_pool3d_backward
+#  - adaptive_max_pool3d_backward.grad_input	# different signature
+#  - add.Scalar	# different signature
+#  - add.Tensor	# different signature
+#  - add.out	# different signature
+#  - add_.Scalar	# different signature
+#  - add_.Tensor	# different signature
+#  - addbmm	# different signature
+#  - addbmm.out	# different signature
+#  - addbmm_	# different signature
+#  - addcdiv	# different signature
+#  - addcdiv.out	# different signature
+#  - addcdiv_	# different signature
+#  - addcmul	# different signature
+#  - addcmul.out	# different signature
+#  - addcmul_	# different signature
+#  - addmm	# different signature
+#  - addmm_	# different signature
+#  - addmv	# different signature
+#  - addmv_	# different signature
+#  - addr	# different signature
+#  - addr_	# different signature
+  - all
+  - all.dim
+#  - all.out	# different signature
+  - amax
+#  - amax.out	# different signature
+  - any
+  - any.dim
+#  - any.out	# different signature
+#  - arange.start_out	# different signature
+  - argmax
+  - argmin
+  - as_strided
+#  - asin.out	# different signature
+#  - atan.out	# different signature
+  - atan2
+#  - atan2.out	# different signature
+  - atan2_
+  - atan_
+  - avg_pool2d
+#  - avg_pool2d.out	# different signature
+  - avg_pool2d_backward
+#  - avg_pool2d_backward.grad_input	# different signature
+  - avg_pool3d
+#  - avg_pool3d.out	# different signature
+  - avg_pool3d_backward
+#  - avg_pool3d_backward.grad_input	# different signature
+#  - baddbmm	# different signature
+#  - baddbmm.out	# different signature
+#  - baddbmm_	# different signature
+#  - bernoulli_.Tensor	# different signature
+#  - bernoulli_.float	# different signature
+#  - binary_cross_entropy	# different signature
+#  - binary_cross_entropy.out	# different signature
+#  - binary_cross_entropy_backward	# different signature
+#  - binary_cross_entropy_backward.grad_input	# different signature
+#  - bincount	# different signature
+#  - bitwise_and.Scalar_out	# different signature
+#  - bitwise_and.Tensor_out	# different signature
+  - bitwise_not
+#  - bitwise_not.out	# different signature
+  - bitwise_not_
+#  - bitwise_or.Scalar_out	# different signature
+#  - bitwise_or.Tensor_out	# different signature
+#  - bitwise_xor.Scalar_out	# different signature
+#  - bitwise_xor.Tensor_out	# different signature
+  - bmm
+#  - bmm.out	# different signature
+#  - cauchy_	# different signature
+#  - ceil.out	# different signature
+#  - chain_matmul	# dispatch is False
+  - cholesky
+#  - cholesky.out	# different signature
+  - cholesky_inverse
+#  - cholesky_inverse.out	# different signature
+  - cholesky_solve
+#  - cholesky_solve.out	# different signature
+#  - clamp	# different signature
+#  - clamp.out	# different signature
+#  - clamp_	# different signature
+#  - clamp_max.out	# different signature
+#  - clamp_max_	# different signature
+#  - clamp_min.out	# different signature
+#  - clamp_min_	# different signature
+  - clone
+  - col2im
+#  - col2im.out	# different signature
+  - col2im_backward
+#  - col2im_backward.grad_input	# different signature
+#  - conj.out	# different schema
+  - conv_tbc
+#  - conv_tbc_backward	# dispatch is False
+#  - convolution_backward_overrideable	# different signature
+#  - convolution_overrideable	# different signature
   - copy_
+#  - cos.out	# different signature
+  - cos_
+#  - cosh.out	# different signature
+  - cross
+#  - cross.out	# different signature
+  - dequantize.self
+  - diag
+#  - diag.out	# different signature
+  - digamma
+#  - digamma.out	# different signature
+  - digamma_
+  - div.Tensor
+#  - div.out	# different signature
+  - div_.Tensor
+  - dot
+#  - elu	# different signature
+#  - elu.out	# different signature
+#  - elu_	# different signature
+#  - elu_backward	# different schema
+#  - elu_backward.grad_input	# different schema
+  - embedding_dense_backward
+#  - empty.memory_format	# different signature
+  - empty_strided
+#  - eq.Scalar	# different signature
+#  - eq.Scalar_out	# different signature
+  - eq.Tensor
+#  - eq.Tensor_out	# different signature
+  - equal
+#  - erf.out	# different signature
+  - erf_
+#  - erfc.out	# different signature
+  - erfc_
+  - erfinv
+#  - erfinv.out	# different signature
+  - erfinv_
+#  - exp.out	# different signature
+  - exp_
+#  - expm1.out	# different signature
+#  - exponential_	# different signature
+#  - eye.m_out	# different signature
+#  - eye.out	# different signature
+#  - fill_.Scalar	# different signature
+  - fill_.Tensor
+  - flip
+#  - floor.out	# different signature
+  - floor_divide
+#  - floor_divide.out	# different signature
+  - floor_divide_.Tensor
+#  - fmod.Scalar	# different signature
+#  - fmod.Scalar_out	# different signature
+  - fmod.Tensor
+#  - fmod.Tensor_out	# different signature
+#  - fmod_.Scalar	# different signature
+  - fmod_.Tensor
+  - frac
+#  - frac.out	# different signature
+  - frac_
+  - fractional_max_pool2d
+#  - fractional_max_pool2d.output	# different signature
+  - fractional_max_pool2d_backward
+#  - fractional_max_pool2d_backward.grad_input	# different signature
+  - fractional_max_pool3d
+#  - fractional_max_pool3d.output	# different signature
+  - fractional_max_pool3d_backward
+#  - fractional_max_pool3d_backward.grad_input	# different signature
+  - gather
+#  - gather.out	# different signature
+#  - ge.Scalar	# different signature
+#  - ge.Scalar_out	# different signature
+  - ge.Tensor
+#  - ge.Tensor_out	# different signature
+  - gelu
+  - gelu_backward
+#  - geometric_	# different signature
+  - geqrf
+#  - geqrf.a	# different signature
+#  - ger	# dispatch is False
+#  - ger.out	# dispatch is False
+  - glu
+#  - glu.out	# different signature
+  - glu_backward
+#  - glu_backward.grad_input	# different signature
+#  - gt.Scalar	# different signature
+#  - gt.Scalar_out	# different signature
+  - gt.Tensor
+#  - gt.Tensor_out	# different signature
+#  - hardshrink	# different signature
+#  - hardshrink_backward	# different signature
+#  - hardtanh	# different signature
+#  - hardtanh.out	# different signature
+#  - hardtanh_	# different signature
+#  - hardtanh_backward	# different signature
+#  - hardtanh_backward.grad_input	# different signature
+#  - histc	# different signature
+#  - histc.out	# different signature
+  - im2col
+#  - im2col.out	# different signature
+  - im2col_backward
+#  - im2col_backward.grad_input	# different signature
+#  - index.Tensor	# different signature
+#  - index_add_	# dispatch is False
+  - index_copy_
+#  - index_fill_.int_Scalar	# different signature
+  - index_fill_.int_Tensor
+  - index_select
+#  - index_select.out	# different signature
+  - inverse
+#  - inverse.out	# different signature
+  - is_set_to
+  - isnan
+#  - kthvalue.values	# different signature
+  - l1_loss
+#  - l1_loss.out	# different signature
+  - l1_loss_backward
+#  - l1_loss_backward.grad_input	# different signature
+#  - le.Scalar	# different signature
+#  - le.Scalar_out	# different signature
+  - le.Tensor
+#  - le.Tensor_out	# different signature
+#  - leaky_relu	# different signature
+#  - leaky_relu.out	# different signature
+#  - leaky_relu_	# different signature
+#  - leaky_relu_backward	# different signature
+#  - lerp.Scalar	# different signature
+#  - lerp.Scalar_out	# different signature
+  - lerp.Tensor
+#  - lerp.Tensor_out	# different signature
+#  - lerp_.Scalar	# different signature
+  - lerp_.Tensor
+  - lgamma
+  - lgamma_
+#  - linspace.out	# different signature
+#  - log.out	# different signature
+#  - log10.out	# different signature
+#  - log1p.out	# different signature
+  - log1p_
+#  - log2.out	# different signature
+  - log_normal_
+  - log_sigmoid_backward
+#  - log_sigmoid_backward.grad_input	# different signature
+  - log_sigmoid_forward
+#  - log_sigmoid_forward.output	# different signature
+#  - logical_and.out	# different signature
+#  - logical_not	# dispatch is False
+#  - logical_not.out	# different signature
+#  - logical_not_	# dispatch is False
+#  - logical_or.out	# different signature
+#  - logical_xor.out	# different signature
+#  - logspace.out	# different signature
+#  - lt.Scalar	# different signature
+#  - lt.Scalar_out	# different signature
+  - lt.Tensor
+#  - lt.Tensor_out	# different signature
+  - lu_solve
+#  - lu_solve.out	# different signature
+#  - masked_fill_.Scalar	# different signature
+  - masked_fill_.Tensor
+  - masked_scatter_
+  - masked_select
+#  - masked_select.out	# different signature
+  - max
+  - max.dim
+#  - max.dim_max	# different signature
+#  - max.out	# dispatch is False
+  - max_pool2d_with_indices
+#  - max_pool2d_with_indices.out	# different signature
+  - max_pool2d_with_indices_backward
+#  - max_pool2d_with_indices_backward.grad_input	# different signature
+  - max_pool3d_with_indices
+#  - max_pool3d_with_indices.out	# different signature
+  - max_pool3d_with_indices_backward
+#  - max_pool3d_with_indices_backward.grad_input	# different signature
+  - max_unpool2d
+#  - max_unpool2d.out	# different signature
+  - max_unpool2d_backward
+#  - max_unpool2d_backward.grad_input	# different signature
+  - max_unpool3d
+#  - max_unpool3d.out	# different signature
+  - max_unpool3d_backward
+#  - max_unpool3d_backward.grad_input	# different signature
+  - maximum
+#  - maximum.out	# different signature
+  - mean
+  - mean.dim
+#  - mean.out	# different signature
+  - median
+  - min
+  - min.dim
+#  - min.dim_min	# different signature
+#  - min.out	# dispatch is False
+  - minimum
+#  - minimum.out	# different signature
+  - mm
+#  - mm.out	# different signature
+  - mode
+#  - mode.values	# different signature
+  - mse_loss
+#  - mse_loss.out	# different signature
+  - mse_loss_backward
+#  - mse_loss_backward.grad_input	# different signature
+#  - mul.Scalar	# different signature
+  - mul.Tensor
+#  - mul.out	# different signature
+#  - mul_.Scalar	# different signature
+  - mul_.Tensor
+#  - multi_margin_loss	# different signature
+#  - multi_margin_loss.out	# different signature
+#  - multi_margin_loss_backward	# different signature
+#  - multi_margin_loss_backward.grad_input	# different signature
+  - multilabel_margin_loss_backward
+#  - multilabel_margin_loss_backward.grad_input	# different signature
+  - multilabel_margin_loss_forward
+#  - multilabel_margin_loss_forward.output	# different signature
+#  - multinomial	# different signature
+#  - multinomial.out	# different signature
+  - mv
+  - mvlgamma
+  - mvlgamma_
+  - narrow_copy
+#  - native_batch_norm	# different signature
+#  - native_batch_norm_backward	# different signature
+#  - native_group_norm	# different signature
+#  - native_group_norm_backward	# different signature
+#  - native_layer_norm	# different schema
+#  - native_layer_norm_backward	# different schema
+#  - ne.Scalar	# different signature
+#  - ne.Scalar_out	# different signature
+  - ne.Tensor
+#  - ne.Tensor_out	# different signature
+#  - neg.out	# different signature
+#  - nll_loss2d_backward	# different signature
+#  - nll_loss2d_backward.grad_input	# different signature
+#  - nll_loss2d_forward	# different signature
+#  - nll_loss2d_forward.output	# different signature
+#  - nll_loss_backward	# different signature
+#  - nll_loss_backward.grad_input	# different signature
+#  - nll_loss_forward	# different signature
+#  - nll_loss_forward.output	# different signature
+  - nonzero
+#  - nonzero.out	# different signature
+#  - norm.Scalar	# different signature
+#  - norm.ScalarOpt_dim	# different signature
+#  - norm.ScalarOpt_dim_dtype	# different signature
+#  - norm.ScalarOpt_dtype	# different signature
+#  - norm.dtype_out	# different signature
+#  - norm.out	# different signature
+#  - normal.Tensor_Tensor	# different signature
+#  - normal.Tensor_Tensor_out	# different signature
+#  - normal.Tensor_float	# different signature
+#  - normal.Tensor_float_out	# different signature
+#  - normal.float_Tensor	# different signature
+#  - normal.float_Tensor_out	# different signature
+#  - normal_	# different signature
+#  - orgqr	# dispatch is False
+#  - orgqr.out	# dispatch is False
+  - ormqr
+#  - ormqr.out	# different signature
+  - polygamma
+#  - polygamma.out	# different signature
+  - polygamma_
+#  - pow.Scalar	# different signature
+#  - pow.Scalar_out	# different signature
+#  - pow.Tensor_Scalar	# different signature
+#  - pow.Tensor_Scalar_out	# different signature
+  - pow.Tensor_Tensor
+#  - pow.Tensor_Tensor_out	# different signature
+#  - pow_.Scalar	# different signature
+  - pow_.Tensor
+  - prelu
+  - prelu_backward
+  - prod
+  - prod.dim_int
+#  - prod.int_out	# different signature
+  - put_
+#  - qr	# dispatch is False
+#  - qr.Q	# dispatch is False
+  - quantize_per_channel
+#  - quantize_per_tensor	# different signature
+  - random_
+  - random_.from
+  - random_.to
+#  - randperm	# different schema
+#  - randperm.generator	# different schema
+#  - randperm.generator_out	# different signature
+#  - randperm.out	# dispatch is False
+#  - range.out	# different signature
+#  - reciprocal.out	# different signature
+  - record_stream
+  - reflection_pad1d
+#  - reflection_pad1d.out	# different signature
+  - reflection_pad1d_backward
+#  - reflection_pad1d_backward.grad_input	# different signature
+  - relu
+  - relu_
+#  - remainder.Scalar	# different signature
+#  - remainder.Scalar_out	# different signature
+  - remainder.Tensor
+#  - remainder.Tensor_out	# different signature
+#  - remainder_.Scalar	# different signature
+  - remainder_.Tensor
+#  - renorm	# different signature
+#  - renorm.out	# different signature
+#  - renorm_	# different signature
+#  - repeat_interleave.Tensor	# different schema
+  - replication_pad2d
+#  - replication_pad2d.out	# different signature
+  - replication_pad2d_backward
+#  - replication_pad2d_backward.grad_input	# different signature
+#  - resize_	# different signature
+#  - resize_as_	# different signature
+  - roll
+  - rot90
+#  - round.out	# different signature
+#  - rrelu	# dispatch is False
+#  - rrelu_	# dispatch is False
+#  - rrelu_with_noise	# different signature
+#  - rrelu_with_noise.out	# different signature
+#  - rrelu_with_noise_	# different signature
+#  - rrelu_with_noise_backward	# different signature
+#  - rsqrt.out	# different signature
+#  - rsub.Scalar	# different signature
+#  - rsub.Tensor	# different signature
+  - scatter_.src
+#  - scatter_.value	# different signature
+  - scatter_add_
+  - set_
+  - set_.source_Storage
+  - set_.source_Storage_storage_offset
+  - set_.source_Tensor
+#  - sgn.out	# different signature
+  - sigmoid
+#  - sigmoid.out	# different signature
+  - sigmoid_
+  - sigmoid_backward
+#  - sigmoid_backward.grad_input	# different signature
+  - sign
+#  - sign.out	# different signature
+  - sign_
+#  - sin.out	# different signature
+#  - sinh.out	# different signature
+#  - slice.Tensor	# different schema
+  - smooth_l1_loss
+#  - smooth_l1_loss.out	# different signature
+  - smooth_l1_loss_backward
+#  - smooth_l1_loss_backward.grad_input	# different signature
+  - soft_margin_loss
+#  - soft_margin_loss.out	# different signature
+  - soft_margin_loss_backward
+#  - soft_margin_loss_backward.grad_input	# different signature
+#  - softplus	# different signature
+#  - softplus.out	# different signature
+#  - softplus_backward	# different signature
+#  - softplus_backward.grad_input	# different signature
+#  - softshrink	# different signature
+#  - softshrink.out	# different signature
+#  - softshrink_backward	# different signature
+#  - softshrink_backward.grad_input	# different signature
+  - solve
+#  - solve.solution	# different signature
+  - sort
+#  - sort.values	# different signature
+#  - sqrt.out	# different signature
+#  - std	# dispatch is False
+#  - std.dim	# dispatch is False
+#  - std.out	# dispatch is False
+#  - std_mean	# dispatch is False
+#  - std_mean.dim	# dispatch is False
+#  - sub.Scalar	# different signature
+#  - sub.Tensor	# different signature
+#  - sub.out	# different signature
+#  - sub_.Scalar	# different signature
+#  - sub_.Tensor	# different signature
+  - sum
+#  - sum.IntList_out	# different signature
+  - sum.dim_IntList
+#  - svd	# dispatch is False
+#  - svd.U	# dispatch is False
+  - take
+#  - take.out	# different signature
+#  - tan.out	# different signature
+  - tan_
+  - tanh
+#  - tanh.out	# different signature
+  - tanh_
+  - tanh_backward
+#  - tanh_backward.grad_input	# different signature
+#  - threshold	# different signature
+#  - threshold.out	# different signature
+#  - threshold_	# different signature
+#  - threshold_backward	# different signature
+  - topk
+#  - topk.values	# different signature
+  - trace
+  - triangular_solve
+#  - triangular_solve.X	# different signature
+#  - tril.out	# different signature
+  - tril_
+#  - tril_indices	# different signature
+#  - triu.out	# different signature
+  - triu_
+#  - triu_indices	# different signature
+#  - trunc.out	# different signature
+  - unfold
+#  - uniform_	# different signature
+  - unique_consecutive
+  - unique_dim
+  - unique_dim_consecutive
+  - upsample_bicubic2d
+#  - upsample_bicubic2d.out	# different signature
+  - upsample_bicubic2d.vec
+  - upsample_bicubic2d_backward
+#  - upsample_bicubic2d_backward.grad_input	# different signature
+  - upsample_bicubic2d_backward.vec
+  - upsample_bilinear2d
+#  - upsample_bilinear2d.out	# different signature
+  - upsample_bilinear2d.vec
+  - upsample_bilinear2d_backward
+#  - upsample_bilinear2d_backward.grad_input	# different signature
+  - upsample_bilinear2d_backward.vec
+  - upsample_linear1d
+#  - upsample_linear1d.out	# different signature
+  - upsample_linear1d.vec
+  - upsample_linear1d_backward
+#  - upsample_linear1d_backward.grad_input	# different signature
+  - upsample_linear1d_backward.vec
+  - upsample_nearest1d
+#  - upsample_nearest1d.out	# different signature
+  - upsample_nearest1d.vec
+  - upsample_nearest1d_backward
+#  - upsample_nearest1d_backward.grad_input	# different signature
+  - upsample_nearest1d_backward.vec
+  - upsample_nearest2d
+#  - upsample_nearest2d.out	# different signature
+  - upsample_nearest2d.vec
+  - upsample_nearest2d_backward
+#  - upsample_nearest2d_backward.grad_input	# different signature
+  - upsample_nearest2d_backward.vec
+  - upsample_nearest3d
+#  - upsample_nearest3d.out	# different signature
+  - upsample_nearest3d.vec
+  - upsample_nearest3d_backward
+#  - upsample_nearest3d_backward.grad_input	# different signature
+  - upsample_nearest3d_backward.vec
+  - upsample_trilinear3d
+#  - upsample_trilinear3d.out	# different signature
+  - upsample_trilinear3d.vec
+  - upsample_trilinear3d_backward
+#  - upsample_trilinear3d_backward.grad_input	# different signature
+  - upsample_trilinear3d_backward.vec
+#  - var	# dispatch is False
+#  - var.dim	# dispatch is False
+#  - var_mean	# dispatch is False
+#  - var_mean.dim	# dispatch is False
+  - view
+  - zero_
