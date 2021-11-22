@@ -44,6 +44,13 @@ void insertPrePackedConvTranspose2dOp(Block* b) {
               weight_size_option.value().size() == 4)) {
           continue;
         }
+
+        // TODO: output_padding unsupported in IPEX temporarily
+        auto output_padding = toIValue(n->input(5))->toIntList();
+        if (output_padding[0] > 0 || output_padding[1] > 0) {
+          continue;
+        }
+
         auto weight_size = weight_size_option.value();
         std::vector<int64_t> k_size = {weight_size[2], weight_size[3]};
         // w_is_channels_last is invaild, there will has a check the memory

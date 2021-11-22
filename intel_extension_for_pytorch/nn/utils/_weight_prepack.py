@@ -314,14 +314,19 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                     warnings.warn(m.__str__() + " not be packed because weight is not transposed or contiguous")
                     new_m = m
             elif isinstance(m, torch.nn.ConvTranspose2d):
-                new_m = _IPEXConvTranspose2d(m)
-                params_attr[weight].update({'op': torch.nn.ConvTranspose2d, \
-                                              'padding': new_m.padding, 'stride': new_m.stride, \
-                                              'dilation': new_m.dilation, 'kernel_size': new_m.kernel_size, \
-                                              'groups': new_m.groups, 'out_channels': new_m.out_channels, \
-                                              'in_channels': new_m.in_channels, \
-                                              'output_padding': new_m.output_padding, \
-                                              'weight_channels_last': new_m.weight_channels_last})
+                # TODO: unsupported in IPEX temporarily, won't replace module with IPEXConvTranspose2d
+                if m.output_padding[0] > 0 or m.output_padding[1] > 0:
+                    warnings.warn("ConvTranspose2d with output_padding > 0 is not supported, ipex.optimize() won't do anything")
+                    new_m = m
+                else:          
+                    new_m = _IPEXConvTranspose2d(m)
+                    params_attr[weight].update({'op': torch.nn.ConvTranspose2d, \
+                                                'padding': new_m.padding, 'stride': new_m.stride, \
+                                                'dilation': new_m.dilation, 'kernel_size': new_m.kernel_size, \
+                                                'groups': new_m.groups, 'out_channels': new_m.out_channels, \
+                                                'in_channels': new_m.in_channels, \
+                                                'output_padding': new_m.output_padding, \
+                                                'weight_channels_last': new_m.weight_channels_last})
             if 'bf16_param' in params_attr[weight]:
                 params_attr[weight]['bf16_param'] = new_m.weight
             elif 'trail' in params_attr[weight]:
