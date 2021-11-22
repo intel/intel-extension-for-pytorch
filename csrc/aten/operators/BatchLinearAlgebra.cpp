@@ -44,7 +44,8 @@ void error_handle(
 #endif
 
 template <typename scalar_t, typename IndexType, bool upper>
-void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
+void apply_triu_tril(Tensor& result, const Tensor& self_, const int64_t k) {
+  auto self = self_.contiguous();
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto N = self.numel();

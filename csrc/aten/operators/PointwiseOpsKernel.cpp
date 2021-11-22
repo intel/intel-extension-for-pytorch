@@ -87,6 +87,19 @@ Tensor& addcdiv_out(
     const Tensor& tensor2,
     Scalar value) {
   // checkBackend("addcdiv_cpu", out, self.options().backend());
+  if (isIntegralType(tensor1.scalar_type(), /*includeBool=*/true) &&
+      isIntegralType(tensor2.scalar_type(), /*includeBool=*/true)) {
+    TORCH_CHECK(
+        false,
+        "Integer division with addcdiv is no longer supported, and in a future  ",
+        "release addcdiv will perform a true division of tensor1 and tensor2. ",
+        "The historic addcdiv behavior can be implemented as ",
+        "(input + value * torch.trunc(tensor1 / tensor2)).to(input.dtype) ",
+        "for integer inputs and as ",
+        "(input + value * tensor1 / tensor2) for float inputs. ",
+        "The future addcdiv behavior is just the latter implementation: ",
+        "(input + value * tensor1 / tensor2), for all dtypes.");
+  }
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .add_output(out)

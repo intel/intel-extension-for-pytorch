@@ -101,6 +101,11 @@ Tensor leaky_relu_backward(
         grad_input, self, grad_output, alpha, 0.0f);
     return grad_input;
   } else {
+    TORCH_CHECK(
+        !self_is_result || negative_slope.to<double>() >= 0.0,
+        "In-place leakyReLu backward calculation is triggered with a negative slope which is not supported. "
+        "This is caused by calling in-place forward function with a negative slope, "
+        "please call out-of-place version instead.");
     grad_input = at::empty({0}, grad_output.options());
     return at::AtenIpexTypeXPU::leaky_relu_backward_out(
         grad_input, grad_output, self, negative_slope);

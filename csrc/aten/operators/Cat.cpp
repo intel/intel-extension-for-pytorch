@@ -534,7 +534,8 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   for (int i = 0; i < tensors.size(); i++) {
     Tensor tensor = tensors[i];
     if (tensor.defined()) {
-      if (tensor.scalar_type() == ScalarType::Short ||
+      if (tensor.scalar_type() == ScalarType::Bool ||
+          tensor.scalar_type() == ScalarType::Short ||
           tensor.scalar_type() == ScalarType::Double ||
           tensor.scalar_type() == ScalarType::Long) {
         skip_dnnl_cat = true;

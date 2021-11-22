@@ -517,6 +517,11 @@ Tensor rrelu_with_noise_backward(
     Scalar upper,
     bool training,
     bool self_is_result) {
+  TORCH_CHECK(
+      !self_is_result,
+      "In-place rrelu_ backward calculation is triggered with a negative slope which is not supported. "
+      "This is caused by calling in-place forward function with a negative slope, "
+      "please call out-of-place version instead.");
   Tensor grad_input = at::empty_like(grad_output);
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
