@@ -197,7 +197,7 @@ std::tuple<Tensor, Tensor> _fused_dropout(
         using accscalar_t = DiscreteDistributionType<scalar_t>::type;
         accscalar_t pa = (accscalar_t)(p);
 #ifdef USE_ONEMKL
-        Tensor rand = bernoulliDistr_impl(self, p, gen_);
+        Tensor rand = impl::bernoulliDistr_impl(self, p, gen_);
         impl::fused_dropout_kernel<scalar_t, accscalar_t, int32_t>(
             self, rand, ret, mask, pa);
 #else
