@@ -4,7 +4,7 @@ def get_num_nodes():
     return int(subprocess.check_output('lscpu | grep Socket | awk \'{print $2}\'', shell=True))
 
 def get_num_cores_per_node():
-    return int(subprocess.check_output('lscpu | grep Core | awk \'{print $4}\'', shell=True))
+    return int(subprocess.check_output('lscpu | grep Core\'.* per socket\' | awk \'{print $4}\'', shell=True))
 
 def get_core_list_of_node_id(node_id):
     r"""
