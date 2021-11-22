@@ -1,0 +1,21 @@
+# - Try to find INTEL_EXT_PT_CPU
+#
+# The following are set after configuration is done:
+#  INTEL_EXT_PT_CPU_FOUND          : set to true if Intel(R) Extension for PyTorch* is found.
+#  TORCH_CXX_FLAGS      : Append cxx flags of Intel(R) Extension for PyTorch* to TORCH_CXX_FLAGS
+#  TORCH_LIBRARIES      : Append libraries of Intel(R) Extension for PyTorch* to TORCH_CXX_FLAGS
+#
+
+IF (NOT INTEL_EXT_PT_CPU_FOUND)
+
+FIND_PACKAGE(Torch REQUIRED)
+FIND_LIBRARY(INTEL_EXT_PT_CPU_LIBRARY libintel-ext-pt-cpu.so PATHS "${TORCH_INSTALL_PREFIX}/lib")
+if(INTEL_EXT_PT_CPU_LIBRARY)
+  LIST(APPEND TORCH_LIBRARIES ${INTEL_EXT_PT_CPU_LIBRARY})
+  SET(TORCH_CXX_FLAGS "${TORCH_CXX_FLAGS} -Wl,--no-as-needed")
+endif()
+
+SET(INTEL_EXT_PT_CPU_FOUND TRUE)
+MESSAGE(STATUS "Found INTEL_EXT_PT_CPU: TRUE")
+
+ENDIF(NOT INTEL_EXT_PT_CPU_FOUND)
