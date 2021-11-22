@@ -9,10 +9,15 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 static inline at::Tensor condition_contiguous(const at::Tensor& t) {
+  if (!t.defined()) {
+    return t;
+  }
+
   if (t.defined() && !is_smf_channels_last(t)) {
     return t.contiguous();
   }
 
+  // if (t.defined() && is_smf_channels_last(t))
   return t.contiguous(get_cl_tag_by_ndim(t.ndimension()));
 }
 
@@ -25,10 +30,14 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(
     bool training,
     double momentum,
     double epsilon) {
-  checkBackend(
-      "batch_norm",
-      {input, weight, bias, running_mean, running_var},
-      Backend::XPU);
+  if (running_mean.defined() && running_var.defined()) {
+    checkBackend(
+        "batch_norm",
+        {input, weight, bias, running_mean, running_var},
+        Backend::XPU);
+  } else {
+    checkBackend("batch_norm", {input, weight, bias}, Backend::XPU);
+  }
 
   if (input.scalar_type() != at::ScalarType::Float &&
       input.scalar_type() != at::ScalarType::Half &&
@@ -61,16 +70,14 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
-  checkBackend(
-      "batch_norm",
-      {input,
-       weight,
-       grad_output,
-       running_mean,
-       running_var,
-       save_mean,
-       save_var},
-      Backend::XPU);
+  if (save_mean.defined() && save_var.defined()) {
+    checkBackend(
+        "batch_norm",
+        {input, weight, grad_output, save_mean, save_var},
+        Backend::XPU);
+  } else {
+    checkBackend("batch_norm", {input, weight, grad_output}, Backend::XPU);
+  }
 
   if (input.scalar_type() != at::ScalarType::Float &&
       input.scalar_type() != at::ScalarType::Half &&
