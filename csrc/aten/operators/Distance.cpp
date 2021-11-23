@@ -947,9 +947,5 @@ Tensor cdist(
   return at::_cdist_forward(x1, x2, p, compute_mode);
 }
 
-TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl("cdist", TORCH_FN(AtenIpexTypeXPU::cdist));
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at

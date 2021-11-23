@@ -321,7 +321,7 @@ std::vector<at::Tensor> rnn_layer(
   }
 }
 
-std::tuple<Tensor, Tensor> gru_xpu(
+std::tuple<Tensor, Tensor> gru_input(
     const Tensor& input_,
     const Tensor& hx_,
     TensorList params,
@@ -382,10 +382,6 @@ std::tuple<Tensor, Tensor> gru_xpu(
   }
 
   return std::make_tuple(std::move(output), std::move(hy));
-}
-
-TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl("gru.input", TORCH_FN(AtenIpexTypeXPU::gru_xpu));
 }
 
 } // namespace AtenIpexTypeXPU

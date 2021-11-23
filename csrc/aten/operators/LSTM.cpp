@@ -127,7 +127,7 @@ class LSTMFunction : public Function<LSTMFunction> {
   }
 };
 
-std::tuple<Tensor, Tensor, Tensor> lstm_xpu(
+std::tuple<Tensor, Tensor, Tensor> lstm_input(
     const Tensor& input,
     TensorList hx,
     TensorList weights,
@@ -213,8 +213,5 @@ std::tuple<Tensor, Tensor, Tensor> lstm_xpu(
   return std::make_tuple(output, hy, cy);
 }
 
-TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
-  m.impl("lstm.input", TORCH_FN(AtenIpexTypeXPU::lstm_xpu));
-}
 } // namespace AtenIpexTypeXPU
 } // namespace at
