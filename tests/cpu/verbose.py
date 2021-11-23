@@ -15,7 +15,7 @@ def run_model(level):
     m = Module().eval()
     m = ipex.optimize(m, dtype=torch.float32, level="O1")
     d = torch.rand(1, 1, 112, 112)
-    with ipex.utils.verbose(level):
+    with ipex.verbose(level):
         m(d)
 
 if __name__ == '__main__':
