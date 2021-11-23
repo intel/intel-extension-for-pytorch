@@ -13,6 +13,8 @@ from .settings import *
 
 from ipex._utils import _get_device_index  # , _dummy_type
 import ipex.optim as optim
+import ipex.autograd as autograd
+from ipex.autograd import inference_mode
 
 default_generators: Tuple[torch._C.Generator] = ipex._C.default_generators
 _device_t = Union[_device, str, int]
