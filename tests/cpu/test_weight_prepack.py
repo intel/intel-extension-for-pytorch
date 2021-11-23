@@ -156,8 +156,8 @@ class TestPrepackCases(TestCase):
             ipex_model_state1 = ipex_model1.state_dict()
             ipex_model_state2 = ipex_model2.state_dict()
             for var_name in origin_model_state:
-                self.assertEqual(origin_model_state[var_name], ipex_model_state1[var_name], rtol=3e-2, atol=5e-3)
-                self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name], rtol=3e-2, atol=5e-3)
+                self.assertEqual(origin_model_state[var_name], ipex_model_state1[var_name], rtol=3e-2, atol=5e-1)
+                self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name], rtol=3e-2, atol=5e-1)
 
             # compare momentum_buffer in optimizer's state(sgd)
             # TODO: other optimizer.
@@ -166,8 +166,8 @@ class TestPrepackCases(TestCase):
             ipex_optimizer_state2 = ipex_optimizer2.state_dict()
             for var_name in origin_optimizer_state:
                 if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=3e-2, atol=5e-02)
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=3e-2, atol=5e-02)
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=3e-2, atol=5e-1)
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=3e-2, atol=5e-1)
 
     @skipIfSpecificVersions
     def test_model_serialization(self):
