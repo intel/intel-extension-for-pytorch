@@ -1288,6 +1288,24 @@ void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
   impl::aminmax_kernel(iter);
 }
 
+void aminmax_dim_out(
+    Tensor& min_result,
+    Tensor& max_result,
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim) {
+  auto iter = impl::make_reduction(
+      "aminmax_dim",
+      min_result,
+      max_result,
+      self,
+      dim,
+      keepdim,
+      self.scalar_type()); // TensorIterator::binary_op(min_result, max_result,
+                           // self);
+  impl::aminmax_kernel(iter);
+}
+
 std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
   TORCH_CHECK(
       !self.is_complex(), "max is not yet implemented for complex tensors.");
@@ -1295,6 +1313,20 @@ std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
   Tensor min_result = at::empty_like(self);
   Tensor max_result = at::empty_like(self);
   at::AtenIpexTypeXPU::aminmax_out(min_result, max_result, self);
+  return std::tuple<Tensor&, Tensor&>(min_result, max_result);
+}
+
+std::tuple<Tensor, Tensor> _aminmax(
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim) {
+  TORCH_CHECK(
+      !self.is_complex(), "max is not yet implemented for complex tensors.");
+  TORCH_CHECK(self.numel() > 0, "operation does not have an identity.");
+  Tensor min_result = at::empty_like(self);
+  Tensor max_result = at::empty_like(self);
+  at::AtenIpexTypeXPU::aminmax_dim_out(
+      min_result, max_result, self, dim, keepdim);
   return std::tuple<Tensor&, Tensor&>(min_result, max_result);
 }
 

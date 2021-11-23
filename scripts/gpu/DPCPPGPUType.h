@@ -38,6 +38,7 @@ struct TORCH_API DPCPPType final {
 
 } // namespace at
 static std::tuple<Tensor,Tensor> _aminmax(const Tensor & self); // aten::_aminmax(Tensor self) -> (Tensor, Tensor)
+static std::tuple<Tensor,Tensor> _aminmax(const Tensor & self, int64_t dim, bool keepdim); // aten::_aminmax.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor, Tensor)
 static Tensor _cat(TensorList tensors, int64_t dim); // aten::_cat(Tensor[] tensors, int dim=0) -> Tensor
 static Tensor & _cat_out(Tensor & out, TensorList tensors, int64_t dim); // aten::_cat.out(Tensor[] tensors, int dim=0, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor _cdist_backward(const Tensor & grad, const Tensor & x1, const Tensor & x2, double p, const Tensor & cdist); // aten::_cdist_backward(Tensor grad, Tensor x1, Tensor x2, float p, Tensor cdist) -> Tensor
