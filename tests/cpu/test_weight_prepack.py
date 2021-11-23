@@ -147,10 +147,10 @@ class TestPrepackCases(TestCase):
                 loss3.backward()
                 ipex_optimizer2.step()
 
-            self.assertEqual(y1, y2, rtol=1e-4, atol=5e-02)
-            self.assertEqual(y1, y3, rtol=1e-4, atol=5e-02)
-            self.assertEqual(x1.grad, x2.grad, rtol=1e-4, atol=5e-02)
-            self.assertEqual(x1.grad, x3.grad, rtol=1e-4, atol=5e-02)
+            self.assertEqual(y1, y2, rtol=1e-4, atol=5e-1)
+            self.assertEqual(y1, y3, rtol=1e-4, atol=5e-1)
+            self.assertEqual(x1.grad, x2.grad, rtol=1e-4, atol=5e-1)
+            self.assertEqual(x1.grad, x3.grad, rtol=1e-4, atol=5e-1)
             # compare origin_model parameters with origin_model parameters after grad updata
             origin_model_state = origin_model1.state_dict()
             ipex_model_state1 = ipex_model1.state_dict()
