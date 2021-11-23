@@ -283,21 +283,47 @@ struct convolution_forward
       dst_desc_query = dst_desc.to_format(tag::nhwc);
     }
 
-    auto key = utils::create_key(aprop_kind, aalgorithm, src_desc_query,
-                                 weights_desc_query, with_bias, strides,
-                                 dilates, padding_l, padding_r, attr);
+    auto key = utils::create_key(
+        aprop_kind,
+        aalgorithm,
+        src_desc_query,
+        weights_desc_query,
+        with_bias,
+        strides,
+        dilates,
+        padding_l,
+        padding_r,
+        attr,
+        omp_get_max_threads());
     return fetch_or_create(key, [&]() {
-    if (with_bias) {
-      return primitive_desc({aprop_kind, aalgorithm, src_desc_query,
-                             weights_desc_query, bias_desc_query, dst_desc_query,
-                             strides, dilates, padding_l, padding_r},
-                            attr, aengine);
-    } else {
-      return primitive_desc({aprop_kind, aalgorithm, src_desc_query,
-                             weights_desc_query, dst_desc_query,
-                             strides, dilates, padding_l, padding_r},
-                            attr, aengine);
-    }
+      if (with_bias) {
+        return primitive_desc(
+            {aprop_kind,
+             aalgorithm,
+             src_desc_query,
+             weights_desc_query,
+             bias_desc_query,
+             dst_desc_query,
+             strides,
+             dilates,
+             padding_l,
+             padding_r},
+            attr,
+            aengine);
+      } else {
+        return primitive_desc(
+            {aprop_kind,
+             aalgorithm,
+             src_desc_query,
+             weights_desc_query,
+             dst_desc_query,
+             strides,
+             dilates,
+             padding_l,
+             padding_r},
+            attr,
+            aengine);
+      }
     });
   }
 
