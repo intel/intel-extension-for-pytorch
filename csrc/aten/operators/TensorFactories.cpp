@@ -6,10 +6,10 @@
 #include <ATen/native/TensorFactories.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
-
 #include <core/Allocator.h>
 #include <core/Generator.h>
 #include <core/TensorImplUtils.h>
+#include <core/detail/ListUtils.h>
 #include <runtime/Utils.h>
 #include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
@@ -34,7 +34,7 @@ Tensor empty_dpcpp(
   // "unpacked"
 
   auto* allocator = xpu::dpcpp::getDeviceAllocator();
-  int64_t nelements = prod_intlist(size);
+  int64_t nelements = xpu::dpcpp::detail::prod_intlist(size);
   auto dtype = options.dtype();
   int64_t size_bytes = nelements * dtype.itemsize();
   auto storage_impl = c10::make_intrusive<StorageImpl>(

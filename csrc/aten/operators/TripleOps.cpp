@@ -5,8 +5,8 @@
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/record_function.h>
+#include <core/detail/ListUtils.h>
 #include <oneDNN/oneDNN.h>
-
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
@@ -266,7 +266,7 @@ Tensor packed_add(
     Tensor top_half_view = top_half.view({view_rows, view_columns});
     Tensor bot_half_view = bot_half.view({view_rows, view_columns});
     values = values.contiguous();
-    int64_t stride = at::prod_intlist(values.sizes().slice(1));
+    int64_t stride = xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
 
     Tensor uniqueOffsets = at::empty({nnz}, indices.options());
     Tensor new_indices, origIndices;

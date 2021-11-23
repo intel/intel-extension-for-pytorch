@@ -5,10 +5,10 @@
 #include <ATen/native/TensorFactories.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <intrinsic/ipex_intrinsic.h>
-
 #include <core/Allocator.h>
 #include <core/TensorImplUtils.h>
+#include <core/detail/ListUtils.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 
@@ -80,7 +80,7 @@ Tensor new_qtensor(
 
   at::DispatchKey tensorDispatchKey = options.computeDispatchKey();
   native::check_size_nonnegative(sizes);
-  int64_t nelements = at::prod_intlist(sizes);
+  int64_t nelements = xpu::dpcpp::detail::prod_intlist(sizes);
   auto dtype = options.dtype();
   TORCH_CHECK(
       isQIntType(typeMetaToScalarType(dtype)),

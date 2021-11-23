@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/SpectralOpsUtils.h>
+#include <core/detail/ListUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
@@ -138,7 +139,7 @@ void _mkl_dft(
   // rescale if requested
   const auto norm = static_cast<at::native::fft_norm_mode>(normalization);
   if (norm != at::native::fft_norm_mode::none) {
-    auto signal_numel = at::prod_intlist(checked_signal_sizes);
+    auto signal_numel = xpu::dpcpp::detail::prod_intlist(checked_signal_sizes);
     double double_scale;
     if (norm == at::native::fft_norm_mode::by_root_n) {
       double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);

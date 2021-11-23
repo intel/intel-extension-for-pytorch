@@ -1,6 +1,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/SparseTensorUtils.h>
 #include <core/Memory.h>
+#include <core/detail/ListUtils.h>
 #include <runtime/Utils.h>
 
 #include "BitonicMergeSort.h"
@@ -202,7 +203,7 @@ Tensor coalesce(const Tensor& self) {
 
   if (newValues.numel() > 0) {
     values = values.contiguous();
-    int64_t stride = at::prod_intlist(values.sizes().slice(1));
+    int64_t stride = xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
