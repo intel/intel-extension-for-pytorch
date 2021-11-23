@@ -1,6 +1,3 @@
-import os
-import json
-import warnings
 import torch
 try:
     import torchvision
@@ -9,23 +6,14 @@ except ImportError:
 
 from .version import __version__, __avx_version__
 
+from .utils import _cpuinfo
+_cpuinfo._check_avx_isa(__avx_version__)
+
 from . import cpu
 from . import quantization
 from . import nn
 
-from .utils import verbose
+from .utils.verbose import verbose
 from .frontend import optimize, enable_onednn_fusion
 
-def check_avx_isa(binary_isa):
-    import intel_extension_for_pytorch._C as core
-    err_msg = "The extension binary is {} while the current machine does not support it."
-    if binary_isa == "AVX2":
-        if not core._does_support_avx2():
-            sys.exit(err_msg.format(binary_isa))
-    elif binary_isa == "AVX512":
-        if not core._does_support_avx512():
-            sys.exit(err_msg.format(binary_isa))
-    else:
-        sys.exit("The extension only supports AVX2 and AVX512 now. The binary is not a correct version.")
-
-check_avx_isa(__avx_version__)
+import intel_extension_for_pytorch._C as core
