@@ -1346,6 +1346,45 @@ class Tester(TestCase):
             kind_in_graph="ipex::softmax",
             prec=5e-3)
 
+    def test_restore_inplace(self):
+        class M(nn.Module):
+            def __init__(self, eltwise_fn, params_dict={}):
+                super(M, self).__init__()
+                self.conv = torch.nn.Conv2d(3, 5, 3, 3)
+                self.eltwise = eltwise_fn
+                self.params_dict = params_dict
+
+            def forward(self, x):
+                x = x * 3.1
+                x = self.eltwise(x, **self.params_dict)
+                x = self.conv(x)
+                return x
+
+        for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu', 'clamp']:
+            eltwise_fn_name = eltwise + '_'
+            if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
+                # use torch.sigmoid_(x)
+                eltwise_fn = getattr(torch, eltwise_fn_name)
+                m = M(eltwise_fn)
+            elif eltwise == 'clamp':
+                eltwise_fn = getattr(torch, eltwise_fn_name)
+                m = M(eltwise_fn, {"min": 0, "max": 2})
+            else:
+                # use F.elu(x, inplace=True)
+                eltwise_fn = getattr(F, eltwise)
+                m = M(eltwise_fn, {"inplace": True})
+
+            with torch.no_grad():
+                m.eval()
+                x = torch.randn(1, 3, 16, 16)
+                traced = torch.jit.trace(m, x)
+                trace_graph = traced.graph_for(x)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
+
+                y = m(x)
+                traced_y = traced(x)
+                self.assertEqual(y, traced_y)
+
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()
