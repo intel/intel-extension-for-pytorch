@@ -56,7 +56,7 @@ From 1.8.0, compiling PyTorch from source is not required. If you still want to 
 
 ### Install via wheel file
 
-```
+```python
 python -m pip install torch_ipex==1.9.0 -f https://software.intel.com/ipex-whl-stable
 ```
 
@@ -84,20 +84,26 @@ python setup.py install
 ```
 
 ## Features
+
 ### Ease-of-use Python API
+
 Intel® Extension for PyTorch* provides simple frontend Python APIs and utilities for users to get performance optimizations  such as graph optimization and operator optimization with minor code changes. Typically, only 2 to 3 clauses are required to be added to the original code.
 
 ### Channels Last
+
 Comparing to the default NCHW memory format, channels_last (NHWC) memory format could further accelerate convolutional neural networks.In Intel® Extension for PyTorch*, NHWC memory format  has been enabled for most key CPU operators, though not all of them have been merged to PyTorch master branch yet. They are expected to be fully landed in PyTorch upstream soon.
 
 ### Auto Mixed Precision (AMP)
+
 Low precision data type BFloat16 has been natively supported on the 3rd Generation Xeon scalable Servers (aka Cooper Lake) with AVX512 instruction set and will be  supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set with further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators have been  massively enabled in Intel® Extension for PyTorch*, and partially upstreamed to PyTorch master branch. Most of these optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.
 
 ### Graph Optimization
+
 To optimize performance further with torchscript, Intel® Extension for PyTorch* supports fusion of frequently used operator patterns, like Conv2D+ReLU, Linear+ReLU, etc.  The benefit of the fusions are delivered to users in a transparant fashion.
 
 ### Operator Optimization
-Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance . A few  ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via ATen registration mechanism. Moreover, some customized operators are implemented for several popular topologies . For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.
+
+Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via ATen registration mechanism. Moreover, some customized operators are implemented for several popular topologies . For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.
 
 ## Getting Started
 
@@ -110,63 +116,72 @@ For training and inference with BFloat16 data type, torch.cpu.amp has been enabl
 The code changes that are required for Intel® Extension for PyTorch* are highlighted with comments in a line above.
 
 ### Training
+
 #### Float32
+
 ```python
 import torch
 import torch.nn as nn
-# Import intel_extension_for_pytorch
 import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
+        self.conv = nn.Conv2d(2, 3, 2)
 
-    def forward(self, input):
-        return self.linear(input)
+    def forward(self, x):
+        return self.conv(x)
 
 model = Model()
 model.set_state_dict(torch.load(PATH))
 optimizer.set_state_dict(torch.load(PATH))
 
+model.train()
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+model = model.to(memory_format=torch.channels_last)
 # Invoke optimize function against the model object and optimizer object
-model, optimizer = ipex.optimize(model, optimizer, dtype=torch.float32)
+model, optimizer = ipex.optimize(model, optimizer=optimizer)
 
 for images, label in train_loader():
-    # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+    # Optional.
     images = images.to(memory_format=torch.channels_last)
 
     loss = criterion(model(images), label)
     loss.backward()
     optimizer.step()
+
 torch.save(model.state_dict(), PATH)
 torch.save(optimizer.state_dict(), PATH)
 ```
+
 #### BFloat16
+
 ```python
 import torch
 import torch.nn as nn
-# Import intel_extension_for_pytorch
 import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
+        self.conv = nn.Conv2d(2, 3, 2)
 
-    def forward(self, input):
-        return self.linear(input)
+    def forward(self, x):
+        return self.conv(x)
 
 model = Model()
 model.set_state_dict(torch.load(PATH))
 optimizer.set_state_dict(torch.load(PATH))
 
+model.train()
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+model = model.to(memory_format=torch.channels_last)
 # Invoke optimize function against the model object and optimizer object with data type set to torch.bfloat16
-model, optimizer = ipex.optimize(model, optimizer, dtype=torch.bfloat16)
+model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
 
 for images, label in train_loader():
     with torch.cpu.amp.autocast():
-        # Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+        # Optional.
         images = images.to(memory_format=torch.channels_last)
         loss = criterion(model(images), label)
     loss.backward()
@@ -176,59 +191,72 @@ torch.save(optimizer.state_dict(), PATH)
 ```
 
 ### Inference - Imperative Mode
+
 #### Float32
+
 ```python
 import torch
 import torch.nn as nn
-
-# Import intel_extension_for_pytorch 
 import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
+        self.conv = nn.Conv2d(2, 3, 2)
 
-    def forward(self, input):
-        return self.linear(input)
+    def forward(self, x):
+        return self.conv(x)
 
-input = torch.randn(2, 4)
 model = Model()
+model.eval()
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+model = model.to(memory_format=torch.channels_last)
 # Invoke optimize function against the model object
 model = ipex.optimize(model)
-res = model(input)
+with torch.no_grad():
+    # Optional.
+    images = images.to(memory_format=torch.channels_last)
+
+    res = model(images)
 ```
+
 #### BFloat16
+
 ```python
 import torch
 import torch.nn as nn
-
-# Import intel_extension_for_pytorch 
 import intel_extension_for_pytorch as ipex
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
+        self.conv = nn.Conv2d(2, 3, 2)
 
-    def forward(self, input):
-        return self.linear(input)
+    def forward(self, x):
+        return self.conv(x)
 
-input = torch.randn(2, 4)
 model = Model()
+model.eval()
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+model = model.to(memory_format=torch.channels_last)
 # Invoke optimize function against the model object with data type set to torch.bfloat16
 model = ipex.optimize(model, dtype=torch.bfloat16)
-with torch.cpu.amp.autocast():
-    res = model(input)
+with torch.no_grad(), torch.cpu.amp.autocast():
+    # Optional.
+    images = images.to(memory_format=torch.channels_last)
+
+    res = model(images)
 ```
+
 ### Inference - TorchScript Mode
+
 TorchScript mode makes graph optimization possible , hence improves performance for some topologies. Intel® Extension for PyTorch* enables most commonly used operator pattern fusion, and users can get the performance benefit without additional code changes
+
 #### Float32
+
 ```python
 import torch
 import torch.nn as nn
-
-# Import intel_extension_for_pytorch 
 import intel_extension_for_pytorch as ipex
 
 # oneDNN graph fusion is enabled by default, uncomment the line below to disable it explicitly 
@@ -237,25 +265,31 @@ import intel_extension_for_pytorch as ipex
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
+        self.conv = nn.Conv2d(2, 3, 2)
 
-    def forward(self, input):
-        return self.linear(input)
+    def forward(self, x):
+        return self.conv(x)
 
-input = torch.randn(2, 4)
 model = Model()
+model.eval()
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+model = model.to(memory_format=torch.channels_last)
 # Invoke optimize function against the model object
 model = ipex.optimize(model)
-model = torch.jit.trace(model, torch.rand(args.batch_size, 3, 224, 224))
-model = torch.jit.freeze(model)
-res = model(input)
+with torch.no_grad():
+    # Optional.
+    images = images.to(memory_format=torch.channels_last)
+
+    model = torch.jit.trace(model, images)
+    model = torch.jit.freeze(model)
+    res = model(images)
 ```
+
 #### BFloat16
+
 ```python
 import torch
 import torch.nn as nn
-
-# Import intel_extension_for_pytorch 
 import intel_extension_for_pytorch as ipex
 
 # oneDNN graph fusion is enabled by default, uncomment the line below to disable it explicitly 
@@ -264,22 +298,30 @@ import intel_extension_for_pytorch as ipex
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.linear = nn.Linear(4, 5)
+        self.conv = nn.Conv2d(2, 3, 2)
 
-    def forward(self, input):
-        return self.linear(input)
+    def forward(self, x):
+        return self.conv(x)
 
-input = torch.randn(2, 4)
 model = Model()
+model.eval()
+# Setting memory_format to torch.channels_last could improve performance with 4D input data. This is optional.
+model = model.to(memory_format=torch.channels_last)
 # Invoke optimize function against the model with data type set to torch.bfloat16
 model = ipex.optimize(model, dtype=torch.bfloat16)
-with torch.cpu.amp.autocast():
+with torch.no_grad(), torch.cpu.amp.autocast():
+    # Optional.
+    images = images.to(memory_format=torch.channels_last)
+
     model = torch.jit.trace(model, torch.rand(args.batch_size, 3, 224, 224))
     model = torch.jit.freeze(model)
-       res = model(input)
+    res = model(images)
 ```
+
 ### Inference - C++
+
 To work with libtorch, C++ library of PyTorch, Intel® Extension for PyTorch* provides its C++ dynamic library as well. The C++ library is supposed to handle inference workload only, such as service deployment. For regular development, please use Python interface. Comparing to usage of libtorch, no specific code changes are required, except for converting input data into channels last data format. During compilation, Intel optimizations will be activated automatically once C++ dynamic library of Intel® Extension for PyTorch* is linked.
+
 ```C++
 #include <torch/script.h>
 #include <iostream> 
@@ -303,8 +345,11 @@ int main(int argc, const char* argv[]) {
   return 0; 
 } 
 ```
+
 ## Operator Optimizations
+
 ### Supported Customized Operators
+
 * ROIAlign
 * NMS
 * BatchScoreNMS
@@ -328,18 +373,18 @@ int main(int argc, const char* argv[]) {
 * View + Transpose + Contiguous + View
 
 ## Tutorials
+
 *  [Performance Tuning](tutorials/Performance_Tuning.md)
 
 ## Joint-blogs
+
 * [Intel and Facebook Accelerate PyTorch Performance with 3rd Gen Intel® Xeon® Processors and Intel® Deep Learning Boost’s new BFloat16 capability](https://www.intel.com/content/www/us/en/artificial-intelligence/posts/intel-facebook-boost-bfloat16.html)
 * [Accelerate PyTorch with the extension and oneDNN using Intel BF16 Technology](https://medium.com/pytorch/accelerate-pytorch-with-ipex-and-onednn-using-intel-bf16-technology-dca5b8e6b58f)
 * [Scaling up BERT-like model Inference on modern CPU - Part 1 by the launcher of the extension](https://huggingface.co/blog/bert-cpu-scaling-part-1)
 
-
 ## Contribution
 
 Please submit PR or issue to communicate with us or contribute code.
-
 
 ## License
 
