@@ -20,6 +20,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
 using xpu::dpcpp::Array;
@@ -374,7 +375,7 @@ struct ReduceOp {
     int num_sg = (item_id.get_local_range(1) * item_id.get_local_range(0)) /
         DPCPP_SUB_GROUP_SIZE;
     for (int64_t offset = num_sg / 2; offset > 0; offset >>= 1) {
-      item_id.barrier(dpcpp_global_and_local_fence);
+      DPCPP::group_barrier(item_id.get_group());
       if (static_cast<int64_t>(item_id.get_local_id(0)) < offset &&
           ((static_cast<int64_t>(item_id.get_local_id(0)) + offset) < num_sg)) {
         arg_t other = local_ptr[config.shared_memory_offset(offset, item_id)];
@@ -473,7 +474,7 @@ struct ReduceOp {
       reduce_buffer[offset] = value;
     }
 
-    item_id.barrier(dpcpp_global_and_local_fence);
+    DPCPP::group_barrier(item_id.get_group());
     bool is_last_block_done =
         mark_block_finished((dpcpp_local_ptr_pt<int>)local_ptr, smem, item_id);
 
@@ -733,5 +734,195 @@ inline void dpcpp_reduce_kernel(
     launch_reduce_kernel<scalar_t>(config, reduce);
   }
 }
+
+// Expecting SIMD-32 kernel, 4 threads;
+// Baseline kernel working set equal local size
+constexpr int REDUCE_GROUP_SIZE = 32 * 4;
+constexpr int REDUCE_WORKING_SET = REDUCE_GROUP_SIZE * 16;
+
+template <
+    typename scalar_t,
+    typename out_t,
+    typename ident_t,
+    typename reduce_t,
+    typename combine_t,
+    typename project_t>
+void dpcpp_simple_reduce_thread(
+    DPCPP::nd_item<1> it,
+    dpcpp_local_acc_t<scalar_t> local_data,
+    out_t* out,
+    scalar_t* ping,
+    scalar_t* in,
+    size_t nelem,
+    ident_t ident,
+    reduce_t reduce,
+    combine_t combine,
+    project_t project) {
+  size_t group_size = REDUCE_GROUP_SIZE;
+  size_t working_set = REDUCE_WORKING_SET;
+  int lid = it.get_local_id(0);
+  int group_id = it.get_group(0);
+  int gid_start = group_id * (group_size * 2);
+  int gid = gid_start + lid;
+
+  scalar_t accumu = scalar_t(ident);
+  while (gid < nelem) {
+    scalar_t reg1 = in[gid];
+    scalar_t reg2 =
+        (gid + group_size) < nelem ? in[gid + group_size] : scalar_t(0);
+    accumu = reduce(accumu, reg1);
+    accumu = reduce(accumu, reg2);
+    gid += group_size * 2 * it.get_group_range(0);
+  }
+  local_data[lid] = accumu;
+  DPCPP::group_barrier(it.get_group());
+
+  size_t local_size = group_size < nelem ? group_size : nelem;
+  while (local_size >= 2) {
+    auto offset = size_t((local_size + 1) / 2);
+    if (lid < offset) {
+      scalar_t data =
+          (lid + offset < local_size) ? local_data[lid + offset] : scalar_t(0);
+      local_data[lid] = combine(local_data[lid], data);
+    }
+    local_size = offset;
+    DPCPP::group_barrier(it.get_group());
+  }
+  if (lid == 0) {
+    int num_group = (nelem + working_set - 1) / working_set;
+    if (num_group == 1) {
+      out[group_id] = out_t(project(local_data[lid]));
+    } else {
+      ping[group_id] = local_data[lid];
+    }
+  }
+}
+
+template <
+    typename scalar_t,
+    typename out_t,
+    typename ident_t,
+    typename reduce_t,
+    typename combine_t,
+    typename project_t>
+void dpcpp_simple_reduce_group(
+    out_t* out,
+    scalar_t* pong,
+    scalar_t* in,
+    size_t nelem,
+    ident_t ident,
+    reduce_t reduce,
+    combine_t combine,
+    project_t project) {
+  auto& queue = dpcppGetCurrentQueue();
+  size_t working_set = REDUCE_WORKING_SET;
+  size_t group_size = REDUCE_GROUP_SIZE;
+  int num_group = (nelem + working_set - 1) / working_set;
+  size_t global_size = group_size * num_group;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    dpcpp_local_acc_t<scalar_t> local_data(group_size, cgh);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      dpcpp_simple_reduce_thread<scalar_t, out_t, ident_t>(
+          item_id,
+          local_data,
+          out,
+          pong,
+          in,
+          nelem,
+          ident,
+          reduce,
+          combine,
+          project);
+    };
+    DPCPP::range<1> global_range{global_size};
+    DPCPP::range<1> local_range{group_size};
+    cgh.parallel_for(DPCPP::nd_range<1>{global_range, local_range}, kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t, typename out_t, typename ident_t, typename ops_t>
+void dpcpp_simple_reduce(
+    scalar_t* pong,
+    scalar_t* ping,
+    scalar_t* in,
+    out_t* out,
+    size_t nelem,
+    const ops_t& ops,
+    bool with_reduce,
+    ident_t ident) {
+  auto reduce = [ops](scalar_t a, scalar_t b) -> scalar_t {
+    return ops.reduce(a, b);
+  };
+  auto combine = [ops](scalar_t a, scalar_t b) -> scalar_t {
+    return ops.combine(a, b);
+  };
+  auto project = [ops](scalar_t a) -> scalar_t { return ops.project(a); };
+
+  if (with_reduce) {
+    dpcpp_simple_reduce_group<scalar_t, out_t, ident_t>(
+        out, ping, in, nelem, ident, reduce, combine, project);
+  } else {
+    dpcpp_simple_reduce_group<scalar_t, out_t, ident_t>(
+        out, ping, in, nelem, ident, combine, combine, project);
+  }
+
+  size_t working_set = REDUCE_WORKING_SET;
+  int num_group = (nelem + working_set - 1) / working_set;
+  if (num_group == 1)
+    return;
+
+  if (num_group > working_set) {
+    dpcpp_simple_reduce<scalar_t, out_t, ident_t, ops_t>(
+        ping, pong, ping, out, num_group, ops, false, ident);
+  } else {
+    dpcpp_simple_reduce_group<scalar_t, out_t, ident_t>(
+        out, ping, ping, num_group, ident, combine, combine, project);
+  }
+}
+
+template <
+    typename scalar_t,
+    typename out_scalar_t,
+    int vt0 = 4,
+    typename ops_t,
+    typename ident_t = double>
+inline void dpcpp_simple_reduce_kernel(
+    TensorIterator& iter,
+    const ops_t& ops,
+    ident_t ident = 0) {
+  TORCH_INTERNAL_ASSERT(
+      iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 &&
+      iter.noutputs() >= 1);
+
+  auto output_ptr = (out_scalar_t*)iter.data_ptr(0);
+  auto input = iter.tensor(iter.ntensors() - 1);
+  auto input_ptr = input.data_ptr<scalar_t>();
+  // TODO: consider reduce case with two output tensors
+  // scalar_t* output_extra = nullptr;
+  /*if (iter.noutputs() > 1) {
+    output_extra = (out_scalar_t*)iter.data_ptr(1);
+  }*/
+
+  auto working_set = REDUCE_WORKING_SET;
+  int64_t ping_elems = (input.numel() + working_set - 1) / working_set;
+  int64_t pong_elems = (ping_elems + working_set - 1) / working_set;
+  auto ping = at::empty({ping_elems}, input.options());
+  auto pong = at::empty({pong_elems}, input.options());
+  scalar_t* ping_ptr = ping.data_ptr<scalar_t>();
+  scalar_t* pong_ptr = pong.data_ptr<scalar_t>();
+  dpcpp_simple_reduce<scalar_t, out_scalar_t, ident_t, ops_t>(
+      pong_ptr,
+      ping_ptr,
+      input_ptr,
+      output_ptr,
+      input.numel(),
+      ops,
+      true,
+      ident);
+}
+// dpcpp simple reduce part end
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

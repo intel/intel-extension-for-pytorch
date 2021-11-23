@@ -560,6 +560,29 @@ static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
     TORCH_CHECK(0, "norm_kernel_impl expects norm to be integer or float");
   }
 
+  auto input = iter.tensor(iter.ntensors() - 1);
+  // Currently, the dpcpp_simple_reduce_kernel only supports contiguous input
+  // with dim=1
+  if (input.is_contiguous() && input.dim() == 1) {
+    if (p == static_cast<float>(0)) {
+      dpcpp_simple_reduce_kernel<scalar_t, out_t>(
+          iter, NormZeroOps<acc_t>(), 0);
+    } else if (p == static_cast<float>(1)) {
+      dpcpp_simple_reduce_kernel<scalar_t, out_t>(iter, NormOneOps<acc_t>(), 0);
+    } else if (Numerics<float>::isinf(p)) {
+      if (p < std::numeric_limits<float>::lowest()) {
+        dpcpp_simple_reduce_kernel<scalar_t, out_t>(
+            iter, AbsMinOps<acc_t>(), std::numeric_limits<acc_t>::max());
+      } else {
+        dpcpp_simple_reduce_kernel<scalar_t, out_t>(
+            iter, AbsMaxOps<acc_t>(), std::numeric_limits<acc_t>::min());
+      }
+    } else {
+      dpcpp_simple_reduce_kernel<scalar_t, out_t>(
+          iter, NormOps<acc_t>{acc_t(p)}, 0);
+    }
+    return;
+  }
   if (p == static_cast<float>(0)) {
     dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormZeroOps<acc_t>(), 0);
   } else if (p == static_cast<float>(1)) {
@@ -639,6 +662,11 @@ static void norm_kernel(TensorIterator& iter, Scalar p) {
     return norm_kernel_impl<at::Half, float>(iter, p);
   } else if (iter.dtype(1) == kHalf && iter.dtype() == kFloat) {
     return norm_kernel_impl<at::Half, float, float>(iter, p);
+  }
+  if (iter.dtype() == kBFloat16) {
+    return norm_kernel_impl<at::BFloat16, float>(iter, p);
+  } else if (iter.dtype(1) == kBFloat16 && iter.dtype() == kFloat) {
+    return norm_kernel_impl<at::BFloat16, float, float>(iter, p);
   }
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
