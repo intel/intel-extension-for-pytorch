@@ -2,6 +2,7 @@
 #include <string>
 #include "codegen/onednn/interface.h"
 #include "graph_rewrite.h"
+#include "torch_ipex/csrc/autocast_mode.h"
 
 #include "concat_linear.h"
 #include "cpu/CustomOPs.h"
@@ -343,6 +344,25 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   ConstantPropagation(graph);
 }
 
+bool checkQuantization(Block* block) {
+  for (auto node : block->nodes()) {
+    for (auto sub : node->blocks()) {
+      checkQuantization(sub);
+    }
+
+    if (node->kind() == Symbol::aten("quantize_per_tensor") ||
+        node->kind() == Symbol::aten("dequantize") ||
+        node->kind() == Symbol::aten("quantize_per_channel")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool isQuantized(const std::shared_ptr<Graph>& graph) {
+  return checkQuantization(graph->block());
+}
+
 void FusionPass(std::shared_ptr<Graph>& graph) {
   GRAPH_DUMP(
       "Before RemoveProfileNodesAndSpecializeTypes. Beginning of "
@@ -354,7 +374,9 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   GRAPH_DUMP(
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
       graph);
-  fuser::onednn::fuseGraph(graph);
+  if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+    fuser::onednn::fuseGraph(graph);
+  }
   GRAPH_DUMP("After LLGA fusion pass. Before IPEXFusionPass", graph);
 
   // IPEX fusion pass for fp32 and bf16
