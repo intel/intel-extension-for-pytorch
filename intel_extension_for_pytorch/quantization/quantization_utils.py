@@ -97,8 +97,8 @@ def _get_default_recipe(configures):
 class calibrate(object):
     r"""
 
-    Enable quantiation calibration scope which will collect the scales and zero
-    points of ops which can be quantized, such as convolution, linear.
+    Enable quantization  calibration scope which will collect the scales and zero
+    points of ops to be quantized, such as convolution, linear.
 
     Args:
         conf (quantization.QuantConf): Quantization's setting.

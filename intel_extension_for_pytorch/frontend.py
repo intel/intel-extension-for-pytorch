@@ -110,12 +110,12 @@ def optimize(
         model (torch.nn.Module): User model to apply optimizations on.
         dtype (torch.dtype): Only works for ``torch.bfloat16``.
             Model parameters will be casted to ``torch.bfloat16`` if dtype is set to
-            ``torch.bfloat16``. The default value is None.
+            ``torch.bfloat16``. The default value is None, meaning do nothing.
             Note: Data type conversion is only applied to ``nn.Conv2d``, ``nn.Linear``
             and ``nn.ConvTranspose2d`` for both training and inference cases. For
             inference mode, additional data type conversion is applied to the weights
             of ``nn.Embedding`` and ``nn.LSTM``.
-        optimizer (torch.optim.Optimizer): User optimzizer to apply optimizations
+        optimizer (torch.optim.Optimizer): User optimizer to apply optimizations
             on, such as SGD. The default value is ``None``, meaning inference case.
         level (string): ``"O0"`` or ``"O1"``. No optimizations are applied with
             ``"O0"``. The optimizer function just returns the original model and
