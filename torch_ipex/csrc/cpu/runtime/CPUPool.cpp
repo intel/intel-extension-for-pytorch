@@ -17,9 +17,8 @@ bool iomp_symbol_loaded{
 } // namespace
 
 void loading_iomp_symbol() {
-  void* handle = dlopen(NULL, RTLD_GLOBAL);
-
-  if (dlsym(handle, "kmp_create_affinity_mask") == NULL ||
+  void* handle = dlopen(NULL, RTLD_NOW | RTLD_GLOBAL);
+  if (handle == NULL || dlsym(handle, "kmp_create_affinity_mask") == NULL ||
       dlsym(handle, "kmp_set_affinity_mask_proc") == NULL ||
       dlsym(handle, "kmp_set_affinity") == NULL ||
       dlsym(handle, "kmp_get_affinity") == NULL ||
