@@ -90,7 +90,7 @@ from os import getenv
 sphinx_md_useGitHubURL = True
 baseBranch = "main"
 commitSHA = getenv('GITHUB_SHA')
-githubBaseURL = 'https://github.com/' + (getenv('GITHUB_REPOSITORY') or 'MichaelHsu170/sphinx_test') + '/'
+githubBaseURL = 'https://github.com/' + (getenv('GITHUB_REPOSITORY') or 'intel/intel-extension-for-pytorch') + '/'
 githubFileURL = githubBaseURL + "blob/"
 githubDirURL = githubBaseURL + "tree/"
 if commitSHA:
