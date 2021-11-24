@@ -382,6 +382,18 @@ Tensor empty(
     c10::optional<MemoryFormat> optional_memory_format) {
   return at::impl::empty_dpcpp(size, options, optional_memory_format);
 }
+Tensor empty(
+    IntArrayRef size,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
+    c10::optional<MemoryFormat> optional_memory_format) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
+  return empty(size, options, optional_memory_format);
+}
 
 Tensor empty_strided(
     IntArrayRef size,

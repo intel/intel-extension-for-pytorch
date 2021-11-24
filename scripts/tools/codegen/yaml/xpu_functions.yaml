@@ -177,7 +177,7 @@ supported:
 #  - elu_backward	# different schema
 #  - elu_backward.grad_input	# different schema
   - embedding_dense_backward
-#  - empty.memory_format	# different signature
+  - empty.memory_format
   - empty_strided
 #  - eq.Scalar	# different signature
 #  - eq.Scalar_out	# different signature
