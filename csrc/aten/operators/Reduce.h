@@ -479,7 +479,7 @@ struct ReduceOp {
         mark_block_finished((dpcpp_local_ptr_pt<int>)local_ptr, smem, item_id);
 
     if (is_last_block_done) {
-      value = arg_t{};
+      value = ident;
       if (config.should_sg_reduce()) {
         index_t input_offset = item_id.get_local_id(1) +
             item_id.get_local_id(0) * item_id.get_local_range(1);
