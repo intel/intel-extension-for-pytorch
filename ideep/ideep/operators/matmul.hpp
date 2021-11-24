@@ -3,8 +3,8 @@
 
 namespace ideep {
 
-struct matmul_forward : public dnnl::matmul {
-
+struct matmul_forward : public dnnl::matmul,
+                        utils::computation_cache<dnnl::matmul::primitive_desc> {
   using super = dnnl::matmul;
 
   static void compute(
@@ -292,11 +292,23 @@ private:
 
    dst_data_type = dst_type == data_type::undef ? dst_data_type : dst_type;
    tensor::desc dst_desc(dst_dims, dst_data_type, tag::any);
-   auto pd = with_bias
-       ? primitive_desc({src_desc, weights_desc, bias_desc, dst_desc},
-                         op_attr, aengine)
-       : primitive_desc({src_desc, weights_desc, dst_desc},
-                         op_attr, aengine);
+   auto key = utils::create_key(
+       src_desc,
+       weights_desc,
+       bias_desc,
+       dst_desc,
+       op_attr,
+       with_bias,
+       omp_get_max_threads());
+   auto pd = fetch_or_create(key, [&]() {
+     if (with_bias) {
+       return primitive_desc(
+           {src_desc, weights_desc, bias_desc, dst_desc}, op_attr, aengine);
+     } else {
+       return primitive_desc(
+           {src_desc, weights_desc, dst_desc}, op_attr, aengine);
+     }
+   });
    auto expected_src = src.reorder_if_differ_in(pd.src_desc(), src_attr);
    auto expected_weights = weights.reorder_if_differ_in(pd.weights_desc(), weights_attr);
    dst.reinit_if_possible(pd.dst_desc());
