@@ -53,10 +53,4 @@ TORCH_LIBRARY_IMPL(aten, ${DispatchKey}, m) {
 
 } // anonymous namespace
 
-namespace ${dispatch_namespace} {
-
-${dispatch_namespaced_definitions}
-
-} // namespace ${dispatch_namespace}
-
 } // namespace at
