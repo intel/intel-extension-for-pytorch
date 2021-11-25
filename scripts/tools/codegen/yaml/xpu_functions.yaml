@@ -226,7 +226,7 @@ supported:
 #  - ge.Scalar	# different signature
 #  - ge.Scalar_out	# different signature
   - ge.Tensor
-#  - ge.Tensor_out	# different signature
+  - ge.Tensor_out
   - gelu
   - gelu_backward
 #  - geometric_	# different signature
@@ -241,7 +241,7 @@ supported:
 #  - gt.Scalar	# different signature
 #  - gt.Scalar_out	# different signature
   - gt.Tensor
-#  - gt.Tensor_out	# different signature
+  - gt.Tensor_out
 #  - hardshrink	# different signature
 #  - hardshrink_backward	# different signature
 #  - hardtanh	# different signature
@@ -274,7 +274,7 @@ supported:
 #  - le.Scalar	# different signature
 #  - le.Scalar_out	# different signature
   - le.Tensor
-#  - le.Tensor_out	# different signature
+  - le.Tensor_out
 #  - leaky_relu	# different signature
 #  - leaky_relu.out	# different signature
 #  - leaky_relu_	# different signature
@@ -308,7 +308,7 @@ supported:
 #  - lt.Scalar	# different signature
 #  - lt.Scalar_out	# different signature
   - lt.Tensor
-#  - lt.Tensor_out	# different signature
+  - lt.Tensor_out
   - lu_solve
 #  - lu_solve.out	# different signature
 #  - masked_fill_.Scalar	# different signature
@@ -384,7 +384,7 @@ supported:
 #  - ne.Scalar	# different signature
 #  - ne.Scalar_out	# different signature
   - ne.Tensor
-#  - ne.Tensor_out	# different signature
+  - ne.Tensor_out
 #  - neg.out	# different signature
 #  - nll_loss2d_backward	# different signature
 #  - nll_loss2d_backward.grad_input	# different signature
