@@ -96,5 +96,7 @@ struct TORCH_API DPCPPType final {
 
   static Tensor upsample_nearest2d(const Tensor & self, IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w); // aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -> Tensor
 
+  static Tensor quantized_native_instance_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, double eps, double output_scale, int64_t output_zero_point);
+
   void record_stream(Tensor & self, Stream s); // {"schema": "aten::record_stream(Tensor(a!) self, Stream s) -> ()", "dispatch": "True", "math": "False"}
 } // namespace at
