@@ -8,11 +8,15 @@ namespace torch_ipex {
 namespace autocast {
 
 template <class Ret, class F, class... Args>
-Ret DataTypeCastFuction(F Quant, F At, std::string op_name, Args... args) {
+Ret DataTypeCastFuction(
+    F Quant,
+    F At,
+    std::string register_op_name,
+    Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   auto target_type = get_autocast_dtype();
 #if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name(op_name);
+  verbose::OpNameGuard op_name(register_op_name);
 #endif
   if (is_quantization_enabled()) {
     return Quant(cpu_cached_cast(target_type, args)...);
@@ -22,10 +26,14 @@ Ret DataTypeCastFuction(F Quant, F At, std::string op_name, Args... args) {
 }
 
 template <class Ret, class F, class... Args>
-Ret FallThroughFuction(F Quant, F At, std::string op_name, Args... args) {
+Ret FallThroughFuction(
+    F Quant,
+    F At,
+    std::string register_op_name,
+    Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
 #if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name(op_name);
+  verbose::OpNameGuard op_name(register_op_name);
 #endif
   if (is_quantization_enabled()) {
     return Quant(args...);
