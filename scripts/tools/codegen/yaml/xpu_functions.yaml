@@ -182,7 +182,7 @@ supported:
 #  - eq.Scalar	# different signature
 #  - eq.Scalar_out	# different signature
   - eq.Tensor
-#  - eq.Tensor_out	# different signature
+  - eq.Tensor_out
   - equal
 #  - erf.out	# different signature
   - erf_
