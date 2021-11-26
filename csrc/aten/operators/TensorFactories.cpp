@@ -457,7 +457,7 @@ Tensor var(const Tensor& self, bool unbiased) {
   auto trivial_return =
       _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
   return trivial_return.has_value() ? trivial_return.value()
-                                    : at::_var(self, unbiased);
+                                    : at::AtenIpexTypeXPU::_var(self, unbiased);
 }
 
 Tensor _var(const Tensor& self, bool unbiased) {
@@ -478,7 +478,7 @@ Tensor std(const Tensor& self, bool unbiased) {
   auto trivial_return =
       _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
   return trivial_return.has_value() ? trivial_return.value()
-                                    : at::_std(self, unbiased);
+                                    : at::AtenIpexTypeXPU::_std(self, unbiased);
 }
 
 Tensor std(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
