@@ -457,6 +457,7 @@ class DistributedTrainingLauncher(Launcher):
         for proc in range(ppn):
             for ccl_worker in range(ccl_worker_count):
                 affinity += str(proc * cores_per_rank + ccl_worker) + ","
+        affinity = affinity[:-1]
         return affinity
 
     def launch(self, args):

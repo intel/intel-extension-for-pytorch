@@ -16,6 +16,8 @@ class TestLauncher(TestCase):
         library_paths = []
         if "CONDA_PREFIX" in os.environ:
             library_paths.append(os.environ["CONDA_PREFIX"] + "/lib/")
+        elif "VIRTUAL_ENV" in os.environ:
+            library_paths.append(os.environ["VIRTUAL_ENV"] + "/lib/")
 
         library_paths += ["{}/.local/lib/".format(expanduser("~")), "/usr/local/lib/",
                          "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
@@ -63,7 +65,7 @@ class TestLauncher(TestCase):
        expect_pin_domain = "[0xffffff0,0xffffff00000000,]"
        self.assertEqual(pin_doamin, expect_pin_domain)
        ccl_worker_affinity = launcher.get_ccl_worker_affinity(proc_per_node, ccl_worker_count, total_cores)
-       expect_ccl_worker_affinity = "0,1,2,3,28,29,30,31,"
+       expect_ccl_worker_affinity = "0,1,2,3,28,29,30,31"
        self.assertEqual(ccl_worker_affinity, expect_ccl_worker_affinity)
 
 
