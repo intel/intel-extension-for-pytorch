@@ -205,12 +205,15 @@ private:
       IDEEP_ENFORCE(utils::one_of(weights.get_data_type(),
                                   data_type::f32, data_type::bf16),
               "Incorrect data type in weights");
-
-      // align weights data type with src
-      dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
-                                                             : data_type::f32;
-      src_desc = src.get_desc().to_type(dst_data_type);
-      weights_desc = weights.get_desc().to_type(dst_data_type);
+      if (dst.is_empty()) {
+        // align weights data type with src
+        dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
+                                                               : data_type::f32;
+      } else {
+        dst_data_type = dst.get_data_type();
+      }
+      src_desc = src.get_desc().to_type(src.get_data_type());
+      weights_desc = weights.get_desc().to_type(src.get_data_type());
       if (with_bias) {
         IDEEP_ENFORCE(utils::one_of(bias.get_data_type(),
                                     data_type::f32, data_type::bf16),
