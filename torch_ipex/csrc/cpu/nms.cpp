@@ -1,12 +1,13 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#include "ExtendOPs.h"
 #include <ATen/Parallel.h>
-#include <algorithm>
 #include <c10/util/Exception.h>
+#include <immintrin.h>
 #include <torch/csrc/autograd/function.h>
+#include <algorithm>
+#include "CustomOPs.h"
+#include "ExtendOPs.h"
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
-#include <immintrin.h>
 
 namespace torch_ipex {
 /*
@@ -733,7 +734,8 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexTypeExt::parallel_scale_back_batch(co
     bbox_result = scale_back_batch_kernel<scalar_t>(bboxes_in, dboxes_xywh, scale_xy, scale_wh);
   });
 
-  auto&& scores_result = at::softmax(scores_in, -1);
+  auto&& scores_result =
+      torch_ipex::cpu::AtenIpexJITDev::dil_softmax(scores_in, -1);
 
   return std::tuple<at::Tensor, at::Tensor>(bbox_result, scores_result);
 }

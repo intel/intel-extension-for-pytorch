@@ -73,8 +73,10 @@ class AtenIpexJITDev {
        const int64_t& softmax_dim,
        const at::IValue& dtype);
 
-   static at::Tensor dil_softmax(const at::Tensor &input, const int64_t dim,
-                                 const at::IValue &dtype);
+   static at::Tensor dil_softmax(
+       const at::Tensor& input,
+       const int64_t dim,
+       const at::IValue& dtype = at::IValue());
 
    static at::Tensor dil_matmul_div(const at::Tensor &left,
                                     const at::Tensor &right, at::Tensor out_opt,
