@@ -35,7 +35,7 @@ at::Tensor q_conv2d(
 
   ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
 
-  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+  auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast
       : at::MemoryFormat::Contiguous;
 
@@ -89,7 +89,7 @@ at::Tensor q_conv2d_relu(
       static_cast<float>(output_scale),
       ConvAttr::kind_with_relu};
 
-  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+  auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast
       : at::MemoryFormat::Contiguous;
 
@@ -138,8 +138,8 @@ at::Tensor q_conv3d(
 
   ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
 
-  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
-      ? at::MemoryFormat::ChannelsLast
+  auto mfmt = onednn_conv_use_channels_last(input, weight)
+      ? at::MemoryFormat::ChannelsLast3d
       : at::MemoryFormat::Contiguous;
   Tensor output = _empty_affine_quantized(
       conv_dst_tz(
@@ -164,6 +164,7 @@ at::Tensor q_conv3d(
       dilation.vec(),
       groups,
       attr);
+
   return output;
 }
 
@@ -191,8 +192,8 @@ at::Tensor q_conv3d_relu(
       static_cast<float>(output_scale),
       ConvAttr::kind_with_relu};
 
-  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast)
-      ? at::MemoryFormat::ChannelsLast
+  auto mfmt = onednn_conv_use_channels_last(input, weight)
+      ? at::MemoryFormat::ChannelsLast3d
       : at::MemoryFormat::Contiguous;
 
   Tensor output = _empty_affine_quantized(

@@ -19,10 +19,11 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
         "quantize only works on Float Tensor.");
     Tensor qtensor = AtenIpexTypeXPU::new_qtensor(
         rtensor.sizes(),
-        rtensor.options().dtype(scalar_type_),
+        rtensor.options()
+            .dtype(scalar_type_)
+            .memory_format(rtensor.suggest_memory_format()),
         intrusive_from_this());
-
-    rtensor = rtensor.contiguous();
+    rtensor = rtensor.contiguous(rtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::quantize_tensor_per_tensor_affine(
         qtensor, rtensor, scale_, zero_point_);
@@ -33,9 +34,12 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
       return qtensor;
     }
 
-    Tensor rtensor =
-        at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
-    qtensor = qtensor.contiguous();
+    Tensor rtensor = at::empty(
+        qtensor.sizes(),
+        qtensor.options()
+            .dtype(at::kFloat)
+            .memory_format(qtensor.suggest_memory_format()));
+    qtensor = qtensor.contiguous(qtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::dequantize_tensor_per_tensor_affine(
         rtensor, qtensor, scale_, zero_point_);
@@ -104,10 +108,12 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
 
     Tensor qtensor = AtenIpexTypeXPU::new_qtensor(
         rtensor.sizes(),
-        rtensor.options().dtype(scalar_type_),
+        rtensor.options()
+            .dtype(scalar_type_)
+            .memory_format(rtensor.suggest_memory_format()),
         intrusive_from_this());
 
-    rtensor = rtensor.contiguous();
+    rtensor = rtensor.contiguous(rtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::quantize_tensor_per_channel_affine(
         qtensor, rtensor, scales_, zero_points_, axis_);
@@ -118,9 +124,12 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
       return qtensor;
     }
 
-    Tensor rtensor =
-        at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
-    qtensor = qtensor.contiguous();
+    Tensor rtensor = at::empty(
+        qtensor.sizes(),
+        qtensor.options()
+            .dtype(at::kFloat)
+            .memory_format(qtensor.suggest_memory_format()));
+    qtensor = qtensor.contiguous(qtensor.suggest_memory_format());
 
     return at::AtenIpexTypeXPU::dequantize_tensor_per_channel_affine(
         rtensor, qtensor, scales_, zero_points_, axis_);
