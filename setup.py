@@ -24,9 +24,8 @@
 #
 # Environment variables for feature toggles:
 #
-#   USE_CXX11_ABI
-#     controls _GLIBCXX_USE_CXX11_ABI whether the declarations in the c++ library headers use the old or new ABI.
-#     https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_macros.html
+#   LIBTORCH_PATH
+#     Absolute path of libtorch
 #
 #   AVX2=1
 #     build the extension with the AVX2
@@ -93,16 +92,35 @@ except Exception:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'packaging'])
     from packaging import version as pkg_ver
 
-try:
-    import torch
-    from torch.utils.cpp_extension import BuildExtension, CppExtension
-except ImportError as e:
-    print("Unable to import torch from the local environment.")
-    raise e
+pytorch_install_dir = os.getenv('LIBTORCH_PATH', '')
+torch_python = False
+USE_CXX11_ABI = 0
+if pytorch_install_dir == '':
+    try:
+        import torch
+        from torch.utils.cpp_extension import BuildExtension, CppExtension
+    except ImportError as e:
+        print("Unable to import torch from the local environment.")
+        raise e
 
-USE_CXX11_ABI = torch._C._GLIBCXX_USE_CXX11_ABI
+    torch_python = True
+    USE_CXX11_ABI = torch._C._GLIBCXX_USE_CXX11_ABI
 
-pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
+    pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
+elif not os.path.isfile(os.path.join(pytorch_install_dir, 'build-version')):
+    print('{} doestn\'t seem to be a valid libtorch directory.'.format(pytorch_install_dir))
+    exit(1)
+else:
+    out = subprocess.check_output(['grep', 'GLIBCXX_USE_CXX11_ABI', os.path.join(pytorch_install_dir, 'share', 'cmake', 'Torch', 'TorchConfig.cmake')]).decode('ascii').strip()
+    if out == '':
+        print('Unable to get GLIBCXX_USE_CXX11_ABI setting from libtorch: 1')
+        exit(1)
+    matches = re.match('.*\"-D_GLIBCXX_USE_CXX11_ABI=(\d)\".*', out)
+    if matches:
+        USE_CXX11_ABI = int(matches.groups()[0])
+    else:
+        print('Unable to get GLIBCXX_USE_CXX11_ABI setting from libtorch: 2')
+        exit(1)
 base_dir = os.path.dirname(os.path.abspath(__file__))
 python_include_dir = get_paths()['include']
 package_name = "intel_extension_for_pytorch"
@@ -306,16 +324,6 @@ def get_build_type():
 
     return build_type
 
-def get_cxxabi_version():
-    global USE_CXX11_ABI
-    if os.getenv('USE_CXX11_ABI', '') != '':
-        if _check_env_flag('USE_CXX11_ABI'):
-            USE_CXX11_ABI = 1
-        else:
-            USE_CXX11_ABI = 0
-
-    return USE_CXX11_ABI
-
 def get_avx_version():
     avx_version = ''
     if _check_env_flag('AVX2'):
@@ -454,12 +462,10 @@ class IPEXCPPLibBuild(build_clib, object):
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DIPEX_AVX_VERSION=' + get_avx_version(),
-            '-DGLIBCXX_USE_CXX11_ABI=' + str(int(get_cxxabi_version())),
+            '-DGLIBCXX_USE_CXX11_ABI=' + str(int(USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
-            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
-            '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
-            '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib"]
+            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir]
 
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
@@ -508,14 +514,15 @@ class IPEXCPPLibBuild(build_clib, object):
         else:
             check_call(['make'] + build_args, cwd=cpp_test_build_dir, env=env)
 
-class IPEXExtBuild(BuildExtension):
-    def run(self):
-        self.run_command('build_clib')
+if torch_python:
+    class IPEXExtBuild(BuildExtension):
+        def run(self):
+            self.run_command('build_clib')
 
-        self.build_lib = os.path.relpath(get_package_base_dir())
-        self.build_temp = os.path.relpath(get_build_type_dir())
-        self.library_dirs.append(os.path.relpath(get_package_lib_dir()))
-        super(IPEXExtBuild, self).run()
+            self.build_lib = os.path.relpath(get_package_base_dir())
+            self.build_temp = os.path.relpath(get_build_type_dir())
+            self.library_dirs.append(os.path.relpath(get_package_lib_dir()))
+            super(IPEXExtBuild, self).run()
 
 # Install requirements for building
 _install_requirements()
@@ -537,51 +544,62 @@ def make_relative_rpath(path):
 
 
 def pyi_module():
-    main_libraries = ['intel-ext-pt-cpu']
-    main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp"),
-                    os.path.join("torch_ipex", "csrc", "python", "TaskModule.cpp")]
+    if torch_python:
+        main_libraries = ['intel-ext-pt-cpu']
+        main_sources = [os.path.join("torch_ipex", "csrc", "init_python_bindings.cpp"),
+                        os.path.join("torch_ipex", "csrc", "python", "TaskModule.cpp")]
 
-    include_dirs = [
-        os.path.realpath("."),
-        os.path.realpath(os.path.join("torch_ipex", "csrc")),
-        os.path.join(pytorch_install_dir, "include"),
-        os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
+        include_dirs = [
+            os.path.realpath("."),
+            os.path.realpath(os.path.join("torch_ipex", "csrc")),
+            os.path.join(pytorch_install_dir, "include"),
+            os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
 
-    library_dirs = [
-        "lib",
-        os.path.join(pytorch_install_dir, "lib")]
+        library_dirs = [
+            "lib",
+            os.path.join(pytorch_install_dir, "lib")]
 
-    extra_compile_args = [
-        '-Wall',
-        '-Wextra',
-        '-Wno-strict-overflow',
-        '-Wno-unused-parameter',
-        '-Wno-missing-field-initializers',
-        '-Wno-write-strings',
-        '-Wno-unknown-pragmas',
-        # This is required for Python 2 declarations that are deprecated in 3.
-        '-Wno-deprecated-declarations',
-        # Python 2.6 requires -fno-strict-aliasing, see
-        # http://legacy.python.org/dev/peps/pep-3123/
-        # We also depend on it in our code (even Python 3).
-        '-fno-strict-aliasing',
-        # Clang has an unfixed bug leading to spurious missing
-        # braces warnings, see
-        # https://bugs.llvm.org/show_bug.cgi?id=21629
-        '-Wno-missing-braces']
+        extra_compile_args = [
+            '-Wall',
+            '-Wextra',
+            '-Wno-strict-overflow',
+            '-Wno-unused-parameter',
+            '-Wno-missing-field-initializers',
+            '-Wno-write-strings',
+            '-Wno-unknown-pragmas',
+            # This is required for Python 2 declarations that are deprecated in 3.
+            '-Wno-deprecated-declarations',
+            # Python 2.6 requires -fno-strict-aliasing, see
+            # http://legacy.python.org/dev/peps/pep-3123/
+            # We also depend on it in our code (even Python 3).
+            '-fno-strict-aliasing',
+            # Clang has an unfixed bug leading to spurious missing
+            # braces warnings, see
+            # https://bugs.llvm.org/show_bug.cgi?id=21629
+            '-Wno-missing-braces']
 
-    C_ext = CppExtension(
-        "intel_extension_for_pytorch._C",
-        libraries=main_libraries,
-        sources=main_sources,
-        language='c++',
-        extra_compile_args=extra_compile_args,
-        include_dirs=include_dirs,
-        library_dirs=library_dirs,
-        extra_link_args=[make_relative_rpath('lib')])
-    return C_ext
+        C_ext = CppExtension(
+            "intel_extension_for_pytorch._C",
+            libraries=main_libraries,
+            sources=main_sources,
+            language='c++',
+            extra_compile_args=extra_compile_args,
+            include_dirs=include_dirs,
+            library_dirs=library_dirs,
+            extra_link_args=[make_relative_rpath('lib')])
+        return C_ext
+    else:
+        return None
 
-
+cmdclass = {
+    'build_py': IPEXPythonPackageBuild,
+    'build_clib': IPEXCPPLibBuild,
+    'egg_info': IPEXEggInfoBuild,
+    'install': IPEXInstallCmd,
+    'clean': IPEXClean,
+}
+if torch_python:
+    cmdclass['build_ext'] = IPEXExtBuild
 setup(
     name='intel_extension_for_pytorch',
     version=ipex_build_version,
@@ -600,11 +618,11 @@ setup(
     package_dir={'': os.path.relpath(get_package_base_dir())},
     zip_safe=False,
     ext_modules=[pyi_module()],
-    cmdclass={
-        'build_py': IPEXPythonPackageBuild,
-        'build_clib': IPEXCPPLibBuild,
-        'build_ext': IPEXExtBuild,
-        'egg_info': IPEXEggInfoBuild,
-        'install': IPEXInstallCmd,
-        'clean': IPEXClean,
-    })
+    cmdclass=cmdclass,
+    )
+
+if not torch_python and os.path.isdir('build'):
+    os.makedirs(os.path.join(pytorch_install_dir, 'share', 'cmake', 'intel_ext_pt_cpu'))
+    shutil.copyfile(os.path.join('cmake', 'Modules', 'FindIPEX.cmake.in'), os.path.join(pytorch_install_dir, 'share', 'cmake', 'intel_ext_pt_cpu', 'intel_ext_pt_cpuConfig.cmake'))
+    shutil.copyfile(os.path.join('build', 'Release', 'packages', package_name, 'lib', 'libintel-ext-pt-cpu.so'), os.path.join(pytorch_install_dir, 'lib', 'libintel-ext-pt-cpu.so'))
+    shutil.copyfile(os.path.join('build', 'Release', 'packages', package_name, 'lib', 'libdnnl_graph.so.0'), os.path.join(pytorch_install_dir, 'lib', 'libdnnl_graph.so.0'))
