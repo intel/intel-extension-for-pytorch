@@ -47,7 +47,7 @@ supported:
   - _unique
   - _unique2
 #  - _var	# different schema
-#  - abs.out	# different signature
+  - abs.out	
 #  - acos.out	# different signature
 #  - adaptive_avg_pool2d.out	# different signature
 #  - adaptive_avg_pool3d	# dispatch is False
