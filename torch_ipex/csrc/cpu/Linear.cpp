@@ -1,5 +1,6 @@
 #include <torch/extension.h>
 
+#include "Eltwise.h"
 #include "Linear.h"
 #include "WeightPack.h"
 #include "mkldnn/MKLDNNCommon.h"
@@ -9,6 +10,8 @@
 
 namespace torch_ipex {
 namespace cpu {
+
+enum EltwiseType { NotFused = 0, ReLU = 1, Sigmoid = 2 };
 /**
  * Linear inplace version with oneDNN kernel. 
  * Inplace version will be used when user provides output tensor. eg: Linear+Add fusion. 
@@ -81,25 +84,47 @@ at::Tensor linear_kernel(
   return output;
 }
 
-at::Tensor linear_forward_impl(
+at::Tensor linear_forward(
     const at::Tensor& self,
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
-    const at::Tensor& bias,
-    const ideep::attr_t& attr) {
+    const c10::optional<at::Tensor>& bias) {
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias);
+  const at::Tensor& bias_ = *bias_maybe_owned;
   const ideep::tensor mkldnn_weight =
       get_linear_packed_weight(weight, out_features, in_features);
-  return linear_kernel(self, mkldnn_weight, bias, attr);
+  return linear_kernel(self, mkldnn_weight, bias_, ideep::attr_t());
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_impl(
+at::Tensor linear_eltwise_forward(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features,
+    const c10::optional<at::Tensor>& bias,
+    const int64_t eltwise) {
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias);
+  const at::Tensor& bias_ = *bias_maybe_owned;
+  const ideep::tensor mkldnn_weight =
+      get_linear_packed_weight(weight, out_features, in_features);
+  auto attr = ideep::attr_t();
+  if (eltwise == ReLU)
+    attr = ideep::attr_t::fuse_relu();
+  else
+    attr = ideep::attr_t::fuse_sigmoid();
+  return linear_kernel(self, mkldnn_weight, bias_, attr);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward(
     const at::Tensor& input,
     const at::Tensor& grad_output,
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
-    std::array<bool,3> output_mask) {
+    std::array<bool, 3> output_mask) {
   at::Tensor grad_input, grad_weight, grad_bias;
   // weight's desc is needed for both bw_d and bw_w
   const ideep::tensor w =
@@ -157,32 +182,52 @@ at::Tensor IPEXLinearOp::_forward(
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
-    const at::Tensor& bias){
+    const c10::optional<at::Tensor>& bias,
+    const int64_t eltwise) {
+  at::AutoNonVariableTypeMode g;
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({}));
 #endif
-  return linear_forward_impl(input, weight, out_features, in_features, bias, ideep::attr_t());
+  if (eltwise == NotFused) {
+    static auto op = torch::Dispatcher::singleton()
+                         .findSchemaOrThrow("torch_ipex::ipex_linear", "")
+                         .typed<decltype(ipex_linear)>();
+    return op.call(input, weight, out_features, in_features, bias);
+  } else {
+    static auto op =
+        torch::Dispatcher::singleton()
+            .findSchemaOrThrow("torch_ipex::ipex_linear_eltwise", "")
+            .typed<decltype(ipex_linear_eltwise)>();
+    return op.call(input, weight, out_features, in_features, bias, eltwise);
+  }
 }
 
 at::Tensor IPEXLinearOp::forward(
-    torch::autograd::AutogradContext *ctx,
+    torch::autograd::AutogradContext* ctx,
     const at::Tensor& input,
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
-    const at::Tensor& bias){
+    const c10::optional<at::Tensor>& bias,
+    const int64_t eltwise) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({}));
 #endif
   at::AutoNonVariableTypeMode g;
-  ctx->saved_data["input"] = input;
-  ctx->saved_data["weight"] = weight;
   ctx->saved_data["out_features"] = out_features;
   ctx->saved_data["in_features"] = in_features;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
   ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
-  ctx->saved_data["bias_requires_grad"] = bias.defined() && bias.requires_grad();
-  return linear_forward_impl(input, weight, out_features, in_features, bias, ideep::attr_t());
+  ctx->saved_data["bias_requires_grad"] =
+      bias.has_value() && bias.value().requires_grad() ? true : false;
+  ctx->saved_data["eltwise"] = eltwise;
+  auto output =
+      _forward(input, weight, out_features, in_features, bias, eltwise);
+  if (eltwise == NotFused)
+    ctx->save_for_backward({input, weight});
+  else
+    ctx->save_for_backward({input, weight, output});
+  return output;
 }
 
 torch::autograd::tensor_list IPEXLinearOp::backward(
@@ -192,57 +237,65 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
   RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}));
 #endif
   auto saved = ctx->get_saved_variables();
-  at::Tensor input = ctx->saved_data["input"].toTensor();
-  at::Tensor weight = ctx->saved_data["weight"].toTensor();
+  at::Tensor input = saved[0];
+  at::Tensor weight = saved[1];
   int64_t out_features = ctx->saved_data["out_features"].toInt();
   int64_t in_features = ctx->saved_data["in_features"].toInt();
   std::array<bool, 3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
   output_mask[2] = ctx->saved_data["bias_requires_grad"].toBool();
-  at::Tensor grad_output = grad_outputs[0];
+  int64_t eltwise = ctx->saved_data["eltwise"].toInt();
+  at::Tensor grad_output;
+  if (eltwise == NotFused) {
+    grad_output = grad_outputs[0];
+  } else {
+    at::Tensor output = saved[2];
+    grad_output = eltwise == ReLU
+        ? relu_use_dst_for_bwd(grad_outputs[0], output)
+        : sigmoid_use_dst_for_bwd(grad_outputs[0], output);
+  }
+
   at::Tensor grad_input, grad_weight, grad_bias;
-  std::tie(grad_input, grad_weight, grad_bias) = linear_backward_impl(
-    input, grad_output, weight, out_features, in_features, output_mask
-  );
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::linear_backward", "")
+                       .typed<decltype(linear_backward)>();
+  std::tie(grad_input, grad_weight, grad_bias) = op.call(
+      input, grad_output, weight, out_features, in_features, output_mask);
   // must have save nums of output with inputs args
-  return {grad_input, grad_weight, at::Tensor(), at::Tensor(), grad_bias};
+  return {
+      grad_input,
+      grad_weight,
+      at::Tensor(),
+      at::Tensor(),
+      grad_bias,
+      at::Tensor()};
 }
 
 at::Tensor ipex_linear(
-    const at::Tensor &input,
-    const at::Tensor &weight,
+    const at::Tensor& input,
+    const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
-    const c10::optional<at::Tensor>& bias_opt) {
-  c10::MaybeOwned<at::Tensor> bias_maybe_owned = at::borrow_from_optional_tensor(bias_opt);
-  const at::Tensor& bias = *bias_maybe_owned;
-  // can not pass undefined tensor in "apply" since pytorch have will record the device but
-  // undefined tensor dose not have a device
-  if (bias.defined()){
-    if (at::GradMode::is_enabled())
-      return IPEXLinearOp::apply(input, weight, out_features, in_features, bias);
-    return IPEXLinearOp::_forward(input, weight, out_features, in_features, bias);
-  }
-  else {
-    if (at::GradMode::is_enabled())
-      return IPEXLinearOp::apply(input, weight, out_features, in_features);
-    return IPEXLinearOp::_forward(input, weight, out_features, in_features);
-  }
+    const c10::optional<at::Tensor>& bias) {
+  if (at::GradMode::is_enabled())
+    return IPEXLinearOp::apply(input, weight, out_features, in_features, bias);
+  return IPEXLinearOp::_forward(input, weight, out_features, in_features, bias);
 }
 
-}  // namespace cpu
-}  // namespace torch_ipex
-
-namespace {
-
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "ipex_linear(Tensor input, Tensor weight, int out_features, int in_features, Tensor? bias) -> Tensor",
-      torch_ipex::cpu::ipex_linear);
+at::Tensor ipex_linear_eltwise(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features,
+    const c10::optional<at::Tensor>& bias,
+    const int64_t eltwise) {
+  return IPEXLinearOp::apply(
+      input, weight, out_features, in_features, bias, eltwise);
 }
 
-}
+} // namespace cpu
+} // namespace torch_ipex
 
 namespace torch_ipex {
 namespace autocast {
@@ -252,7 +305,7 @@ at::Tensor ipex_linear(
     const at::Tensor& weight,
     const int64_t out_features,
     const int64_t in_features,
-    const c10::optional<at::Tensor>& bias_opt) {
+    const c10::optional<at::Tensor>& bias) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
     .findSchemaOrThrow("torch_ipex::ipex_linear", "")
@@ -263,17 +316,79 @@ at::Tensor ipex_linear(
   auto target_type = get_autocast_dtype();
   TORCH_CHECK(weight.scalar_type() == at::kBFloat16 || weight.scalar_type() == at::kFloat,
         "ipex_linear only support bfloat16 and float autocast dtype");
-  return op.call(cpu_cached_cast(target_type, input),
-                 cpu_cached_cast(target_type, weight),
-                 out_features,
-                 in_features,
-                 cpu_cached_cast(target_type, bias_opt));
+  return op.call(
+      cpu_cached_cast(target_type, input),
+      cpu_cached_cast(target_type, weight),
+      out_features,
+      in_features,
+      cpu_cached_cast(target_type, bias));
 }
 
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl("ipex_linear", torch_ipex::autocast::ipex_linear);
+at::Tensor ipex_linear_eltwise(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const int64_t out_features,
+    const int64_t in_features,
+    const c10::optional<at::Tensor>& bias,
+    const int64_t eltwise) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::ipex_linear_eltwise", "")
+                       .typed<decltype(ipex_linear_eltwise)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("ipex_linear_eltwise");
+#endif
+  auto target_type = get_autocast_dtype();
+  TORCH_CHECK(
+      weight.scalar_type() == at::kBFloat16 ||
+          weight.scalar_type() == at::kFloat,
+      "ipex_linear_eltwise only support bfloat16 and float autocast dtype");
+  return op.call(
+      cpu_cached_cast(target_type, input),
+      cpu_cached_cast(target_type, weight),
+      out_features,
+      in_features,
+      cpu_cached_cast(target_type, bias),
+      eltwise);
 }
 
 } // namespace autocast
 } // namespace torch_ipex
 
+namespace {
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "ipex_linear(Tensor input, Tensor weight, int out_features, int in_features, Tensor? bias) -> Tensor");
+  m.impl(
+      "ipex_linear", c10::DispatchKey::Autograd, torch_ipex::cpu::ipex_linear);
+  m.impl(
+      "ipex_linear",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::ipex_linear);
+  m.impl("ipex_linear", c10::DispatchKey::CPU, torch_ipex::cpu::linear_forward);
+  // fuse eltwise
+  m.def(
+      "ipex_linear_eltwise(Tensor input, Tensor weight, int out_features, int in_features, Tensor? bias, int eltwise) -> Tensor");
+  m.impl(
+      "ipex_linear_eltwise",
+      c10::DispatchKey::Autograd,
+      torch_ipex::cpu::ipex_linear_eltwise);
+  m.impl(
+      "ipex_linear_eltwise",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::ipex_linear_eltwise);
+  m.impl(
+      "ipex_linear_eltwise",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::linear_eltwise_forward);
+  // bw
+  m.def(
+      "linear_backward(Tensor input, Tensor grad_output, Tensor weight, int out_features, int in_features, bool[3] out_mask) -> (Tensor, Tensor, Tensor)");
+  m.impl(
+      "linear_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::linear_backward);
+}
+
+} // namespace

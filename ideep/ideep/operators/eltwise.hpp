@@ -61,7 +61,6 @@ struct eltwise_backward : public dnnl::eltwise_backward {
                      aengine, forward_hints);
 
   auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
-  auto expected_src = src.reorder_if_differ_in(pd.src_desc());
   diff_src.reinit_if_possible(pd.diff_src_desc());
 
   auto use_dst = utils::one_of(aalgorithm,
@@ -72,11 +71,13 @@ struct eltwise_backward : public dnnl::eltwise_backward {
                                algorithm::eltwise_logistic_use_dst_for_bwd,
                                algorithm::eltwise_exp_use_dst_for_bwd);
   auto src_dst_arg = use_dst ? DNNL_ARG_DST : DNNL_ARG_SRC;
-
-  super(pd).execute(stream::default_stream(),
-                    {{DNNL_ARG_DIFF_DST, expected_diff_dst},
-                    {src_dst_arg, expected_src},
-                    {DNNL_ARG_DIFF_SRC, diff_src}});
+  auto expected_src_dst_desc = use_dst ? pd.dst_desc() : pd.src_desc();
+  auto expected_src_dst = src.reorder_if_differ_in(expected_src_dst_desc);
+  super(pd).execute(
+      stream::default_stream(),
+      {{DNNL_ARG_DIFF_DST, expected_diff_dst},
+       {src_dst_arg, expected_src_dst},
+       {DNNL_ARG_DIFF_SRC, diff_src}});
   }
 };
 }  // namespace ideep
