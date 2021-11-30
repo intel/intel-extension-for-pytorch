@@ -20,6 +20,10 @@ class MultiStreamModule(nn.Module):
         cpu_pool (intel_extension_for_pytorch.cpu.runtime.CPUPool): An
             intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
             all CPU cores used to run multi-stream inference.
+        concat_output (bool): A flag indicates whether the output of each
+            stream will be concatenated or not. The default value is True. Note:
+            if the output of each stream can't be concatenated, set this flag to
+            false to get the raw output (a list of each stream's output).
 
     Returns:
         intel_extension_for_pytorch.cpu.runtime.MultiStreamModule: Generated
@@ -28,7 +32,7 @@ class MultiStreamModule(nn.Module):
     :meta public:
     """
 
-    def __init__(self, model, num_streams: int, cpu_pool: CPUPool):
+    def __init__(self, model, num_streams: int, cpu_pool: CPUPool, concat_output: bool = True):
         super(MultiStreamModule, self).__init__()
         assert type(cpu_pool) is CPUPool
         core_list = cpu_pool.core_ids
@@ -45,6 +49,7 @@ class MultiStreamModule(nn.Module):
                 end_core_list_idx += self.cores_per_instance
             self.tasks.append(ipex.cpu.runtime.Task(model, ipex.cpu.runtime.CPUPool(core_list[start_core_list_idx:end_core_list_idx])))
             start_core_list_idx = end_core_list_idx
+        self.concat_output = concat_output
 
     def forward(self, inputs):
         # Ensure each instance has input offload
@@ -74,5 +79,4 @@ class MultiStreamModule(nn.Module):
 
         for j in range(used_num_streams):
             results_raw.append(results_raw_future[j].get())
-        output = torch.cat(results_raw)
-        return output
+        return torch.cat(results_raw) if self.concat_output else results_raw

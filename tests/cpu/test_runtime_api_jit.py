@@ -121,6 +121,7 @@ class TestJitRuntimeAPI(JitTestCase):
         model.eval()
         batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
         x = torch.rand(batch_size, 64, 3, 3)
+        num_streams = batch_size
 
         # Calculate the reference result
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
@@ -129,10 +130,33 @@ class TestJitRuntimeAPI(JitTestCase):
 
         # Create MultiStreamModule
         cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
-        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=2, cpu_pool=cpu_pool)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=num_streams, cpu_pool=cpu_pool)
 
         y_runtime = multi_stream_model(x)
         self.assertEqual(y, y_runtime)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_multi_stream_concat_output(self):
+        model = SimpleNet()
+        model.eval()
+        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        x = torch.rand(batch_size, 64, 3, 3)
+        num_streams = batch_size
+
+        # Calculate the reference result
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            trace_model = torch.jit.trace(model, x)
+
+        # Create MultiStreamModule
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        multi_stream_model = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=num_streams, cpu_pool=cpu_pool)
+        y_runtime = multi_stream_model(x)
+
+        # Create MultiStreamModule with concat_output=False
+        multi_stream_model2 = ipex.cpu.runtime.MultiStreamModule(trace_model, num_streams=num_streams, cpu_pool=cpu_pool, concat_output=False)
+        y_runtime2 = multi_stream_model2(x)
+        self.assertEqual(y_runtime2.__len__(), num_streams)
+        self.assertEqual(y_runtime, torch.cat(y_runtime2))
 
 class TestLLGARuntimeAPI(JitLlgaTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
