@@ -188,7 +188,8 @@ TAGS
 #
 #
 tests/gpu/examples/simple_trace_case.zip
-csrc/aten/generated/ATen/*
+csrc/aten/generated/ATen/Register*.cpp
+csrc/aten/generated/ATen/*NativeFunctions.h
 csrc/aten/generated/*
 
 # Clion files
