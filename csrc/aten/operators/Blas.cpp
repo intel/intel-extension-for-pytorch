@@ -290,19 +290,19 @@ void matmul(
 }
 
 Tensor& addmm_out(
-    Tensor& result,
     const Tensor& self,
     const Tensor& m1,
     const Tensor& m2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha,
+    at::Tensor& result) {
   checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
   TORCH_CHECK(m1.dim() == 2 && m2.dim() == 2, "tensors must be 2-D");
 
   if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
       self.scalar_type() == ScalarType::Double ||
       m1.scalar_type() == ScalarType::Double ||
-      m2.scalar_type() == ScalarType::Double) {
+      m2.scalar_type() == ScalarType::Double || self.is_same(result)) {
     // post sum
     matmul(
         result,
@@ -349,7 +349,7 @@ Tensor& addmm_(
   Tensor bias = at::empty_like(self).copy_(self);
   // oneDNN cannot support result/bias (write/read) use the same memory.
   // we will remove copy to keep performance once matmul refactor done.
-  at::AtenIpexTypeXPU::addmm_out(self, bias, m1, m2, beta, alpha);
+  at::AtenIpexTypeXPU::addmm_out(bias, m1, m2, beta, alpha, self);
   return self;
 }
 
@@ -367,7 +367,7 @@ Tensor addmm(
     result = at::empty({0}, input.options());
   }
 
-  at::AtenIpexTypeXPU::addmm_out(result, input, m1, m2, beta, alpha);
+  at::AtenIpexTypeXPU::addmm_out(input, m1, m2, beta, alpha, result);
   return result;
 }
 
@@ -533,7 +533,7 @@ Tensor& addbmm_out(
     b1 = batch1.view({batch1.size(1), -1});
   }
   auto b2 = batch2.view({-1, batch2.size(2)});
-  at::AtenIpexTypeXPU::addmm_out(out, self, b1, b2, beta, alpha);
+  at::AtenIpexTypeXPU::addmm_out(self, b1, b2, beta, alpha, out);
 
   return out;
 }

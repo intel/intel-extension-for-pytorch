@@ -611,6 +611,7 @@ supported:
 #  - var_mean.dim	# dispatch is False
   - view
   - zero_
+  - addmm.out
 autograd:
   - cdist
 #  - lstm.input # different signature
