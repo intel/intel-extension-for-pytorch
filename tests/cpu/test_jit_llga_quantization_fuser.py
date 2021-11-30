@@ -135,7 +135,7 @@ class TestOp(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
                 # single aten::to won't be rewritten by llga backend
                 self.assertFused(graph, ['aten::dequantize', 'aten::linear'])
-                self.checkPatterns(graph, patterns)                
+                self.checkPatterns(graph, patterns)
 
     def test_max_pool2d(self):
         for [
@@ -206,7 +206,7 @@ class TestOp(JitLlgaTestCase):
                 new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
                 y = y.view(*new_y_shape2)
                 z2 = y.permute(0, 2, 1, 3)
-                
+
                 # inputs to matmul has been permuted or transposed, thus are strided tensor
                 return torch.matmul(z1, z2.transpose(-1, -2))
         m = M()
@@ -233,7 +233,7 @@ class TestOp(JitLlgaTestCase):
                 x_shape = x.size()[0]
                 y = x_shape + 2
                 return y
-        
+
         # input[0] to add being scalar is unsupported
         x = torch.randn(3, 3)
         m = M()
@@ -425,6 +425,29 @@ class TestFusionPattern(JitLlgaTestCase):
             self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
 
+    def test_linear_sum_inplace(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(15, 20)
+
+            def forward(self, x, y):
+                x = self.linear1(x)
+                x += y.clone()
+                return x
+
+        x = torch.randn(2, 15)
+        y = torch.randn(2, 20)
+        m = M()
+        patterns = [
+            ["aten::dequantize", "aten::linear", "aten::dequantize"],
+        ]
+        for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, config_name="linear_sum_inplace", qscheme=qscheme)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.assertFused(graph, ['aten::linear', 'aten::quantize_per_channel', 'aten::dequantize'])
+        self.checkPatterns(graph, patterns)
+
     def test_linear_dropout_sum_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -470,7 +493,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ["aten::to", "aten::quantize_per_tensor"],
             ["aten::dequantize", "aten::to", "aten::linear", "aten::gelu", "aten::to", "aten::quantize_per_tensor"],
             ["aten::dequantize", "aten::to", "aten::linear"]
-        ]        
+        ]
         m = M()
         x = torch.rand(32, 28, requires_grad=False)
         for qscheme in [torch.per_tensor_affine]:
@@ -582,7 +605,7 @@ class TestFusionPattern(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(m, [x, y], atol=1e-1, config_name="lift_up_to_quant", qscheme=torch.per_tensor_affine, int8_bf16=True)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
         self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::matmul'])
-        self.checkPatterns(graph, patterns)    
+        self.checkPatterns(graph, patterns)
 
     def test_wildcard(self):
         class M(nn.Module):
@@ -702,7 +725,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
         # single aten::to won't be rewritten by llga backend
         self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
-        self.checkPatterns(graph, patterns)  
+        self.checkPatterns(graph, patterns)
 
     def test_strided_bmm_div_int8_in_bf16_out(self):
         class M(nn.Module):
@@ -719,7 +742,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
                 y = y.view(*new_y_shape2)
                 z2 = y.permute(0, 2, 1, 3)
-                
+
                 # inputs to matmul has been permuted or transposed, thus are strided tensor
                 return torch.matmul(z1, z2.transpose(-1, -2)) / 0.4
         m = M()
@@ -753,7 +776,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
                 y = y.view(*new_y_shape2)
                 z2 = y.permute(0, 2, 1, 3)
-                
+
                 # inputs to matmul has been permuted or transposed, thus are strided tensor
                 s = torch.matmul(z1, z2.transpose(-1, -2)) / 0.4
                 s = s + z
@@ -771,7 +794,7 @@ class TestFusionPattern(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(m, [x, y, z], atol=2e-1, config_name="strided_bmm_int8_in_bf16_out", qscheme=torch.per_tensor_affine)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::div', 'aten::add'])
-        self.checkPatterns(graph, patterns)        
+        self.checkPatterns(graph, patterns)
 
     def test_bmm_div_add_int8_bf16(self):
         class M(nn.Module):
@@ -788,7 +811,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 new_y_shape2 = y.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
                 y = y.view(*new_y_shape2)
                 z2 = y.permute(0, 2, 1, 3)
-                
+
                 # inputs to matmul has been permuted or transposed, thus are strided tensor
                 s = torch.matmul(z1, z2.transpose(-1, -2)) / 0.4
                 s = s + z.to(s.dtype)
@@ -808,7 +831,7 @@ class TestFusionPattern(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(m, [x, y, z], atol=2e-1, config_name="strided_bmm_int8_in_bf16_out", qscheme=torch.per_tensor_affine, int8_bf16=True)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor', 'aten::div', 'aten::add'])
-        self.checkPatterns(graph, patterns)        
+        self.checkPatterns(graph, patterns)
 
     def test_split_dequant_to(self):
         class M(nn.Module):

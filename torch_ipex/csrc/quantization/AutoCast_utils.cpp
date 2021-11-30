@@ -62,10 +62,11 @@ void calibrate(
   }
 
   if (op_type == OP_TYPE_INPLACE) {
-    // Assuming only one input for inplace ops.
+    // Assuming only the first input is used for inplace op, such as add_,
+    // relu_. and the inplace op has only one output.
     TORCH_CHECK(
-        inputs.size() == 1 && outputs.size() == 1,
-        "The size of inputs and outputs should be one for inplace ops.");
+        outputs.size() == 1,
+        "The size of outputs should be one for inplace ops.");
     auto it = tensor_producer_name_map.find(inputs[0].unsafeGetTensorImpl());
     // Replacing tensor_producer_name_map using output info if the tensor has
     // been in tensor_producer_name_map, for example, conv2d -> relu, the
