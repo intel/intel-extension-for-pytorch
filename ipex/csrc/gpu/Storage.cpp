@@ -1388,7 +1388,7 @@ AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, DEFINE_THPUTLIS_UNPACK);
 AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, DEFINE_THPUTLIS_CHECK);
 #undef DEFINE_THPUTLIS_CHECK
 
-PyObject* THPStorage_postInitExtension(PyObject* module) {
+PyObject* THDPStorage_postInitExtension(PyObject* module) {
   HANDLE_TH_ERRORS
 
   // Register Storage Python objects with DynamicTypes.cpp
@@ -1410,7 +1410,7 @@ PyObject* THPStorage_postInitExtension(PyObject* module) {
   if (!(cmd))            \
     return module;
 
-PyObject* THPStorage_init(PyObject* module) {
+PyObject* THDPStorage_init(PyObject* module) {
   HANDLE_TH_ERRORS
   ASSERT_TRUE(THXPStorage_init<at::kBool>(module));
   ASSERT_TRUE(THXPStorage_init<at::kChar>(module));

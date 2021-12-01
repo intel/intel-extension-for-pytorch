@@ -1,7 +1,7 @@
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
-#include <torch/csrc/tensor/python_tensor.h>
+//#include <torch/csrc/tensor/python_tensor.h>
 
 // #include <autograd/InferenceMode.h>
 #include <core/Allocator.h>
@@ -78,7 +78,7 @@ static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   if (!module)
     throw python_error();
 
-  THPStorage_postInitExtension(module);
+  THDPStorage_postInitExtension(module);
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -642,7 +642,7 @@ void init_module(pybind11::module& m) {
   auto module = m.ptr();
   THDPStream_init(module);
   THDPEvent_init(module);
-  THPStorage_init(module);
+  THDPStorage_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
   register_xpu_device_properties(module);
   register_inference_mode(module);
