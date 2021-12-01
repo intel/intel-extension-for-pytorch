@@ -16,38 +16,25 @@ class QuantConf(object):
     Args:
         configure_file (string): The INT8 configure file(.json file) to be
             loaded or saved.
-        id (int): The number of quantized ops in the model running flow.
-            Note: only limited ops are reordered, such as convolution, linear
-            or other ops.
-        name (string): Quantized OP's name.
-        algorithm (string): observe method for activation tensors during
-            calibration. Only support min-max now, more methods will be support
-            in future.
-        weight_granularity (Qscheme): Qscheme for weight quantizer for
-            convolution and linear, can be per_channel or per_tesor, user can
-            manually set it before load existed configure file. The default
-            value is uint8.
-        input_scales: Scales for inputs.
-        input_zero_points: Zero points for inputs.
-        output_scales": Scales for outputs.
-        output_zero_points: Zero points for outputs.
-        weight_scales: Scales for Weights.
-        input_quantized_dtypes: Quantized dtypes fot inputs, can be uint8 or
-            int8, user can manually set it before load existed configure file.
-            The default value is uint8.
-        output_quantized_dtypes: Quantized dtypes fot ouputs, can be uint8 or
-            int8, user can manually set it before load existed configure file.
-            The default value is uint8.
-        inputs_quantized: Whether inputs need quantized, can be true or false,
-            user can manually set it before load existed configure file.
-        outputs_quantized: Whether output need quantized, can be true or false,
-            user can manually set it before load existed configure file.
-        inputs_flow: Where the inputs are from, beacuse we only record limited
-            ops, we can know which ops are adjacent by compare one inputs flow
-            with others' output flow.
-        outputs_flow: Outputs flag for current op, which can be used to check
-            which ops are adjacent.
         qscheme (torch.qscheme): quantization scheme to be used(activation)
+
+    Available configurations in the *configure_file* are:
+
+        * id (int): The number of quantized ops in the model running flow.  Note: only limited ops are reordered, such as convolution, linear or other ops.
+        * name (string): Quantized OP's name.
+        * algorithm (string): observe method for activation tensors during calibration. Only support min-max now, more methods will be support in future.
+        * weight_granularity (Qscheme): Qscheme for weight quantizer for convolution and linear, can be per_channel or per_tesor, user can manually set it before load existed configure file. The default value is uint8.
+        * input_scales: Scales for inputs.
+        * input_zero_points: Zero points for inputs.
+        * output_scales": Scales for outputs.
+        * output_zero_points: Zero points for outputs.
+        * weight_scales: Scales for Weights.
+        * input_quantized_dtypes: Quantized dtypes fot inputs, can be uint8 or int8, user can manually set it before load existed configure file.  The default value is uint8.
+        * output_quantized_dtypes: Quantized dtypes fot ouputs, can be uint8 or int8, user can manually set it before load existed configure file.  The default value is uint8.
+        * inputs_quantized: Whether inputs need quantized, can be true or false, user can manually set it before load existed configure file.
+        * outputs_quantized: Whether output need quantized, can be true or false, user can manually set it before load existed configure file.
+        * inputs_flow: Where the inputs are from, beacuse we only record limited ops, we can know which ops are adjacent by compare one inputs flow with others' output flow.
+        * outputs_flow: Outputs flag for current op, which can be used to check which ops are adjacent.
 
     .. warning::
 

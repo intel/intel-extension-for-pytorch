@@ -1,33 +1,33 @@
 name: Publish
 
-on:
-  push:
-    branches:
-      - ghpapers_style
-
-jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install dependencies
-      run: |
-        export PATH="$HOME/.local/bin:$PATH"
-        sudo apt-get install -y python3-setuptools
-        pip3 install --user --pre torch -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
-        pip3 install --user -r requirements.txt
-        python3 setup.py install
-        pip3 install --user -r docs/requirements.txt
-    - name: Build the docs
-      run: |
-        export PATH="$HOME/.local/bin:$PATH"
-        cd docs
-        make html
-    - name: Push the docs
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: docs/_build/html
-        publish_branch: gh-pages
+#on:
+#  push:
+#    branches:
+#      - gh-pages
+#
+#jobs:
+#  build:
+#
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - uses: actions/checkout@v1
+#    - name: Install dependencies
+#      run: |
+#        export PATH="$HOME/.local/bin:$PATH"
+#        sudo apt-get install -y python3-setuptools
+#        pip3 install --user torch=1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
+#        pip3 install --user -r requirements.txt
+#        python3 setup.py install
+#        pip3 install --user -r docs/requirements.txt
+#    - name: Build the docs
+#      run: |
+#        export PATH="$HOME/.local/bin:$PATH"
+#        cd docs
+#        make html
+#    - name: Push the docs
+#      uses: peaceiris/actions-gh-pages@v3
+#      with:
+#        github_token: ${{ secrets.GITHUB_TOKEN }}
+#        publish_dir: docs/_build/html
+#        publish_branch: gh-pages

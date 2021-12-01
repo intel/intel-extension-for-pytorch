@@ -19,11 +19,7 @@ Please check `API Documentation <api_doc.html>`_ page for details of API functio
    
       * - version
         - package name
-      * - 1.2.0
-        - intel_pytorch_extension
-      * - 1.8.0
-        - intel_pytorch_extension
-      * - 1.9.0
+      * - 1.2.0 ~ 1.9.0
         - intel_pytorch_extension
       * - 1.10.0
         - intel_extension_for_pytorch
@@ -78,23 +74,33 @@ Intel® Extension for PyTorch\* also optimizes operators and implements several 
 .. currentmodule:: intel_extension_for_pytorch.nn.functional
 .. autofunction:: interaction
 
-Train Optimizer
----------------
+Optimizer Optimization
+----------------------
 
-Not only optimizations for inference workloads are Intel's focus, training workloads are also within Intel's optimization scope. As part of it, optimizations for train optimizer functions are an important perspective. The optimizations as implemented as a mechanism called **Split SGD**, taking advantage of BFloat16 data type and operator fusion. Optimizer **adagrad**, **lamb** and **sgd** are supported.
+Optimizers are one of key parts of the training workloads. Intel Extension for PyTorch brings two types of optimizations to optimizers:
+1.	Operator fusion for the computation in the optimizers.
+2.	SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
 
-Check more detailed information for `Split SGD <features/split_sgd.html>`_.
+
+Check more detailed information for `Split SGD <features/split_sgd.html>`_ and `Optimizer Fusion <features/optimizer_fusion.html>`_.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
    features/split_sgd
+   features/optimizer_fusion
 
 Runtime Extension (Experimental)
 --------------------------------
 
-Intel® Extension for PyTorch* Runtime Extension provides a runtime CPU pool API to bind threads to cores. It also features async tasks. Please **note**: Intel® Extension for PyTorch* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at `API Documentation page <../api_doc.html>`_.
+Intel® Extension for PyTorch* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides
+
+1. Multi-stream inference via the Python frontend module MultiStreamModule.
+2. Spawn asynchronous tasks from both Python and C++ frontend.
+3. Configure core bindings for OpenMP threads from both Python and C++ frontend.
+
+Please **note**: Intel® Extension for PyTorch* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at `API Documentation page <api_doc.html>`_.
 
 Check more detailed information for `Runtime Extension <features/runtime_extension.html>`_.
 
@@ -107,7 +113,7 @@ Check more detailed information for `Runtime Extension <features/runtime_extensi
 INT8 Quantization (Experimental)
 --------------------------------
 
-The quantization in Intel® Extension for PyTorch\* integrates `oneDNN graph API <https://spec.oneapi.io/onednn-graph/latest/introduction.html>`_ in the TorchScript graph of PyTorch.
+Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. The quantized model is then optimized with the `oneDNN graph <https://spec.oneapi.io/onednn-graph/latest/introduction.html>`_ fusion pass to deliver good performance.
 
 Check more detailed information for `INT8 <features/int8.html>`_.
 

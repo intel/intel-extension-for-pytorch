@@ -8,7 +8,7 @@ Welcome to Intel® Extension for PyTorch* documentation!
 
 Intel® Extension for PyTorch* extends PyTorch with optimizations for extra performance boost on Intel hardware. Most of the optimizations will be included in stock PyTorch releases eventually, and the intention of the extension is to deliver up-to-date features and optimizations for PyTorch on Intel hardware, examples include AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX).
 
-Intel® Extension for PyTorch* is structured as the following figure. It is a runtime extension. Users can enable it dynamically in script by importing `intel_extension_for_pytorch`. It covers optimizations for both imperative mode and graph mode. Optimized operators and kernels are registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel hardware. During execution, Intel® Extension for PyTorch* intercepts invocation of ATen operators, and replace the original ones with these optimized ones. In graph mode, further operator fusions are applied manually by Intel engineers or through a tool named *oneDNN Graph* to reduce operator/kernel invocation overheads, and thus increase performance.
+Intel® Extension for PyTorch* is structured as the following figure. It is loaded as a Python module for Python programs or linked as a C++ library for C++ programs. Users can enable it dynamically in script by importing `intel_extension_for_pytorch`. It covers optimizations for both imperative mode and graph mode. Optimized operators and kernels are registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel hardware. During execution, Intel® Extension for PyTorch* intercepts invocation of ATen operators, and replace the original ones with these optimized ones. In graph mode, further operator fusions are applied manually by Intel engineers or through a tool named *oneDNN Graph* to reduce operator/kernel invocation overheads, and thus increase performance.
 
 .. image:: ../images/intel_extension_for_pytorch_structure.png
   :width: 800
@@ -24,8 +24,7 @@ Intel® Extension for PyTorch* has been released as an open–source project at 
    :maxdepth: 1
 
    tutorials/features
-   tutorials/notices
-   tutorials/release_notes
+   tutorials/releases
    tutorials/installation
    tutorials/examples
    tutorials/api_doc

@@ -43,7 +43,7 @@ with torch.cpu.amp.autocast():
 
 ### Inference with TorchScript Path
 
-`torch.cpu.amp.autocast` can be used with `torch.jit.trace` to apply graph optimization.
+`torch.cpu.amp.autocast` can be used with `torch.jit.trace` to apply graph optimization. Due to PyTorch limitation, only `torch.jit.trace` is supported.
 
 ```
 model = SimpleNet().eval()
@@ -79,7 +79,7 @@ are allowed in autocast-enabled regions, but won't go through autocasting. For e
 
 ### Op-Specific Behavior
 
-The following lists describe the behavior of eligible ops in autocast-enabled regions. These ops always go through autocasting whether they are invoked as part of a :class:`torch.nn.Module`, as a function, or as a :class:`torch.Tensor` method. If functions are exposed in multiple namespaces, they go through autocasting regardless of the namespace.
+The following lists describe the behavior of eligible ops in autocast-enabled regions. These ops always go through autocasting whether they are invoked as part of a `torch.nn.Module`, as a function, or as a `torch.Tensor` method. If functions are exposed in multiple namespaces, they go through autocasting regardless of the namespace.
 
 Ops not listed below do not go through autocasting. They run in the type defined by their inputs. However, autocasting may still change the type in which unlisted ops run if they're downstream from autocasted ops.
 

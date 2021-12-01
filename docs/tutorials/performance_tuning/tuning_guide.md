@@ -5,7 +5,7 @@ Performance Tuning Guide
 
 Intel Extension for PyTorch (IPEX) is a Python package to extend official PyTorch. It is designed to make the Out-of-Box user experience of PyTorch CPU better while achieving good performance. To fully utilize the power of Intel® architecture and thus yield high performance, PyTorch, as well as IPEX, are powered by [oneAPI Deep Neural Network Library (oneDNN)](https://github.com/oneapi-src/oneDNN), an open-source cross-platform performance library of basic building blocks for deep learning applications. It is developed and optimized for Intel Architecture Processors, Intel Processor Graphics and Xe architecture-based Graphics.
 
-Although by default primitives of PyTorch and IPEX are highly optimized, there are still something that users can do to optimize for performance further more. This article introduces common methods that Intel developers recommend to take.
+Although by default primitives of PyTorch and IPEX are highly optimized, there are still something that users can do to optimize for performance further more. Most optimized configurations can be automatically set by the launcher script. This article introduces common methods that Intel developers recommend to take.
 
 - Hardware Configuration
   - Intel CPU Structure
@@ -79,6 +79,10 @@ NUMA node1 CPU(s):   28-55,84-111
 ## Software Configuration
 
 This section introduces software configurations that helps to boost performance.
+
+### Channels Last
+
+Please take advantage of **Channels Last** memory format for image processing tasks. Comparing to PyTorch default NCHW (`torch.contiguous_format`) memory format, NHWC (`torch.channels_last`) is more friendly to Intel platforms, and thus generally yields better performance. More detailed introduction can be found at [Channels Last page](../features/nhwc.html). You can get sample codes with Resnet50 at [Example page](../examples.html).
 
 ### Numactl
 
@@ -194,6 +198,8 @@ export LD_PRELOAD=<jemalloc.so/tcmalloc.so>:$LD_PRELOAD
 #### Jemalloc
 
 [Jemalloc](https://github.com/jemalloc/jemalloc) is a general purpose malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support. More detailed introduction of performance tuning with Jemalloc can be found at [Jemalloc tuning guide](https://android.googlesource.com/platform/external/jemalloc_new/+/6e6a93170475c05ebddbaf3f0df6add65ba19f01/TUNING.md)
+
+A recommended setting for ``MALLOC_CONF`` is ``oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000`` from performance perspective. However, in some cases the ``dirty_decay_ms:9000000000,mmuzzy_decay_ms:9000000000`` may cause Out-of-Memory crash. Please try ``oversize_threshold:1,background_thread:true,metadata_thp:auto`` instead in this case.
 
 Getting Jemalloc is straight-forward.
 ```
