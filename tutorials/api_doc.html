@@ -494,7 +494,7 @@ as a <cite>with</cite> context or a function decorator.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.MultiStreamModule">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool"><span class="pre">intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool"><span class="pre">intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_output</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
 <dd><p>MultiStreamModule supports inference with multi-stream throughput mode.</p>
 <p>If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
 the cores will be allocated equally to each stream.</p>
@@ -509,6 +509,10 @@ first N streams.</p>
 <li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.CPUPool"><em>intel_extension_for_pytorch.cpu.runtime.CPUPool</em></a>) – An
 intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
 all CPU cores used to run multi-stream inference.</p></li>
+<li><p><strong>concat_output</strong> (<em>bool</em>) – A flag indicates whether the output of each
+stream will be concatenated or not. The default value is True. Note:
+if the output of each stream can’t be concatenated, set this flag to
+false to get the raw output (a list of each stream’s output).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
