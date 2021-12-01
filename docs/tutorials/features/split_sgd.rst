@@ -59,7 +59,11 @@ Where :math:`W` denotes parameters to be updated. :math:`gW` denotes gradient go
 Split SGD
 ---------
 
-Since the addition applied in SGD is repeated again and again, according to the drawback that we mentioned before of low precision data types, if both the :math:`W` and :math:`gW` are stored in BFloat16 data type, we will most likely lose valid bits and make the training results not accurate. In order to get performance benefits with BFloat16 at forward and backward propagation steps, while avoiding accuracy loss at parameter update step as much as possible, we propose the mechanism **"Split SGD"**.
+Since the addition applied in SGD is repeated again and again, according to the drawback that we mentioned before of low precision data types, if both the :math:`W` and :math:`gW` are stored in BFloat16 data type, we will most likely lose valid bits and make the training results not accurate. Using FP32 master parameters is a common practice of avoiding the round-off errors at parameter update step.  
+To keep FP32 master parameters, we have 3 design choices:
+(1) Only save FP32 parameters: For this choice, we need introduce additional FP32->BF16 cast at each iter to get benefit from BF16 at forward and backward propagation steps.
+(2) Save both FP32 and BF16 parameters: BF16 parameter are used at forward and backward propagation steps. And use FP32 master parameters at update steps. For this choice we introduce more memory footprint.
+(3) "Split" choice: In order to get performance benefits with BFloat16 at forward and backward propagation steps, while avoiding increase the memory footprint, we propose the mechanism **"Split SGD"**.
 
 The idea is to "split" a 32-bit floating point number into 2 parts:
 
@@ -67,6 +71,8 @@ The idea is to "split" a 32-bit floating point number into 2 parts:
 2. Bottom half: Last 16 bits are still kept to avoid accuracy loss.
 
 FP32 parameters are split into "Top half" and "Bottom half". When performing forward and backward propagations, the Top halfs are used to benefit from Intel BFloat16 support. When performing paramter update with SGD, we concatenate the Top half and the Bottom half to recover the parameters back to FP32 and then perform regular SGD operations.
+
+It is a common pratice to use FP32 for master parameters in order to avoid round-off errors with BF16 parameter update. **SplitSGD** is an optimization of storing FP32 master parameters with reduced memory footprint.
 
 .. image:: ../../../images/split_sgd/split_sgd.png
   :width: 800
@@ -83,16 +89,3 @@ The following pseudo code illustrates the process of Split SGD.
    fp32_gw = bf16_gw.float()
    fp32_w += α* fp32_gw (sgd step without weight_dacay, momentum)
    bf16_w, trail = split_bf16_from_fp32(fp32_w)
-
-Operation Fusion
-----------------
-
-As the idea of TorchScript, operation fusion reduces number of operators that will be executed, and reduces overhead time. This methodology is also applied in Split SGD.
-
-One problem of the implementation above is that the weights and gradients are accessed several time independently. Execution of each clause flushes cache. Thus, for large topologies, it is highly possible that processors need to read data out from memory, rather than high effeciently using CPU onboard high speed cache, a couple of times during execution of each clause. This is a memory-bound bottle neck preventing us to get a good performance.
-
-Fusion is the methodology to solve this problem. The 4 clauses in the pseudo code is fused into a single one, like the pseudo code below, to avoid unnecessary memory access.
-
-.. code-block:: python
-
-   bf16_w, trail = packed_add(bf16_w, trail, bf16_gw)

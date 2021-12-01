@@ -93,15 +93,6 @@ In case you want to reinstall, make sure that you uninstall Intel® Extension fo
   ENV_KEY1=ENV_VAL1[, ENV_KEY2=ENV_VAL2]* python setup.py develop
   ```
 
-## Codebase structure
-
-* [torch_ipex/csrc](https://github.com/intel/intel-extension-for-pytorch/tree/master/torch_ipex/csrc) - C++ library for Intel® Extension for PyTorch\*
-* [intel_extension_for_pytorch](https://github.com/intel/intel-extension-for-pytorch/tree/master/intel_extension_for_pytorch) - The actual Intel® Extension for PyTorch\* library. Everything that is not in [csrc](https://github.com/intel/intel-extension-for-pytorch/tree/master/torch_ipex/csrc) is a Python module, following the PyTorch Python frontend module structure.
-* [tools](https://github.com/intel/intel-extension-for-pytorch/tree/master/tools) - 
-* [tests](https://github.com/intel/intel-extension-for-pytorch/tree/master/tests) - Python unit tests for Intel® Extension for PyTorch\* Python frontend.
-  * [cpu](https://github.com/intel/intel-extension-for-pytorch/tree/master/tests/cpu) - 
-    * [cpp](https://github.com/intel/intel-extension-for-pytorch/tree/master/tests/cpu/cpp) - C++ unit tests for Intel® Extension for PyTorch\* C++ frontend.
-
 ## Unit testing
 
 ### Python Unit Testing

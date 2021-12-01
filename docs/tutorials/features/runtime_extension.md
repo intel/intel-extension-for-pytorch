@@ -1,7 +1,13 @@
 Runtime Extension (Experimental)
 ================================
 
-Intel® Extension for PyTorch\* Runtime Extension provides a runtime CPU pool API to bind threads to cores. It also features async tasks. Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
+Intel® Extension for PyTorch\* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides
+
+1. Multi-stream inference via the Python frontend module MultiStreamModule.
+2. Spawn asynchronous tasks from both Python and C++ frontend.
+3. Configure core bindings for OpenMP threads from both Python and C++ frontend.
+
+Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
 
 ## Requirements
 

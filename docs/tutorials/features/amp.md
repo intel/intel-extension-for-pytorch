@@ -43,7 +43,7 @@ with torch.cpu.amp.autocast():
 
 ### Inference with TorchScript Path
 
-`torch.cpu.amp.autocast` can be used with `torch.jit.trace` to apply graph optimization.
+`torch.cpu.amp.autocast` can be used with `torch.jit.trace` to apply graph optimization. Due to PyTorch limitation, only `torch.jit.trace` is supported.
 
 ```
 model = SimpleNet().eval()
@@ -67,6 +67,39 @@ for images, label in train_loader():
     loss.backward()
     optimizer.step()
 ```
+
+## Autocast Op Reference
+
+### Op Eligibility
+
+Ops that run in `float64` or non-floating-point dtypes are not eligible, and will run in these types whether or not autocast is enabled.
+
+Only out-of-place ops and Tensor methods are eligible. In-place variants and calls that explicitly supply an `out=...` Tensor
+are allowed in autocast-enabled regions, but won't go through autocasting. For example, in an autocast-enabled region `a.addmm(b, c)` can autocast, but `a.addmm_(b, c)` and `a.addmm(b, c, out=d)` cannot. For best performance and stability, prefer out-of-place ops in autocast-enabled regions.
+
+### Op-Specific Behavior
+
+The following lists describe the behavior of eligible ops in autocast-enabled regions. These ops always go through autocasting whether they are invoked as part of a `torch.nn.Module`, as a function, or as a `torch.Tensor` method. If functions are exposed in multiple namespaces, they go through autocasting regardless of the namespace.
+
+Ops not listed below do not go through autocasting. They run in the type defined by their inputs. However, autocasting may still change the type in which unlisted ops run if they're downstream from autocasted ops.
+
+If an op is unlisted, we assume it's numerically stable in `bfloat16`. If you believe an unlisted op is numerically unstable in `bfloat16`, please file an issue.
+
+#### Ops that can autocast to `bfloat16`
+
+`conv1d`, `conv2d`, `conv3d`, `bmm`, `mm`, `baddbmm`, `addmm`, `addbmm`, `conv_transpose1d`, `conv_transpose2d`, `conv_transpose3d`, `linear`, `matmul`
+
+#### Ops that can autocast to `float32`
+
+`avg_pool3d`, `binary_cross_entropy`, `polar`, `fmod`, `prod`, `quantile`, `nanquantile`, `stft`, `cdist`, `cumprod`, `cumsum`, `diag`, `diagflat`, `histc`, `logcumsumexp`, `trace`, `vander`, `view_as_complex`, `cholesky`, `cholesky_inverse`, `cholesky_solve`, `inverse`, `lu_solve`, `matrix_rank`, `orgqr`, `ormqr`, `pinverse`, `max_pool3d`, `max_unpool2d`, `max_unpool3d`, `adaptive_avg_pool3d`, `reflection_pad1d`, `reflection_pad2d`, `replication_pad1d`, `replication_pad2d`, `replication_pad3d`, `group_norm`, `mse_loss`, `ctc_loss`, `kl_div`, `multilabel_margin_loss`, `fft_fft`, `fft_ifft`, `fft_fft2`, `fft_ifft2`, `fft_fftn`, `fft_ifftn`, `fft_rfft`, `fft_irfft`, `fft_rfft2`, `fft_irfft2`, `fft_rfftn`, `fft_irfftn`, `fft_hfft`, `fft_ihfft`, `conv_tbc`, `linalg_matrix_norm`, `linalg_cond`, `linalg_matrix_rank`, `linalg_solve`, `linalg_cholesky`, `linalg_svdvals`, `linalg_eigvals`, `linalg_inv`, `linalg_householder_product`, `linalg_tensorinv`, `linalg_tensorsolve`, `fake_quantize_per_tensor_affine`, `eig`, `geqrf`, `lstsq`, `_lu_with_info`, `qr`, `solve`, `svd`, `symeig`, `triangular_solve`, `fractional_max_pool2d`, `fractional_max_pool3d`, `adaptive_max_pool3d`, `multilabel_margin_loss_forward`, `linalg_qr`, `linalg_cholesky_ex`, `linalg_svd`, `linalg_eig`, `linalg_eigh`, `linalg_lstsq`, `linalg_inv_ex`
+
+#### Ops that promote to the widest input type
+
+These ops don't require a particular dtype for stability, but take multiple inputs and require that the inputs' dtypes match.  If all of the inputs are `bfloat16`, the op runs in `bfloat16`.  If any of the inputs is `float32`, autocast casts all inputs to `float32` and runs the op in `float32`.
+
+`cat`, `stack`, `index_copy`
+
+Some ops not listed here (e.g., binary ops like `add`) natively promote inputs without autocasting's intervention.  If inputs are a mixture of `bfloat16` and `float32`, these ops run in `float32` and produce `float32` output, regardless of whether autocast is enabled.
 
 ## Design Details
 

@@ -287,7 +287,7 @@ def enable_onednn_fusion(enabled):
 
     Args:
         enabled (bool): Whether to enable oneDNN fusion functionality or not.
-            Default value is ``true``.
+            Default value is ``True``.
 
     Examples:
 

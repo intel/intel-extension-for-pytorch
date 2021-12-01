@@ -3,7 +3,7 @@ Launch Script Usage Guide
 
 ## Overview
 
-As introduced in [Performance Tuning Guide](tuning_guide.md), there are several factors that influence performance very much. Setting those configurations properly contributes to performance boost. However, there is no unified configuration that is optimal to all topologies. Users need to try different combinations by themselves. A *launch* script is provided to automate these configuration settings to free users from this complicated work. This guide helps you to learn some most frequent usage examples.
+As introduced in [Performance Tuning Guide](tuning_guide.md), there are several factors that influence performance very much. Setting those configurations properly contributes to performance boost. However, there is no unified configuration that is optimal to all topologies. Users need to try different combinations by themselves. A *launch* script is provided to automate these configuration settings to free users from this complicated work. This guide helps you to learn some most frequent usage examples. They covers optimized configurations in most cases.
 
 The configurations are mainly around the following perspectives. Italic values are default if applicable.
 1. OpenMP library: [*Intel OpenMP library* | GNU OpenMP library]
