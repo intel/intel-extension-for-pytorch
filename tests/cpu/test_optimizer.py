@@ -4,6 +4,7 @@ import itertools
 import unittest
 from torch.testing._internal.common_utils import TestCase
 from common_utils import TestModule
+import bench.custom_op_bench.optimizer
 
 class TestOptimizers(TestCase):
 
@@ -33,8 +34,8 @@ class TestOptimizers(TestCase):
         options2 = itertools.product([torch.float, torch.bfloat16], [0.1], [0.1, 0], [0], [True])
         for dtype, momentum, weight_decay, dampening, nesterov in list(options1) + list(options2):
             sgd = torch.optim.SGD(
-              M.parameters(), lr=0.001, momentum=momentum, weight_decay=weight_decay,
-              dampening=dampening, nesterov=nesterov)
+                M.parameters(), lr=0.001, momentum=momentum, weight_decay=weight_decay,
+                dampening=dampening, nesterov=nesterov)
             self._test_update(M, sgd, dtype)
 
     def test_adagrad(self):
@@ -42,8 +43,8 @@ class TestOptimizers(TestCase):
         options = itertools.product([torch.float, torch.bfloat16], [0.1, 0], [0.1, 0], [0.1, 0], [1e-5, 0])
         for dtype, lr_decay, weight_decay, initial_accumulator_value, eps in options:
             adagrad = torch.optim.Adagrad(
-              M.parameters(), lr=0.001, lr_decay=lr_decay, weight_decay=weight_decay,
-              initial_accumulator_value=initial_accumulator_value, eps=eps)
+                M.parameters(), lr=0.001, lr_decay=lr_decay, weight_decay=weight_decay,
+                initial_accumulator_value=initial_accumulator_value, eps=eps)
             self._test_update(M, adagrad, dtype)
 
     def test_lamb(self):
@@ -51,55 +52,15 @@ class TestOptimizers(TestCase):
         options = itertools.product([torch.bfloat16], [(0.1, 0.111), (0.9, 0.999)], [0, 1e-8], [0, 0.1], [False])
         for dtype, betas, eps, weight_decay, fused in options:
             lamb = ipex.optim._lamb.Lamb(
-              M.parameters(), lr=0.001, betas=betas, eps=eps,
-              weight_decay=weight_decay, fused=fused)
+                M.parameters(), lr=0.001, betas=betas, eps=eps,
+                weight_decay=weight_decay, fused=fused)
             self._test_update(M, lamb, dtype)
 
 class TestFusedSteps(TestCase):
 
-    def non_fused_lamb(self, param, exp_avg, exp_avg_sq, grad, step, beta1, beta2, lr, weight_decay, eps):
-        bias_correction1 = 1 - beta1 ** step
-        bias_correction2 = 1 - beta2 ** step
-        # Decay the first and second moment running average coefficient
-        exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
-        exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
-        adam_step = (exp_avg / bias_correction1) / ((exp_avg_sq / bias_correction2).sqrt() + eps)
-        if weight_decay != 0:
-            adam_step.add_(param, alpha=weight_decay)
-        weight_norm = param.norm(p=2)
-        rtw_norm = adam_step.norm(p=2)
-        true_ratio = weight_norm / rtw_norm
-        param.add_(adam_step, alpha=-lr * true_ratio)
-
-    def non_fused_adagrad(self, param, grad, state_sum, step, lr, weight_decay, lr_decay, eps):
-        if weight_decay != 0:
-            grad = grad.add(param, alpha=weight_decay)
-        clr = lr / (1 + (step - 1) * lr_decay)
-        state_sum.addcmul_(grad, grad, value=1)
-        std = state_sum.sqrt().add_(eps)
-        param.addcdiv_(grad, std, value=-clr)
-
-    def non_fused_sgd(self, param, grad, momentum_buf, momentum, lr, weight_decay, dampening, nesterov):
-        if weight_decay != 0:
-            grad = grad.add(param, alpha=weight_decay)
-
-        if momentum != 0:
-            buf = momentum_buf
-
-            if buf is None:
-                buf = torch.clone(grad).detach()
-            else:
-                buf.mul_(momentum).add_(grad, alpha=1 - dampening)
-
-            if nesterov:
-                grad = grad.add(buf, alpha=momentum)
-            else:
-                grad = buf
-        param.add_(grad, alpha=-lr)
-
     def test_lamb_step(self):
         fused = torch.ops.torch_ipex.lamb_fused_step
-        non_fused = self.non_fused_lamb
+        non_fused = bench.custom_op_bench.optimizer.non_fused_lamb
 
         # fused fp32 args
         param = torch.randn(80, 100)
@@ -156,7 +117,7 @@ class TestFusedSteps(TestCase):
 
     def test_adagrad_step(self):
         fused = torch.ops.torch_ipex.adagrad_fused_step
-        non_fused = self.non_fused_adagrad
+        non_fused = bench.custom_op_bench.optimizer.non_fused_adagrad
 
         # fused fp32 args
         param = torch.randn(80, 100)
@@ -205,7 +166,7 @@ class TestFusedSteps(TestCase):
 
     def test_sgd_step(self):
         fused = torch.ops.torch_ipex.sgd_fused_step
-        non_fused = self.non_fused_sgd
+        non_fused = bench.custom_op_bench.optimizer.non_fused_sgd
 
         # fused fp32 args
         param = torch.randn(80, 100)

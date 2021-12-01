@@ -32,3 +32,15 @@ python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --op
 python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --optimizer lamb # for lamb
 python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --optimizer adagrad # for adagrad
 ```
+
+## Evaluate IPEX [MergedEmbeddingBag](../../../../intel_extension_for_pytorch/nn/module/merged_embeddingbag.py)
+```
+export CORES=`lscpu | grep Core | awk '{print $4}'`
+export BATCHSIZE=$((128*CORES))
+# Data distribution will not impact inference performance
+python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 merged_embeddingbag.py --inference --data-distribution=balance --batch-size=${BATCHSIZE}
+
+# For training, data distribution will have big impact while update weight. Under the "unbalance" arg, we will use generate datas with half of indice update same raw (which is similiar with real world dataset as DLRM mlperf dataset)
+python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 merged_embeddingbag.py --data-distribution=balance --batch-size=${BATCHSIZE}
+python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 merged_embeddingbag.py --data-distribution=unbalance --batch-size=${BATCHSIZE}
+```

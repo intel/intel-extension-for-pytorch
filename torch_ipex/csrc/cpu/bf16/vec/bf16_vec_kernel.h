@@ -165,6 +165,13 @@ static inline void add_ker(float *inout, at::BFloat16 *in, int len) {
 #endif
 }
 
+inline void add_ker(double* inout, double* in, int len) {
+#pragma omp simd
+  for (int i = 0; i < len; i++) {
+    *(inout + i) += *(in + i);
+  }
+}
+
 static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
   int64_t i = 0;
 #if defined(CPU_AVX512)
@@ -268,6 +275,20 @@ static inline void move_ker(int32_t *out, const int32_t *in, int64_t len) {
 #endif
 }
 
+static inline void move_ker(double* out, double* in, int len) {
+#pragma omp simd
+  for (int i = 0; i < len; i++) {
+    *(out + i) = *(in + i);
+  }
+}
+
+static inline void zero_ker(double* out, int len) {
+#pragma omp simd
+  for (int i = 0; i < len; i++) {
+    *(out + i) = 0;
+  }
+}
+
 static inline void zero_ker(float *out, int64_t len) {
   int64_t i = 0;
 #if defined(CPU_AVX512)
@@ -303,3 +324,46 @@ static inline void zero_ker(at::BFloat16 *out, int64_t len) {
   memset(out, 0, len * sizeof(at::BFloat16));
 #endif
 }
+
+#if defined(CPU_AVX512)
+inline __m512 convert_bf16_to_fp32(const __m256i src) {
+  __m512i y = _mm512_cvtepu16_epi32(src);
+  return _mm512_castsi512_ps(_mm512_bslli_epi128(y, 2));
+}
+#endif
+
+template <typename T>
+inline float toFloat(T val) {
+  float ret = float(val);
+  return ret;
+}
+
+template <typename T1, typename T2>
+inline void madd_ker(T1* inout, T2* in, int len, float alpha) {
+#pragma omp simd
+  for (long v = 0; v < len; v++) {
+    inout[v] += toFloat(in[v]) * alpha;
+  }
+}
+
+#if defined(CPU_AVX512)
+template <>
+inline void madd_ker(float* inout, at::BFloat16* in, int len, float alpha) {
+  __m512 vAlpha = _mm512_set1_ps(alpha);
+  int i = 0;
+  for (; i < len - 15; i += 16) {
+    __m512 y1 = _mm512_loadu_ps(inout + i);
+    __m512 y2 = convert_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
+    y1 = _mm512_fmadd_ps(vAlpha, y2, y1);
+    _mm512_storeu_ps(inout + i, y1);
+  }
+  if (i < len) {
+    int rem = len - i;
+    __mmask16 mask = (1 << rem) - 1;
+    __m512 y1 = _mm512_maskz_loadu_ps(mask, inout + i);
+    __m512 y2 = convert_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, in + i));
+    y1 = _mm512_fmadd_ps(vAlpha, y2, y1);
+    _mm512_mask_storeu_ps(inout + i, mask, y1);
+  }
+}
+#endif
