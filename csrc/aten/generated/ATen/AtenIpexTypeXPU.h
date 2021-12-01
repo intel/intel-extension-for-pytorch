@@ -277,7 +277,7 @@ Tensor& exp_out(Tensor& out, const Tensor& self);
 Tensor& expm1_out(Tensor& out, const Tensor& self);
 Tensor& eye_out(Tensor& out, int64_t n);
 Tensor& eye_out(Tensor& out, int64_t n, int64_t m);
-Tensor& fill_(Tensor& self, Scalar value);
+Tensor& fill_(Tensor& self, const Scalar& value);
 Tensor& fill_(Tensor& self, const Tensor& value);
 Tensor& floor_out(Tensor& out, const Tensor& self);
 Tensor floor_divide(const Tensor& self, const Tensor& other);

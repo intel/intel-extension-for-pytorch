@@ -196,7 +196,7 @@ supported:
 #  - exponential_	# different signature
 #  - eye.m_out	# different signature
 #  - eye.out	# different signature
-#  - fill_.Scalar	# different signature
+  - fill_.Scalar 
   - fill_.Tensor
   - flip
 #  - floor.out	# different signature
