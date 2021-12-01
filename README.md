@@ -4,6 +4,8 @@ Intel® Extension for PyTorch\* extends PyTorch with optimizations for extra per
 
 Intel® Extension for PyTorch\* is loaded as a Python module for Python programs or linked as a C++ library for C++ programs. Users can enable it dynamically in script by importing `intel_extension_for_pytorch`. It covers optimizations for both imperative mode and graph mode. Optimized operators and kernels are registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel hardware. During execution, Intel® Extension for PyTorch\* intercepts invocation of ATen operators, and replace the original ones with these optimized ones. In graph mode, further operator fusions are applied manually by Intel engineers or through a tool named *oneDNN Graph* to reduce operator/kernel invocation overheads, and thus increase performance.
 
+Starting from the 1.10 release of Intel Extension for PyTorch*, the optimizations are registered directly to CPU device so users don’t need to convert model and tensor to xpu device in user application code anymore. Details pls. refer to the 1.10 [release notes](https://intel.github.io/intel-extension-for-pytorch/tutorials/releases.html#highlights). The old xpu code is archived at xpu-cpu branch but won’t be compatible with PyTorch 1.10 and future PyTorch releases.
+
 More detailed tutorials are available at [**Intel® Extension for PyTorch\* online document website**](https://intel.github.io/intel-extension-for-pytorch/).
 
 ## Installation
