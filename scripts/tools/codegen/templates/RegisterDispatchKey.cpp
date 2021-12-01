@@ -5,6 +5,8 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+// clang-format off
+
 // ${generated_comment}
 
 #include <c10/core/TensorImpl.h>
