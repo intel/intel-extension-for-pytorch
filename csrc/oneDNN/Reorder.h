@@ -132,42 +132,9 @@ static inline void reorder(
       prim, strm, {{DNNL_ARG_SRC, src_mem}, {DNNL_ARG_DST, dst_mem}});
 }
 
-static inline Tensor reorder_copy(Tensor& dst, const Tensor& src) {
+static inline void reorder_copy(const Tensor& src, Tensor& dst) {
   RECORD_FUNCTION("reorder_copy", std::vector<c10::IValue>({src}));
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  // align to dst
-  auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-  memory::desc dst_md = dst_ctx.is_plain() ? memory::desc(
-                                                 get_onednn_dims(dst),
-                                                 get_onednn_dtype(dst),
-                                                 get_onednn_strides(dst))
-                                           : dst_ctx.meta();
-  memory dst_mem = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
-
-  auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  memory::desc src_md = src_ctx.is_plain() ? memory::desc(
-                                                 get_onednn_dims(src),
-                                                 get_onednn_dtype(src),
-                                                 get_onednn_strides(src))
-                                           : src_ctx.meta();
-  memory src_mem = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
-  // simple copy checking address only
-  if (dst.data_ptr() != src.data_ptr()) {
-#ifdef USE_PRIMITIVE_CACHE
-    lru_key_t key;
-    create_key(key, src_md, dst_md);
-    auto prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem);
-#else
-    auto prim = dnnl::reorder(src_mem, dst_mem);
-#endif
-    DPCPP_ONEDNN_EXEC(
-        prim, strm, {{DNNL_ARG_SRC, src_mem}, {DNNL_ARG_DST, dst_mem}});
-  }
-
-  return dst;
+  xpu::oneDNN::reorder(src, dst);
 }
 
 } // namespace oneDNN

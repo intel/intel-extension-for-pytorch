@@ -354,6 +354,10 @@ inline bool onednn_strides_check(const Tensor& src) {
 
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
+  if (self.is_same(src)) {
+    return self;
+  }
+
   if (self.is_quantized() && src.is_quantized()) {
     auto mfmt = self.is_contiguous(at::MemoryFormat::ChannelsLast)
         ? at::MemoryFormat::ChannelsLast
@@ -376,10 +380,11 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
       src_device.type() == c10::DeviceType::XPU && src_device == dst_device;
   bool has_sz_st = src.sizes().size() != 0 && src.strides().size() != 0 &&
       self.sizes().size() != 0 && self.strides().size() != 0;
-  if (same_device && has_sz_st && !onednn_strides_check(self) &&
+  if (same_device && has_sz_st && onednn_strides_check(self) &&
+      onednn_strides_check(src) &&
       xpu::oneDNN::is_supported_onednn_dtype(self) &&
       xpu::oneDNN::is_supported_onednn_dtype(src)) {
-    xpu::oneDNN::reorder_copy(self, src);
+    xpu::oneDNN::reorder_copy(src, self);
   } else {
     impl::copy_kernel_dpcpp(iter, non_blocking);
   }

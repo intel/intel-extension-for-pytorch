@@ -854,7 +854,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   // submit to DPCPP queue
   DPCPP_Q_SUBMIT(dpcpp_queue, cgfMaskedSelect);
 
-  if (&tensor != &tensorContig) {
+  if (!tensor.is_same(tensorContig)) {
     tensor.copy_(tensorContig);
   }
 }
