@@ -78,8 +78,7 @@ supported:
 #  - addcmul_	# different signature
 #  - addmm	# different signature
 #  - addmm_	# different signature
-#  - addmv	# different signature
-#  - addmv_	# different signature
+  - addmv.out
 #  - addr	# different signature
 #  - addr_	# different signature
   - all

@@ -724,12 +724,13 @@ Tensor trans_addmm(
   return result;
 }
 
-Tensor addmv(
+Tensor& addmv_out(
     const Tensor& self,
     const Tensor& mat,
     const Tensor& vec,
-    at::Scalar beta,
-    at::Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& out) {
   Tensor self_v;
   TORCH_CHECK(
       (mat.dim() == 2 && vec.dim() == 1 && self.dim() <= 1),
@@ -764,8 +765,9 @@ Tensor addmv(
   }
 
   Tensor vec_v = vec.view({vec.size(0), 1});
-  Tensor result = at::AtenIpexTypeXPU::addmm(self_v, mat, vec_v, beta, alpha);
-  return result.view({mat.size(0)});
+  at::AtenIpexTypeXPU::addmm_out(self_v, mat, vec_v, beta, alpha, out);
+  out.resize_({mat.size(0)});
+  return out;
 }
 
 Tensor& addmv_(

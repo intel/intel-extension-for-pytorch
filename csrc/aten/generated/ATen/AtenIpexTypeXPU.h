@@ -42,11 +42,18 @@ Tensor addmv(
     Scalar beta,
     Scalar alpha);
 Tensor& addmv_(
-    Tensor& self,
+    const Tensor& self,
     const Tensor& mat,
     const Tensor& vec,
     Scalar beta,
     Scalar alpha);
+Tensor& addmv_out(
+    const Tensor& self,
+    const Tensor& mat,
+    const Tensor& vec,
+    const Scalar& beta,
+    const Scalar& alpha,
+    at::Tensor& out);
 Tensor addr(
     const Tensor& self,
     const Tensor& vec1,
