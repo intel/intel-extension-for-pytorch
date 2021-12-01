@@ -27,6 +27,8 @@ static inline dnnl::memory::format_tag get_dnnl_default_format(
                               : memory::format_tag::abcde;
     case 6:
       return memory::format_tag::abcdef;
+    case 7:
+      return memory::format_tag::abcdefg;
     default:
       return memory::format_tag::any;
   }
