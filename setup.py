@@ -59,10 +59,10 @@ ipex_examples = os.path.join(base_dir, 'tests/gpu/examples')
 
 
 def _get_complier():
-    if shutil.which('clang') is None or shutil.which('clang++') is None:
-        raise RuntimeError("Failed to find compiler path from DPCPP_ROOT")
+    if shutil.which('icx') is None or shutil.which('dpcpp') is None:
+        raise RuntimeError("Failed to find compiler path from OS PATH")
     # dpcpp build
-    return "clang", "clang++"
+    return "icx", "dpcpp"
 
 
 def _check_env_flag(name, default=''):
