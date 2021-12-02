@@ -64,7 +64,7 @@ supported:
 #  - adaptive_max_pool3d_backward.grad_input	# different signature
 #  - add.Scalar	# different signature
 #  - add.Tensor	# different signature
-#  - add.out	# different signature
+  - add.out	
 #  - add_.Scalar	# different signature
 #  - add_.Tensor	# different signature
   - addbmm
