@@ -57,6 +57,15 @@ ipex_pydir = os.path.join(base_dir, 'ipex')
 ipex_scripts = os.path.join(base_dir, 'scripts')
 ipex_examples = os.path.join(base_dir, 'tests/gpu/examples')
 
+RERUN_CMAKE = False
+filtered_args = []
+for i, arg in enumerate(sys.argv):
+    if arg == '--cmake':
+        RERUN_CMAKE = True
+        continue
+    filtered_args.append(arg)
+sys.argv = filtered_args
+
 
 def _get_complier():
     if shutil.which('icx') is None or shutil.which('dpcpp') is None:
@@ -222,7 +231,7 @@ class DPCPPBuild(BuildExtension, object):
         cmake = CMake(ext.build_dir)
 
         sequential_build = False
-        if not os.path.isfile(cmake._cmake_cache_file):
+        if not os.path.isfile(cmake._cmake_cache_file) or RERUN_CMAKE:
             build_type = 'Release'
 
             if _check_env_flag('DEBUG'):
