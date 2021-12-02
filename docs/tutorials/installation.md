@@ -13,16 +13,20 @@ Installation Guide
 
 ## Install PyTorch
 
-|Extension Version|PyTorch Version|
+You need to make sure PyTorch is installed in order to get the extension working properly. For each PyTorch release, we have a corresponding release of the extension. Here is the PyTorch versions that we support and the mapping relationship:
+
+|PyTorch Version|Extension Version|
 |--|--|
-|[v1.10.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.0)|[v1.10.0](https://github.com/pytorch/pytorch/tree/v1.10.0 "v1.10.0")|
-|[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|
-|[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|
-|[v1.2.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.2.0)|[v1.7.0](https://github.com/pytorch/pytorch/tree/v1.7.0 "v1.7.0")|
-|[v1.1.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.1.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
-|[v1.0.2](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.2)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
-|[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
-|[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
+|[v1.10.0](https://github.com/pytorch/pytorch/tree/v1.10.0 "v1.10.0")|[v1.10.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.0)|
+|[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|
+|[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|
+|[v1.7.0](https://github.com/pytorch/pytorch/tree/v1.7.0 "v1.7.0")|[v1.2.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.2.0)|
+|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.1.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.1.0)|
+|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.2](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.2)|
+|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|
+|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|
+
+Here is an example showing how to install PyTorch (1.10.0). For more details, please refer to [pytorch.org](https://pytorch.org/)
 
 ```
 python -m pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
@@ -39,6 +43,8 @@ From 1.8.0, compiling PyTorch from source is not required. If you still want to 
 ---
 
 ## Install via wheel file
+
+Prebuilt wheel files are available starting from 1.8.0 release. We recommend you to install the latest version (1.10.0) with the following commands:
 
 ```
 python -m pip install intel_extension_for_pytorch==1.10.0 -f https://software.intel.com/ipex-whl-stable
@@ -62,6 +68,7 @@ python -m pip install psutil
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 cd intel-extension-for-pytorch
+git checkout release/1.10
 
 # if you are updating an existing checkout
 git submodule sync
