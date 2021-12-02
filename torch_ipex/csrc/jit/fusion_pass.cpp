@@ -12,8 +12,10 @@
 #include <torch/csrc/jit/frontend/error_report.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/jit_log.h>
+#include <torch/csrc/jit/passes/batch_mm.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/graph_rewrite_helper.h>
+#include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/remove_dropout.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
@@ -383,6 +385,13 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   IPEXFusionPass(graph);
   GRAPH_DUMP(
       "After IPEXFusionPass. Before RemoveTensorTypeSpecializations", graph);
+
+  // TODO: workaround here to go throughput the TE fuser pass before
+  // RemoveTensorTypeSpecializations since TE fuser needs the type
+  // specializations
+  LowerSimpleTuples(graph);
+  BatchMM(graph);
+  FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
 
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(
