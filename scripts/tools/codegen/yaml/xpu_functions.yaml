@@ -50,7 +50,7 @@ supported:
   - abs.out	
 #  - acos.out	# different signature
 #  - adaptive_avg_pool2d.out	# different signature
-#  - adaptive_avg_pool3d	# dispatch is False
+#  - adaptive_avg_pool3d        # should not register
 #  - adaptive_avg_pool3d.out	# different signature
 #  - adaptive_avg_pool3d_backward	# different schema
 #  - adaptive_avg_pool3d_backward.grad_input	# different signature
@@ -130,7 +130,7 @@ supported:
 #  - bmm.out	# different signature
 #  - cauchy_	# different signature
 #  - ceil.out	# different signature
-#  - chain_matmul	# dispatch is False
+#  - chain_matmul       # should not register
   - cholesky
 #  - cholesky.out	# different signature
   - cholesky_inverse
@@ -151,7 +151,7 @@ supported:
 #  - col2im_backward.grad_input	# different signature
 #  - conj.out	# different schema
   - conv_tbc
-#  - conv_tbc_backward	# dispatch is False
+#  - conv_tbc_backward  # should not register
 #  - convolution_backward_overrideable	# different signature
 #  - convolution_overrideable	# different signature
   - copy_
@@ -231,7 +231,7 @@ supported:
 #  - geometric_	# different signature
   - geqrf
 #  - geqrf.a	# different signature
-#  - ger	# dispatch is False
+#  - ger        # should not register
 #  - ger.out	# dispatch is False
   - glu
 #  - glu.out	# different signature
@@ -255,7 +255,7 @@ supported:
   - im2col_backward
 #  - im2col_backward.grad_input	# different signature
 #  - index.Tensor	# different signature
-#  - index_add_	# dispatch is False
+#  - index_add_         # should not register
   - index_copy_
 #  - index_fill_.int_Scalar	# different signature
   - index_fill_.int_Tensor
@@ -298,9 +298,9 @@ supported:
   - log_sigmoid_forward
 #  - log_sigmoid_forward.output	# different signature
 #  - logical_and.out	# different signature
-#  - logical_not	# dispatch is False
+#  - logical_not        # should not register
 #  - logical_not.out	# different signature
-#  - logical_not_	# dispatch is False
+#  - logical_not_       # should not register
 #  - logical_or.out	# different signature
 #  - logical_xor.out	# different signature
 #  - logspace.out	# different signature
@@ -408,7 +408,7 @@ supported:
 #  - normal.float_Tensor	# different signature
 #  - normal.float_Tensor_out	# different signature
 #  - normal_	# different signature
-#  - orgqr	# dispatch is False
+#  - orgqr      # should not register
 #  - orgqr.out	# dispatch is False
   - ormqr
 #  - ormqr.out	# different signature
@@ -429,7 +429,7 @@ supported:
   - prod.dim_int
 #  - prod.int_out	# different signature
   - put_
-#  - qr	# dispatch is False
+#  - qr         # should not register
 #  - qr.Q	# dispatch is False
   - quantize_per_channel
 #  - quantize_per_tensor	# different signature
@@ -517,11 +517,11 @@ supported:
   - sort
 #  - sort.values	# different signature
 #  - sqrt.out	# different signature
-#  - std	# dispatch is False
-#  - std.dim	# dispatch is False
+#  - std        # should not register
+#  - std.dim    # should not register
 #  - std.out	# dispatch is False
-#  - std_mean	# dispatch is False
-#  - std_mean.dim	# dispatch is False
+#  - std_mean   # should not register
+#  - std_mean.dim       # should not register
 #  - sub.Scalar	# different signature
 #  - sub.Tensor	# different signature
 #  - sub.out	# different signature
@@ -530,7 +530,7 @@ supported:
   - sum
 #  - sum.IntList_out	# different signature
   - sum.dim_IntList
-#  - svd	# dispatch is False
+#  - svd        # should not register
 #  - svd.U	# dispatch is False
   - take
   - take.out	# different signature
@@ -604,10 +604,10 @@ supported:
   - upsample_trilinear3d_backward
 #  - upsample_trilinear3d_backward.grad_input	# different signature
   - upsample_trilinear3d_backward.vec
-#  - var	# dispatch is False
-#  - var.dim	# dispatch is False
-#  - var_mean	# dispatch is False
-#  - var_mean.dim	# dispatch is False
+#  - var        # should not register
+#  - var.dim    # should not register
+#  - var_mean   # should not register
+#  - var_mean.dim       # should not register
   - view
   - zero_
   - addmm.out
