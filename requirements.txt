@@ -1,5 +1,6 @@
 hypothesis
 cmake>=3.13.0
+ninja
 wheel>=0.36
 setuptools>=50.0
 psutil
