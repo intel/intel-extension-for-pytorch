@@ -1348,7 +1348,7 @@ Tensor& _index_put_impl_(
   return self;
 }
 
-Tensor& take_out(Tensor& out, const Tensor& self, const Tensor& index) {
+Tensor& take_out(const Tensor& self, const Tensor& index, Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1361,7 +1361,7 @@ Tensor& take_out(Tensor& out, const Tensor& self, const Tensor& index) {
 
 Tensor take(const Tensor& self, const Tensor& index) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::take_out(out, self, index);
+  return at::AtenIpexTypeXPU::take_out(self, index, out);
 }
 
 } // namespace AtenIpexTypeXPU

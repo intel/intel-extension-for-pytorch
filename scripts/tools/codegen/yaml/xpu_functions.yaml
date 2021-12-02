@@ -178,8 +178,8 @@ supported:
   - embedding_dense_backward
   - empty.memory_format
   - empty_strided
-#  - eq.Scalar	# different signature
-#  - eq.Scalar_out	# different signature
+  - eq.Scalar	# different signature
+  - eq.Scalar_out	# different signature
   - eq.Tensor
   - eq.Tensor_out
   - equal
@@ -222,8 +222,8 @@ supported:
 #  - fractional_max_pool3d_backward.grad_input	# different signature
   - gather
 #  - gather.out	# different signature
-#  - ge.Scalar	# different signature
-#  - ge.Scalar_out	# different signature
+  - ge.Scalar	# different signature
+  - ge.Scalar_out	# different signature
   - ge.Tensor
   - ge.Tensor_out
   - gelu
@@ -237,8 +237,8 @@ supported:
 #  - glu.out	# different signature
   - glu_backward
 #  - glu_backward.grad_input	# different signature
-#  - gt.Scalar	# different signature
-#  - gt.Scalar_out	# different signature
+  - gt.Scalar
+  - gt.Scalar_out
   - gt.Tensor
   - gt.Tensor_out
 #  - hardshrink	# different signature
@@ -270,8 +270,8 @@ supported:
 #  - l1_loss.out	# different signature
   - l1_loss_backward
 #  - l1_loss_backward.grad_input	# different signature
-#  - le.Scalar	# different signature
-#  - le.Scalar_out	# different signature
+  - le.Scalar	# different signature
+  - le.Scalar_out	# different signature
   - le.Tensor
   - le.Tensor_out
 #  - leaky_relu	# different signature
@@ -304,8 +304,8 @@ supported:
 #  - logical_or.out	# different signature
 #  - logical_xor.out	# different signature
 #  - logspace.out	# different signature
-#  - lt.Scalar	# different signature
-#  - lt.Scalar_out	# different signature
+  - lt.Scalar	# different signature
+  - lt.Scalar_out	# different signature
   - lt.Tensor
   - lt.Tensor_out
   - lu_solve
@@ -380,8 +380,8 @@ supported:
 #  - native_group_norm_backward	# different signature
 #  - native_layer_norm	# different schema
 #  - native_layer_norm_backward	# different schema
-#  - ne.Scalar	# different signature
-#  - ne.Scalar_out	# different signature
+  - ne.Scalar	# different signature
+  - ne.Scalar_out	# different signature
   - ne.Tensor
   - ne.Tensor_out
 #  - neg.out	# different signature
@@ -533,7 +533,7 @@ supported:
 #  - svd	# dispatch is False
 #  - svd.U	# dispatch is False
   - take
-#  - take.out	# different signature
+  - take.out	# different signature
 #  - tan.out	# different signature
   - tan_
   - tanh
