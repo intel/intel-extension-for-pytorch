@@ -550,7 +550,10 @@ template <
     typename scalar_t,
     typename acc_t = scalar_t,
     typename out_t = scalar_t>
-static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
+static void norm_kernel_impl(
+    TensorIterator& iter,
+    Scalar val,
+    IntArrayRef dim) {
   float p = 0.0f;
   if (val.isIntegral(false)) {
     p = val.to<int64_t>();
@@ -562,8 +565,8 @@ static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
 
   auto input = iter.tensor(iter.ntensors() - 1);
   // Currently, the dpcpp_simple_reduce_kernel only supports contiguous input
-  // with dim=1
-  if (input.is_contiguous() && input.dim() == 1) {
+  // with dim=1 or normalization dim=1
+  if (input.is_contiguous() && (input.dim() == 1 || dim.size() == 0)) {
     if (p == static_cast<float>(0)) {
       dpcpp_simple_reduce_kernel<scalar_t, out_t>(
           iter, NormZeroOps<acc_t>(), 0);
@@ -657,23 +660,23 @@ static void max_kernel(TensorIterator& iter) {
       [&]() { max_kernel_impl<scalar_t>(iter); });
 }
 
-static void norm_kernel(TensorIterator& iter, Scalar p) {
+static void norm_kernel(TensorIterator& iter, Scalar p, IntArrayRef dim) {
   if (iter.dtype() == kHalf) {
-    return norm_kernel_impl<at::Half, float>(iter, p);
+    return norm_kernel_impl<at::Half, float>(iter, p, dim);
   } else if (iter.dtype(1) == kHalf && iter.dtype() == kFloat) {
-    return norm_kernel_impl<at::Half, float, float>(iter, p);
+    return norm_kernel_impl<at::Half, float, float>(iter, p, dim);
   }
   if (iter.dtype() == kBFloat16) {
-    return norm_kernel_impl<at::BFloat16, float>(iter, p);
+    return norm_kernel_impl<at::BFloat16, float>(iter, p, dim);
   } else if (iter.dtype(1) == kBFloat16 && iter.dtype() == kFloat) {
-    return norm_kernel_impl<at::BFloat16, float, float>(iter, p);
+    return norm_kernel_impl<at::BFloat16, float, float>(iter, p, dim);
   }
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
       "norm",
-      [&]() { norm_kernel_impl<scalar_t>(iter, p); });
+      [&]() { norm_kernel_impl<scalar_t>(iter, p, dim); });
 }
 
 void and_kernel(TensorIterator& iter) {
@@ -886,7 +889,7 @@ static Tensor& norm_out(
   if (iter.numel() == 0) {
     result.zero_();
   } else {
-    impl::norm_kernel(iter, p);
+    impl::norm_kernel(iter, p, dim);
   }
   return result;
 }
