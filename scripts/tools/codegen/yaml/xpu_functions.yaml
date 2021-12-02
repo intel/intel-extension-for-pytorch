@@ -67,9 +67,9 @@ supported:
 #  - add.out	# different signature
 #  - add_.Scalar	# different signature
 #  - add_.Tensor	# different signature
-#  - addbmm	# different signature
-#  - addbmm.out	# different signature
-#  - addbmm_	# different signature
+  - addbmm
+  - addbmm_
+  - addbmm.out
 #  - addcdiv	# different signature
 #  - addcdiv.out	# different signature
 #  - addcdiv_	# different signature
@@ -107,9 +107,9 @@ supported:
 #  - avg_pool3d.out	# different signature
   - avg_pool3d_backward
 #  - avg_pool3d_backward.grad_input	# different signature
-#  - baddbmm	# different signature
-#  - baddbmm.out	# different signature
-#  - baddbmm_	# different signature
+  - baddbmm
+  - baddbmm.out
+  - baddbmm_ #
 #  - bernoulli_.Tensor	# different signature
 #  - bernoulli_.float	# different signature
 #  - binary_cross_entropy	# different signature
@@ -479,7 +479,7 @@ supported:
 #  - rsub.Tensor	# different signature
   - scatter_.src
 #  - scatter_.value	# different signature
-  - scatter_add_
+  - scatter_add.out
   - set_
   - set_.source_Storage
   - set_.source_Storage_storage_offset

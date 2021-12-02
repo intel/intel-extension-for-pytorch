@@ -85,21 +85,21 @@ Tensor baddbmm(
     const Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
+    const Scalar& beta,
+    const Scalar& alpha);
 Tensor& baddbmm_(
     Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
+    const Scalar& beta,
+    const Scalar& alpha);
 Tensor& baddbmm_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& out);
 Tensor& bernoulli_(
     Tensor& self,
     const Tensor& p,
@@ -277,7 +277,7 @@ Tensor& exp_out(Tensor& out, const Tensor& self);
 Tensor& expm1_out(Tensor& out, const Tensor& self);
 Tensor& eye_out(Tensor& out, int64_t n);
 Tensor& eye_out(Tensor& out, int64_t n, int64_t m);
-Tensor& fill_(Tensor& self, const Scalar& value);
+Tensor& fill_(Tensor& self, Scalar value);
 Tensor& fill_(Tensor& self, const Tensor& value);
 Tensor& floor_out(Tensor& out, const Tensor& self);
 Tensor floor_divide(const Tensor& self, const Tensor& other);
@@ -744,11 +744,12 @@ Tensor& scatter_(
     const Tensor& index,
     const Tensor& src);
 Tensor& scatter_(Tensor& self, int64_t dim, const Tensor& index, Scalar value);
-Tensor& scatter_add_(
-    Tensor& self,
+Tensor& scatter_add_out(
+    const Tensor& self,
     int64_t dim,
     const Tensor& index,
-    const Tensor& src);
+    const Tensor& src,
+    Tensor& out);
 Tensor& bitwise_and_out(Tensor& out, const Tensor& self, const Tensor& other);
 Tensor& bitwise_and_out(Tensor& out, const Tensor& self, Scalar other);
 Tensor& bitwise_or_out(Tensor& out, const Tensor& self, const Tensor& other);
@@ -774,21 +775,21 @@ Tensor& addbmm_(
     Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
+    const Scalar& beta,
+    const Scalar& alpha);
 Tensor& addbmm_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& out);
 Tensor addbmm(
     const Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha);
+    const Scalar& beta,
+    const Scalar& alpha);
 Tensor& addcdiv_(
     Tensor& self,
     const Tensor& tensor1,

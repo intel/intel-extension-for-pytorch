@@ -418,8 +418,8 @@ Tensor& baddbmm_(
     Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   checkBackend("baddbmm_", {self, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
@@ -462,19 +462,19 @@ Tensor& baddbmm_(
 }
 
 Tensor& baddbmm_out(
-    Tensor& result,
     const Tensor& input,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& result) {
   checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
   if (alpha.to<float>() != 1.f || beta.to<float>() != 1.f ||
       input.scalar_type() == ScalarType::Double ||
       batch1.scalar_type() == ScalarType::Double ||
-      batch2.scalar_type() == ScalarType::Double) {
+      batch2.scalar_type() == ScalarType::Double || input.is_same(result)) {
     matmul(
         result,
         batch1,
@@ -504,20 +504,20 @@ Tensor baddbmm(
     const Tensor& input,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   Tensor r = at::empty({0}, input.options());
-  at::AtenIpexTypeXPU::baddbmm_out(r, input, batch1, batch2, beta, alpha);
+  at::AtenIpexTypeXPU::baddbmm_out(input, batch1, batch2, beta, alpha, r);
   return r;
 }
 
 Tensor& addbmm_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& out) {
   checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(
       batch1.dim() == 3 && batch2.dim() == 3,
@@ -542,9 +542,9 @@ Tensor& addbmm_(
     Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
-  at::AtenIpexTypeXPU::addbmm_out(self, self, batch1, batch2, beta, alpha);
+    const Scalar& beta,
+    const Scalar& alpha) {
+  at::AtenIpexTypeXPU::addbmm_out(self, batch1, batch2, beta, alpha, self);
   return self;
 }
 
@@ -552,10 +552,10 @@ Tensor addbmm(
     const Tensor& self,
     const Tensor& batch1,
     const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   Tensor out = at::empty({0}, self.options());
-  at::AtenIpexTypeXPU::addbmm_out(out, self, batch1, batch2, beta, alpha);
+  at::AtenIpexTypeXPU::addbmm_out(self, batch1, batch2, beta, alpha, out);
   return out;
 }
 
