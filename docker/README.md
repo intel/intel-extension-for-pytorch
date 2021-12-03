@@ -11,5 +11,5 @@
   ```console
   $ cd $DOCKERFILE_DIR
   $ DOCKER_BUILDKIT=1 docker build -t intel-extension-for-pytorch:test .
-  $ docker run intel-extension-for-pytorch:test python -c "import torch;import intel_extension_for_pytorch as ipex;print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+  $ docker run --rm intel-extension-for-pytorch:test python -c "import torch;import intel_extension_for_pytorch as ipex;print('torch:', torch.__version__,' ipex:',ipex.__version__)"
   ```
