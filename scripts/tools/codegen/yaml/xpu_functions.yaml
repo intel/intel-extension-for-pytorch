@@ -94,11 +94,11 @@ supported:
   - argmin
   - as_strided
 #  - asin.out  # different signature
-#  - atan.out  # different signature
+  - atan.out
   - atan2
 #  - atan2.out  # different signature
   - atan2_
-  - atan_
+#  - atan_  # disabled in torch
   - avg_pool2d
 #  - avg_pool2d.out  # different signature
   - avg_pool2d_backward
@@ -155,9 +155,9 @@ supported:
 #  - convolution_backward_overrideable  # different signature
 #  - convolution_overrideable  # different signature
   - copy_
-#  - cos.out  # different signature
-  - cos_
-#  - cosh.out  # different signature
+  - cos.out
+#  - cos_  # disabled in torch
+#  - cosh.out	# different signature
   - cross
 #  - cross.out  # different signature
   - dequantize.self
@@ -183,19 +183,19 @@ supported:
   - eq.Tensor
   - eq.Tensor_out
   - equal
-#  - erf.out  # different signature
-  - erf_
-#  - erfc.out  # different signature
-  - erfc_
+  - erf.out
+#  - erf_  # disabled in torch
+  - erfc.out
+#  - erfc_  # disabled in torch
   - erfinv
 #  - erfinv.out  # different signature
   - erfinv_
-#  - exp.out  # different signature
-  - exp_
-#  - expm1.out  # different signature
-#  - exponential_  # different signature
-#  - eye.m_out  # different signature
-#  - eye.out  # different signature
+  - exp.out
+#  - exp_  # disabled in torch
+#  - expm1.out	# different signature
+#  - exponential_	# different signature
+#  - eye.m_out	# different signature
+#  - eye.out	# different signature
   - fill_.Scalar 
   - fill_.Tensor
   - flip
@@ -484,7 +484,7 @@ supported:
   - set_.source_Storage
   - set_.source_Storage_storage_offset
   - set_.source_Tensor
-#  - sgn.out  # different signature
+  - sgn.out
   - sigmoid
 #  - sigmoid.out  # different signature
   - sigmoid_
@@ -533,9 +533,9 @@ supported:
 #  - svd        # should not register
 #  - svd.U  # dispatch is False
   - take
-  - take.out  # different signature
-#  - tan.out  # different signature
-  - tan_
+  - take.out	# different signature
+  - tan.out
+# - tan_  # disabled in torch
   - tanh
 #  - tanh.out  # different signature
   - tanh_
