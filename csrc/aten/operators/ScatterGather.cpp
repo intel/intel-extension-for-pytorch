@@ -467,14 +467,22 @@ Tensor& scatter_(
   return self;
 }
 
-Tensor& scatter_(Tensor& self, int64_t dim, const Tensor& index, Scalar value) {
+Tensor& scatter_out(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Scalar& value,
+    Tensor& out) {
+  if (!self.is_same(out)) {
+    out.copy_(self);
+  }
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
       "ScatterFill",
-      [&]() { impl::ScatterFill<scalar_t>(self, dim, index, value); });
-  return self;
+      [&]() { impl::ScatterFill<scalar_t>(out, dim, index, value); });
+  return out;
 }
 
 Tensor& scatter_add_out(

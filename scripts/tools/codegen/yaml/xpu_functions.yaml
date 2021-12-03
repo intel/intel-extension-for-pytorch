@@ -478,7 +478,7 @@ supported:
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
   - scatter_.src
-#  - scatter_.value  # different signature
+  - scatter.value_out
   - scatter_add.out
   - set_
   - set_.source_Storage
