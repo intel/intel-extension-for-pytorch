@@ -117,8 +117,6 @@ void sort_based_batched_csr2csc_opt(
   batched_csc.segment_ptr[U] = n_indices;
   c10::free_cpu(tmpBuf);
   c10::free_cpu(tmpBuf1);
-  for (int i = 0; i < U; i++) {
-  }
 }
 
 } // namespace cpu

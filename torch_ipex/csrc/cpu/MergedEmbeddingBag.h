@@ -29,8 +29,8 @@ class AccGradUpdate<T, SGDArgs> {
       T* weight,
       T* grad,
       const BatchedHyperCompressedSparseColumn& batched_csc,
-      int uniq_index_id,
-      int weight_row_index,
+      int64_t uniq_index_id,
+      int64_t weight_offsets,
       int vector_size,
       int table_id,
       const SGDArgs& args);

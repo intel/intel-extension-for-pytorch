@@ -78,8 +78,8 @@ inline void AccGradUpdate<T, SGDArgs>::update(
     T* weight,
     T* grad,
     const BatchedHyperCompressedSparseColumn& batched_csc,
-    int uniq_index_id,
-    int weight_row_index,
+    int64_t uniq_index_id,
+    int64_t weight_offsets,
     int vector_size,
     int table_id,
     const SGDArgs& args) {
@@ -98,11 +98,11 @@ inline void AccGradUpdate<T, SGDArgs>::update(
     }
   }
   // sgd update
-  T* weight_ptr = &weight[weight_row_index * vector_size];
+  T* weight_ptr = &weight[weight_offsets];
   BFloat16* bf16_trail_ptr = nullptr;
   if (std::is_same<T, BFloat16>::value) {
-    bf16_trail_ptr = args.bf16_trail[table_id].data_ptr<BFloat16>() +
-        weight_row_index * vector_size;
+    bf16_trail_ptr =
+        args.bf16_trail[table_id].data_ptr<BFloat16>() + weight_offsets;
   }
   sgd_update<T, acc_t>(
       weight_ptr,
@@ -150,6 +150,7 @@ void merged_embeddingbag_backward_cpu_kernel(
   int uniq_indice = batched_csc.uniq_indices;
 
   std::vector<void*> weights_ptr;
+  std::vector<int64_t> weights_max_offsets;
   std::vector<void*> grads_ptr;
   std::vector<ScalarType> dtypes;
 
@@ -157,6 +158,7 @@ void merged_embeddingbag_backward_cpu_kernel(
     weights_ptr.emplace_back(weights[i].data_ptr());
     grads_ptr.emplace_back(grads_y[i].data_ptr());
     dtypes.emplace_back(weights[i].scalar_type());
+    weights_max_offsets.emplace_back(weights[i].size(0) * weights[i].size(1));
   }
 
 #pragma omp parallel for schedule(static, 1)
@@ -164,13 +166,17 @@ void merged_embeddingbag_backward_cpu_kernel(
     int row_index = batched_csc.segment_indices[c];
     int table_id = get_table_id(row_index);
     int vector_size = weights[table_id].size(1);
+    int64_t weight_offsets =
+        (row_index - row_offset_data[table_id]) * vector_size;
+    TORCH_CHECK(
+        weight_offsets >= 0 && weight_offsets < weights_max_offsets[table_id]);
     if (dtypes[table_id] == ScalarType::BFloat16) {
       AccGradUpdate<BFloat16, optimizer_arg_t>::update(
           (BFloat16*)weights_ptr[table_id],
           (BFloat16*)grads_ptr[table_id],
           batched_csc,
           c,
-          row_index - row_offset_data[table_id],
+          weight_offsets,
           vector_size,
           table_id,
           args);
@@ -180,7 +186,7 @@ void merged_embeddingbag_backward_cpu_kernel(
           (float*)grads_ptr[table_id],
           batched_csc,
           c,
-          row_index - row_offset_data[table_id],
+          weight_offsets,
           vector_size,
           table_id,
           args);
@@ -190,7 +196,7 @@ void merged_embeddingbag_backward_cpu_kernel(
           (double*)grads_ptr[table_id],
           batched_csc,
           c,
-          row_index - row_offset_data[table_id],
+          weight_offsets,
           vector_size,
           table_id,
           args);

@@ -9,31 +9,31 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
 
     table0 = nn.EmbeddingBag(100, 16, mode='mean').double()
     table1 = nn.EmbeddingBag(50, 32, mode='sum')
-    table2 = nn.EmbeddingBag(200, 128, mode='sum', include_last_offset=True).bfloat16()
+    table2 = nn.EmbeddingBag(18000000, 128, mode='sum', include_last_offset=True, _weight=torch.empty(18000000, 128, dtype=torch.bfloat16))
     merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table2])
     merged2 = MergedEmbeddingBagWithSGD([
         (100, 16, 'mean', table0.weight.dtype, table0.weight.detach()),
         (50, 32, 'sum', table1.weight.dtype, table1.weight.detach()),
-        (200, 128, 'sum', table2.weight.dtype, table2.weight.detach()),
+        (18000000, 128, 'sum', table2.weight.dtype, table2.weight.detach()),
     ])
 
     input = [
-        [torch.LongTensor([10, 10, 15, 10, 20, 25]), torch.LongTensor([[0, 30], [21, 15], [30, 11]]), torch.LongTensor([10, 15, 20])],
+        [torch.LongTensor([10, 10, 15, 10, 20, 25]), torch.LongTensor([[0, 30], [21, 15], [30, 11]]), torch.LongTensor([10, 15, 17999999])],
         [torch.LongTensor([0, 1, 3]), None, torch.LongTensor([0, 1, 2, 3])],
         [table0.include_last_offset, table1.include_last_offset, table2.include_last_offset]
     ]
 
     expected_input = (
-        torch.LongTensor([10, 10, 15, 10, 20, 25, 0, 30, 21, 15, 30, 11, 10, 15, 20]),
+        torch.LongTensor([10, 10, 15, 10, 20, 25, 0, 30, 21, 15, 30, 11, 10, 15, 17999999]),
         torch.LongTensor([0, 1, 3, 6, 8, 10, 12, 13, 14, 15]),
-        torch.LongTensor([10, 10, 15, 10, 20, 25, 100, 130, 121, 115, 130, 111, 160, 165, 170])
+        torch.LongTensor([10, 10, 15, 10, 20, 25, 100, 130, 121, 115, 130, 111, 160, 165, 18000149])
     )
 
     expected_indices_weight_for_update = {
         10: 1 + 1 / 2 + 1 / 3,
         15: 1 / 2, 20: 1 / 3, 25: 1 / 3,
         100: 1, 111: 1, 115: 1, 121: 1, 130: 2,
-        160: 1, 165: 1, 170: 1
+        160: 1, 165: 1, 18000149: 1
     }
 
     def test_create_from_embedingbaglist_vs_create_from_init_function(self):
