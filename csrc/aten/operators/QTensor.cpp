@@ -45,7 +45,8 @@ int64_t q_per_channel_axis(const Tensor& self) {
 }
 
 Tensor& set_quantizer_(Tensor& self, ConstQuantizerPtr quantizer) {
-  return set_quantizer_(self, quantizer);
+  at::set_quantizer_(self, quantizer);
+  return self;
 }
 
 Tensor int_repr(const Tensor& self) {

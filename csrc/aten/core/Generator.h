@@ -23,8 +23,8 @@ struct IPEX_API DPCPPGeneratorImpl : public GeneratorImpl {
   uint64_t philox_offset_per_thread();
   std::pair<uint64_t, uint64_t> philox_engine_inputs(uint64_t increment);
   static DeviceType device_type();
-  void set_state(const c10::TensorImpl& new_state);
-  c10::intrusive_ptr<c10::TensorImpl> get_state() const;
+  void set_state(const c10::TensorImpl& new_state) override;
+  c10::intrusive_ptr<c10::TensorImpl> get_state() const override;
 
  private:
   DPCPPGeneratorImpl* clone_impl() const override;
