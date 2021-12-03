@@ -35,7 +35,11 @@ static inline dnnl::memory dpcpp_onednn_memory(
     dnnl::memory::desc md,
     dnnl::engine& engine,
     void* ptr) {
-  return dnnl::memory(md, engine, ptr);
+  return dnnl::sycl_interop::make_memory(
+      md,
+      engine,
+      dnnl::sycl_interop::memory_kind::usm,
+      ptr == nullptr ? DNNL_MEMORY_ALLOCATE : ptr);
 }
 
 // GpuEngineManager singleton
