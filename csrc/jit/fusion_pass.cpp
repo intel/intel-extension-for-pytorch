@@ -28,8 +28,8 @@ namespace jit {
 namespace xpu {
 
 //
-// The main goal of MKL-DNN fusion is to limit bandwidth wasting.
-// MKL-DNN provided post ops to fuse ops in its output stage
+// The main goal of oneDNN fusion is to limit bandwidth wasting.
+// oneDNN provided post ops to fuse ops in its output stage
 // What we could do is listed inside RuleTab.
 //
 class OpFuser {

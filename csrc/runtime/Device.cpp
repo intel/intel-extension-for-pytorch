@@ -76,9 +76,16 @@ static void initGlobalDevicePoolState() {
             next_partitionable);
         gDevPool.devices.insert(
             gDevPool.devices.end(), sub_devices.begin(), sub_devices.end());
-      } catch (DPCPP::feature_not_supported& e) {
+      } catch (sycl::exception& e) {
+        // FIXME: should only check feature_not_supported here.
+        // But for now we got invalid here if partition is not supported.
+        if (e.code() != DPCPP::errc::feature_not_supported &&
+            e.code() != DPCPP::errc::invalid) {
+          throw std::runtime_error(
+              std::string("Failed to apply tile partition: ") + e.what());
+        }
         TORCH_WARN(
-            "Tile partition is not supported on this device: ",
+            "Tile partition is UNSUPPORTED : ",
             root_device.get_info<dpcpp_dev_name>());
         gDevPool.devices.push_back(root_device);
       }
