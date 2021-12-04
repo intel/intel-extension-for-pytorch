@@ -128,7 +128,7 @@ supported:
 #  - bitwise_xor.Tensor_out  # different signature
   - bmm
 #  - bmm.out  # different signature
-#  - cauchy_  # different signature
+  - cauchy_
 #  - ceil.out  # different signature
 #  - chain_matmul       # should not register
   - cholesky
