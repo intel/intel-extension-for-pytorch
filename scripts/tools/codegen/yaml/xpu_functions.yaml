@@ -153,7 +153,7 @@ supported:
   - conv_tbc
 #  - conv_tbc_backward  # should not register
 #  - convolution_backward_overrideable  # different signature
-#  - convolution_overrideable  # different signature
+  - convolution_overrideable
   - copy_
   - cos.out
 #  - cos_  # disabled in torch

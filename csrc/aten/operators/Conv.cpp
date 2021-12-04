@@ -1002,17 +1002,19 @@ Tensor convolution_sigmoid(
 Tensor convolution_overrideable(
     const Tensor& input_r,
     const Tensor& weight_r,
-    const Tensor& bias_r,
+    const c10::optional<at::Tensor>& bias_r,
     IntArrayRef stride_,
     IntArrayRef padding_,
     IntArrayRef dilation_,
     bool transposed_,
     IntArrayRef output_padding_,
     int64_t groups_) {
+  TORCH_CHECK(bias_r.has_value(), "not implemented");
+  const Tensor bias_value = bias_r.value();
   return _convolution(
       input_r,
       weight_r,
-      bias_r,
+      bias_value,
       stride_,
       padding_,
       dilation_,
