@@ -432,7 +432,7 @@ supported:
 #  - qr         # should not register
 #  - qr.Q  # dispatch is False
   - quantize_per_channel
-#  - quantize_per_tensor  # different signature
+  - quantize_per_tensor
   - random_
   - random_.from
   - random_.to
