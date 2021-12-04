@@ -116,7 +116,7 @@ supported:
 #  - binary_cross_entropy.out  # different signature
 #  - binary_cross_entropy_backward  # different signature
 #  - binary_cross_entropy_backward.grad_input  # different signature
-#  - bincount  # different signature
+  - bincount
 #  - bitwise_and.Scalar_out  # different signature
 #  - bitwise_and.Tensor_out  # different signature
   - bitwise_not
@@ -248,8 +248,8 @@ supported:
 #  - hardtanh_  # different signature
 #  - hardtanh_backward  # different signature
 #  - hardtanh_backward.grad_input  # different signature
-#  - histc  # different signature
-#  - histc.out  # different signature
+  - histc
+  - histc.out
   - im2col
 #  - im2col.out  # different signature
   - im2col_backward

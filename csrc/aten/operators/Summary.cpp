@@ -215,19 +215,27 @@ Tensor histc_template(
 
 } // namespace impl
 
-Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
+Tensor bincount(
+    const Tensor& self,
+    const c10::optional<Tensor>& weights,
+    int64_t minlength) {
+  Tensor weights_t = weights.has_value() ? weights.value() : Tensor();
   return IPEX_DISPATCH_INTEGRAL_TYPES(
       self.scalar_type(), "bincount_dpcpp", [&] {
-        const auto scalar = weights.scalar_type();
+        const auto scalar = weights_t.scalar_type();
         if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
           return impl::bincount_template<scalar_t, float>(
-              self, weights, minlength);
+              self, weights_t, minlength);
         return impl::bincount_template<scalar_t, double>(
-            self, weights.to(kDouble), minlength);
+            self, weights_t.to(kDouble), minlength);
       });
 }
 
-Tensor histc(const Tensor& self, int64_t bins, Scalar min, Scalar max) {
+Tensor histc(
+    const Tensor& self,
+    int64_t bins,
+    const Scalar& min,
+    const Scalar& max) {
   TORCH_CHECK(bins > 0, "bins should be > 0, but is ", bins, " instead");
   return IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "histc", [&] {
     return impl::histc_template<scalar_t>(
@@ -236,11 +244,11 @@ Tensor histc(const Tensor& self, int64_t bins, Scalar min, Scalar max) {
 }
 
 Tensor& histc_out(
-    Tensor& out,
     const Tensor& self,
     int64_t bins,
-    Scalar min,
-    Scalar max) {
+    const Scalar& min,
+    const Scalar& max,
+    Tensor& out) {
   Tensor out_tmp = at::AtenIpexTypeXPU::histc(self, bins, min, max);
   out.resize_as_(out_tmp).copy_(out_tmp);
   return out;
