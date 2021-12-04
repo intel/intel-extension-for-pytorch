@@ -536,11 +536,11 @@ supported:
   - take.out
   - tan.out
 # - tan_  # disabled in torch
-  - tanh
-#  - tanh.out  # different signature
-  - tanh_
+#  - tanh  # disabled in torch
+  - tanh.out
+#  - tanh_  # disabled in torch
   - tanh_backward
-#  - tanh_backward.grad_input  # different signature
+  - tanh_backward.grad_input
 #  - threshold  # different signature
 #  - threshold.out  # different signature
 #  - threshold_  # different signature
