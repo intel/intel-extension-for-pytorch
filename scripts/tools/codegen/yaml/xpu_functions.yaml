@@ -110,8 +110,8 @@ supported:
   - baddbmm
   - baddbmm.out
   - baddbmm_
-#  - bernoulli_.Tensor  # different signature
-#  - bernoulli_.float  # different signature
+  - bernoulli_.Tensor
+  - bernoulli_.float
 #  - binary_cross_entropy  # different signature
 #  - binary_cross_entropy.out  # different signature
 #  - binary_cross_entropy_backward  # different signature
