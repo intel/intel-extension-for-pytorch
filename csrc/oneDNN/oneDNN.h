@@ -14,6 +14,7 @@
 #include "LayerNorm.h"
 #include "Matmul.h"
 #include "Pooling.h"
+#include "Reduce.h"
 #include "Reorder.h"
 #include "Sum.h"
 #include "Types.h"
