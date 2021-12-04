@@ -524,7 +524,7 @@ supported:
 #  - std_mean.dim       # should not register
 #  - sub.Scalar  # different signature
 #  - sub.Tensor  # different signature
-#  - sub.out  # different signature
+  - sub.out
 #  - sub_.Scalar  # different signature
 #  - sub_.Tensor  # different signature
   - sum
