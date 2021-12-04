@@ -20,7 +20,7 @@ supported:
 #  - _cumsum.out  # different schema
 #  - _embedding_bag  # different schema
 #  - _embedding_bag_dense_backward  # different schema
-#  - _empty_affine_quantized  # different signature
+  - _empty_affine_quantized
 #  - _empty_per_channel_affine_quantized  # different signature
 #  - _fft_with_size.norm_modes  # different schema
 #  - _fused_dropout  # different signature

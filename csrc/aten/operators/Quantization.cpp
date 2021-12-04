@@ -166,6 +166,22 @@ Tensor _empty_affine_quantized(
           scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
+Tensor _empty_affine_quantized(
+    IntArrayRef size,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
+    double scale,
+    int64_t zero_point,
+    c10::optional<c10::MemoryFormat> optional_memory_format) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
+  return _empty_affine_quantized(
+      size, options, scale, zero_point, optional_memory_format);
+}
+
 Tensor _empty_per_channel_affine_quantized(
     IntArrayRef size,
     const Tensor& scales,
