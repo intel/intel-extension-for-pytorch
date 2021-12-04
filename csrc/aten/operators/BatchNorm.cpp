@@ -23,13 +23,23 @@ static inline at::Tensor condition_contiguous(const at::Tensor& t) {
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(
     const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& running_mean,
-    const at::Tensor& running_var,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& bias_opt,
+    const c10::optional<at::Tensor>& running_mean_opt,
+    const c10::optional<at::Tensor>& running_var_opt,
     bool training,
     double momentum,
     double epsilon) {
+  TORCH_CHECK(weight_opt.has_value(), "not implemented");
+  TORCH_CHECK(bias_opt.has_value(), "not implemented");
+  TORCH_CHECK(running_mean_opt.has_value(), "not implemented");
+  TORCH_CHECK(running_var_opt.has_value(), "not implemented");
+
+  const Tensor weight = weight_opt.value();
+  const Tensor bias = bias_opt.value();
+  const Tensor running_mean = running_mean_opt.value();
+  const Tensor running_var = running_var_opt.value();
+
   if (running_mean.defined() && running_var.defined()) {
     checkBackend(
         "batch_norm",
