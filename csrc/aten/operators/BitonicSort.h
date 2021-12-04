@@ -285,7 +285,11 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
   {                                              \
     switch (ceilPowerOf2) {                      \
       case 2048:                                 \
+        HANDLE_CASE(TYPE, A, 2048);              \
+        break;                                   \
       case 1024:                                 \
+        HANDLE_CASE(TYPE, A, 1024);              \
+        break;                                   \
       case 512:                                  \
       case 256:                                  \
         HANDLE_CASE(TYPE, A, 512);               \

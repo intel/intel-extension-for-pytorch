@@ -6,8 +6,8 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>
+#include "BitonicSort.h"
 #include "ScanKernel.h"
-#include "Sort.h"
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
