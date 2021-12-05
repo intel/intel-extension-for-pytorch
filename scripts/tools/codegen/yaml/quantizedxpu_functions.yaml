@@ -5,7 +5,7 @@ use_out_as_primary: true
 device_guard: true
 supported:
   - _adaptive_avg_pool2d
-#  - _empty_affine_quantized	# different signature
+  - _empty_affine_quantized
 #  - adaptive_avg_pool2d        # should not register
 #  - adaptive_avg_pool2d.out	# different signature
 #  - add.Tensor	# different signature
