@@ -57,55 +57,42 @@ void sigmoid_backward(
   }
 }
 
-Tensor& _sigmoid_out(Tensor& output, const Tensor& self) {
+Tensor& sigmoid_out(const Tensor& self, Tensor& out) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "_sigmoid_out",
-      [&]() { impl::sigmoid<scalar_t>(output, self); });
-  return output;
+      [&]() { impl::sigmoid<scalar_t>(out, self); });
+  return out;
 }
 
-Tensor& _sigmoid_backward_out(
-    Tensor& grad_input,
+Tensor& sigmoid_backward_out(
     const Tensor& grad_output,
-    const Tensor& self) {
+    const Tensor& output,
+    Tensor& grad_input) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "_sigmoid_backward_out",
+      output.scalar_type(),
+      "sigmoid_backward_out",
       [&]() {
-        impl::sigmoid_backward<scalar_t>(grad_input, grad_output, self);
+        impl::sigmoid_backward<scalar_t>(grad_input, grad_output, output);
       });
   return grad_input;
 }
 
 } // namespace impl
 
-Tensor& sigmoid_out(Tensor& out, const Tensor& self) {
-  return impl::_sigmoid_out(out, self);
-}
-Tensor sigmoid(const Tensor& self) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::sigmoid_out(result, self);
-}
-Tensor& sigmoid_(Tensor& self) {
-  return at::AtenIpexTypeXPU::sigmoid_out(self, self);
+Tensor& sigmoid_out(const Tensor& self, Tensor& out) {
+  return impl::sigmoid_out(self, out);
 }
 
 Tensor& sigmoid_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
-    const Tensor& output) {
+    const Tensor& output,
+    Tensor& grad_input) {
   TORCH_CHECK(output.numel() == grad_output.numel(), "different elements ...");
-  return impl::_sigmoid_backward_out(grad_input, grad_output, output);
-}
-
-Tensor sigmoid_backward(const Tensor& grad_output, const Tensor& output) {
-  auto grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeXPU::sigmoid_backward_out(
-      grad_input, grad_output, output);
+  return impl::sigmoid_backward_out(grad_output, output, grad_input);
 }
 
 } // namespace AtenIpexTypeXPU

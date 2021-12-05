@@ -489,11 +489,11 @@ supported:
   - set_.source_Storage_storage_offset
   - set_.source_Tensor
   - sgn.out
-  - sigmoid
-#  - sigmoid.out  # different signature
-  - sigmoid_
-  - sigmoid_backward
-#  - sigmoid_backward.grad_input  # different signature
+#  - sigmoid  # disabled in torch
+  - sigmoid.out
+#  - sigmoid_  # disabled in torch
+#  - sigmoid_backward  # disabled in torch
+  - sigmoid_backward.grad_input
   - sign
 #  - sign.out  # different signature
   - sign_
