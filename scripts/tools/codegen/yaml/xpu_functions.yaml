@@ -70,17 +70,18 @@ supported:
   - addbmm
   - addbmm_
   - addbmm.out
-#  - addcdiv  # different signature
-#  - addcdiv.out  # different signature
-#  - addcdiv_  # different signature
-#  - addcmul  # different signature
-#  - addcmul.out  # different signature
-#  - addcmul_  # different signature
-#  - addmm  # different signature
-#  - addmm_  # different signature
-  - addmv.out
-#  - addr  # different signature
-#  - addr_  # different signature
+#  - addcdiv	# different signature
+#  - addcdiv.out	# different signature
+#  - addcdiv_	# different signature
+#  - addcmul	# different signature
+#  - addcmul.out	# different signature
+#  - addcmul_	# different signature
+#  - addmm	# different signature
+  - addmm.out  # newly added
+#  - addmm_	# different signature
+  - addmv.out  # newly added
+#  - addr	# different signature
+#  - addr_	# different signature
   - all
   - all.dim
 #  - all.out  # different signature
@@ -478,8 +479,10 @@ supported:
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
   - scatter_.src
+  # - scatter_.value  # disabled in torch
+  # scatter_add_  # disabled in torch
   - scatter.value_out
-  - scatter_add.out
+  - scatter_add.out  # newly added
   - set_
   - set_.source_Storage
   - set_.source_Storage_storage_offset
