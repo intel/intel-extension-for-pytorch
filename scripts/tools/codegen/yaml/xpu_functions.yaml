@@ -562,7 +562,7 @@ supported:
 #  - triu_indices  # different signature
 #  - trunc.out  # different signature
   - unfold
-#  - uniform_  # different signature
+  - uniform_
   - unique_consecutive
   - unique_dim
   - unique_dim_consecutive
