@@ -14,12 +14,13 @@ supported:
   - _cdist_forward
   - _ctc_loss
   - _ctc_loss_backward
-#  - _cumprod  # different schema
-#  - _cumprod.out  # different schema
-#  - _cumsum  # different schema
-#  - _cumsum.out  # different schema
-#  - _embedding_bag  # different schema
-#  - _embedding_bag_dense_backward  # different schema
+#  - _cumprod  # disabled in torch
+  - cumprod.out
+#  - _cumsum	# diabled in torch
+#  - _cumsum.out	# disabled in torch
+  - cumsum.out  # newly added
+#  - _embedding_bag	# different schema
+#  - _embedding_bag_dense_backward	# different schema
   - _empty_affine_quantized
 #  - _empty_per_channel_affine_quantized  # different signature
 #  - _fft_with_size.norm_modes  # different schema

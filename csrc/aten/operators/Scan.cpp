@@ -196,7 +196,11 @@ typename std::enable_if<IS_HALF(scalar_t), void>::type scanDim(
 
 } // namespace impl
 
-Tensor& _cumsum_out(Tensor& out, const Tensor& self, int64_t dim) {
+Tensor& cumsum_out(
+    const Tensor& self,
+    int64_t dim,
+    c10::optional<at::ScalarType> dtype,
+    Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "cumsum", [&]() {
         impl::scanDim<scalar_t>(
@@ -209,12 +213,11 @@ Tensor& _cumsum_out(Tensor& out, const Tensor& self, int64_t dim) {
   return out;
 }
 
-Tensor _cumsum(const Tensor& self, int64_t dim) {
-  auto out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::_cumsum_out(out, self, dim);
-}
-
-Tensor& _cumprod_out(Tensor& out, const Tensor& self, int64_t dim) {
+Tensor& cumprod_out(
+    const Tensor& self,
+    int64_t dim,
+    c10::optional<at::ScalarType> dtype,
+    Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "cumprod", [&]() {
         impl::scanDim<scalar_t>(
@@ -225,11 +228,6 @@ Tensor& _cumprod_out(Tensor& out, const Tensor& self, int64_t dim) {
             MulOp<scalar_t>());
       });
   return out;
-}
-
-Tensor _cumprod(const Tensor& self, int64_t dim) {
-  auto out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::_cumprod_out(out, self, dim);
 }
 
 } // namespace AtenIpexTypeXPU
