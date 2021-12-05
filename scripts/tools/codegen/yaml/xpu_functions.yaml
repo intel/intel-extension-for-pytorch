@@ -194,10 +194,10 @@ supported:
   - erfinv_
   - exp.out
 #  - exp_  # disabled in torch
-#  - expm1.out	# different signature
-#  - exponential_	# different signature
-#  - eye.m_out	# different signature
-#  - eye.out	# different signature
+#  - expm1.out  # different signature
+  - exponential_
+#  - eye.m_out  # different signature
+#  - eye.out    # different signature
   - fill_.Scalar
   - fill_.Tensor
   - flip

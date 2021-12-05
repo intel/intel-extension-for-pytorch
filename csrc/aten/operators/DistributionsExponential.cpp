@@ -21,15 +21,15 @@ namespace AtenIpexTypeXPU {
 
 Tensor& exponential_(
     Tensor& self,
-    double lambda_,
-    c10::optional<Generator> gen_) {
+    double lambd,
+    c10::optional<Generator> generator) {
   auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
-      gen_, getDefaultDPCPPGenerator());
+      generator, getDefaultDPCPPGenerator());
 #ifdef USE_ONEMKL
-  if (lambda_ > 0 && self.is_contiguous()) {
+  if (lambd > 0 && self.is_contiguous()) {
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);
-      scalar_t scale = static_cast<scalar_t>(std::abs(1 / lambda_));
+      scalar_t scale = static_cast<scalar_t>(std::abs(1 / lambd));
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       uint64_t seed;
       {
@@ -53,7 +53,7 @@ Tensor& exponential_(
     auto iter = TensorIterator::nullary_op(self);
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       using accscalar_t = acc_type<scalar_t>;
-      auto lambda = static_cast<accscalar_t>(lambda_);
+      auto lambda = static_cast<accscalar_t>(lambd);
 
       // define lambda for exponential transformation
       auto exponential_func = [lambda](accscalar_t rand) {
