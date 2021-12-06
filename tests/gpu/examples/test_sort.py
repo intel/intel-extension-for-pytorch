@@ -25,13 +25,8 @@ class TestNNMethod(TestCase):
             # print(abcd, dim)
 
             x_cpu = torch.sort(x_cpu, dim=dim)[0]
-            prof = False
-            with torch.autograd.profiler.profile(prof, use_xpu=True) as prof:
-                x_xpu = torch.sort(x_xpu, dim=dim)[0]
-                # print(x_xpu.cpu())
-            if prof:
-                print(prof.key_averages().table(sort_by="self_cpu_time_total"))
-                print(prof.table(sort_by="id", row_limit=100000))
+            x_xpu = torch.sort(x_xpu, dim=dim)[0]
+
             maxdiff = float((x_cpu - x_xpu.cpu().float()).abs().max())
             print(abcd, ', dim:', dim, ', maxdiff:', maxdiff)
             assert(maxdiff < 1e-5)
