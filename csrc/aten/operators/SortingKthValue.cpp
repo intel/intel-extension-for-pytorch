@@ -175,12 +175,12 @@ Tensor median_template(const Tensor& self) {
 
 template <typename scalar_t>
 void kthvalue_template(
-    Tensor& values,
-    Tensor& indices,
     const Tensor& self,
     int64_t k,
     int64_t dim_,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& values,
+    Tensor& indices) {
   int64_t dim = maybe_wrap_dim(dim_, self.dim());
   int64_t slicesize = self.size(dim);
   TORCH_CHECK(
@@ -423,16 +423,16 @@ Tensor median(const Tensor& self) {
 }
 
 std::tuple<Tensor&, Tensor&> kthvalue_out(
-    Tensor& values,
-    Tensor& indices,
     const Tensor& self,
     int64_t k,
     int64_t dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& values,
+    Tensor& indices) {
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "kthvalue", [&] {
         impl::kthvalue_template<scalar_t>(
-            values, indices, self, k, dim, keepdim);
+            self, k, dim, keepdim, values, indices);
       });
   return std::forward_as_tuple(values, indices);
 }

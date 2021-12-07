@@ -267,7 +267,7 @@ supported:
 #  - inverse.out  # different signature
   - is_set_to
   - isnan
-#  - kthvalue.values  # different signature
+  - kthvalue.values
   - l1_loss
 #  - l1_loss.out  # different signature
   - l1_loss_backward
