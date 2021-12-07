@@ -10,7 +10,7 @@ SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
 SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
-set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
+set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc")
 
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
@@ -166,9 +166,11 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
 
+
 include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
-include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
+include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch)
+include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/)
+include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/utils)
 
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/include)
 include_directories(${PROJECT_SOURCE_DIR}/build/third_party/llga/third_party/oneDNN/include)
@@ -192,25 +194,27 @@ else()
   message(FATAL_ERROR, "Cannot find installed Python head file directory")
 endif()
 
-# include pybind11 after pytorch include
-# to be able to use the py::class defined in PyTorch when binding c++ API to Python in IPEX
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
-
 # sources
 set(DPCPP_SRCS)
 set(DPCPP_COMMON_SRCS)
-set(DPCPP_CPU_SRCS)
+set(DPCPP_UTILS_SRCS)
+set(DPCPP_QUANTIZATION_SRCS)
 set(DPCPP_JIT_SRCS)
-set(DPCPP_RUNTIME_SRCS)
+set(DPCPP_CPU_SRCS)
+set(DPCPP_AUTOCAST_SRCS)
+set(DPCPP_ATEN_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
+add_subdirectory(${DPCPP_ROOT}/utils)
 add_subdirectory(${DPCPP_ROOT}/quantization)
 add_subdirectory(${DPCPP_ROOT}/jit)
 add_subdirectory(${DPCPP_ROOT}/cpu)
-add_subdirectory(${DPCPP_ROOT}/cpu/runtime)
+add_subdirectory(${DPCPP_ROOT}/autocast)
+add_subdirectory(${DPCPP_ROOT}/aten)
 
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_RUNTIME_SRCS})
+set(DPCPP_SRCS ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
+    ${DPCPP_CPU_SRCS} ${DPCPP_AUTOCAST_SRCS} ${DPCPP_ATEN_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
