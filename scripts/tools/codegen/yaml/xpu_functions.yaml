@@ -196,7 +196,7 @@ supported:
 #  - exp_  # disabled in torch
 #  - expm1.out  # different signature
   - exponential_
-#  - eye.m_out  # different signature
+  - eye.m_out
 #  - eye.out    # different signature
   - fill_.Scalar
   - fill_.Tensor
