@@ -13,6 +13,7 @@ void sort_based_batched_csr2csc_opt(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
 #endif
+  Allocator* allocator = c10::GetAllocator(c10::DeviceType::CPU);
   TensorAccessor<int64_t, 1> offsets_data = offsets.accessor<int64_t, 1>();
   TensorAccessor<int64_t, 1> batched_csr_indices =
       indices.accessor<int64_t, 1>();
@@ -20,11 +21,10 @@ void sort_based_batched_csr2csc_opt(
   batched_csc.num_tables = num_tables;
   int64_t n_indices = indices.numel();
   int64_t n_offsets = offsets.numel() - 1;
-  batched_csc.output_row_indices =
-      (int*)c10::alloc_cpu(n_indices * sizeof(int));
   for (auto pooling_mode : pooling_modes) {
     if (pooling_mode == MEAN) {
-      batched_csc.weights = (float*)c10::alloc_cpu(n_indices * sizeof(float));
+      batched_csc.weights =
+          (float*)allocator->raw_allocate(n_indices * sizeof(float));
       break;
     }
   }
@@ -32,10 +32,10 @@ void sort_based_batched_csr2csc_opt(
   auto get_table_id = [&](int n) { return n / B; };
 
   Key_Value_Weight_Tuple<int>* tmpBuf =
-      (Key_Value_Weight_Tuple<int>*)c10::alloc_cpu(
+      (Key_Value_Weight_Tuple<int>*)allocator->raw_allocate(
           (n_indices) * sizeof(Key_Value_Weight_Tuple<int>));
   Key_Value_Weight_Tuple<int>* tmpBuf1 =
-      (Key_Value_Weight_Tuple<int>*)c10::alloc_cpu(
+      (Key_Value_Weight_Tuple<int>*)allocator->raw_allocate(
           (n_indices) * sizeof(Key_Value_Weight_Tuple<int>));
 #pragma omp parallel for
   for (int n = 0; n < n_offsets; ++n) {
@@ -75,10 +75,10 @@ void sort_based_batched_csr2csc_opt(
     num_uniq[i][0] += num_uniq[i - 1][0];
   int U = num_uniq[max_thds - 1][0];
 
-  batched_csc.segment_ptr = (int*)c10::alloc_cpu(U * sizeof(int));
-  batched_csc.segment_indices = (int*)c10::alloc_cpu(U * sizeof(int));
+  batched_csc.segment_ptr = (int*)allocator->raw_allocate(U * sizeof(int));
+  batched_csc.segment_indices = (int*)allocator->raw_allocate(U * sizeof(int));
   batched_csc.output_row_indices =
-      (int*)c10::alloc_cpu(n_indices * sizeof(int));
+      (int*)allocator->raw_allocate(n_indices * sizeof(int));
 
   batched_csc.segment_ptr[0] = 0;
   batched_csc.output_row_indices[0] =
@@ -115,8 +115,8 @@ void sort_based_batched_csr2csc_opt(
   }
   batched_csc.uniq_indices += U;
   batched_csc.segment_ptr[U] = n_indices;
-  c10::free_cpu(tmpBuf);
-  c10::free_cpu(tmpBuf1);
+  allocator->raw_deallocate(tmpBuf);
+  allocator->raw_deallocate(tmpBuf1);
 }
 
 } // namespace cpu

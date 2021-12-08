@@ -56,13 +56,14 @@ struct BatchedHyperCompressedSparseColumn {
   float* weights = nullptr; // length column_ptr[table_ptr[T]]
 
   ~BatchedHyperCompressedSparseColumn() {
+    Allocator* allocator = c10::GetAllocator(c10::DeviceType::CPU);
     if (segment_ptr) {
-      c10::free_cpu(segment_ptr);
-      c10::free_cpu(segment_indices);
-      c10::free_cpu(output_row_indices);
+      allocator->raw_deallocate(segment_ptr);
+      allocator->raw_deallocate(segment_indices);
+      allocator->raw_deallocate(output_row_indices);
     }
     if (weights) {
-      c10::free_cpu(weights);
+      allocator->raw_deallocate(weights);
     }
   };
 };
