@@ -257,7 +257,8 @@ at::Tensor AtenIpexJITDev::dil_mha_scores_calc(
 at::Tensor AtenIpexJITDev::dil_softmax(
     const at::Tensor& input,
     const int64_t dim,
-    const at::IValue& dtype) {
+    const at::IValue& dtype,
+    const bool inplace) {
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_softmax", std::vector<c10::IValue>({}));
 #endif
@@ -269,10 +270,10 @@ at::Tensor AtenIpexJITDev::dil_softmax(
         intype != at::ScalarType::Half,
         "softmax with half to float conversion is not supported on Mkldnn");
     at::Tensor converted = input.toType(outtype);
-    return softmax_impl(converted, dim);
+    return softmax_impl(converted, dim, inplace);
   }
 
-  return softmax_impl(input, dim);
+  return softmax_impl(input, dim, inplace);
 }
 
 at::Tensor AtenIpexJITDev::dil_shuffle(
