@@ -541,9 +541,10 @@ class ModMultLinear(nn.Module):
 
 class Tester(TestCase):
 
-    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, levels=['O0','O1']):
+    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, levels=['O0','O1'], use_channels_last=[True, False]):
         modelName = model.__class__.__name__
-        for level in levels:
+        options = itertools.product(levels, use_channels_last)
+        for level, use_channels_last in options:
             ipex.enable_onednn_fusion(False)
             model = model.eval()
             # It will be removed after jit support conv_bn folding
@@ -552,10 +553,11 @@ class Tester(TestCase):
                     model = optimization.fuse(model)
                 except:
                     warnings.warn("Conv BatchNorm folding failed.")
-            if x.dim() == 4:
+            if x.dim() == 4 and use_channels_last:
                 x = x.to(memory_format=torch.channels_last)
                 model = model.to(memory_format=torch.channels_last)
             model = ipex.optimize(model, dtype=torch.float32, level=level)
+
             with torch.no_grad():
                 result = model(x)
                 traced_model = torch.jit.trace(model, x).eval()
@@ -584,9 +586,10 @@ class Tester(TestCase):
                 self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
 
-    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1']):
+    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
         modelName = model.__class__.__name__
-        for level in levels:
+        options = itertools.product(levels, use_channels_last)
+        for level, use_channels_last in options:
             ipex.enable_onednn_fusion(True)
             model = model.eval()
             # It will be removed after jit support conv_bn folding
@@ -595,7 +598,7 @@ class Tester(TestCase):
                     model = optimization.fuse(model)
                 except:
                     warnings.warn("Conv BatchNorm folding failed.")
-            if x.dim() == 4:
+            if x.dim() == 4 and use_channels_last:
                 x = x.to(memory_format=torch.channels_last)
                 model = model.to(memory_format=torch.channels_last)
             model = ipex.optimize(model, dtype=torch.bfloat16, level=level)
@@ -1022,6 +1025,22 @@ class Tester(TestCase):
             torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex_prepack::convolution_add_run",
             prec=0.1)
+        # add outputs' have different data format
+        m = ConvSum(2, 3, 32, kernel_size=3, stride=1).eval()
+        m.conv = m.conv.to(memory_format=torch.torch.channels_last)
+        self._test_output(
+            m,
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="ipex_prepack::convolution_add_run",
+            use_channels_last=[False])
+        m = ConvSum(2, 3, 32, kernel_size=3, stride=1).eval()
+        m.conv = m.conv.to(memory_format=torch.channels_last)
+        self._test_output_bf16(
+            m,
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="ipex_prepack::convolution_add_run",
+            prec=0.1,
+            use_channels_last=[False])
 
     def test_output_conv_sum_3d(self):
         self._test_output(

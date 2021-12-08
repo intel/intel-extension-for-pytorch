@@ -15,5 +15,3 @@ from . import nn
 
 from .utils.verbose import verbose
 from .frontend import optimize, enable_onednn_fusion
-
-import intel_extension_for_pytorch._C as core
