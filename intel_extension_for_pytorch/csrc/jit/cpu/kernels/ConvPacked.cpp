@@ -233,6 +233,8 @@ at::Tensor& run(
   auto memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
                                          : at::MemoryFormat::Contiguous;
   auto input_ = input.contiguous(memory_format);
+  // always align accumu format with inputs' format.
+  accumu = accumu.contiguous(memory_format);
   convolution_kernel_output(
       input_,
       context.weight_packed_,
