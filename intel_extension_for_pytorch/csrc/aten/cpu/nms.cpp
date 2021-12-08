@@ -941,8 +941,8 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexTypeExt::parallel_scale_back_batch(
         bboxes_in, dboxes_xywh, scale_xy, scale_wh);
   });
 
-  auto&& scores_result = torch_ipex::cpu::AtenIpexJITDev::dil_softmax(
-      scores_in, -1, c10::IValue(), true);
+  auto&& scores_result =
+      torch_ipex::cpu::AtenIpexJITDev::dil_softmax(scores_in, -1);
 
   return std::tuple<at::Tensor, at::Tensor>(bbox_result, scores_result);
 }
