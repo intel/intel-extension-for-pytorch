@@ -480,8 +480,8 @@ supported:
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
   - scatter_.src
-  # - scatter_.value  # disabled in torch
-  # scatter_add_  # disabled in torch
+#  - scatter_.value  # disabled in torch
+#  - scatter_add_  # disabled in torch
   - scatter.value_out
   - scatter_add.out  # newly added
   - set_
@@ -539,7 +539,7 @@ supported:
   - take
   - take.out
   - tan.out
-# - tan_  # disabled in torch
+#  - tan_  # disabled in torch
 #  - tanh  # disabled in torch
   - tanh.out
 #  - tanh_  # disabled in torch
