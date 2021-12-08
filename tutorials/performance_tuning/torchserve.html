@@ -116,7 +116,7 @@ Here we show how to use TorchServe with IPEX.</p>
 </section>
 <section id="install-intel-extension-for-pytorch">
 <h2>Install Intel Extension for PyTorch<a class="headerlink" href="#install-intel-extension-for-pytorch" title="Permalink to this headline"></a></h2>
-<p>Refer to the documentation <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch#installation">here</a>.</p>
+<p>Refer to the documentation <a class="reference external" href="../installation.html">here</a>.</p>
 </section>
 <section id="serving-model-with-intel-extension-for-pytorch">
 <h2>Serving model with Intel Extension for PyTorch<a class="headerlink" href="#serving-model-with-intel-extension-for-pytorch" title="Permalink to this headline"></a></h2>
@@ -134,64 +134,83 @@ Here we show how to use TorchServe with IPEX.</p>
 <p>First create <code class="docutils literal notranslate"><span class="pre">.pt</span></code> serialized file using IPEX INT8 inference. Here we show two examples with BERT and ResNet50.</p>
 <section id="bert">
 <h4>BERT<a class="headerlink" href="#bert" title="Permalink to this headline"></a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>import intel_extension_for_pytorch as ipex
-from transformers import AutoModelForSequenceClassification, AutoConfig
-import transformers
-from datasets import load_dataset
-import torch
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span> <span class="nn">transformers</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoModelForSequenceClassification</span><span class="p">,</span> <span class="n">AutoConfig</span>
 
-# load the model 
-config = AutoConfig.from_pretrained(
-    &quot;bert-base-uncased&quot;, return_dict=False, torchscript=True, num_labels=2)
-model = AutoModelForSequenceClassification.from_pretrained(
-    &quot;bert-base-uncased&quot;, config=config)
-model = model.eval()
+<span class="c1"># load the model </span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">AutoConfig</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+    <span class="s2">&quot;bert-base-uncased&quot;</span><span class="p">,</span> <span class="n">return_dict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">torchscript</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">num_labels</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForSequenceClassification</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+    <span class="s2">&quot;bert-base-uncased&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 
-max_length = 384 
-dummy_tensor = torch.ones((1, max_length), dtype=torch.long)
-jit_inputs = (dummy_tensor, dummy_tensor, dummy_tensor)
-conf = ipex.quantization.QuantConf(qscheme=torch.per_tensor_affine)
+<span class="n">max_length</span> <span class="o">=</span> <span class="mi">384</span> 
+<span class="n">dummy_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_length</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
+<span class="n">jit_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">dummy_tensor</span><span class="p">,</span> <span class="n">dummy_tensor</span><span class="p">,</span> <span class="n">dummy_tensor</span><span class="p">)</span>
+<span class="n">conf</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">QuantConf</span><span class="p">(</span><span class="n">qscheme</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">per_tensor_affine</span><span class="p">)</span>
 
+<span class="c1"># calibration </span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">conf</span><span class="p">):</span>
+            <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">,</span> <span class="n">dummy_tensor</span><span class="p">,</span> <span class="n">dummy_tensor</span><span class="p">)</span>
 
-# calibration 
-with torch.no_grad():
-    for i in range(100):
-        with ipex.quantization.calibrate(conf):
-            model(dummy_tensor, dummy_tensor, dummy_tensor)
+<span class="c1"># optionally save the configuraiton for later use</span>
+<span class="c1"># save:</span>
+<span class="c1"># conf.save(&quot;model_conf.json&quot;)</span>
+<span class="c1"># load:</span>
+<span class="c1"># conf = ipex.quantization.QuantConf(&quot;model_conf.json&quot;)</span>
 
-# optionally save the configuraiton for later use 
-conf.save(‘model_conf.json’, default_recipe=True)
+<span class="c1"># conversion </span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">conf</span><span class="p">,</span> <span class="n">jit_inputs</span><span class="p">)</span>
+<span class="c1"># enable fusion path work(need to run forward propagation twice)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">,</span><span class="n">dummy_tensor</span><span class="p">,</span><span class="n">dummy_tensor</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">,</span><span class="n">dummy_tensor</span><span class="p">,</span><span class="n">dummy_tensor</span><span class="p">)</span>
 
-# conversion 
-model = ipex.quantization.convert(model, conf, jit_inputs)
-
-# save to .pt 
-torch.jit.save(model, &#39;bert_int8_jit.pt&#39;)
+<span class="c1"># save to .pt </span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;bert_int8_jit.pt&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="resnet50">
 <h4>ResNet50<a class="headerlink" href="#resnet50" title="Permalink to this headline"></a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
-<span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.fx.experimental.optimization</span> <span class="k">as</span> <span class="nn">optimization</span>
-<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">deepcopy</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
 
-
+<span class="c1"># load the model</span>
+<span class="n">dummy_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">optimization</span><span class="o">.</span><span class="n">fuse</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 
-<span class="n">dummy_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
-<span class="n">jit_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
+<span class="c1"># calibration</span>
 <span class="n">conf</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">QuantConf</span><span class="p">(</span><span class="n">qscheme</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">per_tensor_symmetric</span><span class="p">)</span>
-
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-	<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
-		<span class="k">with</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">conf</span><span class="p">):</span>
-			<span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">conf</span><span class="p">):</span>
+           <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
 
+<span class="c1"># optionally save the configuraiton for later use</span>
+<span class="c1"># save:</span>
+<span class="c1"># conf.save(&quot;model_conf.json&quot;)</span>
+<span class="c1"># load:</span>
+<span class="c1"># conf = ipex.quantization.QuantConf(&quot;model_conf.json&quot;)</span>
+
+
+<span class="c1"># conversion</span>
+<span class="n">jit_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">conf</span><span class="p">,</span> <span class="n">jit_inputs</span><span class="p">)</span>
+<span class="c1"># enable fusion path work(need to run two iterations)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">dummy_tensor</span><span class="p">)</span>
+
+<span class="c1"># save to .pt</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;rn50_int8_jit.pt&#39;</span><span class="p">)</span>
 </pre></div>
 </div>

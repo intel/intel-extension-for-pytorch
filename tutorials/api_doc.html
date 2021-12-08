@@ -48,8 +48,8 @@
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#general">General</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-intel_extension_for_pytorch.quantization">Quantization</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-intel_extension_for_pytorch.cpu.runtime">CPU Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ipex.quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ipex.cpu.runtime">CPU Runtime</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
@@ -87,8 +87,8 @@
 <section id="general">
 <h2>General<a class="headerlink" href="#general" title="Permalink to this headline"></a></h2>
 <dl class="py function">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.optimize">
-<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_kernel_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.optimize" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_kernel_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.optimize" title="Permalink to this definition"></a></dt>
 <dd><p>Apply optimizations at Python frontend to the given model (nn.Module), as
 well as the given optimizer (optional). If the optimizer is given,
 optimizations will be applied for training. Otherwise, optimization will be
@@ -202,8 +202,8 @@ unpredictable accuracy loss.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.enable_onednn_fusion">
-<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.</span></span><span class="sig-name descname"><span class="pre">enable_onednn_fusion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.enable_onednn_fusion" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.enable_onednn_fusion">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">enable_onednn_fusion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.enable_onednn_fusion" title="Permalink to this definition"></a></dt>
 <dd><p>Enables or disables oneDNN fusion functionality. If enabled, oneDNN
 operators will be fused in runtime, when intel_extension_for_pytorch
 is imported.</p>
@@ -224,8 +224,8 @@ Default value is <code class="docutils literal notranslate"><span class="pre">Tr
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.verbose">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.</span></span><span class="sig-name descname"><span class="pre">verbose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.verbose" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.verbose">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">verbose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.verbose" title="Permalink to this definition"></a></dt>
 <dd><p>On-demand oneDNN verbosing functionality</p>
 <p>To make it easier to debug performance issues, oneDNN can dump verbose
 messages containing information like kernel size, input data size and
@@ -257,11 +257,11 @@ will be dumped out for the second inference only.</p>
 </dd></dl>
 
 </section>
-<section id="module-intel_extension_for_pytorch.quantization">
-<span id="quantization"></span><h2>Quantization<a class="headerlink" href="#module-intel_extension_for_pytorch.quantization" title="Permalink to this headline"></a></h2>
+<section id="module-ipex.quantization">
+<span id="quantization"></span><h2>Quantization<a class="headerlink" href="#module-ipex.quantization" title="Permalink to this headline"></a></h2>
 <dl class="py function">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.quantization.QuantConf">
-<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.quantization.</span></span><span class="sig-name descname"><span class="pre">QuantConf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">configure_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qscheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.per_tensor_affine</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.quantization.QuantConf" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.quantization.QuantConf">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">QuantConf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">configure_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qscheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.per_tensor_affine</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.QuantConf" title="Permalink to this definition"></a></dt>
 <dd><p>Configure setting for INT8 quantization flow.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -384,8 +384,8 @@ loaded or saved.</p></li>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.quantization.calibrate">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.quantization.</span></span><span class="sig-name descname"><span class="pre">calibrate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_recipe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.quantization.calibrate" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.quantization.calibrate">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">calibrate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_recipe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.calibrate" title="Permalink to this definition"></a></dt>
 <dd><p>Enable quantization  calibration scope which will collect the scales and zero
 points of ops to be quantized, such as convolution, linear.</p>
 <dl class="field-list simple">
@@ -407,8 +407,8 @@ value is <code class="docutils literal notranslate"><span class="pre">True</span
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.quantization.convert">
-<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.quantization.</span></span><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.quantization.convert" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.quantization.convert">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.convert" title="Permalink to this definition"></a></dt>
 <dd><p>Convert an FP32 torch.nn.Module model to a quantized JIT ScriptModule
 according to the given quantization recipes in the quantization
 configuration conf.</p>
@@ -430,11 +430,11 @@ for JIT trace of the given model.</p></li>
 </dd></dl>
 
 </section>
-<section id="module-intel_extension_for_pytorch.cpu.runtime">
-<span id="cpu-runtime"></span><h2>CPU Runtime<a class="headerlink" href="#module-intel_extension_for_pytorch.cpu.runtime" title="Permalink to this headline"></a></h2>
+<section id="module-ipex.cpu.runtime">
+<span id="cpu-runtime"></span><h2>CPU Runtime<a class="headerlink" href="#module-ipex.cpu.runtime" title="Permalink to this headline"></a></h2>
 <dl class="py function">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.is_runtime_ext_enabled">
-<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">is_runtime_ext_enabled</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.is_runtime_ext_enabled" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.cpu.runtime.is_runtime_ext_enabled">
+<span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">is_runtime_ext_enabled</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.is_runtime_ext_enabled" title="Permalink to this definition"></a></dt>
 <dd><p>Helper function to check whether runtime extension is enabled or not.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -450,8 +450,8 @@ for JIT trace of the given model.</p></li>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.CPUPool">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">CPUPool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">core_ids</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_id</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.cpu.runtime.CPUPool">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">CPUPool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">core_ids</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_id</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.CPUPool" title="Permalink to this definition"></a></dt>
 <dd><p>An abstraction of a pool of CPU cores used for intra-op parallelism.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -463,38 +463,38 @@ for JIT trace of the given model.</p></li>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>Generated
-intel_extension_for_pytorch.cpu.runtime.CPUPool object.</p>
+ipex.cpu.runtime.CPUPool object.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.CPUPool">intel_extension_for_pytorch.cpu.runtime.CPUPool</a></p>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool">ipex.cpu.runtime.CPUPool</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.pin">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">pin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool"><span class="pre">intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.pin" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.cpu.runtime.pin">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">pin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.pin" title="Permalink to this definition"></a></dt>
 <dd><p>Apply the given CPU pool to the master thread that runs the scoped code
 region or the function/method def.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>cpu_pool</strong> (<a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.CPUPool"><em>intel_extension_for_pytorch.cpu.runtime.CPUPool</em></a>) – intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
+<dd class="field-odd"><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – ipex.cpu.runtime.CPUPool object, contains
 all CPU cores used by the designated operations.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>Generated
-intel_extension_for_pytorch.cpu.runtime.pin object which can be used
+ipex.cpu.runtime.pin object which can be used
 as a <cite>with</cite> context or a function decorator.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.pin" title="intel_extension_for_pytorch.cpu.runtime.pin">intel_extension_for_pytorch.cpu.runtime.pin</a></p>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.pin" title="ipex.cpu.runtime.pin">ipex.cpu.runtime.pin</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.MultiStreamModule">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool"><span class="pre">intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_output</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.cpu.runtime.MultiStreamModule">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_output</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
 <dd><p>MultiStreamModule supports inference with multi-stream throughput mode.</p>
 <p>If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
 the cores will be allocated equally to each stream.</p>
@@ -506,8 +506,8 @@ first N streams.</p>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>model</strong> (<em>torch.jit.ScriptModule</em><em> or </em><em>torch.nn.Module</em>) – The input model.</p></li>
 <li><p><strong>num_streams</strong> (<em>int</em>) – Number of instances.</p></li>
-<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.CPUPool"><em>intel_extension_for_pytorch.cpu.runtime.CPUPool</em></a>) – An
-intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
+<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
+ipex.cpu.runtime.CPUPool object, contains
 all CPU cores used to run multi-stream inference.</p></li>
 <li><p><strong>concat_output</strong> (<em>bool</em>) – A flag indicates whether the output of each
 stream will be concatenated or not. The default value is True. Note:
@@ -517,41 +517,41 @@ false to get the raw output (a list of each stream’s output).</p></li>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>Generated
-intel_extension_for_pytorch.cpu.runtime.MultiStreamModule object.</p>
+ipex.cpu.runtime.MultiStreamModule object.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.MultiStreamModule" title="intel_extension_for_pytorch.cpu.runtime.MultiStreamModule">intel_extension_for_pytorch.cpu.runtime.MultiStreamModule</a></p>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModule" title="ipex.cpu.runtime.MultiStreamModule">ipex.cpu.runtime.MultiStreamModule</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.Task">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool"><span class="pre">intel_extension_for_pytorch.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.Task" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.cpu.runtime.Task">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.Task" title="Permalink to this definition"></a></dt>
 <dd><p>An abstraction of computation based on PyTorch module and is scheduled
 asynchronously.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>model</strong> (<em>torch.jit.ScriptModule</em><em> or </em><em>torch.nn.Module</em>) – The input module.</p></li>
-<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.CPUPool" title="intel_extension_for_pytorch.cpu.runtime.CPUPool"><em>intel_extension_for_pytorch.cpu.runtime.CPUPool</em></a>) – An
-intel_extension_for_pytorch.cpu.runtime.CPUPool object, contains
+<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
+ipex.cpu.runtime.CPUPool object, contains
 all CPU cores used to run Task asynchronously.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>Generated
-intel_extension_for_pytorch.cpu.runtime.Task object.</p>
+ipex.cpu.runtime.Task object.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p><a class="reference internal" href="#intel_extension_for_pytorch.cpu.runtime.Task" title="intel_extension_for_pytorch.cpu.runtime.Task">intel_extension_for_pytorch.cpu.runtime.Task</a></p>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.Task" title="ipex.cpu.runtime.Task">ipex.cpu.runtime.Task</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="intel_extension_for_pytorch.cpu.runtime.get_core_list_of_node_id">
-<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">get_core_list_of_node_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.cpu.runtime.get_core_list_of_node_id" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="ipex.cpu.runtime.get_core_list_of_node_id">
+<span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">get_core_list_of_node_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.get_core_list_of_node_id" title="Permalink to this definition"></a></dt>
 <dd><p>Helper function to get the CPU cores’ ids of the input numa node.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
