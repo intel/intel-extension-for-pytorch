@@ -219,20 +219,6 @@ void parallel_cat(
   }
 }
 
-template <typename scalar_t>
-void single_parallel_cat(Tensor& out, const TensorList& inputs, int numInputs) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  scalar_t* output = out.data_ptr<scalar_t>();
-  for (int i = 0; i < numInputs; ++i) {
-    scalar_t* input = inputs[i].data_ptr<scalar_t>();
-    dpcppMemcpy(
-        output + static_cast<uint64_t>(i),
-        input,
-        1 * sizeof(scalar_t),
-        DeviceToDevice);
-  }
-}
-
 void check_shape_except_dim(Tensor& first, Tensor& second, int dimension) {
   int first_dims = first.dim();
   int second_dims = second.dim();
@@ -357,27 +343,6 @@ static void cat(
       offset += dimSize;
     }
   }
-}
-
-// For one-element tensors specific, like Bert, 394 tensors are all 1 element
-// tensor and cat be cat together.
-static void single_cat(
-    Tensor& result,
-    TensorList inputs,
-    int numInputs,
-    int dimension) {
-  std::vector<int64_t> size(1);
-  size[0] = numInputs;
-
-  result.resize_(size, inputs[0].suggest_memory_format());
-
-  IPEX_DISPATCH_ALL_TYPES_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      at::ScalarType::BFloat16,
-      result.scalar_type(),
-      "simple_cat_dpcpp",
-      [&]() { single_parallel_cat<scalar_t>(result, inputs, numInputs); });
 }
 
 void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
@@ -551,25 +516,9 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
       });
   allSameType = allSameType && (out.scalar_type() == firstType);
 
-  // If tensors in TensorList are all one-element tensor, single_cat is called
-  // to cat them together by queue.memcpy.
-  // TODO: Laterly it can be extended: one-dim tensor can be cat together.
-  bool use_single_cat = true;
-  for (int i = 0; i < tensors.size(); i++) {
-    Tensor tensor = tensors[i];
-    if (tensor.defined()) {
-      if (tensor.numel() != 1) {
-        use_single_cat = false;
-        break;
-      }
-    }
-  }
-
   // DNNL cat does not support double datatype now.
   if (!allSameType || skip_dnnl_cat) {
     impl::cat(out, tensors, tensors.size(), dim, allSameType);
-  } else if (use_single_cat) {
-    impl::single_cat(out, tensors, tensors.size(), dim);
   } else {
     impl::dnnl_cat(out, tensors, tensors.size(), dim);
   }
