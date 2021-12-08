@@ -299,12 +299,12 @@ supported:
 #  - log_sigmoid_backward.grad_input  # different signature
   - log_sigmoid_forward
 #  - log_sigmoid_forward.output  # different signature
-#  - logical_and.out  # different signature
+  - logical_and.out
 #  - logical_not        # should not register
 #  - logical_not.out  # different signature
 #  - logical_not_       # should not register
-#  - logical_or.out  # different signature
-#  - logical_xor.out  # different signature
+  - logical_or.out
+  - logical_xor.out
 #  - logspace.out  # different signature
   - lt.Scalar
   - lt.Scalar_out

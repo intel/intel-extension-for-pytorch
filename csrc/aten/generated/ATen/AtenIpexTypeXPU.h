@@ -28,10 +28,7 @@ Tensor& conj_out(Tensor& out, const Tensor& self);
 Tensor& acos_out(Tensor& out, const Tensor& self);
 Tensor add(const Tensor& self, const Tensor& other, const Scalar& alpha);
 Tensor& add_(Tensor& self, const Tensor& other, const Scalar& alpha);
-Tensor& add_out(
-    const Tensor& self,
-    const Tensor& other,
-    const Scalar& alpha);
+Tensor& add_out(const Tensor& self, const Tensor& other, const Scalar& alpha);
 Tensor add(const Tensor& self, const Scalar& other, const Scalar& alpha);
 Tensor& add_(Tensor& self, const Scalar& other, const Scalar& alpha);
 Tensor addmv(
