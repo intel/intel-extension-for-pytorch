@@ -187,24 +187,8 @@ static inline void sparse_packed_add_kernel(
     float f;
   };
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
-
   int64_t newNnz;
   {
-    auto countIterI = oneapi::dpl::counting_iterator<int64_t>(0);
-    auto countIterO = oneapi::dpl::counting_iterator<int64_t>(0);
-
-    std::copy(policy, countIterI, countIterI + nnz, origIndices);
-    std::copy(policy, countIterO, countIterO + nnz, uniqueOffsets);
-
-    // auto indices1D_ptr = indices1D.data_ptr<int64_t>();
-    auto zipped_indices =
-        oneapi::dpl::make_zip_iterator(indices1D, origIndices);
-    std::sort(
-        policy, zipped_indices, zipped_indices + nnz, [](auto lhs, auto rhs) {
-          using std::get;
-          return get<0>(lhs) < get<0>(rhs);
-        });
     auto zipped_uniqueOffsets =
         oneapi::dpl::make_zip_iterator(indices1D, uniqueOffsets);
     auto newEnd = at::AtenIpexTypeXPU::unique(
@@ -298,8 +282,11 @@ Tensor packed_add(
     Tensor bot_half_view = bot_half.view({view_rows, view_columns});
     values = values.contiguous();
     int64_t stride = at::prod_intlist(values.sizes().slice(1));
-    LongTensor origIndices = at::empty({nnz}, indices.options());
+
     LongTensor uniqueOffsets = at::empty({nnz}, indices.options());
+    Tensor new_indices, origIndices;
+    std::tie(new_indices, origIndices) =
+        at::AtenIpexTypeXPU::sort(indices1D, 0, false);
 
     IPEX_DISPATCH_FLOATING_TYPES_AND(
         at::ScalarType::BFloat16,
@@ -310,7 +297,7 @@ Tensor packed_add(
               (unsigned short*)top_half.data_ptr<scalar_t>(),
               (unsigned short*)bot_half.data_ptr<scalar_t>(),
               values.data_ptr<at::BFloat16>(),
-              indices1D.data_ptr<int64_t>(),
+              new_indices.data_ptr<int64_t>(),
               origIndices.data_ptr<int64_t>(),
               uniqueOffsets.data_ptr<int64_t>(),
               stride,
