@@ -557,6 +557,10 @@ std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
       "var_mean", result1, result2, self, {}, unbiased, false, false);
 }
 
+Tensor view_as_real(const at::Tensor& self) {
+  return at::native::view_as_real(self);
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

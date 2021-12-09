@@ -615,6 +615,7 @@ supported:
   - view
   - zero_
   - addmm.out
+  - view_as_real
 autograd:
   - cdist
 #  - lstm.input # different signature
