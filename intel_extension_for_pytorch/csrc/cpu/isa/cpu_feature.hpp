@@ -9,7 +9,8 @@
 #define MICRO_CLASS_PRINT_BOOL_STATUS(feature_name) \
   print_bool_status(#feature_name, m_##feature_name)
 
-namespace torch_ipex { namespace cpu {
+namespace torch_ipex {
+namespace cpu {
 class CPUFeature {
  private:
   CPUFeature();
@@ -121,4 +122,5 @@ class CPUFeature {
   MICRO_CLASS_CHECK_FUNC(prefetchw);
   MICRO_CLASS_CHECK_FUNC(prefetchwt1);
 };
-}}
+} // namespace cpu
+} // namespace torch_ipex

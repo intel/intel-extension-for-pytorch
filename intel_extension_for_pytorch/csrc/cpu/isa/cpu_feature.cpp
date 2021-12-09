@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include "embedded_function.h"
 
-namespace torch_ipex { namespace cpu {
+namespace torch_ipex {
+namespace cpu {
 CPUFeature::CPUFeature() {
   detect_intel_cpu_feature();
 }
@@ -14,7 +15,6 @@ CPUFeature& CPUFeature::get_instance() {
 }
 
 void CPUFeature::detect_intel_cpu_feature() {
-
   uint32_t eax = 0;
   uint32_t ebx = 0;
   uint32_t ecx = 0;
@@ -142,9 +142,9 @@ bool CPUFeature::os_avx() {
     13.1 XSAVE-SUPPORTED FEATURES AND STATE-COMPONENT BITMAPS
     ......
     Bit 1 corresponds to the state component used for registers used by the
-    streaming SIMD extensions (SSE state). See Section 13.5.2. Bit 2 corresponds to
-    the state component used for the additional register state used by the Intel®
-    Advanced Vector Extensions (AVX state). See Section 13.5.3
+    streaming SIMD extensions (SSE state). See Section 13.5.2. Bit 2 corresponds
+    to the state component used for the additional register state used by the
+    Intel® Advanced Vector Extensions (AVX state). See Section 13.5.3
   */
   uint32_t avx_feature_bits = BIT_M_TO_N_64(xcrFeatureMask, 1, 2);
   if (avx_feature_bits == 0b11) {
@@ -191,9 +191,9 @@ bool CPUFeature::os_avx2() {
     13.1 XSAVE-SUPPORTED FEATURES AND STATE-COMPONENT BITMAPS
     ......
     Bit 1 corresponds to the state component used for registers used by the
-    streaming SIMD extensions (SSE state). See Section 13.5.2. Bit 2 corresponds to
-    the state component used for the additional register state used by the Intel®
-    Advanced Vector Extensions (AVX state). See Section 13.5.3
+    streaming SIMD extensions (SSE state). See Section 13.5.2. Bit 2 corresponds
+    to the state component used for the additional register state used by the
+    Intel® Advanced Vector Extensions (AVX state). See Section 13.5.3
   */
   uint32_t avx_feature_bits = BIT_M_TO_N_64(xcrFeatureMask, 1, 2);
   if (avx_feature_bits == 0b11) {
@@ -324,4 +324,5 @@ void CPUFeature::show_features() {
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchwt1);
 #endif
 }
-}}
+} // namespace cpu
+} // namespace torch_ipex
