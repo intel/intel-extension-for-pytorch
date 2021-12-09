@@ -3,7 +3,7 @@
 #include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
-#include "csrc/jit/cpu/kernels/CustomOPs.h"
+#include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/quantization/AutoCast.hpp"
 #include "csrc/utils/rw_lock.h"
 
@@ -521,7 +521,7 @@ at::Tensor embedding_bag_int8_impl(
   return output;
 }
 
-at::Tensor AtenIpexJITDev::dil_qembeddingbag(
+at::Tensor dil_qembeddingbag(
     const at::Tensor weight,
     const at::Tensor indices,
     const at::Tensor offsets,

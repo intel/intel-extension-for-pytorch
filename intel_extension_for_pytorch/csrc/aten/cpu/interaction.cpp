@@ -5,7 +5,7 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
-#include "csrc/jit/cpu/kernels/CustomOPs.h"
+#include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/quantization/AutoCast.hpp"
 
 #include <ATen/Parallel.h>
@@ -358,7 +358,7 @@ static inline void _interaction_s8s8_scale_s32s8(
   }
 }
 
-at::Tensor AtenIpexJITDev::dil_qinteraction(
+at::Tensor dil_qinteraction(
     const std::vector<at::Tensor> input,
     double output_scale,
     int64_t o_zp,

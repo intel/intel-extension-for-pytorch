@@ -7,7 +7,7 @@
 #include <algorithm>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
-#include "csrc/jit/cpu/kernels/CustomOPs.h"
+#include "csrc/jit/cpu/kernels/Softmax.h"
 
 namespace torch_ipex {
 /*
@@ -939,8 +939,7 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
         bboxes_in, dboxes_xywh, scale_xy, scale_wh);
   });
 
-  auto&& scores_result =
-      torch_ipex::cpu::AtenIpexJITDev::dil_softmax(scores_in, -1);
+  auto&& scores_result = torch_ipex::cpu::dil_softmax(scores_in, -1);
 
   return std::tuple<at::Tensor, at::Tensor>(bbox_result, scores_result);
 }
