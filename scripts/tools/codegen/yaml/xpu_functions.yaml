@@ -460,7 +460,7 @@ supported:
 #  - renorm  # different signature
   - renorm.out
 #  - renorm_  # different signature
-#  - repeat_interleave.Tensor  # different schema
+  - repeat_interleave.Tensor
   - replication_pad2d
 #  - replication_pad2d.out  # different signature
   - replication_pad2d_backward
@@ -616,6 +616,7 @@ supported:
   - zero_
   - addmm.out
   - view_as_real
+  - _reshape_alias
 autograd:
   - cdist
 #  - lstm.input # different signature

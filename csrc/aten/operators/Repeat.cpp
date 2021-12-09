@@ -4,6 +4,7 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/Helpers.h>
+#include "comm/ATDispatch.h"
 
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -12,11 +13,13 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename index_t>
 static void repeat_interleave_dpcpp_kernel(
-    int64_t* repeat_ptr,
+    index_t* repeat_ptr,
     int64_t* cumsum_ptr,
-    int64_t* result_ptr,
-    int64_t size) {
+    index_t* result_ptr,
+    int64_t size,
+    int64_t result_size) {
   auto& queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
   parallel_for_setup(size, tile_size, rng, grng);
@@ -57,13 +60,23 @@ static void repeat_interleave_dpcpp_kernel(
 
 } // namespace impl
 
-template <typename index_t>
 Tensor repeat_interleave(
     const Tensor& repeat,
     c10::optional<int64_t> output_size) {
-  return repeat_interleave_common<
-      index_t,
-      impl::repeat_interleave_dpcpp_kernel>(repeat, output_size);
+  Tensor output;
+  IPEX_DISPATCH_INDEX_TYPES(repeat.scalar_type(), "repeat_interleave", [&] {
+    output = repeat_interleave_common<
+        index_t,
+        impl::repeat_interleave_dpcpp_kernel<index_t>>(repeat, output_size);
+  });
+  return output;
+}
+
+Tensor _reshape_alias(
+    const Tensor& self,
+    IntArrayRef size,
+    IntArrayRef stride) {
+  return at::native::_reshape_alias(self, size, stride);
 }
 
 } // namespace AtenIpexTypeXPU

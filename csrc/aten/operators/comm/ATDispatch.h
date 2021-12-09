@@ -585,6 +585,9 @@
   IPEX_AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(              \
       SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, __VA_ARGS__)
 
+#define IPEX_DISPATCH_INDEX_TYPES(TYPE, NAME, ...) \
+  IPEX_AT_DISPATCH_INDEX_TYPES(TYPE, NAME, __VA_ARGS__)
+
 #endif
 #pragma once
 
@@ -1133,4 +1136,20 @@ inline void deprecated_IPEX_AT_DISPATCH_ALL_TYPES_AND_HALF_AND_COMPLEX() {}
       default:                                                               \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
     }                                                                        \
+  }()
+
+#define IPEX_AT_DISPATCH_INDEX_TYPES(TYPE, NAME, ...)                       \
+  [&] {                                                                     \
+    const auto& the_index_type = TYPE;                                      \
+    /* don't use TYPE again in case it is an expensive or side-effect op */ \
+    at::ScalarType _it = ::detail::scalar_type(the_index_type);             \
+    RECORD_KERNEL_FUNCTION_DTYPE(NAME, _it)                                 \
+    switch (_it) {                                                          \
+      AT_PRIVATE_CASE_TYPE_USING_HINT(                                      \
+          NAME, at::ScalarType::Int, int32_t, index_t, __VA_ARGS__)         \
+      AT_PRIVATE_CASE_TYPE_USING_HINT(                                      \
+          NAME, at::ScalarType::Long, int64_t, index_t, __VA_ARGS__)        \
+      default:                                                              \
+        AT_ERROR(#NAME, " not implemented for '", toString(_it), "'");      \
+    }                                                                       \
   }()
