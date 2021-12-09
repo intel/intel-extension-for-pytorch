@@ -419,9 +419,9 @@ Tensor& eye_out(int64_t n, int64_t m, Tensor& out) {
 }
 
 Tensor& randperm_out(
-    Tensor& result,
     int64_t n,
-    c10::optional<Generator> generator) {
+    c10::optional<Generator> generator,
+    Tensor& result) {
   TORCH_CHECK(n >= 0, "n must be non-negative, got", n);
   check_supported_max_int_with_precision(n, result);
   result.resize_({n});
@@ -434,7 +434,7 @@ Tensor& randperm_out(
 }
 
 Tensor& randperm_out(Tensor& result, int64_t n) {
-  return at::AtenIpexTypeXPU::randperm_out(result, n, c10::nullopt);
+  return at::AtenIpexTypeXPU::randperm_out(n, c10::nullopt, result);
 }
 
 Tensor randperm(
@@ -442,7 +442,7 @@ Tensor randperm(
     c10::optional<Generator> generator,
     const TensorOptions& options) {
   auto tensor = at::empty(n, options);
-  return at::AtenIpexTypeXPU::randperm_out(tensor, n, generator);
+  return at::AtenIpexTypeXPU::randperm_out(n, generator, tensor);
 }
 
 Tensor randperm(int64_t n, const TensorOptions& options) {

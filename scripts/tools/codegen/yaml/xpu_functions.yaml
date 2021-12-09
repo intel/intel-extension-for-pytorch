@@ -440,7 +440,7 @@ supported:
   - random_.to
 #  - randperm  # different schema
 #  - randperm.generator  # different schema
-#  - randperm.generator_out  # different signature
+  - randperm.generator_out
 #  - randperm.out  # dispatch is False
 #  - range.out  # different signature
 #  - reciprocal.out  # different signature
