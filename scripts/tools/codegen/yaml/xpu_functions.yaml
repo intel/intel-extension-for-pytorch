@@ -458,7 +458,7 @@ supported:
 #  - remainder_.Scalar  # different signature
   - remainder_.Tensor
 #  - renorm  # different signature
-#  - renorm.out  # different signature
+  - renorm.out
 #  - renorm_  # different signature
 #  - repeat_interleave.Tensor  # different schema
   - replication_pad2d

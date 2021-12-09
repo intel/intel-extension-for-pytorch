@@ -1056,11 +1056,11 @@ Tensor any(const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 Tensor& renorm_out(
-    Tensor& out,
     const Tensor& self,
-    Scalar p,
+    const Scalar& p,
     int64_t dim,
-    Scalar maxnorm) {
+    const Scalar& maxnorm,
+    Tensor& out) {
   TORCH_CHECK(!self.is_sparse(), "renorm(sycl_sparse) is not supported.");
   TORCH_CHECK(dim >= 0 && dim < self.dim(), "invalid dimension dim=", dim);
   TORCH_CHECK(p.toFloat() > 0, "non-positive-norm not supported");
@@ -1104,12 +1104,12 @@ Tensor renorm(const Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
 
   Tensor result;
   result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeXPU::renorm_out(result, self, p, dim, maxnorm);
+  at::AtenIpexTypeXPU::renorm_out(self, p, dim, maxnorm, result);
   return result;
 }
 
 Tensor& renorm_(Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
-  return at::AtenIpexTypeXPU::renorm_out(self, self, p, dim, maxnorm);
+  return at::AtenIpexTypeXPU::renorm_out(self, p, dim, maxnorm, self);
 }
 
 Tensor& std_var_out(
