@@ -509,7 +509,7 @@ supported:
   - soft_margin_loss_backward
 #  - soft_margin_loss_backward.grad_input  # different signature
 #  - softplus  # different signature
-#  - softplus.out  # different signature
+  - softplus.out
 #  - softplus_backward  # different signature
 #  - softplus_backward.grad_input  # different signature
 #  - softshrink  # different signature

@@ -14,10 +14,10 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 Tensor& softplus_out(
-    Tensor& out,
     const Tensor& self,
-    Scalar beta,
-    Scalar threshold) {
+    const Scalar& beta,
+    const Scalar& threshold,
+    Tensor& out) {
   checkBackend("softplus_forward", {out}, self.options().backend());
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
@@ -48,7 +48,7 @@ Tensor& softplus_out(
 
 Tensor softplus(const Tensor& self, Scalar beta, Scalar threshold) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::softplus_out(out, self, beta, threshold);
+  return at::AtenIpexTypeXPU::softplus_out(self, beta, threshold, out);
 }
 
 Tensor& softplus_backward_out(
