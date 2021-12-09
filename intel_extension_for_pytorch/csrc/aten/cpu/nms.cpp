@@ -1,10 +1,10 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+#include "nms.h"
 #include <ATen/Parallel.h>
 #include <c10/util/Exception.h>
 #include <immintrin.h>
 #include <torch/csrc/autograd/function.h>
 #include <algorithm>
-#include "ExtendOPs.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
 #include "csrc/jit/cpu/kernels/CustomOPs.h"
@@ -743,7 +743,7 @@ box_head_nms_cpu(
   return result;
 }
 
-at::Tensor AtenIpexTypeExt::nms(
+at::Tensor nms(
     const at::Tensor& dets,
     const at::Tensor& scores,
     const double threshold,
@@ -761,12 +761,11 @@ at::Tensor AtenIpexTypeExt::nms(
   return result;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::
-    batch_score_nms(
-        const at::Tensor& dets,
-        const at::Tensor& scores,
-        const double threshold,
-        const int64_t max_output) {
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> batch_score_nms(
+    const at::Tensor& dets,
+    const at::Tensor& scores,
+    const double threshold,
+    const int64_t max_output) {
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::batch_score_nms\n");
 #endif
@@ -781,14 +780,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::
   return result;
 }
 
-std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> AtenIpexTypeExt::
-    rpn_nms(
-        const at::Tensor& batch_dets,
-        const at::Tensor& batch_scores,
-        const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
-        const int64_t min_size,
-        const double threshold,
-        const int64_t max_output) {
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
+    const at::Tensor& batch_dets,
+    const at::Tensor& batch_scores,
+    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+    const int64_t min_size,
+    const double threshold,
+    const int64_t max_output) {
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::rpn_nms\n");
 #endif
@@ -807,7 +805,7 @@ std::tuple<
     std::vector<at::Tensor>,
     std::vector<at::Tensor>,
     std::vector<at::Tensor>>
-AtenIpexTypeExt::box_head_nms(
+box_head_nms(
     const std::vector<at::Tensor>& batch_bboxes,
     const std::vector<at::Tensor>& batch_scores,
     const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
@@ -919,7 +917,7 @@ at::Tensor scale_back_batch_kernel(
   return output;
 }
 
-std::tuple<at::Tensor, at::Tensor> AtenIpexTypeExt::parallel_scale_back_batch(
+std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
     const at::Tensor& bboxes_in,
     const at::Tensor& scores_in,
     const at::Tensor& dboxes_xywh,
@@ -951,14 +949,12 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexTypeExt::parallel_scale_back_batch(
 namespace {
 static auto dispatch =
     torch::RegisterOperators()
-        .op("torch_ipex::nms", &torch_ipex::AtenIpexTypeExt::nms)
-        .op("torch_ipex::batch_score_nms",
-            &torch_ipex::AtenIpexTypeExt::batch_score_nms)
-        .op("torch_ipex::rpn_nms", &torch_ipex::AtenIpexTypeExt::rpn_nms)
-        .op("torch_ipex::box_head_nms",
-            &torch_ipex::AtenIpexTypeExt::box_head_nms)
+        .op("torch_ipex::nms", &torch_ipex::nms)
+        .op("torch_ipex::batch_score_nms", &torch_ipex::batch_score_nms)
+        .op("torch_ipex::rpn_nms", &torch_ipex::rpn_nms)
+        .op("torch_ipex::box_head_nms", &torch_ipex::box_head_nms)
         .op("torch_ipex::parallel_scale_back_batch",
-            &torch_ipex::AtenIpexTypeExt::parallel_scale_back_batch);
+            &torch_ipex::parallel_scale_back_batch);
 }
 
 namespace torch_ipex {

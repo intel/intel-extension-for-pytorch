@@ -1,5 +1,5 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#include "ExtendOPs.h"
+#include "interaction.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
@@ -264,8 +264,7 @@ inline std::vector<at::Tensor> _interaction_backward(
   return output;
 }
 
-at::Tensor AtenIpexTypeExt::interaction_forward(
-    const std::vector<at::Tensor>& input) {
+at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
   if (input[0].scalar_type() == at::kFloat) {
     for (auto& in : input) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
@@ -280,7 +279,7 @@ at::Tensor AtenIpexTypeExt::interaction_forward(
   }
 }
 
-std::vector<at::Tensor> AtenIpexTypeExt::interaction_backward(
+std::vector<at::Tensor> interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   if (grad_out.scalar_type() == at::kFloat) {
@@ -460,13 +459,13 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch::schema(
           "torch_ipex::interaction_forward(Tensor[] input) -> Tensor",
           c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::AtenIpexTypeExt::interaction_forward);
+      torch_ipex::interaction_forward);
   m.def(
       torch::schema(
           "torch_ipex::interaction_backward(Tensor grad_out, "
           "Tensor[] input) -> Tensor[]",
           c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::AtenIpexTypeExt::interaction_backward);
+      torch_ipex::interaction_backward);
 }
 } // namespace
 

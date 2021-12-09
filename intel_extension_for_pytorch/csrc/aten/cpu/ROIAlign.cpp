@@ -1,8 +1,8 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+#include "ROIAlign.h"
 #include <ATen/ATen.h>
 #include <ATen/Parallel.h>
 #include <torch/library.h>
-#include "ExtendOPs.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
 #include "csrc/utils/library.h"
@@ -494,11 +494,10 @@ at::Tensor roi_align_forward_kernel(
     int64_t sampling_ratio,
     bool aligned) {
 #if defined(IPEX_DISP_OP)
-  printf("AtenIpexTypeExt::ROIAlign_forward\n");
+  printf("ROIAlign_forward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
-      "AtenIpexTypeExt::ROIAlign_forward", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("ROIAlign_forward", std::vector<c10::IValue>({}));
 #endif
   TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
@@ -558,11 +557,10 @@ at::Tensor roi_align_backward_kernel(
     int64_t sampling_ratio,
     bool aligned) {
 #if defined(IPEX_DISP_OP)
-  printf("AtenIpexTypeExt::ROIAlign_backward\n");
+  printf("ROIAlign_backward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
-      "AtenIpexTypeExt::ROIAlign_backward", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("ROIAlign_backward", std::vector<c10::IValue>({}));
 #endif
   TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
@@ -697,7 +695,7 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
       at::Tensor()};
 }
 
-at::Tensor AtenIpexTypeExt::ROIAlign_forward(
+at::Tensor ROIAlign_forward(
     const at::Tensor& input,
     const at::Tensor& rois,
     double spatial_scale,
@@ -743,7 +741,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ROIAlign_forward(Tensor input, Tensor rois, float spatial_scale, int "
       "pooled_height, int pooled_width, int sampling_ratio, bool aligned) -> "
       "Tensor",
-      torch_ipex::AtenIpexTypeExt::ROIAlign_forward);
+      torch_ipex::ROIAlign_forward);
 }
 
 } // namespace

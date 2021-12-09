@@ -36,7 +36,7 @@
 #include "intel_extension_for_pytorch/csrc/autocast/autocast_mode.h"
 
 #include "TaskModule.h"
-#include "intel_extension_for_pytorch/csrc/aten/cpu/ExtendOPs.h"
+#include "intel_extension_for_pytorch/csrc/aten/cpu/embeddingbag.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/CPUPool.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/TaskExecutor.h"
 #include "intel_extension_for_pytorch/csrc/cpu/utils/CPUISA.h"
@@ -258,8 +258,7 @@ void InitIpexModuleBindings(py::module m) {
 
   // extend OPs
   m.def(
-      "embedding_bag_fast_path_sum",
-      &AtenIpexTypeExt::embedding_bag_fast_path_sum);
+      "embedding_bag_fast_path_sum", &torch_ipex::embedding_bag_fast_path_sum);
 
   // runtime
   py::class_<torch_ipex::runtime::FutureTensor>(m, "FutureTensor")

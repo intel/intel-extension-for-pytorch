@@ -6,6 +6,18 @@
 #include <vector>
 
 namespace torch_ipex {
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
+    const at::Tensor& input,
+    std::vector<at::Tensor> hx,
+    std::vector<at::Tensor> params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first);
+
 namespace cpu {
 
 class IPEXLSTMOp : public torch::autograd::Function<IPEXLSTMOp> {

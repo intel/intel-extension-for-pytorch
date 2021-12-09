@@ -1,3 +1,4 @@
+#include "Cumsum.h"
 #include <ATen/NamedTensorUtils.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/cpu/vec/functional.h>
@@ -5,7 +6,6 @@
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorIterator.h>
 #include <immintrin.h>
-#include "ExtendOPs.h"
 
 namespace torch_ipex {
 
@@ -243,7 +243,7 @@ class NewCumSumOp : public torch::autograd::Function<NewCumSumOp> {
   }
 };
 
-at::Tensor AtenIpexTypeExt::cumsum(
+at::Tensor cumsum_impl(
     at::Tensor& result,
     const at::Tensor& self,
     int64_t dim,
@@ -259,14 +259,14 @@ at::Tensor cumsum(
     c10::optional<at::ScalarType> dtype) {
   auto casted_self = at::native::integer_upcast(self, dtype);
   at::Tensor result = at::empty_like(casted_self, at::MemoryFormat::Contiguous);
-  return AtenIpexTypeExt::cumsum(result, casted_self, dim, dtype);
+  return cumsum_impl(result, casted_self, dim, dtype);
 }
 
 at::Tensor& cumsum_(
     at::Tensor& self,
     int64_t dim,
     c10::optional<at::ScalarType> dtype) {
-  AtenIpexTypeExt::cumsum(self, self, dim, dtype);
+  cumsum_impl(self, self, dim, dtype);
   return self;
 }
 
@@ -275,8 +275,7 @@ at::Tensor& cumsum_out(
     int64_t dim,
     c10::optional<at::ScalarType> dtype,
     at::Tensor& result) {
-  AtenIpexTypeExt::cumsum(
-      result, self.toType(result.scalar_type()), dim, dtype);
+  cumsum_impl(result, self.toType(result.scalar_type()), dim, dtype);
   return result;
 }
 
