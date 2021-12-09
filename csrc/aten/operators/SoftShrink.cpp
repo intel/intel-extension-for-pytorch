@@ -49,7 +49,7 @@ static void softshrink_backward(TensorIterator& iter, Scalar lambd) {
 
 } // namespace impl
 
-Tensor& softshrink_out(Tensor& out, const Tensor& self, Scalar lambd) {
+Tensor& softshrink_out(const Tensor& self, const Scalar& lambd, Tensor& out) {
   checkBackend("softshrink_forward", {out}, self.options().backend());
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
@@ -67,7 +67,7 @@ Tensor softshrink(const Tensor& self, Scalar lambd) {
       lambd.to<double>(),
       ".");
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::softshrink_out(out, self, lambd);
+  return at::AtenIpexTypeXPU::softshrink_out(self, lambd, out);
 }
 
 Tensor& softshrink_backward_out(
