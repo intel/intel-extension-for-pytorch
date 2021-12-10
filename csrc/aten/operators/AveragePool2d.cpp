@@ -82,7 +82,7 @@ void avg_pool2d_out_template(
       outputWidth);
 
   Tensor input = input_;
-  if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (is_smf_channels_last(input_)) {
     output.resize_(
         {nbatch, nInputPlane, outputHeight, outputWidth},
         at::MemoryFormat::ChannelsLast);
@@ -147,7 +147,7 @@ Tensor& avg_pool2d_backward_out_template(
     bool count_include_pad) {
   Tensor gradOutput;
   /* resize */
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (is_smf_channels_last(input)) {
     gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
     gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
   } else {
@@ -348,7 +348,7 @@ Tensor avg_pool2d_backward(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor grad_input = input.is_contiguous(at::MemoryFormat::ChannelsLast)
+  Tensor grad_input = is_smf_channels_last(input)
       ? at::empty_like(input, at::MemoryFormat::ChannelsLast)
       : at::empty_like(input, MemoryFormat::Contiguous);
 

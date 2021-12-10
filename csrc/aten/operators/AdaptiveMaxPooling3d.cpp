@@ -41,10 +41,8 @@ void adaptive_max_pool3d_out_template(
       output_size.size() == 3,
       "adaptive_max_pool3d: internal error: output_size.size() must be 3");
 
-  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-          input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
-      ? input
-      : input.contiguous();
+  auto smf = input.suggest_memory_format();
+  Tensor input_ = is_smf_channels_last(input) ? input : input.contiguous();
 
   int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
   int64_t nblock = input_.size(-4);
@@ -80,7 +78,7 @@ void adaptive_max_pool3d_out_template(
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    if (at::MemoryFormat::ChannelsLast3d == smf) {
       output.resize_(
           {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
@@ -123,12 +121,10 @@ Tensor& adaptive_max_pool3d_backward_out_template(
     const Tensor& indices) {
   Tensor gradOutput;
   /* resize */
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
-  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast3d);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast3d);
+  auto smf = input.suggest_memory_format();
+  if (is_smf_channels_last(input)) {
+    gradInput.resize_as_(input, smf);
+    gradOutput = gradOutput_.contiguous(smf);
   } else {
     gradInput.resize_as_(input);
     gradOutput = gradOutput_.contiguous();
@@ -221,13 +217,8 @@ Tensor adaptive_max_pool3d_backward(
     const Tensor& self,
     const Tensor& indices) {
   Tensor grad_input;
-  if (self.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast);
-  } else if (self.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast3d);
-  } else {
-    grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  }
+  auto smf = self.suggest_memory_format();
+  grad_input = at::zeros_like(self, smf);
   impl::adaptive_max_pool3d_backward_out_template(
       grad_input, grad_output, self, indices);
   return grad_input;

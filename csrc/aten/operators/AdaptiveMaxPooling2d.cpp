@@ -44,9 +44,7 @@ void adaptive_max_pool2d_out_template(
   int64_t outputHeight = output_size[0];
   int64_t outputWidth = output_size[1];
 
-  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast)
-      ? input
-      : input.contiguous();
+  Tensor input_ = is_smf_channels_last(input) ? input : input.contiguous();
   int64_t nbatch = input_.size(0);
   int64_t nInputPlane = input_.size(1);
   int64_t inputHeight = input_.size(2);
@@ -65,7 +63,7 @@ void adaptive_max_pool2d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (is_smf_channels_last(input_)) {
     output.resize_(
         {nbatch, nInputPlane, outputHeight, outputWidth},
         at::MemoryFormat::ChannelsLast);
@@ -109,7 +107,7 @@ Tensor& adaptive_max_pool2d_backward_out_template(
       input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
   Tensor gradOutput;
   /* resize */
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (is_smf_channels_last(input)) {
     gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
     gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
   } else {
@@ -197,7 +195,7 @@ Tensor adaptive_max_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices) {
-  Tensor grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
+  Tensor grad_input = is_smf_channels_last(self)
       ? at::empty_like(self, at::MemoryFormat::ChannelsLast)
       : at::empty_like(self, MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::adaptive_max_pool2d_backward_out(

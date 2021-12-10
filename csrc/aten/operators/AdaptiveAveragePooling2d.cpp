@@ -46,10 +46,9 @@ void adaptive_avg_pool2d_out_template(
   int padH = (dH * (nOutputRows - 1) + kH - nInputRows) / 2;
 
   Tensor input_ = input;
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    output.resize_(
-        {batchSize, nInputPlane, nOutputRows, nOutputCols},
-        at::MemoryFormat::ChannelsLast);
+  auto smf = input.suggest_memory_format();
+  if (is_smf_channels_last(input)) {
+    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols}, smf);
   } else {
     input_ = input.contiguous();
     output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
@@ -85,9 +84,10 @@ void adaptive_avg_pool2d_backward_out_template(
       (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
   Tensor gradOutput;
   /* resize */
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
+  auto smf = input.suggest_memory_format();
+  if (is_smf_channels_last(input)) {
+    gradInput.resize_as_(input, smf);
+    gradOutput = gradOutput_.contiguous(smf);
   } else {
     gradInput.resize_as_(input);
     gradOutput = gradOutput_.contiguous();
@@ -196,8 +196,9 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
 Tensor _adaptive_avg_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
-  Tensor grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
-      ? at::empty_like(self, at::MemoryFormat::ChannelsLast)
+  auto smf = self.suggest_memory_format();
+  Tensor grad_input = is_smf_channels_last(self)
+      ? at::empty_like(self, smf)
       : at::empty_like(self, MemoryFormat::Contiguous);
   impl::adaptive_avg_pool2d_backward_out_template(
       grad_input, grad_output, self);

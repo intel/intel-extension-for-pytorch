@@ -41,7 +41,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_dpcpp.grad, x_dpcpp.grad.to(cpu_device))
 
     def test_channels_last_simple_fwd(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 1, 8, 8], device=cpu_device)
+        x_cpu = torch.randn([3, 2, 8, 8], device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
         max_pool = nn.AdaptiveMaxPool2d((2, 2), return_indices=True)
 
@@ -53,8 +53,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].to(dpcpp_device))
 
     def test_channels_last_simple_bwd(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 1, 8, 8], device=cpu_device)
-        grad_cpu = torch.randn([1, 1, 2, 2], device=cpu_device)
+        x_cpu = torch.randn([3, 2, 8, 8], device=cpu_device)
+        grad_cpu = torch.randn([3, 2, 2, 2], device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last)
         grad_dpcpp = grad_cpu.to(dpcpp_device)
 

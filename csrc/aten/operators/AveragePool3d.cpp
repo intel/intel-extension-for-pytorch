@@ -28,10 +28,8 @@ void avg_pool3d_out_template(
   //  TensorArg input_arg{ input, "input", 2 };
   //
   //  checkAllSameGPU("avg_pool3d_out_sycl", {output_arg, input_arg});
-  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-          input.is_contiguous(at::MemoryFormat::ChannelsLast3d)
-      ? input
-      : input.contiguous();
+
+  Tensor input_ = is_smf_channels_last(input) ? input : input.contiguous();
 
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
@@ -113,7 +111,7 @@ void avg_pool3d_out_template(
     // the 2nd dim is outputDepth, not channel dim
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+    if (is_smf_channels_last(input_)) {
       output.resize_(
           {nbatch, nblock, outputDepth, outputHeight, outputWidth},
           at::MemoryFormat::ChannelsLast3d);
@@ -185,12 +183,10 @@ Tensor& avg_pool3d_backward_out_template(
 
   Tensor gradOutput;
   /* resize */
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
-  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast3d);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast3d);
+  auto smf = input.suggest_memory_format();
+  if (is_smf_channels_last(input)) {
+    gradInput.resize_as_(input, smf);
+    gradOutput = gradOutput_.contiguous(smf);
   } else {
     gradInput.resize_as_(input);
     gradOutput = gradOutput_.contiguous();
@@ -397,10 +393,9 @@ Tensor avg_pool3d_backward(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
   Tensor grad_input;
-  if (self.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast);
-  } else if (self.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast3d);
+  auto smf = self.suggest_memory_format();
+  if (is_smf_channels_last(self)) {
+    grad_input = at::zeros_like(self, smf);
   } else {
     grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
   }
