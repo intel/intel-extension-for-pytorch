@@ -710,7 +710,7 @@ Tensor& set_(
 Tensor& set_(Tensor& self, const Tensor& source);
 Tensor& set_(Tensor& self);
 bool is_set_to(const Tensor& self, const Tensor& tensor);
-Tensor& masked_fill_(Tensor& self, const Tensor& mask, Scalar value);
+Tensor& masked_fill_(Tensor& self, const Tensor& mask, const Scalar& value);
 Tensor& masked_fill_(Tensor& self, const Tensor& mask, const Tensor& value);
 Tensor& masked_scatter_(Tensor& self, const Tensor& mask, const Tensor& source);
 Tensor view(const Tensor& self, IntArrayRef size);

@@ -313,7 +313,7 @@ supported:
   - lt.Tensor_out
   - lu_solve
 #  - lu_solve.out  # different signature
-#  - masked_fill_.Scalar  # different signature
+  - masked_fill_.Scalar
   - masked_fill_.Tensor
   - masked_scatter_
   - masked_select
