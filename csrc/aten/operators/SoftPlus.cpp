@@ -5,6 +5,7 @@
 #include <utils/DPCPP.h>
 #include "Loops.h"
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 
 using namespace xpu::dpcpp;
@@ -30,15 +31,15 @@ Tensor& softplus_out(
       iter.dtype(),
       "softplus_forward",
       [&]() {
-        auto b = beta.to<scalar_t>();
-        auto t = threshold.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-          return (
-              a * b > t
-                  ? a
-                  : scalar_t(
-                        Numerics<float>::log1p(Numerics<float>::exp(a * b)) /
-                        b));
+        using accscalar_t = acc_type<scalar_t>;
+        auto b = beta.to<accscalar_t>();
+        auto t = threshold.to<accscalar_t>();
+        dpcpp_kernel_for_tensor_iter(iter, [=](accscalar_t a) -> scalar_t {
+          return scalar_t(
+              a * b > t ? a
+                        : Numerics<accscalar_t>::log1p(
+                              Numerics<accscalar_t>::exp(a * b)) /
+                      b);
         });
       });
 
