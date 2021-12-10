@@ -509,6 +509,14 @@ class AtenSoftmaxRepalce(nn.Module):
     def forward(self, x):
         return self.softmax(x)
 
+class AtenBatchNormRepalce(nn.Module):
+    def __init__(self):
+        super(AtenBatchNormRepalce, self).__init__()
+        self.bn = torch.nn.BatchNorm2d(10)
+
+    def forward(self, x):
+        return self.bn(x)
+
 class AddLayerNorm(torch.nn.Module):
     def __init__(self, dim=32):
         super(AddLayerNorm, self).__init__()
@@ -925,13 +933,13 @@ class Tester(TestCase):
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::batch_norm",
+            kind_not_in_graph="ipex::batch_norm",
             levels=['O1'])
         self._test_output_bf16(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::batch_norm",
+            kind_not_in_graph="ipex::batch_norm",
             prec=0.02,
             levels=['O1'])
 
@@ -939,21 +947,21 @@ class Tester(TestCase):
         self._test_output(
             BatchNormConv_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::batch_norm",
+            kind_in_graph="ipex::batch_norm",
             kind_not_in_graph=None)
 
     def test_output_bn_conv_bn(self):
         self._test_output(
             BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::batch_norm",
+            kind_in_graph="ipex::batch_norm",
             kind_not_in_graph=None)
 
     def test_output_conv_reshape_bn_2d(self):
         self._test_output(
             ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::batch_norm",
+            kind_in_graph="ipex::batch_norm",
             kind_not_in_graph=None)
 
     def test_output_conv_conv_concate(self):
@@ -994,7 +1002,7 @@ class Tester(TestCase):
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="aten::conv3d",
-            kind_not_in_graph="aten::batch_norm")
+            kind_not_in_graph="ipex::batch_norm")
 
     def test_output_conv_relu_2d(self):
         self._test_output(
@@ -1061,12 +1069,12 @@ class Tester(TestCase):
             CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 64, 64),
             kind_in_graph="ipex_prepack::convolution_add_relu_run",
-            kind_not_in_graph="aten::batch_norm")
+            kind_not_in_graph="ipex::batch_norm")
         self._test_output_bf16(
             CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 64, 64),
             kind_in_graph="ipex_prepack::convolution_add_relu_run",
-            kind_not_in_graph="aten::batch_norm",
+            kind_not_in_graph="ipex::batch_norm",
             prec=0.02)
 
     def test_output_cascaded_conv_bn_sum_relu_3d(self):
@@ -1074,12 +1082,12 @@ class Tester(TestCase):
             CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum_relu",
-            kind_not_in_graph="aten::batch_norm")
+            kind_not_in_graph="ipex::batch_norm")
         self._test_output_bf16(
             CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum_relu",
-            kind_not_in_graph="aten::batch_norm",
+            kind_not_in_graph="ipex::batch_norm",
             prec=0.02)
 
     def test_output_conv_transpose2d(self):
@@ -1344,6 +1352,17 @@ class Tester(TestCase):
             AtenSoftmaxRepalce(),
             torch.rand(3, 4, 4, dtype=torch.bfloat16),
             kind_in_graph="ipex::softmax",
+            prec=5e-3)
+
+    def test_ipex_batch_norm(self):
+        self._test_output(
+            AtenBatchNormRepalce(),
+            torch.rand(10, 10, 4, 4),
+            kind_in_graph="ipex::batch_norm")
+        self._test_output_bf16(
+            AtenBatchNormRepalce(),
+            torch.rand(10, 10, 4, 4, dtype=torch.bfloat16),
+            kind_in_graph="ipex::batch_norm",
             prec=5e-3)
 
     def test_restore_inplace(self):

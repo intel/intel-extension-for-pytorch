@@ -342,6 +342,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // replace aten::softmax with ipex::softmax
   graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 
+  // replace aten::batch_norm with ipex::batch_norm, it will be removed
+  // after TensorExprs fix the performance issue(IPB-808).
+  graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
 }

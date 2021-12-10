@@ -29,9 +29,10 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
 
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph);
-void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph> &graph);
-void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph> &graph);
-void replaceInteractionWithQInteraction(std::shared_ptr<Graph> &graph);
+void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph);
+void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph>& graph);
+void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph>& graph);
+void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConv2dOp(std::shared_ptr<Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);

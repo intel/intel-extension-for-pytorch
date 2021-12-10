@@ -26,7 +26,7 @@ class TestOptimizeCases(TestCase):
                 x = torch.randn(1, 3, 224, 224)
                 traced_model = torch.jit.trace(opt_M, x)
                 trace_graph = traced_model.graph_for(x)
-            self.assertTrue(any(n.kind() == "aten::batch_norm" for n in trace_graph.nodes()))
+            self.assertTrue(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()))
             # TODO check weight_prepack.
 
     def test_optimize_bf16_model(self):
