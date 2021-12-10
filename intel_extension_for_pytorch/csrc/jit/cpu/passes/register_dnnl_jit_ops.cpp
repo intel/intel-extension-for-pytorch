@@ -441,6 +441,27 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = at::batch_norm(
+                (std::move(peek(stack, 0, 9))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 1, 9))),
+                toOptionalTensor(std::move(peek(stack, 2, 9))),
+                toOptionalTensor(std::move(peek(stack, 3, 9))),
+                toOptionalTensor(std::move(peek(stack, 4, 9))),
+                (std::move(peek(stack, 5, 9))).toBool(),
+                (std::move(peek(stack, 6, 9))).toDouble(),
+                (std::move(peek(stack, 7, 9))).toDouble(),
+                (std::move(peek(stack, 8, 9))).toBool());
+            drop(stack, 9);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::qembedding_bag(Tensor weight, Tensor indices, Tensor offsets, "
         "bool sparse, bool include_last_offset, "
         "float o_scale, int o_zp, ScalarType o_dtype) -> Tensor",
