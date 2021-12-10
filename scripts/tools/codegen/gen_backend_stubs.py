@@ -224,6 +224,14 @@ def main() -> None:
 
     run(options.source_yaml, options.output_dir, options.dry_run, options.impl_path)
 
+def print_backend_ops(backend_index):
+    ops = []
+    for op in backend_index.index:
+        ops.append(str(op))
+
+    for op in sorted(ops):
+        print(op)
+
 def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[str] = None) -> None:
 
     # Assumes that this file lives at PYTORCH_ROOT/tools/codegen/gen_backend_stubs.py
@@ -248,6 +256,7 @@ def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[st
 
     selector = SelectiveBuilder.get_nop_selector()
 
+    # print_backend_ops(backend_indices[DispatchKey.SparseCUDA])  # or backend_key or DispatchKey.CUDA
 
     if backend_key is None:
         # This could be useful if a backend wants to quickly set up a noop yaml file but doesn't have any kernels ready yet.
