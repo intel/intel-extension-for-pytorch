@@ -121,7 +121,7 @@ supported:
 #  - binary_cross_entropy_backward.grad_input  # different signature
   - bincount
 #  - bitwise_and.Scalar_out  # different signature
-#  - bitwise_and.Tensor_out  # different signature
+  - bitwise_and.Tensor_out
   - bitwise_not
 #  - bitwise_not.out  # different signature
   - bitwise_not_
@@ -410,7 +410,7 @@ supported:
 #  - normal.Tensor_float_out  # different signature
 #  - normal.float_Tensor  # different signature
 #  - normal.float_Tensor_out  # different signature
-#  - normal_  # different signature
+  - normal_
 #  - orgqr      # should not register
 #  - orgqr.out  # dispatch is False
   - ormqr
