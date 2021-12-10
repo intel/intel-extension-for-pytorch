@@ -933,11 +933,11 @@ Tensor& norm_out(
 }
 
 Tensor& norm_out(
-    Tensor& out,
     const Tensor& self,
-    c10::optional<Scalar> p,
+    const c10::optional<Scalar>& p,
     IntArrayRef dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& out) {
   return at::AtenIpexTypeXPU::norm_out(
       out, self, p, dim, keepdim, c10::nullopt);
 }

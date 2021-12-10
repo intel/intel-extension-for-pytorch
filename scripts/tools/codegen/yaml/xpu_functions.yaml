@@ -403,7 +403,7 @@ supported:
 #  - norm.ScalarOpt_dim_dtype  # different signature
 #  - norm.ScalarOpt_dtype  # different signature
 #  - norm.dtype_out  # different signature
-#  - norm.out  # different signature
+  - norm.out
 #  - normal.Tensor_Tensor  # different signature
 #  - normal.Tensor_Tensor_out  # different signature
 #  - normal.Tensor_float  # different signature
