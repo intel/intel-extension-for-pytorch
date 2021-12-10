@@ -32,6 +32,9 @@ set(IPEX_UTILS_SRCS)
 set(IPEX_UTILS_HEADERS)
 add_subdirectory(${IPEX_GPU_ROOT}/utils)
 
+set(IPEX_DISTRIBUTED_SRCS)
+add_subdirectory(${IPEX_GPU_ROOT}/distributed)
+
 if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
@@ -47,6 +50,7 @@ set(IPEX_INCLUDE_DIRS
 
 set(IPEX_GPU_CORE_SRC
         ${IPEX_JIT_SRCS}
+	${IPEX_DISTRIBUTED_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_AUTOGRAD_SRCS}
