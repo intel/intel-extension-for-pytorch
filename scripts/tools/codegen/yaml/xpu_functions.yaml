@@ -37,6 +37,7 @@ supported:
   - _pdist_backward
   - _pdist_forward
 #  - _qr_helper  # different schema
+  - _reshape_alias  # newly added
   - _s_where
   - _softmax
   - _softmax_backward_data
@@ -613,10 +614,8 @@ supported:
 #  - var_mean   # should not register
 #  - var_mean.dim       # should not register
   - view
+  - view_as_real   # newly added
   - zero_
-  - addmm.out
-  - view_as_real
-  - _reshape_alias
 autograd:
   - cdist
 #  - lstm.input # different signature
