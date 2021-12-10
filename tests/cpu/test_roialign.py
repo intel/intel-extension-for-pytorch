@@ -135,8 +135,10 @@ class RoIAlignTester(TestCase):
             x3 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
             y3 = fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
             y3.mean().backward()
-            self.assertTrue(y3.dtype == torch.float32)
-            self.assertTrue(x2.grad.dtype == torch.float32)
+            self.assertTrue(y3.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_y.to(y3.dtype), y3, rtol=1e-2, atol=1e-2))
+            self.assertTrue(x3.grad.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5))
 
     @skipIfNoTorchVision
     def test_torchvision_roialign(self):
@@ -182,8 +184,10 @@ class RoIAlignTester(TestCase):
             x3 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
             y3 = torchvision_fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
             y3.mean().backward()
-            self.assertTrue(y3.dtype == torch.float32)
-            self.assertTrue(x2.grad.dtype == torch.float32)
+            self.assertTrue(y3.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_y.to(y3.dtype), y3, rtol=1e-2, atol=1e-2))
+            self.assertTrue(x3.grad.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5))
 
 if __name__ == '__main__':
     test = unittest.main()
