@@ -260,7 +260,7 @@ supported:
 #  - index.Tensor  # different signature
 #  - index_add_         # should not register
   - index_copy_
-#  - index_fill_.int_Scalar  # different signature
+  - index_fill_.int_Scalar
   - index_fill_.int_Tensor
   - index_select
 #  - index_select.out  # different signature

@@ -728,7 +728,7 @@ Tensor& index_fill_(
     Tensor& self,
     int64_t dim,
     const Tensor& index,
-    Scalar value);
+    const Scalar& value);
 Tensor& index_fill_(
     Tensor& self,
     int64_t dim,

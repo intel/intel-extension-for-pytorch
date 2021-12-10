@@ -1141,7 +1141,7 @@ Tensor& index_fill_(
     Tensor& self,
     int64_t dim,
     const Tensor& index,
-    Scalar value) {
+    const Scalar& value) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
