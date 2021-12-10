@@ -1,11 +1,12 @@
 #include "fusion_pass.h"
 #include <string>
+#include "autocast/autocast_mode.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
-#include "autocast/autocast_mode.h"
 
 #include "aten/cpu/Pooling.h"
-#include "cpu/kernels/CustomOPs.h"
+#include "cpu/kernels/Convolution.h"
+#include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 
 #include <c10/util/hash.h>
