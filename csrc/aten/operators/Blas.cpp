@@ -822,8 +822,8 @@ Tensor addmm(
     const Tensor& input,
     const Tensor& m1,
     const Tensor& m2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   checkBackend("addmm", m1, Backend::QuantizedXPU);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 

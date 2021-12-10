@@ -9,7 +9,7 @@ supported:
 #  - adaptive_avg_pool2d        # should not register
 #  - adaptive_avg_pool2d.out	# different signature
 #  - add.Tensor	# different signature
-#  - addmm	# different signature
+  - addmm
   - as_strided
   - avg_pool2d
 #  - avg_pool2d.out	# different signature
