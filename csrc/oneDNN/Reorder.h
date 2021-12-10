@@ -65,9 +65,9 @@ static inline void reorder(
     Tensor& dst,
     const ReorderAttr& rattr = ReorderAttr()) {
   RECORD_FUNCTION("dnnl_reorder", std::vector<c10::IValue>({src}));
-  TORCH_CHECK(
-      dst.data_ptr() != src.data_ptr(),
-      "oneDNN reorder supports out-place implementation only ...");
+
+  if (dst.is_same(src))
+    return;
 
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
