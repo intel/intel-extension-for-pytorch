@@ -32,7 +32,7 @@ supported:
 #  - quantize_per_tensor	# different signature
 #  - quantized_max_pool2d	# different signature
   - record_stream
-#  - resize_	# different signature
+  - resize_
 #  - set_quantizer_	# different schema
   - upsample_nearest2d
   - upsample_nearest2d.vec
