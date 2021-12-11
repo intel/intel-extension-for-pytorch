@@ -132,7 +132,7 @@ supported:
   - bmm
 #  - bmm.out  # different signature
   - cauchy_
-#  - ceil.out  # different signature
+  - ceil.out
 #  - chain_matmul       # should not register
   - cholesky
 #  - cholesky.out  # different signature
