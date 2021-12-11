@@ -7,7 +7,7 @@
 
 namespace ${cpp_namespace} {
 
-struct ${class_name} {
+namespace ${class_name} {
 
 ${dispatch_declarations}
 
