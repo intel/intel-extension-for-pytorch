@@ -72,14 +72,27 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(
 std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     const at::Tensor& grad_output,
     const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& running_mean,
-    const at::Tensor& running_var,
-    const at::Tensor& save_mean,
-    const at::Tensor& save_var,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& running_mean_opt,
+    const c10::optional<at::Tensor>& running_var_opt,
+    const c10::optional<at::Tensor>& save_mean_opt,
+    const c10::optional<at::Tensor>& save_var_opt,
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
+  TORCH_WARN_ONCE(
+      "Warning: the function declaration is a little different, see in RegisterXPU.cpp. \n(const at::Tensor & grad_out, const at::Tensor & input, const c10::optional<at::Tensor> & weight, const c10::optional<at::Tensor> & running_mean, const c10::optional<at::Tensor> & running_var, const c10::optional<at::Tensor> & save_mean, const c10::optional<at::Tensor> & save_invstd, bool train, double eps, ::std::array<bool,3> output_mask) \n");
+
+  TORCH_CHECK(weight_opt.has_value(), "not implemented");
+  TORCH_CHECK(running_mean_opt.has_value(), "not implemented");
+  TORCH_CHECK(running_var_opt.has_value(), "not implemented");
+  TORCH_CHECK(save_mean_opt.has_value(), "not implemented");
+  TORCH_CHECK(save_var_opt.has_value(), "not implemented");
+  const Tensor weight = weight_opt.value();
+  const Tensor running_mean = running_mean_opt.value();
+  const Tensor running_var = running_var_opt.value();
+  const Tensor save_mean = save_mean_opt.value();
+  const Tensor save_var = save_var_opt.value();
   if (save_mean.defined() && save_var.defined()) {
     checkBackend(
         "batch_norm",

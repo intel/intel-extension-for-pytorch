@@ -378,7 +378,7 @@ supported:
   - mvlgamma_
   - narrow_copy
   - native_batch_norm
-#  - native_batch_norm_backward  # different signature
+  - native_batch_norm_backward
 #  - native_group_norm  # different signature
 #  - native_group_norm_backward  # different signature
 #  - native_layer_norm  # different schema
