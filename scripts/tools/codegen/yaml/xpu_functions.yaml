@@ -51,9 +51,9 @@ supported:
 #  - _var  # different schema
   - abs.out
   - acos.out
-#  - adaptive_avg_pool2d.out  # different signature
+  - adaptive_avg_pool2d.out
 #  - adaptive_avg_pool3d        # should not register
-#  - adaptive_avg_pool3d.out  # different signature
+  - adaptive_avg_pool3d.out
 #  - adaptive_avg_pool3d_backward  # different schema
 #  - adaptive_avg_pool3d_backward.grad_input  # different signature
   - adaptive_max_pool2d
@@ -73,10 +73,10 @@ supported:
   - addbmm_
   - addbmm.out
 #  - addcdiv	# different signature
-#  - addcdiv.out	# different signature
+#  - addcdiv.out       # different signature
 #  - addcdiv_	# different signature
 #  - addcmul	# different signature
-#  - addcmul.out	# different signature
+#  - addcmul.out       # different signature
 #  - addcmul_	# different signature
 #  - addmm	# different signature
   - addmm.out  # newly added
@@ -86,7 +86,7 @@ supported:
 #  - addr_	# different signature
   - all
   - all.dim
-#  - all.out  # different signature
+  - all.out
   - amax
 #  - amax.out  # different signature
   - any
