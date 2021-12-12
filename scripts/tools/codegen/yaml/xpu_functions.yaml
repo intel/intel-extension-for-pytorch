@@ -32,7 +32,7 @@ supported:
   - _log_softmax_backward_data
 #  - _lu_solve_helper  # different schema
 #  - _lu_with_info  # different schema
-#  - _make_per_channel_quantized_tensor  # different signature
+  - _make_per_channel_quantized_tensor
 #  - _make_per_tensor_quantized_tensor  # different signature
   - _pdist_backward
   - _pdist_forward
