@@ -19,7 +19,7 @@ supported:
 #  - empty.memory_format	# different signature
   - empty_strided
   - equal
-#  - int_repr	# different signature
+  - int_repr
 #  - leaky_relu	# different signature
 #  - leaky_relu_	# different signature
   - max_pool2d_with_indices
