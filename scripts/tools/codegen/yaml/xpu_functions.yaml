@@ -50,7 +50,7 @@ supported:
   - _unique2
 #  - _var  # different schema
   - abs.out
-#  - acos.out  # different signature
+  - acos.out
 #  - adaptive_avg_pool2d.out  # different signature
 #  - adaptive_avg_pool3d        # should not register
 #  - adaptive_avg_pool3d.out  # different signature
@@ -96,7 +96,7 @@ supported:
   - argmax
   - argmin
   - as_strided
-#  - asin.out  # different signature
+  - asin.out
   - atan.out
   - atan2
 #  - atan2.out  # different signature
@@ -160,7 +160,7 @@ supported:
   - copy_
   - cos.out
 #  - cos_  # disabled in torch
-#  - cosh.out	# different signature
+  - cosh.out
   - cross
 #  - cross.out  # different signature
   - dequantize.self
@@ -195,14 +195,14 @@ supported:
   - erfinv_
   - exp.out
 #  - exp_  # disabled in torch
-#  - expm1.out  # different signature
+  - expm1.out
   - exponential_
   - eye.m_out
 #  - eye.out    # different signature
   - fill_.Scalar
   - fill_.Tensor
   - flip
-#  - floor.out  # different signature
+  - floor.out
   - floor_divide
 #  - floor_divide.out  # different signature
   - floor_divide_.Tensor
@@ -290,11 +290,11 @@ supported:
   - lgamma
   - lgamma_
 #  - linspace.out  # different signature
-#  - log.out  # different signature
-#  - log10.out  # different signature
-#  - log1p.out  # different signature
+  - log.out
+  - log10.out
+  - log1p.out
   - log1p_
-#  - log2.out  # different signature
+  - log2.out
   - log_normal_
   - log_sigmoid_backward
 #  - log_sigmoid_backward.grad_input  # different signature
@@ -470,14 +470,14 @@ supported:
   - resize_as_
   - roll
   - rot90
-#  - round.out  # different signature
+  - round.out
 #  - rrelu  # dispatch is False
 #  - rrelu_  # dispatch is False
 #  - rrelu_with_noise  # different signature
 #  - rrelu_with_noise.out  # different signature
 #  - rrelu_with_noise_  # different signature
 #  - rrelu_with_noise_backward  # different signature
-#  - rsqrt.out  # different signature
+  - rsqrt.out
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
   - scatter_.src
@@ -498,8 +498,8 @@ supported:
   - sign
 #  - sign.out  # different signature
   - sign_
-#  - sin.out  # different signature
-#  - sinh.out  # different signature
+  - sin.out
+  - sinh.out
 #  - slice.Tensor  # different schema
   - smooth_l1_loss
 #  - smooth_l1_loss.out  # different signature
@@ -561,7 +561,7 @@ supported:
 #  - triu.out  # different signature
   - triu_
 #  - triu_indices  # different signature
-#  - trunc.out  # different signature
+  - trunc.out
   - unfold
   - uniform_
   - unique_consecutive
