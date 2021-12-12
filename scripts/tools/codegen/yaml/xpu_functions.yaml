@@ -9,7 +9,7 @@ supported:
   - _aminmax
   - _aminmax.dim
   - _cat
-#  - _cat.out  # different signature
+  - _cat.out
   - _cdist_backward
   - _cdist_forward
   - _ctc_loss
@@ -88,10 +88,10 @@ supported:
   - all.dim
   - all.out
   - amax
-#  - amax.out  # different signature
+  - amax.out
   - any
   - any.dim
-#  - any.out  # different signature
+  - any.out
   - arange.start_out
   - argmax
   - argmin
@@ -99,15 +99,15 @@ supported:
   - asin.out
   - atan.out
   - atan2
-#  - atan2.out  # different signature
+  - atan2.out
   - atan2_
 #  - atan_  # disabled in torch
   - avg_pool2d
-#  - avg_pool2d.out  # different signature
+  - avg_pool2d.out
   - avg_pool2d_backward
 #  - avg_pool2d_backward.grad_input  # different signature
   - avg_pool3d
-#  - avg_pool3d.out  # different signature
+  - avg_pool3d.out
   - avg_pool3d_backward
 #  - avg_pool3d_backward.grad_input  # different signature
   - baddbmm
@@ -123,23 +123,23 @@ supported:
 #  - bitwise_and.Scalar_out  # different signature
   - bitwise_and.Tensor_out
   - bitwise_not
-#  - bitwise_not.out  # different signature
+  - bitwise_not.out
   - bitwise_not_
 #  - bitwise_or.Scalar_out  # different signature
-#  - bitwise_or.Tensor_out  # different signature
+  - bitwise_or.Tensor_out
 #  - bitwise_xor.Scalar_out  # different signature
-#  - bitwise_xor.Tensor_out  # different signature
+  - bitwise_xor.Tensor_out
   - bmm
-#  - bmm.out  # different signature
+  - bmm.out
   - cauchy_
   - ceil.out
 #  - chain_matmul       # should not register
   - cholesky
-#  - cholesky.out  # different signature
+  - cholesky.out
   - cholesky_inverse
-#  - cholesky_inverse.out  # different signature
+  - cholesky_inverse.out
   - cholesky_solve
-#  - cholesky_solve.out  # different signature
+  - cholesky_solve.out
 #  - clamp  # different signature
 #  - clamp.out  # different signature
 #  - clamp_  # different signature
@@ -149,7 +149,7 @@ supported:
 #  - clamp_min_  # different signature
   - clone
   - col2im
-#  - col2im.out  # different signature
+  - col2im.out
   - col2im_backward
 #  - col2im_backward.grad_input  # different signature
 #  - conj.out  # different schema
@@ -162,15 +162,15 @@ supported:
 #  - cos_  # disabled in torch
   - cosh.out
   - cross
-#  - cross.out  # different signature
+  - cross.out
   - dequantize.self
   - diag
-#  - diag.out  # different signature
+  - diag.out
   - digamma
-#  - digamma.out  # different signature
+  - digamma.out
   - digamma_
   - div.Tensor
-#  - div.out  # different signature
+  - div.out
   - div_.Tensor
   - dot
 #  - elu  # different signature
@@ -191,29 +191,29 @@ supported:
   - erfc.out
 #  - erfc_  # disabled in torch
   - erfinv
-#  - erfinv.out  # different signature
+  - erfinv.out
   - erfinv_
   - exp.out
 #  - exp_  # disabled in torch
   - expm1.out
   - exponential_
   - eye.m_out
-#  - eye.out    # different signature
+  - eye.out
   - fill_.Scalar
   - fill_.Tensor
   - flip
   - floor.out
   - floor_divide
-#  - floor_divide.out  # different signature
+  - floor_divide.out
   - floor_divide_.Tensor
 #  - fmod.Scalar  # different signature
 #  - fmod.Scalar_out  # different signature
   - fmod.Tensor
-#  - fmod.Tensor_out  # different signature
+  - fmod.Tensor_out
 #  - fmod_.Scalar  # different signature
   - fmod_.Tensor
   - frac
-#  - frac.out  # different signature
+  - frac.out
   - frac_
   - fractional_max_pool2d
 #  - fractional_max_pool2d.output  # different signature
@@ -224,7 +224,7 @@ supported:
   - fractional_max_pool3d_backward
 #  - fractional_max_pool3d_backward.grad_input  # different signature
   - gather
-#  - gather.out  # different signature
+  - gather.out
   - ge.Scalar
   - ge.Scalar_out
   - ge.Tensor
@@ -237,7 +237,7 @@ supported:
 #  - ger        # should not register
 #  - ger.out  # dispatch is False
   - glu
-#  - glu.out  # different signature
+  - glu.out
   - glu_backward
 #  - glu_backward.grad_input  # different signature
   - gt.Scalar
@@ -254,7 +254,7 @@ supported:
   - histc
   - histc.out
   - im2col
-#  - im2col.out  # different signature
+  - im2col.out
   - im2col_backward
 #  - im2col_backward.grad_input  # different signature
 #  - index.Tensor  # different signature
@@ -263,14 +263,14 @@ supported:
   - index_fill_.int_Scalar
   - index_fill_.int_Tensor
   - index_select
-#  - index_select.out  # different signature
+  - index_select.out
   - inverse
-#  - inverse.out  # different signature
+  - inverse.out
   - is_set_to
   - isnan
   - kthvalue.values
   - l1_loss
-#  - l1_loss.out  # different signature
+  - l1_loss.out
   - l1_loss_backward
 #  - l1_loss_backward.grad_input  # different signature
   - le.Scalar
@@ -302,7 +302,7 @@ supported:
 #  - log_sigmoid_forward.output  # different signature
   - logical_and.out
 #  - logical_not        # should not register
-#  - logical_not.out  # different signature
+  - logical_not.out
 #  - logical_not_       # should not register
   - logical_or.out
   - logical_xor.out
@@ -312,12 +312,12 @@ supported:
   - lt.Tensor
   - lt.Tensor_out
   - lu_solve
-#  - lu_solve.out  # different signature
+  - lu_solve.out
   - masked_fill_.Scalar
   - masked_fill_.Tensor
   - masked_scatter_
   - masked_select
-#  - masked_select.out  # different signature
+  - masked_select.out
   - max
   - max.dim
 #  - max.dim_max  # different signature
@@ -331,36 +331,36 @@ supported:
   - max_pool3d_with_indices_backward
 #  - max_pool3d_with_indices_backward.grad_input  # different signature
   - max_unpool2d
-#  - max_unpool2d.out  # different signature
+  - max_unpool2d.out
   - max_unpool2d_backward
 #  - max_unpool2d_backward.grad_input  # different signature
   - max_unpool3d
-#  - max_unpool3d.out  # different signature
+  - max_unpool3d.out
   - max_unpool3d_backward
 #  - max_unpool3d_backward.grad_input  # different signature
   - maximum
-#  - maximum.out  # different signature
+  - maximum.out
   - mean
   - mean.dim
-#  - mean.out  # different signature
+  - mean.out
   - median
   - min
   - min.dim
 #  - min.dim_min  # different signature
 #  - min.out  # dispatch is False
   - minimum
-#  - minimum.out  # different signature
+  - minimum.out
   - mm
-#  - mm.out  # different signature
+  - mm.out
   - mode
 #  - mode.values  # different signature
   - mse_loss
-#  - mse_loss.out  # different signature
+  - mse_loss.out
   - mse_loss_backward
 #  - mse_loss_backward.grad_input  # different signature
 #  - mul.Scalar  # different signature
   - mul.Tensor
-#  - mul.out  # different signature
+  - mul.out
 #  - mul_.Scalar  # different signature
   - mul_.Tensor
 #  - multi_margin_loss  # different signature
@@ -397,7 +397,7 @@ supported:
 #  - nll_loss_forward  # different signature
 #  - nll_loss_forward.output  # different signature
   - nonzero
-#  - nonzero.out  # different signature
+  - nonzero.out
 #  - norm.Scalar  # different signature
 #  - norm.ScalarOpt_dim  # different signature
 #  - norm.ScalarOpt_dim_dtype  # different signature
@@ -414,23 +414,23 @@ supported:
 #  - orgqr      # should not register
 #  - orgqr.out  # dispatch is False
   - ormqr
-#  - ormqr.out  # different signature
+  - ormqr.out
   - polygamma
-#  - polygamma.out  # different signature
+  - polygamma.out
   - polygamma_
 #  - pow.Scalar  # different signature
 #  - pow.Scalar_out  # different signature
 #  - pow.Tensor_Scalar  # different signature
 #  - pow.Tensor_Scalar_out  # different signature
   - pow.Tensor_Tensor
-#  - pow.Tensor_Tensor_out  # different signature
+  - pow.Tensor_Tensor_out
 #  - pow_.Scalar  # different signature
   - pow_.Tensor
   - prelu
   - prelu_backward
   - prod
   - prod.dim_int
-#  - prod.int_out  # different signature
+  - prod.int_out
   - put_
 #  - qr         # should not register
 #  - qr.Q  # dispatch is False
@@ -444,10 +444,10 @@ supported:
   - randperm.generator_out
 #  - randperm.out  # dispatch is False
   - range.out
-#  - reciprocal.out  # different signature
+  - reciprocal.out
   - record_stream
   - reflection_pad1d
-#  - reflection_pad1d.out  # different signature
+  - reflection_pad1d.out
   - reflection_pad1d_backward
 #  - reflection_pad1d_backward.grad_input  # different signature
   - relu
@@ -455,7 +455,7 @@ supported:
 #  - remainder.Scalar  # different signature
 #  - remainder.Scalar_out  # different signature
   - remainder.Tensor
-#  - remainder.Tensor_out  # different signature
+  - remainder.Tensor_out
 #  - remainder_.Scalar  # different signature
   - remainder_.Tensor
 #  - renorm  # different signature
@@ -463,7 +463,7 @@ supported:
 #  - renorm_  # different signature
   - repeat_interleave.Tensor
   - replication_pad2d
-#  - replication_pad2d.out  # different signature
+  - replication_pad2d.out
   - replication_pad2d_backward
 #  - replication_pad2d_backward.grad_input  # different signature
   - resize_
@@ -496,17 +496,17 @@ supported:
 #  - sigmoid_backward  # disabled in torch
   - sigmoid_backward.grad_input
   - sign
-#  - sign.out  # different signature
+  - sign.out
   - sign_
   - sin.out
   - sinh.out
 #  - slice.Tensor  # different schema
   - smooth_l1_loss
-#  - smooth_l1_loss.out  # different signature
+  - smooth_l1_loss.out
   - smooth_l1_loss_backward
 #  - smooth_l1_loss_backward.grad_input  # different signature
   - soft_margin_loss
-#  - soft_margin_loss.out  # different signature
+  - soft_margin_loss.out
   - soft_margin_loss_backward
 #  - soft_margin_loss_backward.grad_input  # different signature
 #  - softplus  # different signature
@@ -521,7 +521,7 @@ supported:
 #  - solve.solution  # different signature
   - sort
 #  - sort.values  # different signature
-#  - sqrt.out  # different signature
+  - sqrt.out
 #  - std        # should not register
 #  - std.dim    # should not register
 #  - std.out  # dispatch is False
@@ -533,7 +533,7 @@ supported:
 #  - sub_.Scalar  # different signature
 #  - sub_.Tensor  # different signature
   - sum
-#  - sum.IntList_out  # different signature
+  - sum.IntList_out
   - sum.dim_IntList
 #  - svd        # should not register
 #  - svd.U  # dispatch is False
@@ -568,43 +568,43 @@ supported:
   - unique_dim
   - unique_dim_consecutive
   - upsample_bicubic2d
-#  - upsample_bicubic2d.out  # different signature
+  - upsample_bicubic2d.out
   - upsample_bicubic2d.vec
   - upsample_bicubic2d_backward
 #  - upsample_bicubic2d_backward.grad_input  # different signature
   - upsample_bicubic2d_backward.vec
   - upsample_bilinear2d
-#  - upsample_bilinear2d.out  # different signature
+  - upsample_bilinear2d.out
   - upsample_bilinear2d.vec
   - upsample_bilinear2d_backward
 #  - upsample_bilinear2d_backward.grad_input  # different signature
   - upsample_bilinear2d_backward.vec
   - upsample_linear1d
-#  - upsample_linear1d.out  # different signature
+  - upsample_linear1d.out
   - upsample_linear1d.vec
   - upsample_linear1d_backward
 #  - upsample_linear1d_backward.grad_input  # different signature
   - upsample_linear1d_backward.vec
   - upsample_nearest1d
-#  - upsample_nearest1d.out  # different signature
+  - upsample_nearest1d.out
   - upsample_nearest1d.vec
   - upsample_nearest1d_backward
 #  - upsample_nearest1d_backward.grad_input  # different signature
   - upsample_nearest1d_backward.vec
   - upsample_nearest2d
-#  - upsample_nearest2d.out  # different signature
+  - upsample_nearest2d.out
   - upsample_nearest2d.vec
   - upsample_nearest2d_backward
 #  - upsample_nearest2d_backward.grad_input  # different signature
   - upsample_nearest2d_backward.vec
   - upsample_nearest3d
-#  - upsample_nearest3d.out  # different signature
+  - upsample_nearest3d.out
   - upsample_nearest3d.vec
   - upsample_nearest3d_backward
 #  - upsample_nearest3d_backward.grad_input  # different signature
   - upsample_nearest3d_backward.vec
   - upsample_trilinear3d
-#  - upsample_trilinear3d.out  # different signature
+  - upsample_trilinear3d.out
   - upsample_trilinear3d.vec
   - upsample_trilinear3d_backward
 #  - upsample_trilinear3d_backward.grad_input  # different signature
