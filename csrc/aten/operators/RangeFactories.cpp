@@ -297,32 +297,44 @@ Tensor& arange_dpcpp_out(
 }
 
 } // namespace impl
+Tensor& linspace_out(
+    const at::Scalar& start,
+    const at::Scalar& end,
+    c10::optional<int64_t> steps,
+    at::Tensor& out);
 
 Tensor& linspace_out(
-    Tensor& out,
-    Scalar start,
-    Scalar end,
-    c10::optional<int64_t> steps) {
+    const Scalar& start,
+    const Scalar& end,
+    c10::optional<int64_t> steps,
+    Tensor& out) {
   impl::linspace_dpcpp_out(out, start, end, steps);
   return out;
 }
 
 Tensor& logspace_out(
-    Tensor& out,
-    Scalar start,
-    Scalar end,
+    const Scalar& start,
+    const Scalar& end,
     c10::optional<int64_t> steps,
-    double base) {
+    double base,
+    Tensor& out) {
   impl::logspace_dpcpp_out(out, start, end, steps, base);
   return out;
 }
 
-Tensor& range_out(Tensor& out, Scalar start, Scalar end, Scalar step) {
+Tensor& range_out(
+    const Scalar& start,
+    const Scalar& end,
+    const Scalar& step,
+    Tensor& out) {
   impl::range_dpcpp_out(out, start, end, step);
   return out;
 }
-
-Tensor& arange_out(Tensor& out, Scalar start, Scalar end, Scalar step) {
+Tensor& arange_out(
+    const Scalar& start,
+    const Scalar& end,
+    const Scalar& step,
+    Tensor& out) {
   impl::arange_dpcpp_out(out, start, end, step);
   return out;
 }

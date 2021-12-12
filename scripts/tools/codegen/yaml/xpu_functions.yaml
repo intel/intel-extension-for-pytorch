@@ -92,7 +92,7 @@ supported:
   - any
   - any.dim
 #  - any.out  # different signature
-#  - arange.start_out  # different signature
+  - arange.start_out
   - argmax
   - argmin
   - as_strided
@@ -289,7 +289,7 @@ supported:
   - lerp_.Tensor
   - lgamma
   - lgamma_
-#  - linspace.out  # different signature
+  - linspace.out
   - log.out
   - log10.out
   - log1p.out
@@ -306,7 +306,7 @@ supported:
 #  - logical_not_       # should not register
   - logical_or.out
   - logical_xor.out
-#  - logspace.out  # different signature
+  - logspace.out
   - lt.Scalar
   - lt.Scalar_out
   - lt.Tensor
@@ -443,7 +443,7 @@ supported:
 #  - randperm.generator  # different schema
   - randperm.generator_out
 #  - randperm.out  # dispatch is False
-#  - range.out  # different signature
+  - range.out
 #  - reciprocal.out  # different signature
   - record_stream
   - reflection_pad1d
@@ -557,10 +557,10 @@ supported:
 #  - triangular_solve.X  # different signature
   - tril.out
   - tril_
-#  - tril_indices  # different signature
+  - tril_indices
   - triu.out
   - triu_
-#  - triu_indices  # different signature
+  - triu_indices
   - trunc.out
   - unfold
   - uniform_

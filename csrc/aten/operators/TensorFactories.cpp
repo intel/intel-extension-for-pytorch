@@ -453,7 +453,13 @@ Tensor tril_indices(
     int64_t row,
     int64_t col,
     int64_t offset,
-    const TensorOptions& options) {
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   return at::impl::tril_indices_dpcpp(row, col, offset, options);
 }
 
@@ -461,7 +467,13 @@ Tensor triu_indices(
     int64_t row,
     int64_t col,
     int64_t offset,
-    const TensorOptions& options) {
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   return at::impl::triu_indices_dpcpp(row, col, offset, options);
 }
 
