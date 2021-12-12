@@ -620,13 +620,17 @@ void GroupNormBackwardKernelImpl(
 
 std::tuple<Tensor, Tensor, Tensor> native_group_norm(
     const Tensor& X,
-    const Tensor& gamma /* optional */,
-    const Tensor& beta /* optional */,
+    const c10::optional<at::Tensor>& gamma_opt,
+    const c10::optional<at::Tensor>& beta_opt,
     int64_t N,
     int64_t C,
     int64_t HxW,
     int64_t group,
     double eps) {
+  TORCH_CHECK(gamma_opt.has_value(), "not implemented");
+  TORCH_CHECK(beta_opt.has_value(), "not implemented");
+  const Tensor gamma = gamma_opt.value();
+  const Tensor beta = beta_opt.value();
   Tensor Y = at::empty_like(X);
   Tensor mean = at::empty({N, group}, X.options());
   Tensor rstd = at::empty({N, group}, X.options());
