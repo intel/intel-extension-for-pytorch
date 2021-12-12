@@ -42,10 +42,10 @@ void lerp(
 } // namespace impl
 
 Tensor& lerp_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& end,
-    const Tensor& weight) {
+    const Tensor& weight,
+    Tensor& out) {
   c10::MaybeOwned<Tensor> b_self, b_end, b_weight;
   TORCH_CHECK(
       weight.dim() <= std::max(self.dim(), end.dim()),
@@ -60,10 +60,10 @@ Tensor& lerp_out(
 }
 
 Tensor& lerp_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& end,
-    Scalar weight) {
+    const Scalar& weight,
+    Tensor& out) {
   c10::MaybeOwned<Tensor> b_self, b_end;
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_out");
   out.resize_as_(*b_self);
@@ -96,7 +96,7 @@ Tensor& lerp_(Tensor& self, const Tensor& end, const Tensor& weight) {
   return self;
 }
 
-Tensor& lerp_(Tensor& self, const Tensor& end, Scalar weight) {
+Tensor& lerp_(Tensor& self, const Tensor& end, const Scalar& weight) {
   c10::MaybeOwned<Tensor> b_self, b_end;
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_");
   TORCH_CHECK(
@@ -117,13 +117,13 @@ Tensor& lerp_(Tensor& self, const Tensor& end, Scalar weight) {
 
 Tensor lerp(const Tensor& self, const Tensor& end, const Tensor& weight) {
   Tensor result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::lerp_out(result, self, end, weight);
+  return at::AtenIpexTypeXPU::lerp_out(self, end, weight, result);
 }
 
-Tensor lerp(const Tensor& self, const Tensor& end, Scalar weight) {
+Tensor lerp(const Tensor& self, const Tensor& end, const Scalar& weight) {
   Tensor result = at::empty_like(self);
   return at::AtenIpexTypeXPU::lerp_out(
-      result, self, end, wrapped_scalar_tensor(weight, kXPU).to(self.dtype()));
+      self, end, wrapped_scalar_tensor(weight, kXPU).to(self.dtype()), result);
 }
 
 } // namespace AtenIpexTypeXPU

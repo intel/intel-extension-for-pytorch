@@ -281,11 +281,11 @@ supported:
 #  - leaky_relu.out  # different signature
 #  - leaky_relu_  # different signature
 #  - leaky_relu_backward  # different signature
-#  - lerp.Scalar  # different signature
-#  - lerp.Scalar_out  # different signature
+  - lerp.Scalar
+  - lerp.Scalar_out
   - lerp.Tensor
-#  - lerp.Tensor_out  # different signature
-#  - lerp_.Scalar  # different signature
+  - lerp.Tensor_out
+  - lerp_.Scalar
   - lerp_.Tensor
   - lgamma
   - lgamma_
@@ -555,10 +555,10 @@ supported:
   - trace
   - triangular_solve
 #  - triangular_solve.X  # different signature
-#  - tril.out  # different signature
+  - tril.out
   - tril_
 #  - tril_indices  # different signature
-#  - triu.out  # different signature
+  - triu.out
   - triu_
 #  - triu_indices  # different signature
   - trunc.out

@@ -747,22 +747,22 @@ static void apply_cholesky_dpcpp(
 
 } // namespace impl
 
-Tensor& triu_out(Tensor& out, const Tensor& self, int64_t diagonal) {
+Tensor& triu_out(const Tensor& self, int64_t diagonal, Tensor& out) {
   impl::triu_dpcpp_out(out, self, diagonal);
   return out;
 }
 
-Tensor& tril_out(Tensor& out, const Tensor& self, int64_t diagonal) {
+Tensor& tril_out(const Tensor& self, int64_t diagonal, Tensor& out) {
   impl::tril_dpcpp_out(out, self, diagonal);
   return out;
 }
 
 Tensor& tril_(Tensor& self, int64_t diagonal) {
-  return at::AtenIpexTypeXPU::tril_out(self, self, diagonal);
+  return at::AtenIpexTypeXPU::tril_out(self, diagonal, self);
 }
 
 Tensor& triu_(Tensor& self, int64_t diagonal) {
-  return at::AtenIpexTypeXPU::triu_out(self, self, diagonal);
+  return at::AtenIpexTypeXPU::triu_out(self, diagonal, self);
 }
 
 std::tuple<Tensor, Tensor, Tensor> _lu_with_info(
