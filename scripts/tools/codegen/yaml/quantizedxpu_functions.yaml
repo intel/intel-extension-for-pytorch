@@ -7,12 +7,12 @@ supported:
   - _adaptive_avg_pool2d
   - _empty_affine_quantized
 #  - adaptive_avg_pool2d        # should not register
-#  - adaptive_avg_pool2d.out	# different signature
+  - adaptive_avg_pool2d.out
 #  - add.Tensor	# different signature
   - addmm
   - as_strided
   - avg_pool2d
-#  - avg_pool2d.out	# different signature
+  - avg_pool2d.out
   - clone
   - copy_
   - dequantize.self
