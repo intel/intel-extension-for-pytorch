@@ -343,7 +343,7 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                     args_exprs_list.append(a.name)
 
                 if metadata.kernel in functions_out_from_last_to_first:
-                    assert 'out' in args_exprs_list[-1]
+                    assert 'out' in args_exprs_list[-1] or 'grad_input' in args_exprs_list[-1]
                     out = args_exprs_list.pop()
                     args_exprs_list.reverse()
                     args_exprs_list.append(out)

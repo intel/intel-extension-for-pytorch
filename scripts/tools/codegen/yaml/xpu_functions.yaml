@@ -55,15 +55,15 @@ supported:
 #  - adaptive_avg_pool3d        # should not register
   - adaptive_avg_pool3d.out
 #  - adaptive_avg_pool3d_backward  # different schema
-#  - adaptive_avg_pool3d_backward.grad_input  # different signature
+  - adaptive_avg_pool3d_backward.grad_input
   - adaptive_max_pool2d
 #  - adaptive_max_pool2d.out  # different signature
   - adaptive_max_pool2d_backward
-#  - adaptive_max_pool2d_backward.grad_input  # different signature
+  - adaptive_max_pool2d_backward.grad_input
   - adaptive_max_pool3d
 #  - adaptive_max_pool3d.out  # different signature
   - adaptive_max_pool3d_backward
-#  - adaptive_max_pool3d_backward.grad_input  # different signature
+  - adaptive_max_pool3d_backward.grad_input
 #  - add.Scalar  # different signature
 #  - add.Tensor  # different signature
   - add.out
@@ -105,11 +105,11 @@ supported:
   - avg_pool2d
   - avg_pool2d.out
   - avg_pool2d_backward
-#  - avg_pool2d_backward.grad_input  # different signature
+  - avg_pool2d_backward.grad_input
   - avg_pool3d
   - avg_pool3d.out
   - avg_pool3d_backward
-#  - avg_pool3d_backward.grad_input  # different signature
+  - avg_pool3d_backward.grad_input
   - baddbmm
   - baddbmm.out
   - baddbmm_
@@ -151,7 +151,7 @@ supported:
   - col2im
   - col2im.out
   - col2im_backward
-#  - col2im_backward.grad_input  # different signature
+  - col2im_backward.grad_input
 #  - conj.out  # different schema
   - conv_tbc
 #  - conv_tbc_backward  # should not register
@@ -218,11 +218,11 @@ supported:
   - fractional_max_pool2d
 #  - fractional_max_pool2d.output  # different signature
   - fractional_max_pool2d_backward
-#  - fractional_max_pool2d_backward.grad_input  # different signature
+  - fractional_max_pool2d_backward.grad_input
   - fractional_max_pool3d
 #  - fractional_max_pool3d.output  # different signature
   - fractional_max_pool3d_backward
-#  - fractional_max_pool3d_backward.grad_input  # different signature
+  - fractional_max_pool3d_backward.grad_input
   - gather
   - gather.out
   - ge.Scalar
@@ -239,7 +239,7 @@ supported:
   - glu
   - glu.out
   - glu_backward
-#  - glu_backward.grad_input  # different signature
+  - glu_backward.grad_input
   - gt.Scalar
   - gt.Scalar_out
   - gt.Tensor
@@ -256,7 +256,7 @@ supported:
   - im2col
   - im2col.out
   - im2col_backward
-#  - im2col_backward.grad_input  # different signature
+  - im2col_backward.grad_input
 #  - index.Tensor  # different signature
 #  - index_add_         # should not register
   - index_copy_
@@ -272,7 +272,7 @@ supported:
   - l1_loss
   - l1_loss.out
   - l1_loss_backward
-#  - l1_loss_backward.grad_input  # different signature
+  - l1_loss_backward.grad_input
   - le.Scalar
   - le.Scalar_out
   - le.Tensor
@@ -297,7 +297,7 @@ supported:
   - log2.out
   - log_normal_
   - log_sigmoid_backward
-#  - log_sigmoid_backward.grad_input  # different signature
+  - log_sigmoid_backward.grad_input
   - log_sigmoid_forward
 #  - log_sigmoid_forward.output  # different signature
   - logical_and.out
@@ -325,19 +325,19 @@ supported:
   - max_pool2d_with_indices
 #  - max_pool2d_with_indices.out  # different signature
   - max_pool2d_with_indices_backward
-#  - max_pool2d_with_indices_backward.grad_input  # different signature
+  - max_pool2d_with_indices_backward.grad_input
   - max_pool3d_with_indices
 #  - max_pool3d_with_indices.out  # different signature
   - max_pool3d_with_indices_backward
-#  - max_pool3d_with_indices_backward.grad_input  # different signature
+  - max_pool3d_with_indices_backward.grad_input
   - max_unpool2d
   - max_unpool2d.out
   - max_unpool2d_backward
-#  - max_unpool2d_backward.grad_input  # different signature
+  - max_unpool2d_backward.grad_input
   - max_unpool3d
   - max_unpool3d.out
   - max_unpool3d_backward
-#  - max_unpool3d_backward.grad_input  # different signature
+  - max_unpool3d_backward.grad_input
   - maximum
   - maximum.out
   - mean
@@ -357,7 +357,7 @@ supported:
   - mse_loss
   - mse_loss.out
   - mse_loss_backward
-#  - mse_loss_backward.grad_input  # different signature
+  - mse_loss_backward.grad_input
 #  - mul.Scalar  # different signature
   - mul.Tensor
   - mul.out
@@ -368,7 +368,7 @@ supported:
 #  - multi_margin_loss_backward  # different signature
 #  - multi_margin_loss_backward.grad_input  # different signature
   - multilabel_margin_loss_backward
-#  - multilabel_margin_loss_backward.grad_input  # different signature
+  - multilabel_margin_loss_backward.grad_input
   - multilabel_margin_loss_forward
 #  - multilabel_margin_loss_forward.output  # different signature
 #  - multinomial  # different signature
@@ -449,7 +449,7 @@ supported:
   - reflection_pad1d
   - reflection_pad1d.out
   - reflection_pad1d_backward
-#  - reflection_pad1d_backward.grad_input  # different signature
+  - reflection_pad1d_backward.grad_input
   - relu
   - relu_
 #  - remainder.Scalar  # different signature
@@ -465,7 +465,7 @@ supported:
   - replication_pad2d
   - replication_pad2d.out
   - replication_pad2d_backward
-#  - replication_pad2d_backward.grad_input  # different signature
+  - replication_pad2d_backward.grad_input
   - resize_
   - resize_as_
   - roll
@@ -504,11 +504,11 @@ supported:
   - smooth_l1_loss
   - smooth_l1_loss.out
   - smooth_l1_loss_backward
-#  - smooth_l1_loss_backward.grad_input  # different signature
+  - smooth_l1_loss_backward.grad_input
   - soft_margin_loss
   - soft_margin_loss.out
   - soft_margin_loss_backward
-#  - soft_margin_loss_backward.grad_input  # different signature
+  - soft_margin_loss_backward.grad_input
 #  - softplus  # different signature
   - softplus.out
 #  - softplus_backward  # different signature
@@ -571,43 +571,43 @@ supported:
   - upsample_bicubic2d.out
   - upsample_bicubic2d.vec
   - upsample_bicubic2d_backward
-#  - upsample_bicubic2d_backward.grad_input  # different signature
+  - upsample_bicubic2d_backward.grad_input
   - upsample_bicubic2d_backward.vec
   - upsample_bilinear2d
   - upsample_bilinear2d.out
   - upsample_bilinear2d.vec
   - upsample_bilinear2d_backward
-#  - upsample_bilinear2d_backward.grad_input  # different signature
+  - upsample_bilinear2d_backward.grad_input
   - upsample_bilinear2d_backward.vec
   - upsample_linear1d
   - upsample_linear1d.out
   - upsample_linear1d.vec
   - upsample_linear1d_backward
-#  - upsample_linear1d_backward.grad_input  # different signature
+  - upsample_linear1d_backward.grad_input
   - upsample_linear1d_backward.vec
   - upsample_nearest1d
   - upsample_nearest1d.out
   - upsample_nearest1d.vec
   - upsample_nearest1d_backward
-#  - upsample_nearest1d_backward.grad_input  # different signature
+  - upsample_nearest1d_backward.grad_input
   - upsample_nearest1d_backward.vec
   - upsample_nearest2d
   - upsample_nearest2d.out
   - upsample_nearest2d.vec
   - upsample_nearest2d_backward
-#  - upsample_nearest2d_backward.grad_input  # different signature
+  - upsample_nearest2d_backward.grad_input
   - upsample_nearest2d_backward.vec
   - upsample_nearest3d
   - upsample_nearest3d.out
   - upsample_nearest3d.vec
   - upsample_nearest3d_backward
-#  - upsample_nearest3d_backward.grad_input  # different signature
+  - upsample_nearest3d_backward.grad_input
   - upsample_nearest3d_backward.vec
   - upsample_trilinear3d
   - upsample_trilinear3d.out
   - upsample_trilinear3d.vec
   - upsample_trilinear3d_backward
-#  - upsample_trilinear3d_backward.grad_input  # different signature
+  - upsample_trilinear3d_backward.grad_input
   - upsample_trilinear3d_backward.vec
 #  - var        # should not register
 #  - var.dim    # should not register
