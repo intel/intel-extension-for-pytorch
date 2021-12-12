@@ -277,10 +277,10 @@ supported:
   - le.Scalar_out
   - le.Tensor
   - le.Tensor_out
-#  - leaky_relu  # different signature
-#  - leaky_relu.out  # different signature
-#  - leaky_relu_  # different signature
-#  - leaky_relu_backward  # different signature
+  - leaky_relu
+  - leaky_relu.out
+  - leaky_relu_
+  - leaky_relu_backward
   - lerp.Scalar
   - lerp.Scalar_out
   - lerp.Tensor

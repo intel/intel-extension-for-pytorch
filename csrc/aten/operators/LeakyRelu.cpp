@@ -10,7 +10,10 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
+Tensor& leaky_relu_out(
+    const Tensor& self,
+    const Scalar& negative_slope,
+    Tensor& out) {
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .add_output(out)
@@ -32,7 +35,7 @@ Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
   return out;
 }
 
-Tensor leaky_relu(const Tensor& self, Scalar negative_slope) {
+Tensor leaky_relu(const Tensor& self, const Scalar& negative_slope) {
   bool is_channel_last = !self.is_contiguous() &&
       (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
        self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
@@ -48,7 +51,7 @@ Tensor leaky_relu(const Tensor& self, Scalar negative_slope) {
         result, self, alpha, 0.0f);
   } else {
     result = at::empty(self.sizes(), self.options());
-    at::AtenIpexTypeXPU::leaky_relu_out(result, self, negative_slope);
+    at::AtenIpexTypeXPU::leaky_relu_out(self, negative_slope, result);
   }
   return result;
 }
@@ -83,7 +86,7 @@ Tensor& leaky_relu_backward_out(
 Tensor leaky_relu_backward(
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar negative_slope,
+    const Scalar& negative_slope,
     bool self_is_result) {
   // TODO: self_is_result
   bool is_channel_last = !self.is_contiguous() &&
@@ -112,7 +115,7 @@ Tensor leaky_relu_backward(
   }
 }
 
-Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
+Tensor& leaky_relu_(Tensor& self, const Scalar& negative_slope) {
   bool is_channel_last = !self.is_contiguous() &&
       (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
        self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
@@ -122,7 +125,7 @@ Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
         self, self, alpha, 0.0f);
     return self;
   } else {
-    return at::AtenIpexTypeXPU::leaky_relu_out(self, self, negative_slope);
+    return at::AtenIpexTypeXPU::leaky_relu_out(self, negative_slope, self);
   }
 }
 
