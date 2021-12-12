@@ -57,11 +57,11 @@ supported:
 #  - adaptive_avg_pool3d_backward  # different schema
   - adaptive_avg_pool3d_backward.grad_input
   - adaptive_max_pool2d
-#  - adaptive_max_pool2d.out  # different signature
+  - adaptive_max_pool2d.out
   - adaptive_max_pool2d_backward
   - adaptive_max_pool2d_backward.grad_input
   - adaptive_max_pool3d
-#  - adaptive_max_pool3d.out  # different signature
+  - adaptive_max_pool3d.out
   - adaptive_max_pool3d_backward
   - adaptive_max_pool3d_backward.grad_input
 #  - add.Scalar  # different signature
@@ -216,11 +216,11 @@ supported:
   - frac.out
   - frac_
   - fractional_max_pool2d
-#  - fractional_max_pool2d.output  # different signature
+  - fractional_max_pool2d.output
   - fractional_max_pool2d_backward
   - fractional_max_pool2d_backward.grad_input
   - fractional_max_pool3d
-#  - fractional_max_pool3d.output  # different signature
+  - fractional_max_pool3d.output
   - fractional_max_pool3d_backward
   - fractional_max_pool3d_backward.grad_input
   - gather
@@ -233,7 +233,7 @@ supported:
   - gelu_backward
 #  - geometric_  # different signature
   - geqrf
-#  - geqrf.a  # different signature
+  - geqrf.a
 #  - ger        # should not register
 #  - ger.out  # dispatch is False
   - glu
@@ -299,7 +299,7 @@ supported:
   - log_sigmoid_backward
   - log_sigmoid_backward.grad_input
   - log_sigmoid_forward
-#  - log_sigmoid_forward.output  # different signature
+  - log_sigmoid_forward.output
   - logical_and.out
 #  - logical_not        # should not register
   - logical_not.out
@@ -320,14 +320,14 @@ supported:
   - masked_select.out
   - max
   - max.dim
-#  - max.dim_max  # different signature
+  - max.dim_max
 #  - max.out  # dispatch is False
   - max_pool2d_with_indices
-#  - max_pool2d_with_indices.out  # different signature
+  - max_pool2d_with_indices.out
   - max_pool2d_with_indices_backward
   - max_pool2d_with_indices_backward.grad_input
   - max_pool3d_with_indices
-#  - max_pool3d_with_indices.out  # different signature
+  - max_pool3d_with_indices.out
   - max_pool3d_with_indices_backward
   - max_pool3d_with_indices_backward.grad_input
   - max_unpool2d
@@ -346,14 +346,14 @@ supported:
   - median
   - min
   - min.dim
-#  - min.dim_min  # different signature
+  - min.dim_min
 #  - min.out  # dispatch is False
   - minimum
   - minimum.out
   - mm
   - mm.out
   - mode
-#  - mode.values  # different signature
+  - mode.values
   - mse_loss
   - mse_loss.out
   - mse_loss_backward
@@ -370,7 +370,7 @@ supported:
   - multilabel_margin_loss_backward
   - multilabel_margin_loss_backward.grad_input
   - multilabel_margin_loss_forward
-#  - multilabel_margin_loss_forward.output  # different signature
+  - multilabel_margin_loss_forward.output
 #  - multinomial  # different signature
 #  - multinomial.out  # different signature
   - mv
@@ -518,9 +518,9 @@ supported:
 #  - softshrink_backward  # different signature
 #  - softshrink_backward.grad_input  # different signature
   - solve
-#  - solve.solution  # different signature
+  - solve.solution
   - sort
-#  - sort.values  # different signature
+  - sort.values
   - sqrt.out
 #  - std        # should not register
 #  - std.dim    # should not register
@@ -551,10 +551,10 @@ supported:
 #  - threshold_  # different signature
 #  - threshold_backward  # different signature
   - topk
-#  - topk.values  # different signature
+  - topk.values
   - trace
   - triangular_solve
-#  - triangular_solve.X  # different signature
+  - triangular_solve.X
   - tril.out
   - tril_
   - tril_indices
