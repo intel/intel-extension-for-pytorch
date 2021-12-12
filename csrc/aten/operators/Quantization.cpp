@@ -187,8 +187,14 @@ Tensor _empty_per_channel_affine_quantized(
     const Tensor& scales,
     const Tensor& zero_points,
     int64_t axis,
-    const TensorOptions& options_,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
+  TensorOptions options_ =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   TORCH_CHECK(
       !(options_.has_memory_format() && optional_memory_format.has_value()),
       "Cannot set memory_format both in TensorOptions and explicit argument; "
