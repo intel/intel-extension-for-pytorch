@@ -8,7 +8,7 @@ supported:
   - _empty_affine_quantized
 #  - adaptive_avg_pool2d        # should not register
   - adaptive_avg_pool2d.out
-#  - add.Tensor	# different signature
+  - add.Tensor
   - addmm
   - as_strided
   - avg_pool2d
