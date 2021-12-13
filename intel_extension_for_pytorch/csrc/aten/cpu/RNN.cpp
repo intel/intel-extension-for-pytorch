@@ -7,7 +7,6 @@
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
 #include <torch/extension.h>
-#include "ExtendOPs.h"
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
@@ -906,7 +905,7 @@ std::pair<at::Tensor, hidden_type> mkldnn_impl(
 } // namespace torch_ipex
 
 namespace torch_ipex {
-std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::ipex_lstm(
+std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
     const at::Tensor& input,
     std::vector<at::Tensor> hx,
     std::vector<at::Tensor> params,
@@ -917,10 +916,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::ipex_lstm(
     bool bidirectional,
     bool batch_first) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexTypeExt::ipex_lstm", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("ipex_lstm", std::vector<c10::IValue>({}));
 #endif
 #if defined(IPEX_DISP_OP)
-  printf("AtenIpexTypeExt::ipex_lstm\n");
+  printf("ipex_lstm\n");
 #endif
   auto result = cpu::mkldnn_impl(
       input,
@@ -946,11 +945,8 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "ipex_lstm(Tensor input, Tensor[] hx, Tensor[] params, bool "
       "has_biases, int num_layers, float dropout_p, bool train, bool "
       "bidirectional, bool batch_first) -> (Tensor, Tensor, Tensor)",
-      torch_ipex::AtenIpexTypeExt::ipex_lstm);
-  m.impl(
-      "ipex_lstm",
-      c10::DispatchKey::CPU,
-      torch_ipex::AtenIpexTypeExt::ipex_lstm);
+      torch_ipex::ipex_lstm);
+  m.impl("ipex_lstm", c10::DispatchKey::CPU, torch_ipex::ipex_lstm);
   m.def(
       "ipex_lstm_layer(Tensor input, Tensor weight0, Tensor weight1, Tensor "
       "weight2, Tensor weight3, Tensor hx_, Tensor cx_, bool reverse, int[] "

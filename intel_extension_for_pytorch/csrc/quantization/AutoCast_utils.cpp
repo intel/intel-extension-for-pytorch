@@ -6,7 +6,6 @@
 
 #include "Common.hpp"
 #include "Config.hpp"
-#include "csrc/aten/cpu/ExtendOPs.h"
 #include "csrc/autocast/autocast_mode.h"
 namespace torch_ipex {
 namespace autocast {

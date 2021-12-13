@@ -75,3 +75,17 @@ at::Tensor AddLayerNorm(
 } // namespace cpu
 } // namespace jit
 } // namespace torch_ipex
+
+namespace torch_ipex {
+namespace cpu {
+at::Tensor dil_add_layernorm(
+    const at::Tensor& input,
+    const at::Tensor& b,
+    int alpha,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& bias_opt,
+    float eps,
+    bool cuda_enable);
+}
+} // namespace torch_ipex

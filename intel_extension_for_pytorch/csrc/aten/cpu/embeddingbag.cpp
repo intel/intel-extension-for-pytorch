@@ -1,9 +1,9 @@
-#include "ExtendOPs.h"
+#include "embeddingbag.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
-#include "csrc/jit/cpu/kernels/CustomOPs.h"
+#include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/quantization/AutoCast.hpp"
 #include "csrc/utils/rw_lock.h"
 
@@ -44,7 +44,7 @@ static inline bool is_bfloat16_tensor(const at::Tensor tensor_) {
   return false;
 }
 
-bool AtenIpexTypeExt::embedding_bag_fast_path_sum(
+bool embedding_bag_fast_path_sum(
     const at::Tensor weight,
     const c10::optional<at::Tensor> per_sample_weights,
     int64_t mode,
@@ -438,7 +438,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
   }
 };
 
-at::Tensor AtenIpexTypeExt::embedding_bag(
+at::Tensor embedding_bag(
     const at::Tensor& weight,
     const at::Tensor& indices,
     const at::Tensor& offsets,
@@ -521,7 +521,7 @@ at::Tensor embedding_bag_int8_impl(
   return output;
 }
 
-at::Tensor AtenIpexJITDev::dil_qembeddingbag(
+at::Tensor dil_qembeddingbag(
     const at::Tensor weight,
     const at::Tensor indices,
     const at::Tensor offsets,
@@ -544,7 +544,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
           "torch_ipex::embedding_bag(Tensor weight, Tensor indices, Tensor "
           "offsets, bool sparse, bool include_last_offset) -> Tensor",
           c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::AtenIpexTypeExt::embedding_bag);
+      torch_ipex::embedding_bag);
 }
 } // namespace
 

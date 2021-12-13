@@ -1,11 +1,11 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#include "ExtendOPs.h"
+#include "interaction.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
-#include "csrc/jit/cpu/kernels/CustomOPs.h"
+#include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/quantization/AutoCast.hpp"
 
 #include <ATen/Parallel.h>
@@ -264,8 +264,7 @@ inline std::vector<at::Tensor> _interaction_backward(
   return output;
 }
 
-at::Tensor AtenIpexTypeExt::interaction_forward(
-    const std::vector<at::Tensor>& input) {
+at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
   if (input[0].scalar_type() == at::kFloat) {
     for (auto& in : input) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
@@ -280,7 +279,7 @@ at::Tensor AtenIpexTypeExt::interaction_forward(
   }
 }
 
-std::vector<at::Tensor> AtenIpexTypeExt::interaction_backward(
+std::vector<at::Tensor> interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   if (grad_out.scalar_type() == at::kFloat) {
@@ -359,7 +358,7 @@ static inline void _interaction_s8s8_scale_s32s8(
   }
 }
 
-at::Tensor AtenIpexJITDev::dil_qinteraction(
+at::Tensor dil_qinteraction(
     const std::vector<at::Tensor> input,
     double output_scale,
     int64_t o_zp,
@@ -460,13 +459,13 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch::schema(
           "torch_ipex::interaction_forward(Tensor[] input) -> Tensor",
           c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::AtenIpexTypeExt::interaction_forward);
+      torch_ipex::interaction_forward);
   m.def(
       torch::schema(
           "torch_ipex::interaction_backward(Tensor grad_out, "
           "Tensor[] input) -> Tensor[]",
           c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::AtenIpexTypeExt::interaction_backward);
+      torch_ipex::interaction_backward);
 }
 } // namespace
 

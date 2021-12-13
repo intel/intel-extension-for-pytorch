@@ -1,4 +1,4 @@
-#include "AddSoftmax.hpp"
+#include "AddSoftmax.h"
 
 #if defined(CPU_AVX512)
 #include "csrc/cpu/vec512/add_softmax.h"

@@ -1,11 +1,12 @@
 #include "fusion_pass.h"
 #include <string>
+#include "autocast/autocast_mode.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
-#include "autocast/autocast_mode.h"
 
 #include "aten/cpu/Pooling.h"
-#include "cpu/kernels/CustomOPs.h"
+#include "cpu/kernels/Convolution.h"
+#include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 
 #include <c10/util/hash.h>
@@ -344,6 +345,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // replace aten::softmax with ipex::softmax
   graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 
+  // replace aten::batch_norm with ipex::batch_norm, it will be removed
+  // after TensorExprs fix the performance issue(IPB-808).
+  graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
 }

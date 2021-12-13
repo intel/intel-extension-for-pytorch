@@ -324,7 +324,7 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
       graph(%add_a, %add_b, %alpha, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
         %r = ipex::add_layernorm(%add_a, %add_b, %alpha, %shape, %w, %b, %eps, %cudnn_enable)
         return (%r) )";
-  SubgraphRewriter rewriter_aten;
+  IpexSubgraphRewriter rewriter_aten;
   rewriter_aten.RegisterRewritePattern(aten_add_layernorm, fused_add_layernorm);
   rewriter_aten.runOnGraph(graph);
 }
@@ -350,7 +350,7 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
         return (%scores) )";
 
-  SubgraphRewriter mha_fusion;
+  IpexSubgraphRewriter mha_fusion;
   mha_fusion.RegisterRewritePattern(
       div_matmul_add_softmax, div_matmul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
@@ -386,6 +386,21 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
   IpexSubgraphRewriter rewriter_aten;
   rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
   rewriter_aten.runOnGraph(graph);
+}
+
+void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph) {
+  std::string batch_norm = R"(
+      graph(%a, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled):
+        %r = aten::batch_norm(%a, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled)
+        return (%r) )";
+  std::string ipex_batch_norm = R"(
+      graph(%a, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled):
+        %r = ipex::batch_norm(%a, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled)
+        return (%r) )";
+
+  IpexSubgraphRewriter rewriter_batch_norm;
+  rewriter_batch_norm.RegisterRewritePattern(batch_norm, ipex_batch_norm);
+  rewriter_batch_norm.runOnGraph(graph);
 }
 
 void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph>& graph) {
