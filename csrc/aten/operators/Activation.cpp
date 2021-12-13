@@ -398,8 +398,8 @@ Tensor threshold_backward(
 Tensor rrelu_with_noise(
     const Tensor& self,
     const Tensor& noise,
-    Scalar lower,
-    Scalar upper,
+    const Scalar& lower,
+    const Scalar& upper,
     bool training,
     c10::optional<Generator> generator) {
   auto self_ = self.contiguous();
@@ -421,8 +421,8 @@ Tensor rrelu_with_noise(
 Tensor& rrelu_with_noise_(
     Tensor& self,
     const Tensor& noise,
-    Scalar lower,
-    Scalar upper,
+    const Scalar& lower,
+    const Scalar& upper,
     bool training,
     c10::optional<Generator> generator) {
   auto lower_ = lower.toDouble();
@@ -440,13 +440,13 @@ Tensor& rrelu_with_noise_(
 }
 
 Tensor& rrelu_with_noise_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& noise,
-    Scalar lower,
-    Scalar upper,
+    const Scalar& lower,
+    const Scalar& upper,
     bool training,
-    c10::optional<Generator> generator) {
+    c10::optional<Generator> generator,
+    Tensor& out) {
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -465,8 +465,8 @@ Tensor rrelu_with_noise_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& noise,
-    Scalar lower,
-    Scalar upper,
+    const Scalar& lower,
+    const Scalar& upper,
     bool training,
     bool self_is_result) {
   TORCH_CHECK(

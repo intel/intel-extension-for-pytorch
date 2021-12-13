@@ -473,10 +473,10 @@ supported:
   - round.out
 #  - rrelu  # dispatch is False
 #  - rrelu_  # dispatch is False
-#  - rrelu_with_noise  # different signature
-#  - rrelu_with_noise.out  # different signature
-#  - rrelu_with_noise_  # different signature
-#  - rrelu_with_noise_backward  # different signature
+  - rrelu_with_noise
+  - rrelu_with_noise.out
+  - rrelu_with_noise_
+  - rrelu_with_noise_backward
   - rsqrt.out
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
