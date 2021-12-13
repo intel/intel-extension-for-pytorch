@@ -404,12 +404,12 @@ supported:
 #  - norm.ScalarOpt_dtype  # different signature
 #  - norm.dtype_out  # different signature
   - norm.out
-#  - normal.Tensor_Tensor  # different signature
-#  - normal.Tensor_Tensor_out  # different signature
-#  - normal.Tensor_float  # different signature
-#  - normal.Tensor_float_out  # different signature
-#  - normal.float_Tensor  # different signature
-#  - normal.float_Tensor_out  # different signature
+  - normal.Tensor_Tensor
+  - normal.Tensor_Tensor_out
+  - normal.Tensor_float
+  - normal.Tensor_float_out
+  - normal.float_Tensor
+  - normal.float_Tensor_out
   - normal_
 #  - orgqr      # should not register
 #  - orgqr.out  # dispatch is False

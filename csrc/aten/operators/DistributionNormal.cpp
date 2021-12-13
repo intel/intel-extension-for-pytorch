@@ -102,48 +102,21 @@ Tensor& normal_(
   return self;
 }
 
-Tensor normal(
-    const Tensor& mean,
-    double std,
-    c10::optional<Generator> generator) {
-  Tensor ret = at::empty_like(mean, MemoryFormat::Contiguous);
-  normal_out(ret, mean, std, generator);
-  return ret;
-}
-
-Tensor normal(
-    double mean,
-    const Tensor& std,
-    c10::optional<Generator> generator) {
-  Tensor ret = at::empty_like(std, MemoryFormat::Contiguous);
-  normal_out(ret, mean, std, generator);
-  return ret;
-}
-
-Tensor normal(
-    const Tensor& mean,
-    const Tensor& std,
-    c10::optional<Generator> generator) {
-  Tensor ret = at::empty({0}, mean.options(), MemoryFormat::Contiguous);
-  normal_out(ret, mean, std, generator);
-  return ret;
-}
-
 Tensor& normal_out(
-    Tensor& output,
     const Tensor& mean,
     double std,
-    c10::optional<Generator> generator) {
+    c10::optional<Generator> generator,
+    Tensor& output) {
   normal_(output, 0, std, generator);
   output.add_(mean);
   return output;
 }
 
 Tensor& normal_out(
-    Tensor& output,
     double mean,
     const Tensor& std,
-    c10::optional<Generator> generator) {
+    c10::optional<Generator> generator,
+    Tensor& output) {
   normal_(output, 0, 1, generator);
   auto mean_tensor = at::full({}, mean, output.options());
   output.mul_(std).add_(mean_tensor);
@@ -151,10 +124,10 @@ Tensor& normal_out(
 }
 
 Tensor& normal_out(
-    Tensor& output,
     const Tensor& mean,
     const Tensor& std,
-    c10::optional<Generator> generator) {
+    c10::optional<Generator> generator,
+    Tensor& output) {
   bool is_deprecated_th_impl = resize_output_for_normal(output, mean, std);
   normal_(output, 0, 1, generator);
   if (is_deprecated_th_impl) {
@@ -163,6 +136,33 @@ Tensor& normal_out(
     output.mul_(std).add_(mean);
   }
   return output;
+}
+
+Tensor normal(
+    const Tensor& mean,
+    double std,
+    c10::optional<Generator> generator) {
+  Tensor ret = at::empty_like(mean, MemoryFormat::Contiguous);
+  normal_out(mean, std, generator, ret);
+  return ret;
+}
+
+Tensor normal(
+    double mean,
+    const Tensor& std,
+    c10::optional<Generator> generator) {
+  Tensor ret = at::empty_like(std, MemoryFormat::Contiguous);
+  normal_out(mean, std, generator, ret);
+  return ret;
+}
+
+Tensor normal(
+    const Tensor& mean,
+    const Tensor& std,
+    c10::optional<Generator> generator) {
+  Tensor ret = at::empty({0}, mean.options(), MemoryFormat::Contiguous);
+  normal_out(mean, std, generator, ret);
+  return ret;
 }
 
 } // namespace AtenIpexTypeXPU
