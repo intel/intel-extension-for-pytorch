@@ -141,7 +141,7 @@ supported:
   - cholesky_solve
   - cholesky_solve.out
 #  - clamp  # different signature
-#  - clamp.out  # different signature
+  - clamp.out
 #  - clamp_  # different signature
 #  - clamp_max.out  # different signature
 #  - clamp_max_  # different signature
