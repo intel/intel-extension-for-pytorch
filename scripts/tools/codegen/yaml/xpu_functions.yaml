@@ -76,7 +76,7 @@ supported:
 #  - addcdiv.out       # different signature
 #  - addcdiv_	# different signature
 #  - addcmul	# different signature
-#  - addcmul.out       # different signature
+  - addcmul.out
 #  - addcmul_	# different signature
 #  - addmm	# different signature
   - addmm.out  # newly added

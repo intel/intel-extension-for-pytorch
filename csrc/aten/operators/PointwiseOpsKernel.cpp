@@ -45,11 +45,11 @@ static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
 } // namespace impl
 
 Tensor& addcmul_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& tensor1,
     const Tensor& tensor2,
-    Scalar value) {
+    const Scalar& value,
+    Tensor& out) {
   // checkBackend("addcmul_cpu", out, self.options().backend());
   auto iter = at::TensorIteratorConfig()
                   .set_check_mem_overlap(true)
@@ -69,7 +69,7 @@ Tensor addcmul(
     Scalar value) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::addcmul_out(
-      result, self, tensor1, tensor2, value);
+      self, tensor1, tensor2, value, result);
 }
 
 Tensor& addcmul_(
@@ -77,7 +77,7 @@ Tensor& addcmul_(
     const Tensor& tensor1,
     const Tensor& tensor2,
     Scalar value) {
-  return at::AtenIpexTypeXPU::addcmul_out(self, self, tensor1, tensor2, value);
+  return at::AtenIpexTypeXPU::addcmul_out(self, tensor1, tensor2, value, self);
 }
 
 Tensor& addcdiv_out(
