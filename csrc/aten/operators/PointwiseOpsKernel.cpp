@@ -81,11 +81,11 @@ Tensor& addcmul_(
 }
 
 Tensor& addcdiv_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& tensor1,
     const Tensor& tensor2,
-    Scalar value) {
+    const Scalar& value,
+    Tensor& out) {
   // checkBackend("addcdiv_cpu", out, self.options().backend());
   if (isIntegralType(tensor1.scalar_type(), /*includeBool=*/true) &&
       isIntegralType(tensor2.scalar_type(), /*includeBool=*/true)) {
@@ -118,7 +118,7 @@ Tensor addcdiv(
     Scalar value) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::addcdiv_out(
-      result, self, tensor1, tensor2, value);
+      self, tensor1, tensor2, value, result);
 }
 
 Tensor& addcdiv_(
@@ -126,7 +126,7 @@ Tensor& addcdiv_(
     const Tensor& tensor1,
     const Tensor& tensor2,
     Scalar value) {
-  return at::AtenIpexTypeXPU::addcdiv_out(self, self, tensor1, tensor2, value);
+  return at::AtenIpexTypeXPU::addcdiv_out(self, tensor1, tensor2, value, self);
 }
 
 } // namespace AtenIpexTypeXPU

@@ -73,7 +73,7 @@ supported:
   - addbmm_
   - addbmm.out
 #  - addcdiv	# different signature
-#  - addcdiv.out       # different signature
+  - addcdiv.out
 #  - addcdiv_	# different signature
 #  - addcmul	# different signature
   - addcmul.out
