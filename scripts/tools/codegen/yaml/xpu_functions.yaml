@@ -371,7 +371,7 @@ supported:
   - multilabel_margin_loss_backward.grad_input
   - multilabel_margin_loss_forward
   - multilabel_margin_loss_forward.output
-#  - multinomial  # different signature
+  - multinomial
 #  - multinomial.out  # different signature
   - mv
   - mvlgamma
