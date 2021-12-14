@@ -257,7 +257,7 @@ supported:
   - im2col.out
   - im2col_backward
   - im2col_backward.grad_input
-#  - index.Tensor  # different signature
+  - index.Tensor
 #  - index_add_         # should not register
   - index_copy_
   - index_fill_.int_Scalar

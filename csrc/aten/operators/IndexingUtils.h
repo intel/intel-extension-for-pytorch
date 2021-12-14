@@ -25,9 +25,10 @@ namespace AtenIpexTypeXPU {
 
 static std::vector<Tensor> expandTensors(
     const Tensor& self,
-    TensorList indices) {
+    const c10::List<c10::optional<Tensor>>& indices) {
   std::vector<Tensor> result;
-  for (const auto& index : indices) {
+  for (c10::optional<Tensor> index_opt : indices) {
+    Tensor index = std::move(*index_opt);
     if (index.scalar_type() == kByte || index.scalar_type() == kBool) {
       if (index.scalar_type() == kByte) {
         TORCH_WARN(
@@ -51,8 +52,10 @@ static std::vector<Tensor> expandTensors(
   return result;
 }
 
-static void checkIndexTensorTypes(TensorList indices) {
-  for (auto& tensor : indices) {
+static void checkIndexTensorTypes(
+    const c10::List<c10::optional<Tensor>>& indices) {
+  for (c10::optional<Tensor> tensor_opt : indices) {
+    Tensor tensor = std::move(*tensor_opt);
     if (tensor.defined()) {
       auto scalarType = tensor.scalar_type();
       if (scalarType != kLong && scalarType != kByte && scalarType != kBool) {
@@ -235,7 +238,9 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
   }
 }
 
-static AdvancedIndex make_info(Tensor self, TensorList orig) {
+static AdvancedIndex make_info(
+    Tensor self,
+    const c10::List<c10::optional<Tensor>>& orig) {
   checkIndexTensorTypes(orig);
   // LongTensors
   auto indices = expandTensors(self, orig);

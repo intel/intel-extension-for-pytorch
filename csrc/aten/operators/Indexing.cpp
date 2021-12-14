@@ -1308,7 +1308,9 @@ Tensor& put_(
   return self;
 }
 
-Tensor index(const Tensor& self, TensorList indices) {
+Tensor index(
+    const Tensor& self,
+    const c10::List<c10::optional<Tensor>>& indices) {
   TORCH_CHECK(
       indices.size() <= (size_t)self.dim(),
       "too many indices for tensor of dimension ",
@@ -1330,7 +1332,7 @@ Tensor index(const Tensor& self, TensorList indices) {
 
 Tensor& _index_put_impl_(
     Tensor& self,
-    TensorList indices,
+    const c10::List<c10::optional<Tensor>>& indices,
     const Tensor& value,
     const bool accumulate,
     const bool unsafe) {
