@@ -203,8 +203,11 @@ void l1_backward_kernel(TensorIterator& iter, Scalar norm) {
 Tensor binary_cross_entropy(
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const c10::optional<Tensor>& weight_opt,
     int64_t reduction) {
+  TORCH_CHECK(weight_opt.has_value(), "not implemented");
+  const Tensor weight = weight_opt.value();
+
   auto minvalue = self.min().item<float>();
   auto maxvalue = self.max().item<float>();
   TORCH_CHECK(
