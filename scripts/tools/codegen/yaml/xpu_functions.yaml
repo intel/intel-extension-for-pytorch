@@ -363,10 +363,10 @@ supported:
   - mul.out
 #  - mul_.Scalar  # different signature
   - mul_.Tensor
-#  - multi_margin_loss  # different signature
-#  - multi_margin_loss.out  # different signature
-#  - multi_margin_loss_backward  # different signature
-#  - multi_margin_loss_backward.grad_input  # different signature
+  - multi_margin_loss
+  - multi_margin_loss.out
+  - multi_margin_loss_backward
+  - multi_margin_loss_backward.grad_input
   - multilabel_margin_loss_backward
   - multilabel_margin_loss_backward.grad_input
   - multilabel_margin_loss_forward

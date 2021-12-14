@@ -27,8 +27,11 @@ void MultiMarginCriterion_updateOutput(
     const Tensor& target,
     Scalar p,
     Scalar margin,
-    const Tensor& weights,
+    const c10::optional<at::Tensor>& weights_optional,
     int64_t reduction) {
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weights_optional);
+  const Tensor& weights = *weight_maybe_owned;
   const auto ndims = input.dim();
   TORCH_CHECK(
       input.numel() > 0 && ndims <= 2,
@@ -163,8 +166,11 @@ void MultiMarginCriterion_updateGradInput(
     const Tensor& target,
     Scalar p,
     Scalar margin,
-    const Tensor& weights,
+    const c10::optional<at::Tensor>& weights_optional,
     int64_t reduction) {
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weights_optional);
+  const Tensor& weights = *weight_maybe_owned;
   const auto ndims = input.dim();
   TORCH_CHECK(
       input.numel() > 0 && ndims <= 2,
@@ -257,13 +263,13 @@ void MultiMarginCriterion_updateGradInput(
 } // namespace impl
 
 Tensor& multi_margin_loss_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& target,
-    Scalar p,
-    Scalar margin,
-    const Tensor& weights,
-    int64_t reduction) {
+    const Scalar& p,
+    const Scalar& margin,
+    const c10::optional<at::Tensor>& weight,
+    int64_t reduction,
+    Tensor& out) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -271,7 +277,7 @@ Tensor& multi_margin_loss_out(
       "multi_margin_loss_out",
       [&] {
         impl::MultiMarginCriterion_updateOutput<scalar_t>(
-            out, self, target, p, margin, weights, reduction);
+            out, self, target, p, margin, weight, reduction);
       });
   return out;
 }
@@ -279,24 +285,24 @@ Tensor& multi_margin_loss_out(
 Tensor multi_margin_loss(
     const Tensor& self,
     const Tensor& target,
-    Scalar p,
-    Scalar margin,
-    const Tensor& weights,
+    const Scalar& p,
+    const Scalar& margin,
+    const c10::optional<at::Tensor>& weight,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::multi_margin_loss_out(
-      out, self, target, p, margin, weights, reduction);
+      self, target, p, margin, weight, reduction, out);
 }
 
 Tensor& multi_margin_loss_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    Scalar p,
-    Scalar margin,
-    const Tensor& weights,
-    int64_t reduction) {
+    const Scalar& p,
+    const Scalar& margin,
+    const c10::optional<at::Tensor>& weight,
+    int64_t reduction,
+    Tensor& grad_input) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -309,7 +315,7 @@ Tensor& multi_margin_loss_backward_out(
             target,
             p,
             margin,
-            weights,
+            weight,
             reduction);
       });
   return grad_input;
@@ -319,13 +325,13 @@ Tensor multi_margin_loss_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    Scalar p,
-    Scalar margin,
-    const Tensor& weights,
+    const Scalar& p,
+    const Scalar& margin,
+    const c10::optional<at::Tensor>& weight,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::multi_margin_loss_backward_out(
-      grad_input, grad_output, self, target, p, margin, weights, reduction);
+      grad_output, self, target, p, margin, weight, reduction, grad_input);
 }
 
 } // namespace AtenIpexTypeXPU
