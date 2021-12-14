@@ -11,11 +11,11 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 Tensor& elu_out(
-    Tensor& out,
     const Tensor& self,
-    Scalar alpha,
-    Scalar scale,
-    Scalar input_scale) {
+    const Scalar& alpha,
+    const Scalar& scale,
+    const Scalar& input_scale,
+    Tensor& out) {
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .add_output(out)
@@ -44,7 +44,7 @@ Tensor& elu_out(
 
 Tensor elu(const Tensor& self, Scalar alpha, Scalar scale, Scalar input_scale) {
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeXPU::elu_out(result, self, alpha, scale, input_scale);
+  at::AtenIpexTypeXPU::elu_out(self, alpha, scale, input_scale, result);
   return result;
 }
 
@@ -91,7 +91,7 @@ Tensor elu_backward(
 }
 
 Tensor& elu_(Tensor& self, Scalar alpha, Scalar scale, Scalar input_scale) {
-  return at::AtenIpexTypeXPU::elu_out(self, self, alpha, scale, input_scale);
+  return at::AtenIpexTypeXPU::elu_out(self, alpha, scale, input_scale, self);
 }
 
 } // namespace AtenIpexTypeXPU

@@ -174,7 +174,7 @@ supported:
   - div_.Tensor
   - dot
 #  - elu  # different signature
-#  - elu.out  # different signature
+  - elu.out
 #  - elu_  # different signature
 #  - elu_backward  # different schema
 #  - elu_backward.grad_input  # different schema
