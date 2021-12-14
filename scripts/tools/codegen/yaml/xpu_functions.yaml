@@ -547,7 +547,7 @@ supported:
   - tanh_backward
   - tanh_backward.grad_input
 #  - threshold  # different signature
-#  - threshold.out  # different signature
+  - threshold.out
 #  - threshold_  # different signature
 #  - threshold_backward  # different signature
   - topk

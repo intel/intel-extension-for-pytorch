@@ -380,10 +380,10 @@ Tensor threshold(const Tensor& self, Scalar threshold, Scalar value) {
 }
 
 Tensor& threshold_out(
-    Tensor& result,
     const Tensor& self,
-    Scalar threshold,
-    Scalar value) {
+    const Scalar& threshold,
+    const Scalar& value,
+    Tensor& result) {
   impl::threshold_out(make_optional(result), self, threshold, value, self);
   return result;
 }
