@@ -643,12 +643,14 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
     const Tensor& X,
     const Tensor& mean,
     const Tensor& rstd,
-    const Tensor& gamma,
+    const c10::optional<at::Tensor>& gamma_opt,
     int64_t N,
     int64_t C,
     int64_t HxW,
     int64_t group,
     std::array<bool, 3> grad_input_mask) {
+  TORCH_CHECK(gamma_opt.has_value(), "not implemented");
+  const Tensor gamma = gamma_opt.value();
   Tensor dX;
   Tensor dgamma;
   Tensor dbeta;
