@@ -95,7 +95,7 @@ Tensor& pow_out(Tensor& result, const Tensor& base, const Tensor& exp) {
   return result;
 }
 
-Tensor& pow_out(Tensor& result, const Tensor& base, Scalar exp) {
+Tensor& pow_out(Tensor& result, const Tensor& base, const Scalar& exp) {
   TORCH_CHECK(
       !(isIntegralType(base.scalar_type(), true) && exp.isIntegral(true) &&
         exp.toLong() < 0),

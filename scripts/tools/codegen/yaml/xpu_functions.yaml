@@ -421,7 +421,7 @@ supported:
 #  - pow.Scalar  # different signature
 #  - pow.Scalar_out  # different signature
 #  - pow.Tensor_Scalar  # different signature
-#  - pow.Tensor_Scalar_out  # different signature
+  - pow.Tensor_Scalar_out
   - pow.Tensor_Tensor
   - pow.Tensor_Tensor_out
 #  - pow_.Scalar  # different signature
