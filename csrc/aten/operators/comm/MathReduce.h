@@ -74,17 +74,14 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto totalElements = src.numel();
-  auto num_groups = CeilDiv(totalElements, group_size);
-  auto total_items = num_groups * group_size;
 
-  auto tgt1_size = (tgt1.numel()) * (tgt1.itemsize());
-  auto tgt2_size = (tgt2.numel()) * (tgt2.itemsize());
-  auto src_size = totalElements * (src.itemsize());
   auto dim = tgt1.dim() - 1;
-
   int64_t n = src.size(dim);
-  int64_t stride = src.stride(dim);
-  int64_t batch = totalElements / (n * stride);
+  // stride == 1 due to we have ensured src is contiguous before
+  int64_t batch = totalElements / n;
+
+  auto num_groups = CeilDiv(totalElements / n, group_size);
+  auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<K>();
@@ -96,10 +93,8 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
       auto tgt1_ptr = tgt1_data;
       auto tgt2_ptr = tgt2_data;
 
-      for (int64_t linearIndex = item.get_global_id(0);
-           linearIndex < totalElements;
-           linearIndex += item.get_global_range()[0]) {
-        int64_t base_start = linearIndex % (batch * stride);
+      int64_t linearIndex = item.get_global_id(0);
+      if (linearIndex < batch) {
         int64_t start = linearIndex % batch * n;
 
         std::pair<K, Index> acc = init;
@@ -115,8 +110,8 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
           Index idx = j /* + TH_INDEX_BASE */;
           acc = binary_op(acc, std::make_pair<K, Index>((K)data, (Index)idx));
         }
-        tgt1_ptr[base_start] = acc.first;
-        tgt2_ptr[base_start] = acc.second;
+        tgt1_ptr[linearIndex] = acc.first;
+        tgt2_ptr[linearIndex] = acc.second;
       }
     };
 
