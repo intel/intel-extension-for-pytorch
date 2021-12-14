@@ -81,7 +81,13 @@ Tensor _sparse_coo_tensor_with_dims_and_tensors(
     IntArrayRef size,
     const Tensor& indices,
     const Tensor& values,
-    const TensorOptions& options) {
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   return at::native::new_with_dims_and_tensor_sparse(
       sparse_dim,
       dense_dim,

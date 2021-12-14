@@ -7,7 +7,7 @@ supported:
   - _coalesced_
   - _indices
   - _nnz
-#  - _sparse_coo_tensor_with_dims_and_tensors	# different signature
+  - _sparse_coo_tensor_with_dims_and_tensors
   - _values
 #  - coalesce	# different schema
   - copy_sparse_to_sparse_
