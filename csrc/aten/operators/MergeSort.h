@@ -21,26 +21,19 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename _Acc, typename _Size, typename _Value, typename _Compare>
-_Size lower_bound_with_stride(
+inline _Size lower_bound_with_stride(
     _Acc acc,
     _Size first,
     _Size last,
     const _Value& value,
     _Compare comp,
     const size_t stride) {
-  auto n = last - first;
-  auto cur = n;
-  _Size it;
-  while (n > 0) {
-    it = first;
-    cur = n / stride / 2 * stride;
-    it += cur;
-    if (comp(acc[it], value)) {
-      n -= cur + stride;
-      it += stride;
-      first = it;
-    } else
-      n = cur;
+  while (first < last) {
+    _Size mid = first + (last - first) / stride / 2 * stride;
+    if (comp(acc[mid], value))
+      first = mid + stride;
+    else
+      last = mid;
   }
   return first; // padding with stride
 }
@@ -63,20 +56,18 @@ inline _Size upper_bound_with_stride(
 }
 
 template <typename _IterKey, typename _IterValue, typename _Compare>
-void bubble_sort_with_stride(
+inline void bubble_sort_with_stride(
     _IterKey key,
     _IterValue value,
     const size_t begin,
     const size_t end,
     _Compare comp,
     const size_t stride) {
-  if (begin < end) {
-    for (size_t i = begin; i < end; i += stride) {
-      for (size_t idx = i + stride; idx < end; idx += stride) {
-        if (comp(key[idx], key[i])) {
-          std::swap(key[i], key[idx]);
-          std::swap(value[i], value[idx]);
-        }
+  for (size_t i = begin; i < end; i += stride) {
+    for (size_t idx = i + stride; idx < end; idx += stride) {
+      if (comp(key[idx], key[i])) {
+        std::swap(key[i], key[idx]);
+        std::swap(value[i], value[idx]);
       }
     }
   }
@@ -88,7 +79,7 @@ template <
     typename _OutKeyAcc,
     typename _OutValueAcc,
     typename _Compare>
-void merge_with_stride(
+inline void merge_with_stride(
     const size_t offset,
     _InKeyAcc& in_key_acc1,
     _InValueAcc& in_value_acc1,
@@ -103,15 +94,10 @@ void merge_with_stride(
     const size_t stride) {
   const size_t start_2 = end_1;
   // Borders of the sequences to merge within this call
-  const size_t local_start_1 =
-      DPCPP::min(static_cast<size_t>(offset + start_1), end_1);
-  const size_t local_end_1 =
-      DPCPP::min(static_cast<size_t>(local_start_1 + chunk * stride), end_1);
-  const size_t local_start_2 =
-      DPCPP::min(static_cast<size_t>(offset + start_2), end_2);
-  const size_t local_end_2 =
-      DPCPP::min(static_cast<size_t>(local_start_2 + chunk * stride), end_2);
-
+  const size_t local_start_1 = DPCPP::min(offset + start_1, end_1);
+  const size_t local_end_1 = DPCPP::min(local_start_1 + chunk * stride, end_1);
+  const size_t local_start_2 = DPCPP::min(offset + start_2, end_2);
+  const size_t local_end_2 = DPCPP::min(local_start_2 + chunk * stride, end_2);
   const size_t local_size_1 = local_end_1 - local_start_1;
   const size_t local_size_2 = local_end_2 - local_start_2;
 
@@ -231,12 +217,11 @@ void merge_sort_with_stride(
     uint8_t* scratch_value,
     _Id id,
     const size_t stride = 1) {
-  using TK = typename std::iterator_traits<_IterKey>::value_type;
-  using TV = typename std::iterator_traits<_IterValue>::value_type;
   const size_t local = group.get_local_range(0);
   const size_t idx = id.get_local_id();
-  const size_t chunk = (size / stride - 1) / local + 1;
-  const size_t chunk_times_stride = chunk * stride;
+  size_t chunk = (size / stride - 1) / local + 1;
+  chunk = chunk / 2 * 2 + 2;
+  size_t chunk_times_stride = chunk * stride;
 
   // we need to sort within work item firstly
   bubble_sort_with_stride(
@@ -248,11 +233,13 @@ void merge_sort_with_stride(
       stride);
   id.barrier();
 
-  TK* temp_key = reinterpret_cast<TK*>(scratch_key);
-  TV* temp_value = reinterpret_cast<TV*>(scratch_value);
+  auto temp_key = reinterpret_cast<_IterKey>(scratch_key);
+  auto temp_value = reinterpret_cast<_IterValue>(scratch_value);
 
   bool data_in_temp = false;
-  size_t sorted_size = 1;
+  size_t sorted_size = 2;
+  chunk /= 2;
+  chunk_times_stride = chunk * stride;
   while (sorted_size * chunk_times_stride < size) {
     const size_t start_1 = DPCPP::min(
         2 * sorted_size * chunk_times_stride * (idx / sorted_size),
@@ -431,40 +418,6 @@ void merge_sort_kernel(
       } else {
         MERGE_SORT_EXEC([](auto x, auto y) { return std::less<key_t>()(x, y); })
       }
-    };
-    h.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(sort_group_size * max_group_size),
-            DPCPP::range<1>(max_group_size)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(q, cgf);
-}
-
-template <typename key_t, typename value_t, class comp_t>
-void merge_sort_kernel(
-    key_t* key,
-    value_t* value,
-    const size_t sort_group_size,
-    const size_t sort_item_size,
-    uint8_t* scratch_key,
-    uint8_t* scratch_value,
-    const comp_t comp_op,
-    const int stride = 1) {
-  auto& q = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto max_group_size = dpcppMaxWorkGroupSize(dev_id);
-  auto element_size_of_key = sizeof(key_t);
-  auto element_size_of_value = sizeof(value_t);
-
-  auto cgf = DPCPP_Q_CGF(h) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> id) {
-      auto group_id = id.get_group(0);
-      auto start =
-          group_id / stride * stride * sort_item_size + group_id % stride;
-      auto keys = &key[start];
-      auto vals = &value[start];
-      MERGE_SORT_EXEC([=](auto x, auto y) { return comp_op(x, y); })
     };
     h.parallel_for(
         DPCPP::nd_range<1>(
