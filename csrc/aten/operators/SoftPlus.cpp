@@ -46,18 +46,21 @@ Tensor& softplus_out(
   return out;
 }
 
-Tensor softplus(const Tensor& self, Scalar beta, Scalar threshold) {
+Tensor softplus(
+    const Tensor& self,
+    const Scalar& beta,
+    const Scalar& threshold) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::softplus_out(self, beta, threshold, out);
 }
 
 Tensor& softplus_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar beta,
-    Scalar threshold,
-    const Tensor& output) {
+    const Scalar& beta,
+    const Scalar& threshold,
+    const Tensor& output,
+    Tensor& grad_input) {
   checkBackend(
       "softplus_backward",
       {grad_input, grad_output, output},
@@ -89,12 +92,12 @@ Tensor& softplus_backward_out(
 Tensor softplus_backward(
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar beta,
-    Scalar threshold,
+    const Scalar& beta,
+    const Scalar& threshold,
     const Tensor& output) {
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::AtenIpexTypeXPU::softplus_backward_out(
-      grad_input, grad_output, self, beta, threshold, output);
+      grad_output, self, beta, threshold, output, grad_input);
 }
 
 } // namespace AtenIpexTypeXPU
