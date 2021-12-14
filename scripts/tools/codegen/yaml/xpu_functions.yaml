@@ -516,7 +516,7 @@ supported:
 #  - softshrink  # different signature
   - softshrink.out
 #  - softshrink_backward  # different signature
-#  - softshrink_backward.grad_input  # different signature
+  - softshrink_backward.grad_input
   - solve
   - solve.solution
   - sort

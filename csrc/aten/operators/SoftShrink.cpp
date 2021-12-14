@@ -71,10 +71,10 @@ Tensor softshrink(const Tensor& self, Scalar lambd) {
 }
 
 Tensor& softshrink_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar lambd) {
+    const Scalar& lambd,
+    Tensor& grad_input) {
   checkBackend(
       "softshrink_backward",
       {grad_input, grad_output},
