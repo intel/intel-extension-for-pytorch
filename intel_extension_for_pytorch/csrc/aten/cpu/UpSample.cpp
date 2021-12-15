@@ -1711,9 +1711,13 @@ at::Tensor upsample_nearest2d_backward_out_cpu(
         grad_output.size(i));
   }
 
-  at::Tensor grad_input = at::zeros(
-      input_size,
-      grad_output.options().memory_format(grad_output.suggest_memory_format()));
+  // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
+  // the memory format tag.
+  at::Tensor grad_input = at::empty(
+                              input_size,
+                              grad_output.options().memory_format(
+                                  grad_output.suggest_memory_format()))
+                              .zero_();
   upsample_nearest2d_backward_kernel_impl(
       grad_input, grad_output, scales_h, scales_w);
   return grad_input;
@@ -1926,9 +1930,13 @@ at::Tensor upsample_bilinear2d_backward_out_cpu(
         grad_output.size(i));
   }
 
-  at::Tensor grad_input = at::zeros(
-      input_size,
-      grad_output.options().memory_format(grad_output.suggest_memory_format()));
+  // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
+  // the memory format tag.
+  at::Tensor grad_input = at::empty(
+                              input_size,
+                              grad_output.options().memory_format(
+                                  grad_output.suggest_memory_format()))
+                              .zero_();
   upsample_bilinear2d_backward_kernel_impl(
       grad_input, grad_output, align_corners, scales_h, scales_w);
   return grad_input;
