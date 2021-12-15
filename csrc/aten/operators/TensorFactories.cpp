@@ -517,6 +517,18 @@ Tensor std(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
       result, self, dim, unbiased, keepdim, true);
 }
 
+Tensor std(
+    const Tensor& self,
+    c10::optional<IntArrayRef>(_dim),
+    c10::optional<int64_t>(_correction),
+    bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  auto correction = _correction.value_or(1);
+  auto dim = _dim.value_or(IntArrayRef{});
+  return at::AtenIpexTypeXPU::std_var_out(
+      result, self, dim, correction, keepdim, true);
+}
+
 Tensor& std_out(
     Tensor& out,
     const Tensor& self,
@@ -525,6 +537,18 @@ Tensor& std_out(
     bool keepdim) {
   return at::AtenIpexTypeXPU::std_var_out(
       out, self, dim, unbiased, keepdim, true);
+}
+
+Tensor std_out(
+    const Tensor& self,
+    c10::optional<IntArrayRef>(_dim),
+    c10::optional<int64_t>(_correction),
+    bool keepdim,
+    Tensor& result) {
+  auto correction = _correction.value_or(1);
+  auto dim = _dim.value_or(IntArrayRef{});
+  return at::AtenIpexTypeXPU::std_var_out(
+      result, self, dim, correction, keepdim, true);
 }
 
 Tensor _std(const Tensor& self, bool unbiased) {
