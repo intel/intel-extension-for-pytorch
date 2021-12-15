@@ -258,8 +258,8 @@ void inline prelu_backward_kernel_multi_weights(
 inline Tensor threshold_out(
     optional<Tensor> opt_result,
     const Tensor& self,
-    Scalar threshold,
-    Scalar value,
+    const Scalar& threshold,
+    const Scalar& value,
     const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
   if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, self, other) &&
@@ -370,12 +370,15 @@ Tensor& relu_(Tensor& self) {
   }
 }
 
-Tensor& threshold_(Tensor& self, Scalar threshold, Scalar value) {
+Tensor& threshold_(Tensor& self, const Scalar& threshold, const Scalar& value) {
   impl::threshold_out(make_optional(self), self, threshold, value, self);
   return self;
 }
 
-Tensor threshold(const Tensor& self, Scalar threshold, Scalar value) {
+Tensor threshold(
+    const Tensor& self,
+    const Scalar& threshold,
+    const Scalar& value) {
   return impl::threshold_out(nullopt, self, threshold, value, self);
 }
 
@@ -391,8 +394,17 @@ Tensor& threshold_out(
 Tensor threshold_backward(
     const Tensor& grad,
     const Tensor& self,
-    Scalar threshold) {
+    const Scalar& threshold) {
   return impl::threshold_out(nullopt, self, threshold, 0, grad);
+}
+
+Tensor& threshold_backward_out(
+    const Tensor& grad,
+    const Tensor& self,
+    const Scalar& threshold,
+    Tensor& gradInput) {
+  impl::threshold_out(make_optional(gradInput), self, threshold, 0, grad);
+  return gradInput;
 }
 
 Tensor rrelu_with_noise(

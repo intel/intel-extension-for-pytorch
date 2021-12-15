@@ -547,10 +547,11 @@ supported:
 #  - tanh_  # disabled in torch
   - tanh_backward
   - tanh_backward.grad_input
-#  - threshold  # different signature
+  - threshold
   - threshold.out
-#  - threshold_  # different signature
-#  - threshold_backward  # different signature
+  - threshold_
+  - threshold_backward
+  - threshold_backward.grad_input
   - topk
   - topk.values
   - trace
