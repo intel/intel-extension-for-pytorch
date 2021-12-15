@@ -523,11 +523,11 @@ supported:
   - sort.values
   - sqrt.out
 #  - std        # should not register
+  - std.correction
 #  - std.dim    # should not register
 #  - std.out  # dispatch is False
 #  - std_mean   # should not register
 #  - std_mean.dim       # should not register
-  - std.correction 
 #  - sub.Scalar  # different signature
 #  - sub.Tensor  # different signature
   - sub.out
