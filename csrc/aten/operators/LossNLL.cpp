@@ -28,7 +28,7 @@ void ClassNLLCriterion_updateOutput(
     const Tensor& input,
     const Tensor& target,
     Tensor& output,
-    const Tensor& weights,
+    const optional<Tensor>& weights,
     Tensor& total_weight,
     int64_t reduction,
     int64_t ignore_index) {
@@ -53,23 +53,25 @@ void ClassNLLCriterion_updateOutput(
   int64_t num_targets = target.size(0);
   int64_t target_stride = target.stride(0);
 
+  const Tensor weights_val = weights.value();
   TORCH_CHECK(
-      !weights.defined() || weights.numel() == n_classes,
+      !weights_val.defined() || weights_val.numel() == n_classes,
       "weight tensor should be defined either for all ",
       n_classes,
       " classes or no classes"
       " but got weight tensor of shape: ",
-      weights.sizes());
+      weights_val.sizes());
 
   if (reduction == at::Reduction::None && n_dims == 2) {
     output.resize_({batch_size});
 
-    auto weights_cont = weights.defined() ? weights.contiguous() : weights;
+    auto weights_cont =
+        weights_val.defined() ? weights_val.contiguous() : weights_val;
 
     auto& queue = dpcppGetCurrentQueue();
     auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
     int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
-    bool has_weights = weights.defined()
+    bool has_weights = weights_val.defined()
         ? true
         : false; // dpcpp kernel can not accept host pointer
 
@@ -116,12 +118,13 @@ void ClassNLLCriterion_updateOutput(
   total_weight.resize_({});
 
   auto input_cont = input.contiguous();
-  auto weights_cont = weights.defined() ? weights.contiguous() : weights;
+  auto weights_cont =
+      weights_val.defined() ? weights_val.contiguous() : weights_val;
   auto target_cont = target.contiguous();
 
   scalar_t* _input_data = input_cont.data_ptr<scalar_t>();
   scalar_t* _weights_data =
-      weights.defined() ? weights_cont.data_ptr<scalar_t>() : NULL;
+      weights_val.defined() ? weights_cont.data_ptr<scalar_t>() : NULL;
   int64_t* _target_data = target_cont.data_ptr<int64_t>();
   scalar_t* _output_data = output.data_ptr<scalar_t>();
   scalar_t* _total_weight_data = total_weight.data_ptr<scalar_t>();
@@ -234,7 +237,7 @@ void ClassNLLCriterion_updateGradInput(
     const Tensor& gradOutput,
     Tensor& gradInput,
     int64_t reduction,
-    const Tensor& weights,
+    const optional<Tensor>& weights,
     const Tensor& total_weight,
     int64_t ignore_index) {
   TORCH_CHECK(
@@ -260,20 +263,22 @@ void ClassNLLCriterion_updateGradInput(
       batch_size == num_targets,
       "mismatch between the batch size of input and that of target")
 
+  const Tensor weights_val = weights.value();
   TORCH_CHECK(
-      !weights.defined() || weights.numel() == input.size(-1),
+      !weights_val.defined() || weights_val.numel() == input.size(-1),
       "weight tensor should be defined either for all or no classes");
 
   if (reduction == at::Reduction::None && n_dims == 2) {
     check_dim_size(gradOutput, 1, 0, batch_size);
-    auto weights_cont = weights.defined() ? weights.contiguous() : weights;
+    auto weights_cont =
+        weights_val.defined() ? weights_val.contiguous() : weights_val;
 
     auto& queue = dpcppGetCurrentQueue();
     auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
     int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
     int64_t global_size =
         ((batch_size + local_size - 1) / local_size) * local_size;
-    bool has_weights = weights.defined() ? true : false;
+    bool has_weights = weights_val.defined() ? true : false;
 
     auto gradInput_stride_0 = gradInput.stride(0);
     auto gradInput_stride_1 = gradInput.stride(1);
@@ -319,9 +324,10 @@ void ClassNLLCriterion_updateGradInput(
     return;
   }
 
-  auto weights_cont = weights.defined() ? weights.contiguous() : weights;
+  auto weights_cont =
+      weights_val.defined() ? weights_val.contiguous() : weights_val;
   auto target_cont = target.contiguous();
-  bool has_weights = weights.defined() ? true : false;
+  bool has_weights = weights_val.defined() ? true : false;
 
   TORCH_CHECK(
       gradOutput.dim() <= 1 && gradOutput.numel() == 1,
@@ -409,7 +415,8 @@ void ClassNLLCriterion_updateGradInput(
 void spatial_class_nll_criterion_shape_check(
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weights) {
+    const optional<Tensor>& weights) {
+  const Tensor weights_val = weights.value();
   TORCH_CHECK(
       target.dim() == 3,
       1,
@@ -429,9 +436,9 @@ void spatial_class_nll_criterion_shape_check(
       target.sizes(),
       ", input ",
       self.sizes());
-  if (weights.defined()) {
+  if (weights_val.defined()) {
     TORCH_CHECK(
-        weights.numel() == self.size(1),
+        weights_val.numel() == self.size(1),
         "weight tensor should be defined either for all or no classes");
   }
 }
@@ -796,13 +803,13 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
 
 // namespace AtenIpexTypeXPU
 std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
-    Tensor& output,
-    Tensor& total_weight,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
-    int64_t ignore_index) {
+    int64_t ignore_index,
+    Tensor& output,
+    Tensor& total_weight) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -825,7 +832,7 @@ std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
 std::tuple<at::Tensor, at::Tensor> nll_loss_forward(
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index) {
   auto output = at::empty({0}, self.options());
@@ -851,14 +858,14 @@ std::tuple<at::Tensor, at::Tensor> nll_loss_forward(
 }
 
 Tensor& nll_loss_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index,
-    const Tensor& total_weight) {
+    const Tensor& total_weight,
+    Tensor& grad_input) {
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -881,7 +888,7 @@ Tensor nll_loss_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index,
     const Tensor& total_weight) {
@@ -906,20 +913,21 @@ Tensor nll_loss_backward(
 }
 
 Tensor& nll_loss2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index,
-    const Tensor& total_weight) {
+    const Tensor& total_weight,
+    Tensor& grad_input) {
   impl::spatial_class_nll_criterion_shape_check(self, target, weight);
   grad_input.resize_(self.sizes()).zero_();
 
-  if (weight.defined()) {
+  const Tensor weight_val = weight.value();
+  if (weight_val.defined()) {
     TORCH_CHECK(
-        IsOnSameDevice({self, target, weight, grad_input, total_weight}),
+        IsOnSameDevice({self, target, weight_val, grad_input, total_weight}),
         "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   } else {
     TORCH_CHECK(
@@ -952,8 +960,9 @@ Tensor& nll_loss2d_backward_out(
               target,
               grad_output,
               grad_input,
-              weight.defined() ? weight
-                               : at::ones({self.size(1)}, self.options()),
+              weight.value().defined()
+                  ? weight.value()
+                  : at::ones({self.size(1)}, self.options()),
               ignore_index);
         });
   } else {
@@ -966,8 +975,9 @@ Tensor& nll_loss2d_backward_out(
               grad_input,
               grad_output,
               target,
-              weight.defined() ? weight
-                               : at::ones({self.size(1)}, self.options()),
+              weight.value().defined()
+                  ? weight.value()
+                  : at::ones({self.size(1)}, self.options()),
               total_weight,
               reduction,
               ignore_index);
@@ -981,38 +991,40 @@ Tensor nll_loss2d_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index,
     const Tensor& total_weight) {
   Tensor grad_input = at::empty({0}, grad_output.options());
   at::AtenIpexTypeXPU::nll_loss2d_backward_out(
-      grad_input,
       grad_output,
       self,
       target,
       weight,
       reduction,
       ignore_index,
-      total_weight);
+      total_weight,
+      grad_input);
+
   return grad_input;
 }
 
 std::tuple<Tensor&, Tensor&> nll_loss2d_forward_out(
-    Tensor& output,
-    Tensor& total_weight,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
-    int64_t ignore_index) {
+    int64_t ignore_index,
+    Tensor& output,
+    Tensor& total_weight) {
   impl::spatial_class_nll_criterion_shape_check(self, target, weight);
   output.resize_({});
   total_weight.resize_({});
 
-  if (weight.defined()) {
+  const Tensor weight_val = weight.value();
+  if (weight_val.defined()) {
     TORCH_CHECK(
-        IsOnSameDevice({self, target, weight, output, total_weight}),
+        IsOnSameDevice({self, target, weight_val, output, total_weight}),
         "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   } else {
     TORCH_CHECK(
@@ -1041,8 +1053,9 @@ std::tuple<Tensor&, Tensor&> nll_loss2d_forward_out(
                 self,
                 target,
                 output,
-                weight.defined() ? weight
-                                 : at::ones({self.size(1)}, self.options()),
+                weight.value().defined()
+                    ? weight.value()
+                    : at::ones({self.size(1)}, self.options()),
                 ignore_index);
           });
     } else {
@@ -1061,8 +1074,9 @@ std::tuple<Tensor&, Tensor&> nll_loss2d_forward_out(
                 total_weight,
                 self,
                 target,
-                weight.defined() ? weight
-                                 : at::ones({self.size(1)}, self.options()),
+                weight.value().defined()
+                    ? weight.value()
+                    : at::ones({self.size(1)}, self.options()),
                 reduction,
                 ignore_index);
           });
@@ -1075,13 +1089,13 @@ std::tuple<Tensor&, Tensor&> nll_loss2d_forward_out(
 std::tuple<Tensor, Tensor> nll_loss2d_forward(
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
+    const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index) {
   Tensor output = at::empty({0}, self.options());
   Tensor total_weight = at::empty({0}, self.options());
   at::AtenIpexTypeXPU::nll_loss2d_forward_out(
-      output, total_weight, self, target, weight, reduction, ignore_index);
+      self, target, weight, reduction, ignore_index, output, total_weight);
   return std::tuple<Tensor, Tensor>{output, total_weight};
 }
 

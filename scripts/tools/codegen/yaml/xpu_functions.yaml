@@ -388,14 +388,14 @@ supported:
   - ne.Tensor
   - ne.Tensor_out
   - neg.out
-#  - nll_loss2d_backward  # different signature
-#  - nll_loss2d_backward.grad_input  # different signature
-#  - nll_loss2d_forward  # different signature
-#  - nll_loss2d_forward.output  # different signature
-#  - nll_loss_backward  # different signature
-#  - nll_loss_backward.grad_input  # different signature
-#  - nll_loss_forward  # different signature
-#  - nll_loss_forward.output  # different signature
+  - nll_loss2d_backward
+  - nll_loss2d_backward.grad_input
+  - nll_loss2d_forward
+  - nll_loss2d_forward.output
+  - nll_loss_backward
+  - nll_loss_backward.grad_input
+  - nll_loss_forward
+  - nll_loss_forward.output
   - nonzero
   - nonzero.out
 #  - norm.Scalar  # different signature
