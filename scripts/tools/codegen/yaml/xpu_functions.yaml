@@ -118,7 +118,7 @@ supported:
   - binary_cross_entropy
   - binary_cross_entropy.out
   - binary_cross_entropy_backward
-#  - binary_cross_entropy_backward.grad_input  # different signature
+  - binary_cross_entropy_backward.grad_input
   - bincount
 #  - bitwise_and.Scalar_out  # different signature
   - bitwise_and.Tensor_out

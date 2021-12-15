@@ -258,12 +258,14 @@ Tensor& binary_cross_entropy_out(
 }
 
 Tensor& binary_cross_entropy_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    const Tensor& weight,
-    int64_t reduction) {
+    const c10::optional<at::Tensor>& weight_opt,
+    int64_t reduction,
+    Tensor& grad_input) {
+  TORCH_CHECK(weight_opt.has_value(), "not implemented");
+  const Tensor weight = weight_opt.value();
   auto iter = at::TensorIteratorConfig()
                   .add_output(grad_input)
                   .add_input(self)
@@ -291,7 +293,7 @@ Tensor binary_cross_entropy_backward(
   Tensor grad_input = at::zeros_like(
       self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
   return at::AtenIpexTypeXPU::binary_cross_entropy_backward_out(
-      grad_input, grad_output, self, target, weight, reduction);
+      grad_output, self, target, weight, reduction, grad_input);
 }
 
 Tensor soft_margin_loss(
