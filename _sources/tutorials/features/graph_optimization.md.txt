@@ -79,7 +79,7 @@ with torch.no_grad():
     # Print the graph
     print(model.graph_for(x))
 ```
-If the model owner does not invoke the `torch.jit.freeze`, the `BatchNormalization` still exists on the graph. Otheriwse, the `BatchNormalization` will be folded on the graph to save the compuation and then improve the performance. Please refer to the https://en.wikipedia.org/wiki/Constant_folding for more details.
+If the model owner does not invoke the `torch.jit.freeze`, the `BatchNormalization` still exists on the graph. Otheriwse, the `BatchNormalization` will be folded on the graph to save the compuation and then improve the performance. Please refer to the [Constant Folding Wikipedia page](https://en.wikipedia.org/wiki/Constant_folding) for more details.
 
 
 ## Ease-of-use graph optimization API
