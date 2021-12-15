@@ -25,7 +25,7 @@ supported:
   - _empty_per_channel_affine_quantized
 #  - _fft_with_size.norm_modes  # different schema
   - _fused_dropout
-#  - _index_put_impl_  # different signature
+  - _index_put_impl_ 
   - _inverse_helper
   - _local_scalar_dense
   - _log_softmax
