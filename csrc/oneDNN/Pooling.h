@@ -71,7 +71,7 @@ static at::Tensor pooling(
   memory::format_tag format_any = memory::format_tag::any;
 
   if (srcDepth == 0) {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast)
+    format = (4 == src.ndimension() && is_smf_channels_last(src))
         ? memory::format_tag::nhwc
         : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
@@ -80,7 +80,7 @@ static at::Tensor pooling(
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+    format = (5 == src.ndimension() && is_smf_channels_last(src))
         ? memory::format_tag::ndhwc
         : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
@@ -119,9 +119,7 @@ static at::Tensor pooling(
       pooling_forward::primitive_desc(pooling_fwd_desc, engine);
 
   memory src_m, dst_m;
-  if (!Settings::I().is_onednn_layout_enabled() ||
-      src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-      src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+  if (!Settings::I().is_onednn_layout_enabled() || is_smf_channels_last(src)) {
     src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
     dst_m = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
   } else {
@@ -153,7 +151,6 @@ static at::Tensor pooling(
 
   DPCPP_ONEDNN_EXEC(
       pooling_fwd, strm, {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
-
   return dst;
 }
 
@@ -371,7 +368,7 @@ static at::Tensor pooling_backward(
   memory::format_tag format_any = memory::format_tag::any;
 
   if (diff_src_depth == 0) {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast)
+    format = (4 == diff_src.ndimension() && is_smf_channels_last(diff_src))
         ? memory::format_tag::nhwc
         : memory::format_tag::nchw;
 
@@ -381,7 +378,7 @@ static at::Tensor pooling_backward(
     stride = {dH, dW};
     padding = {padH, padW};
   } else {
-    format = diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+    format = (5 == diff_src.ndimension() && is_smf_channels_last(diff_src))
         ? memory::format_tag::ndhwc
         : memory::format_tag::ncdhw;
 
@@ -443,8 +440,7 @@ static at::Tensor pooling_backward(
 
   memory diff_src_m, diff_dst_m;
   if (!Settings::I().is_onednn_layout_enabled() ||
-      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-      diff_src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+      is_smf_channels_last(diff_src)) {
     diff_dst_m = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
 
     diff_src_m = dpcpp_onednn_memory(diff_src_md, engine, diff_src.data_ptr());

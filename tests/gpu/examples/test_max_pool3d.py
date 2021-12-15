@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import pytest
 
 import numpy
 
@@ -12,12 +13,12 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_max_pool3d(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 4, 4, 3], device=cpu_device, dtype=dtype)
-        grad_cpu = torch.randn([1, 4, 4, 3], device=cpu_device, dtype=dtype)
+        x_cpu = torch.randn([1, 4, 4, 3, 3], device=cpu_device, dtype=dtype)
+        grad_cpu = torch.randn([1, 4, 4, 3, 3], device=cpu_device, dtype=dtype)
         x_dpcpp = x_cpu.to("xpu")
         grad_dpcpp = grad_cpu.to("xpu")
 
-        max_pool = nn.MaxPool2d(kernel_size=3, stride=1,
+        max_pool = nn.MaxPool3d(kernel_size=3, stride=1,
                                 padding=1, return_indices=True)
 
         x_cpu.requires_grad_(True)
@@ -35,11 +36,11 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    def test_channels_last_simple_fwd(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 4, 3, 4], device=cpu_device, dtype=dtype)
-        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last)
+    def test_channels_last_3d_simple_fwd(self, dtype=torch.float):
+        x_cpu = torch.randn([1, 4, 4, 3, 3], device=cpu_device, dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last_3d)
 
-        max_pool = nn.MaxPool2d(kernel_size=3, stride=1,
+        max_pool = nn.MaxPool3d(kernel_size=3, stride=1,
                                 padding=1, return_indices=True)
 
         y_cpu = max_pool(x_cpu)
@@ -50,13 +51,13 @@ class TestNNMethod(TestCase):
         print("y_dpcpp", y_dpcpp[0].to("cpu"))
         self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
 
-    def test_channels_last_simple_bwd(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 4, 4, 3], device=cpu_device, dtype=dtype)
-        grad_cpu = torch.randn([1, 4, 4, 3], device=cpu_device, dtype=dtype)
-        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last)
+    def test_channels_last_3d_simple_bwd(self, dtype=torch.float):
+        x_cpu = torch.randn([1, 4, 4, 3, 3], device=cpu_device, dtype=dtype)
+        grad_cpu = torch.randn([1, 4, 4, 3, 3], device=cpu_device, dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu").to(memory_format=torch.channels_last_3d)
         grad_dpcpp = grad_cpu.to("xpu")
 
-        max_pool = nn.MaxPool2d(kernel_size=3, stride=1,
+        max_pool = nn.MaxPool3d(kernel_size=3, stride=1,
                                 padding=1, return_indices=True)
 
         x_cpu.requires_grad_(True)
