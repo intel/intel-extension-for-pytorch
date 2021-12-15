@@ -10,10 +10,10 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 Tensor& hardtanh_out(
-    Tensor& out,
     const Tensor& self,
-    Scalar min_val,
-    Scalar max_val) {
+    const Scalar& min_val,
+    const Scalar& max_val,
+    Tensor& out) {
   checkBackend("hardtanh", out, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIteratorConfig()
@@ -43,23 +43,26 @@ Tensor& hardtanh_out(
   return out;
 }
 
-Tensor hardtanh(const Tensor& self, Scalar min_val, Scalar max_val) {
+Tensor hardtanh(
+    const Tensor& self,
+    const Scalar& min_val,
+    const Scalar& max_val) {
   TORCH_CHECK(!self.is_sparse(), "hardtanh(dpcpp_sparse) is not supported.");
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeXPU::hardtanh_out(result, self, min_val, max_val);
+  at::AtenIpexTypeXPU::hardtanh_out(self, min_val, max_val, result);
   return result;
 }
 
-Tensor& hardtanh_(Tensor& self, Scalar min_val, Scalar max_val) {
-  return at::AtenIpexTypeXPU::hardtanh_out(self, self, min_val, max_val);
+Tensor& hardtanh_(Tensor& self, const Scalar& min_val, const Scalar& max_val) {
+  return at::AtenIpexTypeXPU::hardtanh_out(self, min_val, max_val, self);
 }
 
 Tensor& hardtanh_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar min_val,
-    Scalar max_val) {
+    const Scalar& min_val,
+    const Scalar& max_val,
+    Tensor& grad_input) {
   checkBackend(
       "hardtanh_backward", {grad_input, grad_output}, self.options().backend());
   // Compare the norm and maxnorm value.
@@ -89,11 +92,11 @@ Tensor& hardtanh_backward_out(
 Tensor hardtanh_backward(
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar min_val,
-    Scalar max_val) {
+    const Scalar& min_val,
+    const Scalar& max_val) {
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::AtenIpexTypeXPU::hardtanh_backward_out(
-      grad_input, grad_output, self, min_val, max_val);
+      grad_output, self, min_val, max_val, grad_input);
 }
 } // namespace AtenIpexTypeXPU
 } // namespace at
