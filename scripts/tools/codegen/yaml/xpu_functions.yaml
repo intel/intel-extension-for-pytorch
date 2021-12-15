@@ -117,7 +117,7 @@ supported:
   - bernoulli_.float
   - binary_cross_entropy
 #  - binary_cross_entropy.out  # different signature
-#  - binary_cross_entropy_backward  # different signature
+  - binary_cross_entropy_backward
 #  - binary_cross_entropy_backward.grad_input  # different signature
   - bincount
 #  - bitwise_and.Scalar_out  # different signature
