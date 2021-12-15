@@ -80,7 +80,7 @@ import re
 TORCH_VERSION = '1.10.0'
 TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
 
-TORCH_IPEX_VERSION = '1.10.0+cpu'
+TORCH_IPEX_VERSION = '1.10.100+cpu'
 PYTHON_VERSION = sys.version_info
 
 IS_WINDOWS = (platform.system() == 'Windows')
