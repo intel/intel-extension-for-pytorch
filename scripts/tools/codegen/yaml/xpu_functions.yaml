@@ -53,8 +53,9 @@ supported:
   - acos.out
   - adaptive_avg_pool2d.out
 #  - adaptive_avg_pool3d        # should not register
+  - _adaptive_avg_pool3d
   - adaptive_avg_pool3d.out
-#  - adaptive_avg_pool3d_backward  # different schema
+  - _adaptive_avg_pool3d_backward
   - adaptive_avg_pool3d_backward.grad_input
   - adaptive_max_pool2d
   - adaptive_max_pool2d.out

@@ -181,7 +181,21 @@ Tensor& adaptive_avg_pool3d_out(
   return out;
 }
 
-Tensor adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
+Tensor adaptive_avg_pool3d(const at::Tensor& input, IntArrayRef output_size) {
+  TORCH_CHECK(
+      output_size.size() == 3, "adaptive_avg_pool3d: output_size must be 3");
+
+  if (output_size[0] == 1 && output_size[1] == 1 && output_size[2] == 1) {
+    // in this case, adaptive pooling is just computing mean over hw
+    // dimensions, which can be done more efficiently
+    Tensor out = input.mean({-1, -2, -3}, /* keepdim = */ true);
+    return out;
+  } else {
+    return _adaptive_avg_pool3d(input, output_size);
+  }
+}
+
+Tensor _adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
   auto output = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::adaptive_avg_pool3d_out(
       output, self, output_size);
@@ -196,7 +210,7 @@ Tensor& adaptive_avg_pool3d_backward_out(
   return grad_input;
 }
 
-Tensor adaptive_avg_pool3d_backward(
+Tensor _adaptive_avg_pool3d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
   Tensor grad_input;
