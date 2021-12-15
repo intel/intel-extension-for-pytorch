@@ -1165,9 +1165,13 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
     bool scale_grad_by_freq,
     int64_t mode,
     bool sparse,
-    const Tensor& per_sample_weights,
-    bool include_last_offset) {
+    const c10::optional<at::Tensor>& per_sample_weights_opt,
+    bool include_last_offset,
+    int64_t padding_idx) {
   // TODO: include_last_offset
+  // TODO: padding_idx
+  TORCH_CHECK(per_sample_weights_opt.has_value(), "not implemented");
+  const Tensor per_sample_weights = per_sample_weights_opt.value();
   return impl::_embedding_bag_dpcpp(
       weight,
       indices,

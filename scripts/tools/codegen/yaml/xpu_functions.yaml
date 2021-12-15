@@ -19,7 +19,7 @@ supported:
 #  - _cumsum	# diabled in torch
 #  - _cumsum.out	# disabled in torch
   - cumsum.out  # newly added
-#  - _embedding_bag	# different schema
+  - _embedding_bag
 #  - _embedding_bag_dense_backward	# different schema
   - _empty_affine_quantized
   - _empty_per_channel_affine_quantized
