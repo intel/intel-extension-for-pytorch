@@ -144,9 +144,9 @@ supported:
 #  - clamp  # different signature
   - clamp.out
 #  - clamp_  # different signature
-#  - clamp_max.out  # different signature
+  - clamp_max.out
 #  - clamp_max_  # different signature
-#  - clamp_min.out  # different signature
+  - clamp_min.out
 #  - clamp_min_  # different signature
   - clone
   - col2im
@@ -208,7 +208,7 @@ supported:
   - floor_divide.out
   - floor_divide_.Tensor
 #  - fmod.Scalar  # different signature
-#  - fmod.Scalar_out  # different signature
+  - fmod.Scalar_out
   - fmod.Tensor
   - fmod.Tensor_out
 #  - fmod_.Scalar  # different signature
@@ -455,7 +455,7 @@ supported:
   - relu
   - relu_
 #  - remainder.Scalar  # different signature
-#  - remainder.Scalar_out  # different signature
+  - remainder.Scalar_out
   - remainder.Tensor
   - remainder.Tensor_out
 #  - remainder_.Scalar  # different signature

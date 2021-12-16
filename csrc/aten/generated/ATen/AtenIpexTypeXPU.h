@@ -1037,7 +1037,6 @@ Tensor& erfinv_(Tensor& self);
 Tensor& erfinv_out(Tensor& out, const Tensor& self);
 Tensor sign(const Tensor& self);
 Tensor& sign_(Tensor& self);
-Tensor& sign_out(Tensor& out, const Tensor& self);
 Tensor& atan2_out(Tensor& out, const Tensor& self, const Tensor& other);
 Tensor atan2(const Tensor& self, const Tensor& other);
 Tensor& lerp_out(
