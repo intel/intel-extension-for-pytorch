@@ -174,9 +174,9 @@ supported:
   - div.out
   - div_.Tensor
   - dot
-#  - elu  # different signature
+  - elu
   - elu.out
-#  - elu_  # different signature
+  - elu_
 #  - elu_backward  # different schema
 #  - elu_backward.grad_input  # different schema
   - embedding_dense_backward

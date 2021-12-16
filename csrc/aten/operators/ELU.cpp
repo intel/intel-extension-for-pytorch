@@ -42,7 +42,11 @@ Tensor& elu_out(
   return out;
 }
 
-Tensor elu(const Tensor& self, Scalar alpha, Scalar scale, Scalar input_scale) {
+Tensor elu(
+    const Tensor& self,
+    const Scalar& alpha,
+    const Scalar& scale,
+    const Scalar& input_scale) {
   Tensor result = at::empty(self.sizes(), self.options());
   at::AtenIpexTypeXPU::elu_out(self, alpha, scale, input_scale, result);
   return result;
@@ -90,7 +94,11 @@ Tensor elu_backward(
       grad_input, grad_output, alpha, scale, input_scale, output);
 }
 
-Tensor& elu_(Tensor& self, Scalar alpha, Scalar scale, Scalar input_scale) {
+Tensor& elu_(
+    Tensor& self,
+    const Scalar& alpha,
+    const Scalar& scale,
+    const Scalar& input_scale) {
   return at::AtenIpexTypeXPU::elu_out(self, alpha, scale, input_scale, self);
 }
 
