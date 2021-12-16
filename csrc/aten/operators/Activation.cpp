@@ -624,8 +624,10 @@ std::tuple<Tensor, Tensor> prelu_backward(
   return std::tuple<Tensor, Tensor>{input_grad, weight_grad};
 }
 
-Tensor hardshrink(const Tensor& self, Scalar lambd) {
-  auto result = at::empty_like(self);
+Tensor& hardshrink_out(
+    const Tensor& self,
+    const Scalar& lambd,
+    Tensor& result) {
   auto iter = TensorIterator::unary_op(result, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -641,10 +643,15 @@ Tensor hardshrink(const Tensor& self, Scalar lambd) {
   return result;
 }
 
+Tensor hardshrink(const Tensor& self, const Scalar& lambd) {
+  Tensor result = at::empty_like(self);
+  return hardshrink_out(self, lambd, result);
+}
+
 Tensor hardshrink_backward(
     const Tensor& grad,
     const Tensor& self,
-    Scalar lambd) {
+    const Scalar& lambd) {
   auto result = at::empty_like(grad);
   auto iter = TensorIterator::binary_op(result, grad, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(

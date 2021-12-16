@@ -245,8 +245,9 @@ supported:
   - gt.Scalar_out
   - gt.Tensor
   - gt.Tensor_out
-#  - hardshrink  # different signature
-#  - hardshrink_backward  # different signature
+  - hardshrink
+  - hardshrink.out
+  - hardshrink_backward
   - hardtanh
   - hardtanh.out
   - hardtanh_
