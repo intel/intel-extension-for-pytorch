@@ -304,5 +304,17 @@ Tensor sparse_mask(const Tensor& self, const Tensor& mask) {
   return r;
 }
 
+Tensor empty(
+    IntArrayRef size,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
+    c10::optional<MemoryFormat> optional_memory_format) {
+  TensorOptions options =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
+  return empty(size, options, optional_memory_format);
+}
 } // namespace AtenIpexTypeSparseXPU
 } // namespace at

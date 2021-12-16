@@ -384,12 +384,70 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   return impl::copy_(self, src, non_blocking);
 }
 
+Tensor _to_copy(
+    const Tensor& self,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory,
+    bool non_blocking,
+    c10::optional<c10::MemoryFormat> optional_memory_format) {
+  return at::native::_to_copy(
+      self,
+      dtype,
+      layout,
+      device,
+      pin_memory,
+      non_blocking,
+      optional_memory_format);
+}
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   return impl::copy_(self, src, non_blocking);
 }
+
+Tensor _to_copy(
+    const Tensor& self,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory,
+    bool non_blocking,
+    c10::optional<c10::MemoryFormat> optional_memory_format) {
+  return at::native::_to_copy(
+      self,
+      dtype,
+      layout,
+      device,
+      pin_memory,
+      non_blocking,
+      optional_memory_format);
+}
 } // namespace AtenIpexTypeQuantizedXPU
 
+namespace AtenIpexTypeSparseXPU {
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
+  return at::impl::copy_(self, src, non_blocking);
+}
+
+Tensor _to_copy(
+    const Tensor& self,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory,
+    bool non_blocking,
+    c10::optional<c10::MemoryFormat> optional_memory_format) {
+  return at::native::_to_copy(
+      self,
+      dtype,
+      layout,
+      device,
+      pin_memory,
+      non_blocking,
+      optional_memory_format);
+}
+} // namespace AtenIpexTypeSparseXPU
 } // namespace at

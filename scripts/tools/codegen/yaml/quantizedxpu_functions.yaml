@@ -6,6 +6,7 @@ device_guard: true
 supported:
   - _adaptive_avg_pool2d
   - _empty_affine_quantized
+  - _to_copy
 #  - adaptive_avg_pool2d        # should not register
   - adaptive_avg_pool2d.out
   - add.Tensor
@@ -16,7 +17,7 @@ supported:
   - clone
   - copy_
   - dequantize.self
-#  - empty.memory_format	# different signature
+  - empty.memory_format
   - empty_strided
   - equal
   - int_repr

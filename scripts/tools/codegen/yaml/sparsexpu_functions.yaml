@@ -12,7 +12,9 @@ supported:
 #  - coalesce	# different schema
   - copy_sparse_to_sparse_
   - dense_dim
-#  - empty.memory_format	# different signature
+  - empty.memory_format
   - is_coalesced
   - sparse_dim
   - sparse_mask
+  - copy_
+  - _to_copy

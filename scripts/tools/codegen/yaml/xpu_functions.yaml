@@ -159,6 +159,7 @@ supported:
   - convolution_backward_overrideable
   - convolution_overrideable
   - copy_
+  - _to_copy
   - cos.out
 #  - cos_  # disabled in torch
   - cosh.out
