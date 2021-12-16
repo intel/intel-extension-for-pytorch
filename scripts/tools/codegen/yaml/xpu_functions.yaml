@@ -625,5 +625,5 @@ supported:
   - zero_
 autograd:
   - cdist
-#  - lstm.input # different signature
+  - lstm.input
 #  - gru.input  # different signature

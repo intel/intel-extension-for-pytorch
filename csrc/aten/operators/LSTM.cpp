@@ -127,7 +127,7 @@ class LSTMFunction : public Function<LSTMFunction> {
   }
 };
 
-std::tuple<Tensor, Tensor, Tensor> lstm_input(
+std::tuple<Tensor, Tensor, Tensor> lstm(
     const Tensor& input,
     TensorList hx,
     TensorList weights,
