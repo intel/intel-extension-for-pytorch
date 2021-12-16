@@ -529,6 +529,7 @@ supported:
 #  - std.dim    # should not register
 #  - std.out  # dispatch is False
 #  - std_mean   # should not register
+  - std_mean.correction
 #  - std_mean.dim       # should not register
 #  - sub.Scalar  # different signature
 #  - sub.Tensor  # different signature
@@ -614,9 +615,11 @@ supported:
   - upsample_trilinear3d_backward.grad_input
   - upsample_trilinear3d_backward.vec
 #  - var        # should not register
+  - var.correction
 #  - var.dim    # should not register
 #  - var_mean   # should not register
 #  - var_mean.dim       # should not register
+  - var_mean.correction
   - view
   - view_as_real   # newly added
   - zero_

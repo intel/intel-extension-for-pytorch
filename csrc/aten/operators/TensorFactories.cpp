@@ -483,6 +483,18 @@ Tensor var(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
       result, self, dim, unbiased, keepdim, false);
 }
 
+Tensor var(
+    const Tensor& self,
+    c10::optional<IntArrayRef> _dim,
+    c10::optional<int64_t> _correction,
+    bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  auto dim = _dim.value_or(IntArrayRef{});
+  auto correction = _correction.value_or(1);
+  return at::AtenIpexTypeXPU::std_var_out(
+      result, self, dim, correction, keepdim, false);
+}
+
 Tensor var(const Tensor& self, bool unbiased) {
   auto trivial_return =
       _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
@@ -568,6 +580,19 @@ std::tuple<Tensor, Tensor> var_mean(
       "var_mean", result1, result2, self, dim, unbiased, keepdim, false);
 }
 
+std::tuple<Tensor, Tensor> var_mean(
+    const Tensor& self,
+    c10::optional<IntArrayRef> _dim,
+    c10::optional<int64_t> _correction,
+    bool keepdim) {
+  Tensor result1 = at::empty({0}, self.options());
+  Tensor result2 = at::empty({0}, self.options());
+  auto dim = _dim.value_or(IntArrayRef{});
+  auto correction = _correction.value_or(1);
+  return at::AtenIpexTypeXPU::std_var_mean_out(
+      "var_mean", result1, result2, self, dim, correction, keepdim, false);
+}
+
 std::tuple<Tensor, Tensor> std_mean(
     const Tensor& self,
     IntArrayRef dim,
@@ -584,6 +609,19 @@ std::tuple<Tensor, Tensor> std_mean(const Tensor& self, bool unbiased) {
   Tensor result2 = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_mean_out(
       "std_mean", result1, result2, self, {}, unbiased, false, true);
+}
+
+std::tuple<Tensor, Tensor> std_mean(
+    const Tensor& self,
+    c10::optional<IntArrayRef> _dim,
+    c10::optional<int64_t> _correction,
+    bool keepdim) {
+  Tensor result1 = at::empty({0}, self.options());
+  Tensor result2 = at::empty({0}, self.options());
+  auto dim = _dim.value_or(IntArrayRef{});
+  auto correction = _correction.value_or(1);
+  return at::AtenIpexTypeXPU::std_var_mean_out(
+      "std_mean", result1, result2, self, dim, correction, keepdim, true);
 }
 
 std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
