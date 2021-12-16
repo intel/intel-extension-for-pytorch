@@ -20,8 +20,8 @@ supported:
   - empty_strided
   - equal
   - int_repr
-#  - leaky_relu	# different signature
-#  - leaky_relu_	# different signature
+  - leaky_relu
+  - leaky_relu_
   - max_pool2d_with_indices
   - q_per_channel_axis
   - q_per_channel_scales
