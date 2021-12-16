@@ -917,7 +917,7 @@ void EmbeddingBag_updateOutputKernel(
 Tensor embedding_bag_backward_dpcpp_sum_avg(
     const Tensor& grad,
     const Tensor& indices,
-    const Tensor& offsets,
+    // const Tensor& offsets,
     const Tensor& offset2bag,
     const Tensor& bag_size,
     int64_t num_weights,
@@ -1121,7 +1121,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
 Tensor _embedding_bag_dense_backward_dpcpp(
     const Tensor& grad_,
     const Tensor& indices,
-    const Tensor& offsets,
+    // const Tensor& offsets,
     const Tensor& offset2bag,
     const Tensor& bag_size_,
     const Tensor& max_indices,
@@ -1139,7 +1139,7 @@ Tensor _embedding_bag_dense_backward_dpcpp(
       return embedding_bag_backward_dpcpp_sum_avg(
           grad,
           indices,
-          offsets,
+          // offsets,
           offset2bag,
           bag_size_,
           num_weights,
@@ -1185,18 +1185,22 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
 Tensor _embedding_bag_dense_backward(
     const Tensor& grad,
     const Tensor& indices,
-    const Tensor& offsets,
+    // const Tensor& offsets,
     const Tensor& offset2bag,
     const Tensor& bag_size,
     const Tensor& maximum_indices,
     int64_t num_weights,
     bool scale_grad_by_freq,
     int64_t mode,
-    const Tensor& per_sample_weights) {
+    const c10::optional<at::Tensor>& per_sample_weights_opt,
+    int64_t padding_idx) {
+  // TODO: padding_idx
+  TORCH_CHECK(per_sample_weights_opt.has_value(), "not implemented");
+  const Tensor per_sample_weights = per_sample_weights_opt.value();
   return impl::_embedding_bag_dense_backward_dpcpp(
       grad,
       indices,
-      offsets,
+      // offsets,
       offset2bag,
       bag_size,
       maximum_indices,
