@@ -156,7 +156,7 @@ supported:
 #  - conj.out  # different schema
   - conv_tbc
 #  - conv_tbc_backward  # should not register
-#  - convolution_backward_overrideable  # different signature
+  - convolution_backward_overrideable
   - convolution_overrideable
   - copy_
   - cos.out
