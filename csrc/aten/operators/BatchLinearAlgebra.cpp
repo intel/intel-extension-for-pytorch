@@ -77,27 +77,14 @@ void apply_triu_tril(Tensor& result, const Tensor& self_, const int64_t k) {
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <bool upper>
-Tensor& triu_tril_dpcpp_template(
-    Tensor& result,
-    const Tensor& self,
-    int64_t k,
-    const char* name) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      self.scalar_type(),
-      name,
-      [&] {
-        if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
-          apply_triu_tril<scalar_t, int32_t, upper>(result, self, k);
-        } else {
-          apply_triu_tril<scalar_t, int64_t, upper>(result, self, k);
-        }
-      });
-
-  return result;
-}
+#define TRIU_TRIL_LAMBDA(upper)                                   \
+  [&] {                                                           \
+    if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {         \
+      apply_triu_tril<scalar_t, int32_t, upper>(result, self, k); \
+    } else {                                                      \
+      apply_triu_tril<scalar_t, int64_t, upper>(result, self, k); \
+    }                                                             \
+  }
 
 Tensor& tril_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
   if (result.sizes() != self.sizes()) {
@@ -107,7 +94,14 @@ Tensor& tril_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
     return result;
   }
 
-  return triu_tril_dpcpp_template<false>(result, self, k, "tril");
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "tril",
+      TRIU_TRIL_LAMBDA(false));
+
+  return result;
 }
 
 Tensor& tril_dpcpp_(Tensor& self, int64_t k) {
@@ -121,7 +115,14 @@ Tensor& triu_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
   if (self.numel() == 0) {
     return result;
   }
-  return triu_tril_dpcpp_template<true>(result, self, k, "triu");
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "triu",
+      TRIU_TRIL_LAMBDA(true));
+
+  return result;
 }
 
 Tensor& triu_dpcpp_(Tensor& self, int64_t k) {
