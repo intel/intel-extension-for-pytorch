@@ -626,4 +626,4 @@ supported:
 autograd:
   - cdist
   - lstm.input
-#  - gru.input  # different signature
+  - gru.input

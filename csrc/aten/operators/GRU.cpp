@@ -321,7 +321,7 @@ std::vector<at::Tensor> rnn_layer(
   }
 }
 
-std::tuple<Tensor, Tensor> gru_input(
+std::tuple<Tensor, Tensor> gru(
     const Tensor& input_,
     const Tensor& hx_,
     TensorList params,
