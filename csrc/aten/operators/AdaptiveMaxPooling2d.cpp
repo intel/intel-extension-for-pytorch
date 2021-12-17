@@ -139,6 +139,7 @@ Tensor& adaptive_max_pool2d_backward_out_template(
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
+      input,
       indices,
       nbatch,
       nPlane,

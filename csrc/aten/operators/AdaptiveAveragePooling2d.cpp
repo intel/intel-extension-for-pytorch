@@ -122,6 +122,7 @@ void adaptive_avg_pool2d_backward_out_template(
       ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
+      input,
       batchSize,
       nInputPlane,
       0,

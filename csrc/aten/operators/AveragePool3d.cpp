@@ -277,6 +277,7 @@ Tensor& avg_pool3d_backward_out_template(
         ::xpu::oneDNN::alg::pooling_avg_include_padding>(
         gradInput,
         gradOutput,
+        input,
         nbatch,
         nblock,
         idepth,
@@ -299,6 +300,7 @@ Tensor& avg_pool3d_backward_out_template(
         ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
+        input,
         nbatch,
         nblock,
         idepth,

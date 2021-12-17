@@ -90,15 +90,11 @@ static at::Tensor pooling(
     padding = {padD, padH, padW};
   }
 
-  auto src_md = memory::desc({src_tz}, data_t, format);
+  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
+  auto src_md = src_ctx.is_plain() ? memory::desc({src_tz}, data_t, format)
+                                   : src_ctx.meta();
   auto dst_md = memory::desc({dst_tz}, data_t, format);
   auto dst_md_any = memory::desc({dst_tz}, data_t, format_any);
-
-  if (Settings::I().is_onednn_layout_enabled()) {
-    auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
-    src_md = src_ctx.is_plain() ? memory::desc({src_tz}, data_t, format)
-                                : src_ctx.meta();
-  }
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -216,16 +212,13 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   }
 
   auto format_any = memory::format_tag::any;
-  auto src_md = memory::desc(src_tz, data_t, format);
+  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
+  auto src_md = src_ctx.is_plain() ? memory::desc(src_tz, data_t, format)
+                                   : src_ctx.meta();
   auto idx_md = memory::desc(dst_tz, data_t, format);
   auto dst_md = memory::desc(dst_tz, data_t, format);
 
   auto dst_md_any = memory::desc(dst_tz, data_t, format_any);
-
-  if (Settings::I().is_onednn_layout_enabled()) {
-    auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
-    src_md = src_ctx.is_plain() ? src_md : src_ctx.meta();
-  }
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -331,6 +324,7 @@ template <alg alg_kind>
 static at::Tensor pooling_backward(
     at::Tensor& diff_src,
     const at::Tensor& diff_dst,
+    const at::Tensor& src,
     int64_t nbatch,
     int64_t nInputPlane,
     int64_t diff_src_depth,
@@ -392,6 +386,10 @@ static at::Tensor pooling_backward(
   }
 
   auto diff_src_md = memory::desc({diff_src_tz}, data_t, format);
+  auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
+  auto src_md = src_ctx.is_plain()
+      ? memory::desc(src.sizes().vec(), data_t, format)
+      : src_ctx.meta();
   auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format_any);
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
 
@@ -404,19 +402,12 @@ static at::Tensor pooling_backward(
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   create_key(
-      key,
-      diff_src_md_any,
-      diff_dst_md,
-      stride,
-      kernel,
-      padding,
-      padding,
-      alg_kind);
+      key, src_md, diff_dst_md, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
-      diff_src_md_any,
+      src_md,
       diff_dst_md,
       stride,
       kernel,
@@ -472,6 +463,7 @@ template <alg alg_kind>
 static at::Tensor pooling_backward(
     at::Tensor& diff_src,
     const at::Tensor& diff_dst,
+    const at::Tensor& src,
     const at::Tensor& idx,
     int64_t nbatch,
     int64_t nInputPlane,
@@ -533,6 +525,10 @@ static at::Tensor pooling_backward(
 
   auto format_any = memory::format_tag::any;
   auto diff_src_md = memory::desc({diff_src_tz}, data_t, format);
+  auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
+  auto src_md = src_ctx.is_plain()
+      ? memory::desc(src.sizes().vec(), data_t, format)
+      : src_ctx.meta();
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
   auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format_any);
   if (Settings::I().is_onednn_layout_enabled()) {
@@ -544,19 +540,12 @@ static at::Tensor pooling_backward(
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   create_key(
-      key,
-      diff_src_md_any,
-      diff_dst_md,
-      stride,
-      kernel,
-      padding,
-      padding,
-      alg_kind);
+      key, src_md, diff_dst_md, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_fwd_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
-      diff_src_md_any,
+      src_md,
       diff_dst_md,
       stride,
       kernel,

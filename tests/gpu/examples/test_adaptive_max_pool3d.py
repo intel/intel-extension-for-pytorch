@@ -10,9 +10,9 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_adaptive_max_pool3d(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 4, 4, 4], device=cpu_device, dtype=dtype)
+        x_cpu = torch.randn([1, 1, 4, 4, 4], device=cpu_device, dtype=dtype)
         x_dpcpp = x_cpu.to(dpcpp_device)
-        grad_cpu = torch.randn([1, 2, 2, 2], device=cpu_device)
+        grad_cpu = torch.randn([1, 1, 2, 2, 2], device=cpu_device)
         grad_dpcpp = grad_cpu.to(dpcpp_device)
 
         self.assertEqual(x_cpu, x_dpcpp.to(cpu_device))

@@ -215,6 +215,7 @@ Tensor& avg_pool2d_backward_out_template(
         ::xpu::oneDNN::alg::pooling_avg_include_padding>(
         gradInput,
         gradOutput,
+        input,
         nbatch,
         nInputPlane,
         0,
@@ -237,6 +238,7 @@ Tensor& avg_pool2d_backward_out_template(
         ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
+        input,
         nbatch,
         nInputPlane,
         0,

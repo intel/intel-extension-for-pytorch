@@ -10,10 +10,10 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_adaptive_avg_pool3d(self, dtype=torch.float):
-        x_cpu = torch.randn([1, 4, 4, 4], device=cpu_device)
-        grad_cpu = torch.ones([1, 4, 4, 4], device=cpu_device)
+        x_cpu = torch.randn([1, 1, 4, 4, 4], device=cpu_device)
+        grad_cpu = torch.ones([1, 1, 4, 4, 4], device=cpu_device)
         x_dpcpp = x_cpu.to(dpcpp_device)
-        grad_cpu = torch.randn([1, 2, 2, 2], device=cpu_device)
+        grad_cpu = torch.randn([1, 1, 2, 2, 2], device=cpu_device)
         grad_dpcpp = grad_cpu.to(dpcpp_device)
         avg_pool = nn.AdaptiveAvgPool3d((2, 2, 2))
 

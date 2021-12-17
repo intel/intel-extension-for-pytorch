@@ -220,6 +220,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
+      input,
       indices,
       nbatch,
       nInputPlane,
