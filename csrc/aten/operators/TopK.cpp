@@ -729,16 +729,5 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
   return std::forward_as_tuple(values, indices);
 }
 
-std::tuple<at::Tensor, at::Tensor> topk(
-    const at::Tensor& self,
-    int64_t k,
-    int64_t dim,
-    bool largest,
-    bool sorted) {
-  TORCH_CHECK(false, "TopK is not supported for ipex with torch1.10.(to do)");
-  return std::make_tuple(self, self);
-  // return at::native::topk(self, k, dim, largest, sorted);
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at

@@ -556,7 +556,7 @@ supported:
   - threshold_
   - threshold_backward
   - threshold_backward.grad_input
-  - topk
+#  - topk    # we do not implement topk, and torch.topk will call aten::topk.values
   - topk.values
   - trace
   - triangular_solve
