@@ -49,6 +49,8 @@ if(BUILD_STRIPPED_BIN)
   set_target_properties(ipex_python PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
-target_link_libraries(ipex_python PUBLIC ipex_gpu)
+target_link_libraries(ipex_python PUBLIC ipex_gpu_core)
 
-install(TARGETS ipex_python LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS ipex_python
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

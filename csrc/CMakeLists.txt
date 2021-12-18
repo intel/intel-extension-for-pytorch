@@ -45,28 +45,40 @@ set(IPEX_INCLUDE_DIRS
         ${IPEX_GPU_ATEN_GENERATED})
 
 set(IPEX_GPU_CORE_SRC
-        ${IPEX_ATEN_OPS_SRCS}
+        ${IPEX_JIT_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_AUTOGRAD_SRCS}
         ${IPEX_GPU_GEN_FILES}
         ${IPEX_TENSOR_SRCS}
         ${IPEX_UTILS_SRCS})
+
 # WARNING XXX: We assume that kernel codes only are contained in IPEX_ATEN_OPS_SRCS.
 # WARNING XXX: Therefore we only set sycl flags for these C++ files here.
 append_compile_flags(IPEX_ATEN_OPS_SRCS ${IPEX_SYCL_KERNEL_FLAGS})
+
+if(BUILD_SEPARATE_OPS)
+  set(IPEX_GPU_OP_LIBRARIES)
+  foreach(op_src ${IPEX_ATEN_OPS_SRCS})
+      get_filename_component(obj ${op_src} NAME_WLE REALPATH)
+      set(op_lib ipex_gpu_op_${obj})
+      add_library(${op_lib} SHARED ${op_src})
+      set_target_properties(${op_lib} PROPERTIES LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
+      target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
+      target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
+      target_link_libraries(${op_lib} PUBLIC ${TORCH_LIBRARIES})
+      list(APPEND IPEX_GPU_OP_LIBRARIES ${op_lib})
+  endforeach()
+else()
+  list(APPEND IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS})
+endif()
+
 add_library(ipex_gpu_core SHARED ${IPEX_GPU_CORE_SRC})
 set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
-
-set(IPEX_GPU_SRC ${IPEX_JIT_SRCS})
-add_library(ipex_gpu SHARED ${IPEX_GPU_SRC})
-
 target_include_directories(ipex_gpu_core PUBLIC ${IPEX_INCLUDE_DIRS})
-target_include_directories(ipex_gpu PUBLIC ${IPEX_INCLUDE_DIRS})
-
 target_link_directories(ipex_gpu_core PUBLIC ${SYCL_LIBRARY_DIR})
-target_link_directories(ipex_gpu PUBLIC ${SYCL_LIBRARY_DIR})
 
+add_dependencies(ipex_gpu_core IPEX_GPU_GEN_TARGET)
 include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_NATIVE_CSRC_FILES ${IPEX_GPU_ROOT}/**.[ch] ${IPEX_GPU_ROOT}/**.[ch]pp)
@@ -74,10 +86,11 @@ if(CLANG_FORMAT)
   add_dependencies(ipex_gpu_core CL_FORMAT_NATIVE_CSRC)
 endif()
 
-add_dependencies(ipex_gpu_core IPEX_GPU_GEN_TARGET)
-
+if(BUILD_SEPARATE_OPS)
+target_link_libraries(ipex_gpu_core PUBLIC ${TORCH_LIBRARIES} ${IPEX_GPU_OP_LIBRARIES})
+else()
 target_link_libraries(ipex_gpu_core PUBLIC ${TORCH_LIBRARIES})
-target_link_libraries(ipex_gpu PUBLIC ${TORCH_LIBRARIES})
+endif()
 
 set(IPEX_COMPILE_DEFINITIONS)
 
@@ -117,8 +130,12 @@ endif()
 
 if(USE_ONEDPL)
     find_package(oneDPL)
-    target_link_libraries(ipex_gpu PUBLIC oneDPL)
     target_link_libraries(ipex_gpu_core PUBLIC oneDPL)
+    if(BUILD_SEPARATE_OPS)
+        foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+            target_link_libraries(${op_lib} PUBLIC oneDPL)
+        endforeach()
+    endif()
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_ONEDPL")
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};ONEDPL_USE_TBB_BACKEND=0")
     # FIXME:
@@ -162,28 +179,60 @@ if (USE_ITT)
     endif()
 endif()
 
-# Try to find ITT support before oneDNN settings
+# XXX: Try to find ITT & oneMKL support before oneDNN settings
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
-    target_link_libraries(ipex_gpu_core PRIVATE ${ONEDNN_LIBRARIES})
+    target_link_libraries(ipex_gpu_core PRIVATE ${ONEDNN_LIBRARY})
     target_include_directories(ipex_gpu_core BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
-    add_dependencies(ipex_gpu_core dnnl)
+    add_dependencies(ipex_gpu_core ${ONEDNN_LIBRARY})
+    if(BUILD_SEPARATE_OPS)
+      # Suppress soname to prevent from creating symbolic link
+      # Change output path to avoid link error from dependents
+      get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+      set_target_properties(${ONEDNN_LIBRARY} PROPERTIES NO_SONAME ON
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${DIR_NAME}"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${DIR_NAME}")
+        foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+            target_link_libraries(${op_lib} PRIVATE ${ONEDNN_LIBRARY})
+            target_include_directories(${op_lib} BEFORE PUBLIC ${ONEDNN_INCLUDE_DIR})
+            add_dependencies(${op_lib} ${ONEDNN_LIBRARY})
+        endforeach()
+    endif()
 else()
     message(FATAL_ERROR "Cannot find oneDNN")
 endif()
 
-target_compile_definitions(ipex_gpu PUBLIC ${IPEX_COMPILE_DEFINITIONS})
 target_compile_definitions(ipex_gpu_core PUBLIC ${IPEX_COMPILE_DEFINITIONS})
-
-target_link_libraries(ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} ipex_gpu_core)
-
-if(BUILD_STRIPPED_BIN)
-  set_target_properties(ipex_gpu PROPERTIES LINK_FLAGS_RELEASE -s)
-  set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS_RELEASE -s)
+if(BUILD_SEPARATE_OPS)
+  set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
+  foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+      target_compile_definitions(${op_lib} PUBLIC ${IPEX_COMPILE_DEFINITIONS})
+      set_target_properties(${op_lib} PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
+  endforeach()
 endif()
 
-install(TARGETS ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS ipex_gpu_core LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(BUILD_STRIPPED_BIN)
+  set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS_RELEASE -s)
+  if(BUILD_SEPARATE_OPS)
+    foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+        set_target_properties(${op_lib} PROPERTIES LINK_FLAGS_RELEASE -s)
+    endforeach()
+  endif()
+endif()
+
+if(BUILD_SEPARATE_OPS)
+  install(TARGETS ${ONEDNN_LIBRARY}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+    install(TARGETS ${op_lib}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endforeach()
+endif()
+install(TARGETS ipex_gpu_core
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 install(FILES ${IPEX_ATEN_HEADERS} DESTINATION include/core)
 install(FILES ${IPEX_UTILS_HEADERS} DESTINATION include/utils)
