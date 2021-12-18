@@ -220,9 +220,11 @@ def main() -> None:
         '--dry_run', type=bool, default=False, help='output directory')
     parser.add_argument(
         '--impl_path', type=str, default=None, help='path to the source C++ file containing kernel definitions')
+    parser.add_argument(
+        '--simple_trace', action='store_true', default=False, help='simple trace the entry to ipex')
     options = parser.parse_args()
 
-    run(options.source_yaml, options.output_dir, options.dry_run, options.impl_path)
+    run(options.source_yaml, options.output_dir, options.dry_run, options.simple_trace, options.impl_path)
 
 def print_backend_ops(backend_index):
     ops = []
@@ -232,7 +234,7 @@ def print_backend_ops(backend_index):
     for op in sorted(ops):
         print(op)
 
-def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[str] = None) -> None:
+def run(source_yaml: str, output_dir: str, dry_run: bool, simple_trace: bool, impl_path: Optional[str] = None) -> None:
 
     # Assumes that this file lives at PYTORCH_ROOT/tools/codegen/gen_backend_stubs.py
     pytorch_root = pathlib.Path(__file__).parent.parent.parent.absolute()
@@ -304,6 +306,7 @@ def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[st
                     selector,
                     rocm=False,
                     cpp_namespace=cpp_namespace,
+                    simple_trace=simple_trace,
                     class_method_name=f'{class_name}'),
                 grouped_native_functions
             )),
@@ -314,6 +317,7 @@ def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[st
                     selector,
                     rocm=False,
                     cpp_namespace=cpp_namespace,
+                    simple_trace=simple_trace,
                     class_method_name=f'{class_name}'),
                 grouped_native_functions
             )),
@@ -324,6 +328,7 @@ def run(source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[st
                     selector,
                     rocm=False,
                     cpp_namespace=cpp_namespace,
+                    simple_trace=simple_trace,
                     class_method_name=f'{backend_key}NativeFunctions'),
                 grouped_native_functions
             )),

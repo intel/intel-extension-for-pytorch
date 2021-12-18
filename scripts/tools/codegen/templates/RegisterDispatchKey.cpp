@@ -45,6 +45,32 @@ namespace at {
 // at namespace already.
 namespace {
 
+class IpexSimpleTrace {
+public:
+  IpexSimpleTrace(const char * name) : _name(name) {
+    indent++;
+    print_indent();
+    printf("step into %s\n", _name);
+    fflush(stdout);
+  }
+  ~IpexSimpleTrace() {
+    print_indent();
+    printf("step out of %s\n", _name);
+    fflush(stdout);
+    indent--;
+  }
+private:
+  void print_indent() {
+    for (int i = 0; i < indent*2; ++i) {
+      printf(" ");
+    }
+  }
+  static int indent;
+  const char * _name;
+};
+
+int IpexSimpleTrace::indent = -1;
+
 ${dispatch_helpers}
 
 ${dispatch_anonymous_definitions}

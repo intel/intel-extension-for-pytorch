@@ -36,6 +36,7 @@ cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 option(USE_HOOKS "Use XPU Hooks in build. Should turn off it for 1.10 rebase" OFF)
 option(USE_PROFILER "USE XPU Profiler in build. Should turn off it for 1.10 rebase" OFF)
+option(BUILD_SIMPLE_TRACE_IPEX_ENTRY "Build simple trace for ipex entry" OFF)
 
 if (BUILD_STATS)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")
@@ -129,6 +130,7 @@ function (print_configuration_summary)
     message(STATUS "  BUILD_SEPARATE_OPS    : ${BUILD_SEPARATE_OPS}")
     message(STATUS "  USE_HOOKS             : ${USE_HOOKS}")
     message(STATUS "  USE_PROFILER          : ${USE_PROFILER}")
+    message(STATUS "  BUILD_SIMPLE_TRACE_IPEX_ENTRY    : ${BUILD_SIMPLE_TRACE_IPEX_ENTRY}")
 
     message(STATUS "")
 endfunction()

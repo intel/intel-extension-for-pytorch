@@ -1,3 +1,8 @@
+set(SIMPLE_TRACE)
+if(BUILD_SIMPLE_TRACE_IPEX_ENTRY)
+        set(SIMPLE_TRACE "--simple_trace")
+endif()
+
 Function(GEN_BACKEND_ONECPP file_cpp file_h file_yaml)
 add_custom_command(OUTPUT
         ${IPEX_GPU_ATEN_GENERATED}/ATen/${file_cpp}
@@ -8,6 +13,7 @@ add_custom_command(OUTPUT
         "${PYTHON_EXECUTABLE}" -m tools.codegen.gen_backend_stubs
         --output_dir ${IPEX_GPU_ATEN_GENERATED}/ATen
         --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml}
+        ${SIMPLE_TRACE}
         WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts
         DEPENDS
         ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/gen_backend_stubs.py
@@ -25,6 +31,7 @@ add_custom_command(OUTPUT
         "${PYTHON_EXECUTABLE}" -m tools.codegen.gen_backend_stubs
         --output_dir ${IPEX_GPU_ATEN_GENERATED}/ATen
         --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml}
+        ${SIMPLE_TRACE}
         WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts
         DEPENDS
         ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/gen_backend_stubs.py
