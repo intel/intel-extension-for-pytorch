@@ -59,8 +59,10 @@ class TestNNMethod(TestCase):
 
         y_dpcpp0, y_dpcpp1 = x_dpcpp1.topk(5, 1, True, True)
 
-        print("y_dpcpp0 = ", y_dpcpp0.to("cpu"),
-              "y_dpcpp1 = ", y_dpcpp1.to("cpu"))
+        print("y_cpu0 = ", y_cpu0.to("cpu"))
+        print("y_dpcpp0 = ", y_dpcpp0.to("cpu"))
+        print("y_cpu1 = ", y_cpu1.to("cpu"))
+        print("y_dpcpp1 = ", y_dpcpp1.to("cpu"))
         self.assertEqual(x_cpu1, x_dpcpp1.cpu())
         self.assertEqual(y_cpu0, y_dpcpp0.cpu())
         self.assertEqual(y_cpu1, y_dpcpp1.cpu())
