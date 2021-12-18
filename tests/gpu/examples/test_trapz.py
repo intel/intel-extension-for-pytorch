@@ -26,7 +26,8 @@ class TestTorchMethod(TestCase):
         def test_x(sizes, dim, x, device):
             t = torch.randn(sizes, device=device)
             actual = torch.trapz(t, x=torch.tensor(x, device=device), dim=dim)
-            expected = np.trapz(t.cpu().numpy(), x=x, axis=dim)
+            t_cpu = t.cpu().numpy()
+            expected = np.trapz(t_cpu, x=x, axis=dim).astype(t_cpu.dtype)
             self.assertEqual(expected.shape, actual.shape)
             self.assertEqual(expected, actual.cpu())
 
