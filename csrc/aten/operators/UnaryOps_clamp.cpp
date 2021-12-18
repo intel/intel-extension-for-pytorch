@@ -47,20 +47,5 @@ Tensor clamp(const Tensor& self, optional<Scalar> min, optional<Scalar> max) {
   return at::AtenIpexTypeXPU::clamp_out(result, self, min, max);
 }
 
-Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
-  auto iter = TensorIterator::unary_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "reciprocal_xpu",
-      [&] {
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-          return static_cast<scalar_t>(1.0) / a;
-        });
-      });
-  return out;
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
