@@ -208,11 +208,11 @@ supported:
   - floor_divide
   - floor_divide.out
   - floor_divide_.Tensor
-#  - fmod.Scalar  # different signature
+  - fmod.Scalar
   - fmod.Scalar_out
   - fmod.Tensor
   - fmod.Tensor_out
-#  - fmod_.Scalar  # different signature
+  - fmod_.Scalar
   - fmod_.Tensor
   - frac
   - frac.out
