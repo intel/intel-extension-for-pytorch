@@ -30,15 +30,21 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm(
     bool training,
     double momentum,
     double epsilon) {
-  TORCH_CHECK(weight_opt.has_value(), "not implemented");
-  TORCH_CHECK(bias_opt.has_value(), "not implemented");
-  TORCH_CHECK(running_mean_opt.has_value(), "not implemented");
-  TORCH_CHECK(running_var_opt.has_value(), "not implemented");
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
 
-  const Tensor weight = weight_opt.value();
-  const Tensor bias = bias_opt.value();
-  const Tensor running_mean = running_mean_opt.value();
-  const Tensor running_var = running_var_opt.value();
+  c10::MaybeOwned<Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias_opt);
+  const Tensor& bias = *bias_maybe_owned;
+
+  c10::MaybeOwned<Tensor> running_mean_maybe_owned =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  const Tensor& running_mean = *running_mean_maybe_owned;
+
+  c10::MaybeOwned<Tensor> running_var_maybe_owned =
+      at::borrow_from_optional_tensor(running_var_opt);
+  const Tensor& running_var = *running_var_maybe_owned;
 
   if (running_mean.defined() && running_var.defined()) {
     checkBackend(
@@ -83,16 +89,26 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
   TORCH_WARN_ONCE(
       "Warning: the function declaration is a little different, see in RegisterXPU.cpp. \n(const at::Tensor & grad_out, const at::Tensor & input, const c10::optional<at::Tensor> & weight, const c10::optional<at::Tensor> & running_mean, const c10::optional<at::Tensor> & running_var, const c10::optional<at::Tensor> & save_mean, const c10::optional<at::Tensor> & save_invstd, bool train, double eps, ::std::array<bool,3> output_mask) \n");
 
-  TORCH_CHECK(weight_opt.has_value(), "not implemented");
-  TORCH_CHECK(running_mean_opt.has_value(), "not implemented");
-  TORCH_CHECK(running_var_opt.has_value(), "not implemented");
-  TORCH_CHECK(save_mean_opt.has_value(), "not implemented");
-  TORCH_CHECK(save_var_opt.has_value(), "not implemented");
-  const Tensor weight = weight_opt.value();
-  const Tensor running_mean = running_mean_opt.value();
-  const Tensor running_var = running_var_opt.value();
-  const Tensor save_mean = save_mean_opt.value();
-  const Tensor save_var = save_var_opt.value();
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
+
+  c10::MaybeOwned<Tensor> running_mean_maybe_owned =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  const Tensor& running_mean = *running_mean_maybe_owned;
+
+  c10::MaybeOwned<Tensor> running_var_maybe_owned =
+      at::borrow_from_optional_tensor(running_var_opt);
+  const Tensor& running_var = *running_var_maybe_owned;
+
+  c10::MaybeOwned<Tensor> save_mean_maybe_owned =
+      at::borrow_from_optional_tensor(save_mean_opt);
+  const Tensor& save_mean = *save_mean_maybe_owned;
+
+  c10::MaybeOwned<Tensor> save_var_maybe_owned =
+      at::borrow_from_optional_tensor(save_var_opt);
+  const Tensor& save_var = *save_var_maybe_owned;
+
   if (save_mean.defined() && save_var.defined()) {
     checkBackend(
         "batch_norm",

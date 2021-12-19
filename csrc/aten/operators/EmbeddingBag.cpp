@@ -1170,8 +1170,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
     int64_t padding_idx) {
   // TODO: include_last_offset
   // TODO: padding_idx
-  TORCH_CHECK(per_sample_weights_opt.has_value(), "not implemented");
-  const Tensor per_sample_weights = per_sample_weights_opt.value();
+  c10::MaybeOwned<Tensor> per_sample_weights_maybe_owned =
+      at::borrow_from_optional_tensor(per_sample_weights_opt);
+  const Tensor& per_sample_weights = *per_sample_weights_maybe_owned;
   return impl::_embedding_bag_dpcpp(
       weight,
       indices,
@@ -1195,8 +1196,9 @@ Tensor _embedding_bag_dense_backward(
     const c10::optional<at::Tensor>& per_sample_weights_opt,
     int64_t padding_idx) {
   // TODO: padding_idx
-  TORCH_CHECK(per_sample_weights_opt.has_value(), "not implemented");
-  const Tensor per_sample_weights = per_sample_weights_opt.value();
+  c10::MaybeOwned<Tensor> per_sample_weights_maybe_owned =
+      at::borrow_from_optional_tensor(per_sample_weights_opt);
+  const Tensor& per_sample_weights = *per_sample_weights_maybe_owned;
   return impl::_embedding_bag_dense_backward_dpcpp(
       grad,
       indices,

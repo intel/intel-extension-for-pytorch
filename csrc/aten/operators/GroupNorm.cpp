@@ -627,10 +627,14 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm(
     int64_t HxW,
     int64_t group,
     double eps) {
-  TORCH_CHECK(gamma_opt.has_value(), "not implemented");
-  TORCH_CHECK(beta_opt.has_value(), "not implemented");
-  const Tensor gamma = gamma_opt.value();
-  const Tensor beta = beta_opt.value();
+  c10::MaybeOwned<Tensor> gamma_maybe_owned =
+      at::borrow_from_optional_tensor(gamma_opt);
+  const Tensor& gamma = *gamma_maybe_owned;
+
+  c10::MaybeOwned<Tensor> beta_maybe_owned =
+      at::borrow_from_optional_tensor(beta_opt);
+  const Tensor& beta = *beta_maybe_owned;
+
   Tensor Y = at::empty_like(X);
   Tensor mean = at::empty({N, group}, X.options());
   Tensor rstd = at::empty({N, group}, X.options());
@@ -649,8 +653,9 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
     int64_t HxW,
     int64_t group,
     std::array<bool, 3> grad_input_mask) {
-  TORCH_CHECK(gamma_opt.has_value(), "not implemented");
-  const Tensor gamma = gamma_opt.value();
+  c10::MaybeOwned<Tensor> gamma_maybe_owned =
+      at::borrow_from_optional_tensor(gamma_opt);
+  const Tensor& gamma = *gamma_maybe_owned;
   Tensor dX;
   Tensor dgamma;
   Tensor dbeta;

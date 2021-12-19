@@ -205,7 +205,14 @@ Tensor binary_cross_entropy(
     const Tensor& target,
     const c10::optional<Tensor>& weight_opt,
     int64_t reduction) {
-  TORCH_CHECK(weight_opt.has_value(), "not implemented");
+  TORCH_CHECK(
+      weight_opt.has_value(),
+      "not implemented at ",
+      __FILE__,
+      ":",
+      __LINE__,
+      ":",
+      __func__);
   const Tensor weight = weight_opt.value();
 
   auto minvalue = self.min().item<float>();
@@ -228,8 +235,9 @@ Tensor& binary_cross_entropy_out(
     const c10::optional<at::Tensor>& weight_opt,
     int64_t reduction,
     Tensor& out) {
-  TORCH_CHECK(weight_opt.has_value(), "not implemented");
-  const Tensor weight = weight_opt.value();
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
   auto minvalue = self.min().item<float>();
   auto maxvalue = self.max().item<float>();
   TORCH_CHECK(
@@ -264,8 +272,9 @@ Tensor& binary_cross_entropy_backward_out(
     const c10::optional<at::Tensor>& weight_opt,
     int64_t reduction,
     Tensor& grad_input) {
-  TORCH_CHECK(weight_opt.has_value(), "not implemented");
-  const Tensor weight = weight_opt.value();
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
   auto iter = at::TensorIteratorConfig()
                   .add_output(grad_input)
                   .add_input(self)
@@ -288,8 +297,9 @@ Tensor binary_cross_entropy_backward(
     const Tensor& target,
     const c10::optional<at::Tensor>& weight_opt,
     int64_t reduction) {
-  TORCH_CHECK(weight_opt.has_value(), "not implemented");
-  const Tensor weight = weight_opt.value();
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
   Tensor grad_input = at::zeros_like(
       self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
   return at::AtenIpexTypeXPU::binary_cross_entropy_backward_out(
