@@ -455,11 +455,11 @@ supported:
   - reflection_pad1d_backward.grad_input
   - relu
   - relu_
-#  - remainder.Scalar  # different signature
+  - remainder.Scalar
   - remainder.Scalar_out
   - remainder.Tensor
   - remainder.Tensor_out
-#  - remainder_.Scalar  # different signature
+  - remainder_.Scalar
   - remainder_.Tensor
 #  - renorm  # different signature
   - renorm.out
