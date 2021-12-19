@@ -449,34 +449,80 @@ void init_module(pybind11::module& m) {
   });
 
   m.def(
+      "_get_verbose_level", []() { return Settings::I().get_verbose_level(); });
+
+  m.def("_set_verbose_level", [](int level) {
+    Settings::I().set_verbose_level(level);
+  });
+
+  m.def(
       "_get_warning_level", []() { return Settings::I().get_warning_level(); });
+
+  m.def("_set_warning_level", [](int level) {
+    Settings::I().set_warning_level(level);
+  });
 
   m.def("_get_xpu_backend", []() {
     return int(Settings::I().get_xpu_backend());
   });
   m.def("_set_xpu_backend", [](const int backend) {
-    return Settings::I().set_xpu_backend(static_cast<XPU_BACKEND>(backend));
+    Settings::I().set_xpu_backend(static_cast<XPU_BACKEND>(backend));
   });
 
   m.def("_is_force_sync_exec", []() {
     return Settings::I().is_force_sync_exec();
   });
 
+  m.def("_enable_force_sync_exec", []() {
+    Settings::I().enable_force_sync_exec();
+  });
+
+  m.def("_disable_force_sync_exec", []() {
+    Settings::I().disable_force_sync_exec();
+  });
+
   m.def("_is_event_profiling_enabled", []() {
     return Settings::I().is_event_profiling_enabled();
+  });
+
+  m.def("_enable_event_profiling", []() {
+    Settings::I().enable_event_profiling();
+  });
+
+  m.def("_disable_event_profiling", []() {
+    Settings::I().disable_event_profiling();
   });
 
   m.def("_is_tile_partition_enabled", []() {
     return Settings::I().is_tile_partition_enabled();
   });
 
+  m.def("_enable_tile_partition", []() {
+    Settings::I().enable_tile_partition();
+  });
+
+  m.def("_disable_tile_partition", []() {
+    Settings::I().disable_tile_partition();
+  });
+
   m.def("_is_onednn_layout_enabled", []() {
     return Settings::I().is_onednn_layout_enabled();
+  });
+
+  m.def(
+      "_enable_onednn_layout", []() { Settings::I().enable_onednn_layout(); });
+
+  m.def("_disable_onednn_layout", []() {
+    Settings::I().disable_onednn_layout();
   });
 
   m.def("_is_tf32_mode_enabled", []() {
     return Settings::I().is_tf32_mode_enabled();
   });
+
+  m.def("_enable_tf32_mode", []() { Settings::I().enable_tf32_mode(); });
+
+  m.def("_disable_tf32_mode", []() { Settings::I().disable_tf32_mode(); });
 
   m.def("_set_onednn_verbose", [](const int level) {
     return Settings::I().set_onednn_verbose(level);
