@@ -65,11 +65,11 @@ supported:
   - adaptive_max_pool3d.out
   - adaptive_max_pool3d_backward
   - adaptive_max_pool3d_backward.grad_input
-#  - add.Scalar  # different signature
-#  - add.Tensor  # different signature
+  - add.Scalar
+  - add.Tensor
   - add.out
-#  - add_.Scalar  # different signature
-#  - add_.Tensor  # different signature
+  - add_.Scalar
+  - add_.Tensor
   - addbmm
   - addbmm_
   - addbmm.out
