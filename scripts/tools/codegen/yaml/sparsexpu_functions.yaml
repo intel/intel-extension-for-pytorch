@@ -18,3 +18,4 @@ supported:
   - sparse_mask
   - copy_
   - _to_copy
+  - _coalesce

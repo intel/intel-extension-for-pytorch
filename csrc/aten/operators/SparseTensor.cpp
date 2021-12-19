@@ -148,7 +148,14 @@ int64_t _nnz(const Tensor& self) {
   return at::native::_nnz_sparse(self);
 }
 
-Tensor coalesce(const Tensor& self) {
+SparseTensor coalesce(const SparseTensor& self) {
+  if (self.is_coalesced()) {
+    return self;
+  }
+  return at::_coalesce(self);
+}
+
+Tensor _coalesce(const Tensor& self) {
   int64_t nnz = self._nnz();
   if (self.is_coalesced()) {
     return self;
