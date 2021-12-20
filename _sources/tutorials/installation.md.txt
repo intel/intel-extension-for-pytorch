@@ -17,7 +17,7 @@ You need to make sure PyTorch is installed in order to get the extension working
 
 |PyTorch Version|Extension Version|
 |--|--|
-|[v1.10.0](https://github.com/pytorch/pytorch/tree/v1.10.0 "v1.10.0")|[v1.10.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.0)|
+|[v1.10.\*](https://github.com/pytorch/pytorch/tree/v1.10.0 "v1.10.0")|[v1.10.\*](https://github.com/intel/intel-extension-for-pytorch/tree/v1.10.100)|
 |[v1.9.0](https://github.com/pytorch/pytorch/tree/v1.9.0 "v1.9.0")|[v1.9.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.9.0)|
 |[v1.8.0](https://github.com/pytorch/pytorch/tree/v1.8.0 "v1.8.0")|[v1.8.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.8.0)|
 |[v1.7.0](https://github.com/pytorch/pytorch/tree/v1.7.0 "v1.7.0")|[v1.2.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.2.0)|
