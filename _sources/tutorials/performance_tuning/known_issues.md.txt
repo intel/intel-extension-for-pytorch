@@ -55,4 +55,4 @@ Known Issues
         m.inference(d)
   ```
 
-  This is PyTorch FX limitation, user can avoid this error by calling `m = ipex.optimize(m, level="O0")`, which doesn't apply ipex optimization, or diable `conv+bn` floding by calling `m = ipex.optimize(m, level="O1", conv_bn_folding=False)`.
+  This is PyTorch FX limitation, user can avoid this error by calling `m = ipex.optimize(m, level="O0")`, which doesn't apply ipex optimization, or diable `conv+bn` folding by calling `m = ipex.optimize(m, level="O1", conv_bn_folding=False)`.

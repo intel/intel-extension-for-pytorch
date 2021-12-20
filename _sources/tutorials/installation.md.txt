@@ -44,10 +44,10 @@ From 1.8.0, compiling PyTorch from source is not required. If you still want to 
 
 ## Install via wheel file
 
-Prebuilt wheel files are available starting from 1.8.0 release. We recommend you to install the latest version (1.10.0) with the following commands:
+Prebuilt wheel files are available starting from 1.8.0 release. We recommend you to install the latest version with the following commands:
 
 ```
-python -m pip install intel_extension_for_pytorch==1.10.0 -f https://software.intel.com/ipex-whl-stable
+python -m pip install intel_extension_for_pytorch==1.10.100 -f https://software.intel.com/ipex-whl-stable
 python -m pip install psutil
 ```
 
@@ -55,6 +55,7 @@ python -m pip install psutil
 
 | Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
 | :--: | :--: | :--: | :--: | :--: |
+| 1.10.100 | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.10.0 | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.9.0 | ✔️ | ✔️ | ✔️ | ✔️ |
 | 1.8.0 |  | ✔️ |  |  |
@@ -68,7 +69,7 @@ python -m pip install psutil
 ```bash
 git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 cd intel-extension-for-pytorch
-git checkout release/1.10
+git checkout v1.10.100
 
 # if you are updating an existing checkout
 git submodule sync
@@ -84,6 +85,7 @@ python setup.py install
 
 |Version|Pre-cxx11 ABI|cxx11 ABI|
 |--|--|--|
+| 1.10.100 | [libtorch-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/libtorch-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip) | [libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip](http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip) |
 | 1.10.0 | [intel-ext-pt-cpu-libtorch-shared-with-deps-1.10.0+cpu.zip](https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/intel-ext-pt-cpu-libtorch-shared-with-deps-1.10.0%2Bcpu.zip) | [intel-ext-pt-cpu-libtorch-cxx11-abi-shared-with-deps-1.10.0+cpu.zip](https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/intel-ext-pt-cpu-libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcpu.zip) |
 
 **Usage:** Donwload one zip file above according to your scenario, unzip it and follow the [C++ example](./examples.html#c).

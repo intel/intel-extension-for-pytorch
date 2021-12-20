@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Installation Guide &mdash; intel_extension_for_pytorch 1.10.0+cpu documentation</title>
+  <title>Installation Guide &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.0+cpu
+                1.10.100+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -167,8 +167,8 @@
 <hr class="docutils" />
 <section id="install-via-wheel-file">
 <h2>Install via wheel file<a class="headerlink" href="#install-via-wheel-file" title="Permalink to this headline"></a></h2>
-<p>Prebuilt wheel files are available starting from 1.8.0 release. We recommend you to install the latest version (1.10.0) with the following commands:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">intel_extension_for_pytorch</span><span class="o">==</span><span class="mf">1.10.0</span> <span class="o">-</span><span class="n">f</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">software</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ipex</span><span class="o">-</span><span class="n">whl</span><span class="o">-</span><span class="n">stable</span>
+<p>Prebuilt wheel files are available starting from 1.8.0 release. We recommend you to install the latest version with the following commands:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">intel_extension_for_pytorch</span><span class="o">==</span><span class="mf">1.10.100</span> <span class="o">-</span><span class="n">f</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">software</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ipex</span><span class="o">-</span><span class="n">whl</span><span class="o">-</span><span class="n">stable</span>
 <span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">psutil</span>
 </pre></div>
 </div>
@@ -184,6 +184,13 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td align="center">1.10.100</td>
+<td align="center">✔️</td>
+<td align="center">✔️</td>
+<td align="center">✔️</td>
+<td align="center">✔️</td>
+</tr>
 <tr>
 <td align="center">1.10.0</td>
 <td align="center">✔️</td>
@@ -213,7 +220,7 @@
 <h2>Install via source compilation<a class="headerlink" href="#install-via-source-compilation" title="Permalink to this headline"></a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone --recursive https://github.com/intel/intel-extension-for-pytorch
 <span class="nb">cd</span> intel-extension-for-pytorch
-git checkout release/1.10
+git checkout v1.10.100
 
 <span class="c1"># if you are updating an existing checkout</span>
 git submodule sync
@@ -237,6 +244,11 @@ python setup.py install
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>1.10.100</td>
+<td><a href="http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/libtorch-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip">libtorch-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip</a></td>
+<td><a href="http://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip">libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcpu-intel-ext-pt-cpu-1.10.100.zip</a></td>
+</tr>
 <tr>
 <td>1.10.0</td>
 <td><a href="https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/wheels/v1.10/intel-ext-pt-cpu-libtorch-shared-with-deps-1.10.0%2Bcpu.zip">intel-ext-pt-cpu-libtorch-shared-with-deps-1.10.0+cpu.zip</a></td>

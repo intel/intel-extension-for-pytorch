@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Releases &mdash; intel_extension_for_pytorch 1.10.0+cpu documentation</title>
+  <title>Releases &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.0+cpu
+                1.10.100+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -44,39 +44,40 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Releases</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#id1">1.10.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id1">1.10.100</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id2">1.10.0</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#known-issues">Known Issues</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#what-s-changed">What’s Changed</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id2">1.9.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id3">1.9.0</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#what-s-new">What’s New</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id3">1.8.0</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id4">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id4">1.8.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id5">What’s New</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id5">1.2.0</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id6">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id6">1.2.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id7">What’s New</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#performance-improvement">Performance Improvement</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#others">Others</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id7">Known issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id8">Known issues</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id8">1.1.0</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id9">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id9">1.1.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id10">What’s New</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#performance">Performance</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#known-issue">Known issue</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id10">1.0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id11">1.0.2</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alpha">1.0.1-Alpha</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#id11">1.0.0-Alpha</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id12">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id12">1.0.0-Alpha</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id13">What’s New</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#performance-result">Performance Result</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id13">Known issue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id14">Known issue</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#note">NOTE</a></li>
 </ul>
 </li>
@@ -118,7 +119,21 @@
   <section id="releases">
 <h1>Releases<a class="headerlink" href="#releases" title="Permalink to this headline"></a></h1>
 <section id="id1">
-<h2>1.10.0<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h2>
+<h2>1.10.100<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h2>
+<p>This release is meant to fix the following issues:</p>
+<ul class="simple">
+<li><p>Resolve the issue that the PyTorch Tensor Expression(TE) did not work after importing the extension.</p></li>
+<li><p>Wraps the BactchNorm(BN) as another operator to break the TE’s BN-related fusions. Because the BatchNorm performance of PyTorch Tensor Expression can not achieve the same performance as PyTorch ATen BN.</p></li>
+<li><p>Update the <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/">documentation</a></p>
+<ul>
+<li><p>Fix the INT8 quantization example issue #205</p></li>
+<li><p>Polish the installation guide</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="id2">
+<h2>1.10.0<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h2>
 <p>The Intel® Extension for PyTorch* 1.10 is on top of PyTorch 1.10. In this release, we polished the front end APIs. The APIs are more simplible, stable and straightforward now. According to PyTorch community recommendation, we changed the underhood device from <code class="docutils literal notranslate"><span class="pre">XPU</span></code> to <code class="docutils literal notranslate"><span class="pre">CPU</span></code>. With this change, the model and tensor does not need to be converted to the extension device to get performance improvement. It simplifies the model changes.</p>
 <p>Besides that, we continuously optimize the Transformer* and CNN models by fusing more operators and applying NHWC. We measured the 1.10 performance on Torchvison and HugginFace. As expected, 1.10 can speed up the two model zones.</p>
 <section id="highlights">
@@ -363,8 +378,8 @@
 <p><strong>Full Changelog</strong>: https://github.com/intel/intel-extension-for-pytorch/compare/v1.9.0…v1.10.0+cpu-rc3</p>
 </section>
 </section>
-<section id="id2">
-<h2>1.9.0<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h2>
+<section id="id3">
+<h2>1.9.0<a class="headerlink" href="#id3" title="Permalink to this headline"></a></h2>
 <section id="what-s-new">
 <h3>What’s New<a class="headerlink" href="#what-s-new" title="Permalink to this headline"></a></h3>
 <ul>
@@ -376,10 +391,10 @@
 </ul>
 </section>
 </section>
-<section id="id3">
-<h2>1.8.0<a class="headerlink" href="#id3" title="Permalink to this headline"></a></h2>
 <section id="id4">
-<h3>What’s New<a class="headerlink" href="#id4" title="Permalink to this headline"></a></h3>
+<h2>1.8.0<a class="headerlink" href="#id4" title="Permalink to this headline"></a></h2>
+<section id="id5">
+<h3>What’s New<a class="headerlink" href="#id5" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Rebased the Intel Extension for Pytorch from Pytorch -1.7.0 to the official Pytorch-1.8.0 release. The new XPU device type has been added into Pytorch-1.8.0(49786), don’t need to patch PyTorch to enable Intel Extension for Pytorch anymore</p></li>
 <li><p>Upgraded the oneDNN from v1.5-rc to v1.8.1</p></li>
@@ -387,10 +402,10 @@
 </ul>
 </section>
 </section>
-<section id="id5">
-<h2>1.2.0<a class="headerlink" href="#id5" title="Permalink to this headline"></a></h2>
 <section id="id6">
-<h3>What’s New<a class="headerlink" href="#id6" title="Permalink to this headline"></a></h3>
+<h2>1.2.0<a class="headerlink" href="#id6" title="Permalink to this headline"></a></h2>
+<section id="id7">
+<h3>What’s New<a class="headerlink" href="#id7" title="Permalink to this headline"></a></h3>
 <ul>
 <li><p>We rebased the Intel Extension for pytorch from Pytorch -1.5rc3 to the official Pytorch-1.7.0 release. It will have performance improvement with the new Pytorch-1.7 support.</p></li>
 <li><p>Device name was changed from DPCPP to XPU.</p>
@@ -427,17 +442,17 @@
 </li>
 </ul>
 </section>
-<section id="id7">
-<h3>Known issues<a class="headerlink" href="#id7" title="Permalink to this headline"></a></h3>
+<section id="id8">
+<h3>Known issues<a class="headerlink" href="#id8" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Multi-node training still encounter hang issues after several iterations. The fix will be included in the next official release.</p></li>
 </ul>
 </section>
 </section>
-<section id="id8">
-<h2>1.1.0<a class="headerlink" href="#id8" title="Permalink to this headline"></a></h2>
 <section id="id9">
-<h3>What’s New<a class="headerlink" href="#id9" title="Permalink to this headline"></a></h3>
+<h2>1.1.0<a class="headerlink" href="#id9" title="Permalink to this headline"></a></h2>
+<section id="id10">
+<h3>What’s New<a class="headerlink" href="#id10" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Added optimization for training with FP32 data type &amp; BF16 data type. All the optimized FP32/BF16 backward operators include:</p>
 <ul>
@@ -511,8 +526,8 @@
 </ul>
 </section>
 </section>
-<section id="id10">
-<h2>1.0.2<a class="headerlink" href="#id10" title="Permalink to this headline"></a></h2>
+<section id="id11">
+<h2>1.0.2<a class="headerlink" href="#id11" title="Permalink to this headline"></a></h2>
 <ul class="simple">
 <li><p>Rebase torch CCL patch to PyTorch 1.5.0-rc3</p></li>
 </ul>
@@ -525,10 +540,10 @@
 <li><p>Fix the issue that cannot normally invoke <code class="docutils literal notranslate"><span class="pre">enable_auto_optimization</span></code></p></li>
 </ul>
 </section>
-<section id="id11">
-<h2>1.0.0-Alpha<a class="headerlink" href="#id11" title="Permalink to this headline"></a></h2>
 <section id="id12">
-<h3>What’s New<a class="headerlink" href="#id12" title="Permalink to this headline"></a></h3>
+<h2>1.0.0-Alpha<a class="headerlink" href="#id12" title="Permalink to this headline"></a></h2>
+<section id="id13">
+<h3>What’s New<a class="headerlink" href="#id13" title="Permalink to this headline"></a></h3>
 <ul>
 <li><p>Auto Operator Optimization</p>
 <p>Intel Extension for PyTorch will automatically optimize the operators of PyTorch when importing its python package. It will significantly improve the computation performance if the input tensor and the model is converted to the extension device.</p>
@@ -575,8 +590,8 @@ Currently, the extension has supported bfloat16. It streamlines the work to enab
 </tbody>
 </table><p>We also measured the performance of ResNeXt101, Transformer-FB, DLRM, and YOLOv3 with the extension. We observed that the performance could be significantly improved by the extension as expected.</p>
 </section>
-<section id="id13">
-<h3>Known issue<a class="headerlink" href="#id13" title="Permalink to this headline"></a></h3>
+<section id="id14">
+<h3>Known issue<a class="headerlink" href="#id14" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/10">#10</a> All data types have not been registered for DPCPP</p></li>
 <li><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/37">#37</a> MaxPool can’t get nan result when input’s value is nan</p></li>
