@@ -30,10 +30,10 @@ class dists {
 
   // Zero norm
   struct zero {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
       agg += diff != 0.0;
     }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    static scalar_t finish(const scalar_t agg, const double p) {
       return agg;
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -43,10 +43,10 @@ class dists {
 
   // One norm
   struct one {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
       agg += diff;
     }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    static scalar_t finish(const scalar_t agg, const double p) {
       return agg;
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -56,7 +56,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const scalar_t p) {
+        const double p) {
       return grad * sign(diff);
     }
   };
@@ -67,7 +67,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const scalar_t p) {
+        const double p) {
       return dist == 0.0 ? static_cast<scalar_t>(0)
                          : sign(diff) *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 1) *
@@ -77,10 +77,10 @@ class dists {
 
   // Two norm
   struct two {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
       agg += diff * diff;
     }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    static scalar_t finish(const scalar_t agg, const double p) {
       return device_sqrt<scalar_t>(agg);
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -90,18 +90,32 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const scalar_t p) {
+        const double p) {
       return dist == 0.0 ? static_cast<scalar_t>(0) : grad * diff / dist;
     }
   };
 
   // General p norm
   struct p {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
-      agg += Numerics<scalar_t>::pow(diff, p);
+    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
+      // TODO:
+      // Here had an unknown bug which affected other code segments
+      // unexpectedly. See Jira:
+      // https://jira.devtools.intel.com/browse/PYTORCHDGQ-958 for details Below
+      // is what code we wrote before and will trigger the bug
+      //
+      // agg += Numerics<scalar_t>::pow(diff, p);
+      agg += static_cast<scalar_t>(std::pow(static_cast<double>(diff), p));
     }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
-      return Numerics<scalar_t>::pow(agg, static_cast<scalar_t>(1) / p);
+    static scalar_t finish(const scalar_t agg, const double p) {
+      // TODO:
+      // Here had an unknown bug which affected other code segments
+      // unexpectedly. See Jira:
+      // https://jira.devtools.intel.com/browse/PYTORCHDGQ-958 for details Below
+      // is what code we wrote before and will trigger the bug
+      //
+      // return Numerics<scalar_t>::pow(agg, static_cast<scalar_t>(1) / p);
+      return static_cast<scalar_t>(std::pow(static_cast<double>(agg), 1. / p));
     }
     static void agg(scalar_t& update, const scalar_t other) {
       update += other;
@@ -110,7 +124,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const scalar_t p) {
+        const double p) {
       return dist == 0.0 ? static_cast<scalar_t>(0)
                          : diff *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
@@ -120,12 +134,12 @@ class dists {
 
   // Inf norm
   struct inf {
-    static void inc(scalar_t& agg, const scalar_t diff, const scalar_t p) {
+    static void inc(scalar_t& agg, const scalar_t diff, const double p) {
       if (diff > agg) {
         agg = diff;
       }
     }
-    static scalar_t finish(const scalar_t agg, const scalar_t p) {
+    static scalar_t finish(const scalar_t agg, const double p) {
       return agg;
     }
     static void agg(scalar_t& update, const scalar_t other) {
@@ -137,7 +151,7 @@ class dists {
         const scalar_t diff,
         const scalar_t grad,
         const scalar_t dist,
-        const scalar_t p) {
+        const double p) {
       return grad * sign(diff) * (Numerics<scalar_t>::abs(diff) == dist);
     }
   };
@@ -185,7 +199,7 @@ static void pdist_kernel_impl(
     const Tensor& self,
     const int64_t n,
     const int64_t m,
-    const scalar_t p,
+    const double p,
     const double n2,
     const double n2_squared_minus_1) {
   const auto ngroups = result.numel();
@@ -249,7 +263,7 @@ static void pdist_backward_kernel_impl(
     const int64_t n,
     const int64_t m,
     const int64_t combs,
-    const scalar_t p,
+    const double p,
     const double n2,
     const double n2_squared_minus_1) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -452,7 +466,7 @@ static void cdist_forward_kernel_impl(
     Tensor& result,
     const Tensor& x1,
     const Tensor& x2,
-    const scalar_t p,
+    const double p,
     const int64_t r1,
     const int64_t r2,
     const int64_t m,
@@ -634,7 +648,7 @@ static void cdist_backward_kernel_impl(
     const Tensor& x2,
     const Tensor& dist,
     int64_t gs,
-    const scalar_t p,
+    const double p,
     const int64_t r1,
     const int64_t r2,
     const int64_t m,
