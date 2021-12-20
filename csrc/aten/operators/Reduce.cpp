@@ -6,8 +6,6 @@
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <oneDNN/oneDNN.h>
-
 #include <c10/core/ScalarType.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -1281,10 +1279,16 @@ Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
 }
 
 void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
-  auto alg_min = dnnl::algorithm::reduction_min;
-  auto alg_max = dnnl::algorithm::reduction_max;
-  xpu::oneDNN::reduce(self, min_result, alg_min, 0, 0);
-  xpu::oneDNN::reduce(self, max_result, alg_max, 0, 0);
+  auto iter = impl::make_reduction(
+      "aminmax",
+      min_result,
+      max_result,
+      self,
+      std::vector<int64_t>{},
+      false,
+      self.scalar_type()); // TensorIterator::binary_op(min_result, max_result,
+                           // self);
+  impl::aminmax_kernel(iter);
 }
 
 void aminmax_dim_out(
@@ -1309,20 +1313,9 @@ std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
   TORCH_CHECK(
       !self.is_complex(), "max is not yet implemented for complex tensors.");
   TORCH_CHECK(self.numel() > 0, "operation does not have an identity.");
-  auto ndim = self.ndimension();
-  Tensor min_result, max_result;
-  if (ndim == 0) {
-    min_result = at::empty({0}, self.options());
-    max_result = at::empty({0}, self.options());
-  } else {
-    std::vector<long> target_dim(ndim, 1);
-    min_result = at::empty(target_dim, self.options());
-    max_result = at::empty(target_dim, self.options());
-  }
-
+  Tensor min_result = at::empty_like(self);
+  Tensor max_result = at::empty_like(self);
   at::AtenIpexTypeXPU::aminmax_out(min_result, max_result, self);
-  min_result.squeeze_();
-  max_result.squeeze_();
   return std::tuple<Tensor, Tensor>(min_result, max_result);
 }
 
