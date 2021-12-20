@@ -205,15 +205,9 @@ Tensor binary_cross_entropy(
     const Tensor& target,
     const c10::optional<Tensor>& weight_opt,
     int64_t reduction) {
-  TORCH_CHECK(
-      weight_opt.has_value(),
-      "not implemented at ",
-      __FILE__,
-      ":",
-      __LINE__,
-      ":",
-      __func__);
-  const Tensor weight = weight_opt.value();
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
 
   auto minvalue = self.min().item<float>();
   auto maxvalue = self.max().item<float>();
