@@ -384,8 +384,8 @@ supported:
   - native_batch_norm_backward
   - native_group_norm
   - native_group_norm_backward
-#  - native_layer_norm  # different schema
-#  - native_layer_norm_backward  # different schema
+  - native_layer_norm
+  - native_layer_norm_backward
   - ne.Scalar
   - ne.Scalar_out
   - ne.Tensor
