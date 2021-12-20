@@ -655,9 +655,13 @@ at::Tensor adaptive_max_pool2d_backward_out_cpu(
       " for `grad_output` but got dtype ",
       grad_output.dtype());
 
-  at::Tensor grad_input = at::zeros(
-      input.sizes(),
-      input.options().memory_format(input.suggest_memory_format()));
+  // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
+  // the memory format tag.
+  at::Tensor grad_input =
+      at::empty(
+          input.sizes(),
+          input.options().memory_format(input.suggest_memory_format()))
+          .zero_();
   adaptive_max_pool2d_backward_kernel_impl(grad_input, grad_output, indices);
 
   return grad_input;

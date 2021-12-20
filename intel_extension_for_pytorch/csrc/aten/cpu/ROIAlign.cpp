@@ -756,9 +756,12 @@ at::Tensor roi_align_backward_kernel(
 
   auto memory_format = grad.suggest_memory_format();
   bool is_channels_last = memory_format == at::MemoryFormat::ChannelsLast;
-  at::Tensor grad_input =
-      at::zeros({batch_size, channels, height, width}, grad.options())
-          .contiguous(grad.suggest_memory_format());
+  // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
+  // the memory format tag.
+  at::Tensor grad_input = at::empty(
+                              {batch_size, channels, height, width},
+                              grad.options().memory_format(memory_format))
+                              .zero_();
 
   // handle possibly empty gradients
   if (grad.numel() == 0) {

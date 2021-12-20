@@ -850,8 +850,11 @@ at::Tensor avg_pool2d_backward_out_cpu(
       memory_format);
 
   /* resize output */
+  // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
+  // the memory format tag.
   at::Tensor gradInput =
-      at::zeros(input.sizes(), input.options().memory_format(memory_format));
+      at::empty(input.sizes(), input.options().memory_format(memory_format))
+          .zero_();
 
   TORCH_CHECK(
       input.dtype() == gradOutput.dtype(),
