@@ -34,7 +34,7 @@ def run_model(level):
     f = open(fname)
     num = 0
     for line in f.readlines():
-        if line.strip().startswith("dnnl_verbose"):
+        if line.strip().startswith("onednn_verbose"):
             num = num + 1
     f.close()
     os.remove(fname)
