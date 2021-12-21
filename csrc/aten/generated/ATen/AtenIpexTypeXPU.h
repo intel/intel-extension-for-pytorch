@@ -26,15 +26,15 @@ Tensor& abs_out(Tensor& out, const Tensor& self);
 Tensor& sgn_out(Tensor& out, const Tensor& self);
 Tensor& conj_out(Tensor& out, const Tensor& self);
 Tensor& acos_out(Tensor& out, const Tensor& self);
-Tensor add(const Tensor& self, const Tensor& other, Scalar alpha);
-Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha);
+Tensor add(const Tensor& self, const Tensor& other, const Scalar& alpha);
+Tensor& add_(Tensor& self, const Tensor& other, const Scalar& alpha);
 Tensor& add_out(
     Tensor& out,
     const Tensor& self,
     const Tensor& other,
-    Scalar alpha);
-Tensor add(const Tensor& self, Scalar other, Scalar alpha);
-Tensor& add_(Tensor& self, Scalar other, Scalar alpha);
+    const Scalar& alpha);
+Tensor add(const Tensor& self, const Scalar& other, const Scalar& alpha);
+Tensor& add_(Tensor& self, const Scalar& other, const Scalar& alpha);
 Tensor addmv(
     const Tensor& self,
     const Tensor& mat,
@@ -1055,13 +1055,9 @@ Tensor& histc_out(
     Scalar min,
     Scalar max);
 Tensor histc(const Tensor& self, int64_t bins, Scalar min, Scalar max);
-Tensor& fmod_out(Tensor& out, const Tensor& self, Scalar other);
 Tensor fmod(const Tensor& self, Scalar other);
-Tensor& fmod_out(Tensor& out, const Tensor& self, const Tensor& other);
 Tensor fmod(const Tensor& self, const Tensor& other);
-Tensor& remainder_out(Tensor& out, const Tensor& self, Scalar other);
 Tensor remainder(const Tensor& self, Scalar other);
-Tensor& remainder_out(Tensor& out, const Tensor& self, const Tensor& other);
 Tensor remainder(const Tensor& self, const Tensor& other);
 Tensor min(const Tensor& self);
 Tensor max(const Tensor& self);
