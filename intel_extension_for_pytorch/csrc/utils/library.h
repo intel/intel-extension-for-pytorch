@@ -44,3 +44,27 @@ extern int FLAGS_caffe2_log_level;
 
 #define IPEX_TORCH_LIBRARY_IMPL(ns, k, m) \
   _IPEX_TORCH_LIBRARY_IMPL(ns, k, m, C10_UID)
+
+#define _IPEX_TORCH_LIBRARY_FRAGMENT(ns, m, uid)                             \
+  static void C10_CONCATENATE(                                               \
+      TORCH_LIBRARY_FRAGMENT_init_##ns##_, uid)(torch::Library&);            \
+  static void C10_CONCATENATE(                                               \
+      IPEX_TORCH_LIBRARY_FRAGMENT_init_##ns##_, uid)(torch::Library & lib) { \
+    int org_FLAGS_caffe2_log_level = FLAGS_caffe2_log_level;                 \
+    FLAGS_caffe2_log_level = 2;                                              \
+    C10_CONCATENATE(TORCH_LIBRARY_FRAGMENT_init_##ns##_, uid)(lib);          \
+    FLAGS_caffe2_log_level = org_FLAGS_caffe2_log_level;                     \
+  }                                                                          \
+  static const torch::detail::TorchLibraryInit C10_CONCATENATE(              \
+      TORCH_LIBRARY_FRAGMENT_static_init_##ns##_, uid)(                      \
+      torch::Library::FRAGMENT,                                              \
+      &C10_CONCATENATE(IPEX_TORCH_LIBRARY_FRAGMENT_init_##ns##_, uid),       \
+      #ns,                                                                   \
+      c10::nullopt,                                                          \
+      __FILE__,                                                              \
+      __LINE__);                                                             \
+  void C10_CONCATENATE(                                                      \
+      TORCH_LIBRARY_FRAGMENT_init_##ns##_, uid)(torch::Library & m)
+
+#define IPEX_TORCH_LIBRARY_FRAGMENT(ns, m) \
+  _IPEX_TORCH_LIBRARY_FRAGMENT(ns, m, C10_UID)
