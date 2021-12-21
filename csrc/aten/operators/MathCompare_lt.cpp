@@ -17,6 +17,7 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
+
 void lt_kernel_dpcpp(TensorIterator& iter) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
@@ -35,7 +36,7 @@ void lt_kernel_dpcpp(TensorIterator& iter) {
 
 /*=========================== lt ==========================*/
 
-Tensor& lt_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& lt_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::comparison_op(out, self, other);
   impl::lt_kernel_dpcpp(iter);
   return out;
@@ -43,18 +44,18 @@ Tensor& lt_out(Tensor& out, const Tensor& self, const Tensor& other) {
 
 Tensor lt(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::lt_out(result, self, other);
+  return at::AtenIpexTypeXPU::lt_out(self, other, result);
 }
 
-Tensor& lt_out(Tensor& out, const Tensor& self, Scalar other_) {
-  at::AtenIpexTypeXPU::lt_out(out, self, wrapped_scalar_tensor(other_));
+Tensor& lt_out(const Tensor& self, const Scalar& other_, Tensor& out) {
+  at::AtenIpexTypeXPU::lt_out(self, wrapped_scalar_tensor(other_), out);
   return out;
 }
 
-Tensor lt(const Tensor& self, Scalar other_) {
+Tensor lt(const Tensor& self, const Scalar& other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
   return at::AtenIpexTypeXPU::lt_out(
-      result, self, wrapped_scalar_tensor(other_));
+      self, wrapped_scalar_tensor(other_), result);
 }
 
 } // namespace AtenIpexTypeXPU

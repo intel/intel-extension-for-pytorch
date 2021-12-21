@@ -20,7 +20,7 @@ IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log1p_out, Numerics<scalar_t>::log1p, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log2_out, Numerics<scalar_t>::log2, Real);
 
 Tensor& log1p_(Tensor& self) {
-  at::AtenIpexTypeXPU::log1p_out(self, self);
+  at::log1p_out(self, self);
   return self;
 }
 

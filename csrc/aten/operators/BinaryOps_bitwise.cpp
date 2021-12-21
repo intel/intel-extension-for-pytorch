@@ -83,7 +83,7 @@ void xor_kernel_dpcpp(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor& bitwise_and_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& bitwise_and_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   impl::and_kernel_dpcpp(iter);
   return out;
@@ -91,7 +91,7 @@ Tensor& bitwise_and_out(Tensor& out, const Tensor& self, const Tensor& other) {
 
 Tensor& bitwise_and_out(Tensor& out, const Tensor& self, Scalar other) {
   return at::AtenIpexTypeXPU::bitwise_and_out(
-      out, self, wrapped_scalar_tensor(other));
+      self, wrapped_scalar_tensor(other), out);
 }
 
 Tensor& bitwise_or_out(Tensor& out, const Tensor& self, const Tensor& other) {

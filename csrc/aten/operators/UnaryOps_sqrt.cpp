@@ -29,7 +29,7 @@ Tensor& sqrt_out(Tensor& result, const Tensor& self) {
     xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_sqrt>(
         result, self, 0.0f, 0.0f);
   } else {
-    sqrt(result, self);
+    sqrt(self, result);
   }
   return result;
 }

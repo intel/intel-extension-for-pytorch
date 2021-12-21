@@ -15,9 +15,9 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 Tensor& tanh_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
-    const Tensor& output) {
+    const Tensor& output,
+    Tensor& grad_input) {
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .add_output(grad_input)

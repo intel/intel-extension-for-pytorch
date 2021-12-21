@@ -15,23 +15,21 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_ALL_CALLABLE_1_UNARY_OPS(clamp_max_, TensorMinValueOp);
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(clamp_max_out, TensorMinValueOp);
-IPEX_ALL_CALLABLE_1_UNARY_OPS(clamp_min_, TensorMaxValueOp);
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(clamp_min_out, TensorMaxValueOp);
-IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(clamp_min_max, TensorClampOp);
+IPEX_OUT_ALL_CALLABLE_1_CONST_UNARY_OPS(clamp_max_out, TensorMinValueOp);
+IPEX_OUT_ALL_CALLABLE_1_CONST_UNARY_OPS(clamp_min_out, TensorMaxValueOp);
+IPEX_OUT_ALL_CALLABLE_2_CONST_UNARY_OPS(clamp_min_max, TensorClampOp);
 
 Tensor& clamp_out(
-    Tensor& result,
     const Tensor& self,
-    optional<Scalar> min,
-    optional<Scalar> max) {
+    const optional<Scalar>& min,
+    const optional<Scalar>& max,
+    Tensor& result) {
   if (min && max) {
-    at::AtenIpexTypeXPU::clamp_min_max(result, self, *min, *max);
+    at::AtenIpexTypeXPU::clamp_min_max(self, *min, *max, result);
   } else if (max) {
-    at::AtenIpexTypeXPU::clamp_max_out(result, self, *max);
+    at::AtenIpexTypeXPU::clamp_max_out(self, *max, result);
   } else if (min) {
-    at::AtenIpexTypeXPU::clamp_min_out(result, self, *min);
+    at::AtenIpexTypeXPU::clamp_min_out(self, *min, result);
   } else {
     TORCH_CHECK(false, "At least one of 'min' or 'max' must not be None");
   }
@@ -39,12 +37,12 @@ Tensor& clamp_out(
 }
 
 Tensor& clamp_(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
-  return at::AtenIpexTypeXPU::clamp_out(self, self, min, max);
+  return at::AtenIpexTypeXPU::clamp_out(self, min, max, self);
 }
 
 Tensor clamp(const Tensor& self, optional<Scalar> min, optional<Scalar> max) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::clamp_out(result, self, min, max);
+  return at::AtenIpexTypeXPU::clamp_out(self, min, max, result);
 }
 
 } // namespace AtenIpexTypeXPU

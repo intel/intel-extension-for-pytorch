@@ -36,7 +36,7 @@ void gt_kernel_dpcpp(TensorIterator& iter) {
 
 /*=========================== gt ==========================*/
 
-Tensor& gt_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& gt_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::comparison_op(out, self, other);
   impl::gt_kernel_dpcpp(iter);
   return out;
@@ -44,18 +44,18 @@ Tensor& gt_out(Tensor& out, const Tensor& self, const Tensor& other) {
 
 Tensor gt(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::gt_out(result, self, other);
+  return at::AtenIpexTypeXPU::gt_out(self, other, result);
 }
 
-Tensor& gt_out(Tensor& out, const Tensor& self, Scalar other_) {
-  at::AtenIpexTypeXPU::gt_out(out, self, wrapped_scalar_tensor(other_));
+Tensor& gt_out(const Tensor& self, const Scalar& other_, Tensor& out) {
+  at::AtenIpexTypeXPU::gt_out(self, wrapped_scalar_tensor(other_), out);
   return out;
 }
 
-Tensor gt(const Tensor& self, Scalar other_) {
+Tensor gt(const Tensor& self, const Scalar& other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
   return at::AtenIpexTypeXPU::gt_out(
-      result, self, wrapped_scalar_tensor(other_));
+      self, wrapped_scalar_tensor(other_), result);
 }
 
 } // namespace AtenIpexTypeXPU

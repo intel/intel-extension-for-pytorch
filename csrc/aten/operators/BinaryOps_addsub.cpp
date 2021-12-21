@@ -65,10 +65,10 @@ inline void sub_check(const Tensor& self, const Tensor& other) {
 namespace AtenIpexTypeXPU {
 
 Tensor& add_out(
-    Tensor& result,
     const Tensor& _self,
     const Tensor& _other,
-    Scalar alpha) {
+    const Scalar& alpha,
+    Tensor& result) {
   if (1.0 == alpha.to<float>() && xpu::oneDNN::binary_valid(_self, _other) &&
       (IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)
        // FIXME: [4,16,16,512] + [4,1,1,512] are in poor efficiency
@@ -95,7 +95,7 @@ Tensor& add_out(
   }
 }
 
-Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
+Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
   Tensor result;
   if (1.0 == alpha.to<float>() && xpu::oneDNN::binary_valid(_self, _other) &&
       (IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other) ||
@@ -120,23 +120,23 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   }
 }
 
-Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::add_out(self, self, other, alpha);
+Tensor& add_(Tensor& self, const Tensor& other, const Scalar& alpha) {
+  return at::AtenIpexTypeXPU::add_out(self, other, alpha, self);
 }
 
-Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
+Tensor add(const Tensor& self, const Scalar& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::add(self, wrapped_scalar_tensor(other), alpha);
 }
 
-Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
+Tensor& add_(Tensor& self, const Scalar& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::add_(self, wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_out(
-    Tensor& result,
     const Tensor& self,
     const Tensor& other,
-    Scalar alpha) {
+    const Scalar& alpha,
+    Tensor& result) {
   impl::sub_check(self, other);
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
@@ -145,7 +145,7 @@ Tensor& sub_out(
   return result;
 }
 
-Tensor sub(const Tensor& self, const Tensor& other, Scalar alpha) {
+Tensor sub(const Tensor& self, const Tensor& other, const Scalar alpha) {
   impl::sub_check(self, other);
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
@@ -155,7 +155,7 @@ Tensor sub(const Tensor& self, const Tensor& other, Scalar alpha) {
 }
 
 Tensor& sub_(Tensor& self, const Tensor& other, Scalar alpha) {
-  return at::AtenIpexTypeXPU::sub_out(self, self, other, alpha);
+  return at::AtenIpexTypeXPU::sub_out(self, other, alpha, self);
 }
 
 Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
@@ -178,7 +178,7 @@ Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
 
 namespace AtenIpexTypeQuantizedXPU {
 
-Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
+Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
   Tensor result, self, other;
   if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
       _self.sizes() == _other.sizes() && !is_wrapped_number(_self) &&

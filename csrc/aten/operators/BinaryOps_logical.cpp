@@ -66,9 +66,9 @@ void check_convert(Scalar scalar, ScalarType scalarType) {
 } // namespace impl
 
 Tensor& logical_and_out(
-    Tensor& result,
     const Tensor& self,
-    const Tensor& other) {
+    const Tensor& other,
+    Tensor& result) {
   if (self.scalar_type() != other.scalar_type()) {
     if (self.dim() != 0 && other.dim() == 0) {
       impl::check_convert(other.item(), self.scalar_type());
@@ -82,9 +82,9 @@ Tensor& logical_and_out(
 }
 
 Tensor& logical_or_out(
-    Tensor& result,
     const Tensor& self,
-    const Tensor& other) {
+    const Tensor& other,
+    Tensor& result) {
   if (self.scalar_type() != other.scalar_type()) {
     if (self.dim() != 0 && other.dim() == 0) {
       impl::check_convert(other.item(), self.scalar_type());
@@ -98,9 +98,9 @@ Tensor& logical_or_out(
 }
 
 Tensor& logical_xor_out(
-    Tensor& result,
     const Tensor& self,
-    const Tensor& other) {
+    const Tensor& other,
+    Tensor& result) {
   if (self.scalar_type() != other.scalar_type()) {
     if (self.dim() != 0 && other.dim() == 0) {
       impl::check_convert(other.item(), self.scalar_type());

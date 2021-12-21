@@ -7,7 +7,6 @@
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
 
-#include <oneDNN/oneDNN.h>
 #include "Loops.h"
 
 using namespace xpu::dpcpp;

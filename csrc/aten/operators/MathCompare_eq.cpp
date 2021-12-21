@@ -36,7 +36,7 @@ void eq_kernel_dpcpp(TensorIterator& iter) {
 
 /*=========================== eq ==========================*/
 
-Tensor& eq_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& eq_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::comparison_op(out, self, other);
   impl::eq_kernel_dpcpp(iter);
   return out;
@@ -44,16 +44,16 @@ Tensor& eq_out(Tensor& out, const Tensor& self, const Tensor& other) {
 
 Tensor eq(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::eq_out(result, self, other);
+  return at::AtenIpexTypeXPU::eq_out(self, other, result);
 }
-Tensor& eq_out(Tensor& out, const Tensor& self, Scalar other_) {
-  return at::AtenIpexTypeXPU::eq_out(out, self, wrapped_scalar_tensor(other_));
+Tensor& eq_out(const Tensor& self, const Scalar& other_, Tensor& out) {
+  return at::AtenIpexTypeXPU::eq_out(self, wrapped_scalar_tensor(other_), out);
 }
 
-Tensor eq(const Tensor& self, Scalar other_) {
+Tensor eq(const Tensor& self, const Scalar& other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
   return at::AtenIpexTypeXPU::eq_out(
-      result, self, wrapped_scalar_tensor(other_));
+      self, wrapped_scalar_tensor(other_), result);
 }
 
 bool equal(const Tensor& self, const Tensor& other) {
@@ -62,7 +62,7 @@ bool equal(const Tensor& self, const Tensor& other) {
   if (!self.sizes().equals(other.sizes()))
     return false;
 
-  at::AtenIpexTypeXPU::eq_out(result, self, other);
+  at::AtenIpexTypeXPU::eq_out(self, other, result);
   Tensor min = at::AtenIpexTypeXPU::min(result);
   Scalar min_ = at::AtenIpexTypeXPU::_local_scalar_dense(min);
   return min_.to<bool>() != 0;

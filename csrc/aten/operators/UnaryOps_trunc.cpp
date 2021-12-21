@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
@@ -13,7 +13,6 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
 namespace impl {
 
 void frac_kernel(TensorIterator& iter) {
@@ -23,6 +22,7 @@ void frac_kernel(TensorIterator& iter) {
     });
   });
 }
+
 } // namespace impl
 
 Tensor& frac_out(Tensor& result, const Tensor& self) {

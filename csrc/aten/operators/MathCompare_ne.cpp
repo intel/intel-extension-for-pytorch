@@ -36,7 +36,7 @@ void ne_kernel_dpcpp(TensorIterator& iter) {
 
 /*=========================== ne ==========================*/
 
-Tensor& ne_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& ne_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::comparison_op(out, self, other);
   impl::ne_kernel_dpcpp(iter);
   return out;
@@ -44,18 +44,18 @@ Tensor& ne_out(Tensor& out, const Tensor& self, const Tensor& other) {
 
 Tensor ne(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::ne_out(result, self, other);
+  return at::AtenIpexTypeXPU::ne_out(self, other, result);
 }
 
-Tensor& ne_out(Tensor& out, const Tensor& self, Scalar other_) {
-  at::AtenIpexTypeXPU::ne_out(out, self, wrapped_scalar_tensor(other_));
+Tensor& ne_out(const Tensor& self, const Scalar& other_, Tensor& out) {
+  at::AtenIpexTypeXPU::ne_out(self, wrapped_scalar_tensor(other_), out);
   return out;
 }
 
-Tensor ne(const Tensor& self, Scalar other_) {
+Tensor ne(const Tensor& self, const Scalar& other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
   return at::AtenIpexTypeXPU::ne_out(
-      result, self, wrapped_scalar_tensor(other_));
+      self, wrapped_scalar_tensor(other_), result);
 }
 
 } // namespace AtenIpexTypeXPU

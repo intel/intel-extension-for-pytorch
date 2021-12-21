@@ -7,7 +7,6 @@
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
 
-#include <oneDNN/oneDNN.h>
 #include "Loops.h"
 
 using namespace xpu::dpcpp;
@@ -28,12 +27,12 @@ IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(atan, Numerics<scalar_t>::atan, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(tanh_out, Numerics<scalar_t>::tanh, Real);
 
 Tensor& tanh_(Tensor& self) {
-  return at::AtenIpexTypeXPU::tanh_out(self, self);
+  return at::tanh_out(self, self);
 }
 
 Tensor tanh(const Tensor& self) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::tanh_out(result, self);
+  return at::tanh_out(result, self);
 }
 
 } // namespace AtenIpexTypeXPU
