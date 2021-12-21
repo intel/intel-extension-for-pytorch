@@ -170,7 +170,7 @@ Tensor median_template(const Tensor& self) {
         0,
         KthValueLauncher((self_copy.size(0) + 1) / 2)); // KthValue is 1-based
   }
-  return values.view({});
+  return values.squeeze();
 }
 
 template <typename scalar_t>
