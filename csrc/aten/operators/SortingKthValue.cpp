@@ -408,8 +408,8 @@ std::tuple<Tensor, Tensor> mode(const Tensor& self, int64_t dim, bool keepdim) {
     indices = at::empty({1}, self.options().dtype(kLong));
     auto ans =
         at::AtenIpexTypeXPU::mode_out(values, indices, self, dim, keepdim);
-    values = std::get<0>(ans).view({});
-    indices = std::get<1>(ans).view({});
+    values = std::get<0>(ans).squeeze();
+    indices = std::get<1>(ans).squeeze();
   }
 
   return std::forward_as_tuple(values, indices);
