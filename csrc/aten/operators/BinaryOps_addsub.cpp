@@ -16,7 +16,7 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace impl {
 
-static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
+void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -31,12 +31,12 @@ static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       });
 }
 
-static void sub_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
+void sub_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
   return add_kernel_dpcpp(iter, -alpha_scalar);
 }
 
 // alpha_check
-static inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
+inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
   TORCH_CHECK(
       !alpha.isBoolean() || iter.dtype() == ScalarType::Bool,
       "Boolean alpha only supported for Boolean results.");
@@ -47,7 +47,7 @@ static inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
 }
 
 // Basic checking for all sub functions.
-static inline void sub_check(const Tensor& self, const Tensor& other) {
+inline void sub_check(const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
       self.scalar_type() != kBool || other.scalar_type() != kBool,
       "Subtraction, the `-` operator, with two bool tensors is not supported. "
