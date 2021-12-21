@@ -464,8 +464,8 @@ supported:
 #  - replication_pad2d.out	# different signature
   - replication_pad2d_backward
 #  - replication_pad2d_backward.grad_input	# different signature
-#  - resize_	# different signature
-#  - resize_as_	# different signature
+  - resize_
+  - resize_as_
   - roll
   - rot90
 #  - round.out	# different signature

@@ -8,8 +8,8 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-Tensor& resize_(
-    Tensor& self,
+const Tensor& resize_(
+    const Tensor& self,
     IntArrayRef size,
     c10::optional<MemoryFormat> optional_memory_format) {
   auto* self_ = self.unsafeGetTensorImpl();
@@ -27,22 +27,22 @@ Tensor& resize_(
   return self;
 }
 
-Tensor& resize_as_(Tensor& self, const Tensor& the_template) {
+const Tensor& resize_as_(const Tensor& self, const Tensor& the_template) {
   return impl::resize_(self, the_template.sizes(), c10::nullopt);
 }
 
 } // namespace impl
 
-Tensor& resize_(
-    Tensor& self,
+const Tensor& resize_(
+    const Tensor& self,
     IntArrayRef size,
     c10::optional<MemoryFormat> memory_format) {
   impl::resize_(self, size, memory_format);
   return self;
 }
 
-Tensor& resize_as_(
-    Tensor& self,
+const Tensor& resize_as_(
+    const Tensor& self,
     const Tensor& the_template,
     c10::optional<MemoryFormat> memory_format) {
   return at::AtenIpexTypeXPU::resize_(
@@ -51,8 +51,8 @@ Tensor& resize_as_(
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
-Tensor& resize_(
-    Tensor& self,
+const Tensor& resize_(
+    const Tensor& self,
     IntArrayRef size,
     c10::optional<MemoryFormat> memory_format) {
   at::AtenIpexTypeXPU::impl::resize_(self, size, memory_format);
