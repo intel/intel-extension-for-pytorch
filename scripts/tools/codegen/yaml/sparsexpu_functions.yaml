@@ -16,6 +16,4 @@ supported:
   - is_coalesced
   - sparse_dim
   - sparse_mask
-  - copy_
-  - _to_copy
   - _coalesce
