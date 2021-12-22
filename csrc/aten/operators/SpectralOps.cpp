@@ -241,20 +241,37 @@ Tensor _fft_with_size(
         input_.numel());
     auto output_ =
         at::empty(output.numel(), output.options().dtype(at::kFloat));
-    impl::_mkl_dft<
-        oneapi::mkl::dft::precision::SINGLE,
-        oneapi::mkl::dft::domain::REAL,
-        float>(
-        input,
-        output_,
-        signal_ndim,
-        complex_input,
-        complex_output,
-        inverse,
-        checked_signal_sizes,
-        normalization,
-        onesided,
-        batch);
+    if (complex_type) {
+      impl::_mkl_dft<
+          oneapi::mkl::dft::precision::SINGLE,
+          oneapi::mkl::dft::domain::COMPLEX,
+          float>(
+          input,
+          output_,
+          signal_ndim,
+          complex_input,
+          complex_output,
+          inverse,
+          checked_signal_sizes,
+          normalization,
+          onesided,
+          batch);
+    } else {
+      impl::_mkl_dft<
+          oneapi::mkl::dft::precision::SINGLE,
+          oneapi::mkl::dft::domain::REAL,
+          float>(
+          input,
+          output_,
+          signal_ndim,
+          complex_input,
+          complex_output,
+          inverse,
+          checked_signal_sizes,
+          normalization,
+          onesided,
+          batch);
+    }
     dtype_convert_by_scalar(
         output.data_ptr<at::BFloat16>(),
         output_.data_ptr<float>(),
