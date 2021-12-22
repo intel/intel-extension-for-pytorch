@@ -315,8 +315,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseMHAScoreCalc(graph);
 
   // Replace _convolution with conv2d or conv3d
-  graph_rewrite::replaceConvolutionWithAtenConv(graph);
-  // graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+  graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 
   // convolution fusion
   graph_rewrite::insertPrePackedConv2dOp(graph);
