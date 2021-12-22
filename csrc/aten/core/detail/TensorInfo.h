@@ -88,9 +88,13 @@ struct IndexToOffset {
   static IndexType get(
       IndexType linearId,
       const TensorInfo<T, IndexType>& info) {
-    IndexType offset = 0;
+    if (info.isContiguous()) {
+      return linearId;
+    }
 
+    IndexType offset = 0;
     // Uses static dims
+#pragma unroll
     for (int i = Dims - 1; i > 0; --i) {
       IndexType curDimIndex = linearId % info.sizes[i];
       IndexType curDimOffset = curDimIndex * info.strides[i];
@@ -108,13 +112,20 @@ struct IndexToOffset<T, IndexType, -1> {
   static inline IndexType get(
       IndexType linearId,
       const TensorInfo<T, IndexType>& info) {
+    if (info.isContiguous()) {
+      return linearId;
+    }
+
     IndexType offset = 0;
 
-    for (int i = info.dims - 1; i > 0; --i) {
-      IndexType curDimIndex = linearId % info.sizes[i];
-      IndexType curDimOffset = curDimIndex * info.strides[i];
-      offset += curDimOffset;
-      linearId /= info.sizes[i];
+#pragma unroll
+    for (int i = MAX_TENSORINFO_DIMS; i > 0; --i) {
+      if (i < info.dims) {
+        IndexType curDimIndex = linearId % info.sizes[i];
+        IndexType curDimOffset = curDimIndex * info.strides[i];
+        offset += curDimOffset;
+        linearId /= info.sizes[i];
+      }
     }
 
     return offset + linearId * info.strides[0];
