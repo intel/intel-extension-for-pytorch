@@ -1,6 +1,5 @@
 #include "embeddingbag.h"
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
@@ -561,9 +560,6 @@ at::Tensor embedding_bag(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::embedding_bag", "")
                        .typed<decltype(embedding_bag)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("embedding_bag");
-#endif
   auto target_type = get_autocast_dtype();
   if (is_quantization_enabled()) {
     return int8::embedding_bag(

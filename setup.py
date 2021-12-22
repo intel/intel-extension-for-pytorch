@@ -482,8 +482,6 @@ class IPEXCPPLibBuild(build_clib, object):
             use_ninja = True
             cmake_args += ['-GNinja']
 
-        if _check_env_flag("ENABLE_AUTOCAST_VERBOSE"):
-            cmake_args += ['-DENABLE_AUTOCAST_VERBOSE=1']
 
         build_args = ['-j', str(multiprocessing.cpu_count())]
 

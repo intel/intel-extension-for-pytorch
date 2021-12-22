@@ -3,7 +3,6 @@
 #include <ATen/record_function.h>
 #include <torch/types.h>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/utils/library.h"
 
 #include "torchvision_nms.h"
@@ -143,9 +142,6 @@ at::Tensor nms_autocast(
                            const at::Tensor& dets,
                            const at::Tensor& scores,
                            double iou_threshold)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("nms");
-#endif
   return op.call(
       cpu_cached_cast(at::kFloat, dets),
       cpu_cached_cast(at::kFloat, scores),

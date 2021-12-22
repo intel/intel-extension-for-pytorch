@@ -4,7 +4,6 @@
 #include "Linear.h"
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/utils.h"
 
@@ -308,9 +307,6 @@ at::Tensor ipex_linear(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ipex_linear", "")
                        .typed<decltype(ipex_linear)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("ipex_linear");
-#endif
   auto target_type = get_autocast_dtype();
   TORCH_CHECK(
       weight.scalar_type() == at::kBFloat16 ||
@@ -335,9 +331,6 @@ at::Tensor ipex_linear_eltwise(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ipex_linear_eltwise", "")
                        .typed<decltype(ipex_linear_eltwise)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("ipex_linear_eltwise");
-#endif
   auto target_type = get_autocast_dtype();
   TORCH_CHECK(
       weight.scalar_type() == at::kBFloat16 ||

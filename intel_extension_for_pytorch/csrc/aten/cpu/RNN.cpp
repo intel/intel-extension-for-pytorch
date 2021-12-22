@@ -9,7 +9,6 @@
 #include <torch/extension.h>
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/utils.h"
 
@@ -999,9 +998,6 @@ std::vector<at::Tensor> ipex_lstm_layer(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ipex_lstm_layer", "")
                        .typed<decltype(ipex_lstm_layer)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("ipex_lstm_layer");
-#endif
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::autocast::ipex_lstm_layer\n");
 #endif

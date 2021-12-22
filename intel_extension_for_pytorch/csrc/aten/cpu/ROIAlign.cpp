@@ -5,7 +5,6 @@
 #include <ATen/cpu/vec/vec.h>
 #include <torch/library.h>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/utils/library.h"
 
 // use float as accumulation type for BFloat16
@@ -931,9 +930,6 @@ at::Tensor roi_align_autocast(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torchvision::roi_align", "")
                        .typed<decltype(torch_ipex::cpu::ROIAlign_forward)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("roi_align");
-#endif
   if (input.scalar_type() == at::ScalarType::BFloat16) {
     return op.call(
         input,
@@ -967,9 +963,6 @@ at::Tensor ROIAlign_forward(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ROIAlign_forward", "")
                        .typed<decltype(torch_ipex::cpu::ROIAlign_forward)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("ROIAlign_forward");
-#endif
   if (input.scalar_type() == at::ScalarType::BFloat16) {
     return op.call(
         input,

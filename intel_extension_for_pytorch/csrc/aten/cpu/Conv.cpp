@@ -2,7 +2,6 @@
 #include <torch/extension.h>
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/utils.h"
 
@@ -785,9 +784,6 @@ at::Tensor convolution_forward(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::convolution_forward", "")
                        .typed<decltype(convolution_forward)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("convolution_forward");
-#endif
   auto target_type = get_autocast_dtype();
 
   // TODO: make check weight dtype should be float for training case.

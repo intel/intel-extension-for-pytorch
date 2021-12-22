@@ -1,6 +1,5 @@
 #include "autocast_mode.h"
 #include "autocast_kernel.hpp"
-#include "autocast_verbose.h"
 
 #include "library.h"
 
@@ -74,16 +73,10 @@ Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
     auto casted_arg = arg;
     if (arg.scalar_type() == at::kFloat && to_type == at::kBFloat16) {
       // This path works for fp32 to bf16
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-      verbose::autocast_verbose(to_type, arg);
-#endif
       casted_arg = arg.to(at::kBFloat16);
       // casted_arg = arg.to_mkldnn(at::kBFloat16);
     } else if (arg.scalar_type() == at::kBFloat16 && to_type == at::kFloat) {
       // This path works for bf16 to fp32
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-      verbose::autocast_verbose(to_type, arg);
-#endif
       casted_arg = arg.to(at::kFloat);
       // casted_arg = arg.to_dense(at::kFloat);
     }
@@ -141,9 +134,6 @@ struct CPU_WrapFunction_<
     guts::typelist::typelist<Args...>> {
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-    verbose::OpNameGuard op_name(get_op_name<Redispatch, F>());
-#endif
     return (*F)(cpu_cached_cast(current_target_dtype, args)...);
   }
 };
@@ -158,9 +148,6 @@ struct CPU_WrapFunction_<
     guts::typelist::typelist<Args...>> {
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-    verbose::OpNameGuard op_name(get_op_name<Redispatch, F>());
-#endif
     return (*F)(cpu_cached_cast(at::kFloat, args)...);
   }
 };
@@ -176,9 +163,6 @@ struct CPU_WrapFunction_<
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
     auto to_type = promote_type(at::kBFloat16, args...);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-    verbose::OpNameGuard op_name(get_op_name<Redispatch, F>());
-#endif
     return (*F)(cpu_cached_cast(to_type, args)...);
   }
 };

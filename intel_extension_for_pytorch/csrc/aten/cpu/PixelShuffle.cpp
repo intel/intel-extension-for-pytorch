@@ -12,7 +12,6 @@
 #include "PixelShuffle.h"
 
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
