@@ -98,7 +98,7 @@ void interaction_kernel(
               static_cast<int>(index[2 * local_row + 1]) * TILE_OUTPUT_COL;
 
           // each thread computes TILE_OUTPUT_COL * TILE_OUTPUT_COL outputs
-          float res[TILE_OUTPUT_COL][TILE_OUTPUT_COL] = {0.f};
+          float res[TILE_OUTPUT_COL][TILE_OUTPUT_COL] = {{0.f}};
           int cub_numel = (Row - 1) * TILE_BN * TILE_INPUT_COL_FLOAT;
           // Computation in Col direction
           for (int col = 0; col < Col_fp; col += TILE_INPUT_COL_FLOAT) {
