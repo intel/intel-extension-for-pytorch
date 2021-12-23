@@ -25,10 +25,10 @@ class TestLinearFuseEltwise(TestCase):
     def test_linear_fuse_eltwise(self):
         x1 = torch.rand(5, 10).requires_grad_()
         x2 = copy.deepcopy(x1)
-        model = MLP()
-        opt = torch.optim.SGD(model.parameters(), lr=0.01)
         for dtype in [torch.float, torch.bfloat16]:
-            model, opt = ipex.optimize(model, optimizer=opt, dtype=torch.float, auto_kernel_selection=True)
+            model = MLP()
+            opt = torch.optim.SGD(model.parameters(), lr=0.01)
+            model, opt = ipex.optimize(model, optimizer=opt, dtype=dtype, auto_kernel_selection=True)
             with torch.cpu.amp.autocast(enabled=(dtype == torch.bfloat16)):
                 ref_out = model(x1).sum()
             ref_out.backward()
