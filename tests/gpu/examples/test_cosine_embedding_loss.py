@@ -15,7 +15,7 @@ def _test_cpu(input1, input2, target, reduc):
     output = loss(input1, input2, target)
     print(output)
     if (reduc == "none"):
-        output.backward(torch.ones((2, 1), dtype=torch.float))
+        output.backward(torch.ones(2, dtype=torch.float))
     else:
         output.backward(torch.tensor((1.0), dtype=torch.float))
     print(input1.grad)
@@ -33,7 +33,7 @@ def _test_dpcpp(input1, input2, target, reduc):
     output = loss(input1, input2, target)
     print(output.cpu())
     if (reduc == "none"):
-        output.backward(torch.ones((2, 1), dtype=torch.float).to(dpcpp_device))
+        output.backward(torch.ones(2, dtype=torch.float).to(dpcpp_device))
     else:
         output.backward(torch.tensor(
             (1.0), dtype=torch.float).to(dpcpp_device))
@@ -46,9 +46,9 @@ def _test_dpcpp(input1, input2, target, reduc):
 
 class TestNNMethod(TestCase):
     def test_cosine_embedding_loss(self, dtype=torch.float):
-        input1 = torch.randn(1, 5)
-        input2 = torch.randn(1, 5)
-        target = torch.tensor([[1], [-1]])
+        input1 = torch.randn(2, 5)
+        input2 = torch.randn(2, 5)
+        target = torch.tensor([1, -1])
 
         input1_cpu = input1
         input2_cpu = input2
