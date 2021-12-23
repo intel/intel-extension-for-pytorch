@@ -22,7 +22,7 @@
 */**/**/**/*.pyc
 */**/**/**/**/*.pyc
 
-ipex/version.py
+ipex/_version.py
 ipex/README.md
 ipex/requirements.txt
 ipex/csrc/aten_ipex_sparse_type_default.*
