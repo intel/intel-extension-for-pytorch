@@ -27,30 +27,6 @@ ideep::tensor get_conv_packed_weight(
     at::IntArrayRef input_size,
     const ideep::attr_t& attr);
 
-// pack convolution's weight according to dummy input.
-// weight: weight need to be packed
-// dtype: if given dtype, will use this dtype to override weight's dtype
-at::Tensor conv2d_weight_pack(
-    const at::Tensor& weight,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    c10::optional<at::ScalarType> dtype);
-
-// Unpack convolution's weight according to dummy input.
-at::Tensor conv2d_weight_unpack(
-    const at::Tensor& weight,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
-    int64_t groups,
-    int64_t output_channel,
-    int64_t input_channel,
-    bool is_channels_last,
-    c10::optional<at::ScalarType> dtype);
-
 // Get the linear's expected ideep weight tensor, the weight may be a 2-D tensor
 // or has benn packed to a n-D tensor, if it is a plain tensor, it will reorder
 // to a expected weight according queried desc of OneDNN linear, or if it is

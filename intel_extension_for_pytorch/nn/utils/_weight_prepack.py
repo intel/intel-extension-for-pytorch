@@ -17,6 +17,75 @@ class _IPEXConvNd(nn.Module):
         self.padding = dense_module.padding
         self.dilation = dense_module.dilation
         self.groups = dense_module.groups
+        self.weight_packed = True
+        self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
+            or dense_module.weight.is_contiguous(memory_format=torch.channels_last_3d)
+
+        # TODO: ".clone()" will make weight shared by multiple module not shared anymore
+        # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
+        self.weight = nn.Parameter(torch.ops.torch_ipex.convolution_weight_pack(
+            dense_module.weight.detach().clone(),
+            self.padding,
+            self.stride,
+            self.dilation,
+            self.groups))
+
+        if hasattr(dense_module, 'master_weight'):
+            self.master_weight = torch.ops.torch_ipex.convolution_weight_pack(
+                dense_module.master_weight.detach().clone(),
+                self.padding,
+                self.stride,
+                self.dilation,
+                self.groups,
+                self.weight.dtype)
+        elif hasattr(dense_module, 'weight_trail'):
+            self.weight_trail = torch.ops.torch_ipex.convolution_weight_pack(
+                dense_module.weight_trail.detach().clone(),
+                self.padding,
+                self.stride,
+                self.dilation,
+                self.groups)
+        if dense_module.bias is not None:
+            self.bias = nn.Parameter(dense_module.bias.detach().clone())
+            if hasattr(dense_module, 'master_bias'):
+                self.master_bias = dense_module.master_bias
+            elif hasattr(dense_module, 'bias_trail'):
+                self.bias_trail = dense_module.bias_trail
+        else:
+            self.register_parameter('bias', None)
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        unpack_dtype = self.weight.dtype
+        assert not keep_vars, "can not using keep_vars true when to save _IPEXConvNd's parameters"
+        if self.bias is not None:
+            if hasattr(self, 'master_bias'):
+                bias = self.master_bias
+            elif hasattr(self, 'bias_trail'):
+                bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
+            else:
+                bias = self.bias
+            destination[prefix + 'bias'] = bias.detach()
+        if hasattr(self, 'master_weight'):
+            weight = self.master_weight
+        elif hasattr(self, 'weight_trail'):
+            weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
+        else:
+            weight = self.weight
+        destination[prefix + 'weight'] = torch.ops.torch_ipex.convolution_weight_unpack(
+            weight.detach(),
+            self.padding,
+            self.stride,
+            self.dilation,
+            self.kernel_size,
+            self.groups,
+            self.out_channels,
+            self.in_channels,
+            self.weight_channels_last,
+            unpack_dtype)
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        assert False, "_IPEXConvNd does not support _load_from_state_dict method"
 
     def forward(self, x):
         return torch.ops.torch_ipex.convolution_forward(
@@ -35,73 +104,10 @@ class _IPEXConvNd(nn.Module):
 class _IPEXConv2d(_IPEXConvNd):
     def __init__(self, dense_module):
         super(_IPEXConv2d, self).__init__(dense_module)
-        self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last)
-        self.weight_packed = True
 
-        # TODO: ".clone()" will make weight shared by multiple module not shared anymore
-        # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
-        self.weight = nn.Parameter(torch.ops.torch_ipex.conv2d_weight_pack(
-            dense_module.weight.detach().clone(),
-            self.padding,
-            self.stride,
-            self.dilation,
-            self.groups))
-        if hasattr(dense_module, 'master_weight'):
-            self.master_weight = torch.ops.torch_ipex.conv2d_weight_pack(
-                dense_module.master_weight.detach().clone(),
-                self.padding,
-                self.stride,
-                self.dilation,
-                self.groups,
-                self.weight.dtype)
-        elif hasattr(dense_module, 'weight_trail'):
-            self.weight_trail = torch.ops.torch_ipex.conv2d_weight_pack(
-                dense_module.weight_trail.detach().clone(),
-                self.padding,
-                self.stride,
-                self.dilation,
-                self.groups)
-        if dense_module.bias is not None:
-            self.bias = nn.Parameter(dense_module.bias.detach().clone())
-            if hasattr(dense_module, 'master_bias'):
-                self.master_bias = dense_module.master_bias
-            elif hasattr(dense_module, 'bias_trail'):
-                self.bias_trail = dense_module.bias_trail
-        else:
-            self.register_parameter('bias', None)
-
-    def _save_to_state_dict(self, destination, prefix, keep_vars):
-        unpack_dtype = self.weight.dtype
-        assert not keep_vars, "can not using keep_vars true when to save _IPEXConv2d's parameters"
-        if self.bias is not None:
-            if hasattr(self, 'master_bias'):
-                bias = self.master_bias
-            elif hasattr(self, 'bias_trail'):
-                bias = torch.ops.torch_ipex.cat_bfloat16_float(self.bias, self.bias_trail)
-            else:
-                bias = self.bias
-            destination[prefix + 'bias'] = bias.detach()
-        if hasattr(self, 'master_weight'):
-            weight = self.master_weight
-        elif hasattr(self, 'weight_trail'):
-            weight = torch.ops.torch_ipex.cat_bfloat16_float(self.weight, self.weight_trail)
-        else:
-            weight = self.weight
-        destination[prefix + 'weight'] = torch.ops.torch_ipex.conv2d_weight_unpack(
-            weight.detach(),
-            self.padding,
-            self.stride,
-            self.dilation,
-            self.kernel_size,
-            self.groups,
-            self.out_channels,
-            self.in_channels,
-            self.weight_channels_last,
-            unpack_dtype)
-
-    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
-                              missing_keys, unexpected_keys, error_msgs):
-        assert False, "_IPEXConv2d does not support _load_from_state_dict method"
+class _IPEXConv3d(_IPEXConvNd):
+    def __init__(self, dense_module):
+        super(_IPEXConv3d, self).__init__(dense_module)
 
 class _IPEXLinear(torch.nn.Module):
     def __init__(self, dense_module):
@@ -277,6 +283,7 @@ IPEX_WEIGHT_PREPACK_MODULE = {
     torch.nn.Linear,
     torch.nn.Conv2d,
     torch.nn.ConvTranspose2d,
+    torch.nn.Conv3d,
 }
 
 def _should_prepack(module, auto_kernel_selection):
@@ -298,6 +305,14 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                 new_m = _IPEXConv2d(m)
                 params_attr[weight].update({
                     'op': torch.nn.Conv2d, 'padding': new_m.padding,
+                    'dilation': new_m.dilation, 'stride': new_m.stride,
+                    'kernel_size': new_m.kernel_size, 'groups': new_m.groups,
+                    'in_channels': new_m.in_channels, 'out_channels': new_m.out_channels,
+                    'weight_channels_last': new_m.weight_channels_last})
+            elif isinstance(m, torch.nn.Conv3d):
+                new_m = _IPEXConv3d(m)
+                params_attr[weight].update({
+                    'op': torch.nn.Conv3d, 'padding': new_m.padding,
                     'dilation': new_m.dilation, 'stride': new_m.stride,
                     'kernel_size': new_m.kernel_size, 'groups': new_m.groups,
                     'in_channels': new_m.in_channels, 'out_channels': new_m.out_channels,

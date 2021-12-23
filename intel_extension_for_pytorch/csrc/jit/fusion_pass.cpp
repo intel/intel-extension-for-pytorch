@@ -5,7 +5,6 @@
 #include "cpu/passes/graph_rewrite.h"
 
 #include "aten/cpu/Pooling.h"
-#include "cpu/kernels/Convolution.h"
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 
@@ -293,14 +292,6 @@ class OpFuser {
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::matmul, aten::div}, ipex::matmul_div},
-    // 3d ops
-    {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
-    {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
-    {{aten::conv3d, aten::add}, ipex::conv3d_sum},
-    {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
-    {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
-    {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")},
-     ipex::conv3d_sum_relu},
 };
 
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
@@ -318,7 +309,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 
   // convolution fusion
-  graph_rewrite::insertPrePackedConv2dOp(graph);
+  graph_rewrite::insertPrePackedConvOp(graph);
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
 
