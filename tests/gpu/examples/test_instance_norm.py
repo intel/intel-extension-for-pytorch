@@ -47,8 +47,8 @@ class TestNNMethod(TestCase):
 
     @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_instance_norm2d_channels_last(self, dtype=torch.float):
-        shapes = [(1, 3, 7, 7), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
-                  (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
+        shapes = [(1, 3, 7, 7), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 2), (4, 1, 4, 4),
+                  (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 2, 1)]
         for shape in shapes:
             N, C, H, W = shape[0], shape[1], shape[2], shape[3]
             test_conv = torch.nn.Conv2d(C, C, kernel_size=(3, 3), padding=(1, 1))
