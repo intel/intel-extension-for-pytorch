@@ -210,6 +210,36 @@ static void initDeviceProperty(DeviceId device_id) {
   device_prop.profiling_resolution =
       device.get_info<dpcpp_dev_profiling_resolution>();
 
+  device_prop.pref_vec_width_char =
+      device.get_info<dpcpp_dev_pref_vec_width_char>();
+  device_prop.pref_vec_width_short =
+      device.get_info<dpcpp_dev_pref_vec_width_short>();
+  device_prop.pref_vec_width_int =
+      device.get_info<dpcpp_dev_pref_vec_width_int>();
+  device_prop.pref_vec_width_long =
+      device.get_info<dpcpp_dev_pref_vec_width_long>();
+  device_prop.pref_vec_width_float =
+      device.get_info<dpcpp_dev_pref_vec_width_float>();
+  device_prop.pref_vec_width_double =
+      device.get_info<dpcpp_dev_pref_vec_width_double>();
+  device_prop.pref_vec_width_half =
+      device.get_info<dpcpp_dev_pref_vec_width_half>();
+
+  device_prop.native_vec_width_char =
+      device.get_info<dpcpp_dev_native_vec_width_char>();
+  device_prop.native_vec_width_short =
+      device.get_info<dpcpp_dev_native_vec_width_short>();
+  device_prop.native_vec_width_int =
+      device.get_info<dpcpp_dev_native_vec_width_int>();
+  device_prop.native_vec_width_long =
+      device.get_info<dpcpp_dev_native_vec_width_long>();
+  device_prop.native_vec_width_float =
+      device.get_info<dpcpp_dev_native_vec_width_float>();
+  device_prop.native_vec_width_double =
+      device.get_info<dpcpp_dev_native_vec_width_double>();
+  device_prop.native_vec_width_half =
+      device.get_info<dpcpp_dev_native_vec_width_half>();
+
   device_properties[device_id] = device_prop;
 }
 

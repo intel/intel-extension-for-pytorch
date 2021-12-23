@@ -227,6 +227,38 @@ static constexpr auto dpcpp_dev_max_sub_devices =
 // Returns the resolution of device timer in nanoseconds.
 static constexpr auto dpcpp_dev_profiling_resolution =
     DPCPP::info::device::profiling_timer_resolution;
+// Returns the preferred native vector width size for built-in
+// scalar types that can be put into vectors.
+static constexpr auto dpcpp_dev_pref_vec_width_char =
+    DPCPP::info::device::preferred_vector_width_char;
+static constexpr auto dpcpp_dev_pref_vec_width_short =
+    DPCPP::info::device::preferred_vector_width_short;
+static constexpr auto dpcpp_dev_pref_vec_width_int =
+    DPCPP::info::device::preferred_vector_width_int;
+static constexpr auto dpcpp_dev_pref_vec_width_long =
+    DPCPP::info::device::preferred_vector_width_long;
+static constexpr auto dpcpp_dev_pref_vec_width_float =
+    DPCPP::info::device::preferred_vector_width_float;
+static constexpr auto dpcpp_dev_pref_vec_width_double =
+    DPCPP::info::device::preferred_vector_width_double;
+static constexpr auto dpcpp_dev_pref_vec_width_half =
+    DPCPP::info::device::preferred_vector_width_half;
+// Returns the native ISA vector width. The vector width is defined as
+// the number of scalar elements that can be stored in the vector.
+static constexpr auto dpcpp_dev_native_vec_width_char =
+    DPCPP::info::device::native_vector_width_char;
+static constexpr auto dpcpp_dev_native_vec_width_short =
+    DPCPP::info::device::native_vector_width_short;
+static constexpr auto dpcpp_dev_native_vec_width_int =
+    DPCPP::info::device::native_vector_width_int;
+static constexpr auto dpcpp_dev_native_vec_width_long =
+    DPCPP::info::device::native_vector_width_long;
+static constexpr auto dpcpp_dev_native_vec_width_float =
+    DPCPP::info::device::native_vector_width_float;
+static constexpr auto dpcpp_dev_native_vec_width_double =
+    DPCPP::info::device::native_vector_width_double;
+static constexpr auto dpcpp_dev_native_vec_width_half =
+    DPCPP::info::device::native_vector_width_half;
 
 // dpcpp event info
 static constexpr auto dpcpp_event_exec_stat =

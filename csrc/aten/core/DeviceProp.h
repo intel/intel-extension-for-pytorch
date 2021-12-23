@@ -49,6 +49,34 @@ struct IPEX_API DeviceProp {
   dpcpp_info_t<DPCPP::info::device, dpcpp_dev_max_sub_devices> max_sub_devices;
   dpcpp_info_t<DPCPP::info::device, dpcpp_dev_profiling_resolution>
       profiling_resolution;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_char>
+      pref_vec_width_char;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_short>
+      pref_vec_width_short;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_int>
+      pref_vec_width_int;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_long>
+      pref_vec_width_long;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_float>
+      pref_vec_width_float;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_double>
+      pref_vec_width_double;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_pref_vec_width_half>
+      pref_vec_width_half;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_char>
+      native_vec_width_char;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_short>
+      native_vec_width_short;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_int>
+      native_vec_width_int;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_long>
+      native_vec_width_long;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_float>
+      native_vec_width_float;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_double>
+      native_vec_width_double;
+  dpcpp_info_t<DPCPP::info::device, dpcpp_dev_native_vec_width_half>
+      native_vec_width_half;
 };
 
 } // namespace dpcpp
