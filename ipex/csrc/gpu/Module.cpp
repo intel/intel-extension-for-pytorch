@@ -397,6 +397,13 @@ void init_module(pybind11::module& m) {
       "enable Fusion SGD for weight update. on Intel device");
 
   m.def(
+      "interaction",
+      [](at::Tensor& input_mlp, at::Tensor& input_emb) {
+        return at::AtenIpexTypeXPU::interaction(input_mlp, input_emb);
+      },
+      "interaction kernel implemtation on Intel device");
+
+  m.def(
       "fused_adamW",
       [](at::Tensor& master_grad_input,
          at::Tensor& grad_input,

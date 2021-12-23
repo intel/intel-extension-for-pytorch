@@ -20,6 +20,8 @@ void matmul(
     bool m2_trans,
     int fusion);
 
+at::Tensor interaction(at::Tensor& input_mlp, at::Tensor& input_emb);
+
 at::Tensor& fused_adamW(
     at::Tensor& master_grad_input,
     at::Tensor& grad_input,
