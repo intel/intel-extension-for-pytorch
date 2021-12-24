@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
+set(DPCPP_ISA_SRCS)
+set(DPCPP_ISA_SRCS_ORIGIN)
+include(cmake/Codegen.cmake)
+
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -15,8 +19,7 @@ set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc")
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
-FIND_PACKAGE(AVX)
-
+#[[
 IF (C_AVX512_FOUND AND CXX_AVX512_FOUND)
   message(VERBOSE "Build the extension with AVX512 enabled.")
 ELSEIF(C_AVX2_FOUND AND CXX_AVX2_FOUND)
@@ -24,6 +27,7 @@ ELSEIF(C_AVX2_FOUND AND CXX_AVX2_FOUND)
 ELSE()
   message(FATAL_ERROR "Does not support building the extension on non-AVX512/AVX2 machine.")
 ENDIF()
+]]
 
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -82,6 +86,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=pedantic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=redundant-decls")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=old-style-cast")
 
+#[[
 IF ("${AVX_VERSION}" MATCHES "AVX512")
   IF (C_AVX512_FOUND OR CXX_AVX512_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY_AVX2")
@@ -110,6 +115,9 @@ ELSEIF("${AVX_VERSION}" MATCHES "AVX2")
 ELSE()
   message(FATAL_ERROR "Wrong AVX version.")
 ENDIF()
+]]
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDYN_DISP_BUILD")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 # These flags are not available in GCC-4.8.5. Set only when using clang.
@@ -201,6 +209,10 @@ set(DPCPP_CPU_SRCS)
 set(DPCPP_AUTOCAST_SRCS)
 set(DPCPP_ATEN_SRCS)
 
+foreach(file_path ${DPCPP_ISA_SRCS})
+  message(${file_path})
+endforeach()
+
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/utils)
 add_subdirectory(${DPCPP_ROOT}/quantization)
@@ -209,9 +221,22 @@ add_subdirectory(${DPCPP_ROOT}/cpu)
 add_subdirectory(${DPCPP_ROOT}/autocast)
 add_subdirectory(${DPCPP_ROOT}/aten)
 
+file(GLOB_RECURSE EXCLUDE_FILES_1 "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/*.cpp")
+file(GLOB_RECURSE EXCLUDE_FILES_2 "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/cpu/*.cpp")
+
+file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/_DynDispSample.cpp")
+
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
+set(DPCPP_SRCS ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
     ${DPCPP_CPU_SRCS} ${DPCPP_AUTOCAST_SRCS} ${DPCPP_ATEN_SRCS})
+
+list(REMOVE_ITEM DPCPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
+
+list(REMOVE_ITEM DPCPP_SRCS ${EXCLUDE_FILES_1})
+list(REMOVE_ITEM DPCPP_SRCS ${EXCLUDE_FILES_2})
+
+list(APPEND DPCPP_SRCS ${SAMPLE_FILES})
+
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
 foreach(file_path ${DPCPP_SRCS})

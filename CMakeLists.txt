@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 project(IPEX CXX C)
 
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 # set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -46,4 +48,8 @@ set(DPCPP_THIRD_PARTY_ROOT "${PROJECT_SOURCE_DIR}/third_party")
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Common dependencies
+if("$ENV{DYN_DISP}" STREQUAL "1")
+include(cmake/CpuDynDisp.cmake)
+else()
 include(cmake/CPU.cmake)
+endif()
