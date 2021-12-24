@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 
+#include <ATen/record_function.h>
 #include <core/MemoryFormat.h>
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
@@ -63,6 +64,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_normalization(
     bool training,
     double momentum,
     double epsilon) {
+  RECORD_FUNCTION("dnnl_batch_normalization", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -250,6 +252,7 @@ batch_normalization_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> diff_src_mask) {
+  RECORD_FUNCTION("dnnl_batch_normalization_backward", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

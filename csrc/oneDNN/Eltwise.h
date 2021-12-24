@@ -1,6 +1,7 @@
 #pragma once
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
+#include <ATen/record_function.h>
 
 #include <intrinsic/ipex_intrinsic.h>
 #include <oneDNN/LRUCache.h>
@@ -23,6 +24,7 @@ static inline void eltwise(
     const at::Tensor& src,
     float alpha = 0,
     float beta = 0) {
+  RECORD_FUNCTION("dnnl_eltwise", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -142,6 +144,7 @@ static inline void eltwise_backward(
     const at::Tensor& diff_dst_,
     float alpha = 0,
     float beta = 0) {
+  RECORD_FUNCTION("dnnl_eltwise_backward", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();

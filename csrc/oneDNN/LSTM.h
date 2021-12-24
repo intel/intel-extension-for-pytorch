@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <ATen/record_function.h>
 
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
@@ -30,6 +31,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm_kernel_impl(
     double dropout_p,
     bool train,
     bool bidirectional) {
+  RECORD_FUNCTION("dnnl_lstm_kernel_impl", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -352,6 +354,7 @@ lstm_kernel_impl_bwd(
     double dropout_p,
     bool train,
     bool bidirectional) {
+  RECORD_FUNCTION("dnnl_lstm_kernel_impl_bwd", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

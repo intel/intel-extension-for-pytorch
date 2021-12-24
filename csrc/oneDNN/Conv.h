@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/core/grad_mode.h>
+#include <ATen/record_function.h>
 #include <core/MemoryFormat.h>
 
 #include <oneDNN/LRUCache.h>
@@ -191,6 +192,7 @@ static at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     ConvAttr attr) {
+  RECORD_FUNCTION("dnnl_convolution", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <ATen/record_function.h>
 
 #include <autograd/InferenceMode.h>
 #include <oneDNN/LRUCache.h>
@@ -71,6 +72,7 @@ static inline void matmul(
     const Tensor& m2,
     const Tensor& b,
     MatmulAttr attr) {
+  RECORD_FUNCTION("dnnl_matmul", {});
   size_t dims = dst.dim();
   TORCH_CHECK(
       dims == 2 || dims == 3,

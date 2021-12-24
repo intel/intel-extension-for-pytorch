@@ -165,6 +165,10 @@ if (USE_ONEMKL)
     endif()
 endif()
 
+if (USE_MICROBENCH)
+     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_MICROBENCH")
+endif()
+
 if (USE_ITT)
     find_package(ITT QUIET)
     if (ITT_FOUND)

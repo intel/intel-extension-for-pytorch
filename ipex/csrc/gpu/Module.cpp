@@ -15,6 +15,10 @@
 #include "Storage.h"
 #include "Stream.h"
 
+#ifdef USE_MICROBENCH
+#include <ATen/MicroBenchRegister.h>
+#endif
+
 #define ASSERT_TRUE(cmd) \
   if (!(cmd))            \
   return
@@ -338,7 +342,32 @@ static void bindGetDeviceProperties(PyObject* module) {
   });
 }
 
+at::Scalar scalar_slow(PyObject* object) {
+  // Zero-dim tensors are converted to Scalars as-is. Note this doesn't
+  // currently handle most NumPy scalar types except np.float64.
+  if (THPVariable_Check(object)) {
+    return ((THPVariable*)object)->cdata.item();
+  }
+
+  if (THPUtils_checkLong(object)) {
+    return at::Scalar(static_cast<int64_t>(THPUtils_unpackLong(object)));
+  }
+
+  if (PyBool_Check(object)) {
+    return at::Scalar(THPUtils_unpackBool(object));
+  }
+
+  if (PyComplex_Check(object)) {
+    return at::Scalar(THPUtils_unpackComplexDouble(object));
+  }
+  return at::Scalar(THPUtils_unpackDouble(object));
+}
+
 void init_module(pybind11::module& m) {
+#ifdef USE_MICROBENCH
+  MICRO_BENCH_REGISTER
+#endif
+
   m.def(
       "linear_relu",
       [](const at::Tensor& input,

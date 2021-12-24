@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <ATen/record_function.h>
 
 #include <ATen/AtenIpexTypeXPU.h>
 #include <oneDNN/Runtime.h>
@@ -20,6 +21,7 @@ static inline Tensor sum(
     Tensor& output,
     const std::vector<Tensor>& inputs,
     const std::vector<float>& scales) {
+  RECORD_FUNCTION("dnnl_sum", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
