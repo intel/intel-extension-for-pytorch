@@ -283,7 +283,6 @@ static at::Tensor convolution(
       _dilation,
       _padding,
       _padding);
-
   float src_scale;
   std::vector<float> wgh_scales, conv_scale = {1};
   primitive_attr pattr;
@@ -302,14 +301,17 @@ static at::Tensor convolution(
       }
     }
 
-    auto dst_scale = attr.oscale_;
-    src_scale = src.q_scale();
+    auto dst_scale = get_onednn_dtype(dst) == memory::data_type::u8
+        ? attr.oscale_ / 2
+        : attr.oscale_;
+    src_scale = get_onednn_dtype(src) == memory::data_type::u8
+        ? src.q_scale() / 2
+        : src.q_scale();
     conv_scale.clear();
     for (int i = 0; i < wgh_scales.size(); i++) {
       conv_scale.push_back(1.f / (dst_scale / (src_scale * wgh_scales[i])));
     }
-    conv_zero_point = static_cast<int>(dst.q_zero_point());
-
+    conv_zero_point = static_cast<int>(0);
     int mask_ac = 0;
     int mask_conv = wgh_scales.size() > 1 ? 1 << 1 : 0;
     pattr.set_output_scales(mask_conv, conv_scale);
@@ -461,8 +463,9 @@ static at::Tensor convolution(
   if (dst_usr_md != expected_dst_md) {
     if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
       auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-          dst.q_scale(),
-          dst.q_zero_point(),
+          get_onednn_dtype(dst) == memory::data_type::u8 ? dst.q_scale() / 2
+                                                         : dst.q_scale(),
+          0,
           typeMetaToScalarType(dst.options().dtype()));
       dst_ = empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
     } else {

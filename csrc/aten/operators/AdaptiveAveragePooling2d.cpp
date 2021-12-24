@@ -155,12 +155,8 @@ Tensor& adaptive_avg_pool2d_out(
 Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
   if (self.is_quantized()) {
-    output = _empty_affine_quantized(
-        {0},
-        self.options(),
-        self.q_scale(),
-        self.q_zero_point(),
-        MemoryFormat::Contiguous);
+    output = at::_empty_affine_quantized(
+        {0}, self.options(), self.q_scale(), self.q_zero_point());
   } else {
     output = at::empty({0}, self.options());
   }
@@ -172,12 +168,8 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
   if (self.is_quantized()) {
-    output = _empty_affine_quantized(
-        {0},
-        self.options(),
-        self.q_scale(),
-        self.q_zero_point(),
-        MemoryFormat::Contiguous);
+    output = at::_empty_affine_quantized(
+        {0}, self.options(), self.q_scale(), self.q_zero_point());
   } else {
     output = at::empty({0}, self.options());
   }
@@ -221,7 +213,7 @@ Tensor& adaptive_avg_pool2d_out(
 
 Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
-  output = _empty_affine_quantized(
+  output = at::_empty_affine_quantized(
       {0},
       self.options(),
       self.q_scale(),
@@ -233,7 +225,7 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   Tensor output;
-  output = _empty_affine_quantized(
+  output = at::_empty_affine_quantized(
       {0},
       self.options(),
       self.q_scale(),

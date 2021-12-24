@@ -249,7 +249,10 @@ Tensor empty(
     c10::optional<MemoryFormat> memory_format);
 Tensor _empty_affine_quantized(
     IntArrayRef size,
-    const TensorOptions& options,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory,
     double scale,
     int64_t zero_point,
     c10::optional<MemoryFormat> memory_format);
@@ -258,7 +261,10 @@ Tensor _empty_per_channel_affine_quantized(
     const Tensor& scales,
     const Tensor& zero_points,
     int64_t axis,
-    const TensorOptions& options,
+    c10::optional<ScalarType> dtype,
+    c10::optional<Layout> layout,
+    c10::optional<Device> device,
+    c10::optional<bool> pin_memory,
     c10::optional<MemoryFormat> memory_format);
 const Tensor& resize_(
     const Tensor& self,

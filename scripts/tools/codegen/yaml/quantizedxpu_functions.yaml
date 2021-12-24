@@ -30,11 +30,14 @@ supported:
   - q_scale
   - q_zero_point
   - qscheme
-#  - quantize_per_tensor	# different signature
-#  - quantized_max_pool2d	# different signature
+  - quantize_per_tensor
+  - quantized_max_pool2d
   - record_stream
   - resize_
 #  - set_quantizer_	# different schema
   - upsample_nearest2d
   - upsample_nearest2d.vec
   - view
+  - empty_quantized
+  - transpose_
+  - as_strided_

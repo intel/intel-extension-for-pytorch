@@ -111,7 +111,10 @@ Tensor quantize_tensor_per_tensor_affine(
 
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
-  std::vector<float> scls = {static_cast<float>(1.0f / scale)};
+  std::vector<float> scls = {
+      get_onednn_dtype(qtensor) == memory::data_type::u8
+          ? static_cast<float>(1.0f / (scale / 2))
+          : static_cast<float>(1.0f / scale)};
   std::vector<int> zps = {static_cast<int>(zero_point)};
 
   rattr.set_dst_sc_and_zp(mask, scls, mask, zps);
@@ -128,8 +131,10 @@ Tensor quantize_per_tensor(
   if (self.is_quantized()) {
     return self;
   }
-  auto quantizer =
-      dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
+      get_onednn_dtype(self) == memory::data_type::u8 ? scale / 2 : scale,
+      zero_point,
+      dtype);
   return quantizer->quantize(self);
 }
 
@@ -146,10 +151,16 @@ Tensor quantize_per_channel(
 
 Tensor _empty_affine_quantized(
     IntArrayRef size,
-    const TensorOptions& options_,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
     double scale,
     int64_t zero_point,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
+  TensorOptions options_ =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   TORCH_CHECK(
       !(options_.has_memory_format() && optional_memory_format.has_value()),
       "Cannot set memory_format both in TensorOptions and explicit argument; "
@@ -164,22 +175,6 @@ Tensor _empty_affine_quantized(
       options,
       dpcpp_make_per_tensor_affine_quantizer(
           scale, zero_point, typeMetaToScalarType(options.dtype())));
-}
-
-Tensor _empty_affine_quantized(
-    IntArrayRef size,
-    c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Layout> layout,
-    c10::optional<at::Device> device,
-    c10::optional<bool> pin_memory,
-    double scale,
-    int64_t zero_point,
-    c10::optional<c10::MemoryFormat> optional_memory_format) {
-  TensorOptions options =
-      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
-          pin_memory);
-  return _empty_affine_quantized(
-      size, options, scale, zero_point, optional_memory_format);
 }
 
 Tensor _empty_per_channel_affine_quantized(
@@ -218,12 +213,19 @@ Tensor _empty_per_channel_affine_quantized(
 
 namespace AtenIpexTypeQuantizedXPU {
 
+using namespace at::AtenIpexTypeXPU;
 Tensor _empty_affine_quantized(
     IntArrayRef size,
-    const TensorOptions& options_,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
     double scale,
     int64_t zero_point,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
+  TensorOptions options_ =
+      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
+          pin_memory);
   TORCH_CHECK(
       !(options_.has_memory_format() && optional_memory_format.has_value()),
       "Cannot set memory_format both in TensorOptions and explicit argument; "
@@ -240,20 +242,36 @@ Tensor _empty_affine_quantized(
           scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
-Tensor _empty_affine_quantized(
+Tensor _empty_per_channel_affine_quantized(
     IntArrayRef size,
+    const Tensor& scales,
+    const Tensor& zero_points,
+    int64_t axis,
     c10::optional<at::ScalarType> dtype,
     c10::optional<at::Layout> layout,
     c10::optional<at::Device> device,
     c10::optional<bool> pin_memory,
-    double scale,
-    int64_t zero_point,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
-  TensorOptions options =
+  TensorOptions options_ =
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
-  return _empty_affine_quantized(
-      size, options, scale, zero_point, optional_memory_format);
+  TORCH_CHECK(
+      !(options_.has_memory_format() && optional_memory_format.has_value()),
+      "Cannot set memory_format both in TensorOptions and explicit argument; "
+      "please delete "
+      "the redundant setter.");
+  auto options = options_.memory_format(optional_memory_format);
+  TORCH_CHECK(
+      options.has_dtype(),
+      "Must provide data type for Tensor creation functions.");
+  TORCH_CHECK(
+      options.dtype() == kQInt8 || options.dtype() == kQUInt8,
+      "Supported data type for tensor creation is int8 or uint8");
+  return AtenIpexTypeXPU::new_qtensor(
+      size,
+      options,
+      dpcpp_make_per_channel_affine_quantizer(
+          scales, zero_points, axis, typeMetaToScalarType(options.dtype())));
 }
 
 Tensor quantize_per_tensor(
@@ -264,8 +282,10 @@ Tensor quantize_per_tensor(
   if (self.is_quantized()) {
     return self;
   }
-  auto quantizer =
-      dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
+      get_onednn_dtype(self) == memory::data_type::u8 ? scale / 2 : scale,
+      zero_point,
+      dtype);
   return quantizer->quantize(self);
 }
 

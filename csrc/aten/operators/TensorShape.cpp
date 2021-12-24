@@ -44,7 +44,6 @@ Tensor unfold(
     int64_t step) {
   return at::native::unfold(self, dimension, size, step);
 }
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
@@ -58,6 +57,18 @@ Tensor as_strided(
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset) {
   return at::native::as_strided_qtensorimpl(self, size, stride, storage_offset);
+}
+
+const Tensor& as_strided_(
+    const Tensor& self,
+    IntArrayRef size,
+    IntArrayRef stride,
+    optional<int64_t> storage_offset_) {
+  return at::native::as_strided_(self, size, stride, storage_offset_);
+}
+
+Tensor& transpose_(Tensor& self, int64_t dim0, int64_t dim1) {
+  return at::native::transpose_(self, dim0, dim1);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

@@ -299,7 +299,7 @@ Tensor avg_pool2d(
     c10::optional<int64_t> divisor_override) {
   Tensor output;
   if (input.is_quantized()) {
-    output = _empty_affine_quantized(
+    output = at::_empty_affine_quantized(
         {0},
         input.options(),
         input.q_scale(),
