@@ -72,10 +72,10 @@ DPCPP_DEVICE static inline OutputIt exclusive_scan(
       for (auto i = 1; i <= ngroups; i++) {
         auto global_id = i * wgroup_size + local_id;
         auto prelast_id = i * wgroup_size - 1;
-        if (global_id >= N)
-          continue;
-        d_first[global_id] =
-            d_first[global_id] + d_first[prelast_id] + first[prelast_id];
+        if (global_id < N)
+          d_first[global_id] =
+              d_first[global_id] + d_first[prelast_id] + first[prelast_id];
+        DPCPP::group_barrier(item_id.get_group());
       }
     };
     __cgh.parallel_for(
