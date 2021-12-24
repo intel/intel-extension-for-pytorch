@@ -491,7 +491,6 @@ class THXPStorage_Bridge {
         (index >= 0) && (index < (self->nbytes() / sizeof(scalar_t))),
         2,
         "index out of bounds");
-    xpu::dpcpp::DPCPPStream stream = xpu::dpcpp::getCurrentDPCPPStream();
     dpcppMemcpy(
         self->data<scalar_t>() + index,
         &value,
@@ -505,7 +504,6 @@ class THXPStorage_Bridge {
         2,
         "index out of bounds");
     scalar_t value;
-    xpu::dpcpp::DPCPPStream stream = xpu::dpcpp::getCurrentDPCPPStream();
     dpcppMemcpy(
         &value,
         self->data<scalar_t>() + index,

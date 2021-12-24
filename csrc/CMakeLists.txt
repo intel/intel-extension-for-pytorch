@@ -55,7 +55,7 @@ set(IPEX_GPU_CORE_SRC
 
 # WARNING XXX: We assume that kernel codes only are contained in IPEX_ATEN_OPS_SRCS.
 # WARNING XXX: Therefore we only set sycl flags for these C++ files here.
-append_compile_flags(IPEX_ATEN_OPS_SRCS ${IPEX_SYCL_KERNEL_FLAGS})
+append_file_property(IPEX_ATEN_OPS_SRCS COMPILE_FLAGS ${IPEX_SYCL_KERNEL_FLAGS})
 
 if(BUILD_SEPARATE_OPS)
   set(IPEX_GPU_OP_LIBRARIES)
@@ -63,7 +63,7 @@ if(BUILD_SEPARATE_OPS)
       get_filename_component(obj ${op_src} NAME_WLE REALPATH)
       set(op_lib ipex_gpu_op_${obj})
       add_library(${op_lib} SHARED ${op_src})
-      set_target_properties(${op_lib} PROPERTIES LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
+      append_target_property(${op_lib} LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
       target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
       target_link_libraries(${op_lib} PUBLIC ${TORCH_LIBRARIES})
@@ -74,7 +74,7 @@ else()
 endif()
 
 add_library(ipex_gpu_core SHARED ${IPEX_GPU_CORE_SRC})
-set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
+append_target_property(ipex_gpu_core LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
 target_include_directories(ipex_gpu_core PUBLIC ${IPEX_INCLUDE_DIRS})
 target_link_directories(ipex_gpu_core PUBLIC ${SYCL_LIBRARY_DIR})
 
@@ -204,10 +204,10 @@ endif()
 
 target_compile_definitions(ipex_gpu_core PUBLIC ${IPEX_COMPILE_DEFINITIONS})
 if(BUILD_SEPARATE_OPS)
-  set_target_properties(ipex_gpu_core PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
+  append_target_property(ipex_gpu_core LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
   foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
       target_compile_definitions(${op_lib} PUBLIC ${IPEX_COMPILE_DEFINITIONS})
-      set_target_properties(${op_lib} PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
+      append_target_property(${op_lib} LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
   endforeach()
 endif()
 
