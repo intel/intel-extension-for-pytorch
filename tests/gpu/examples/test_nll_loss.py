@@ -36,7 +36,7 @@ class TestNNMethod(TestCase):
         print("SYCL: ", output.to("cpu"))
         print("SYCL: ", input_dpcpp.grad.to("cpu"))
         self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        self.assertEqual(input.grad, input_dpcpp.grad.cpu())
 
         # input is of size N x C x H x W = 3 x 5 x 2 x 2
         input = torch.randn(3, 5, 2, 2)
@@ -62,7 +62,7 @@ class TestNNMethod(TestCase):
         print("none SYCL grad: ", input_dpcpp.grad.to("cpu"))
 
         self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        self.assertEqual(input.grad, input_dpcpp.grad.cpu())
         input.grad.detach_()
         input.grad.zero_()
         input_dpcpp.grad.detach_()
@@ -81,7 +81,7 @@ class TestNNMethod(TestCase):
         print("sum SYCL grad: ", input_dpcpp.grad.to("cpu"))
 
         self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        self.assertEqual(input.grad, input_dpcpp.grad.cpu())
         input.grad.detach_()
         input.grad.zero_()
         input_dpcpp.grad.detach_()
@@ -98,7 +98,7 @@ class TestNNMethod(TestCase):
         print("mean SYCL grad: ", input_dpcpp.grad.to("cpu"))
 
         self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        self.assertEqual(input.grad, input_dpcpp.grad.cpu())
         input.grad.detach_()
         input.grad.zero_()
         input_dpcpp.grad.detach_()
