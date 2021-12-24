@@ -1406,9 +1406,11 @@ PyObject* THPStorage_postInitExtension(PyObject* module) {
   HANDLE_TH_ERRORS
 
   // Register Storage Python objects with DynamicTypes.cpp
-  THXPStorage_postInit<at::kHalf>(module);
-  THXPStorage_postInit<at::kInt>(module);
   THXPStorage_postInit<at::kBool>(module);
+  THXPStorage_postInit<at::kChar>(module);
+  THXPStorage_postInit<at::kHalf>(module);
+  THXPStorage_postInit<at::kShort>(module);
+  THXPStorage_postInit<at::kInt>(module);
   THXPStorage_postInit<at::kLong>(module);
   THXPStorage_postInit<at::kFloat>(module);
   THXPStorage_postInit<at::kDouble>(module);
@@ -1424,10 +1426,12 @@ PyObject* THPStorage_postInitExtension(PyObject* module) {
 
 PyObject* THPStorage_init(PyObject* module) {
   HANDLE_TH_ERRORS
+  ASSERT_TRUE(THXPStorage_init<at::kBool>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kChar>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kHalf>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kShort>(module));
   ASSERT_TRUE(THXPStorage_init<at::kInt>(module));
   ASSERT_TRUE(THXPStorage_init<at::kLong>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kHalf>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kBool>(module));
   ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
   ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
   ASSERT_TRUE(THXPStorage_init<at::kBFloat16>(module));

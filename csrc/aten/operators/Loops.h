@@ -11,6 +11,8 @@
 #include <runtime/Utils.h>
 #include "MemoryAccess.h"
 
+#define UNROLLED_ELEM_PER_WORK_ITEM 1
+
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -123,112 +125,108 @@ typename traits::ArgsTuple dereference(
   return dereference_impl<traits>(data, strides, i, Indices{});
 }
 
-// This is a workaround for the compute cpp's issue and limitation.
-// 1. The DPCPPAccessor cannot be put in container because there is no default
-// constructor in accessor.
-// 2. The DPCPPAccessor cannot be *new* because the dpcpp kernel doesn't accept
-// host pointer.
-// 3. The DPCPPAccessor cannot be in tuples because the dpcpp kernel doesn't
-// accept the std::tuple. (But also variance template class)
-// 4. The DPCPPAccessor cannot be passed to dpcpp kernel in array like:
-// DPCPPAccessor acc[1] = {DPCPPAccessor(cgh, vptr)}.
-//    Because of unknown compute cpp bug, the dpcpp kernel always got random
-//    data by passing DPCPPAccessor array.
-// To add the repeating accessor and pointer code pair in macro.
-#define CHR1(x, y) x##y
-#define CHR(x, y) CHR1(x, y)
+template <int vec_size, typename T>
+struct vectorized_args_tuple {};
 
-#define DEC_1 0
-#define DEC_2 1
-#define DEC_3 2
-#define DEC_4 3
-#define DEC_5 4
-#define DEC_6 5
-#define DEC_7 6
-#define DEC_8 7
-#define DEC_9 8
-#define DEC_10 9
-#define DEC_11 10
-#define DEC_12 11
-#define DEC_13 12
-#define DEC_14 13
-#define DEC_15 14
-#define DEC_16 15
-#define DEC_17 16
-#define DEC_18 17
-#define DEC_19 18
-#define DEC_20 19
-#define DEC_21 20
-#define DEC_22 21
-#define DEC_23 22
-#define DEC_24 23
-#define DEC_25 24
+template <int vec_size, typename... Args>
+struct vectorized_args_tuple<vec_size, std::tuple<Args...>> {
+  using vec_args_t = std::tuple<sycl::vec<
+      typename native::Memory::aligned_element<sizeof(Args)>::element_type,
+      vec_size>...>;
+};
 
-#define DEC_(n) DEC_##n
-#define DEC(n) DEC_(n)
+template <int vec_size, typename T>
+struct vectorized_return_type {
+  using vec_ret_t = sycl::vec<
+      typename native::Memory::aligned_element<sizeof(T)>::element_type,
+      vec_size>;
+};
 
-#define REPEAT_0(n, f) f(n)
-#define REPEAT_1(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_2(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_3(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_4(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_5(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_6(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_7(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_8(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_9(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_10(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_11(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_12(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_13(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_14(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_15(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_16(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_17(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_18(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_19(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_20(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_21(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_22(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_23(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_24(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
-#define REPEAT_25(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f) f(n)
+template <
+    int unroll_index,
+    typename Result,
+    class F,
+    class TupleVector,
+    typename policy_t,
+    std::size_t... I>
+constexpr void apply_fun_impl(
+    Result&& results,
+    F& f,
+    TupleVector& t,
+    const policy_t& policy,
+    std::index_sequence<I...>) {
+  using traits = function_traits<F>;
+  using result_t = std::decay_t<decltype(results[unroll_index])>;
+  if (policy.check_inbounds(unroll_index)) {
+    auto ret = std::__invoke(
+        std::forward<F>(f),
+        at::native::Memory::detail::bitwise_cast<
+            typename traits::template arg<I>::type>(
+            std::get<I>(std::forward<TupleVector>(t))[unroll_index])...);
 
-#define REPEAT_PATTERN(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f)
+    results[unroll_index] =
+        at::native::Memory::detail::bitwise_cast<result_t>(ret);
+  }
+}
 
-template <typename func_t, typename policy_t>
-inline void elementwise_kernel_helper(func_t f, policy_t policy) {
+template <int unroll_index>
+struct apply_func_helper {
+  template <
+      typename Result,
+      typename F,
+      typename TupleVector,
+      typename policy_t>
+  static void apply(
+      Result&& results,
+      F&& f,
+      TupleVector&& t,
+      policy_t&& policy) {
+    using Indices = std::make_index_sequence<
+        std::tuple_size<std::decay_t<TupleVector>>::value>;
+    apply_fun_impl<unroll_index>(
+        std::forward<Result>(results),
+        std::forward<F>(f),
+        std::forward<TupleVector>(t),
+        std::forward<policy_t>(policy),
+        Indices{});
+  }
+};
+
+template <int vec_size, typename func_t, typename policy_t>
+inline void elementwise_kernel_helper(func_t f, policy_t& policy) {
   using traits = function_traits<func_t>;
-  using return_t = typename traits::result_type;
   using args_t = typename traits::ArgsTuple;
+  using vectorized_args_t =
+      typename vectorized_args_tuple<vec_size, args_t>::vec_args_t;
+  using return_t = typename traits::result_type;
+  using vectorized_ret_t =
+      typename vectorized_return_type<vec_size, return_t>::vec_ret_t;
 
-  return_t results[THREAD_WORK_SIZE];
-  args_t args[THREAD_WORK_SIZE];
+  vectorized_ret_t results;
+  vectorized_args_t args;
 
   // load
-  policy.load(args);
+  policy.template load<args_t>(args);
 
-  // compute
-  for (int i = 0; i < THREAD_WORK_SIZE; i++) {
-    if (policy.check_inbounds(i)) {
-      results[i] = c10::guts::apply(f, args[i]);
-    }
-  }
+  // unroll the compute multiple times
+  native::Memory::detail::static_unroll<apply_func_helper, vec_size>::with_args(
+      results, f, args, policy);
 
   // store
-  policy.store(results);
+  policy.template store<return_t>(results);
 }
 
 template <
+    int vec_size,
     typename func_t,
     typename array_t,
     typename inp_calc_t,
     typename out_calc_t,
     typename loader_t,
     typename storer_t>
-void unrolled_elementwise_kernel(
+static inline void unrolled_elementwise_kernel(
     DPCPP::item<1> item_id,
-    int N,
+    int numel,
     func_t f,
     array_t data,
     inp_calc_t ic,
@@ -236,14 +234,16 @@ void unrolled_elementwise_kernel(
     loader_t l,
     storer_t s) {
   int thread_idx = item_id.get_linear_id();
-  int remaining = N - thread_idx * THREAD_WORK_SIZE;
+
+  int remaining = numel - thread_idx * vec_size;
   auto policy = at::native::Memory::policies::
-      unroll<array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
+      unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
           data, remaining, ic, oc, l, s, thread_idx);
-  elementwise_kernel_helper(f, policy);
+  elementwise_kernel_helper<vec_size>(f, policy);
 }
 
 template <
+    int vec_size,
     typename func_t,
     typename array_t,
     typename inp_calc_t,
@@ -259,108 +259,110 @@ static inline void launch_unrolled_kernel(
     loader_t l,
     storer_t s) {
   using traits = function_traits<func_t>;
-  using ret_t = typename traits::result_type;
-
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
+  using ret_t = typename traits::result_type;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int thread_num = (N + THREAD_WORK_SIZE - 1) / THREAD_WORK_SIZE;
+  int thread_num = (N + vec_size - 1) / vec_size;
 
-  auto cgf = DPCPP_Q_CGF(__cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      unrolled_elementwise_kernel(item_id, N, f, data, ic, oc, l, s);
+      unrolled_elementwise_kernel<vec_size>(item_id, N, f, data, ic, oc, l, s);
     };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
+    cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
-#if 1
 template <int vec_size, typename func_t, typename array_t>
 void vectorized_elementwise_kernel(
     DPCPP::item<1> item_id,
-    int N,
-    func_t f,
+    int numel,
+    const func_t& fn,
     array_t data) {
   using traits = function_traits<func_t>;
   int thread_idx = item_id.get_linear_id();
-  int remaining = N - vec_size * thread_idx;
+  int remaining = numel - vec_size * thread_idx;
 
-  if (remaining < vec_size) { // if this thread handles the reminder, just do a
+  if (remaining < vec_size) { // if this thread handles the remaining, just do a
                               // naive unrolled loop
     auto input_calc = TrivialOffsetCalculator<traits::arity>();
     auto output_calc = TrivialOffsetCalculator<1>();
     auto loader = at::native::Memory::LoadWithoutCast();
     auto storer = at::native::Memory::StoreWithoutCast();
     auto policy = at::native::Memory::policies::unroll<
+        vec_size,
         array_t,
         decltype(input_calc),
         decltype(output_calc),
         at::native::Memory::LoadWithoutCast,
         at::native::Memory::StoreWithoutCast>(
         data, remaining, input_calc, output_calc, loader, storer, thread_idx);
-    elementwise_kernel_helper(f, policy);
+    elementwise_kernel_helper<vec_size>(fn, policy);
   } else { // if this block has a full `block_work_size` data to handle, use
-           // vectorized memory access
-    elementwise_kernel_helper(
-        f,
-        at::native::Memory::policies::vectorized<vec_size, array_t>(
-            data, thread_idx));
+    // vectorized memory access
+    auto policy = at::native::Memory::policies::vectorized<vec_size, array_t>(
+        data, thread_idx);
+    elementwise_kernel_helper<vec_size>(fn, policy);
   }
 }
 
+// Assumption:
 // this function assume trivial 1d and no dynamic casting
 template <typename func_t, typename array_t>
 static inline void launch_vectorized_kernel(
     int64_t N,
-    const func_t& f,
+    const func_t& fn,
     array_t data) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int vec_size = at::native::Memory::can_vectorize_up_to<func_t>(data);
-  int thread_num = (N + vec_size - 1) / vec_size;
+  auto vec_size = at::native::Memory::can_vectorize_up_to<func_t>(
+      getDeviceIdOfCurrentQueue(), data);
+  auto thread_num = (N + vec_size - 1) / vec_size;
+
+#define VEC_LOOPS_KERNEL(vec_size)                                        \
+  {                                                                       \
+    auto cgf = DPCPP_Q_CGF(cgh) {                                         \
+      cgh.parallel_for(                                                   \
+          DPCPP::range<1>(thread_num), [=](DPCPP::item<1> itemId) {       \
+            vectorized_elementwise_kernel<vec_size>(itemId, N, fn, data); \
+          });                                                             \
+    };                                                                    \
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);                                     \
+  }
 
   switch (vec_size) {
+    case 16: {
+      VEC_LOOPS_KERNEL(16);
+      break;
+    }
+    case 8: {
+      VEC_LOOPS_KERNEL(8);
+      break;
+    }
     case 4: {
-      auto cgf = DPCPP_Q_CGF(__cgh) {
-        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-          vectorized_elementwise_kernel<4>(item_id, N, f, data);
-        };
-        __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+      VEC_LOOPS_KERNEL(4);
       break;
     }
     case 2: {
-      auto cgf = DPCPP_Q_CGF(__cgh) {
-        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-          vectorized_elementwise_kernel<2>(item_id, N, f, data);
-        };
-        __cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_num), kfn);
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+      VEC_LOOPS_KERNEL(2);
       break;
     }
     case 1: {
-      auto input_calc = TrivialOffsetCalculator<traits::arity>();
-      auto output_calc = TrivialOffsetCalculator<1>();
-      auto loader = at::native::Memory::LoadWithoutCast();
-      auto storer = at::native::Memory::StoreWithoutCast();
-      launch_unrolled_kernel(
-          N, f, data, input_calc, output_calc, loader, storer);
+      VEC_LOOPS_KERNEL(1);
       break;
     }
     default:
       TORCH_INTERNAL_ASSERT(false, "Unexpected vectorization size", vec_size);
   }
+
+#undef VEC_LOOPS_KERNEL
 }
 
-#endif
-
 template <typename func_t>
-void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
+void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
   using traits = function_traits<func_t>;
   constexpr int ntensors = traits::arity + 1;
 
@@ -387,7 +389,7 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
       auto output_offset_calculator = make_output_offset_calculator(iter);
       auto loader = at::native::Memory::LoadWithoutCast();
       auto storer = at::native::Memory::StoreWithoutCast();
-      launch_unrolled_kernel(
+      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
           numel,
           f,
           data,
@@ -408,7 +410,7 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
     if (contiguous) {
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
       auto output_offset_calculator = TrivialOffsetCalculator<1>();
-      launch_unrolled_kernel(
+      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
           numel,
           f,
           data,
@@ -420,7 +422,7 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
       auto input_offset_calculator =
           make_input_offset_calculator<traits::arity>(iter);
       auto output_offset_calculator = make_output_offset_calculator(iter);
-      launch_unrolled_kernel(
+      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
           numel,
           f,
           data,
@@ -449,7 +451,7 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
     return;
   }
 
-  new_dpcpp_loops_kernel_impl(iter, f);
+  dpcpp_loops_kernel(iter, f);
 }
 
 template <typename func_t>

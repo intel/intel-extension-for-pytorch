@@ -202,6 +202,14 @@ def stream(stream):
 from torch.storage import _StorageBase
 
 
+class ShortStorage(ipex._C.ShortStorageBase, _StorageBase):
+    pass
+
+
+class CharStorage(ipex._C.CharStorageBase, _StorageBase):
+    pass
+
+
 class IntStorage(ipex._C.IntStorageBase, _StorageBase):
     pass
 
@@ -230,6 +238,8 @@ class BFloat16Storage(ipex._C.BFloat16StorageBase, _StorageBase):
     pass
 
 
+torch._storage_classes.add(ShortStorage)
+torch._storage_classes.add(CharStorage)
 torch._storage_classes.add(IntStorage)
 torch._storage_classes.add(LongStorage)
 torch._storage_classes.add(BoolStorage)
