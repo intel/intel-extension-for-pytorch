@@ -19,8 +19,8 @@ class TestTensorMethod(TestCase):
 
         print("x_cpu", x_cpu)
 
-        x_dpcpp.put_(torch.tensor([1, 3]), torch.tensor(
-            [9, 10], dtype=torch.int32))
+        x_dpcpp.put_(torch.tensor([1, 3]).to(dpcpp_device), torch.tensor(
+            [9, 10], dtype=torch.int32).to(dpcpp_device))
 
         print("x_dpcpp", x_dpcpp.cpu())
         self.assertEqual(x_cpu, x_dpcpp.cpu())
@@ -30,8 +30,8 @@ class TestTensorMethod(TestCase):
 
         print("x_cpu", x_cpu)
 
-        x_dpcpp.put_(torch.tensor([1, 1]), torch.tensor(
-            [9, 10], dtype=torch.int32), accumulate=True)
+        x_dpcpp.put_(torch.tensor([1, 1]).to(dpcpp_device), torch.tensor(
+            [9, 10], dtype=torch.int32).to(dpcpp_device), accumulate=True)
 
         print("x_dpcpp", x_dpcpp.cpu())
         self.assertEqual(x_cpu, x_dpcpp.cpu())
