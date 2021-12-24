@@ -1403,9 +1403,9 @@ Tensor cholesky(const Tensor& self, bool upper) {
   native::squareCheckInputs(self);
   auto raw_cholesky_output = at::AtenIpexTypeXPU::_cholesky_helper(self, upper);
   if (upper) {
-    return raw_cholesky_output.tril_();
+    return raw_cholesky_output.contiguous().triu_();
   } else {
-    return raw_cholesky_output.triu_();
+    return raw_cholesky_output.contiguous().tril_();
   }
 }
 
