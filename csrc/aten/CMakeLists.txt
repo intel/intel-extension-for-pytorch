@@ -1,29 +1,39 @@
-FILE(GLOB aten_functions_src "operators/*.cpp")
+FILE(GLOB aten_ops_src "operators/*.cpp")
 
 # Reset the order of src files to compile slow files first
-list(APPEND aten_slow_src
-  LogicalXor.cpp
-  TopK.cpp
-  UnaryOps_1.cpp
-  UnaryOps_2.cpp
-  UnaryOps_3.cpp
-  UnaryOps_4.cpp)
-foreach (sfile ${aten_functions_src})
-  set(find_in_slow_list FALSE)
-  foreach (ssrc ${aten_slow_src})
-    string(FIND ${sfile} ${ssrc} pos)
-    if (${pos} GREATER -1)
-      set(find_in_slow_list TRUE)
-      list(APPEND _SLOW_SRCS ${sfile})
-      break()
+list(APPEND slow_patterns
+  Copy
+  UnaryOps
+  BinaryOps
+  TopK
+  Reduce
+  Unique
+  Sort
+  Indexing
+  Pow
+  Loss
+  Activation
+  MathCompare
+  )
+
+set(slow_srcs)
+foreach (fn_pattern ${slow_patterns})
+  foreach (sfile ${aten_ops_src})
+    string(REGEX MATCHALL "${fn_pattern}[_a-zA-Z0-9]*\.cpp$" FN_LIST ${sfile})
+    if (FN_LIST)
+      list(APPEND slow_srcs ${sfile})
     endif()
   endforeach()
-  if (NOT find_in_slow_list)
-    list(APPEND _FAST_SRCS ${sfile})
+endforeach()
+
+set(fast_srcs)
+foreach(sfile ${aten_ops_src})
+  if (NOT ${sfile} IN_LIST slow_srcs)
+    list(APPEND fast_srcs ${sfile})
   endif()
 endforeach()
-list(APPEND aten_ops_src ${_SLOW_SRCS} ${_FAST_SRCS})
-set(IPEX_ATEN_OPS_SRCS ${aten_ops_src} PARENT_SCOPE)
+
+set(IPEX_ATEN_OPS_SRCS ${slow_srcs} ${fast_srcs} PARENT_SCOPE)
 
 # Add oneDNN runtime src here to avoid adding
 # any unexpected kernel src in oneDNN folder
