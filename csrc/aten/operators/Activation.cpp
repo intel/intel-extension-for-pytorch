@@ -202,7 +202,7 @@ void inline prelu_kernel_share_weights(
     const Tensor& weight) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = input.numel();
-  auto weight_val = weight.data_ptr<scalar_t>()[0];
+  auto weight_val = weight.data_ptr<scalar_t>();
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = input.data_ptr<scalar_t>();
@@ -214,7 +214,7 @@ void inline prelu_kernel_share_weights(
           auto id = itemId.get_id(0);
           out_ptr[id] = (in_ptr[id] >= 0)
               ? in_ptr[id]
-              : weight_val * static_cast<scalar_t>(in_ptr[id]);
+              : (*weight_val) * static_cast<scalar_t>(in_ptr[id]);
         });
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
@@ -262,7 +262,7 @@ void inline prelu_backward_kernel_share_weights(
     Tensor& weight_grad_collector) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto total_threads = input_grad.numel();
-  auto weight_val = weight.data_ptr<scalar_t>()[0];
+  auto weight_val = weight.data_ptr<scalar_t>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_grad_data = input_grad.data_ptr<scalar_t>();
@@ -281,7 +281,7 @@ void inline prelu_backward_kernel_share_weights(
 
           in_grad_ptr[id] = (in_ptr[id] > 0)
               ? grad_out_ptr[id]
-              : weight_val * static_cast<scalar_t>(grad_out_ptr[id]);
+              : (*weight_val) * static_cast<scalar_t>(grad_out_ptr[id]);
           weight_grad_collector_ptr[id] = (in_ptr[id] > 0)
               ? scalar_t(0)
               : static_cast<scalar_t>(in_ptr[id]) *

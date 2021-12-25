@@ -3,7 +3,7 @@ import torch.nn.functional
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
-
+import copy
 import pytest
 
 
@@ -85,12 +85,13 @@ class TestNNMethod(TestCase):
     def test_activation_rrelu(self, dtype=torch.float):
         #  Will not check the result due to different random seeds on cpu and xpu
         RReLU = torch.nn.RReLU(0.1, 0.3)
+        RReLU_dpcpp = copy.deepcopy(RReLU).to("xpu")
         x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = RReLU(x_cpu)
-        y_dpcpp = RReLU(x_dpcpp)
+        y_dpcpp = RReLU_dpcpp(x_dpcpp)
         print("cpu rrelu ", y_cpu)
         print("dpcpp rrelu ", y_dpcpp.cpu())
         #  self.assertEqual(y_cpu, y_dpcpp.cpu())
@@ -104,12 +105,13 @@ class TestNNMethod(TestCase):
 
     def test_activation_gelu(self, dtype=torch.float):
         GELU = torch.nn.GELU()
+        GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
         x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = GELU(x_cpu)
-        y_dpcpp = GELU(x_dpcpp)
+        y_dpcpp = GELU_dpcpp(x_dpcpp)
         print("cpu gelu ", y_cpu)
         print("dpcpp gelu ", y_dpcpp.cpu())
         self.assertEqual(y_cpu, y_dpcpp.cpu())
@@ -125,12 +127,13 @@ class TestNNMethod(TestCase):
 
     def test_activation_prelu(self, dtype=torch.float):
         PReLU = torch.nn.PReLU()
+        PReLU_dpcpp = copy.deepcopy(PReLU).to("xpu")
         x_cpu = torch.tensor([[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = PReLU(x_cpu)
-        y_dpcpp = PReLU(x_dpcpp)
+        y_dpcpp = PReLU_dpcpp(x_dpcpp)
         print("cpu prelu ", y_cpu)
         print("dpcpp prelu ", y_dpcpp.cpu())
         self.assertEqual(y_cpu, y_dpcpp.cpu())
