@@ -342,7 +342,7 @@ at::Scalar scalar_slow(PyObject* object) {
   // Zero-dim tensors are converted to Scalars as-is. Note this doesn't
   // currently handle most NumPy scalar types except np.float64.
   if (THPVariable_Check(object)) {
-    return ((THPVariable*)object)->cdata.item();
+    return ((THPVariable*)object)->cdata->item();
   }
 
   if (THPUtils_checkLong(object)) {
