@@ -34,6 +34,7 @@
 #include <ATen/Config.h>
 #include <ATen/core/op_registration/adaption.h>
 #include <torch/library.h>
+#include <intrinsic/ipex_intrinsic.h>
 $extra_cuda_headers
 $external_backend_headers
 $namespaced_headers
