@@ -111,7 +111,7 @@ Tensor& logspace_dpcpp_out(
   } else if (steps == 1) {
     r.fill_(Numerics<double>::pow(base, start.to<double>()));
   } else if (isIntegralType(r.scalar_type(), /*includeBool=*/false)) {
-    AT_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "logspace_dpcpp", [&]() {
+    IPEX_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "logspace_dpcpp", [&]() {
       float scalar_base =
           static_cast<float>(base); // Use float to avoid promotion to double
       scalar_t scalar_start = start.to<scalar_t>();
@@ -136,7 +136,7 @@ Tensor& logspace_dpcpp_out(
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     });
   } else {
-    AT_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         r.scalar_type(),

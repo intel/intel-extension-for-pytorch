@@ -109,7 +109,7 @@ Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
           Max<int64_t>(in_tensor.size(i + 1), 1) * stride_contiguous_v[i + 1];
   }
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, in_tensor.scalar_type(), "flip_dpcpp", [&] {
         flip_dpcpp_kernel<scalar_t>(
             in_tensor,

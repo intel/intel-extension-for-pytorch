@@ -19,7 +19,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   if (isFloatingType(iter.dtype())) {
-    AT_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         iter.dtype(),
@@ -63,7 +63,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
         },
         random_func);
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
-    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "random_kernel_int", [&] {
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "random_kernel_int", [&] {
       if (std::is_same<scalar_t, int64_t>::value) {
         auto random_func = [](uint64_t rand) {
           return transformation::uniform_int<scalar_t>(rand);
@@ -103,7 +103,7 @@ void random_from_to_kernel(
     c10::optional<RNG> gen_) {
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Bool,
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -152,7 +152,7 @@ void random_full_64_bits_range_kernel(
     c10::optional<RNG> gen_) {
   auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       iter.dtype(),
       "random_full_64_bits_range_kernel",

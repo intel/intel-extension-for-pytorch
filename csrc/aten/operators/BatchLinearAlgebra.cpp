@@ -823,7 +823,7 @@ Tensor _lu_solve_helper(
   if (self.numel() == 0 || LU_data.numel() == 0) {
     return at::zeros_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_solve_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_solve_dpcpp", [&] {
     impl::apply_lu_solve_dpcpp_<scalar_t>(
         self_working_copy, LU_data_working_copy, LU_pivots_working_copy, infos);
   });
@@ -896,7 +896,7 @@ std::tuple<Tensor, Tensor> _solve_helper(const Tensor& self, const Tensor& A) {
   auto pivots_tensor = at::empty(req_size, A.options().dtype(kLong));
   std::vector<int64_t> infos(native::batchCount(self), 0);
 
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "solve_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "solve_dpcpp", [&] {
     impl::apply_lu_dpcpp_<scalar_t>(A_working_copy, pivots_tensor, infos);
     impl::apply_lu_solve_dpcpp_<scalar_t>(
         self_working_copy, A_working_copy, pivots_tensor, infos);
@@ -941,7 +941,7 @@ std::tuple<Tensor&, Tensor&> solve_out(
 Tensor _inverse_helper(const Tensor& self) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "inverse_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "inverse_dpcpp", [&] {
     impl::apply_inverse_dpcpp_<scalar_t>(self_working_copy, infos);
   });
   if (self.dim() > 2) {
@@ -1000,7 +1000,7 @@ std::tuple<Tensor, Tensor> _qr_helper(const Tensor& self, bool some) {
   q_working_copy = at::empty_strided(q_sizes, q_strides, self.options());
   q_working_copy.narrow(-1, 0, n).copy_(self);
 
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "qr_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "qr_dpcpp", [&] {
     impl::apply_geqrf_dpcpp_<scalar_t>(
         q_working_copy, tau_working_copy, m, n, infos);
   });
@@ -1014,7 +1014,7 @@ std::tuple<Tensor, Tensor> _qr_helper(const Tensor& self, bool some) {
           .contiguous()
           .triu();
 
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "qr_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "qr_dpcpp", [&] {
     impl::apply_orgqr_dpcpp_<scalar_t>(
         q_working_copy,
         tau_working_copy,
@@ -1073,7 +1073,7 @@ std::tuple<Tensor, Tensor> geqrf(const Tensor& self) {
   req_size[self.dim() - 2] = std::min(m, n);
   Tensor tau_working_copy = at::empty(req_size, self.options());
 
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "geqrf_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "geqrf_dpcpp", [&] {
     impl::apply_geqrf_dpcpp_<scalar_t>(
         self_working_copy, tau_working_copy, m, n, infos);
   });
@@ -1106,7 +1106,7 @@ Tensor orgqr(const Tensor& self, const Tensor& input2) {
   int64_t m = self.size(-2), n_columns_q = self.size(-1), n = input2.size(-1);
   auto q_working_copy = native::cloneBatchedColumnMajor(self);
 
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "orgqr_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "orgqr_dpcpp", [&] {
     impl::apply_orgqr_dpcpp_<scalar_t>(
         q_working_copy, input2, m, n_columns_q, std::min(m, n), infos);
   });
@@ -1135,7 +1135,7 @@ Tensor ormqr(
   // int64_t m = self.size(-2), n = self.size(-1), k = input2.size(-1);
   int64_t m = input3.size(0), n = input3.size(1), k = input2.size(-1);
   auto c_working_copy = native::cloneBatchedColumnMajor(input3);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "ormqr_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "ormqr_dpcpp", [&] {
     impl::apply_ormqr_dpcpp_<scalar_t>(
         self,
         input2,
@@ -1182,7 +1182,7 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
 
   if (self.numel() > 0) {
     auto self_working_copy = native::cloneBatchedColumnMajor(self);
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "svd_xpu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "svd_xpu", [&] {
       impl::apply_svd<scalar_t>(
           self_working_copy,
           U_working_copy,
@@ -1260,7 +1260,7 @@ std::tuple<Tensor, Tensor> _symeig_helper(
   }
 
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "symeig", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "symeig", [&] {
     impl::apply_symeig<scalar_t>(
         self_working_copy, eigvals, eigenvectors, upper, infos);
   });
@@ -1285,7 +1285,7 @@ std::tuple<Tensor, Tensor> _triangular_solve_helper(
     bool unitriangular) {
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
   auto A_working_copy = native::cloneBatchedColumnMajor(A);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "triangular_solve_cpu", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "triangular_solve_cpu", [&] {
     impl::apply_triangular_solve<scalar_t>(
         self_working_copy, A_working_copy, upper, transpose, unitriangular);
   });
@@ -1339,7 +1339,7 @@ Tensor _cholesky_solve_helper(
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
   auto input2_working_copy = native::cloneBatchedColumnMajor(input2);
   std::vector<int64_t> infos(native::batchCount(self), 0);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_solve_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_solve_dpcpp", [&] {
     impl::apply_cholesky_solve_dpcpp_<scalar_t>(
         self_working_copy, input2_working_copy, upper, infos);
   });
@@ -1383,7 +1383,7 @@ Tensor& cholesky_solve_out(
 Tensor _cholesky_helper(const Tensor& self, bool upper) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_dpcpp", [&] {
     impl::apply_cholesky_dpcpp<scalar_t>(self_working_copy, upper, infos);
   });
   if (self.dim() > 2) {
