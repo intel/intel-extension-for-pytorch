@@ -95,7 +95,7 @@ function (print_configuration_summary)
     message(STATUS "  ONEMKL include        : ${ONEMKL_INCLUDE_DIR}")
   endif(USE_ONEMKL)
 
-    message(STATUS "  USE_MICROBENCH  : ${USE_MICROBENCH}")
+    message(STATUS "  USE_MICROBENCH        : ${USE_MICROBENCH}")
     message(STATUS "  USE_CHANNELS_LAST_1D  : ${USE_CHANNELS_LAST_1D}")
 
     message(STATUS "  USE_LEVEL_ZERO_ONLY   : ${USE_LEVEL_ZERO_ONLY}")

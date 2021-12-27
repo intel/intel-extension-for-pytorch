@@ -5,6 +5,7 @@
 #
 # USE_ONEDPL            - to use oneDPL in operators
 # USE_ONEMKL            - to use oneMKL in operators
+# USE_MICROBENCH        - to build with Microbench
 # USE_CHANNELS_LAST_1D  - to use channels last 1d feature
 # USE_LEVEL_ZERO_ONLY   - to enumerate devices only with Level Zero
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
@@ -89,9 +90,11 @@ def get_git_head_sha(base_dir):
         ['git', 'rev-parse', '--short', 'HEAD'], cwd=base_dir).decode('ascii').strip()
     return git_sha
 
+
 def get_submodule_commit(base_dir, submodule_dir):
     return subprocess.check_output(
         ['git', 'submodule', 'status', submodule_dir], cwd=base_dir).decode('ascii').strip().split()[0]
+
 
 def check_flake8_errors(base_dir, filepath):
     if shutil.which('flake8') is None:

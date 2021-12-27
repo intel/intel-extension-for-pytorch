@@ -128,6 +128,12 @@ if (USE_CHANNELS_LAST_1D)
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_CHANNELS_LAST_1D")
 endif()
 
+if (USE_MICROBENCH)
+    # Enforce to re-generate the operator registration files.
+    file(REMOVE_RECURSE ${IPEX_GPU_ATEN_GENERATED})
+    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_MICROBENCH")
+endif()
+
 if(USE_ONEDPL)
     find_package(oneDPL)
     target_link_libraries(ipex_gpu_core PUBLIC oneDPL)
@@ -163,10 +169,6 @@ if (USE_ONEMKL)
         set(USE_ONEMKL OFF PARENT_SCOPE)
         message(WARNING "WARNING: Cannot find oneMKL! Continue to build without oneMKL!")
     endif()
-endif()
-
-if (USE_MICROBENCH)
-     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_MICROBENCH")
 endif()
 
 if (USE_ITT)
