@@ -15,6 +15,7 @@
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_ITT               - to Use Intel(R) VTune Profiler ITT functionality
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
+# BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_NO_L0_ONEDNN    - to build oneDNN without LevelZero support
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
@@ -223,6 +224,8 @@ class DPCPPBuild(BuildExtension, object):
         if not os.path.exists(ext.build_dir):
             os.mkdir(ext.build_dir)
         cmake = CMake(ext.build_dir)
+
+        sequential_build = False
         if not os.path.isfile(cmake._cmake_cache_file):
             build_type = 'Release'
 
@@ -267,6 +270,8 @@ class DPCPPBuild(BuildExtension, object):
             my_env = os.environ.copy()
             for var, val in my_env.items():
                 if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
+                    if var == 'BUILD_STATS' and val.upper() not in ['OFF', 'NO', '0']:
+                        sequential_build = True
                     if var == 'CMAKE_PREFIX_PATH':
                         # Do NOT overwrite this path. Append into the list, instead.
                         build_options[var] += ';' + val
@@ -290,7 +295,12 @@ class DPCPPBuild(BuildExtension, object):
             check_call(command, cwd=ext.build_dir, env=env)
 
         env = os.environ.copy()
-        build_args = ['-j', str(os.cpu_count()), 'install']
+
+        build_nproc = str(os.cpu_count())
+        if sequential_build:
+            build_nproc = '1'
+            print("WARNING: Practice as sequential build with single process !")
+        build_args = ['-j', build_nproc, 'install']
         # build_args += ['VERBOSE=1']
 
         gen_exec = 'make'
