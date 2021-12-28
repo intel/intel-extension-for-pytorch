@@ -112,26 +112,18 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
         numel * iter.element_size(0),
         DeviceToDevice);
   } else {
-    ScalarType dtype = iter.dtype(0);
-    if (!isQIntType(dtype)) {
-      IPEX_DISPATCH_ALL_TYPES_AND3(
-          kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
-            using src_t = scalar_t;
-            IPEX_DISPATCH_ALL_TYPES_AND3(
-                kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
-                  dpcpp_kernel_for_tensor_iter(
-                      iter, [=](src_t src_val) -> scalar_t {
-                        return static_cast<scalar_t>(src_val);
-                      });
-                });
-          });
-    } else {
-      IPEX_DISPATCH_QINT_TYPES(iter.dtype(1), "copy_", [&] {
-        using src_t = scalar_t;
-        dpcpp_kernel_for_tensor_iter(iter, [=](src_t src_val) -> scalar_t {
-          return static_cast<scalar_t>(src_val);
-        });
+    auto dtype = iter.dtype(0);
+    if (isQIntType(dtype)) {
+      IPEX_DISPATCH_QINT_TYPES(dtype, "copy_", [&] {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t src_val) { return src_val; });
       });
+    } else {
+      IPEX_DISPATCH_ALL_TYPES_AND3(
+          kBool, kHalf, kBFloat16, dtype, "copy_", [&] {
+            dpcpp_kernel_for_tensor_iter(
+                iter, [=](scalar_t src_val) { return src_val; });
+          });
     }
   }
 

@@ -16,15 +16,15 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 void logical_not_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kBool, kHalf, iter.dtype(1), "logical_not_dpcpp", [&]() {
-        using self_t = scalar_t;
-        IPEX_DISPATCH_ALL_TYPES_AND2(
-            kBool, kHalf, iter.dtype(0), "logical_not_dpcpp", [&]() {
-              dpcpp_kernel_for_tensor_iter(iter, [](self_t a) -> scalar_t {
-                return static_cast<scalar_t>(!a);
-              });
-            });
+  // NOTE: We should not dispatch on types which aren't in below
+  // ALL_TYPES_AND... Therefore, we add the check here.
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      kBool, kHalf, kBFloat16, iter.dtype(0), "logical_not_dpcpp", [&]() {});
+
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      kBool, kHalf, kBFloat16, iter.dtype(1), "logical_not_dpcpp", [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> bool { return !a; });
       });
 }
 
