@@ -111,14 +111,62 @@ Tensor quantize_tensor_per_tensor_affine(
 
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
-  std::vector<float> scls = {
-      get_onednn_dtype(qtensor) == memory::data_type::u8
-          ? static_cast<float>(1.0f / (scale / 2))
-          : static_cast<float>(1.0f / scale)};
-  std::vector<int> zps = {static_cast<int>(zero_point)};
+  std::vector<float> scls = {static_cast<float>(1.0f / scale)};
+  std::vector<int> zps = {static_cast<int>(0)};
 
   rattr.set_dst_sc_and_zp(mask, scls, mask, zps);
-  xpu::oneDNN::reorder(rtensor, qtensor, rattr);
+  if (qtensor.scalar_type() == kQUInt8 && zero_point == 128) {
+    Tensor qtensor_opt = qtensor;
+    memory::dims q_dims = rtensor.dim() == 5
+        ? memory::dims(
+              {rtensor.size(0),
+               rtensor.size(1),
+               rtensor.size(2),
+               rtensor.size(3),
+               rtensor.size(4)})
+        : rtensor.dim() == 4 ? memory::dims(
+                                   {rtensor.size(0),
+                                    rtensor.size(1),
+                                    rtensor.size(2),
+                                    rtensor.size(3)})
+                             : rtensor.dim() == 2
+                ? memory::dims({rtensor.size(0), rtensor.size(1)})
+                : memory::dims({rtensor.size(0)});
+    memory::format_tag q_fmt = rtensor.dim() == 5
+        ? memory::format_tag::ncdhw
+        : rtensor.dim() == 4 ? memory::format_tag::nchw
+                             : rtensor.dim() == 2 ? memory::format_tag::nc
+                                                  : memory::format_tag::x;
+
+    // We will force to specify s8 as quantization data type to meet the
+    // requirement of pytorch calibration with unified data type.
+    memory::data_type q_dt =
+        (qtensor.scalar_type() == kQUInt8 && zero_point == 128)
+        ? memory::data_type::s8
+        : get_onednn_dtype(qtensor);
+    memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
+    auto q_type = (qtensor.scalar_type() == kQUInt8 && zero_point == 128)
+        ? kQInt8
+        : qtensor.scalar_type();
+    auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
+        scale,
+        0,
+        (get_onednn_dtype(qtensor) == memory::data_type::u8 &&
+         zero_point == 128)
+            ? kQInt8
+            : q_type);
+    qtensor_opt =
+        AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
+
+    xpu::oneDNN::reorder(rtensor, qtensor_opt, rattr);
+    auto q_opt_ctx =
+        at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(
+            qtensor_opt);
+    at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(
+        qtensor, std::move(q_opt_ctx));
+  } else {
+    xpu::oneDNN::reorder(rtensor, qtensor, rattr);
+  }
 
   return qtensor;
 }
@@ -131,10 +179,8 @@ Tensor quantize_per_tensor(
   if (self.is_quantized()) {
     return self;
   }
-  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-      get_onednn_dtype(self) == memory::data_type::u8 ? scale / 2 : scale,
-      zero_point,
-      dtype);
+  auto quantizer =
+      dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, dtype);
   return quantizer->quantize(self);
 }
 
@@ -174,7 +220,7 @@ Tensor _empty_affine_quantized(
       size,
       options,
       dpcpp_make_per_tensor_affine_quantizer(
-          scale, zero_point, typeMetaToScalarType(options.dtype())));
+          scale, 0, typeMetaToScalarType(options.dtype())));
 }
 
 Tensor _empty_per_channel_affine_quantized(
@@ -282,10 +328,7 @@ Tensor quantize_per_tensor(
   if (self.is_quantized()) {
     return self;
   }
-  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-      get_onednn_dtype(self) == memory::data_type::u8 ? scale / 2 : scale,
-      zero_point,
-      dtype);
+  auto quantizer = dpcpp_make_per_tensor_affine_quantizer(scale, 0, dtype);
   return quantizer->quantize(self);
 }
 

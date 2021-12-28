@@ -213,8 +213,9 @@ static at::Tensor convolution(
 
     dst = at::empty(dst_tz, dst_opt);
   }
-
-  auto src_data_t = get_onednn_dtype(src);
+  auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
+  auto src_data_t =
+      src_ctx.is_plain() ? get_onednn_dtype(src) : src_ctx.meta().data_type();
   auto wei_usr_data_t = get_onednn_dtype(wgh);
   auto wei_data_t =
       src.is_quantized() ? memory::data_type::s8 : get_onednn_dtype(wgh);
@@ -301,10 +302,12 @@ static at::Tensor convolution(
       }
     }
 
-    auto dst_scale = get_onednn_dtype(dst) == memory::data_type::u8
+    auto dst_scale = (get_onednn_dtype(dst) == memory::data_type::u8 &&
+                      dst.q_zero_point() == 128)
         ? attr.oscale_ / 2
         : attr.oscale_;
-    src_scale = get_onednn_dtype(src) == memory::data_type::u8
+    src_scale =
+        (src_data_t == memory::data_type::u8 && src.q_zero_point() == 128)
         ? src.q_scale() / 2
         : src.q_scale();
     conv_scale.clear();
@@ -457,14 +460,15 @@ static at::Tensor convolution(
       DPCPPTensorContext::set_tensor_ctx(wgh, std::move(wgh_opt_ctx));
     }
   }
-
   auto expected_dst_md = conv_forward_pd.dst_desc();
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
     if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
       auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-          get_onednn_dtype(dst) == memory::data_type::u8 ? dst.q_scale() / 2
-                                                         : dst.q_scale(),
+          (get_onednn_dtype(dst) == memory::data_type::u8 &&
+           dst.q_zero_point() == 128)
+              ? dst.q_scale() / 2
+              : dst.q_scale(),
           0,
           typeMetaToScalarType(dst.options().dtype()));
       dst_ = empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);

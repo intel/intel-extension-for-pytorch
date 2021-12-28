@@ -29,9 +29,14 @@ Tensor dequantize_tensor_per_tensor_affine(
     int64_t zero_point) {
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
-  std::vector<float> scls = {static_cast<float>(
-      get_onednn_dtype(qtensor) == memory::data_type::u8 ? scale / 2 : scale)};
-  std::vector<int> zps = {static_cast<int>(zero_point)};
+  auto q_ctx = DPCPPTensorContext::get_tensor_ctx(qtensor);
+  std::vector<float> scls = {
+      ((q_ctx.is_plain() ? get_onednn_dtype(qtensor)
+                         : q_ctx.meta().data_type()) == memory::data_type::u8 &&
+       qtensor.q_zero_point() == 128)
+          ? static_cast<float>(scale / 2)
+          : static_cast<float>(scale)};
+  std::vector<int> zps = {static_cast<int>(0)};
   rattr.set_src_sc_and_zp(mask, scls, mask, zps);
 
   Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
