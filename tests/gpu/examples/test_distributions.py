@@ -122,7 +122,7 @@ class TestDistributions(TestCase):
         self.assertEqual(s.size(), expected_shape)
 
         def apply_fn(s, *params):
-            return dist_ctor(*params).log_prob(s)
+            return dist_ctor(*params, validate_args=False).log_prob(s)
 
         gradcheck(apply_fn, (s,) + tuple(ctor_params), raise_exception=True)
         torch.set_default_dtype(dtype_origin)
