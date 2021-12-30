@@ -7,8 +7,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 
-#include "BitonicSort.h"
-#include "MergeSort.h"
+#include "BitonicMergeSort.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -37,51 +36,50 @@ std::tuple<Tensor&, Tensor&> sort_out(
 
   // How large are the slices that we are sorting?
   int64_t sliceSize = input.dim() == 0 ? 1 : input.size(dim);
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
-  int maxSliceSize = local_size * 2;
-  if (sliceSize <= maxSliceSize) { // inplace sort
-    // Fill `indices` (the values) with the
-    // slice-relative index.
-    at::AtenIpexTypeXPU::fill_slice_with_index(indices, dim);
 
-    // We sort k/v pairs in-place; copy unsorted input to output
-    sorted.copy_(input);
+  at::AtenIpexTypeXPU::fill_slice_with_index(indices, dim);
 
-    // Sort using our in-place k/v kernel that supports arbitrary
-    // layout
+  int64_t prb_size = sorted.size(dim);
+  int64_t stride = sorted.stride(dim);
+  int64_t batch_size = sorted.numel() / prb_size / stride;
+
+  sorted.copy_(input);
+
+  if (!order) {
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         sorted.scalar_type(),
-        "SortKeyValueInplace",
-        [&]() { SortKeyValueInplace<scalar_t>(sorted, indices, dim, order); });
-  } else {
-    at::AtenIpexTypeXPU::fill_slice_with_index(indices, dim);
-    int64_t item_size = sorted.size(dim);
-    int64_t group_size = sorted.numel() / item_size;
-    int64_t stride = sorted.stride(dim);
-    sorted.copy_(input);
-    std::vector<int64_t> scratch_size{sizeof(double) * sorted.numel()};
-    Tensor scratch_key =
-        at::empty(scratch_size, indices.options().dtype(at::ScalarType::Byte));
-    Tensor scratch_value =
-        at::empty(scratch_size, indices.options().dtype(at::ScalarType::Byte));
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        sorted.scalar_type(),
-        "merge_sort_kernel",
+        "bitonic_merge_sort_kernel",
         [&]() {
-          merge_sort_kernel<scalar_t, int64_t>(
+          bitonic_merge_sort_kernel<scalar_t, int64_t>(
               sorted.data_ptr<scalar_t>(),
               indices.data_ptr<int64_t>(),
-              group_size,
-              item_size,
-              order,
-              (uint8_t*)scratch_key.data_ptr(),
-              (uint8_t*)scratch_value.data_ptr(),
-              stride);
+              prb_size,
+              batch_size,
+              stride,
+              Numerics<scalar_t>::upper_bound(),
+              [](scalar_t a, scalar_t b) -> bool {
+                return Numerics<scalar_t>::lt(a, b);
+              });
+        });
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        sorted.scalar_type(),
+        "bitonic_merge_sort_kernel",
+        [&]() {
+          bitonic_merge_sort_kernel<scalar_t, int64_t>(
+              sorted.data_ptr<scalar_t>(),
+              indices.data_ptr<int64_t>(),
+              prb_size,
+              batch_size,
+              stride,
+              Numerics<scalar_t>::lower_bound(),
+              [](scalar_t a, scalar_t b) -> bool {
+                return Numerics<scalar_t>::gt(a, b);
+              });
         });
   }
 

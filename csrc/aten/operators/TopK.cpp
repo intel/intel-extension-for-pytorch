@@ -6,7 +6,7 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>
-#include "BitonicSort.h"
+#include "BitonicMergeSort.h"
 #include "ScanKernel.h"
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
@@ -680,14 +680,27 @@ void Topk(
   // Sort the results if the user wants them sorted, since our
   // selection routine does not ensure sorting
   if (sorted) {
-    if (k <= 2048) {
-      // This avoids any memory allocations and performs all sorting
-      // work inplace along the slice
-      SortKeyValueInplace<scalar_t>(topK, indices, dim, dir);
+    int64_t prb_size = topK.size(dim);
+    int64_t stride = topK.stride(dim);
+    int64_t batch_size = topK.numel() / prb_size / stride;
+    if (!dir) {
+      bitonic_merge_sort_kernel<scalar_t, int64_t>(
+          topK.data_ptr<scalar_t>(),
+          indices.data_ptr<int64_t>(),
+          prb_size,
+          batch_size,
+          stride,
+          Numerics<scalar_t>::upper_bound(),
+          [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
     } else {
-      TORCH_CHECK(
-          false,
-          "DPCPP can not support element number to sort is larger than 2048");
+      bitonic_merge_sort_kernel<scalar_t, int64_t>(
+          topK.data_ptr<scalar_t>(),
+          indices.data_ptr<int64_t>(),
+          prb_size,
+          batch_size,
+          stride,
+          Numerics<scalar_t>::lower_bound(),
+          [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::gt(a, b); });
     }
   }
 }
