@@ -1,6 +1,6 @@
 import csv
 import argparse
-from op_roofline_schema import cfg
+from op_roofline_schema import cfg, default_roofline_func
 
 
 def get_spec(spec_file):
@@ -48,8 +48,13 @@ class RooflineManager:
 
     def get_roofline(self, info):
         name, pattern = self._get_input_pattern(info)
-        f = cfg[name][pattern]
         info['name'] = name
+        try:
+            f = cfg[name][pattern]
+        except Exception as e:
+            f = default_roofline_func
+        if isinstance(f, dict):
+            f = default_roofline_func
         return f(info, self.spec)
 
 

@@ -177,13 +177,14 @@ def get_normalized_time(time_: str, base='us') -> float:
         return float('nan')
 
 
-def op_filter(infos):
+def op_filter(infos, model_time_filter=True):
     def get_id(info):
         return "[{0}]{1}".format(info['op_class_name'], ";".join(info['params']))
     dd_count = collections.defaultdict(float)
     dd_time = collections.defaultdict(float)
     dd_model_time = collections.defaultdict(float)
-    infos = [t for t in infos if not math.isnan(t['model_time'])]
+    if model_time_filter:
+        infos = [t for t in infos if not math.isnan(t['model_time'])]
     for info in infos:
         id = get_id(info)
         dd_count[id] += 1
@@ -237,7 +238,7 @@ def get_io_info(true_inputs, true_outputs):
     return inputs_, outputs_
 
 
-def run_op(filename, bench_type=None, dpcpp_only=False, backend='XPU', sample=8, outer=[], inner=None, time_base='us'):
+def run_op(filename, bench_type=None, dpcpp_only=False, backend='XPU', sample=8, outer=[], inner=None, time_base='us', filter_en=True):
 
     assert sample > 1
 
@@ -307,7 +308,7 @@ def run_op(filename, bench_type=None, dpcpp_only=False, backend='XPU', sample=8,
             print("skipping {0}: {1}".format(op_class_name, e))
             continue
 
-    infos = op_filter(infos)
+    infos = op_filter(infos, filter_en)
     print('-------------------- output --------------------')
     for info in infos:
         print(info)
@@ -317,5 +318,10 @@ def run_op(filename, bench_type=None, dpcpp_only=False, backend='XPU', sample=8,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MicroBench for Pytorch')
     parser.add_argument('--log', help='path to log file')
+    parser.add_argument('--filter', help='0:disable, 1:enable', default='0')
     args = parser.parse_args()
-    infos = run_op(args.log)
+    if int(args.filter) == 0:
+        filter_en = False
+    else:
+        filter_en = True
+    infos = run_op(args.log, filter_en=filter_en)

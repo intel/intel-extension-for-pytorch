@@ -39,17 +39,14 @@ oneDNNOp = [
 
 def efficiency_workload(filename, spec_file, bench_type, dpcpp_only, outer=[]):
     bench_type = dtype_transfer[bench_type]
-    ops_info = run_op(filename, bench_type, dpcpp_only, outer=outer)
+    ops_info = run_op(filename, bench_type, dpcpp_only, outer=outer, filter_en=False)
     if len(ops_info) <= 0:
         return None
     roofline_manager = RooflineManager(spec_file)
     output_list = []
     for info in ops_info:
-        try:
-            roofline_manager.get_roofline(info)
-            output_list.append(info)
-        except Exception as e:
-            print('skipping ' + str(info))
+        roofline_manager.get_roofline(info)
+        output_list.append(info)
     return output_list
 
 
@@ -59,12 +56,17 @@ def main():
     parser.add_argument("--dtype", type=str, default='default', help="tensor dtype")
     parser.add_argument("--workload", default=None, required=True, help="Workload config txt file")
     parser.add_argument("--dpcpp_only", action="store_true", default=False, help="Bench only for dpcpp kernels")
+    parser.add_argument("--ignore", default='none', help="Ignore ops")
     args = parser.parse_args()
     args.dtype = args.dtype.lower()
+    outer_str = args.ignore.lower().strip()
+    outer = []
+    if 'onednn' in outer_str:
+        outer = oneDNNOp
     infos = None
     if args.workload:
         filename = args.workload[:args.workload.rfind('.')] + '_' + args.dtype + '_roofline.csv'
-        infos = efficiency_workload(args.workload, args.spec, args.dtype, args.dpcpp_only, outer=oneDNNOp)
+        infos = efficiency_workload(args.workload, args.spec, args.dtype, args.dpcpp_only, outer=outer)
     else:
         print("MicroBench only supports workload mode now.")
 
