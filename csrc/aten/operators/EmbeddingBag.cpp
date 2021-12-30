@@ -13,6 +13,8 @@
 #include "comm/Numerics.h"
 #include "comm/PSTLFunctions.h"
 
+#include <aten/operators/MemoryAccess.h>
+
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
@@ -506,149 +508,424 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 #endif
 }
 
-// This kernel assumes that all input tensors except `weight` and
-// per_sample_weights are contiguous.
-template <typename scalar_t>
-void EmbeddingBag_updateOutputKernel(
+template <
+    int vec_size,
+    typename vec_t,
+    typename elem_t,
+    typename scalar_t,
+    typename accscalar_t>
+void vec_chunk_kernel_embeddingbag(
+    const int64_t mode,
     int64_t* input,
-    int64_t* offsets,
+    int64_t* offset,
     scalar_t* weight,
     scalar_t* output,
     int64_t* offset2bag,
-    int64_t numIndices,
-    int64_t numBags,
-    int64_t featureSize,
-    int64_t weight_stide0,
-    int64_t weight_stride1,
-    int mode,
     int64_t* bag_size,
-    int64_t* max_indices,
+    bool per_sample_weights_defined,
     scalar_t* per_sample_weights,
-    int64_t per_sample_weights_stride) {
-  // the strategy here is that each bag x feature is handled by a single thread
+    int64_t per_sample_weights_stride,
+    int64_t* max_indices,
+    int64_t WGNumber,
+    int64_t numBags,
+    bool feature_full_divide,
+    int64_t chunk_size,
+    int64_t bag_chunk_num,
+    int64_t bag_wi_num,
+    int64_t bagsPerLoop,
+    int64_t input_length,
+    int64_t weight_feature_size,
+    int64_t weight_stride0,
+    int64_t weight_stride1,
+    DPCPP::nd_item<1> item) {
+  auto globalId = item.get_global_linear_id();
 
-  using accscalar_t = acc_type<scalar_t>;
-  auto& queue = dpcppGetCurrentQueue();
-  auto workersPerChunk = [featureSize]() -> int64_t {
-    int64_t _workersPerChunk = 64;
-    if (featureSize < 64 && featureSize >= 32) {
-      _workersPerChunk = 32;
-    } else if (featureSize < 32) {
-      _workersPerChunk = 16;
-    }
-    return _workersPerChunk;
-  }();
-  int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)workersPerChunk);
-  int64_t numChunks = numBags * chunksPerBag;
-  int64_t kernel_range = 1024 * workersPerChunk;
-  int64_t chunksPerWorkGroup = 256 / workersPerChunk;
-  bool per_sample_weights_defined = per_sample_weights ? true : false;
+  // global chunk id
+  auto globalChunkId = globalId / chunk_size;
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto input_data = input;
-    auto offsets_data = offsets;
-    auto weight_data = weight;
-    auto output_data = output;
-    auto offset2bag_data = offset2bag;
-    auto bag_size_data = bag_size;
-    // use the weight handler as the dummy handler.
-    // The kernel would not access the data thru the per_sample_weights_ptr in
-    // false case
-    auto per_sample_weights_data =
-        per_sample_weights_defined ? per_sample_weights : weight_data;
-    // use the offset2bag handler as the dummy handler.
-    // The kernel would not access the data thru the max_indices_ptr in false
-    // case
-    auto max_indices_data = mode == MODE_MAX ? max_indices : offset2bag_data;
+  // which initial bag this work item is in
+  auto bagId = globalChunkId / bag_chunk_num;
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      auto input_ptr = input_data;
-      auto offsets_ptr = offsets_data;
-      auto weight_ptr = weight_data;
-      auto output_ptr = output_data;
-      auto offset2bag_ptr = offset2bag_data;
-      auto bag_size_ptr = bag_size_data;
-      auto per_sample_weights_ptr = per_sample_weights_data;
-      auto max_indices_ptr = max_indices_data;
+  // work item id inside one bag
+  auto insideBagId = globalId % bag_wi_num;
 
-      int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
-          item.get_local_id()[1];
+  // outer bag loop
+  for (auto bag = bagId; bag < numBags; bag += bagsPerLoop) {
+    auto begin = offset[bag];
+    auto end = (bag < numBags - 1) ? (offset[bag + 1]) : input_length;
+    // In single_bag situation, embeddingbag is like embedding, no
+    // per_sample_weight, mode is sum, vec copy is used to achieve
+    // higher bandwidth.
+    auto single_bag = bool(
+        (end == (begin + 1)) && (!per_sample_weights_defined) &&
+        (mode == MODE_SUM));
 
-      for (int64_t chunk = chunkOffset; chunk < numChunks;
-           chunk += item.get_group_range()[0] * item.get_global_range()[1]) {
-        int64_t featureDim = (chunk % chunksPerBag) * item.get_local_range(0) +
-            item.get_local_id(0);
-        if (featureDim < featureSize) {
-          int64_t bag = chunk / chunksPerBag;
-          auto weightFeat = weight_ptr + featureDim * weight_stride1;
-          int64_t begin = offsets_ptr[bag];
-          int64_t end =
-              (bag < numBags - 1) ? (offsets_ptr[bag + 1]) : numIndices;
-
-          accscalar_t weightFeatSum = 0;
-          scalar_t weightFeatMax;
-
-          int64_t bag_size_ = 0;
-          int64_t maxWord = -1;
-          for (int64_t emb = begin; emb < end; emb++) {
-            const int64_t weightRow = input_ptr[emb] * weight_stide0;
-            scalar_t weightValue = weightFeat[weightRow];
-
-            if (mode == MODE_MAX) {
-              if (emb == begin || weightValue > weightFeatMax) {
-                weightFeatMax = weightValue;
-                maxWord = input_ptr[emb];
-              }
-            } else {
-              if (per_sample_weights_defined) {
-                accscalar_t scaleWeightBy = static_cast<accscalar_t>(
-                    per_sample_weights_ptr[emb * per_sample_weights_stride]);
-                weightFeatSum +=
-                    scaleWeightBy * static_cast<accscalar_t>(weightValue);
-              } else {
-                weightFeatSum += static_cast<accscalar_t>(weightValue);
-              }
-            }
-
-            bag_size_++;
-            if (featureDim == 0) {
-              offset2bag_ptr[emb] = bag;
-            }
-          }
-          if (mode == MODE_MEAN) {
-            if (end == begin) {
-              bag_size_ptr[bag] = 0;
-            } else {
-              weightFeatSum =
-                  weightFeatSum / static_cast<accscalar_t>(bag_size_);
-              bag_size_ptr[bag] = bag_size_;
-            }
-          }
-
-          if (mode == MODE_MEAN || mode == MODE_SUM) {
-            output_ptr[bag * featureSize + featureDim] =
-                static_cast<scalar_t>(weightFeatSum);
-          } else if (mode == MODE_MAX) {
-            if (end == begin) {
-              // If bag is empty, set output to 0.
-              weightFeatMax = 0;
-            }
-            max_indices_ptr[bag * featureSize + featureDim] = maxWord;
-            output_ptr[bag * featureSize + featureDim] = weightFeatMax;
+    if (single_bag) {
+      if (feature_full_divide) {
+        vec_t* weight_vec = reinterpret_cast<vec_t*>(weight);
+        // for single bag and feature full divide, fully copy is done with no
+        // tail situation
+        auto weightOffset = input[begin] * bag_wi_num;
+        auto weightOffset_inbag = weightOffset + insideBagId;
+        auto weightValue = weight_vec[weightOffset_inbag];
+        vec_t* output_vec = reinterpret_cast<vec_t*>(output);
+        auto output_offset = bag * bag_wi_num + insideBagId;
+        output_vec[output_offset] = weightValue;
+      } else {
+        // for tail, element-wise addressing is needed
+        vec_t* weight_vec = reinterpret_cast<vec_t*>(
+            weight + input[begin] * weight_feature_size);
+        vec_t* output_vec =
+            reinterpret_cast<vec_t*>(output + bag * weight_feature_size);
+        for (auto id = 0; id < vec_size; id++) {
+          // kick off tail worker id
+          if ((insideBagId * vec_size + id) < weight_feature_size) {
+            output_vec[insideBagId][id] = weight_vec[insideBagId][id];
           }
         }
       }
-    };
+      // avoid compete write in
+      if (insideBagId == 0) {
+        offset2bag[begin] = bag;
+      }
+    } else {
+      vec_t weightFeatSum;
+      // initial to 0 for accumulating
+      for (auto id = 0; id < vec_size; id++) {
+        weightFeatSum[id] =
+            at::native::Memory::detail::bitwise_cast<elem_t>(scalar_t{0});
+      }
 
-    // kick off kernel
-    cgh.parallel_for(
-        DPCPP::nd_range<2>(
-            DPCPP::range<2>(kernel_range, chunksPerWorkGroup),
-            DPCPP::range<2>(workersPerChunk, chunksPerWorkGroup)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+      vec_t weightFeatMax;
+      int64_t bag_size_ = 0;
+      // watch out register spill out when vec_size is large
+      int64_t maxWord[vec_size] = {0};
+
+      for (int64_t emb = begin; emb < end; emb++) {
+        vec_t* weight_vec =
+            reinterpret_cast<vec_t*>(weight + input[emb] * weight_feature_size);
+        auto weightValue = weight_vec[insideBagId];
+
+        for (auto id = 0; id < vec_size; id++) {
+          if ((insideBagId * vec_size + id) < weight_feature_size) {
+            if (mode == MODE_MAX) {
+              // static_cast to scalar_t is used because vec_t contains
+              // uint dtype
+              auto val = at::native::Memory::detail::bitwise_cast<scalar_t>(
+                  weightValue[id]);
+              auto max_val = at::native::Memory::detail::bitwise_cast<scalar_t>(
+                  weightFeatMax[id]);
+              if (emb == begin || val > max_val) {
+                weightFeatMax[id] = weightValue[id];
+                maxWord[id] = input[emb];
+              }
+            } else {
+              // for scalar type fma/add, accscalar_t is needed to keep
+              // accurate. Vec is stored uint value, whose size is same
+              // as sizeof(scalar_t), when computing, uint value should
+              // be casted to floating value, after computation,
+              // write-back needs casting to uint value.
+              auto val = at::native::Memory::detail::bitwise_cast<scalar_t>(
+                  weightValue[id]);
+              auto acc_val = static_cast<accscalar_t>(val);
+              auto sum = at::native::Memory::detail::bitwise_cast<scalar_t>(
+                  weightFeatSum[id]);
+              auto acc_sum = static_cast<accscalar_t>(sum);
+              if (per_sample_weights_defined) {
+                auto scaleWeightBy = static_cast<accscalar_t>(
+                    per_sample_weights[emb * per_sample_weights_stride]);
+                acc_sum += acc_val * scaleWeightBy;
+              } else {
+                acc_sum += acc_val;
+              }
+              auto _res = static_cast<scalar_t>(acc_sum);
+              weightFeatSum[id] =
+                  at::native::Memory::detail::bitwise_cast<elem_t>(_res);
+            }
+          }
+        }
+        bag_size_++;
+        // avoid compete write in
+        if (insideBagId == 0) {
+          offset2bag[emb] = bag;
+        }
+      }
+
+      if (mode == MODE_MEAN) {
+        if (end == begin) {
+          bag_size[bag] = static_cast<int64_t>(0);
+        } else {
+          for (auto id = 0; id < vec_size; id++) {
+            if ((insideBagId * vec_size + id) < weight_feature_size) {
+              auto sum = at::native::Memory::detail::bitwise_cast<scalar_t>(
+                  weightFeatSum[id]);
+              auto acc_sum = static_cast<accscalar_t>(sum);
+              acc_sum /= static_cast<accscalar_t>(bag_size_);
+              auto _res = static_cast<scalar_t>(acc_sum);
+              weightFeatSum[id] =
+                  at::native::Memory::detail::bitwise_cast<elem_t>(_res);
+              bag_size[bag] = static_cast<int64_t>(bag_size_);
+            }
+          }
+        }
+      }
+
+      vec_t* output_vec =
+          reinterpret_cast<vec_t*>(output + bag * weight_feature_size);
+      for (auto id = 0; id < vec_size; id++) {
+        if ((insideBagId * vec_size + id) < weight_feature_size) {
+          if (mode == MODE_MEAN || mode == MODE_SUM) {
+            output_vec[insideBagId][id] = weightFeatSum[id];
+          } else if (mode == MODE_MAX) {
+            if (end == begin) {
+              weightFeatMax[id] =
+                  at::native::Memory::detail::bitwise_cast<elem_t>(scalar_t{0});
+            }
+            output_vec[insideBagId][id] = weightFeatMax[id];
+            max_indices
+                [bag * weight_feature_size + insideBagId * vec_size + id] =
+                    maxWord[id];
+          }
+        }
+      }
+    }
+  }
 }
+
+/*
+  The kernel EmbeddingBag is optimized for memory coleascing and thread
+  efficiency. Vec design and chunk design are deployed for this kernel. In
+  additional, single bag is specifically considered.(for example, when
+  offset_data=0,1,2,3,4,5,...).
+  Thought:
+  0. Principle: One or multi chunks work for one Bag. One loop at least solves
+  one bag.
+  1. Implementation: Use vec<scalar_t, vec_size> to achieve higher bandwidth
+  both in ATS and PVC, because it is a memory bound kernel. Use chunk design,
+  chunk splitted from different WG to reach high occupancy especially when bag
+  dim is much larger. The vec size is determined by device. The chunk size is
+  determined by workload amounts and device resource.
+  2. If it is single bag specific situation, pure copy is done for kernel.
+  Single bag means offset is linear increase by 1.
+  3. Passing vec size as template to kernel.
+
+  Shortcoming:
+  1. Chunk design may cause some resource waste when work items is handling the
+  tail of last bag in one loop.
+*/
+template <typename scalar_t>
+void EmbeddingBag_updateOutputKernel(
+    const int64_t mode,
+    int64_t* input_data,
+    int64_t* offset_data,
+    scalar_t* weight_data,
+    scalar_t* output_data,
+    int64_t* offset2bag_data,
+    int64_t input_length,
+    int64_t numBags,
+    int64_t weight_feature_size,
+    int64_t weight_stride0,
+    int64_t weight_stride1,
+    int64_t* bag_size_data,
+    int64_t* max_indices_data,
+    scalar_t* per_sample_weights_data,
+    int64_t per_sample_weights_stride) {
+  using accscalar_t = acc_type<scalar_t>;
+
+  // vector size, query it according to machine, scalar_t and weight_data
+  auto& queue = dpcppGetCurrentQueue();
+  auto vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
+      getDeviceIdOfCurrentQueue(), reinterpret_cast<char*>(weight_data));
+
+  // determine per sample weights should be in calculation or not
+  bool per_sample_weights_defined = per_sample_weights_data ? true : false;
+
+  auto maxWGSize =
+      queue.get_device().template get_info<dpcpp_dev_max_work_group_size>();
+
+  auto maxComputeUnit =
+      queue.get_device().template get_info<dpcpp_dev_max_compute_units>();
+
+  // how many work items serve for one bag in vector sight
+  auto bag_wi_num = (weight_feature_size % vec_size == 0)
+      ? (weight_feature_size / vec_size)
+      : (weight_feature_size / vec_size + 1);
+
+  // chunk size, up to the bag_wi_num
+  // candidate size are 8, 16 and 32.
+  // Thought: avoid most waste work items
+  // TODO: candidate size may need to be considered, however chunks size had
+  // TODO: better to be the factor of the wg size to avoid the divergence cross
+  // TODO: work group
+  auto chunk_size = 8;
+  if (bag_wi_num % 32 == 0) {
+    chunk_size = 32;
+  } else if (bag_wi_num % 16 == 0) {
+    chunk_size = 16;
+  } else if (bag_wi_num % 8 == 0) {
+    chunk_size = 8;
+  } else if (
+      ((bag_wi_num % 8) == (bag_wi_num % 16)) &&
+      ((bag_wi_num % 16) == (bag_wi_num % 32))) {
+    chunk_size = 8;
+  } else if ((bag_wi_num % 16) == (bag_wi_num % 32)) {
+    chunk_size = 16;
+  } else if ((bag_wi_num % 8) == (bag_wi_num % 16)) {
+    chunk_size = 8;
+  } else {
+    chunk_size = 32;
+  }
+
+  // how many chunks serve for one bag
+  auto bag_chunk_num = (bag_wi_num % chunk_size == 0)
+      ? (bag_wi_num / chunk_size)
+      : (bag_wi_num / chunk_size + 1);
+
+  // how many work items serve for one bag in chunk sight
+  bag_wi_num = bag_chunk_num * chunk_size;
+
+  // how many chunks serve for all bag
+  auto all_chunk_num = numBags * bag_chunk_num;
+
+  // how many wi serve for all bag
+  auto all_wi_num = all_chunk_num * chunk_size;
+
+  // on host-side, the weight feature size can be fully divided by chunk size
+  // and vec size or not will affect the performance. Under full divided
+  // circumstance, kernel has highest efficiency and bandwidth
+  auto feature_full_divide = bool(
+      ((weight_feature_size % vec_size) == 0) &&
+      (((weight_feature_size / vec_size) % chunk_size) == 0));
+
+  // For huge bags number, limited wg number is set to avoid overhead of
+  // group scheduling. WGNumber default in single tile in one time =
+  // Max compute unit * 8 threads * SIMD32 per thread / max WG size * 512.
+  // TODO: 512 is an empirical value, may need tune
+  // FIXME: maxComputeUnit may have issue now.
+  // FIXME: Jira link: https://jira.devtools.intel.com/browse/XDEPS-3272
+  auto WGNumber = maxComputeUnit * 8 * 32 / maxWGSize * 512;
+
+  // one or multi chunks for one bag.
+  // all_wi_num <= maxWGSize: one wg is enough to finish all bags
+  // bag_wi_num > (maxWGSize * WGNumber): all wg is not enough to finish one
+  // bag. To avoid the inner-bag loop, all needed wg are launched
+  // else: one wg is not enough to finish all bags, but all wg can finish at
+  // least one bag
+  auto local_range = maxWGSize;
+  if (all_wi_num <= maxWGSize) {
+    local_range = all_wi_num;
+    WGNumber = 1;
+  } else if (bag_wi_num > (maxWGSize * WGNumber)) {
+    local_range = maxWGSize;
+    // at least, one loop finish one bag
+    WGNumber = (bag_wi_num + maxWGSize - 1) / maxWGSize;
+  } else {
+    for (auto factor = 0; (((maxWGSize - factor * 8) >= 8)); ++factor) {
+      auto infactor = maxWGSize - factor * 8;
+      if (all_wi_num % infactor == 0) {
+        if ((all_wi_num / infactor) > WGNumber) {
+          local_range = infactor;
+        } else {
+          WGNumber = all_wi_num / infactor;
+          local_range = infactor;
+        }
+        break;
+      }
+    }
+  }
+
+  // for outer bag loop, how many bag finish in one loop
+  auto bagsPerLoop = WGNumber * local_range / chunk_size / bag_chunk_num;
+
+  // total work item size
+  auto global_range = WGNumber * local_range;
+
+// launch vec kernel for embeddingbag, code pass according to vec size
+#define VEC_EMBBAG_KERNEL(vec_size)                                           \
+  {                                                                           \
+    auto cgf = DPCPP_Q_CGF(cgh) {                                             \
+      auto input = input_data;                                                \
+      auto offset = offset_data;                                              \
+      auto weight = weight_data;                                              \
+      auto output = output_data;                                              \
+      auto offset2bag = offset2bag_data;                                      \
+      auto bag_size = bag_size_data;                                          \
+      auto per_sample_weights =                                               \
+          per_sample_weights_defined ? per_sample_weights_data : weight_data; \
+      auto max_indices =                                                      \
+          mode == MODE_MAX ? max_indices_data : offset2bag_data;              \
+      using vec_t = typename at::native::Memory::                             \
+          aligned_vector<scalar_t, vec_size>::type;                           \
+      using elem_t = typename at::native::Memory::                            \
+          aligned_vector<scalar_t, vec_size>::element_type;                   \
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {                        \
+        vec_chunk_kernel_embeddingbag<                                        \
+            vec_size,                                                         \
+            vec_t,                                                            \
+            elem_t,                                                           \
+            scalar_t,                                                         \
+            accscalar_t>(                                                     \
+            mode,                                                             \
+            input,                                                            \
+            offset,                                                           \
+            weight,                                                           \
+            output,                                                           \
+            offset2bag,                                                       \
+            bag_size,                                                         \
+            per_sample_weights_defined,                                       \
+            per_sample_weights,                                               \
+            per_sample_weights_stride,                                        \
+            max_indices,                                                      \
+            WGNumber,                                                         \
+            numBags,                                                          \
+            feature_full_divide,                                              \
+            chunk_size,                                                       \
+            bag_chunk_num,                                                    \
+            bag_wi_num,                                                       \
+            bagsPerLoop,                                                      \
+            input_length,                                                     \
+            weight_feature_size,                                              \
+            weight_stride0,                                                   \
+            weight_stride1,                                                   \
+            item);                                                            \
+      };                                                                      \
+      cgh.parallel_for(                                                       \
+          DPCPP::nd_range<1>(                                                 \
+              DPCPP::range<1>(global_range), DPCPP::range<1>(local_range)),   \
+          kfn);                                                               \
+    };                                                                        \
+    DPCPP_Q_SUBMIT(queue, cgf);                                               \
+  }
+
+  switch (vec_size) {
+    case 16: {
+      VEC_EMBBAG_KERNEL(16);
+      break;
+    }
+    case 8: {
+      VEC_EMBBAG_KERNEL(8);
+      break;
+    }
+    case 4: {
+      VEC_EMBBAG_KERNEL(4);
+      break;
+    }
+    case 2: {
+      VEC_EMBBAG_KERNEL(2);
+      break;
+    }
+    case 1: {
+      VEC_EMBBAG_KERNEL(1);
+      break;
+    }
+    default:
+      TORCH_INTERNAL_ASSERT(
+          false,
+          "Unexpected vectorization size for EmbeddingBag. vec size ",
+          vec_size);
+  }
+#undef VEC_EMBBAG_KERNEL
+} // namespace AtenIpexTypeXPU
 
 Tensor embedding_bag_backward_dpcpp_sum_avg(
     const Tensor& grad,
@@ -838,10 +1115,13 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
   auto bag_size = at::empty(offsets.sizes(), indices.options());
   auto offset2bag = at::empty({indices.size(0)}, indices.options());
   auto output = at::empty({offsets.size(0), weight.size(1)}, weight.options());
-  Tensor max_indices;
-  if (MODE_MAX)
-    max_indices =
-        at::empty({offsets.size(0), weight.size(1)}, indices.options());
+
+  Tensor max_indices =
+      at::empty({offsets.size(0), weight.size(1)}, indices.options());
+
+  if (mode == MODE_MAX) {
+    max_indices.zero_();
+  }
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -850,6 +1130,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
       "embedding_bag_dpcpp",
       [&] {
         EmbeddingBag_updateOutputKernel<scalar_t>(
+            mode,
             indices.data_ptr<int64_t>(),
             offsets.data_ptr<int64_t>(),
             weight.data_ptr<scalar_t>(),
@@ -860,7 +1141,6 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
             featureSize,
             weight.stride(0),
             weight.stride(1),
-            mode,
             bag_size.data_ptr<int64_t>(),
             mode == MODE_MAX ? max_indices.data_ptr<int64_t>() : NULL,
             per_sample_weights.defined()

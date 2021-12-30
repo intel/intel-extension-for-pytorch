@@ -15,10 +15,10 @@ namespace Memory {
 namespace detail {
 
 template <typename TO, typename FROM>
-inline std::decay_t<TO>& bitwise_cast(FROM& value) {
+inline std::decay_t<TO> bitwise_cast(FROM&& value) {
   static_assert(
       sizeof(TO) == sizeof(FROM), "in-compatible type size in bitwise_cast.");
-  std::decay_t<TO>& transport_bits = *((std::decay_t<TO>*)&value);
+  std::decay_t<TO> transport_bits = *((std::decay_t<TO>*)&value);
   return transport_bits;
 }
 
