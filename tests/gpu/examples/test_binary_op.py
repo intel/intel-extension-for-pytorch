@@ -477,3 +477,41 @@ class TestTorchMethod(TestCase):
         t = torch.tensor([True, True], device="xpu")
 
         assert torch.equal(a + b, t)
+
+    def test_binary_op_broadcast(self, dtype=torch.float):
+
+        print('testing add broadcast')
+        a = torch.randn(4, 16, 16, 512).to(dtype)
+        b = torch.randn(4, 1, 1, 512).to(dtype)
+        a_ = a.clone().xpu()
+        b_ = b.clone().xpu()
+        c = a + b
+        c_ = a_ + b_
+        self.assertEqual(c, c_.cpu())
+
+        print('testing add_ broadcast')
+        a = torch.randn(4, 16, 16, 512).to(dtype)
+        b = torch.randn(4, 1, 1, 512).to(dtype)
+        a_ = a.clone().xpu()
+        b_ = b.clone().xpu()
+        a += b
+        a_ += b_
+        self.assertEqual(a, a_.cpu())
+
+        print('testing div broadcast')
+        a = torch.randn(4, 16, 16, 512).to(dtype)
+        b = torch.randn(4, 1, 1, 512).to(dtype)
+        a_ = a.clone().xpu()
+        b_ = b.clone().xpu()
+        c = a / b
+        c_ = a_ / b_
+        self.assertEqual(c, c_.cpu())
+
+        print('testing div_ broadcast')
+        a = torch.randn(4, 16, 16, 512).to(dtype)
+        b = torch.randn(4, 1, 1, 512).to(dtype)
+        a_ = a.clone().xpu()
+        b_ = b.clone().xpu()
+        a /= b
+        a_ /= b_
+        self.assertEqual(a, a_.cpu())

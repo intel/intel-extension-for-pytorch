@@ -87,7 +87,6 @@ Tensor& add_out(
   if (3 == ndim || 4 == ndim || 5 == ndim) {
     cl_tag = get_cl_tag_by_ndim(ndim);
   }
-  // 1. onednn kernel
   if (_self.is_xpu() && _other.is_xpu() && 1.0 == alpha.to<float>() &&
       _self.defined() && _other.defined() &&
       _self.scalar_type() == _other.scalar_type() &&
@@ -102,86 +101,12 @@ Tensor& add_out(
        * TensorIterator pass below. */
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      !(DPCPPTensorContext::is_plain(_self) &&
-        !DPCPPTensorContext::is_plain(_other) &&
-        _self.sizes() != _other.sizes()) &&
-      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-        !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
+      (!DPCPPTensorContext::is_plain(_self) ||
+       !DPCPPTensorContext::is_plain(_other)) &&
+      _self.sizes() == _other.sizes()) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
-  }
-  // 2. naive kernel
-  else if (
-      _self.is_xpu() && _other.is_xpu() && _self.sizes() == _other.sizes() &&
-      ((_self.is_contiguous() && _other.is_contiguous()) ||
-       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      _self.scalar_type() == _other.scalar_type()) {
-    // propogate block format in case: alpha != 1
-    if (!DPCPPTensorContext::is_plain(result) ||
-        !DPCPPTensorContext::is_plain(_self) ||
-        !DPCPPTensorContext::is_plain(_other)) {
-      auto r_ctx = DPCPPTensorContext::get_tensor_ctx(result);
-      auto s_ctx = DPCPPTensorContext::get_tensor_ctx(_self);
-      auto o_ctx = DPCPPTensorContext::get_tensor_ctx(_other);
-      auto r_md = r_ctx.meta();
-      auto s_md = s_ctx.meta();
-      auto o_md = o_ctx.meta();
-
-      auto tar_ctx = !r_ctx.is_plain()
-          ? r_ctx
-          : (!s_ctx.is_plain() ? s_ctx : (!o_ctx.is_plain() ? o_ctx : s_ctx));
-      auto tar_md = tar_ctx.meta();
-
-      if (r_md != tar_md) {
-        auto _res = at::AtenIpexTypeXPU::empty_opaque_tensor(
-            tar_md, result.options(), c10::nullopt);
-
-        if (result.is_same(_self)) {
-          xpu::oneDNN::reorder(result, _res);
-        }
-
-        // result is alias, have to write back
-        auto tar_r_ctx = DPCPPTensorContext::release_tensor_ctx(_res);
-        DPCPPTensorContext::set_tensor_ctx(result, std::move(tar_r_ctx));
-      }
-
-      // avoid redundant reorder in inplace case
-      if (!result.is_same(_self) && s_md != tar_md) {
-        self = at::AtenIpexTypeXPU::empty_opaque_tensor(
-            tar_md, _self.options(), c10::nullopt);
-        xpu::oneDNN::reorder(_self, self);
-      }
-
-      if (o_md != tar_md) {
-        other = at::AtenIpexTypeXPU::empty_opaque_tensor(
-            tar_md, _other.options(), c10::nullopt);
-        xpu::oneDNN::reorder(_other, other);
-      }
-    }
-
-    IPEX_DISPATCH_ALL_TYPES_AND3(
-        at::ScalarType::BFloat16,
-        at::ScalarType::Bool,
-        at::ScalarType::Half,
-        result.scalar_type(),
-        "eltwise_binary_naive::add",
-        [&]() {
-          const auto op = AddNaiveOp<scalar_t>(alpha.to<scalar_t>());
-          int nelem = !DPCPPTensorContext::is_plain(result)
-              ? DPCPPTensorContext::get_tensor_ctx(result).padded_size()
-              : prod_intlist(result.sizes());
-          eltwise_binary_naive_kernel(
-              result.data_ptr<scalar_t>(),
-              self.data_ptr<scalar_t>(),
-              other.data_ptr<scalar_t>(),
-              nelem,
-              op);
-        });
-    return result;
-  }
-  // 3. TensorIterator kernel
-  else {
+  } else {
     // loops
     // use inplace conversion not to break alias property "Tensor& result"
     result = to_plain_if_needed_(result);
@@ -217,12 +142,9 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       _other.dim() > 0 && _self.dim() == _other.dim() &&
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      !(DPCPPTensorContext::is_plain(_self) &&
-        !DPCPPTensorContext::is_plain(_other) &&
-        _self.sizes() != _other.sizes()) &&
-      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
-        !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !is_wrapped_number(_self) && !is_wrapped_number(_other)) {
+      (!DPCPPTensorContext::is_plain(_self) ||
+       !DPCPPTensorContext::is_plain(_other)) &&
+      _self.sizes() == _other.sizes()) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
