@@ -25,7 +25,7 @@ template <
     dnnl::algorithm algo,
     dnnl::algorithm algo_post = dnnl::algorithm::binary_add>
 static inline Tensor bin(
-    Tensor& output,
+    Tensor& dst,
     const Tensor& t1,
     const Tensor& t2,
     const Tensor t3 = at::Tensor()) {
@@ -94,23 +94,36 @@ static inline Tensor bin(
     md2 = tar_md;
   }
 
-  // 1. output: undefined, lazy_reorder: off
-  // 2. output: undefined, lazy_reorder: on, output: plain
-  if (!output.defined() && tar_ctx.is_plain()) {
-    output = at::empty_like(t1, t1.suggest_memory_format());
+  // 1. dst: undefined, lazy_reorder: off
+  // 2. dst: undefined, lazy_reorder: on, dst: plain
+  if (!dst.defined() && tar_ctx.is_plain()) {
+    dst = at::empty_like(t1, t1.suggest_memory_format());
   }
-  // 1. output: undefined, lazy_reorder: on, output: block
-  // 2. output: defined, lazy_reorder: on, output block
-  else if (Settings::I().is_onednn_layout_enabled() && !tar_ctx.is_plain()) {
-    if (t1.is_quantized()) {
+  // 1. dst: undefined, lazy_reorder: on, dst: block
+  // 2. dst: defined, lazy_reorder: on, dst block
+  else if (!tar_ctx.is_plain()) {
+    Tensor dst_ = dst;
+    if (/* must be defined in qunat case, due to q_scale */ t1.is_quantized()) {
       auto quantizer =
-          dpcpp_make_per_tensor_affine_quantizer(output.q_scale(), 0, kQInt8);
-      output = empty_opaque_qtensor(tar_md, c10::nullopt, quantizer);
-    } else {
-      output = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
+          dpcpp_make_per_tensor_affine_quantizer(dst.q_scale(), 0, kQInt8);
+      dst_ = empty_opaque_qtensor(tar_md, c10::nullopt, quantizer);
+    } else if (!dst_.defined()) {
+      dst_ = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
+    }
+
+    auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst_);
+    if (/* dst is passed by user */ dst_ctx.meta() != tar_md) {
+      dst_ = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
+    }
+
+    if (!dst.defined()) {
+      dst = dst_;
+    } else if (/* need a new oneDNN blk layout mem */ !dst.is_same(dst_)) {
+      dst_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
+      DPCPPTensorContext::set_tensor_ctx(dst, std::move(dst_ctx));
     }
   }
-  auto mo = dpcpp_onednn_memory(tar_md, engine, output.data_ptr());
+  auto mo = dpcpp_onednn_memory(tar_md, engine, dst.data_ptr());
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -146,7 +159,7 @@ static inline Tensor bin(
         {{DNNL_ARG_SRC_0, m1}, {DNNL_ARG_SRC_1, m2}, {DNNL_ARG_DST, mo}});
   }
 
-  return output;
+  return dst;
 }
 } // namespace oneDNN
 } // namespace xpu
