@@ -7,6 +7,7 @@
 #include "aten/cpu/Pooling.h"
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
+#include "cpu/passes/frozen_conv_folding.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -307,6 +308,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Replace _convolution with conv2d or conv3d
   graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+
+  // convolution folding
+  FoldFrozenConvAddOrSub(graph);
+  FoldFrozenConvMulOrDiv(graph);
 
   // convolution fusion
   graph_rewrite::insertPrePackedConvOp(graph);
