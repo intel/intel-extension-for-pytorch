@@ -43,14 +43,13 @@ class LSTMFunction : public Function<LSTMFunction> {
     ctx->saved_data["train"] = train;
     ctx->saved_data["bidirectional"] = bidirectional;
 
-    auto result_ = xpu::oneDNN::lstm_kernel_impl(
+    auto result_ = xpu::oneDNN::lstm(
         input,
         hx,
         cx,
         weight_i,
         weight_h,
         bias,
-        has_biases,
         layer_num,
         num_layers,
         dropout,
@@ -94,7 +93,7 @@ class LSTMFunction : public Function<LSTMFunction> {
     auto train = ctx->saved_data["train"].toBool();
     auto bidirectional = ctx->saved_data["bidirectional"].toBool();
     auto layer_num = ctx->saved_data["layer_num"].toInt();
-    auto result_ = xpu::oneDNN::lstm_kernel_impl_bwd(
+    auto result_ = xpu::oneDNN::lstm_backward(
         input,
         hx,
         cx,
@@ -108,7 +107,6 @@ class LSTMFunction : public Function<LSTMFunction> {
         grad_output,
         grad_hy,
         grad_cy,
-        has_biases,
         layer_num,
         num_layers,
         dropout,
@@ -197,6 +195,10 @@ std::tuple<Tensor, Tensor, Tensor> lstm_xpu(
     input_v = output[0];
     hy_arr.push_back(output[1]);
     cy_arr.push_back(output[2]);
+
+    if (dropout != 0 && train && i < num_layers - 1) {
+      input_v = at::dropout(input_v, dropout, /*train=*/true);
+    }
   }
   Tensor output = input_v;
   Tensor hy, cy;

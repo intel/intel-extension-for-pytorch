@@ -18,106 +18,102 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace oneDNN {
 
-static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm_kernel_impl(
-    const Tensor& input,
+static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
+    const Tensor& src,
     const Tensor& hx,
     const Tensor& cx,
-    const Tensor& weight_i,
-    const Tensor& weight_h,
-    const Tensor& bias,
-    bool has_biases,
+    const Tensor& wgh_i,
+    const Tensor& wgh_h,
+    const Tensor& bia,
     int layer_num,
     int64_t num_layers,
     double dropout_p,
     bool train,
     bool bidirectional) {
-  RECORD_FUNCTION("dnnl_lstm_kernel_impl", {});
+  RECORD_FUNCTION("dnnl_lstm", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  int32_t hidden_size = hx.size(-1);
-  int32_t seq_length = input.size(0);
-  int32_t mini_batch = input.size(1);
-  int32_t input_size = input.size(2);
+  int32_t hidden_sz = hx.size(-1);
+  int32_t seq_length = src.size(0);
+  int32_t mini_batch = src.size(1);
+  int32_t src_sz = src.size(2);
   int32_t num_directions = bidirectional ? 2 : 1;
   int32_t num_gate = 4;
 
-  auto data_t = xpu::oneDNN::get_onednn_dtype(input);
+  auto src_data_t = xpu::oneDNN::get_onednn_dtype(src);
+  auto iter_c_data_t = xpu::oneDNN::get_onednn_dtype(src);
+
+  auto bia_ = bia;
+  auto cx_ = cx;
+  auto bia_data_t = xpu::oneDNN::get_onednn_dtype(bia_);
+  if (bia_.scalar_type() == ScalarType::BFloat16) {
+    bia_ = bia_.to(at::kFloat);
+    cx_ = cx_.to(at::kFloat);
+    bia_data_t = memory::data_type::f32;
+    iter_c_data_t = memory::data_type::f32;
+  }
+
   auto format_any = memory::format_tag::any;
   auto format_tnc = memory::format_tag::tnc;
   auto format_ldnc = memory::format_tag::ldnc;
   auto format_ldigo = memory::format_tag::ldigo;
   auto format_ldgo = memory::format_tag::ldgo;
 
-  Tensor hy =
-      at::empty({num_directions, mini_batch, hidden_size}, hx.options());
-  Tensor cy =
-      at::empty({num_directions, mini_batch, hidden_size}, cx.options());
+  Tensor hy = at::empty({num_directions, mini_batch, hidden_sz}, hx.options());
+  Tensor cy = at::empty({num_directions, mini_batch, hidden_sz}, cx_.options());
 
   rnn_direction dir = bidirectional ? rnn_direction::bidirectional_concat
                                     : rnn_direction::unidirectional_left2right;
-  Tensor layer_x = at::empty_like(input);
-  layer_x.copy_(input);
+  Tensor layer_x = at::empty_like(src);
+  layer_x.copy_(src);
   Tensor workspace_t;
 
-  memory::dims src_layer_0_dims = {
-      seq_length, mini_batch, input_size}; // for layer=0, tnc
-  memory::dims src_layer_dims = {
-      seq_length, mini_batch, hidden_size * num_directions}; // for layer>0, tnc
-  memory::dims src_iter_dims = {
+  memory::dims src_layer_0_tz = {
+      seq_length, mini_batch, src_sz}; // for layer=0, tnc
+  memory::dims src_layer_tz = {
+      seq_length, mini_batch, hidden_sz * num_directions}; // for layer>0, tnc
+  memory::dims src_iter_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc hx, src hidden state
+  memory::dims src_iter_c_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc cx_, src cell state
+  memory::dims wghs_layer_0_tz = {
+      1, num_directions, src_sz, num_gate, hidden_sz}; // for layer=0, ldigo
+  memory::dims wghs_layer_tz = {
       1,
       num_directions,
-      mini_batch,
-      hidden_size}; // ldnc hx, input hidden state
-  memory::dims src_iter_c_dims = {
-      1, num_directions, mini_batch, hidden_size}; // ldnc cx, input cell state
-  memory::dims weights_layer_0_dims = {
-      1,
-      num_directions,
-      input_size,
+      hidden_sz * num_directions,
       num_gate,
-      hidden_size}; // for layer=0, ldigo
-  memory::dims weights_layer_dims = {
+      hidden_sz}; // for layer>0, ldigo
+  memory::dims wghs_iter_tz = {
       1,
       num_directions,
-      hidden_size * num_directions,
+      hidden_sz,
       num_gate,
-      hidden_size}; // for layer>0, ldigo
-  memory::dims weights_iter_dims = {
-      1,
-      num_directions,
-      hidden_size,
-      num_gate,
-      hidden_size}; // ldigo weight for hidden
-  memory::dims bias_dims = {1, num_directions, num_gate, hidden_size}; // ldgo
-  memory::dims dst_layer_dims = {
-      seq_length, mini_batch, hidden_size * num_directions}; // tnc
-  memory::dims dst_iter_dims = {
-      1,
-      num_directions,
-      mini_batch,
-      hidden_size}; // ldnc   hy, output hidden state
-  memory::dims dst_iter_c_dims = {
-      1,
-      num_directions,
-      mini_batch,
-      hidden_size}; // ldnc  cy, output cell state
+      hidden_sz}; // ldigo wgh for hidden
+  memory::dims bia_tz = {1, num_directions, num_gate, hidden_sz}; // ldgo
+  memory::dims dst_layer_tz = {
+      seq_length, mini_batch, hidden_sz * num_directions}; // tnc
+  memory::dims dst_iter_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc   hy, dst hidden state
+  memory::dims dst_iter_c_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc  cy, dst cell state
 
   int i = layer_num;
-  Tensor layer_y = at::empty({dst_layer_dims}, input.options());
+  Tensor layer_y = at::empty({dst_layer_tz}, src.options());
 
   auto src_layer_md = memory::desc(
-      {i == 0 ? src_layer_0_dims : src_layer_dims}, data_t, format_any);
-  auto weights_layer_md = memory::desc(
-      {i == 0 ? weights_layer_0_dims : weights_layer_dims}, data_t, format_any);
-  auto weights_iter_md = memory::desc({weights_iter_dims}, data_t, format_any);
-  auto bias_md = memory::desc({bias_dims}, data_t, format_any);
-  auto src_iter_md = memory::desc({src_iter_dims}, data_t, format_any);
-  auto src_iter_c_md = memory::desc({src_iter_c_dims}, data_t, format_any);
-  auto dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
-  auto dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
-  auto dst_iter_c_md = memory::desc({dst_iter_c_dims}, data_t, format_any);
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_any);
+  auto wghs_layer_md = memory::desc(
+      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_any);
+  auto wghs_iter_md = memory::desc({wghs_iter_tz}, src_data_t, format_any);
+  auto bia_md = memory::desc({bia_tz}, bia_data_t, format_any);
+  auto src_iter_md = memory::desc({src_iter_tz}, src_data_t, format_any);
+  auto src_iter_c_md = memory::desc({src_iter_c_tz}, iter_c_data_t, format_any);
+  auto dst_layer_md = memory::desc({dst_layer_tz}, src_data_t, format_any);
+  auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_any);
+  auto dst_iter_c_md = memory::desc({dst_iter_c_tz}, iter_c_data_t, format_any);
 
   std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
   lstm_forward_desc.reset(new lstm_forward::desc(
@@ -126,9 +122,9 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm_kernel_impl(
       src_layer_md,
       src_iter_md,
       src_iter_c_md,
-      weights_layer_md,
-      weights_iter_md,
-      bias_md,
+      wghs_layer_md,
+      wghs_iter_md,
+      bia_md,
       dst_layer_md,
       dst_iter_md,
       dst_iter_c_md));
@@ -137,192 +133,182 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm_kernel_impl(
   lstm_forward_pd.reset(
       new lstm_forward::primitive_desc(*lstm_forward_desc, engine));
 
-  auto weights_layer_usr_memory = dpcpp_onednn_memory(
-      {{i == 0 ? weights_layer_0_dims : weights_layer_dims},
-       data_t,
-       format_ldigo},
+  auto wghs_layer_usr_m = dpcpp_onednn_memory(
+      {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo},
       engine,
-      weight_i.data_ptr());
+      wgh_i.data_ptr());
 
-  auto weights_iter_usr_memory = dpcpp_onednn_memory(
-      {{weights_iter_dims}, data_t, format_ldigo}, engine, weight_h.data_ptr());
+  auto wghs_iter_usr_m = dpcpp_onednn_memory(
+      {{wghs_iter_tz}, src_data_t, format_ldigo}, engine, wgh_h.data_ptr());
 
-  auto bias_usr_memory = dpcpp_onednn_memory(
-      {{bias_dims}, data_t, format_ldgo}, engine, bias.data_ptr());
+  auto bia_usr_m = dpcpp_onednn_memory(
+      {{bia_tz}, bia_data_t, format_ldgo}, engine, bia_.data_ptr());
 
-  auto src_layer_usr_memory = dpcpp_onednn_memory(
-      {{i == 0 ? src_layer_0_dims : src_layer_dims}, data_t, format_tnc},
+  auto src_layer_usr_m = dpcpp_onednn_memory(
+      {{i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc},
       engine,
       layer_x.data_ptr());
 
-  auto src_iter_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_dims}, data_t, format_ldnc}, engine, hx.data_ptr());
+  auto src_iter_usr_m = dpcpp_onednn_memory(
+      {{src_iter_tz}, src_data_t, format_ldnc}, engine, hx.data_ptr());
 
-  auto src_iter_c_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_c_dims}, data_t, format_ldnc}, engine, cx.data_ptr());
+  auto src_iter_c_usr_m = dpcpp_onednn_memory(
+      {{src_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cx_.data_ptr());
 
-  auto dst_layer_usr_memory = dpcpp_onednn_memory(
-      {{dst_layer_dims}, data_t, format_tnc}, engine, layer_y.data_ptr());
+  auto dst_layer_usr_m = dpcpp_onednn_memory(
+      {{dst_layer_tz}, src_data_t, format_tnc}, engine, layer_y.data_ptr());
 
-  auto dst_iter_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_dims}, data_t, format_ldnc}, engine, hy.data_ptr());
+  auto dst_iter_usr_m = dpcpp_onednn_memory(
+      {{dst_iter_tz}, src_data_t, format_ldnc}, engine, hy.data_ptr());
 
-  auto dst_iter_c_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_c_dims}, data_t, format_ldnc}, engine, cy.data_ptr());
+  auto dst_iter_c_usr_m = dpcpp_onednn_memory(
+      {{dst_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cy.data_ptr());
 
-  auto expected_weights_layer_md = lstm_forward_pd->weights_layer_desc();
-  auto weights_layer_memory = weights_layer_usr_memory;
-  if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
-    weights_layer_memory = memory(expected_weights_layer_md, engine);
+  auto expected_wghs_layer_md = lstm_forward_pd->weights_layer_desc();
+  auto wghs_layer_m = wghs_layer_usr_m;
+  if (wghs_layer_usr_m.get_desc() != expected_wghs_layer_md) {
+    wghs_layer_m = memory(expected_wghs_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_layer_usr_memory, weights_layer_memory),
+        dnnl::reorder(wghs_layer_usr_m, wghs_layer_m),
         strm,
-        {{DNNL_ARG_FROM, weights_layer_usr_memory},
-         {DNNL_ARG_TO, weights_layer_memory}});
+        {{DNNL_ARG_FROM, wghs_layer_usr_m}, {DNNL_ARG_TO, wghs_layer_m}});
   }
 
-  auto expected_weights_iter_md = lstm_forward_pd->weights_iter_desc();
-  auto weights_iter_memory = weights_iter_usr_memory;
-  if (weights_iter_usr_memory.get_desc() != expected_weights_iter_md) {
-    weights_iter_memory = memory(expected_weights_iter_md, engine);
+  auto expected_wghs_iter_md = lstm_forward_pd->weights_iter_desc();
+  auto wghs_iter_m = wghs_iter_usr_m;
+  if (wghs_iter_usr_m.get_desc() != expected_wghs_iter_md) {
+    wghs_iter_m = memory(expected_wghs_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_iter_usr_memory, weights_iter_memory),
+        dnnl::reorder(wghs_iter_usr_m, wghs_iter_m),
         strm,
-        {{DNNL_ARG_FROM, weights_iter_usr_memory},
-         {DNNL_ARG_TO, weights_iter_memory}});
+        {{DNNL_ARG_FROM, wghs_iter_usr_m}, {DNNL_ARG_TO, wghs_iter_m}});
   }
 
-  auto expected_bias_md = lstm_forward_pd->bias_desc();
-  auto bias_memory = bias_usr_memory;
-  if (bias_usr_memory.get_desc() != expected_bias_md) {
-    bias_memory = memory(expected_bias_md, engine);
+  auto expected_bia_md = lstm_forward_pd->bias_desc();
+  auto bia_m = bia_usr_m;
+  if (bia_usr_m.get_desc() != expected_bia_md) {
+    bia_m = memory(expected_bia_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(bias_usr_memory, bias_memory),
+        dnnl::reorder(bia_usr_m, bia_m),
         strm,
-        {{DNNL_ARG_FROM, bias_usr_memory}, {DNNL_ARG_TO, bias_memory}});
+        {{DNNL_ARG_FROM, bia_usr_m}, {DNNL_ARG_TO, bia_m}});
   }
 
   auto expected_src_layer_md = lstm_forward_pd->src_layer_desc();
-  auto src_layer_memory = src_layer_usr_memory;
-  if (src_layer_usr_memory.get_desc() != expected_src_layer_md) {
-    src_layer_memory = memory(expected_src_layer_md, engine);
+  auto src_layer_m = src_layer_usr_m;
+  if (src_layer_usr_m.get_desc() != expected_src_layer_md) {
+    src_layer_m = memory(expected_src_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_layer_usr_memory, src_layer_memory),
+        dnnl::reorder(src_layer_usr_m, src_layer_m),
         strm,
-        {{DNNL_ARG_FROM, src_layer_usr_memory},
-         {DNNL_ARG_TO, src_layer_memory}});
+        {{DNNL_ARG_FROM, src_layer_usr_m}, {DNNL_ARG_TO, src_layer_m}});
   }
 
   auto expected_src_iter_md = lstm_forward_pd->src_iter_desc();
-  auto src_iter_memory = src_iter_usr_memory;
-  if (src_iter_usr_memory.get_desc() != expected_src_iter_md) {
-    src_iter_memory = memory(expected_src_iter_md, engine);
+  auto src_iter_m = src_iter_usr_m;
+  if (src_iter_usr_m.get_desc() != expected_src_iter_md) {
+    src_iter_m = memory(expected_src_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_iter_usr_memory, src_iter_memory),
+        dnnl::reorder(src_iter_usr_m, src_iter_m),
         strm,
-        {{DNNL_ARG_FROM, src_iter_usr_memory}, {DNNL_ARG_TO, src_iter_memory}});
+        {{DNNL_ARG_FROM, src_iter_usr_m}, {DNNL_ARG_TO, src_iter_m}});
   }
 
   auto expected_src_iter_c_md = lstm_forward_pd->src_iter_c_desc();
-  auto src_iter_c_memory = src_iter_c_usr_memory;
-  if (src_iter_c_usr_memory.get_desc() != expected_src_iter_c_md) {
-    src_iter_c_memory = memory(expected_src_iter_c_md, engine);
+  auto src_iter_c_m = src_iter_c_usr_m;
+  if (src_iter_c_usr_m.get_desc() != expected_src_iter_c_md) {
+    src_iter_c_m = memory(expected_src_iter_c_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_iter_c_usr_memory, src_iter_c_memory),
+        dnnl::reorder(src_iter_c_usr_m, src_iter_c_m),
         strm,
-        {{DNNL_ARG_FROM, src_iter_c_usr_memory},
-         {DNNL_ARG_TO, src_iter_c_memory}});
+        {{DNNL_ARG_FROM, src_iter_c_usr_m}, {DNNL_ARG_TO, src_iter_c_m}});
   }
 
   auto expected_dst_layer_md = lstm_forward_pd->dst_layer_desc();
-  auto dst_layer_memory = dst_layer_usr_memory;
-  if (dst_layer_usr_memory.get_desc() != expected_dst_layer_md) {
-    dst_layer_memory = memory(expected_dst_layer_md, engine);
+  auto dst_layer_m = dst_layer_usr_m;
+  if (dst_layer_usr_m.get_desc() != expected_dst_layer_md) {
+    dst_layer_m = memory(expected_dst_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_layer_usr_memory, dst_layer_memory),
+        dnnl::reorder(dst_layer_usr_m, dst_layer_m),
         strm,
-        {{DNNL_ARG_FROM, dst_layer_usr_memory},
-         {DNNL_ARG_TO, dst_layer_memory}});
+        {{DNNL_ARG_FROM, dst_layer_usr_m}, {DNNL_ARG_TO, dst_layer_m}});
   }
 
   auto expected_dst_iter_md = lstm_forward_pd->dst_iter_desc();
-  auto dst_iter_memory = dst_iter_usr_memory;
-  if (dst_iter_usr_memory.get_desc() != expected_dst_iter_md) {
-    dst_iter_memory = memory(expected_dst_iter_md, engine);
+  auto dst_iter_m = dst_iter_usr_m;
+  if (dst_iter_usr_m.get_desc() != expected_dst_iter_md) {
+    dst_iter_m = memory(expected_dst_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_usr_memory, dst_iter_memory),
+        dnnl::reorder(dst_iter_usr_m, dst_iter_m),
         strm,
-        {{DNNL_ARG_FROM, dst_iter_usr_memory}, {DNNL_ARG_TO, dst_iter_memory}});
+        {{DNNL_ARG_FROM, dst_iter_usr_m}, {DNNL_ARG_TO, dst_iter_m}});
   }
 
   auto expected_dst_iter_c_md = lstm_forward_pd->dst_iter_c_desc();
-  auto dst_iter_c_memory = dst_iter_c_usr_memory;
-  if (dst_iter_c_usr_memory.get_desc() != expected_dst_iter_c_md) {
-    dst_iter_c_memory = memory(expected_dst_iter_c_md, engine);
+  auto dst_iter_c_m = dst_iter_c_usr_m;
+  if (dst_iter_c_usr_m.get_desc() != expected_dst_iter_c_md) {
+    dst_iter_c_m = memory(expected_dst_iter_c_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_c_usr_memory, dst_iter_c_memory),
+        dnnl::reorder(dst_iter_c_usr_m, dst_iter_c_m),
         strm,
-        {{DNNL_ARG_FROM, dst_iter_c_usr_memory},
-         {DNNL_ARG_TO, dst_iter_c_memory}});
+        {{DNNL_ARG_FROM, dst_iter_c_usr_m}, {DNNL_ARG_TO, dst_iter_c_m}});
   }
 
   std::shared_ptr<lstm_forward> lstm1_forward;
   lstm1_forward.reset(new lstm_forward(*lstm_forward_pd));
   if (train) {
     auto workspace_md = lstm_forward_pd->workspace_desc();
-    workspace_t = at::zeros(workspace_md.get_size(), input.options());
+    workspace_t = at::zeros(workspace_md.get_size(), src.options());
     auto workspace =
         dpcpp_onednn_memory(workspace_md, engine, workspace_t.data_ptr());
 
     DPCPP_ONEDNN_EXEC(
         *lstm1_forward,
         strm,
-        {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-         {DNNL_ARG_SRC_ITER, src_iter_memory},
-         {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},
-         {DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory},
-         {DNNL_ARG_WEIGHTS_ITER, weights_iter_memory},
-         {DNNL_ARG_BIAS, bias_memory},
-         {DNNL_ARG_DST_LAYER, dst_layer_memory},
-         {DNNL_ARG_DST_ITER, dst_iter_memory},
-         {DNNL_ARG_DST_ITER_C, dst_iter_c_memory},
+        {{DNNL_ARG_SRC_LAYER, src_layer_m},
+         {DNNL_ARG_SRC_ITER, src_iter_m},
+         {DNNL_ARG_SRC_ITER_C, src_iter_c_m},
+         {DNNL_ARG_WEIGHTS_LAYER, wghs_layer_m},
+         {DNNL_ARG_WEIGHTS_ITER, wghs_iter_m},
+         {DNNL_ARG_BIAS, bia_m},
+         {DNNL_ARG_DST_LAYER, dst_layer_m},
+         {DNNL_ARG_DST_ITER, dst_iter_m},
+         {DNNL_ARG_DST_ITER_C, dst_iter_c_m},
          {DNNL_ARG_WORKSPACE, workspace}});
   } else {
     DPCPP_ONEDNN_EXEC(
         *lstm1_forward,
         strm,
-        {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-         {DNNL_ARG_SRC_ITER, src_iter_memory},
-         {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},
-         {DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory},
-         {DNNL_ARG_WEIGHTS_ITER, weights_iter_memory},
-         {DNNL_ARG_BIAS, bias_memory},
-         {DNNL_ARG_DST_LAYER, dst_layer_memory},
-         {DNNL_ARG_DST_ITER, dst_iter_memory},
-         {DNNL_ARG_DST_ITER_C, dst_iter_c_memory}});
+        {{DNNL_ARG_SRC_LAYER, src_layer_m},
+         {DNNL_ARG_SRC_ITER, src_iter_m},
+         {DNNL_ARG_SRC_ITER_C, src_iter_c_m},
+         {DNNL_ARG_WEIGHTS_LAYER, wghs_layer_m},
+         {DNNL_ARG_WEIGHTS_ITER, wghs_iter_m},
+         {DNNL_ARG_BIAS, bia_m},
+         {DNNL_ARG_DST_LAYER, dst_layer_m},
+         {DNNL_ARG_DST_ITER, dst_iter_m},
+         {DNNL_ARG_DST_ITER_C, dst_iter_c_m}});
   }
 
-  if (dst_layer_memory != dst_layer_usr_memory) {
+  if (dst_layer_m != dst_layer_usr_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_layer_memory, dst_layer_usr_memory),
+        dnnl::reorder(dst_layer_m, dst_layer_usr_m),
         strm,
-        {{DNNL_ARG_FROM, dst_layer_memory},
-         {DNNL_ARG_TO, dst_layer_usr_memory}});
+        {{DNNL_ARG_FROM, dst_layer_m}, {DNNL_ARG_TO, dst_layer_usr_m}});
   }
 
-  if (dst_iter_memory != dst_iter_usr_memory) {
+  if (dst_iter_m != dst_iter_usr_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_memory, dst_iter_usr_memory),
+        dnnl::reorder(dst_iter_m, dst_iter_usr_m),
         strm,
-        {{DNNL_ARG_FROM, dst_iter_memory}, {DNNL_ARG_TO, dst_iter_usr_memory}});
+        {{DNNL_ARG_FROM, dst_iter_m}, {DNNL_ARG_TO, dst_iter_usr_m}});
   }
 
-  if (dst_iter_c_memory != dst_iter_c_usr_memory) {
+  if (dst_iter_c_m != dst_iter_c_usr_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_c_memory, dst_iter_c_usr_memory),
+        dnnl::reorder(dst_iter_c_m, dst_iter_c_usr_m),
         strm,
-        {{DNNL_ARG_FROM, dst_iter_c_memory},
-         {DNNL_ARG_TO, dst_iter_c_usr_memory}});
+        {{DNNL_ARG_FROM, dst_iter_c_m}, {DNNL_ARG_TO, dst_iter_c_usr_m}});
   }
   return std::make_tuple(layer_y, hy, cy, workspace_t);
 }
@@ -334,145 +320,149 @@ static inline std::tuple<
     at::Tensor,
     at::Tensor,
     at::Tensor>
-lstm_kernel_impl_bwd(
-    const Tensor& input,
+lstm_backward(
+    const Tensor& src,
     const Tensor& hx,
     const Tensor& cx,
-    const Tensor& output,
-    const Tensor& hy_,
-    const Tensor& cy_,
-    const Tensor& weight_i,
-    const Tensor& weight_h,
-    const Tensor& bias,
+    const Tensor& dst,
+    const Tensor& hy,
+    const Tensor& cy,
+    const Tensor& wgh_i,
+    const Tensor& wgh_h,
+    const Tensor& bia,
     Tensor workspace_arr,
-    const Tensor& grad_output,
-    const Tensor& grad_hy_ori,
-    const Tensor& grad_cy_ori,
-    bool has_biases,
+    const Tensor& diff_dst,
+    const Tensor& diff_hy_ori,
+    const Tensor& diff_cy_ori,
     int layer_num,
     int64_t num_layers,
     double dropout_p,
     bool train,
     bool bidirectional) {
-  RECORD_FUNCTION("dnnl_lstm_kernel_impl_bwd", {});
+  RECORD_FUNCTION("dnnl_lstm_bwd", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  int32_t hidden_size = hx.size(-1);
-  int32_t seq_length = input.size(0);
-  int32_t mini_batch = input.size(1);
-  int32_t input_size = input.size(2);
+  int32_t hidden_sz = hx.size(-1);
+  int32_t seq_length = src.size(0);
+  int32_t mini_batch = src.size(1);
+  int32_t src_sz = src.size(2);
   int32_t num_directions = bidirectional ? 2 : 1;
   int32_t num_gate = 4;
 
-  Tensor grad_hy, grad_cy;
-  if (grad_hy_ori.defined()) {
-    grad_hy = grad_hy_ori;
+  Tensor diff_hy, diff_cy;
+  if (diff_hy_ori.defined()) {
+    diff_hy = diff_hy_ori;
   } else {
-    grad_hy = at::zeros_like(hy_);
+    diff_hy = at::zeros_like(hy);
   }
-  if (grad_cy_ori.defined()) {
-    grad_cy = grad_cy_ori;
+  if (diff_cy_ori.defined()) {
+    diff_cy = diff_cy_ori;
   } else {
-    grad_cy = at::zeros_like(cy_);
+    diff_cy = at::zeros_like(cy);
   }
 
-  Tensor layer_x = at::empty_like(input);
-  layer_x.copy_(input);
+  Tensor layer_x = at::empty_like(src);
+  layer_x.copy_(src);
 
-  Tensor layer_y = at::empty_like(output);
-  layer_y.copy_(output);
+  Tensor layer_y = at::empty_like(dst);
+  layer_y.copy_(dst);
 
-  Tensor grad_layer_y = at::empty_like(grad_output);
-  grad_layer_y.copy_(grad_output);
+  Tensor diff_layer_y = at::empty_like(diff_dst);
+  diff_layer_y.copy_(diff_dst);
 
-  auto grad_hx = at::zeros_like(hx);
-  auto grad_cx = at::zeros_like(cx);
-  auto grad_weight_i = at::zeros_like(weight_i);
-  auto grad_weight_h = at::zeros_like(weight_h);
-  auto grad_bias = at::zeros_like(bias);
+  auto diff_hx = at::zeros_like(hx);
+  auto diff_cx = at::zeros_like(cx);
+  auto diff_wgh_i = at::zeros_like(wgh_i);
+  auto diff_wgh_h = at::zeros_like(wgh_h);
+  auto diff_bia = at::zeros_like(bia);
 
-  auto data_t = memory::data_type::f32;
+  auto src_data_t = xpu::oneDNN::get_onednn_dtype(src);
+  auto iter_c_data_t = xpu::oneDNN::get_onednn_dtype(src);
+
+  auto bia_ = bia;
+  auto cx_ = cx;
+  auto bia_data_t = xpu::oneDNN::get_onednn_dtype(bia_);
+  auto diff_data_t = xpu::oneDNN::get_onednn_dtype(diff_dst);
+  if (bia_.scalar_type() == ScalarType::BFloat16) {
+    bia_ = bia_.to(at::kFloat);
+    cx_ = cx_.to(at::kFloat);
+    diff_layer_y = diff_layer_y.to(at::kFloat);
+    bia_data_t = memory::data_type::f32;
+    iter_c_data_t = memory::data_type::f32;
+    diff_data_t = memory::data_type::f32;
+  }
+
   auto format_any = memory::format_tag::any;
   auto format_tnc = memory::format_tag::tnc;
   auto format_ldnc = memory::format_tag::ldnc;
   auto format_ldigo = memory::format_tag::ldigo;
   auto format_ldgo = memory::format_tag::ldgo;
 
-  memory::dims src_layer_0_dims = {
-      seq_length, mini_batch, input_size}; // for layer=0, tnc
-  memory::dims src_layer_dims = {
-      seq_length, mini_batch, hidden_size * num_directions}; // for layer>0, tnc
-  memory::dims src_iter_dims = {
-      1,
-      num_directions,
-      mini_batch,
-      hidden_size}; // ldnc hx, input hidden state
-  memory::dims src_iter_c_dims = {
-      1, num_directions, mini_batch, hidden_size}; // ldnc cx, input cell state
+  memory::dims src_layer_0_tz = {
+      seq_length, mini_batch, src_sz}; // for layer=0, tnc
+  memory::dims src_layer_tz = {
+      seq_length, mini_batch, hidden_sz * num_directions}; // for layer>0, tnc
+  memory::dims src_iter_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc hx, src hidden state
+  memory::dims src_iter_c_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc cx_, src cell state
 
-  memory::dims weights_layer_0_dims = {
+  memory::dims wghs_layer_0_tz = {
+      1, num_directions, src_sz, num_gate, hidden_sz}; // for layer=0, ldigo
+  memory::dims wghs_layer_tz = {
       1,
       num_directions,
-      input_size,
+      hidden_sz * num_directions,
       num_gate,
-      hidden_size}; // for layer=0, ldigo
-  memory::dims weights_layer_dims = {
+      hidden_sz}; // for layer>0, ldigo
+  memory::dims wghs_iter_tz = {
       1,
       num_directions,
-      hidden_size * num_directions,
+      hidden_sz,
       num_gate,
-      hidden_size}; // for layer>0, ldigo
-  memory::dims weights_iter_dims = {
-      1,
-      num_directions,
-      hidden_size,
-      num_gate,
-      hidden_size}; // ldigo weight for hidden
-  memory::dims bias_dims = {1, num_directions, num_gate, hidden_size}; // ldgo
+      hidden_sz}; // ldigo wgh for hidden
+  memory::dims bia_tz = {1, num_directions, num_gate, hidden_sz}; // ldgo
 
-  memory::dims dst_layer_dims = {
-      seq_length, mini_batch, hidden_size * num_directions}; // tnc
-  memory::dims dst_iter_dims = {
-      1,
-      num_directions,
-      mini_batch,
-      hidden_size}; // ldnc   hy, output hidden state
-  memory::dims dst_iter_c_dims = {
-      1,
-      num_directions,
-      mini_batch,
-      hidden_size}; // ldnc  cy, output cell state
+  memory::dims dst_layer_tz = {
+      seq_length, mini_batch, hidden_sz * num_directions}; // tnc
+  memory::dims dst_iter_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc   hy, dst hidden state
+  memory::dims dst_iter_c_tz = {
+      1, num_directions, mini_batch, hidden_sz}; // ldnc  cy, dst cell state
 
-  auto grad_src = at::zeros_like(input);
+  auto diff_src = at::zeros_like(src);
   int i = layer_num;
-  auto grad_layer_x = at::zeros(
-      {i == 0 ? src_layer_0_dims : src_layer_dims}, grad_output.options());
+  auto diff_layer_x = at::zeros(
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, diff_layer_y.options());
 
   auto src_layer_md = memory::desc(
-      {i == 0 ? src_layer_0_dims : src_layer_dims}, data_t, format_any);
-  auto weights_layer_md = memory::desc(
-      {i == 0 ? weights_layer_0_dims : weights_layer_dims}, data_t, format_any);
-  auto weights_iter_md = memory::desc({weights_iter_dims}, data_t, format_any);
-  auto bias_md = memory::desc({bias_dims}, data_t, format_any);
-  auto src_iter_md = memory::desc({src_iter_dims}, data_t, format_any);
-  auto src_iter_c_md = memory::desc({src_iter_c_dims}, data_t, format_any);
-  auto dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
-  auto dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
-  auto dst_iter_c_md = memory::desc({dst_iter_c_dims}, data_t, format_any);
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_any);
+  auto wghs_layer_md = memory::desc(
+      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_any);
+  auto wghs_iter_md = memory::desc({wghs_iter_tz}, src_data_t, format_any);
+  auto bia_md = memory::desc({bia_tz}, bia_data_t, format_any);
+  auto src_iter_md = memory::desc({src_iter_tz}, src_data_t, format_any);
+  auto src_iter_c_md = memory::desc({src_iter_c_tz}, iter_c_data_t, format_any);
+  auto dst_layer_md = memory::desc({dst_layer_tz}, src_data_t, format_any);
+  auto dst_iter_md = memory::desc({dst_iter_tz}, src_data_t, format_any);
+  auto dst_iter_c_md = memory::desc({dst_iter_c_tz}, iter_c_data_t, format_any);
   auto diff_src_layer_md = memory::desc(
-      {i == 0 ? src_layer_0_dims : src_layer_dims}, data_t, format_any);
-  auto diff_src_iter_md = memory::desc({src_iter_dims}, data_t, format_any);
-  auto diff_src_iter_c_md = memory::desc({src_iter_c_dims}, data_t, format_any);
-  auto diff_weights_layer_md = memory::desc(
-      {i == 0 ? weights_layer_0_dims : weights_layer_dims}, data_t, format_any);
-  auto diff_weights_iter_md =
-      memory::desc({weights_iter_dims}, data_t, format_any);
-  auto diff_bias_md = memory::desc({bias_dims}, data_t, format_any);
-  auto diff_dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
-  auto diff_dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
-  auto diff_dst_iter_c_md = memory::desc({dst_iter_c_dims}, data_t, format_any);
+      {i == 0 ? src_layer_0_tz : src_layer_tz}, diff_data_t, format_any);
+  auto diff_src_iter_md = memory::desc({src_iter_tz}, diff_data_t, format_any);
+  auto diff_src_iter_c_md =
+      memory::desc({src_iter_c_tz}, diff_data_t, format_any);
+  auto diff_wghs_layer_md = memory::desc(
+      {i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, diff_data_t, format_any);
+  auto diff_wghs_iter_md =
+      memory::desc({wghs_iter_tz}, diff_data_t, format_any);
+  auto diff_bia_md = memory::desc({bia_tz}, diff_data_t, format_any);
+  auto diff_dst_layer_md =
+      memory::desc({dst_layer_tz}, diff_data_t, format_any);
+  auto diff_dst_iter_md = memory::desc({dst_iter_tz}, diff_data_t, format_any);
+  auto diff_dst_iter_c_md =
+      memory::desc({dst_iter_c_tz}, diff_data_t, format_any);
 
   rnn_direction dir = bidirectional ? rnn_direction::bidirectional_concat
                                     : rnn_direction::unidirectional_left2right;
@@ -484,9 +474,9 @@ lstm_kernel_impl_bwd(
       src_layer_md,
       src_iter_md,
       src_iter_c_md,
-      weights_layer_md,
-      weights_iter_md,
-      bias_md,
+      wghs_layer_md,
+      wghs_iter_md,
+      bia_md,
       dst_layer_md,
       dst_iter_md,
       dst_iter_c_md));
@@ -495,364 +485,328 @@ lstm_kernel_impl_bwd(
   lstm_forward_pd.reset(
       new lstm_forward::primitive_desc(*lstm_forward_desc, engine));
 
-  std::shared_ptr<lstm_backward::desc> lstm_backward_desc;
-  lstm_backward_desc.reset(new lstm_backward::desc(
+  std::shared_ptr<dnnl::lstm_backward::desc> lstm_backward_desc;
+  lstm_backward_desc.reset(new dnnl::lstm_backward::desc(
       prop_kind::backward,
       dir,
       src_layer_md,
       src_iter_md,
       src_iter_c_md,
-      weights_layer_md,
-      weights_iter_md,
-      bias_md,
+      wghs_layer_md,
+      wghs_iter_md,
+      bia_md,
       dst_layer_md,
       dst_iter_md,
       dst_iter_c_md,
       diff_src_layer_md,
       diff_src_iter_md,
       diff_src_iter_c_md,
-      diff_weights_layer_md,
-      diff_weights_iter_md,
-      diff_bias_md,
+      diff_wghs_layer_md,
+      diff_wghs_iter_md,
+      diff_bia_md,
       diff_dst_layer_md,
       diff_dst_iter_md,
       diff_dst_iter_c_md));
 
-  auto src_layer_usr_memory = dpcpp_onednn_memory(
-      {{i == 0 ? src_layer_0_dims : src_layer_dims}, data_t, format_tnc},
+  auto src_layer_usr_m = dpcpp_onednn_memory(
+      {{i == 0 ? src_layer_0_tz : src_layer_tz}, src_data_t, format_tnc},
       engine,
       layer_x.data_ptr());
 
-  auto src_iter_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_dims}, data_t, format_ldnc}, engine, hx.data_ptr());
+  auto src_iter_usr_m = dpcpp_onednn_memory(
+      {{src_iter_tz}, src_data_t, format_ldnc}, engine, hx.data_ptr());
 
-  auto src_iter_c_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_c_dims}, data_t, format_ldnc}, engine, cx.data_ptr());
+  auto src_iter_c_usr_m = dpcpp_onednn_memory(
+      {{src_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cx_.data_ptr());
 
-  auto dst_layer_usr_memory = dpcpp_onednn_memory(
-      {{dst_layer_dims}, data_t, format_tnc}, engine, layer_y.data_ptr());
+  auto dst_layer_usr_m = dpcpp_onednn_memory(
+      {{dst_layer_tz}, src_data_t, format_tnc}, engine, layer_y.data_ptr());
 
-  auto dst_iter_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_dims}, data_t, format_ldnc}, engine, hy_.data_ptr());
+  auto dst_iter_usr_m = dpcpp_onednn_memory(
+      {{dst_iter_tz}, src_data_t, format_ldnc}, engine, hy.data_ptr());
 
-  auto dst_iter_c_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_c_dims}, data_t, format_ldnc}, engine, cy_.data_ptr());
+  auto dst_iter_c_usr_m = dpcpp_onednn_memory(
+      {{dst_iter_c_tz}, iter_c_data_t, format_ldnc}, engine, cy.data_ptr());
 
-  auto weights_layer_usr_memory = dpcpp_onednn_memory(
-      {{i == 0 ? weights_layer_0_dims : weights_layer_dims},
-       data_t,
-       format_ldigo},
+  auto wghs_layer_usr_m = dpcpp_onednn_memory(
+      {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, src_data_t, format_ldigo},
       engine,
-      weight_i.data_ptr());
+      wgh_i.data_ptr());
 
-  auto weights_iter_usr_memory = dpcpp_onednn_memory(
-      {{weights_iter_dims}, data_t, format_ldigo}, engine, weight_h.data_ptr());
+  auto wghs_iter_usr_m = dpcpp_onednn_memory(
+      {{wghs_iter_tz}, src_data_t, format_ldigo}, engine, wgh_h.data_ptr());
 
-  auto bias_usr_memory = dpcpp_onednn_memory(
-      {{bias_dims}, data_t, format_ldgo}, engine, bias.data_ptr());
+  auto bia_usr_m = dpcpp_onednn_memory(
+      {{bia_tz}, bia_data_t, format_ldgo}, engine, bia_.data_ptr());
 
-  auto grad_src_layer_usr_memory = dpcpp_onednn_memory(
-      {{i == 0 ? src_layer_0_dims : src_layer_dims}, data_t, format_tnc},
+  auto diff_src_layer_usr_m = dpcpp_onednn_memory(
+      {{i == 0 ? src_layer_0_tz : src_layer_tz}, diff_data_t, format_tnc},
       engine,
-      grad_layer_x.data_ptr());
+      diff_layer_x.data_ptr());
 
-  auto grad_src_iter_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_dims}, data_t, format_ldnc}, engine, grad_hx.data_ptr());
+  auto diff_src_iter_usr_m = dpcpp_onednn_memory(
+      {{src_iter_tz}, diff_data_t, format_ldnc}, engine, diff_hx.data_ptr());
 
-  auto grad_src_iter_c_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_c_dims}, data_t, format_ldnc}, engine, grad_cx.data_ptr());
+  auto diff_src_iter_c_usr_m = dpcpp_onednn_memory(
+      {{src_iter_c_tz}, diff_data_t, format_ldnc}, engine, diff_cx.data_ptr());
 
-  auto grad_dst_layer_usr_memory = dpcpp_onednn_memory(
-      {{dst_layer_dims}, data_t, format_tnc}, engine, grad_layer_y.data_ptr());
-
-  auto grad_dst_iter_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_dims}, data_t, format_ldnc}, engine, grad_hy.data_ptr());
-
-  auto grad_dst_iter_c_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_c_dims}, data_t, format_ldnc}, engine, grad_cy.data_ptr());
-
-  auto grad_weights_layer_usr_memory = dpcpp_onednn_memory(
-      {{i == 0 ? weights_layer_0_dims : weights_layer_dims},
-       data_t,
-       format_ldigo},
+  auto diff_dst_layer_usr_m = dpcpp_onednn_memory(
+      {{dst_layer_tz}, diff_data_t, format_tnc},
       engine,
-      grad_weight_i.data_ptr());
+      diff_layer_y.data_ptr());
 
-  auto grad_weights_iter_usr_memory = dpcpp_onednn_memory(
-      {{weights_iter_dims}, data_t, format_ldigo},
+  auto diff_dst_iter_usr_m = dpcpp_onednn_memory(
+      {{dst_iter_tz}, diff_data_t, format_ldnc}, engine, diff_hy.data_ptr());
+
+  auto diff_dst_iter_c_usr_m = dpcpp_onednn_memory(
+      {{dst_iter_c_tz}, diff_data_t, format_ldnc}, engine, diff_cy.data_ptr());
+
+  auto diff_wghs_layer_usr_m = dpcpp_onednn_memory(
+      {{i == 0 ? wghs_layer_0_tz : wghs_layer_tz}, diff_data_t, format_ldigo},
       engine,
-      grad_weight_h.data_ptr());
+      diff_wgh_i.data_ptr());
 
-  auto grad_bias_usr_memory = dpcpp_onednn_memory(
-      {{bias_dims}, data_t, format_ldgo}, engine, grad_bias.data_ptr());
+  auto diff_wghs_iter_usr_m = dpcpp_onednn_memory(
+      {{wghs_iter_tz}, diff_data_t, format_ldigo},
+      engine,
+      diff_wgh_h.data_ptr());
 
-  std::shared_ptr<lstm_backward::primitive_desc> lstm_backward_pd;
-  lstm_backward_pd.reset(new lstm_backward::primitive_desc(
+  auto diff_bia_usr_m = dpcpp_onednn_memory(
+      {{bia_tz}, diff_data_t, format_ldgo}, engine, diff_bia.data_ptr());
+
+  std::shared_ptr<dnnl::lstm_backward::primitive_desc> lstm_backward_pd;
+  lstm_backward_pd.reset(new dnnl::lstm_backward::primitive_desc(
       *lstm_backward_desc, engine, *lstm_forward_pd));
 
   auto expected_src_layer_md = lstm_forward_pd->src_layer_desc();
-  auto src_layer_memory = src_layer_usr_memory;
-  if (src_layer_usr_memory.get_desc() != expected_src_layer_md) {
-    src_layer_memory = memory(expected_src_layer_md, engine);
+  auto src_layer_m = src_layer_usr_m;
+  if (src_layer_usr_m.get_desc() != expected_src_layer_md) {
+    src_layer_m = memory(expected_src_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_layer_usr_memory, src_layer_memory),
+        dnnl::reorder(src_layer_usr_m, src_layer_m),
         strm,
-        {{DNNL_ARG_FROM, src_layer_usr_memory},
-         {DNNL_ARG_TO, src_layer_memory}});
+        {{DNNL_ARG_FROM, src_layer_usr_m}, {DNNL_ARG_TO, src_layer_m}});
   }
 
   auto expected_src_iter_md = lstm_forward_pd->src_iter_desc();
-  auto src_iter_memory = src_iter_usr_memory;
-  if (src_iter_usr_memory.get_desc() != expected_src_iter_md) {
-    src_iter_memory = memory(expected_src_iter_md, engine);
+  auto src_iter_m = src_iter_usr_m;
+  if (src_iter_usr_m.get_desc() != expected_src_iter_md) {
+    src_iter_m = memory(expected_src_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_iter_usr_memory, src_iter_memory),
+        dnnl::reorder(src_iter_usr_m, src_iter_m),
         strm,
-        {{DNNL_ARG_FROM, src_iter_usr_memory}, {DNNL_ARG_TO, src_iter_memory}});
+        {{DNNL_ARG_FROM, src_iter_usr_m}, {DNNL_ARG_TO, src_iter_m}});
   }
 
   auto expected_src_iter_c_md = lstm_forward_pd->src_iter_c_desc();
-  auto src_iter_c_memory = src_iter_c_usr_memory;
-  if (src_iter_c_usr_memory.get_desc() != expected_src_iter_c_md) {
-    src_iter_c_memory = memory(expected_src_iter_c_md, engine);
+  auto src_iter_c_m = src_iter_c_usr_m;
+  if (src_iter_c_usr_m.get_desc() != expected_src_iter_c_md) {
+    src_iter_c_m = memory(expected_src_iter_c_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(src_iter_c_usr_memory, src_iter_c_memory),
+        dnnl::reorder(src_iter_c_usr_m, src_iter_c_m),
         strm,
-        {{DNNL_ARG_FROM, src_iter_c_usr_memory},
-         {DNNL_ARG_TO, src_iter_c_memory}});
+        {{DNNL_ARG_FROM, src_iter_c_usr_m}, {DNNL_ARG_TO, src_iter_c_m}});
   }
 
   auto expected_dst_layer_md = lstm_forward_pd->dst_layer_desc();
-  auto dst_layer_memory = dst_layer_usr_memory;
-  if (dst_layer_usr_memory.get_desc() != expected_dst_layer_md) {
-    dst_layer_memory = memory(expected_dst_layer_md, engine);
+  auto dst_layer_m = dst_layer_usr_m;
+  if (dst_layer_usr_m.get_desc() != expected_dst_layer_md) {
+    dst_layer_m = memory(expected_dst_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_layer_usr_memory, dst_layer_memory),
+        dnnl::reorder(dst_layer_usr_m, dst_layer_m),
         strm,
-        {{DNNL_ARG_FROM, dst_layer_usr_memory},
-         {DNNL_ARG_TO, dst_layer_memory}});
+        {{DNNL_ARG_FROM, dst_layer_usr_m}, {DNNL_ARG_TO, dst_layer_m}});
   }
 
   auto expected_dst_iter_md = lstm_forward_pd->dst_iter_desc();
-  auto dst_iter_memory = dst_iter_usr_memory;
-  if (dst_iter_usr_memory.get_desc() != expected_dst_iter_md) {
-    dst_iter_memory = memory(expected_dst_iter_md, engine);
+  auto dst_iter_m = dst_iter_usr_m;
+  if (dst_iter_usr_m.get_desc() != expected_dst_iter_md) {
+    dst_iter_m = memory(expected_dst_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_usr_memory, dst_iter_memory),
+        dnnl::reorder(dst_iter_usr_m, dst_iter_m),
         strm,
-        {{DNNL_ARG_FROM, dst_iter_usr_memory}, {DNNL_ARG_TO, dst_iter_memory}});
+        {{DNNL_ARG_FROM, dst_iter_usr_m}, {DNNL_ARG_TO, dst_iter_m}});
   }
 
   auto expected_dst_iter_c_md = lstm_forward_pd->dst_iter_c_desc();
-  auto dst_iter_c_memory = dst_iter_c_usr_memory;
-  if (dst_iter_c_usr_memory.get_desc() != expected_dst_iter_c_md) {
-    dst_iter_c_memory = memory(expected_dst_iter_c_md, engine);
+  auto dst_iter_c_m = dst_iter_c_usr_m;
+  if (dst_iter_c_usr_m.get_desc() != expected_dst_iter_c_md) {
+    dst_iter_c_m = memory(expected_dst_iter_c_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(dst_iter_c_usr_memory, dst_iter_c_memory),
+        dnnl::reorder(dst_iter_c_usr_m, dst_iter_c_m),
         strm,
-        {{DNNL_ARG_FROM, dst_iter_c_usr_memory},
-         {DNNL_ARG_TO, dst_iter_c_memory}});
+        {{DNNL_ARG_FROM, dst_iter_c_usr_m}, {DNNL_ARG_TO, dst_iter_c_m}});
   }
 
-  auto expected_weights_layer_md = lstm_forward_pd->weights_layer_desc();
-  auto weights_layer_memory = weights_layer_usr_memory;
-  if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
-    weights_layer_memory = memory(expected_weights_layer_md, engine);
+  auto expected_bia_md = lstm_backward_pd->bias_desc();
+  auto bia_m = bia_usr_m;
+  if (bia_usr_m.get_desc() != expected_bia_md) {
+    bia_m = memory(expected_bia_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_layer_usr_memory, weights_layer_memory),
+        dnnl::reorder(bia_usr_m, bia_m),
         strm,
-        {{DNNL_ARG_FROM, weights_layer_usr_memory},
-         {DNNL_ARG_TO, weights_layer_memory}});
+        {{DNNL_ARG_FROM, bia_usr_m}, {DNNL_ARG_TO, bia_m}});
   }
 
-  auto expected_weights_iter_md = lstm_forward_pd->weights_iter_desc();
-  auto weights_iter_memory = weights_iter_usr_memory;
-  if (weights_iter_usr_memory.get_desc() != expected_weights_iter_md) {
-    weights_iter_memory = memory(expected_weights_iter_md, engine);
+  auto expected_bwd_wghs_layer_md = lstm_backward_pd->weights_layer_desc();
+  auto bwd_wghs_layer_m = wghs_layer_usr_m;
+  if (wghs_layer_usr_m.get_desc() != expected_bwd_wghs_layer_md) {
+    bwd_wghs_layer_m = memory(expected_bwd_wghs_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_iter_usr_memory, weights_iter_memory),
+        dnnl::reorder(wghs_layer_usr_m, bwd_wghs_layer_m),
         strm,
-        {{DNNL_ARG_FROM, weights_iter_usr_memory},
-         {DNNL_ARG_TO, weights_iter_memory}});
+        {{DNNL_ARG_FROM, wghs_layer_usr_m}, {DNNL_ARG_TO, bwd_wghs_layer_m}});
   }
 
-  auto expected_bias_md = lstm_backward_pd->bias_desc();
-  auto bias_memory = bias_usr_memory;
-  if (bias_usr_memory.get_desc() != expected_bias_md) {
-    bias_memory = memory(expected_bias_md, engine);
+  auto expected_bwd_wghs_iter_md = lstm_backward_pd->weights_iter_desc();
+  auto bwd_wghs_iter_m = wghs_iter_usr_m;
+  if (wghs_iter_usr_m.get_desc() != expected_bwd_wghs_iter_md) {
+    bwd_wghs_iter_m = memory(expected_bwd_wghs_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(bias_usr_memory, bias_memory),
+        dnnl::reorder(wghs_iter_usr_m, bwd_wghs_iter_m),
         strm,
-        {{DNNL_ARG_FROM, bias_usr_memory}, {DNNL_ARG_TO, bias_memory}});
+        {{DNNL_ARG_FROM, wghs_iter_usr_m}, {DNNL_ARG_TO, bwd_wghs_iter_m}});
   }
 
-  auto bwd_expected_weights_layer_md = lstm_backward_pd->weights_layer_desc();
-  auto bwd_weights_layer_memory = weights_layer_usr_memory;
-  if (weights_layer_usr_memory.get_desc() != bwd_expected_weights_layer_md) {
-    bwd_weights_layer_memory = memory(bwd_expected_weights_layer_md, engine);
+  auto diff_expected_src_layer_md = lstm_backward_pd->diff_src_layer_desc();
+  auto diff_src_layer_m = diff_src_layer_usr_m;
+  if (diff_src_layer_usr_m.get_desc() != diff_expected_src_layer_md) {
+    diff_src_layer_m = memory(diff_expected_src_layer_md, engine);
+  }
+
+  auto diff_expected_src_iter_md = lstm_backward_pd->diff_src_iter_desc();
+  auto diff_src_iter_m = diff_src_iter_usr_m;
+  if (diff_src_iter_usr_m.get_desc() != diff_expected_src_iter_md) {
+    diff_src_iter_m = memory(diff_expected_src_iter_md, engine);
+  }
+
+  auto diff_expected_src_iter_c_md = lstm_backward_pd->diff_src_iter_c_desc();
+  auto diff_src_iter_c_m = diff_src_iter_c_usr_m;
+  if (diff_src_iter_c_usr_m.get_desc() != diff_expected_src_iter_c_md) {
+    diff_src_iter_c_m = memory(diff_expected_src_iter_c_md, engine);
+  }
+
+  auto diff_expected_dst_layer_md = lstm_backward_pd->diff_dst_layer_desc();
+  auto diff_dst_layer_m = diff_dst_layer_usr_m;
+  if (diff_dst_layer_usr_m.get_desc() != diff_expected_dst_layer_md) {
+    diff_dst_layer_m = memory(diff_expected_dst_layer_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_layer_usr_memory, bwd_weights_layer_memory),
+        dnnl::reorder(diff_dst_layer_usr_m, diff_dst_layer_m),
         strm,
-        {{DNNL_ARG_FROM, weights_layer_usr_memory},
-         {DNNL_ARG_TO, bwd_weights_layer_memory}});
+        {{DNNL_ARG_FROM, diff_dst_layer_usr_m},
+         {DNNL_ARG_TO, diff_dst_layer_m}});
   }
 
-  auto bwd_expected_weights_iter_md = lstm_backward_pd->weights_iter_desc();
-  auto bwd_weights_iter_memory = weights_iter_usr_memory;
-  if (weights_iter_usr_memory.get_desc() != bwd_expected_weights_iter_md) {
-    bwd_weights_iter_memory = memory(bwd_expected_weights_iter_md, engine);
+  auto diff_expected_dst_iter_md = lstm_backward_pd->diff_dst_iter_desc();
+  auto diff_dst_iter_m = diff_dst_iter_usr_m;
+  if (diff_dst_iter_usr_m.get_desc() != diff_expected_dst_iter_md) {
+    diff_dst_iter_m = memory(diff_expected_dst_iter_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(weights_iter_usr_memory, bwd_weights_iter_memory),
+        dnnl::reorder(diff_dst_iter_usr_m, diff_dst_iter_m),
         strm,
-        {{DNNL_ARG_FROM, weights_iter_usr_memory},
-         {DNNL_ARG_TO, bwd_weights_iter_memory}});
+        {{DNNL_ARG_FROM, diff_dst_iter_usr_m}, {DNNL_ARG_TO, diff_dst_iter_m}});
   }
 
-  auto grad_expected_src_layer_md = lstm_backward_pd->diff_src_layer_desc();
-  auto grad_src_layer_memory = grad_src_layer_usr_memory;
-  if (grad_src_layer_usr_memory.get_desc() != grad_expected_src_layer_md) {
-    grad_src_layer_memory = memory(grad_expected_src_layer_md, engine);
-  }
-
-  auto grad_expected_src_iter_md = lstm_backward_pd->diff_src_iter_desc();
-  auto grad_src_iter_memory = grad_src_iter_usr_memory;
-  if (grad_src_iter_usr_memory.get_desc() != grad_expected_src_iter_md) {
-    grad_src_iter_memory = memory(grad_expected_src_iter_md, engine);
-  }
-
-  auto grad_expected_src_iter_c_md = lstm_backward_pd->diff_src_iter_c_desc();
-  auto grad_src_iter_c_memory = grad_src_iter_c_usr_memory;
-  if (grad_src_iter_c_usr_memory.get_desc() != grad_expected_src_iter_c_md) {
-    grad_src_iter_c_memory = memory(grad_expected_src_iter_c_md, engine);
-  }
-
-  auto grad_expected_dst_layer_md = lstm_backward_pd->diff_dst_layer_desc();
-  auto grad_dst_layer_memory = grad_dst_layer_usr_memory;
-  if (grad_dst_layer_usr_memory.get_desc() != grad_expected_dst_layer_md) {
-    grad_dst_layer_memory = memory(grad_expected_dst_layer_md, engine);
+  auto diff_expected_dst_iter_c_md = lstm_backward_pd->diff_dst_iter_c_desc();
+  auto diff_dst_iter_c_m = diff_dst_iter_c_usr_m;
+  if (diff_dst_iter_c_usr_m.get_desc() != diff_expected_dst_iter_c_md) {
+    diff_dst_iter_c_m = memory(diff_expected_dst_iter_c_md, engine);
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_dst_layer_usr_memory, grad_dst_layer_memory),
+        dnnl::reorder(diff_dst_iter_c_usr_m, diff_dst_iter_c_m),
         strm,
-        {{DNNL_ARG_FROM, grad_dst_layer_usr_memory},
-         {DNNL_ARG_TO, grad_dst_layer_memory}});
+        {{DNNL_ARG_FROM, diff_dst_iter_c_usr_m},
+         {DNNL_ARG_TO, diff_dst_iter_c_m}});
   }
 
-  auto grad_expected_dst_iter_md = lstm_backward_pd->diff_dst_iter_desc();
-  auto grad_dst_iter_memory = grad_dst_iter_usr_memory;
-  if (grad_dst_iter_usr_memory.get_desc() != grad_expected_dst_iter_md) {
-    grad_dst_iter_memory = memory(grad_expected_dst_iter_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_dst_iter_usr_memory, grad_dst_iter_memory),
-        strm,
-        {{DNNL_ARG_FROM, grad_dst_iter_usr_memory},
-         {DNNL_ARG_TO, grad_dst_iter_memory}});
-  }
-
-  auto grad_expected_dst_iter_c_md = lstm_backward_pd->diff_dst_iter_c_desc();
-  auto grad_dst_iter_c_memory = grad_dst_iter_c_usr_memory;
-  if (grad_dst_iter_c_usr_memory.get_desc() != grad_expected_dst_iter_c_md) {
-    grad_dst_iter_c_memory = memory(grad_expected_dst_iter_c_md, engine);
-    DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_dst_iter_c_usr_memory, grad_dst_iter_c_memory),
-        strm,
-        {{DNNL_ARG_FROM, grad_dst_iter_c_usr_memory},
-         {DNNL_ARG_TO, grad_dst_iter_c_memory}});
-  }
-
-  auto grad_expected_weights_layer_md =
+  auto diff_expected_wghs_layer_md =
       lstm_backward_pd->diff_weights_layer_desc();
-  auto grad_weights_layer_memory = grad_weights_layer_usr_memory;
-  if (grad_weights_layer_usr_memory.get_desc() !=
-      grad_expected_weights_layer_md) {
-    grad_weights_layer_memory = memory(grad_expected_weights_layer_md, engine);
+  auto diff_wghs_layer_m = diff_wghs_layer_usr_m;
+  if (diff_wghs_layer_usr_m.get_desc() != diff_expected_wghs_layer_md) {
+    diff_wghs_layer_m = memory(diff_expected_wghs_layer_md, engine);
   }
 
-  auto grad_expected_weights_iter_md =
-      lstm_backward_pd->diff_weights_iter_desc();
-  auto grad_weights_iter_memory = grad_weights_iter_usr_memory;
-  if (grad_weights_iter_usr_memory.get_desc() !=
-      grad_expected_weights_iter_md) {
-    grad_weights_iter_memory = memory(grad_expected_weights_iter_md, engine);
+  auto diff_expected_wghs_iter_md = lstm_backward_pd->diff_weights_iter_desc();
+  auto diff_wghs_iter_m = diff_wghs_iter_usr_m;
+  if (diff_wghs_iter_usr_m.get_desc() != diff_expected_wghs_iter_md) {
+    diff_wghs_iter_m = memory(diff_expected_wghs_iter_md, engine);
   }
 
-  auto grad_expected_bias_md = lstm_backward_pd->diff_bias_desc();
-  auto grad_bias_memory = grad_bias_usr_memory;
-  if (grad_bias_usr_memory.get_desc() != grad_expected_bias_md) {
-    grad_bias_memory = memory(grad_expected_bias_md, engine);
+  auto diff_expected_bia_md = lstm_backward_pd->diff_bias_desc();
+  auto diff_bia_m = diff_bia_usr_m;
+  if (diff_bia_usr_m.get_desc() != diff_expected_bia_md) {
+    diff_bia_m = memory(diff_expected_bia_md, engine);
   }
 
   auto workspace = dpcpp_onednn_memory(
       lstm_backward_pd->workspace_desc(), engine, workspace_arr.data_ptr());
 
-  std::shared_ptr<lstm_backward> lstm_backward_p;
-  lstm_backward_p.reset(new lstm_backward(*lstm_backward_pd));
+  std::shared_ptr<dnnl::lstm_backward> lstm_backward_p;
+  lstm_backward_p.reset(new dnnl::lstm_backward(*lstm_backward_pd));
 
   DPCPP_ONEDNN_EXEC(
       *lstm_backward_p,
       strm,
-      {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-       {DNNL_ARG_SRC_ITER, src_iter_memory},
-       {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},
-       {DNNL_ARG_WEIGHTS_LAYER, bwd_weights_layer_memory},
-       {DNNL_ARG_WEIGHTS_ITER, bwd_weights_iter_memory},
-       {DNNL_ARG_BIAS, bias_memory},
-       {DNNL_ARG_DST_LAYER, dst_layer_memory},
-       {DNNL_ARG_DST_ITER, dst_iter_memory},
-       {DNNL_ARG_DST_ITER_C, dst_iter_c_memory},
-       {DNNL_ARG_DIFF_DST_LAYER, grad_dst_layer_memory},
-       {DNNL_ARG_DIFF_DST_ITER, grad_dst_iter_memory},
-       {DNNL_ARG_DIFF_DST_ITER_C, grad_dst_iter_c_memory},
+      {{DNNL_ARG_SRC_LAYER, src_layer_m},
+       {DNNL_ARG_SRC_ITER, src_iter_m},
+       {DNNL_ARG_SRC_ITER_C, src_iter_c_m},
+       {DNNL_ARG_WEIGHTS_LAYER, bwd_wghs_layer_m},
+       {DNNL_ARG_WEIGHTS_ITER, bwd_wghs_iter_m},
+       {DNNL_ARG_BIAS, bia_m},
+       {DNNL_ARG_DST_LAYER, dst_layer_m},
+       {DNNL_ARG_DST_ITER, dst_iter_m},
+       {DNNL_ARG_DST_ITER_C, dst_iter_c_m},
+       {DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer_m},
+       {DNNL_ARG_DIFF_DST_ITER, diff_dst_iter_m},
+       {DNNL_ARG_DIFF_DST_ITER_C, diff_dst_iter_c_m},
        {DNNL_ARG_WORKSPACE, workspace},
-       {DNNL_ARG_DIFF_SRC_LAYER, grad_src_layer_memory},
-       {DNNL_ARG_DIFF_SRC_ITER, grad_src_iter_memory},
-       {DNNL_ARG_DIFF_SRC_ITER_C, grad_src_iter_c_memory},
-       {DNNL_ARG_DIFF_WEIGHTS_LAYER, grad_weights_layer_memory},
-       {DNNL_ARG_DIFF_WEIGHTS_ITER, grad_weights_iter_memory},
-       {DNNL_ARG_DIFF_BIAS, grad_bias_memory}});
+       {DNNL_ARG_DIFF_SRC_LAYER, diff_src_layer_m},
+       {DNNL_ARG_DIFF_SRC_ITER, diff_src_iter_m},
+       {DNNL_ARG_DIFF_SRC_ITER_C, diff_src_iter_c_m},
+       {DNNL_ARG_DIFF_WEIGHTS_LAYER, diff_wghs_layer_m},
+       {DNNL_ARG_DIFF_WEIGHTS_ITER, diff_wghs_iter_m},
+       {DNNL_ARG_DIFF_BIAS, diff_bia_m}});
 
-  if (grad_src_layer_usr_memory != grad_src_layer_memory) {
+  if (diff_src_layer_usr_m != diff_src_layer_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_src_layer_memory, grad_src_layer_usr_memory),
+        dnnl::reorder(diff_src_layer_m, diff_src_layer_usr_m),
         strm,
-        {{DNNL_ARG_FROM, grad_src_layer_memory},
-         {DNNL_ARG_TO, grad_src_layer_usr_memory}});
+        {{DNNL_ARG_FROM, diff_src_layer_m},
+         {DNNL_ARG_TO, diff_src_layer_usr_m}});
   }
-  if (grad_src_iter_usr_memory != grad_src_iter_memory) {
+  if (diff_src_iter_usr_m != diff_src_iter_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_src_iter_memory, grad_src_iter_usr_memory),
+        dnnl::reorder(diff_src_iter_m, diff_src_iter_usr_m),
         strm,
-        {{DNNL_ARG_FROM, grad_src_iter_memory},
-         {DNNL_ARG_TO, grad_src_iter_usr_memory}});
+        {{DNNL_ARG_FROM, diff_src_iter_m}, {DNNL_ARG_TO, diff_src_iter_usr_m}});
   }
-  if (grad_src_iter_c_usr_memory != grad_src_iter_c_memory) {
+  if (diff_src_iter_c_usr_m != diff_src_iter_c_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_src_iter_c_memory, grad_src_iter_c_usr_memory),
+        dnnl::reorder(diff_src_iter_c_m, diff_src_iter_c_usr_m),
         strm,
-        {{DNNL_ARG_FROM, grad_src_iter_c_memory},
-         {DNNL_ARG_TO, grad_src_iter_c_usr_memory}});
+        {{DNNL_ARG_FROM, diff_src_iter_c_m},
+         {DNNL_ARG_TO, diff_src_iter_c_usr_m}});
   }
-  if (grad_weights_layer_usr_memory != grad_weights_layer_memory) {
+  if (diff_wghs_layer_usr_m != diff_wghs_layer_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_weights_layer_memory, grad_weights_layer_usr_memory),
+        dnnl::reorder(diff_wghs_layer_m, diff_wghs_layer_usr_m),
         strm,
-        {{DNNL_ARG_FROM, grad_weights_layer_memory},
-         {DNNL_ARG_TO, grad_weights_layer_usr_memory}});
+        {{DNNL_ARG_FROM, diff_wghs_layer_m},
+         {DNNL_ARG_TO, diff_wghs_layer_usr_m}});
   }
-  if (grad_weights_iter_usr_memory != grad_weights_iter_memory) {
+  if (diff_wghs_iter_usr_m != diff_wghs_iter_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_weights_iter_memory, grad_weights_iter_usr_memory),
+        dnnl::reorder(diff_wghs_iter_m, diff_wghs_iter_usr_m),
         strm,
-        {{DNNL_ARG_FROM, grad_weights_iter_memory},
-         {DNNL_ARG_TO, grad_weights_iter_usr_memory}});
+        {{DNNL_ARG_FROM, diff_wghs_iter_m},
+         {DNNL_ARG_TO, diff_wghs_iter_usr_m}});
   }
-  if (grad_bias_usr_memory != grad_bias_memory) {
+  if (diff_bia_usr_m != diff_bia_m) {
     DPCPP_ONEDNN_EXEC(
-        dnnl::reorder(grad_bias_memory, grad_bias_usr_memory),
+        dnnl::reorder(diff_bia_m, diff_bia_usr_m),
         strm,
-        {{DNNL_ARG_FROM, grad_bias_memory},
-         {DNNL_ARG_TO, grad_bias_usr_memory}});
+        {{DNNL_ARG_FROM, diff_bia_m}, {DNNL_ARG_TO, diff_bia_usr_m}});
   }
-  grad_src = grad_layer_x;
+  diff_src = diff_layer_x;
 
   return std::tuple<
       at::Tensor,
@@ -860,8 +814,7 @@ lstm_kernel_impl_bwd(
       at::Tensor,
       at::Tensor,
       at::Tensor,
-      at::Tensor>{
-      grad_src, grad_hx, grad_cx, grad_weight_i, grad_weight_h, grad_bias};
+      at::Tensor>{diff_src, diff_hx, diff_cx, diff_wgh_i, diff_wgh_h, diff_bia};
 }
 
 } // namespace oneDNN
