@@ -34,7 +34,7 @@ option(BUILD_NO_L0_ONEDNN "Build oneDNN without LevelZero support" OFF)
 option(BUILD_STRIPPED_BIN "Strip all symbols after build" OFF)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
-option(BUILD_SEPARATE_OPS "Build operators in separate libraries" OFF)
+option(BUILD_SEPARATE_OPS "Build each operator in separate library" OFF)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 
