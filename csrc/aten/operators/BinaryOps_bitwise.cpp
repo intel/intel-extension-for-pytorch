@@ -15,37 +15,70 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-static void and_kernel_dpcpp(TensorIterator& iter) {
-  if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars(iter, [](bool a, bool b) { return a && b; });
-  } else {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_and_xpu", [&]() {
-      dpcpp_kernel_with_scalars(
-          iter, [](scalar_t a, scalar_t b) { return a & b; });
-    });
+template <typename scalar_t>
+struct BitwiseAndFunctor {
+  DPCPP_DEVICE inline scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a & b;
   }
+};
+
+template <>
+struct BitwiseAndFunctor<bool> {
+  DPCPP_DEVICE inline bool operator()(bool a, bool b) const {
+    return a && b;
+  }
+};
+
+void and_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_INTEGRAL_TYPES_AND(
+      kBool, iter.dtype(), "bitwise_and_xpu", [&]() {
+        BitwiseAndFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
+      });
 }
 
-static void or_kernel_dpcpp(TensorIterator& iter) {
-  if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars(iter, [](bool a, bool b) { return a || b; });
-  } else {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_or_xpu", [&]() {
-      dpcpp_kernel_with_scalars(
-          iter, [](scalar_t a, scalar_t b) { return a | b; });
-    });
+template <typename scalar_t>
+struct BitwiseOrFunctor {
+  DPCPP_DEVICE inline scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a | b;
   }
+};
+
+template <>
+struct BitwiseOrFunctor<bool> {
+  DPCPP_DEVICE inline bool operator()(bool a, bool b) const {
+    return a || b;
+  }
+};
+
+void or_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_INTEGRAL_TYPES_AND(
+      kBool, iter.dtype(), "bitwise_or_xpu", [&]() {
+        BitwiseOrFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
+      });
 }
 
-static void xor_kernel_dpcpp(TensorIterator& iter) {
-  if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_with_scalars(iter, [](bool a, bool b) { return a != b; });
-  } else {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_xor_xpu", [&]() {
-      dpcpp_kernel_with_scalars(
-          iter, [](scalar_t a, scalar_t b) { return a ^ b; });
-    });
+template <typename scalar_t>
+struct BitwiseXorFunctor {
+  DPCPP_DEVICE inline scalar_t operator()(scalar_t a, scalar_t b) const {
+    return a ^ b;
   }
+};
+
+template <>
+struct BitwiseXorFunctor<bool> {
+  DPCPP_DEVICE inline bool operator()(bool a, bool b) const {
+    return a != b;
+  }
+};
+
+void xor_kernel_dpcpp(TensorIterator& iter) {
+  IPEX_DISPATCH_INTEGRAL_TYPES_AND(
+      kBool, iter.dtype(), "bitwise_xor_xpu", [&]() {
+        BitwiseXorFunctor<scalar_t> f;
+        dpcpp_kernel_with_scalars(iter, f);
+      });
 }
 
 } // namespace impl
