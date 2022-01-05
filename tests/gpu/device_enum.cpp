@@ -1,63 +1,81 @@
 /* Build command:
-$ dpcpp device_enum.cpp -fsycl -o device_enum
+$ dpcpp device_enum.cpp -o device_enum
 */
 
 /* Example result:
 $ ./device_enum
-================================================================
+=====================================================================================
 Available DPC++ Platforms / Devices
-================================================================
-|Platform0 :
-|Intel(R) OpenCL HD Graphics
-|       |__|Device0 :
-|          |Intel(R) UHD Graphics 630 [0x3e98] (GPU)
-----------------------------------------------------------------
-|Platform1 :
-|Intel(R) Level-Zero
-|       |__|Device0 :
-|          |Intel(R) UHD Graphics 630 [0x3e98] (GPU)
-----------------------------------------------------------------
-|Platform2 :
-|SYCL host platform
-|       |__|Device0 :
-|          |SYCL host device (NonGPU)
-----------------------------------------------------------------
+=====================================================================================
+|Platform 0:
+|Intel(R) OpenCL HD Graphics (opencl)
+|	|__|Device 0 :
+|	   |Intel(R) UHD Graphics 630 [0x3e9b] (gpu)
+-------------------------------------------------------------------------------------
+|Platform 1:
+|Intel(R) Level-Zero (level_zero)
+|	|__|Device 0 :
+|	   |Intel(R) UHD Graphics 630 [0x3e9b] (gpu)
+-------------------------------------------------------------------------------------
+|Platform 2:
+|SYCL host platform (host)
+|	|__|Device 0 :
+|	   |SYCL host device (host)
+-------------------------------------------------------------------------------------
 */
 
+#include <CL/sycl.hpp>
 #include <stdlib.h>
 #include <vector>
-#include <CL/sycl.hpp>
+#include <iomanip>
 
-int main(int argc, char *argv[]) {
-  std::cout<< "================================================================\n";
-  std::cout<< "           Available DPC++ Platforms / Devices                  \n";
-  std::cout<< "================================================================\n";
+#define DEL_WIDTH 85
 
-  std::vector<sycl::platform> platforms = sycl::platform::get_platforms();
-  for (size_t pid = 0; pid < platforms.size(); pid++) {
-    sycl::string_class pname = platforms[pid].get_info<sycl::info::platform::name>();
-    std::cout << "|Platform" << pid << " :\n" << "|" << pname << std::endl;
+using namespace cl::sycl;
 
-    std::vector<sycl::device> devices = platforms[pid].get_devices(sycl::info::device_type::all);
-    for (size_t device_id = 0; device_id < devices.size(); device_id++) {
-      sycl::string_class dname = devices[device_id].get_info<sycl::info::device::name>();
-
-      sycl::string_class dtype;
-      if (devices[device_id].is_gpu()) {
-        dtype = "GPU";
-      } else {
-        dtype = "NonGPU";
-      }
-
-      std::cout << "|\t|__|Device" << device_id << " :\n";
-      if (device_id == devices.size() - 1) {
-        std::cout << "|\t   |" << dname << " (" << dtype << ")" << std::endl;
-      } else {
-        std::cout << "|\t|  |" << dname << " (" << dtype << ")" << std::endl;
-      }
-    }
-
-    std::cout<< "----------------------------------------------------------------\n";
+std::string getDeviceTypeName(const device &Device) {
+  auto DeviceType = Device.get_info<info::device::device_type>();
+  switch (DeviceType) {
+  case info::device_type::cpu:
+    return "cpu";
+  case info::device_type::gpu:
+    return "gpu";
+  case info::device_type::host:
+    return "host";
+  case info::device_type::accelerator:
+    return "accelerator";
+  default:
+    return "unknown";
   }
 }
 
+int main(int argc, char* argv[]) {
+  // print header
+  std::cout << std::setw(DEL_WIDTH) << std::setfill('=') << '=' << std::endl;
+  std::cout << "Available DPC++ Platforms / Devices" << std::endl;
+  std::cout << std::setw(DEL_WIDTH) << std::setfill('=') << '=' << std::endl;
+  // enum Platforms
+  std::vector<platform> Platforms = platform::get_platforms();
+  for (size_t PlatformID = 0; PlatformID < Platforms.size(); PlatformID++) {
+    auto PlatformName = Platforms[PlatformID].get_info<info::platform::name>();
+    backend Backend =  Platforms[PlatformID].get_backend();
+    // print Platform Info
+    std::cout << "|Platform " << PlatformID << ":" << std::endl
+              << "|" << PlatformName << " (" << Backend << ")" <<std::endl;
+    //enum Devices
+    std::vector<device> Devices = Platforms[PlatformID].get_devices();
+    for (size_t DevicesID = 0; DevicesID < Devices.size(); DevicesID++) {
+      auto DeviceName = Devices[DevicesID].get_info<info::device::name>();
+      auto DeviceType = Devices[DevicesID].get_info<info::device::device_type>();
+      std::string DeviceTypeName = getDeviceTypeName(Devices[DevicesID]);
+      // print Device Info
+      std::cout << "|\t|__|Device " << DevicesID << ":" << std::endl;
+      if (DevicesID == Devices.size() - 1) {
+        std::cout << "|\t   |" << DeviceName << " (" << DeviceTypeName << ")" << std::endl;
+      } else {
+        std::cout << "|\t|  |" << DeviceName << " (" << DeviceTypeName << ")" << std::endl;
+      }
+    }
+    std::cout << std::setw(DEL_WIDTH) << std::setfill('-') << '-' << std::endl;
+  }
+}

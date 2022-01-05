@@ -1,29 +1,32 @@
 # How to Write and RUN Test Case
 
-## Notice:
+## Notice
 
-*  These tests are powered by [Pytest](https://docspytest.org/en/stable/).
+* These tests are powered by [Pytest](https://docspytest.org/en/stable/).
 
-*  Please refer to [Pytest Documents](https://docspytest.org/en/stable/) for more helps.
+* Please refer to [Pytest Documents](https://docspytest.org/en/stable/) for more helps.
 
-## Pre-requirements:
+## Pre-requirements
 
-*  PyTorch and Intel GPU Extensio for PyTorch have been installed and verified.
+* PyTorch and Intel GPU Extension for PyTorch have been installed and verified.
 
-*  Install Pytest
+* Install Pytest
+
 ```bash
 python3 -m pip install pytest
 ```
 
 ## Find and Run tests
 
-*  All tests are found under the ${PATH_To_Your_Extension_Source_Code}/tests/gpu/ path.
-*  Or download from the repo with below command.
+* All tests are found under the ${PATH_To_Your_Extension_Source_Code}/tests/gpu/ path.
+* Or download from the repo with below command.
+
 ```bash
-git clone --depth=1 ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/intel-pytorch-extension.git
+git clone --depth=1 https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git
 ```
 
-*  Please use pytest to run one test, or all of them if ${Test_Name} is empty.
+* Please use pytest to run one test, or all of them if ${Test_Name} is empty.
+
 ```bash
 pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
 ```
@@ -38,10 +41,11 @@ pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
 ## Example
 
 ### General case study:
+
 ```python
 import torch
 import ipex
-## import testcase parent class TestCaes
+## import testcase parent class TestCase
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
@@ -61,7 +65,7 @@ class TestTorchMethod(TestCase):
         x_dpcpp = x.to(dpcpp_device)
         y = torch.abs(x)
         y_dpcpp = torch.abs(x_dpcpp)
-        ## asssert
+        ## assertion
         self.assertEqual(y, y_dpcpp.to(cpu_device))
 
     def test_abs2(self, dtype=torch.float):
@@ -71,7 +75,7 @@ class TestTorchMethod(TestCase):
         x_dpcpp = x.to(dpcpp_device)
         y = torch.abs(x)
         y_dpcpp = torch.abs(x_dpcpp)
-        ## asssert
+        ## assertion
         self.assertEqual(y, y_dpcpp.to(cpu_device))
 
 class TestTorchMethod2(TestCase):
@@ -111,14 +115,14 @@ class TestNNMethod(TestCase):
 
         print("normal_ cpu", x_cpu.normal_(2.0, 0.5))
         print("normal_ dpcpp", x_dpcpp.normal_(2.0, 0.5).cpu())
-        # assert
+        # assertion
         self.assertEqual(x_cpu.normal_(2.0, 0.5),
                          x_dpcpp.normal_(2.0, 0.5).cpu())
 ```
 
 ### skip with judgment
 
-```python 
+```python
 import torch
 import ipex
 from torch.testing._internal.common_utils import TestCase
@@ -131,11 +135,11 @@ class TestTorchMethod(TestCase):
 
 ```
 
-### repeat for different  dtype
+### repeat for different dtype
 
 ```python
 import torch
-import ipex 
+import ipex
 from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
 
 cpu_device = torch.device("cpu")
@@ -144,15 +148,13 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
-        def test_abs(self, dtype=torch.float):
-            data = [[-0.2911, -1.3204,  -2.6425,  -2.4644,  -
-                            0.6018, -0.0839, -0.1322, -0.4713, -0.3586, -0.8882, 0.0000, 0.0000, 1.1111, 2.2222, 3.3333]]
-            excepted = [[0.2911, 1.3204,  2.6425,  2.4644,
-                            0.6018, 0.0839, 0.1322, 0.4713, 0.3586, 0.8882, 0.0000, 0.0000, 1.1111, 2.2222, 3.3333]]
-            x_dpcpp = torch.tensor(data, device=dpcpp_device)
-            y = torch.tensor(excepted, device=dpcpp_device)
-            y_dpcpp = torch.abs(x_dpcpp)
-            self.assertEqual(y.to(cpu_device), y_dpcpp.to(cpu_device))
-
+    def test_abs(self, dtype=torch.float):
+        data = [[-0.2911, -1.3204,  -2.6425,  -2.4644,  -
+                        0.6018, -0.0839, -0.1322, -0.4713, -0.3586, -0.8882, 0.0000, 0.0000, 1.1111, 2.2222, 3.3333]]
+        excepted = [[0.2911, 1.3204,  2.6425,  2.4644,
+                        0.6018, 0.0839, 0.1322, 0.4713, 0.3586, 0.8882, 0.0000, 0.0000, 1.1111, 2.2222, 3.3333]]
+        x_dpcpp = torch.tensor(data, device=dpcpp_device)
+        y = torch.tensor(excepted, device=dpcpp_device)
+        y_dpcpp = torch.abs(x_dpcpp)
+        self.assertEqual(y.to(cpu_device), y_dpcpp.to(cpu_device))
 ```
-
