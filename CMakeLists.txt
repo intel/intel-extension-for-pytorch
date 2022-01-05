@@ -37,6 +37,7 @@ set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example,
 option(USE_HOOKS "Use XPU Hooks in build. Should turn off it for 1.10 rebase" OFF)
 option(USE_PROFILER "USE XPU Profiler in build. Should turn off it for 1.10 rebase" OFF)
 option(BUILD_SIMPLE_TRACE_IPEX_ENTRY "Build simple trace for ipex entry" OFF)
+set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 
 if (BUILD_STATS)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "time -v")
@@ -131,6 +132,7 @@ function (print_configuration_summary)
     message(STATUS "  USE_HOOKS             : ${USE_HOOKS}")
     message(STATUS "  USE_PROFILER          : ${USE_PROFILER}")
     message(STATUS "  BUILD_SIMPLE_TRACE_IPEX_ENTRY    : ${BUILD_SIMPLE_TRACE_IPEX_ENTRY}")
+    message(STATUS "  BUILD_OPT_LEVEL       : ${BUILD_OPT_LEVEL}")
 
     message(STATUS "")
 endfunction()

@@ -62,6 +62,17 @@ set(IPEX_GPU_CORE_SRC
 # WARNING XXX: Therefore we only set sycl flags for these C++ files here.
 append_file_property(IPEX_ATEN_OPS_SRCS COMPILE_FLAGS ${IPEX_SYCL_KERNEL_FLAGS})
 
+if("${BUILD_OPT_LEVEL}" STREQUAL "")
+    set(OPT_LEVEL " ")
+elseif("${BUILD_OPT_LEVEL}" STREQUAL "1" OR "${BUILD_OPT_LEVEL}" STREQUAL "0")
+    set(OPT_LEVEL "-O${BUILD_OPT_LEVEL}")
+else()
+    set(OPT_LEVEL " ")
+    message(WARNING "unknown BUILD_OPT_LEVEL ${BUILD_OPT_LEVEL}")
+endif()
+append_file_property(IPEX_ATEN_OPS_SRCS COMPILE_FLAGS ${OPT_LEVEL})
+append_file_property(IPEX_GPU_CORE_SRC COMPILE_FLAGS ${OPT_LEVEL})
+
 if(BUILD_SEPARATE_OPS)
   set(IPEX_GPU_OP_LIBRARIES)
   foreach(op_src ${IPEX_ATEN_OPS_SRCS})
@@ -69,6 +80,9 @@ if(BUILD_SEPARATE_OPS)
       set(op_lib ipex_gpu_op_${obj})
       add_library(${op_lib} SHARED ${op_src})
       append_target_property(${op_lib} LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
+      if(NOT obj MATCHES "Gamma$") # need to fix op Gamma with -O0
+          append_target_property(${op_lib} LINK_FLAGS ${OPT_LEVEL})
+      endif()
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
       target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
       target_link_libraries(${op_lib} PUBLIC ${TORCH_LIBRARIES})
