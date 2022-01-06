@@ -96,6 +96,9 @@ set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-early-optimizati
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
+include(ProcessorCount)
+ProcessorCount(proc_cnt)
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-max-parallel-link-jobs=${proc_cnt}")
 set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${SYCL_FLAGS}")
 if(BUILD_BY_PER_KERNEL)
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
