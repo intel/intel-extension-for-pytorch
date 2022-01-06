@@ -753,7 +753,7 @@ Tensor gelu(const Tensor& self) {
   return result;
 }
 
-Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
+inline Tensor gelu_backward_dpcpp(const Tensor& grad, const Tensor& self) {
   auto self_ = self.contiguous();
   Tensor dX = at::empty_like(self_);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -761,6 +761,13 @@ Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
       self_.scalar_type(),
       "GeluBackwardKernelImpl",
       [&]() { impl::GeluBackwardKernelImpl<scalar_t>(grad, self_, dX); });
+  return dX;
+}
+
+Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
+  Tensor dX;
+  xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
+      dX, self, grad, 0.0f, 0.0f);
   return dX;
 }
 
