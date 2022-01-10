@@ -462,6 +462,32 @@ void init_module(pybind11::module& m) {
       },
       "optimized adamW optimizer kernel implemtation on Intel device");
 
+  m.def(
+      "fused_SGDMasterWeight",
+      [](at::Tensor& master_weight,
+         at::Tensor& weight,
+         at::Tensor& grad,
+         double weight_decay,
+         bool momentum_buffer_existed,
+         at::Tensor& momentum_buffer,
+         double momentum,
+         double dampening,
+         bool nesterov,
+         double lr) {
+        return at::AtenIpexTypeXPU::fused_SGDMasterWeight(
+            master_weight,
+            weight,
+            grad,
+            weight_decay,
+            momentum_buffer_existed,
+            momentum_buffer,
+            momentum,
+            dampening,
+            nesterov,
+            lr);
+      },
+      "optimized SGDMasterWeight optimizer kernel implemtation on Intel device");
+
   m.def("to_plain", [](const at::Tensor& input) {
     return at::AtenIpexTypeXPU::to_plain_if_needed(input);
   });

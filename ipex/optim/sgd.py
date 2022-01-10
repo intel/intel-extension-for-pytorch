@@ -105,24 +105,41 @@ class SGDMasterWeight(Optimizer):
                 if p.master_weight.device is not p.data.device:
                     p.master_weight = p.master_weight.to(p.data.device)
 
-                d_p = p.grad.to(p.master_weight.dtype)
-                if weight_decay != 0:
-                    d_p = d_p.add(p.master_weight, alpha=weight_decay)
-                if momentum != 0:
-                    param_state = self.state[p]
-                    if 'momentum_buffer' not in param_state:
-                        buf = param_state['momentum_buffer'] = torch.clone(d_p).detach()
-                    else:
-                        buf = param_state['momentum_buffer']
-                        buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
-                    if nesterov:
-                        d_p = d_p.add(buf, alpha=momentum)
-                    else:
-                        d_p = buf
+                param_state = self.state[p]
 
-                p.master_weight.add_(d_p, alpha=-group['lr'])
+                # first time, no momentum buffer has been created
+                momentum_buffer_not_existed = 'momentum_buffer' not in param_state
+                if momentum_buffer_not_existed:
+                    buf = param_state['momentum_buffer'] = torch.clone(p.grad.to(p.master_weight.dtype)).detach()
+                else:
+                    buf = param_state['momentum_buffer']
 
-                # sync between master weight and computation weight
-                p.data.copy_(p.master_weight.data)
+                # original logic
+                # d_p = p.grad.to(p.master_weight.dtype)
+
+                # if weight_decay != 0:
+                #     d_p = d_p.add(p.master_weight, alpha=weight_decay)
+
+                # if momentum != 0:
+                #     param_state = self.state[p]
+                #     if 'momentum_buffer' not in param_state:
+                #         buf = param_state['momentum_buffer'] = torch.clone(d_p).detach()
+                #     else:
+                #         buf = param_state['momentum_buffer']
+                #         buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+                #     if nesterov:
+                #         d_p = d_p.add(buf, alpha=momentum)
+                #     else:
+                #         d_p = buf
+
+                # p.master_weight.add_(d_p, alpha=-group['lr'])
+
+                # p.data.copy_(p.master_weight.data)
+
+                # fuse SGDMasterWeight update into one kernel
+                # TODO: ipex in Python code will be removed
+                ipex._C.fused_SGDMasterWeight(p.master_weight.data, p.data, p.grad, weight_decay,
+                                              momentum_buffer_not_existed, buf,
+                                              momentum, (1 - dampening), nesterov, group['lr'])
 
         return loss

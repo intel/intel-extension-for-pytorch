@@ -36,6 +36,18 @@ at::Tensor& fused_adamW(
     double weight_decay = 0.f,
     const bool correct_bias = true);
 
+at::Tensor& fused_SGDMasterWeight(
+    at::Tensor& master_weight,
+    at::Tensor& weight,
+    at::Tensor& grad,
+    double weight_decay,
+    bool momentum_buffer_existed,
+    at::Tensor& momentum_buffer,
+    double momentum,
+    double dampening,
+    bool nesterov,
+    double lr);
+
 at::Tensor convolution_sum(
     const at::Tensor& input,
     const at::Tensor& weight,
