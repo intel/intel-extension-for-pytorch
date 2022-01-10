@@ -2,6 +2,7 @@
 #include <ATen/AccumulateType.h>
 #include <ATen/NativeFunctions.h>
 #include <core/Memory.h>
+#include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
@@ -23,7 +24,8 @@ void max_unpooling2d_forward_kernel(
     const int64_t inputWidth,
     const int64_t outputHeight,
     const int64_t outputWidth,
-    scalar_t* output) {
+    scalar_t* output,
+    const bool is_channels_last) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
@@ -41,11 +43,20 @@ void max_unpooling2d_forward_kernel(
       for (int linearIndex = item.get_global_id(0);
            linearIndex < numInputElements;
            linearIndex += item.get_global_range()[0]) {
-        int c = (linearIndex / inputWidth / inputHeight) % numChannels;
+        int c = is_channels_last
+            ? linearIndex % numChannels
+            : (linearIndex / inputWidth / inputHeight) % numChannels;
         int n = linearIndex / inputWidth / inputHeight / numChannels;
-        output_ptr += (n * numChannels + c) * outputHeight * outputWidth;
         int maxind = indices_ptr[linearIndex];
-        output_ptr[maxind] = input_ptr[linearIndex];
+        int offset = is_channels_last
+            ? n * numChannels * outputHeight * outputWidth + c
+            : (n * numChannels + c) * outputHeight * outputWidth;
+        output_ptr += offset;
+        if (is_channels_last) {
+          output_ptr[maxind * numChannels] = input_ptr[linearIndex];
+        } else {
+          output_ptr[maxind] = input_ptr[linearIndex];
+        }
       }
     };
 
@@ -115,13 +126,15 @@ void max_unpooling3d_forward_kernel(
 }
 
 template <typename scalar_t>
-void max_unpooling2d_backward_kernel(
+void max_unpooling3d_cl_forward_kernel(
     const int64_t numInputElements,
     const scalar_t* input,
     const int64_t* indices,
     const int64_t numChannels,
+    const int64_t inputDepth,
     const int64_t inputHeight,
     const int64_t inputWidth,
+    const int64_t outputDepth,
     const int64_t outputHeight,
     const int64_t outputWidth,
     scalar_t* output) {
@@ -142,11 +155,70 @@ void max_unpooling2d_backward_kernel(
       for (int linearIndex = item.get_global_id(0);
            linearIndex < numInputElements;
            linearIndex += item.get_global_range()[0]) {
-        int c = (linearIndex / inputWidth / inputHeight) % numChannels;
-        int n = linearIndex / inputWidth / inputHeight / numChannels;
-        input_ptr += (n * numChannels + c) * outputHeight * outputWidth;
+        int c = linearIndex % numChannels;
+        int n =
+            linearIndex / inputDepth / inputWidth / inputHeight / numChannels;
         int maxind = indices_ptr[linearIndex];
-        output_ptr[linearIndex] = input_ptr[maxind];
+        int offset =
+            n * numChannels * outputDepth * outputHeight * outputWidth + c;
+        output_ptr += offset;
+        output_ptr[maxind * numChannels] = input_ptr[linearIndex];
+      }
+    };
+
+    // kick off kernel
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+void max_unpooling2d_backward_kernel(
+    const int64_t numInputElements,
+    const scalar_t* input,
+    const int64_t* indices,
+    const int64_t numChannels,
+    const int64_t inputHeight,
+    const int64_t inputWidth,
+    const int64_t outputHeight,
+    const int64_t outputWidth,
+    scalar_t* output,
+    const bool is_channels_last) {
+  auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
+  int64_t num_groups = CeilDiv(numInputElements, group_size);
+  int64_t total_items = num_groups * group_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto output_data = output;
+    auto input_data = input;
+    auto indices_data = indices;
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto output_ptr = output_data;
+      auto input_ptr = input_data;
+      auto indices_ptr = indices_data;
+      for (int linearIndex = item.get_global_id(0);
+           linearIndex < numInputElements;
+           linearIndex += item.get_global_range()[0]) {
+        int c = is_channels_last
+            ? linearIndex % numChannels
+            : (linearIndex / inputWidth / inputHeight) % numChannels;
+        int n = linearIndex / inputWidth / inputHeight / numChannels;
+        int maxind = indices_ptr[linearIndex];
+        int offset = is_channels_last
+            ? n * numChannels * outputHeight * outputWidth + c
+            : (n * numChannels + c) * outputHeight * outputWidth;
+        input_ptr += offset;
+        if (is_channels_last) {
+          output_ptr[linearIndex] = input_ptr[maxind * numChannels];
+        } else {
+          output_ptr[linearIndex] = input_ptr[maxind];
+        }
       }
     };
 
@@ -217,6 +289,57 @@ void max_unpooling3d_backward_kernel(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
+template <typename scalar_t>
+void max_unpooling3d_cl_backward_kernel(
+    const int64_t numInputElements,
+    const scalar_t* input,
+    const int64_t numChannels,
+    const int64_t inputDepth,
+    const int64_t inputHeight,
+    const int64_t inputWidth,
+    const int64_t outputDepth,
+    const int64_t outputHeight,
+    const int64_t outputWidth,
+    const int64_t* indices,
+    scalar_t* output) {
+  auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
+  int64_t num_groups = CeilDiv(numInputElements, group_size);
+  int64_t total_items = num_groups * group_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto output_data = output;
+    auto input_data = input;
+    auto indices_data = indices;
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto output_ptr = output_data;
+      auto input_ptr = input_data;
+      auto indices_ptr = indices_data;
+      for (int linearIndex = item.get_global_id(0);
+           linearIndex < numInputElements;
+           linearIndex += item.get_global_range()[0]) {
+        int c = linearIndex % numChannels;
+        int n =
+            linearIndex / inputDepth / inputWidth / inputHeight / numChannels;
+        int maxind = indices_ptr[linearIndex];
+        int offset =
+            n * numChannels * outputDepth * outputHeight * outputWidth + c;
+        input_ptr += offset;
+        output_ptr[linearIndex] = input_ptr[maxind * numChannels];
+      }
+    };
+
+    // kick off kernel
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        kfn);
+  };
+
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
 Tensor& max_unpooling2d_forward_template(
     Tensor& output,
     const Tensor& self_,
@@ -250,8 +373,11 @@ Tensor& max_unpooling2d_forward_template(
   int64_t inputHeight;
   int64_t inputWidth;
 
-  auto self = self_.contiguous();
-  auto indices = indices_.contiguous();
+  auto fmt = is_smf_channels_last(self_)
+      ? get_cl_tag_by_ndim(self_.ndimension())
+      : at::MemoryFormat::Contiguous;
+  auto self = self_.contiguous(fmt);
+  auto indices = indices_.contiguous(fmt);
 
   if (self.ndimension() == 4) {
     numBatch = self.size(0);
@@ -262,7 +388,7 @@ Tensor& max_unpooling2d_forward_template(
   inputHeight = self.size(dimh);
   inputWidth = self.size(dimw);
 
-  output.resize_({numBatch, numChannels, oheight, owidth});
+  output.resize_({numBatch, numChannels, oheight, owidth}, fmt);
 
   output.zero_();
 
@@ -282,7 +408,8 @@ Tensor& max_unpooling2d_forward_template(
             inputWidth,
             oheight,
             owidth,
-            output.data_ptr<scalar_t>());
+            output.data_ptr<scalar_t>(),
+            is_smf_channels_last(self_));
       }));
 
   if (self.ndimension() == 3) {
@@ -320,9 +447,12 @@ Tensor& max_unpooling2d_backward_template(
   int dimw = 2;
   int dimh = 1;
 
-  auto self = self_.contiguous();
-  auto indices = indices_.contiguous();
-  auto grad_output = grad_output_.contiguous();
+  auto fmt = is_smf_channels_last(self_)
+      ? get_cl_tag_by_ndim(self_.ndimension())
+      : at::MemoryFormat::Contiguous;
+  auto self = self_.contiguous(fmt);
+  auto indices = indices_.contiguous(fmt);
+  auto grad_output = grad_output_.contiguous(fmt);
 
   if (self.ndimension() == 3) {
     nInputPlane = self.size(0);
@@ -347,7 +477,7 @@ Tensor& max_unpooling2d_backward_template(
         grad_output.size(dimw));
   }
 
-  grad_input.resize_as_(self);
+  grad_input.resize_as_(self, fmt);
   grad_input.zero_();
 
   int count = self.numel();
@@ -366,7 +496,8 @@ Tensor& max_unpooling2d_backward_template(
             nInputCols,
             oheight,
             owidth,
-            grad_input.data_ptr<scalar_t>());
+            grad_input.data_ptr<scalar_t>(),
+            is_smf_channels_last(self_));
       }));
   return grad_input;
 }
@@ -464,9 +595,11 @@ Tensor& max_unpooling3d_forward_template(
   int64_t oT = output_size[0];
   int64_t oH = output_size[1];
   int64_t oW = output_size[2];
-
-  auto self = self_.contiguous();
-  auto indices = indices_.contiguous();
+  auto fmt = is_smf_channels_last(self_)
+      ? get_cl_tag_by_ndim(self_.ndimension())
+      : at::MemoryFormat::Contiguous;
+  auto self = self_.contiguous(fmt);
+  auto indices = indices_.contiguous(fmt);
 
   int64_t batchSize;
   int64_t inputSlices;
@@ -480,17 +613,41 @@ Tensor& max_unpooling3d_forward_template(
     inputTime = self.size(1);
     inputHeight = self.size(2);
     inputWidth = self.size(3);
-    output.resize_({inputSlices, oT, oH, oW});
+    output.resize_({inputSlices, oT, oH, oW}, fmt);
   } else {
     batchSize = self.size(0);
     inputSlices = self.size(1);
     inputTime = self.size(2);
     inputHeight = self.size(3);
     inputWidth = self.size(4);
-    output.resize_({batchSize, inputSlices, oT, oH, oW});
+    output.resize_({batchSize, inputSlices, oT, oH, oW}, fmt);
   }
 
   output.zero_();
+
+  if (is_smf_channels_last(self_)) {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "max_unpooling3d_cl_forward_kernel",
+        ([&] {
+          max_unpooling3d_cl_forward_kernel(
+              self.numel(),
+              self.data_ptr<scalar_t>(),
+              indices.data_ptr<int64_t>(),
+              inputSlices,
+              inputTime,
+              inputHeight,
+              inputWidth,
+              oT,
+              oH,
+              oW,
+              output.data_ptr<scalar_t>());
+        }));
+
+    return output;
+  }
 
   // Collapse batch and feature dimensions if needed
   if (self.ndimension() == 5) {
@@ -557,9 +714,13 @@ Tensor& max_unpooling3d_backward_template(
   int64_t inputHeight = 0;
   int64_t inputWidth = 0;
 
-  auto self = self_.contiguous();
-  auto indices = indices_.contiguous();
-  auto grad_output = grad_output_.contiguous();
+  const bool is_smf_cl =
+      is_smf_channels_last(self_) || is_smf_channels_last(grad_output_);
+  auto fmt = is_smf_cl ? get_cl_tag_by_ndim(self_.ndimension())
+                       : at::MemoryFormat::Contiguous;
+  auto self = self_.contiguous(fmt);
+  auto indices = indices_.contiguous(fmt);
+  auto grad_output = grad_output_.contiguous(fmt);
 
   if (self.ndimension() == 4) {
     batchSize = 1;
@@ -575,8 +736,31 @@ Tensor& max_unpooling3d_backward_template(
     inputWidth = self.size(4);
   }
 
-  grad_input.resize_as_(self);
+  grad_input.resize_as_(self, fmt);
   grad_input.zero_();
+
+  if (is_smf_cl) {
+    IPEX_DISPATCH_ALL_TYPES_AND(
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "max_unpooling3d_cl_backward_kernel",
+        ([&] {
+          max_unpooling3d_cl_backward_kernel(
+              grad_output.numel(),
+              grad_output.data_ptr<scalar_t>(),
+              inputSlices,
+              inputTime,
+              inputHeight,
+              inputWidth,
+              oT,
+              oH,
+              oW,
+              indices.data_ptr<int64_t>(),
+              grad_input.data_ptr<scalar_t>());
+        }));
+
+    return grad_input;
+  }
 
   // Collapse batch and feature dimensions if needed
   auto grad_input_reshaped = grad_input;
