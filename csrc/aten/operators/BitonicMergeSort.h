@@ -25,15 +25,21 @@ inline void swap_var(T& t1, T& t2) {
   t2 = tmp;
 }
 
-template <typename KeyType, typename ValueType, typename CompFunc>
+template <
+    typename KeyType,
+    typename ValueType,
+    typename CompFunc,
+    typename EqualFunc>
 inline void compare_and_swap(
     KeyType& kA,
     ValueType& vA,
     KeyType& kB,
     ValueType& vB,
     bool dir,
-    const CompFunc comp) {
-  if ((kA != kB && comp(kA, kB) == dir) || (kA == kB && vA > vB)) {
+    const CompFunc comp_t,
+    const EqualFunc equal_t) {
+  if ((!equal_t(kA, kB) && comp_t(kA, kB) == dir) ||
+      (equal_t(kA, kB) && vB < vA)) {
     swap_var(kA, kB);
     swap_var(vA, vB);
   }
@@ -43,12 +49,14 @@ template <
     typename KeyType,
     typename ValueType,
     DPCPP::memory_scope fence_scope,
-    typename CompFunc>
+    typename CompFunc,
+    typename EqualFunc>
 inline void bitonic_sort(
     const DPCPP::nd_item<1>& item,
     KeyType* key,
     ValueType* val,
-    const CompFunc& comp,
+    const CompFunc& comp_t,
+    const EqualFunc& equal_t,
     /* total sort problem size   */ const unsigned int sort_sz,
     /* stride between elements   */ const unsigned int stride = 1,
     /* adjust order              */ const bool inverse_order = false,
@@ -68,7 +76,13 @@ inline void bitonic_sort(
         unsigned int pos_a = (2 * loc - (loc & (bitonic_seq_sz - 1))) * stride;
         unsigned int pos_b = pos_a + bitonic_seq_sz * stride;
         compare_and_swap(
-            key[pos_a], val[pos_a], key[pos_b], val[pos_b], order, comp);
+            key[pos_a],
+            val[pos_a],
+            key[pos_b],
+            val[pos_b],
+            order,
+            comp_t,
+            equal_t);
       }
     }
   }
@@ -88,7 +102,11 @@ inline uint64_t last_power2(uint64_t n) {
 
 } // namespace impl
 
-template <typename KeyType, typename ValueType, typename CompFunc>
+template <
+    typename KeyType,
+    typename ValueType,
+    typename CompFunc,
+    typename EqualFunc>
 void bitonic_merge_sort_kernel(
     KeyType* key,
     ValueType* val,
@@ -96,7 +114,8 @@ void bitonic_merge_sort_kernel(
     const size_t outer_sz,
     const size_t inner_sz,
     const KeyType pad_k,
-    const CompFunc comp) {
+    const CompFunc comp_t,
+    const EqualFunc equal_t) {
   auto& q = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto max_group_sz = dpcppMaxWorkGroupSize(dev_id);
@@ -181,7 +200,8 @@ void bitonic_merge_sort_kernel(
               item,
               s_key.get_pointer().get(),
               s_val.get_pointer().get(),
-              comp,
+              comp_t,
+              equal_t,
               bitonic_blk_sort_sz,
               /* stride */ 1,
               inverse_order);
@@ -209,7 +229,8 @@ void bitonic_merge_sort_kernel(
             item,
             g_key_ + batch_off_,
             g_val_ + batch_off_,
-            comp,
+            comp_t,
+            equal_t,
             bitonic_sort_sz,
             /* transposed for contiguous */ 1,
             /* inverse_order */ false,

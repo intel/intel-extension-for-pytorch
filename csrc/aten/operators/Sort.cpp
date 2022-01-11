@@ -61,6 +61,9 @@ std::tuple<Tensor&, Tensor&> sort_out(
               Numerics<scalar_t>::upper_bound(),
               [](scalar_t a, scalar_t b) -> bool {
                 return Numerics<scalar_t>::lt(a, b);
+              },
+              [](scalar_t a, scalar_t b) -> bool {
+                return Numerics<scalar_t>::eq(a, b);
               });
         });
   } else {
@@ -79,6 +82,9 @@ std::tuple<Tensor&, Tensor&> sort_out(
               Numerics<scalar_t>::lower_bound(),
               [](scalar_t a, scalar_t b) -> bool {
                 return Numerics<scalar_t>::gt(a, b);
+              },
+              [](scalar_t a, scalar_t b) -> bool {
+                return Numerics<scalar_t>::eq(a, b);
               });
         });
   }

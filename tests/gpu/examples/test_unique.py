@@ -5,46 +5,75 @@ import ipex
 
 import pytest
 
-cpu_device = torch.device("cpu")
-sycl_device = torch.device("xpu")
-
+N = 1024
+M = 5
 
 class TestTorchMethod(TestCase):
+
     @pytest.mark.skipif("not torch.xpu.has_onedpl()")
-    def test_activation(self):
-        output = torch.unique(torch.tensor([1, 3, 2, 3], dtype=torch.long))
-        output_dpcpp = torch.unique(torch.tensor([1, 3, 2, 3], dtype=torch.long, device=sycl_device))
-        print(output_dpcpp)
-        # tensor([ 2,  3,  1])
-        self.assertEqual(output, output_dpcpp.cpu())
+    def test_single_unique(self):
+        a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
+        a_xpu = a_cpu.xpu()
 
-        output, inverse_indices = torch.unique(torch.tensor(
-            [1, 3, 2, 3], dtype=torch.long), sorted=True, return_inverse=True)
-        output_dpcpp, inverse_indices_dpcpp = torch.unique(torch.tensor(
-            [1, 3, 2, 3], dtype=torch.long, device=sycl_device), sorted=True, return_inverse=True)
-        print(output_dpcpp)
-        # tensor([ 1,  2,  3])
-        print(inverse_indices_dpcpp)
-        # tensor([ 0,  2,  1,  2])
-        self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(inverse_indices, inverse_indices_dpcpp.cpu())
+        output_cpu = torch.unique(a_cpu, sorted=True)
+        output_xpu = torch.unique(a_xpu, sorted=True)
+        self.assertEqual(output_cpu, output_xpu)
 
-        output, inverse_indices, counts = torch.unique(torch.tensor(
-            [[5, 6], [2, 3]], dtype=torch.long), dim=0, sorted=True, return_inverse=True, return_counts=True)
-        output_dpcpp, inverse_indices_dpcpp, counts_dpcpp = torch.unique(torch.tensor(
-            [[5, 6], [2, 3]], dtype=torch.long, device=sycl_device), dim=0, sorted=True, return_inverse=True, return_counts=True)
-        self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(inverse_indices, inverse_indices_dpcpp.cpu())
-        self.assertEqual(counts, counts_dpcpp.cpu())
+        output_cpu = torch.unique(a_cpu, sorted=False)
+        output_xpu = torch.unique(a_xpu, sorted=False)
 
-        output, inverse_indices, counts = torch.unique_consecutive(torch.tensor(
-            [[1, 3], [2, 3]], dtype=torch.long), return_inverse=True, return_counts=True)
-        output_dpcpp, inverse_indices_dpcpp, counts_dpcpp = torch.unique_consecutive(torch.tensor(
-            [[1, 3], [2, 3]], dtype=torch.long, device=sycl_device), return_inverse=True, return_counts=True)
-        print(output_dpcpp)
-        # tensor([ 1,  2,  3])
-        print(inverse_indices_dpcpp)
-        # tensor([[ 0,  2], [ 1,  2]])
-        self.assertEqual(output, output_dpcpp.cpu())
-        self.assertEqual(inverse_indices, inverse_indices_dpcpp.cpu())
-        self.assertEqual(counts, counts_dpcpp.cpu())
+        self.assertTrue(len(output_cpu) == len(output_xpu))
+        list_output_cpu = list(output_cpu.numpy())
+        list_output_xpu = list(output_xpu.cpu().numpy())
+
+        for item in list_output_cpu:
+            self.assertTrue(item in list_output_xpu)
+        for item in list_output_xpu:
+            self.assertTrue(item in list_output_cpu)
+
+
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
+    def test_inverse_unique(self):
+        a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
+        a_xpu = a_cpu.xpu()
+
+        output_cpu, inverse_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True)
+        output_xpu, inverse_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True)
+        self.assertEqual(output_cpu, output_xpu)
+        self.assertEqual(inverse_cpu, inverse_xpu)
+
+
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
+    def test_inverse_counts_unique(self):
+        a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
+        a_xpu = a_cpu.xpu()
+
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True)
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True)
+        self.assertEqual(output_cpu, output_xpu)
+        self.assertEqual(inverse_cpu, inverse_xpu)
+        self.assertEqual(counts_cpu, counts_xpu)
+
+
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
+    def test_dim0_unique(self):
+        a_cpu = torch.randint(0, 5, [N, M], dtype=torch.long)
+        a_xpu = a_cpu.xpu()
+
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True, dim=0)
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True, dim=0)
+        self.assertEqual(output_cpu, output_xpu)
+        self.assertEqual(inverse_cpu, inverse_xpu)
+        self.assertEqual(counts_cpu, counts_xpu)
+
+
+    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
+    def test_dim1_unique(self):
+        a_cpu = torch.randint(0, 5, [N, M], dtype=torch.long)
+        a_xpu = a_cpu.xpu()
+
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True, dim=1)
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True, dim=1)
+        self.assertEqual(output_cpu, output_xpu)
+        self.assertEqual(inverse_cpu, inverse_xpu)
+        self.assertEqual(counts_cpu, counts_xpu)

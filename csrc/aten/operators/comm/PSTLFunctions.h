@@ -11,8 +11,8 @@
 #include <oneapi/dpl/numeric>
 
 namespace sycl {
-template <typename T>
-struct sycl::is_device_copyable<oneapi::dpl::zip_iterator<T*, T*>>
+template <typename T1, typename T2>
+struct sycl::is_device_copyable<oneapi::dpl::zip_iterator<T1*, T2*>>
     : std::true_type {};
 } // namespace sycl
 #endif
@@ -20,12 +20,13 @@ struct sycl::is_device_copyable<oneapi::dpl::zip_iterator<T*, T*>>
 namespace at {
 namespace AtenIpexTypeXPU {
 
-template <class InputIt, class OutputIt, class T>
+template <class InputIt, class OutputIt, class T, class options_t>
 DPCPP_DEVICE static inline OutputIt exclusive_scan(
     InputIt first,
     InputIt last,
     OutputIt d_first,
-    T init) {
+    T init,
+    options_t options) {
   const auto N = std::distance(first, last);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -33,6 +34,9 @@ DPCPP_DEVICE static inline OutputIt exclusive_scan(
   const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
 
   // 1. do exclusive_scan on each workgroups
+  const auto dtype_size = sizeof(*first);
+  Tensor scratchpad = at::empty({N}, options);
+  T* scratchpad_ptr = (T*)scratchpad.data_ptr();
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
     DPCPP::accessor<T, 1, dpcpp_rw_mode, DPCPP::access::target::local>
         local_scan(wgroup_size, __cgh);
@@ -53,7 +57,7 @@ DPCPP_DEVICE static inline OutputIt exclusive_scan(
       down_sweep(item_id, local_scan, init);
 
       if (first + global_id < last)
-        d_first[global_id] = local_scan[local_id];
+        scratchpad_ptr[global_id] = local_scan[local_id];
     };
 
     __cgh.parallel_for(
@@ -62,8 +66,7 @@ DPCPP_DEVICE static inline OutputIt exclusive_scan(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   // 2. reduce among workgroups,
-  //     will rewrite this while work group reduction is ready For now,
-  //     this is implemented with serial algorithm actually.
+  //    this is implemented with serial algorithm actually.
   auto cgf_2 = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto local_id = item_id.get_local_linear_id();
@@ -72,45 +75,60 @@ DPCPP_DEVICE static inline OutputIt exclusive_scan(
       for (auto i = 1; i <= ngroups; i++) {
         auto global_id = i * wgroup_size + local_id;
         auto prelast_id = i * wgroup_size - 1;
-        if (global_id < N)
-          d_first[global_id] =
-              d_first[global_id] + d_first[prelast_id] + first[prelast_id];
+        if (global_id < N) {
+          scratchpad_ptr[global_id] = scratchpad_ptr[global_id] +
+              first[prelast_id] + scratchpad_ptr[prelast_id];
+        }
         DPCPP::group_barrier(item_id.get_group());
       }
     };
     __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(wgroup_size, wgroup_size), kfn);
+        DPCPP::nd_range</*dim=*/1>(1 * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
+
+  // 3. flush back into destination
+  auto cgf_3 = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto global_id = item_id.get_global_linear_id();
+      if (global_id < N)
+        d_first[global_id] = scratchpad_ptr[global_id];
+    };
+    __cgh.parallel_for(
+        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
   return d_first + N;
 }
 
-template <class InputIt, class OutputIt, class T>
+template <class InputIt, class OutputIt, class T, class options_t>
 DPCPP_DEVICE static inline OutputIt inclusive_scan(
     InputIt first,
     InputIt last,
     OutputIt d_first,
-    T init) {
+    T init,
+    options_t options) {
   // 1. do exclusive_scan
-  OutputIt d_last =
-      at::AtenIpexTypeXPU::exclusive_scan(first, last, d_first, init);
-  const auto N = std::distance(d_first, d_last);
-
+  const auto N = std::distance(first, last);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
 
+  Tensor scratchpad = at::empty({N}, options);
+  T* scratchpad_begin = (T*)scratchpad.data_ptr();
+  at::AtenIpexTypeXPU::exclusive_scan(
+      first, last, scratchpad_begin, init, options);
+
   // 2. update exclusive_scan to inclusive_scan
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto global_id = item_id.get_global_linear_id();
-      d_first[global_id] += first[global_id];
+      d_first[global_id] = scratchpad_begin[global_id] + first[global_id];
     };
-
     __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(ngroups * wgroup_size, wgroup_size), kfn);
+        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
@@ -128,16 +146,13 @@ DPCPP_DEVICE static inline OutputIt copy_if(
   const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+  const auto options =
+      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
+          LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
-  Tensor global_mask = at::zeros(
-      {N + 1},
-      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
-          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  Tensor global_mask = at::zeros({N + 1}, options);
   int64_t* gmask_ptr = (int64_t*)global_mask.data_ptr();
-  Tensor target_pos = at::empty(
-      {N + 1},
-      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
-          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  Tensor target_pos = at::empty({N + 1}, options);
   int64_t* tpos_ptr = (int64_t*)target_pos.data_ptr();
 
   // 1. get mask vector (Tensor) for exclusive_scan
@@ -157,7 +172,7 @@ DPCPP_DEVICE static inline OutputIt copy_if(
 
   // 2. calculate positions via exclusive_scan
   at::AtenIpexTypeXPU::exclusive_scan(
-      gmask_ptr, gmask_ptr + N + 1, tpos_ptr, (int64_t)0);
+      gmask_ptr, gmask_ptr + N + 1, tpos_ptr, (int64_t)0, options);
 
   // 3. copy data into destination
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
@@ -271,24 +286,21 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+  auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+  const auto options =
+      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
+          LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
-  Tensor global_mask = at::ones(
-      {N + 1},
-      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
-          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  Tensor global_mask = at::ones({N + 1}, options);
   int64_t* gmask_ptr = (int64_t*)global_mask.data_ptr();
-  Tensor target_pos = at::empty(
-      {N + 1},
-      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
-          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  Tensor target_pos = at::empty({N + 1}, options);
   int64_t* tpos_ptr = (int64_t*)target_pos.data_ptr();
 
   // 1. mark duplicated item as 0 in mask vector.
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto global_id = item_id.get_global_linear_id();
-      if (global_id > 1 && first + global_id < last) {
+      if (global_id >= 1 && first + global_id < last) {
         if (p(first[global_id - 1], first[global_id])) {
           gmask_ptr[global_id] = 0;
         }
@@ -303,20 +315,106 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
 
   // 2. calculate positions via exclusive_scan
   at::AtenIpexTypeXPU::exclusive_scan(
-      gmask_ptr, gmask_ptr + N + 1, tpos_ptr, (int64_t)0);
+      gmask_ptr, gmask_ptr + N + 1, tpos_ptr, (int64_t)0, options);
 
-  // 3. copy data into destination, now its done by linear algorithm, need to
-  // rewrite this while global reduce is ready
+  // 3. transfer data to destination using a temp buffer
+  int64_t dtype_size = sizeof(*first);
+  Tensor buf = at::empty(
+      {N * dtype_size},
+      at::TensorOptions().device(kXPU).dtype(kByte).memory_format(
+          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  auto buf_ptr = buf.data_ptr<uint8_t>();
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto global_id = item_id.get_global_linear_id();
-      if (global_id == 0) {
-        for (auto i = 0; first + i < last; i++) {
-          auto pos = tpos_ptr[i];
-          if (gmask_ptr[i] != 0) {
-            *(first + pos) = std::move(*(first + i));
-          }
+      if (global_id < N && gmask_ptr[global_id] != 0)
+        *((ForwardIt)(buf_ptr + tpos_ptr[global_id] * dtype_size)) =
+            first[global_id];
+    };
+
+    __cgh.parallel_for(
+        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
+
+  int64_t n = target_pos.max().item<int64_t>();
+  ngroups = (n + wgroup_size - 1) / wgroup_size;
+  auto cgf_4 = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto global_id = item_id.get_global_linear_id();
+      if (global_id < n)
+        first[global_id] = *((ForwardIt)(buf_ptr + global_id * dtype_size));
+    };
+    __cgh.parallel_for(
+        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
+
+  return first + n;
+}
+
+template <class ForwardIt, class ZipForwardIt, class BinaryPredicate>
+std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
+    ForwardIt first,
+    ForwardIt last,
+    ZipForwardIt z_first,
+    BinaryPredicate p) {
+  const auto N = std::distance(first, last);
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  const auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+  const auto options =
+      at::TensorOptions().device(kXPU).dtype(kLong).memory_format(
+          LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+
+  Tensor global_mask = at::ones({N + 1}, options);
+  int64_t* gmask_ptr = (int64_t*)global_mask.data_ptr();
+  Tensor target_pos = at::empty({N + 1}, options);
+  int64_t* tpos_ptr = (int64_t*)target_pos.data_ptr();
+
+  // 1. mark duplicated item as 0 in mask vector.
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto global_id = item_id.get_global_linear_id();
+      if (global_id >= 1 && first + global_id < last) {
+        if (p(first[global_id - 1], first[global_id])) {
+          gmask_ptr[global_id] = 0;
         }
+      }
+    };
+
+    __cgh.parallel_for(
+        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+  };
+
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+
+  // 2. calculate positions via exclusive_scan
+  at::AtenIpexTypeXPU::exclusive_scan(
+      gmask_ptr, gmask_ptr + N + 1, tpos_ptr, (int64_t)0, options);
+
+  // 3. transfer data to destination using a temp buffer
+  int64_t dtype_size = sizeof(*first);
+  int64_t z_dtype_size = sizeof(*z_first);
+  Tensor buf = at::empty(
+      {N * dtype_size},
+      at::TensorOptions().device(kXPU).dtype(kByte).memory_format(
+          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  Tensor z_buf = at::empty(
+      {N * z_dtype_size},
+      at::TensorOptions().device(kXPU).dtype(kByte).memory_format(
+          LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+  auto buf_ptr = buf.data_ptr<uint8_t>();
+  auto z_buf_ptr = z_buf.data_ptr<uint8_t>();
+  auto cgf_3 = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto global_id = item_id.get_global_linear_id();
+      if (global_id < N && gmask_ptr[global_id] != 0) {
+        *((ForwardIt)(buf_ptr + tpos_ptr[global_id] * dtype_size)) =
+            first[global_id];
+        *((ZipForwardIt)(z_buf_ptr + tpos_ptr[global_id] * z_dtype_size)) =
+            z_first[global_id];
       }
     };
 
@@ -325,7 +423,23 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
-  return first + target_pos.max().item<int64_t>();
+  int64_t n = target_pos.max().item<int64_t>();
+  ngroups = (n + wgroup_size - 1) / wgroup_size;
+  auto cgf_4 = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto global_id = item_id.get_global_linear_id();
+      if (global_id < n) {
+        first[global_id] = *((ForwardIt)(buf_ptr + global_id * dtype_size));
+        z_first[global_id] =
+            *((ZipForwardIt)(z_buf_ptr + global_id * z_dtype_size));
+      }
+    };
+    __cgh.parallel_for(
+        DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_4);
+
+  return std::make_tuple<ForwardIt, ZipForwardIt>(first + n, z_first + n);
 }
 
 } // namespace AtenIpexTypeXPU

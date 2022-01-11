@@ -189,16 +189,14 @@ static inline void sparse_packed_add_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t newNnz;
   {
-    auto zipped_uniqueOffsets =
-        oneapi::dpl::make_zip_iterator(indices1D, uniqueOffsets);
-    auto newEnd = at::AtenIpexTypeXPU::unique(
-        zipped_uniqueOffsets,
-        zipped_uniqueOffsets + nnz,
-        [](auto lhs, auto rhs) {
-          using std::get;
-          return get<0>(lhs) == get<0>(rhs);
-        });
-    newNnz = std::distance(zipped_uniqueOffsets, newEnd);
+    auto indices1D_end = indices1D;
+    auto uniqueOffsets_end = uniqueOffsets;
+    std::tie(indices1D_end, uniqueOffsets_end) =
+        at::AtenIpexTypeXPU::unique_with_zip(
+            indices1D, indices1D + nnz, uniqueOffsets, [](auto lhs, auto rhs) {
+              return lhs == rhs;
+            });
+    newNnz = std::distance(indices1D, indices1D_end);
   }
 
   const int num_group_0 = CeilDiv(newNnz, (int64_t)4);

@@ -183,16 +183,16 @@ Tensor coalesce(const Tensor& self) {
           using std::get;
           return get<0>(lhs) < get<0>(rhs);
         });
-    auto zipped_uniqueOffsets =
-        oneapi::dpl::make_zip_iterator(indices1D_ptr, uniqueOffsets_ptr);
-    auto newEnd = at::AtenIpexTypeXPU::unique(
-        zipped_uniqueOffsets,
-        zipped_uniqueOffsets + nnz,
-        [](auto lhs, auto rhs) {
-          using std::get;
-          return get<0>(lhs) == get<0>(rhs);
-        });
-    newNnz = std::distance(zipped_uniqueOffsets, newEnd);
+
+    auto indices1D_end = indices1D_ptr;
+    auto uniqueOffsets_end = uniqueOffsets_ptr;
+    std::tie(indices1D_end, uniqueOffsets_end) =
+        at::AtenIpexTypeXPU::unique_with_zip(
+            indices1D_ptr,
+            indices1D_ptr + nnz,
+            uniqueOffsets_ptr,
+            [](auto lhs, auto rhs) { return Numerics<int64_t>::eq(lhs, rhs); });
+    newNnz = std::distance(indices1D_ptr, indices1D_end);
   }
 
   indices1D.resize_({1, newNnz});

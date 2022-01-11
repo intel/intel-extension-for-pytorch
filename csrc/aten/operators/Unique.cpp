@@ -7,7 +7,9 @@
 #include <tuple>
 
 #include <ATen/AtenIpexTypeXPU.h>
+#include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
+#include "comm/PSTLFunctions.h"
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
@@ -23,10 +25,10 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 #ifdef USE_ONEDPL
-template <typename policy_t, typename scalar_t, typename not_equal_t>
+template <typename policy_t, typename input_t, typename not_equal_t>
 Tensor compute_inverse(
     const policy_t& policy,
-    scalar_t* data,
+    input_t* data,
     int64_t num_inp,
     const Tensor& sorted_indices,
     const bool return_inverse,
@@ -50,52 +52,55 @@ Tensor compute_inverse(
     std::adjacent_difference(
         policy, data_begin, data_begin + num_inp, inv_loc_begin, not_equal);
     inv_loc[0] = 0;
-    std::inclusive_scan(
-        policy, inv_loc_begin, inv_loc_begin + num_inp, inv_loc_begin);
-
-    auto zipped_begin =
-        oneapi::dpl::make_zip_iterator(sorted_indices_begin, inv_loc_begin);
-    std::stable_sort(
-        policy, zipped_begin, zipped_begin + num_inp, [](auto lhs, auto rhs) {
-          using std::get;
-          return get<0>(lhs) < get<0>(rhs);
-        });
+    at::AtenIpexTypeXPU::inclusive_scan(
+        inv_loc_begin,
+        inv_loc_begin + num_inp,
+        inv_loc_begin,
+        (int64_t)0,
+        inv_loc.options());
+    // Here this sort must be stable-sort
+    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<int64_t, int64_t>(
+        sorted_indices_ptr,
+        inv_loc_ptr,
+        sorted_indices.size(0), // prb_size
+        1, // batch_size
+        sorted_indices.stride(0), // stride
+        Numerics<int64_t>::upper_bound(),
+        [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); },
+        [](int64_t a, int64_t b) { return Numerics<int64_t>::eq(a, b); });
     inverse_indices = inv_loc;
   }
 
   return inverse_indices;
 }
 
-template <
-    typename policy_t,
-    typename scalar_t,
-    typename equal_t,
-    typename equal_by_key_t>
+template <typename policy_t, typename input_t, typename equal_t>
 std::tuple<Tensor, int64_t> compute_unique(
     const policy_t& policy,
-    scalar_t* data,
+    input_t* data,
     int64_t num_inp,
     const Tensor& sorted_indices,
     const bool return_counts,
     TensorOptions options,
-    equal_t equal,
-    equal_by_key_t equal_by_key) {
+    equal_t equal) {
   auto data_begin = data;
   // unique and count
   Tensor counts = at::empty({0}, options);
   int64_t num_out;
   if (!return_counts) {
-    num_out = std::unique(policy, data_begin, data_begin + num_inp, equal) -
+    num_out =
+        at::AtenIpexTypeXPU::unique(data_begin, data_begin + num_inp, equal) -
         data_begin;
   } else {
     Tensor range = at::empty({0}, options);
     range = at::AtenIpexTypeXPU::arange_out(range, 0, num_inp + 1, 1);
     int64_t* range_ptr = range.data_ptr<int64_t>();
     auto range_begin = range_ptr;
-    auto zipped_begin = oneapi::dpl::make_zip_iterator(data_begin, range_begin);
-    num_out = std::unique(
-                  policy, zipped_begin, zipped_begin + num_inp, equal_by_key) -
-        zipped_begin;
+    auto data_end = data_begin;
+    auto range_end = range_begin;
+    std::tie(data_end, range_end) = at::AtenIpexTypeXPU::unique_with_zip(
+        data_begin, data_begin + num_inp, range_begin, equal);
+    num_out = std::distance(data_begin, data_end);
     range[num_out] = num_inp;
     counts.resize_(num_out);
     int64_t* counts_ptr = counts.data_ptr<int64_t>();
@@ -122,31 +127,24 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   auto options = self.options().dtype(kLong);
   Tensor output = self.clone().reshape(-1);
   int64_t num_inp = output.numel();
-  scalar_t* output_data = output.data_ptr<scalar_t>();
-  auto output_begin = output_data;
-  Tensor sorted_indices;
-  if (!return_inverse) {
-    if (!consecutive) {
-      std::sort(policy, output_begin, output_begin + num_inp);
-    }
-  } else {
-    sorted_indices = at::arange(0, num_inp, options);
-    if (!consecutive) {
-      int64_t* sorted_indices_ptr = sorted_indices.data_ptr<int64_t>();
-      auto sorted_indices_begin = sorted_indices_ptr;
-      auto zipped_begin =
-          oneapi::dpl::make_zip_iterator(output_begin, sorted_indices_begin);
-      std::stable_sort(
-          policy, zipped_begin, zipped_begin + num_inp, [](auto lhs, auto rhs) {
-            using std::get;
-            return get<0>(lhs) < get<0>(rhs);
-          });
-    }
+  Tensor sorted_indices = at::arange(0, num_inp, options);
+  auto sorted_indices_begin = (int64_t*)sorted_indices.data_ptr();
+  if (!consecutive) {
+    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, int64_t>(
+        output.data_ptr<scalar_t>(),
+        sorted_indices.data_ptr<int64_t>(),
+        output.size(0), // prb_size
+        1, // batch_size
+        output.stride(0), // stride
+        Numerics<scalar_t>::upper_bound(),
+        [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); },
+        [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::eq(a, b); });
   }
 
   Tensor inverse_indices, counts;
   int64_t num_out;
 
+  scalar_t* output_data = output.data_ptr<scalar_t>();
   inverse_indices = compute_inverse(
       policy,
       output_data,
@@ -170,13 +168,6 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
       options,
       [](auto lhs, auto rhs) -> bool {
         if (lhs != rhs) {
-          return false;
-        }
-        return true;
-      },
-      [](auto lhs, auto rhs) -> bool {
-        using std::get;
-        if (get<0>(lhs) != get<0>(rhs)) {
           return false;
         }
         return true;
@@ -229,27 +220,61 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   scalar_t* input_flat_ptr = input_flat.data_ptr<scalar_t>();
 
   Tensor indices = at::arange(0, num_inp, options);
+  Tensor indices_idx = at::arange(0, num_inp, options);
   int64_t* indices_data = indices.data_ptr<int64_t>();
   auto indices_begin = indices_data;
+
+  auto less_comp = [=](int64_t a, int64_t b) -> bool {
+    // this is a must to bypass padding comparision in bitonic sort.
+    if (a >= num_inp || b >= num_inp)
+      return a < b;
+    // calculate the dictionary order
+    for (int64_t i = 0; i < n; ++i) {
+      scalar_t lhs = input_flat_ptr[i + a * n];
+      scalar_t rhs = input_flat_ptr[i + b * n];
+      if (lhs < rhs) {
+        return true;
+      } else if (lhs > rhs) {
+        return false;
+      }
+    }
+    return false;
+  };
+  auto equal_comp = [=](auto a, auto b) -> bool {
+    for (int64_t i = 0; i < n; ++i) {
+      scalar_t lhs = input_flat_ptr[i + a * n];
+      scalar_t rhs = input_flat_ptr[i + b * n];
+      if (lhs != rhs) {
+        return false;
+      }
+    }
+    return true;
+  };
+  auto not_equal_comp = [=](auto a, auto b) -> bool {
+    for (int64_t i = 0; i < n; ++i) {
+      scalar_t lhs = input_flat_ptr[i + a * n];
+      scalar_t rhs = input_flat_ptr[i + b * n];
+      if (lhs != rhs) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   if (!consecutive) {
-    std::sort(
-        policy,
+    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<int64_t, int64_t>(
         indices_begin,
-        indices_begin + num_inp,
-        [=](int64_t a, int64_t b) -> bool {
-          for (int64_t i = 0; i < n; ++i) {
-            scalar_t lhs = input_flat_ptr[i + a * n];
-            scalar_t rhs = input_flat_ptr[i + b * n];
-            if (lhs < rhs) {
-              return true;
-            } else if (lhs > rhs) {
-              return false;
-            }
-          }
-          return false;
-        });
+        indices_idx.data_ptr<int64_t>(),
+        num_inp, // prb_size
+        1, // batch_size
+        indices.stride(0), // stride
+        Numerics<int64_t>::upper_bound(), // padding
+        less_comp,
+        equal_comp);
   }
   Tensor origin_indices = indices.clone();
+  int64_t* origin_indices_data = origin_indices.data_ptr<int64_t>();
+
   Tensor inverse_indices, counts;
   int64_t num_out;
 
@@ -260,45 +285,16 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
       indices,
       return_inverse,
       options,
-      [=](auto a, auto b) -> int64_t {
-        for (int64_t i = 0; i < n; ++i) {
-          scalar_t lhs = input_flat_ptr[i + a * n];
-          scalar_t rhs = input_flat_ptr[i + b * n];
-          if (lhs != rhs) {
-            return 1;
-          }
-        }
-        return 0;
-      });
+      not_equal_comp);
 
   std::tie(counts, num_out) = compute_unique(
       policy,
-      indices_data,
+      origin_indices_data,
       num_inp,
-      indices,
+      origin_indices,
       return_counts,
       options,
-      [=](auto a, auto b) -> bool {
-        for (int64_t i = 0; i < n; ++i) {
-          scalar_t lhs = input_flat_ptr[i + a * n];
-          scalar_t rhs = input_flat_ptr[i + b * n];
-          if (lhs != rhs) {
-            return false;
-          }
-        }
-        return true;
-      },
-      [=](auto a, auto b) -> bool {
-        using std::get;
-        for (int64_t i = 0; i < n; ++i) {
-          scalar_t lhs = input_flat_ptr[i + get<0>(a) * n];
-          scalar_t rhs = input_flat_ptr[i + get<0>(b) * n];
-          if (lhs != rhs) {
-            return false;
-          }
-        }
-        return true;
-      });
+      equal_comp);
   origin_indices.resize_(num_out);
   return std::tuple<Tensor, Tensor, Tensor>(
       self.index_select(dim, origin_indices), inverse_indices, counts);

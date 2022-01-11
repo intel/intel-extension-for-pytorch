@@ -435,7 +435,8 @@ Tensor embedding_bag_backward_dpcpp_kernel(
       partials_per_segment.data_ptr<int64_t>(),
       partials_per_segment.data_ptr<int64_t>() + num_of_segments,
       partials_per_segment_offset.data_ptr<int64_t>(),
-      0);
+      (int64_t)0,
+      partials_per_segment.options());
 
   // The total number of partial-segments is the sum of
   // `partials_per_segment_offset`
