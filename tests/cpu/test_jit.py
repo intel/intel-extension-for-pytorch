@@ -170,7 +170,7 @@ class Conv_Scalar_Binary(nn.Module):
         super(Conv_Scalar_Binary, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv = conv_module[dim](in_channels, out_channels, **kwargs)
         self.op = op
 
     def forward(self, x):
@@ -181,12 +181,37 @@ class Conv_Scalar_Binary_Add(nn.Module):
         super(Conv_Scalar_Binary_Add, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
-        self.conv2 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = conv_module[dim](in_channels, out_channels, **kwargs)
+        self.conv2 = conv_module[dim](in_channels, out_channels, **kwargs)
         self.op = op
 
     def forward(self, x):
         return torch.add(self.op(self.conv1(x), 2.0), self.op(self.conv2(x), 2.0))
+
+class Conv_Tensor_Binary(nn.Module):
+    def __init__(self, op, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Tensor_Binary, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.randn([1, out_channels, 1, 1])
+
+    def forward(self, x):
+        return self.op(self.conv(x), self.tensor)
+
+class Conv_Tensor_Binary_Add(nn.Module):
+    def __init__(self, op, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Tensor_Binary_Add, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv1 = conv_module[dim](in_channels, out_channels, **kwargs)
+        self.conv2 = conv_module[dim](in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.randn([1, out_channels, 1, 1])
+
+    def forward(self, x):
+        return torch.add(self.op(self.conv1(x), self.tensor), self.op(self.conv2(x), self.tensor))
 
 class Conv_Bn_Relu(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -574,7 +599,7 @@ class ModMultLinear(nn.Module):
 
 class Tester(TestCase):
 
-    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, levels=['O0','O1'], use_channels_last=[True, False]):
+    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
         modelName = model.__class__.__name__
         options = itertools.product(levels, use_channels_last)
         for level, use_channels_last in options:
@@ -602,7 +627,7 @@ class Tester(TestCase):
                 traced_model = torch.jit.freeze(traced_model)
                 tresult = traced_model(x)
 
-            self.assertEqual(result, tresult)
+            self.assertEqual(result, tresult, prec=prec)
 
             ipex.enable_onednn_fusion(True)
             with torch.no_grad():
@@ -614,7 +639,7 @@ class Tester(TestCase):
                 # conv relu fusion, conv sum fusion or conv sum relu fusion
                 trace_graph = trace_fused_model.graph_for(x)
                 fused_tresult = trace_fused_model(x)
-            self.assertEqual(result, fused_tresult)
+            self.assertEqual(result, fused_tresult, prec=prec)
             # check if the fused node exists in the graph
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
@@ -1082,110 +1107,222 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_relu_run")
 
     def test_output_conv_scalar_binary(self):
-        self._test_output(
-            Conv_Scalar_Binary(torch.add, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::add")
+        for bias in [True, False]:
+            self._test_output(
+                Conv_Scalar_Binary(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::add")
 
-        self._test_output(
-            Conv_Scalar_Binary(torch.sub, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::sub")
+            self._test_output(
+                Conv_Scalar_Binary(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::sub")
 
-        self._test_output(
-            Conv_Scalar_Binary(torch.mul, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::mul")
+            self._test_output(
+                Conv_Scalar_Binary(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::mul")
 
-        self._test_output(
-            Conv_Scalar_Binary(torch.div, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::div")
+            self._test_output(
+                Conv_Scalar_Binary(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::div")
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary(torch.add, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::add",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary(torch.sub, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::sub",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary(torch.mul, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::mul",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary(torch.div, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_run",
-            kind_not_in_graph="aten::div",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::div",
+                prec=0.1)
 
     def test_output_conv_scalar_binary_add(self):
-        self._test_output(
-            Conv_Scalar_Binary_Add(torch.add, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::add")
+        for bias in [True, False]:
+            self._test_output(
+                Conv_Scalar_Binary_Add(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::add")
 
-        self._test_output(
-            Conv_Scalar_Binary_Add(torch.sub, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::sub")
+            self._test_output(
+                Conv_Scalar_Binary_Add(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::sub")
 
-        self._test_output(
-            Conv_Scalar_Binary_Add(torch.mul, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::mul")
+            self._test_output(
+                Conv_Scalar_Binary_Add(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::mul")
 
-        self._test_output(
-            Conv_Scalar_Binary_Add(torch.div, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::div")
+            self._test_output(
+                Conv_Scalar_Binary_Add(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::div")
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary_Add(torch.add, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::add",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary_Add(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary_Add(torch.sub, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::sub",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary_Add(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary_Add(torch.mul, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::mul",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary_Add(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
 
-        self._test_output_bf16(
-            Conv_Scalar_Binary_Add(torch.div, 2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex_prepack::convolution_add_run",
-            kind_not_in_graph="aten::div",
-            prec=0.1)
+            self._test_output_bf16(
+                Conv_Scalar_Binary_Add(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::div",
+                prec=0.1)
+
+    def test_output_conv_tensor_binary(self):
+        for bias in [True, False]:
+            self._test_output(
+                Conv_Tensor_Binary(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
+                Conv_Tensor_Binary(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::sub")
+
+            self._test_output(
+                Conv_Tensor_Binary(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::mul")
+
+            self._test_output(
+                Conv_Tensor_Binary(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::div",
+                prec=2e-5)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="aten::div",
+                prec=0.5)
+
+    def test_output_conv_tensor_binary_add(self):
+        for bias in [True, False]:
+            self._test_output(
+                Conv_Tensor_Binary_Add(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
+                Conv_Tensor_Binary_Add(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::sub")
+
+            self._test_output(
+                Conv_Tensor_Binary_Add(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::mul")
+
+            self._test_output(
+                Conv_Tensor_Binary_Add(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::div",
+                prec=2e-5)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary_Add(torch.add, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary_Add(torch.sub, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary_Add(torch.mul, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Conv_Tensor_Binary_Add(torch.div, 2, 3, 32, kernel_size=3, stride=1, bias=bias),
+                torch.randn(32, 3, 64, 64),
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="aten::div",
+                prec=0.5)
 
     def test_output_conv_bn_relu(self):
         batch_size = 8
