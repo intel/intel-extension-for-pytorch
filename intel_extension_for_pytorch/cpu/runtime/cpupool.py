@@ -76,7 +76,9 @@ def is_runtime_ext_enabled():
        None (None): None
 
     Returns:
-        bool: Whether the runtime exetension is enabled or not.
+        bool: Whether the runtime exetension is enabled or not. If the
+            Intel OpenMP Library is preloaded, this API will return True.
+            Otherwise, it will return False.
     """
 
     return ipex._C.is_runtime_ext_enabled() == 1
