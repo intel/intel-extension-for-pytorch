@@ -624,7 +624,7 @@ namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
-      "convolution_forward(Tensor input, Tensor wieght, Tensor? bias_opt, "
+      "convolution_forward(Tensor input, Tensor weight, Tensor? bias, "
       "int[] stride, int[] padding, int[] dilation, int[] kernel_size, int "
       "groups, int output_channel, bool weight_channels_last, bool "
       "weight_packed) -> Tensor",

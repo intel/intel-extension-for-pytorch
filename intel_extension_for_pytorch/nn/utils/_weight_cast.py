@@ -15,6 +15,7 @@ IPEX_WEIGHT_CAST_MODULE = {
     torch.nn.ConvTranspose3d,
     # ipex support
     torch.nn.EmbeddingBag,
+    torch.nn.Embedding,
 }
 
 def _save_to_state_dict(self, destination, prefix, keep_vars):

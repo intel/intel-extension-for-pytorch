@@ -1,6 +1,13 @@
 #include <ATen/ATen.h>
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
+#include <ATen/cpu/vec/vec512/vec512.h>
+#else
+#include <ATen/cpu/vec/vec256/vec256.h>
+#endif
+using namespace at::vec;
+
+#if defined(CPU_CAPABILITY_AVX512)
 #include <immintrin.h>
 // Conversion from BF16 to FP32
 inline __m512 cvt_bf16_to_fp32(const __m256i src) {
@@ -28,7 +35,7 @@ inline __m256i trunc_fp32_to_bf16(const __m512 src) {
 }
 
 inline __m256i cvt_fp32_to_bf16(const __m512 src) {
-#if (defined CPU_AVX512_BF16) || defined(AVX512_BF16)
+#if (defined CPU_CAPABILITY_AVX512_BF16)
   return reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(src));
 #else
   return trunc_fp32_to_bf16(src);
@@ -63,13 +70,6 @@ inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
 }
 #endif
 
-#if defined(CPU_AVX512)
-#include <ATen/cpu/vec/vec512/vec512.h>
-#else
-#include <ATen/cpu/vec/vec256/vec256.h>
-#endif
-using namespace at::vec;
-
 namespace at {
 namespace vec {
 // See Note [CPU_CAPABILITY namespace]
@@ -94,7 +94,7 @@ inline std::tuple<at::BFloat16, at::BFloat16> unpack_float_bfloat16(float a) {
   return std::make_tuple(*hip, *lop);
 }
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 inline std::tuple<Vectorized<float>, Vectorized<float>> pack_bfloat16_float(
     const Vectorized<at::BFloat16>& a,
     const Vectorized<at::BFloat16>& b) {
@@ -252,36 +252,3 @@ unpack_float_bfloat16(const Vectorized<float>& a, const Vectorized<float>& b) {
 } // namespace CPU_CAPABILITY
 } // namespace vec
 } // namespace at
-
-/*
-1. Add a namespace wrapper to bridge IPEX bf16 namespace to pytorch vec
-namespace.
-2. pytorch vec namespace need according CPU_CAPABILITY to isolate ISA
-implementions.
-*/
-namespace torch_ipex {
-namespace cpu {
-namespace bf16 {
-
-inline float pack_bfloat16_float(at::BFloat16 a, at::BFloat16 b) {
-  return at::vec::pack_bfloat16_float(a, b);
-}
-
-inline std::tuple<at::BFloat16, at::BFloat16> unpack_float_bfloat16(float a) {
-  return at::vec::unpack_float_bfloat16(a);
-}
-
-inline std::tuple<Vectorized<float>, Vectorized<float>> pack_bfloat16_float(
-    const Vectorized<at::BFloat16>& a,
-    const Vectorized<at::BFloat16>& b) {
-  return at::vec::pack_bfloat16_float(a, b);
-}
-
-inline std::tuple<Vectorized<at::BFloat16>, Vectorized<at::BFloat16>>
-unpack_float_bfloat16(const Vectorized<float>& a, const Vectorized<float>& b) {
-  return at::vec::unpack_float_bfloat16(a, b);
-}
-
-} // namespace bf16
-} // namespace cpu
-} // namespace torch_ipex

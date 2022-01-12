@@ -106,7 +106,7 @@ void packed_add(
 
     at::parallel_for(0, len, 64, [&](int64_t start, int64_t end) {
       int64_t i = start;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
       auto alpha_vec = _mm512_set1_ps(alpha_);
       for (; i < end - 31; i += 32) {
         auto bot0 = _mm256_loadu_si256((__m256i*)(bot_half_ptr + i));

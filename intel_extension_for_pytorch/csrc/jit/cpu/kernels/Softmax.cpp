@@ -25,6 +25,7 @@ at::Tensor dil_softmax(
   RECORD_FUNCTION("dil_softmax", std::vector<c10::IValue>({}));
 #endif
   auto half_to_float = false;
+
   if (!dtype.isNone()) {
     auto outtype = dtype.toScalarType();
     auto intype = input.scalar_type();
@@ -34,8 +35,30 @@ at::Tensor dil_softmax(
     at::Tensor converted = input.toType(outtype);
     return softmax_impl(converted, dim);
   }
-
   return softmax_impl(input, dim);
+}
+
+// Dispatch inplace softmax to oneDNN path for jit inference
+at::Tensor& dil_softmax_(
+    at::Tensor& input,
+    const int64_t dim,
+    const at::IValue& dtype) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("dil_softmax_", std::vector<c10::IValue>({}));
+#endif
+  auto half_to_float = false;
+  if (!dtype.isNone()) {
+    auto outtype = dtype.toScalarType();
+    auto intype = input.scalar_type();
+    AT_ASSERTM(
+        intype != at::ScalarType::Half,
+        "softmax with half to float conversion is not supported on Mkldnn");
+    at::Tensor converted = input.toType(outtype);
+    softmax_impl_(converted, dim);
+    return converted;
+  }
+  softmax_impl_(input, dim);
+  return input;
 }
 
 } // namespace cpu

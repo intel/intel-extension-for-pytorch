@@ -383,6 +383,21 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::softmax_(Tensor(a!) self, int dim, ScalarType ? dtype) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            // here the return value (Tensor) is alias of the input "self"
+            auto output = (peek(stack, 0, 3).toTensor());
+            auto result = dil_softmax_(
+                output, peek(stack, 1, 3).toInt(), peek(stack, 2, 3));
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {

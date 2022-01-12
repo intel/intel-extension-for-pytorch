@@ -117,7 +117,7 @@ void adagrad_fused_step_kernel<at::BFloat16, at::BFloat16>(
           bVec param2_bvec = bVec::loadu(param2_ptr + d);
           fVec param_fvec, param_fvec2;
           std::tie(param_fvec, param_fvec2) =
-              bf16::pack_bfloat16_float(param_bvec, param2_bvec);
+              at::vec::pack_bfloat16_float(param_bvec, param2_bvec);
 
           bVec grad_bvec = bVec::loadu(grad_ptr + d);
           fVec grad_fvec, grad_fvec2;
@@ -139,20 +139,20 @@ void adagrad_fused_step_kernel<at::BFloat16, at::BFloat16>(
           param_fvec2 = param_fvec2 - grad_fvec2 / std_fvec2 * fVec(float(clr));
 
           std::tie(param_bvec, param2_bvec) =
-              bf16::unpack_float_bfloat16(param_fvec, param_fvec2);
+              at::vec::unpack_float_bfloat16(param_fvec, param_fvec2);
           param_bvec.store(param_ptr + d);
           param2_bvec.store(param2_ptr + d);
         }
         for (; d < size; d++) {
           float param_val =
-              bf16::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
+              at::vec::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
           float grad_val = float(grad_ptr[d]) + param_val * weight_decay;
           state_sum_ptr[d] += grad_val * grad_val;
 
           float std_val = std::sqrt(state_sum_ptr[d]) + eps;
           param_val -= grad_val / std_val * clr;
           std::tie(param_ptr[d], param2_ptr[d]) =
-              bf16::unpack_float_bfloat16(param_val);
+              at::vec::unpack_float_bfloat16(param_val);
         }
       });
 }
@@ -237,7 +237,7 @@ void adagrad_fused_step_kernel<float, at::BFloat16>(
         }
         for (; d < size; d++) {
           float param_val =
-              bf16::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
+              at::vec::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
           float grad_val = float(grad_ptr[d]) + param_val * weight_decay;
           state_sum_ptr[d] += grad_val * grad_val;
 

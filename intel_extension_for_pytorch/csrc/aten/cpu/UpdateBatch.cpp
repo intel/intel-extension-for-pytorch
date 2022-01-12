@@ -7,9 +7,7 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 
-#if defined(CPU_AVX512)
 #include "csrc/cpu/vec512/update_batch.h"
-#endif
 
 namespace torch_ipex {
 namespace kernel {
@@ -85,7 +83,7 @@ static bool rnnt_update_batch(
   RECORD_FUNCTION("IPEX::rnnt_update_batch", std::vector<c10::IValue>({}));
 #endif
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   vec::vec512::update_batch_kernel(
       k,
       out_lens,

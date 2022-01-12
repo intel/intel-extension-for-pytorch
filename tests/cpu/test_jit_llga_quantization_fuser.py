@@ -760,7 +760,6 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
         self.checkPatterns(graph, patterns)
 
-    @unittest.skipIf(True, 'bmm-div-add for int8-fp32 pattern unsupported yet in the backend')
     def test_bmm_div_add_int8_fp32(self):
         class M(nn.Module):
             def __init__(self):

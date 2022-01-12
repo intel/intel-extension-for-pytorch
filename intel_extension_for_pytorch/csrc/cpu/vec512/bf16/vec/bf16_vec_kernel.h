@@ -1,6 +1,6 @@
 #include "vec_type_cvt.h"
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #include <immintrin.h>
 #else
 #include "csrc/cpu/vec512/ref/add_ker.h"
@@ -8,7 +8,7 @@
 using namespace torch_ipex::cpu::kernel;
 #endif
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 inline __m512 pack_bf16_to_fp32(const __m256i top, const __m256i bot) {
   auto x1 = _mm512_cvtepu16_epi32(top);
   auto x2 = _mm512_cvtepu16_epi32(bot);
@@ -25,7 +25,7 @@ inline void packed_bf16_add_ker(
     at::BFloat16* b,
     int len,
     float alpha) {
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   auto vAlpha = _mm512_set1_ps(alpha);
   int i = 0;
   for (; i < len - 15; i += 16) {
@@ -72,7 +72,7 @@ inline void packed_bf16_add_ker(
 
 inline void add_ker(at::BFloat16* inout, at::BFloat16* in, int len) {
   int i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
@@ -108,7 +108,7 @@ inline void add_ker(at::BFloat16* inout, at::BFloat16* in, int len) {
 
 static inline void add_ker(float* inout, float* in, int len) {
   int i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto out1 = _mm512_loadu_ps(inout + i);
@@ -141,7 +141,7 @@ static inline void add_ker(float* inout, float* in, int len) {
 
 static inline void add_ker(float* inout, at::BFloat16* in, int len) {
   int i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
@@ -183,7 +183,7 @@ inline void add_ker(double* inout, double* in, int len) {
 
 static inline void move_ker(at::BFloat16* out, float* in, int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i));
@@ -210,7 +210,7 @@ static inline void move_ker(at::BFloat16* out, float* in, int64_t len) {
 
 static inline void move_ker(float* out, const float* in, int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_loadu_ps(in + i);
@@ -232,7 +232,7 @@ static inline void move_ker(
     const at::BFloat16* in,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -251,7 +251,7 @@ static inline void move_ker(
 
 static inline void move_ker(int64_t* out, int64_t* in, int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 7; i += 8) {
     auto in0 = _mm512_loadu_pd(in + i);
@@ -270,7 +270,7 @@ static inline void move_ker(int64_t* out, int64_t* in, int64_t len) {
 
 static inline void move_ker(int32_t* out, const int32_t* in, int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_loadu_ps(in + i);
@@ -303,7 +303,7 @@ static inline void zero_ker(double* out, int len) {
 
 static inline void zero_ker(float* out, int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   __m512 zero_512 = _mm512_setzero_ps();
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -321,7 +321,7 @@ static inline void zero_ker(float* out, int64_t len) {
 
 static inline void zero_ker(at::BFloat16* out, int64_t len) {
   int64_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
@@ -337,7 +337,7 @@ static inline void zero_ker(at::BFloat16* out, int64_t len) {
 #endif
 }
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 inline __m512 convert_bf16_to_fp32(const __m256i src) {
   __m512i y = _mm512_cvtepu16_epi32(src);
   return _mm512_castsi512_ps(_mm512_bslli_epi128(y, 2));
@@ -358,7 +358,7 @@ inline void madd_ker(T1* inout, T2* in, int len, float alpha) {
   }
 }
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 template <>
 inline void madd_ker(float* inout, at::BFloat16* in, int len, float alpha) {
   __m512 vAlpha = _mm512_set1_ps(alpha);

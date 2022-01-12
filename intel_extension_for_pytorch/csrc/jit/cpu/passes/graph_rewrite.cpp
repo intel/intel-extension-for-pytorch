@@ -1,5 +1,6 @@
 
 #include "graph_rewrite.h"
+#include <torch/csrc/jit/passes/remove_mutation.h>
 
 namespace torch {
 namespace jit {
@@ -131,8 +132,14 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   rewriter_aten.runOnGraph(graph);
 }
 
+// MHA fusion covers aten::softmax, ipex::softmax and ipex::softmax_:
+// (1) MHA obviously shows better performance than aten div/matmul/add/softmax.
+// (2) MHA also shows better performance than aten add + matmul_div fusion
+//     + ipex::softmax/softmax_.
+// (3) Current ipex::softmax/softmax_ is from the replacement of aten::softmax,
+//     it is safe to make MHA cover ipex::softmax/softmax_.
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
-  std::string div_matmul_add_softmax = R"(
+  std::string div_matmul_add_aten_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %_q = aten::div(%q, %dim_per_head)
         %qk = aten::matmul(%_q, %k)
@@ -140,13 +147,46 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
         return (%scores) )";
 
-  std::string matmul_div_add_softmax = R"(
+  std::string div_matmul_add_ipex_softmax = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %_q = aten::div(%q, %dim_per_head)
+        %qk = aten::matmul(%_q, %k)
+        %_scores = aten::add(%qk, %relative_qk, %alpha)
+        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string div_matmul_add_ipex_softmax_ = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %_q = aten::div(%q, %dim_per_head)
+        %qk = aten::matmul(%_q, %k)
+        %_scores = aten::add(%qk, %relative_qk, %alpha)
+        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string matmul_div_add_aten_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %qk = aten::matmul(%q, %k)
         %_qk = aten::div(%qk, %dim_per_head)
         %_scores = aten::add(%_qk, %relative_qk, %alpha)
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
         return (%scores) )";
+
+  std::string matmul_div_add_ipex_softmax = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha)
+        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string matmul_div_add_ipex_softmax_ = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha)
+        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
   std::string div_matmul_add_softmax_fusion = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
@@ -154,9 +194,17 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
 
   SubgraphRewriter mha_fusion;
   mha_fusion.RegisterRewritePattern(
-      div_matmul_add_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_aten_softmax, div_matmul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
-      matmul_div_add_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_ipex_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      div_matmul_add_ipex_softmax_, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_aten_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_ipex_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_ipex_softmax_, div_matmul_add_softmax_fusion);
   mha_fusion.runOnGraph(graph);
 }
 
@@ -174,8 +222,15 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   rewriter_max_pool2d.runOnGraph(graph);
 }
 
-// replace aten::softmax to ipex::softmax during jit pass
-// there is better performanc for ipex::softmax with oneDNN than aten::softmax
+// for contiguous input:
+// replace aten::softmax to ipex::softmax/ipex::softmax_ during jit pass
+// there is better performance for ipex::softmax/ipex::softmax_ with oneDNN than
+// aten::softmax
+// for non-contiguous input:
+// (1) oneDNN will use ref path which is not optimized as expected
+// (2) if do contiguous copy then go into oneDNN optimized path, the
+// copy overhead is unneglectable
+// (3) so here will not replace aten::softmax to avoid unexpected regression
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
   std::string aten_softmax = R"(
       graph(%a, %dim:int, %half_to_float:bool):
@@ -185,9 +240,63 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
       graph(%a, %dim:int, %half_to_float:bool):
         %r = ipex::softmax(%a, %dim, %half_to_float)
         return (%r) )";
+  std::string ipex_softmax_ = R"(
+      graph(%a, %dim:int, %half_to_float:bool):
+        %r = ipex::softmax_(%a, %dim, %half_to_float)
+        return (%r) )";
+
+  // Filter the unsupported case for inplace softmax
+  auto filter_inplace =
+      [graph](
+          const Match& match,
+          const std::unordered_map<std::string, Value*>& vmap) {
+        Node* node = match.anchor;
+        std::unique_ptr<AliasDb> aliasDb_ = std::make_unique<AliasDb>(graph);
+
+        // check if the input is contiguous, and skip if it is not
+        auto input_value = node->input(0)->type()->cast<TensorType>();
+        auto input_value_contiguous = input_value->contiguous();
+        bool is_contiguous =
+            input_value_contiguous->strides() == input_value->strides();
+        if (!is_contiguous) {
+          return false;
+        }
+
+        // Skip if input has more than one use
+        if (node->input(0)->uses().size() > 1) {
+          return false;
+        }
+        // Skip if input's def node has side effect or input has alias
+        if (MutationRemover::hasSideEffectOrAlias(
+                node->inputs().at(0), aliasDb_.get())) {
+          return false;
+        }
+        return true;
+      };
+
+  auto filter_outplace =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        Node* node = match.anchor;
+        // check if the input is contiguous, and skip if it is not
+        auto input_value = node->input(0)->type()->cast<TensorType>();
+        auto input_value_contiguous = input_value->contiguous();
+        bool is_contiguous =
+            input_value_contiguous->strides() == input_value->strides();
+        if (!is_contiguous) {
+          return false;
+        }
+        return true;
+      };
+
+  // try to replace inplace softmax first
+  SubgraphRewriter rewriter_aten_inplace;
+  rewriter_aten_inplace.RegisterRewritePattern(aten_softmax, ipex_softmax_);
+  rewriter_aten_inplace.runOnGraph(graph, filter_inplace);
+  // if any miss, then try to replace outplace softmax
   SubgraphRewriter rewriter_aten;
   rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
-  rewriter_aten.runOnGraph(graph);
+  rewriter_aten.runOnGraph(graph, filter_outplace);
 }
 
 void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph) {
