@@ -132,8 +132,14 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   rewriter_aten.runOnGraph(graph);
 }
 
+// MHA fusion covers aten::softmax, ipex::softmax and ipex::softmax_:
+// (1) MHA obviously shows better performance than aten div/matmul/add/softmax.
+// (2) MHA also shows better performance than aten add + matmul_div fusion
+//     + ipex::softmax/softmax_.
+// (3) Current ipex::softmax/softmax_ is from the replacement of aten::softmax,
+//     it is safe to make MHA cover ipex::softmax/softmax_.
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
-  std::string div_matmul_add_softmax = R"(
+  std::string div_matmul_add_aten_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %_q = aten::div(%q, %dim_per_head)
         %qk = aten::matmul(%_q, %k)
@@ -141,13 +147,46 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
         return (%scores) )";
 
-  std::string matmul_div_add_softmax = R"(
+  std::string div_matmul_add_ipex_softmax = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %_q = aten::div(%q, %dim_per_head)
+        %qk = aten::matmul(%_q, %k)
+        %_scores = aten::add(%qk, %relative_qk, %alpha)
+        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string div_matmul_add_ipex_softmax_ = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %_q = aten::div(%q, %dim_per_head)
+        %qk = aten::matmul(%_q, %k)
+        %_scores = aten::add(%qk, %relative_qk, %alpha)
+        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string matmul_div_add_aten_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %qk = aten::matmul(%q, %k)
         %_qk = aten::div(%qk, %dim_per_head)
         %_scores = aten::add(%_qk, %relative_qk, %alpha)
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
         return (%scores) )";
+
+  std::string matmul_div_add_ipex_softmax = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha)
+        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string matmul_div_add_ipex_softmax_ = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha)
+        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
   std::string div_matmul_add_softmax_fusion = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
@@ -155,9 +194,17 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
 
   SubgraphRewriter mha_fusion;
   mha_fusion.RegisterRewritePattern(
-      div_matmul_add_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_aten_softmax, div_matmul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
-      matmul_div_add_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_ipex_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      div_matmul_add_ipex_softmax_, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_aten_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_ipex_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_ipex_softmax_, div_matmul_add_softmax_fusion);
   mha_fusion.runOnGraph(graph);
 }
 
