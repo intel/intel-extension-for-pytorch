@@ -569,16 +569,16 @@ Tensor reflection_pad1d(const Tensor& input, IntArrayRef padding) {
 }
 
 Tensor& reflection_pad2d_out(
-    Tensor& output,
     const Tensor& input,
-    IntArrayRef padding) {
+    IntArrayRef padding,
+    Tensor& output) {
   impl::reflection_pad2d_out_template(output, input, padding);
   return output;
 }
 
 Tensor reflection_pad2d(const Tensor& input, IntArrayRef padding) {
   auto output = at::empty({0}, input.options());
-  return at::AtenIpexTypeXPU::reflection_pad2d_out(output, input, padding);
+  return at::AtenIpexTypeXPU::reflection_pad2d_out(input, padding, output);
 }
 
 Tensor& reflection_pad1d_backward_out(
@@ -594,10 +594,10 @@ Tensor& reflection_pad1d_backward_out(
 }
 
 Tensor& reflection_pad2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& input,
-    IntArrayRef padding) {
+    IntArrayRef padding,
+    Tensor& grad_input) {
   grad_input.resize_as_(input);
   grad_input.zero_();
   impl::reflection_pad2d_backward_out_template(

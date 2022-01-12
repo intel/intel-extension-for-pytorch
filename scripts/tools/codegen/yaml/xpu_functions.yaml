@@ -453,6 +453,10 @@ supported:
   - reflection_pad1d.out
   - reflection_pad1d_backward
   - reflection_pad1d_backward.grad_input
+  - reflection_pad2d
+  - reflection_pad2d.out
+  - reflection_pad2d_backward
+  - reflection_pad2d_backward.grad_input
   - relu
   - relu_
   - remainder.Scalar
