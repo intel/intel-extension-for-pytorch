@@ -101,9 +101,28 @@ Tensor& add_out(
        * TensorIterator pass below. */
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other)) &&
-      _self.sizes() == _other.sizes()) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other) &&
+      (((!DPCPPTensorContext::is_plain(_self) ||
+         !DPCPPTensorContext::is_plain(_other)) &&
+        _self.sizes() == _other.sizes()) ||
+       (_self.sizes() != _other.sizes() &&
+        is_expandable_to(_other.sizes(), _self.sizes())))) {
+    /* If the following conditions are satisfied, then oneDNN path will be
+     selected:
+     * 1. _self and _other should be xpu tensor and be defined.
+     * 2. res = _self + alpha * _other; the scalar alpha should be equal to 1.0.
+     * 3. _self and _other should be in the same datatype.
+     * 4. the datatype should be supported by oneDNN primitive.
+     * 5. dim of _self and _other should be equal and must be larger than 0.
+     * 6. _self and _other should be contiguous or channel-last contiguous.
+     * 7. _self or _other should not be scalar (wrapped tensor).
+     * 8. _self or _other is block format and should not involve broadcast,
+          or involved in broadcast when _other is expandable to _self (temporary
+     decision).
+     * TODO: Currently, DPCPP binary ops for tensor broadcast ([4,16,16,512] +
+     * [4,1,1,512]) are in poor efficiency. So for these cases, we still use
+     * oneDNN path. In the future, we will optimize the tensor broadcast cases
+     * and use DPCPP binary ops all the time except the blocked format cases. */
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
@@ -142,9 +161,12 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       _other.dim() > 0 && _self.dim() == _other.dim() &&
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other)) &&
-      _self.sizes() == _other.sizes()) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other) &&
+      (((!DPCPPTensorContext::is_plain(_self) ||
+         !DPCPPTensorContext::is_plain(_other)) &&
+        _self.sizes() == _other.sizes()) ||
+       (_self.sizes() != _other.sizes() &&
+        is_expandable_to(_other.sizes(), _self.sizes())))) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {

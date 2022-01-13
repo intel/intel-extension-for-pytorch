@@ -89,9 +89,12 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
       xpu::oneDNN::is_supported_onednn_dtype(_other) &&
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other)) &&
-      _self.sizes() == _other.sizes()) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other) &&
+      (((!DPCPPTensorContext::is_plain(_self) ||
+         !DPCPPTensorContext::is_plain(_other)) &&
+        _self.sizes() == _other.sizes()) ||
+       (_self.sizes() != _other.sizes() &&
+        is_expandable_to(_other.sizes(), _self.sizes())))) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
   } else {
     result = to_plain_if_needed_(result);
@@ -124,9 +127,12 @@ Tensor div(const Tensor& self, const Tensor& other) {
       xpu::oneDNN::is_supported_onednn_dtype(_other) &&
       ((_self.is_contiguous() && _other.is_contiguous()) ||
        (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other)) &&
-      _self.sizes() == _other.sizes()) {
+      !is_wrapped_number(_self) && !is_wrapped_number(_other) &&
+      (((!DPCPPTensorContext::is_plain(_self) ||
+         !DPCPPTensorContext::is_plain(_other)) &&
+        _self.sizes() == _other.sizes()) ||
+       (_self.sizes() != _other.sizes() &&
+        is_expandable_to(_other.sizes(), _self.sizes())))) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
     return result;
   } else {
