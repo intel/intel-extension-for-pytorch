@@ -34,13 +34,13 @@ For memory management, it configures NUMA binding and preload optimized memory a
 
 ::
 
-   >>> python -m intel_extension_for_pytorch.launch --throughput_mode script.py args
+   >>> python -m intel_extension_for_pytorch.cpu.launch --throughput_mode script.py args
 
 2. Run single-instance inference or training on a single CPU socket.
 
 ::
 
-   >>> python -m intel_extension_for_pytorch.launch --socket_id 1 script.py args
+   >>> python -m intel_extension_for_pytorch.cpu.launch --socket_id 1 script.py args
 
 *** Multi-instance inference ***
 
@@ -49,12 +49,12 @@ For memory management, it configures NUMA binding and preload optimized memory a
    --ninstances and  --ncore_per_instance should be set.
 
 
-   >>> python -m intel_extension_for_pytorch.launch -- python_script args
+   >>> python -m intel_extension_for_pytorch.cpu.launch -- python_script args
 
    eg: on CLX8280 with 14 instance, 4 cores per instance
 ::
 
-   >>> python -m intel_extension_for_pytorch.launch  --ninstances 14 --ncore_per_instance 4 python_script args
+   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 14 --ncore_per_instance 4 python_script args
 
 2. Run single-instance inference among multiple instances.
    By default, runs all ninstances. If you want to independently run a single instance among ninstances, specify instance_idx.
@@ -92,7 +92,7 @@ for well-improved multi-node distributed training performance as well.
 
 ::
 
-    >>> python  -m intel_extension_for_pytorch.launch --distributed  python_script  --arg1 --arg2 --arg3 and all other
+    >>> python  -m intel_extension_for_pytorch.cpu.launch --distributed  python_script  --arg1 --arg2 --arg3 and all other
                 arguments of your training script
 
 2. Multi-Node multi-process distributed training: (e.g. two nodes)
@@ -102,7 +102,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
 
 ::
 
-    >>> python -m intel_extension_for_pytorch.launch --distributed --nproc_per_node=xxx
+    >>> python -m intel_extension_for_pytorch.cpu.launch --distributed --nproc_per_node=xxx
                --nnodes=2 --hostfile hostfile python_sript --arg1 --arg2 --arg3
                and all other arguments of your training script)
 
@@ -111,7 +111,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
 
 ::
 
-    >>> python -m intel_extension_for_pytorch.launch --help
+    >>> python -m intel_extension_for_pytorch.cpu.launch --help
 
 *** Memory allocator  ***
 
@@ -675,14 +675,14 @@ def parse_args():
                                         "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
                                         "\n################################# Basic usage ############################# \n"
                                         "\n 1. single instance\n"
-                                        "\n   >>> python -m intel_extension_for_pytorch.launch python_script args \n"
+                                        "\n   >>> python -m intel_extension_for_pytorch.cpu.launch python_script args \n"
                                         "\n2. multi-instance \n"
-                                        "\n    >>> python -m intel_extension_for_pytorch.launch --ninstances xxx --ncore_per_instance xx python_script args\n"
+                                        "\n    >>> python -m intel_extension_for_pytorch.cpu.launch --ninstances xxx --ncore_per_instance xx python_script args\n"
                                         "\n3. Single-Node multi-process distributed training\n"
-                                        "\n    >>> python  -m intel_extension_for_pytorch.launch --distributed  python_script args\n"
+                                        "\n    >>> python  -m intel_extension_for_pytorch.cpu.launch --distributed  python_script args\n"
                                         "\n4. Multi-Node multi-process distributed training: (e.g. two nodes)\n"
                                         "\n   rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*\n"
-                                        "\n   >>> python -m intel_extension_for_pytorch.launch --distributed --nproc_per_node=2\n"
+                                        "\n   >>> python -m intel_extension_for_pytorch.cpu.launch --distributed --nproc_per_node=2\n"
                                         "\n       --nnodes=2 --hostfile hostfile python_script args\n"
                                         "\n############################################################################# \n",
                                         formatter_class=RawTextHelpFormatter)
