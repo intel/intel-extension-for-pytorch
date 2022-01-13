@@ -65,6 +65,20 @@ ArgSpec LlgaKernel::getQuantizedSpec(ArgSpec spec, size_t offset) const {
   return spec;
 }
 
+std::map<size_t, int64_t> LlgaKernel::initializeTensorIdToOccurence() const {
+  std::map<size_t, int64_t> tensorIdToOccurence;
+  for (auto& lt : partition_.get_in_ports()) {
+    auto inputId = lt.get_id();
+    std::map<size_t, int64_t>::iterator it(tensorIdToOccurence.find(inputId));
+    if (it != tensorIdToOccurence.end()) {
+      it->second++;
+    } else {
+      tensorIdToOccurence[inputId] = 1;
+    }
+  }
+  return tensorIdToOccurence;
+}
+
 void LlgaKernel::initializeConstantInputs() {
   for (auto& lt : partition_.get_in_ports()) {
     auto inputId = lt.get_id();
@@ -94,10 +108,16 @@ ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
   ArgSpecs inputSpecs;
   inputSpecs.reserve(nPartitionInputs_);
   GRAPH_DEBUG("Initializing graph input logical tensors");
+
+  std::map<size_t, int64_t> tensorIdToOccurence =
+      initializeTensorIdToOccurence();
   for (size_t i = 0; i < nGraphInputs_; i++) {
     auto spec = ArgSpec(graph_->inputs()[i]).supplementTensorInfo(inputs[i]);
     initializedInputIds_.insert(spec.tid());
-    inputSpecs.emplace_back(spec);
+
+    int64_t occurence = tensorIdToOccurence[spec.tid()];
+    inputSpecs.insert(inputSpecs.end(), occurence, spec);
+    runArgsIdx_.insert(runArgsIdx_.end(), occurence, i);
   }
 
   GRAPH_DEBUG("Initializing constant input tensors");
@@ -139,10 +159,11 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
   RECORD_FUNCTION("LLGA_bridge::prepareRunArgs", std::vector<c10::IValue>({}));
 #endif
   RunArgs runInputs, runOutputs;
-  for (size_t i = 0; i < nGraphInputs_; i++) {
+  for (size_t i = 0; i < runArgsIdx_.size(); i++) {
     auto spec = inputSpecs_[i];
+    auto input = inputs[runArgsIdx_[i]];
     runInputs.push_back(
-        {spec.logical_tensor(), Engine::getEngine(), inputs[i].data_ptr()});
+        {spec.logical_tensor(), Engine::getEngine(), input.data_ptr()});
   }
   for (size_t i = 0; i < constantInputs_.size(); i++) {
     // constantInputSpecs are placed after graphInputSpecs
