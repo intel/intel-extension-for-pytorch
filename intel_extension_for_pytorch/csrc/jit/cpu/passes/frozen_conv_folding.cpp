@@ -1,3 +1,4 @@
+#include <ATen/Functions.h>
 #include <ATen/Utils.h>
 #include <c10/core/ScalarType.h>
 #include <c10/util/Exception.h>

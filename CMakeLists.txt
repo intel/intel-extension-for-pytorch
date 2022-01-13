@@ -46,6 +46,9 @@ set(DPCPP_THIRD_PARTY_ROOT "${PROJECT_SOURCE_DIR}/third_party")
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Common dependencies
+
+# The DYN_DISP is a temporary flag, and it should be switch to dynamic dispatch after 
+# we fully support dynamic dispatch runtime.
 if("$ENV{DYN_DISP}" STREQUAL "1")
 include(cmake/CpuDynDisp.cmake)
 else()

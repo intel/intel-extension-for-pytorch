@@ -70,6 +70,12 @@ inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
 }
 #endif
 
+/*
+  Following the namespace convention of PyTorch, we put ISA-specific kernels
+  under at::vec::[CPU_CAPABILITY] with [CPU_CAPABILITY] as the inline namespace.
+  Then, the signatures of kernel functions are declared and invoked the same way
+  regardless of ISAs. See Note [CPU_CAPABILITY namespace] in PyTorch.
+ */
 namespace at {
 namespace vec {
 // See Note [CPU_CAPABILITY namespace]

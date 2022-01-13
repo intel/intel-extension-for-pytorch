@@ -199,6 +199,24 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
     @llga_fp32_bf16_test_env
+    def test_add_with_duplicated_input(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.pool1 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+                self.pool2 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+
+            def forward(self, x):
+                x1 = self.pool1(x)
+                x2 = self.pool2(x)
+                return x1 + x2
+
+        m = M()
+        x = torch.randn(1, 3, 4, 4)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)     
+
+    @llga_fp32_bf16_test_env
     @unittest.skipIf(True, 'Disable mul due to bad performance')
     def test_mul(self):
         def forward_mul(x, y):

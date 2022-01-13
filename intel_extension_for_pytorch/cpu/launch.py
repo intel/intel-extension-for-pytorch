@@ -56,6 +56,23 @@ For memory management, it configures NUMA binding and preload optimized memory a
 
    >>> python -m intel_extension_for_pytorch.launch  --ninstances 14 --ncore_per_instance 4 python_script args
 
+2. Run single-instance inference among multiple instances.
+   By default, runs all ninstances. If you want to independently run a single instance among ninstances, specify instance_idx.
+
+   eg: run 0th instance among SKX with 2 instance (i.e., numactl -C 0-27)
+::
+
+   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 0 python_script args 
+
+   eg: run 1st instance among SKX with 2 instance (i.e., numactl -C 28-55)
+::
+
+   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 1 python_script args
+   
+   eg: run 0th instance among SKX with 2 instance, 2 cores per instance, first four cores (i.e., numactl -C 0-1)
+::
+
+   >>> python -m intel_extension_for_pytorch.cpu.launch  --core_list "0, 1, 2, 3" --ninstances 2 --ncore_per_instance 2 --instance_idx 0 python_script args
 
 *** Distributed Training ***
 
@@ -316,7 +333,7 @@ class MultiInstanceLauncher(Launcher):
         cores = []
         set_kmp_affinity = True
         if args.core_list:  # user specify what cores will be used by params
-            cores = args.core_list.strip().split(",")
+            cores = [int(x) for x in args.core_list.split(",")]
             if args.ncore_per_instance == -1:
                 logger.error("please specify the '--ncore_per_instance' if you have pass the --core_list params")
                 exit(-1)
@@ -324,6 +341,7 @@ class MultiInstanceLauncher(Launcher):
                 logger.warning("only first {} cores will be used, but you specify {} cores in core_list".format(args.ncore_per_instance * args.ninstances, len(cores)))
             else:
                 args.ninstances = len(cores) // args.ncore_per_instance
+            
         else:
             if args.use_logical_core:
                 if args.socket_id != -1:
@@ -343,7 +361,11 @@ class MultiInstanceLauncher(Launcher):
             elif args.multi_instance and args.ninstances == -1 and args.ncore_per_instance == -1:
                 args.throughput_mode = True
             elif args.ncore_per_instance == -1 and args.ninstances != -1:
-                args.ncore_per_instance = len(cores) // args.ninstances
+                if args.ninstances > len(cores):
+                    logger.error("there are {} total cores but you specify {} ninstances; please make sure ninstances <= total_cores)".format(len(cores), args.ninstances))
+                    exit(-1)
+                else:
+                    args.ncore_per_instance = len(cores) // args.ninstances
             elif args.ncore_per_instance != -1 and args.ninstances == -1:
                 args.ninstances = len(cores) // args.ncore_per_instance
             else:
@@ -361,6 +383,9 @@ class MultiInstanceLauncher(Launcher):
                 args.ninstances = self.cpuinfo.socket_nums()
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
+            
+        if args.ninstances > 1 and args.instance_idx != -1:
+            logger.info("assigning {} cores for instance {}".format(args.ncore_per_instance, args.instance_idx)) 
 
         self.set_multi_thread_and_allocator(args.ncore_per_instance,
                                             args.disable_iomp,
@@ -374,8 +399,12 @@ class MultiInstanceLauncher(Launcher):
             cur_process_cores = ""
             if not args.disable_numactl:
                 cmd = ["numactl"]
-                core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
-                core_list = sorted(core_list)
+                cores = sorted(cores)
+                if args.instance_idx == -1: # sequentially assign ncores_per_instance to ninstances 
+                    core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
+                else: # assign ncores_per_instance from instance_idx 
+                    core_list = cores[args.instance_idx * args.ncore_per_instance : (args.instance_idx + 1) * args.ncore_per_instance]
+
                 same_numa = self.cpuinfo.numa_aware_check(core_list)
                 core_ranges = []
                 for core in core_list:
@@ -412,6 +441,10 @@ class MultiInstanceLauncher(Launcher):
             logger.info(cmd_s)
             process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
             processes.append(process)
+            
+            if args.instance_idx != -1: # launches single instance, instance_idx, only 
+                break 
+                
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
         for process in processes:
             process.wait()
@@ -602,6 +635,8 @@ def add_multi_instance_params(parser):
                        help="Cores per instance")
     group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
                        help="For multi-instance, you should give the cores number you used for per instance.")
+    group.add_argument("--instance_idx", metavar='\b', default="-1", type=int,
+                       help="Specify instance index to assign ncores_per_instance for instance_idx; otherwise ncore_per_instance will be assigned sequentially to ninstances. Please refer to https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/performance_tuning/launch_script.md") 
     group.add_argument("--latency_mode", action='store_true', default=False,
                        help="By detault 4 core per instance and use all physical cores")
     group.add_argument("--throughput_mode", action='store_true', default=False,

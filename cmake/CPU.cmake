@@ -17,14 +17,6 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 FIND_PACKAGE(AVX)
 
-IF (C_AVX512_FOUND AND CXX_AVX512_FOUND)
-  message(VERBOSE "Build the extension with AVX512 enabled.")
-ELSEIF(C_AVX2_FOUND AND CXX_AVX2_FOUND)
-  message(VERBOSE "Build the extension with AVX2 enabled.")
-ELSE()
-  message(FATAL_ERROR "Does not support building the extension on non-AVX512/AVX2 machine.")
-ENDIF()
-
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   message("Debug build.")
@@ -86,7 +78,7 @@ IF ("${AVX_VERSION}" MATCHES "AVX512")
   IF (C_AVX512_FOUND OR CXX_AVX512_FOUND)
     set(IPEX_BUILD_ISA_MODE "AVX512")
   ELSE()
-    # message(FATAL_ERROR "The build environment does not support AVX512.")
+    message(WARNING "The build environment does not support AVX512, It will switch to AVX2.")
     IF (C_AVX2_FOUND OR CXX_AVX2_FOUND)
       set(IPEX_BUILD_ISA_MODE "AVX2")
     ENDIF()
@@ -114,12 +106,14 @@ IF ("${IPEX_BUILD_ISA_MODE}" MATCHES "AVX512")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512bf16 -DCPU_CAPABILITY_AVX512_BF16")
   ENDIF()
 
+  message("Build the extension with AVX512 enabled.")
 ELSEIF("${IPEX_BUILD_ISA_MODE}" MATCHES "AVX2")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY_AVX2")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY=AVX2")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfma")
 
+  message("Build the extension with AVX2 enabled.")
 ENDIF()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
@@ -211,17 +205,19 @@ set(DPCPP_JIT_SRCS)
 set(DPCPP_CPU_SRCS)
 set(DPCPP_AUTOCAST_SRCS)
 set(DPCPP_ATEN_SRCS)
+set(DPCPP_DYNDISP_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/utils)
 add_subdirectory(${DPCPP_ROOT}/quantization)
 add_subdirectory(${DPCPP_ROOT}/jit)
 add_subdirectory(${DPCPP_ROOT}/cpu)
+add_subdirectory(${DPCPP_ROOT}/dyndisp)
 add_subdirectory(${DPCPP_ROOT}/autocast)
 add_subdirectory(${DPCPP_ROOT}/aten)
 
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
+set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
     ${DPCPP_CPU_SRCS} ${DPCPP_AUTOCAST_SRCS} ${DPCPP_ATEN_SRCS})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
