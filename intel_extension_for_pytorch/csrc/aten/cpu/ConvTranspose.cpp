@@ -2,7 +2,6 @@
 #include <torch/extension.h>
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/utils.h"
 
@@ -617,9 +616,6 @@ at::Tensor conv_transpose2d(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose2d", "")
                        .typed<decltype(conv_transpose2d)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("conv_transpose2d");
-#endif
   auto target_type = get_autocast_dtype();
 
   // TODO: make check weight dtype should be float for training case.

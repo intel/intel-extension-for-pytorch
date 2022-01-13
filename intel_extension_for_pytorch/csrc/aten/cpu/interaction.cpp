@@ -1,7 +1,6 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #include "interaction.h"
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
@@ -291,9 +290,6 @@ std::vector<at::Tensor> interaction_backward(
     // Performance overhead in training here if you use autocast.
     // Because we save the ctx.arg in python before autocast, we have duplicated
     // cast for the input: here and in autocast of the forward path.
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-    torch_ipex::autocast::verbose::OpNameGuard op_name("interaction_backward");
-#endif
     return _interaction_backward<at::BFloat16>(
         grad_out, torch_ipex::autocast::cpu_cached_cast(at::kBFloat16, input));
   }
@@ -477,9 +473,6 @@ at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::interaction_forward", "")
                        .typed<decltype(interaction_forward)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("interaction_forward");
-#endif
 
   auto target_type = get_autocast_dtype();
   if (is_quantization_enabled()) {

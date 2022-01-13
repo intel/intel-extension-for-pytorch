@@ -15,6 +15,7 @@ namespace jit {
 // So we fake some op namespaces to workaround that.
 namespace ipex {
 static auto softmax = Symbol::fromQualString("ipex::softmax");
+static auto softmax_ = Symbol::fromQualString("ipex::softmax_");
 
 } // namespace ipex
 
@@ -26,6 +27,11 @@ namespace cpu {
 
 at::Tensor dil_softmax(
     const at::Tensor& input,
+    const int64_t dim,
+    const at::IValue& dtype = at::IValue());
+
+at::Tensor& dil_softmax_(
+    at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype = at::IValue());
 

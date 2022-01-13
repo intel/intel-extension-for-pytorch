@@ -159,7 +159,11 @@ class TestOp(JitLlgaTestCase):
     def test_softmax(self):
         for dim in [-4, -3, -2, -1, 0, 1, 2, 3]:
             m = nn.Softmax(dim=dim)
-            x = torch.rand(8, 12, 12, 12)
+            x = torch.rand(8, 12, 12, 12).transpose(2,3)
+            # Here for aten::softmax, inplace optimization comes before LLGA fusion pass,
+            # which will replace aten::softmax with ipex::softmax_/ipex::softmax.
+            # Therefore, to make LLGA fusion pass to take effect on aten::softmax, we have
+            # to make the input non-contiguous to skip inplace optimization.
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
@@ -277,6 +281,41 @@ class TestOp(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::matmul'])
+
+    @llga_fp32_bf16_test_env
+    def test_bmm_div(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                return x.matmul(y) / 2
+
+        x = torch.randn(128, 16, 384, 64)
+        y = torch.randn(128, 16, 64, 384)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul', 'aten::div'])
+
+    @llga_fp32_bf16_test_env
+    def test_bmm_div_add(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y, z):
+                return x.matmul(y) / 2 + z
+
+        x = torch.randn(128, 16, 5, 64)
+        y = torch.randn(128, 16, 64, 5)
+        z = torch.randn(128, 1, 1, 5)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x, y, z])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul', 'aten::div', 'aten::add'])
 
     @llga_fp32_bf16_test_env
     def test_to(self):

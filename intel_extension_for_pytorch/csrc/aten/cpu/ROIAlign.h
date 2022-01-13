@@ -159,7 +159,8 @@ at::Tensor roi_align_backward_kernel(
     int64_t height,
     int64_t width,
     int64_t sampling_ratio,
-    bool aligned);
+    bool aligned,
+    bool is_channels_last);
 
 class IPEXROIAlignOp : public torch::autograd::Function<IPEXROIAlignOp> {
  public:

@@ -92,10 +92,12 @@ def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
                                 if isinstance(state_value, torch.Tensor):
                                     assert state_value.size() == p.size(), \
                                         "Only support the optimizer state's size has the same shape with model's parameter."
-                                    if attr['op'] is torch.nn.Conv2d:
-                                        value_temp = state_value.to(memory_format=torch.channels_last) \
+                                    if attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
+                                        memory_format = torch.channels_last \
+                                            if attr['op'] is torch.nn.Conv2d else torch.channels_last_3d
+                                        value_temp = state_value.to(memory_format=memory_format) \
                                             if attr['weight_channels_last'] else state_value
-                                        state[state_key] = torch.ops.torch_ipex.conv2d_weight_pack(
+                                        state[state_key] = torch.ops.torch_ipex.convolution_weight_pack(
                                             value_temp,
                                             attr['padding'],
                                             attr['stride'],
@@ -123,8 +125,8 @@ def patch_state_dict(optimizer):
                         if 'op' in params_attr:
                             # Secondly, unpack releated states
                             unpack_dtype = torch.bfloat16 if 'bf16_param' in params_attr else k1.dtype
-                            if params_attr['op'] is torch.nn.Conv2d:
-                                state_value = torch.ops.torch_ipex.conv2d_weight_unpack(
+                            if params_attr['op'] is torch.nn.Conv2d or params_attr['op'] is torch.nn.Conv3d:
+                                state_value = torch.ops.torch_ipex.convolution_weight_unpack(
                                     state_value,
                                     params_attr['padding'],
                                     params_attr['stride'],

@@ -22,6 +22,7 @@ class TestModule(torch.nn.Module):
         self.transpose_conv3d = torch.nn.ConvTranspose3d(1, 10, 5, 1)
         self.bn = torch.nn.BatchNorm2d(num_features=10)
         self.embeddingbag = torch.nn.EmbeddingBag(10, 3, mode='sum')
+        self.embedding = torch.nn.Embedding(10, 3)
 
     def forward(self, x):
         x = self.conv2d(x)

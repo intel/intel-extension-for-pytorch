@@ -174,15 +174,23 @@ class tensor : public memory {
           strides[c] == 1;
     };
 
-    inline bool is_nchw() const {
-      if (!is_plain() || data.ndims != 4)
+    inline bool is_channels_last() const {
+      if (!is_plain() || !(data.ndims != 4 || data.ndims != 5))
         return false;
       const auto& dims = data.dims;
       const auto& strides = blocking_strides();
-      const auto n = 0, c = 1, h = 2, w = 3;
-      return strides[n] == dims[c] * dims[h] * dims[w] &&
-          strides[c] == dims[h] * dims[w] && strides[h] == dims[w] &&
-          strides[w] == 1;
+      if (data.ndims == 4) {
+        const auto n = 0, c = 1, h = 2, w = 3;
+        return strides[n] == dims[h] * dims[w] * dims[c] &&
+            strides[h] == dims[w] * dims[c] && strides[w] == dims[c] &&
+            strides[c] == 1;
+      } else {
+        const auto n = 0, c = 1, d = 2, h = 3, w = 4;
+        return strides[n] == dims[d] * dims[h] * dims[w] * dims[c] &&
+            strides[d] == dims[h] * dims[w] * dims[c] &&
+            strides[h] == dims[w] * dims[c] && strides[w] == dims[c] &&
+            strides[c] == 1;
+      }
     };
 
     inline bool is_iohw() const {
@@ -739,20 +747,6 @@ class tensor : public memory {
     }
   }
 
-  // legacy API for caffe2
-  dims get_public_format_dims() const {
-    auto nchw_dims = get_dims();
-    if (get_desc().is_nhwc()) {
-      dims nhwc_dims(ndims());
-      nhwc_dims[0] = nchw_dims[0];
-      nhwc_dims[1] = nchw_dims[2];
-      nhwc_dims[2] = nchw_dims[3];
-      nhwc_dims[3] = nchw_dims[1];
-      return nhwc_dims;
-    }
-    return nchw_dims;
-  }
-
   tensor reorder_if_differ_in(
       const desc& expected_desc,
       const attr_t& aattr = attr_t()) const {
@@ -803,17 +797,19 @@ class tensor : public memory {
     // handle channels last with groups
     if (is_deconv) {
       // deconv: judge whether is channels last on iohw format
-      auto is_channels_last = old_desc.transpose(0, 1).is_nhwc();
-      if (is_channels_last) {
+      // TODO: 3d deconv channels_last check(onednn doesn't has acdefb format).
+      auto channels_last = old_desc.transpose(0, 1).is_nhwc();
+      if (channels_last) {
         // giohw (acbde) => gihwo (acdeb)
         grouped_desc = grouped_desc.to_format(format_tag::acdeb);
       }
     } else {
       // conv: judge whether is channels last on oihw format
-      auto is_channels_last = old_desc.is_nhwc();
-      if (is_channels_last) {
-        // goihw (abcde) => gohwi (abdec)
-        grouped_desc = grouped_desc.to_format(format_tag::abdec);
+      auto channels_last = old_desc.is_channels_last();
+      if (channels_last) {
+        // goihw (abcde) => gohwi (abdec) or goidhw (abcdef) => gohwi (abdefc)
+        grouped_desc = grouped_desc.to_format(
+            old_desc.get_ndims() == 4 ? format_tag::abdec : format_tag::abdefc);
       }
     }
 

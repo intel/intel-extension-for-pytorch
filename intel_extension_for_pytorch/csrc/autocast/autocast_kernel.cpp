@@ -1,6 +1,5 @@
 #include "autocast_kernel.hpp"
 #include "autocast_mode.h"
-#include "autocast_verbose.h"
 #include "csrc/aten/cpu/BatchNorm.h"
 #include "csrc/quantization/AutoCast.hpp"
 
@@ -15,9 +14,6 @@ Ret DataTypeCastFuction(
     Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   auto target_type = get_autocast_dtype();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name(register_op_name);
-#endif
   if (is_quantization_enabled()) {
     return Quant(cpu_cached_cast(target_type, args)...);
   } else {
@@ -32,9 +28,6 @@ Ret FallThroughFuction(
     std::string register_op_name,
     Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name(register_op_name);
-#endif
   if (is_quantization_enabled()) {
     return Quant(args...);
   } else {
@@ -122,9 +115,6 @@ at::Tensor _convolution(
     bool cudnn_enabled,
     bool allow_tf32) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("_convolution");
-#endif
   if (is_quantization_enabled()) {
     return int8::_convolution(
         input,
@@ -172,9 +162,6 @@ at::Tensor _convolution_deprecated(
     bool deterministic,
     bool cudnn_enabled) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("_convolution_deprecated");
-#endif
   auto target_type = get_autocast_dtype();
   if (is_quantization_enabled()) {
     return int8::_convolution(
@@ -415,9 +402,6 @@ at::Tensor relu(const at::Tensor& input) {
 
 at::Tensor& relu_(at::Tensor& input) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("relu_");
-#endif
   if (is_quantization_enabled()) {
     return int8::relu_(input);
   }
@@ -434,9 +418,6 @@ at::Tensor& add_tensor_(
     const at::Tensor& other,
     const at::Scalar& alpha) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("add_tensor_");
-#endif
   if (is_quantization_enabled()) {
     return int8::add_tensor_(input, other, alpha);
   }

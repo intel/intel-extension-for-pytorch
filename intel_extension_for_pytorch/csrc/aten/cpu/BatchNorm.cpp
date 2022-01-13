@@ -4,7 +4,6 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -346,9 +345,6 @@ at::Tensor frozen_batch_norm(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::frozen_batch_norm", "")
                        .typed<decltype(frozen_batch_norm)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("frozen_batch_norm");
-#endif
   return op.call(input, weight, bias, running_mean, running_var);
 }
 

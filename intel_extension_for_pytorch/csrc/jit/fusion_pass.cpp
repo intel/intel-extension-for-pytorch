@@ -5,9 +5,9 @@
 #include "cpu/passes/graph_rewrite.h"
 
 #include "aten/cpu/Pooling.h"
-#include "cpu/kernels/Convolution.h"
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
+#include "cpu/passes/frozen_conv_folding.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -293,15 +293,16 @@ class OpFuser {
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::matmul, aten::div}, ipex::matmul_div},
-    // 3d ops
-    {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
-    {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
-    {{aten::conv3d, aten::add}, ipex::conv3d_sum},
-    {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
-    {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
-    {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")},
-     ipex::conv3d_sum_relu},
 };
+
+// Including in-place optimizations that try to (conditionally)
+// replace the origin op with in-place opted one for better performance.
+// This in-place optimized ops may come from either oneDNN or aten
+void ApplyInplaceOptimization(std::shared_ptr<Graph>& graph) {
+  // try to replace aten::softmax with in-place opt ipex::softmax_
+  // or ipex::softmax
+  graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
+}
 
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // remove dropout;
@@ -315,11 +316,14 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseMHAScoreCalc(graph);
 
   // Replace _convolution with conv2d or conv3d
-  graph_rewrite::replaceConvolutionWithAtenConv(graph);
-  // graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+  graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+
+  // convolution folding
+  FoldFrozenConvAddOrSub(graph);
+  FoldFrozenConvMulOrDiv(graph);
 
   // convolution fusion
-  graph_rewrite::insertPrePackedConv2dOp(graph);
+  graph_rewrite::insertPrePackedConvOp(graph);
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
 
@@ -342,8 +346,6 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
-  // replace aten::softmax with ipex::softmax
-  graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 
   // replace aten::batch_norm with ipex::batch_norm, it will be removed
   // after TensorExprs fix the performance issue(IPB-808).
@@ -378,10 +380,30 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
       graph);
   RemoveProfileNodesAndSpecializeTypes(graph);
 
-  // LLGA fusion pass for int8
+  // ApplyInplaceOptimization is necessary and safe to do before LLGA fusion
+  // pass:
+  // (1) necessary: in-place optimizations will not take effect or
+  //     will be impacted by LLGA fusion group if coming after LLGA fusion pass
+  // (2) safe: has no side-effects on LLGA fusion pass
+  // Explain:
+  // To check if one op can be replaced with an inplace opted one,
+  // we do one check to see if it is "hasSideEffectOrAlias"
+  // (refer to PYTORCH_REPO/torch/csrc/jit/passes/remove_mutation.cpp#L18)
+  // This check does a conservative way to verify the block size of
+  // of previous node (i.e., pass if equal to 0).
+  // One one hand, if we do LLGA fusion pass first, there is a chance that the
+  // op that we want to replace with inplace opt will come after a LLGA fusion
+  // group, which accidentally impacts the check since LLGA fusion group
+  // contains "if-else" 2 blocks.
+  // On the other hand, if the op is not in the scope of LLGA fusion pass,
+  // it is also safe to do the in-place optimization first.
   GRAPH_DUMP(
-      "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
+      "After RemoveProfileNodesAndSpecializeTypes. Before ApplyInplaceOptimization",
       graph);
+  ApplyInplaceOptimization(graph);
+
+  // LLGA fusion pass for int8
+  GRAPH_DUMP("After ApplyInplaceOptimization. Before LLGA fusion pass", graph);
   if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
     fuser::onednn::fuseGraph(graph);
   }

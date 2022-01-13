@@ -5,7 +5,6 @@
 #include <ATen/cpu/vec/vec.h>
 #include <torch/library.h>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/utils/library.h"
 
 // use float as accumulation type for BFloat16
@@ -738,7 +737,8 @@ at::Tensor roi_align_backward_kernel(
     int64_t height,
     int64_t width,
     int64_t sampling_ratio,
-    bool aligned) {
+    bool aligned,
+    bool is_channels_last) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::ROIAlign_backward\n");
 #endif
@@ -754,8 +754,8 @@ at::Tensor roi_align_backward_kernel(
   at::CheckedFrom c = "roi_align_backward_kernel";
   // at::checkAllSameType(c, {grad_t, rois_t});
 
-  auto memory_format = grad.suggest_memory_format();
-  bool is_channels_last = memory_format == at::MemoryFormat::ChannelsLast;
+  auto memory_format = is_channels_last ? at::MemoryFormat::ChannelsLast
+                                        : at::MemoryFormat::Contiguous;
   // TODO: This is a workaround for the bug that 'at::zeros' does not recognize
   // the memory format tag.
   at::Tensor grad_input = at::empty(
@@ -833,6 +833,8 @@ at::Tensor IPEXROIAlignOp::forward(
   ctx->saved_data["pooled_width"] = pooled_width;
   ctx->saved_data["sampling_ratio"] = sampling_ratio;
   ctx->saved_data["aligned"] = aligned;
+  ctx->saved_data["is_channels_last"] =
+      input.is_contiguous(at::MemoryFormat::ChannelsLast);
   ctx->save_for_backward({rois});
   return roi_align_forward_kernel(
       input,
@@ -856,6 +858,7 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
   auto pooled_width = ctx->saved_data["pooled_width"].toInt();
   auto sampling_ratio = ctx->saved_data["sampling_ratio"].toInt();
   auto aligned = ctx->saved_data["aligned"].toBool();
+  auto is_channels_last = ctx->saved_data["is_channels_last"].toBool();
   auto saved = ctx->get_saved_variables();
   at::Tensor rois = saved[0];
   at::Tensor grad_input = roi_align_backward_kernel(
@@ -869,7 +872,8 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
       input_shape[2],
       input_shape[3],
       sampling_ratio,
-      aligned);
+      aligned,
+      is_channels_last);
   return {
       grad_input,
       at::Tensor(),
@@ -908,27 +912,8 @@ at::Tensor ROIAlign_forward(
       aligned);
 }
 
-IPEX_TORCH_LIBRARY_IMPL(torchvision, CPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("torchvision::roi_align"),
-      TORCH_FN((&torch_ipex::cpu::roi_align_forward_kernel)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("torchvision::_roi_align_backward"),
-      TORCH_FN((&torch_ipex::cpu::roi_align_backward_kernel)));
-}
-
 } // namespace cpu
 } // namespace torch_ipex
-
-namespace {
-
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "ROIAlign_forward(Tensor input, Tensor rois, float spatial_scale, int pooled_height, int pooled_width, int sampling_ratio, bool aligned) -> Tensor",
-      torch_ipex::cpu::ROIAlign_forward);
-}
-
-} // namespace
 
 namespace torch_ipex {
 namespace autocast {
@@ -942,13 +927,9 @@ at::Tensor roi_align_autocast(
     int64_t sampling_ratio,
     bool aligned) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  static auto op =
-      torch::Dispatcher::singleton()
-          .findSchemaOrThrow("torchvision::roi_align", "")
-          .typed<decltype(torch_ipex::cpu::roi_align_forward_kernel)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("roi_align");
-#endif
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torchvision::roi_align", "")
+                       .typed<decltype(torch_ipex::cpu::ROIAlign_forward)>();
   if (input.scalar_type() == at::ScalarType::BFloat16) {
     return op.call(
         input,
@@ -968,12 +949,6 @@ at::Tensor roi_align_autocast(
         sampling_ratio,
         aligned);
   }
-}
-
-IPEX_TORCH_LIBRARY_IMPL(torchvision, AutocastCPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("torchvision::roi_align"),
-      TORCH_FN((&torch_ipex::autocast::roi_align_autocast)));
 }
 
 at::Tensor ROIAlign_forward(
@@ -988,9 +963,6 @@ at::Tensor ROIAlign_forward(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ROIAlign_forward", "")
                        .typed<decltype(torch_ipex::cpu::ROIAlign_forward)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("ROIAlign_forward");
-#endif
   if (input.scalar_type() == at::ScalarType::BFloat16) {
     return op.call(
         input,
@@ -1012,11 +984,44 @@ at::Tensor ROIAlign_forward(
   }
 }
 
-IPEX_TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("torch_ipex::ROIAlign_forward"),
-      TORCH_FN((&torch_ipex::autocast::ROIAlign_forward)));
-}
-
 } // namespace autocast
 } // namespace torch_ipex
+
+namespace {
+
+IPEX_TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "ROIAlign_forward(Tensor input, Tensor rois, float spatial_scale, int pooled_height, int pooled_width, int sampling_ratio, bool aligned) -> Tensor");
+  m.impl(
+      "ROIAlign_forward",
+      c10::DispatchKey::AutogradCPU,
+      torch_ipex::cpu::ROIAlign_forward);
+  m.impl(
+      "ROIAlign_forward",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::ROIAlign_forward);
+  m.impl(
+      "ROIAlign_forward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::roi_align_forward_kernel);
+  // bw
+  m.def(
+      "_ROIAlign_backward(Tensor grad, Tensor rois, float spatial_scale, int pooled_height, int pooled_width, int batch_size, int channels, int height, int width, int sampling_ratio, bool aligned, bool is_channels_last) -> Tensor");
+  m.impl(
+      "_ROIAlign_backward",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::roi_align_backward_kernel);
+}
+
+IPEX_TORCH_LIBRARY_FRAGMENT(torchvision, m) {
+  m.impl(
+      "roi_align",
+      c10::DispatchKey::AutogradCPU,
+      torch_ipex::cpu::ROIAlign_forward);
+  m.impl(
+      "roi_align",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::roi_align_autocast);
+}
+
+} // namespace

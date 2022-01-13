@@ -43,10 +43,10 @@ void write_cached_weights(const at::Tensor& weight, ideep::tensor& result) {
 static ideep::tensor::desc get_conv_expected_weights_desc(
     const ideep::tensor::dims& weights_dims,
     ideep::tensor::data_type w_dtype = ideep::data_type::f32,
-    const ideep::tensor::dims& strides = {1, 1},
-    const ideep::tensor::dims& padding_l = {0, 0},
-    const ideep::tensor::dims& padding_r = {0, 0},
-    const ideep::tensor::dims& dilates = {1, 1},
+    const ideep::tensor::dims& strides = {1, 1, 1},
+    const ideep::tensor::dims& padding_l = {0, 0, 0},
+    const ideep::tensor::dims& padding_r = {0, 0, 0},
+    const ideep::tensor::dims& dilates = {1, 1, 1},
     int groups = 1,
     bool channels_last = false,
     ideep::algorithm aalgorithm = ideep::algorithm::convolution_direct,
@@ -120,6 +120,10 @@ ideep::tensor get_conv_packed_weight(
   if (input_size.empty()) {
     return packed_weight;
   }
+
+  TORCH_CHECK(
+      input_size.size() == 4 || input_size.size() == 5,
+      "Only support 2d or 3d convolution for get_conv_packed_weight");
   // get packed_desc using real data
   auto packed_desc_real_input = get_conv_expected_weights_desc(
       weight_size.vec(),
@@ -142,15 +146,21 @@ ideep::tensor get_conv_packed_weight(
     expected_packed_weight.feed_from(packed_weight);
     return expected_packed_weight;
   }
-  auto memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
-                                         : at::MemoryFormat::Contiguous;
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input_size.size() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   auto weight_ = weight.contiguous(memory_format);
   ideep::tensor w = itensor_view_from_dense(weight_);
   expected_packed_weight.feed_from(w);
   return expected_packed_weight;
 }
 
-at::Tensor conv2d_weight_pack(
+at::Tensor convolution_weight_pack(
     const at::Tensor& weight,
     at::IntArrayRef padding,
     at::IntArrayRef stride,
@@ -164,7 +174,8 @@ at::Tensor conv2d_weight_pack(
   // treated as MemoryFormat::ChannelsLast and MemoryFormat::Contiguous. For
   // convolution input, if it can be treated as MemoryFormat::ChannelsLast and
   // MemoryFormat::Contiguous, the prefer format use MemoryFormat::Contiguous.
-  if (weight.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  if (weight.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      weight.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     is_channels_last = true;
   }
 
@@ -197,7 +208,7 @@ at::Tensor conv2d_weight_pack(
   return output;
 }
 
-at::Tensor conv2d_weight_unpack(
+at::Tensor convolution_weight_unpack(
     const at::Tensor& weight,
     at::IntArrayRef padding,
     at::IntArrayRef stride,
@@ -239,7 +250,11 @@ at::Tensor conv2d_weight_unpack(
   // init output.
   at::Tensor result = at::empty(origin_weight_dims, weight.options());
   if (is_channels_last) {
-    result = result.to(at::MemoryFormat::ChannelsLast);
+    if (origin_weight_dims.size() == 4) {
+      result = result.to(at::MemoryFormat::ChannelsLast);
+    } else {
+      result = result.to(at::MemoryFormat::ChannelsLast3d);
+    }
   }
   auto y = itensor_view_from_dense(result);
   y.feed_from(blocked_weight);
@@ -718,15 +733,15 @@ namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
-      "conv2d_weight_pack(Tensor weight, int[] padding, int[] stride, int[] "
+      "convolution_weight_pack(Tensor weight, int[] padding, int[] stride, int[] "
       "dilation, int groups, ScalarType? dtype=None) -> Tensor",
-      torch_ipex::cpu::conv2d_weight_pack);
+      torch_ipex::cpu::convolution_weight_pack);
   m.def(
-      "conv2d_weight_unpack(Tensor weight, int[] padding, int[] stride, "
+      "convolution_weight_unpack(Tensor weight, int[] padding, int[] stride, "
       "int[] dilation, int[] kernel_size, int groups, int output_channel, "
       "int input_channel, bool is_channels_last, ScalarType? dtype=None) -> "
       "Tensor",
-      torch_ipex::cpu::conv2d_weight_unpack);
+      torch_ipex::cpu::convolution_weight_unpack);
   m.def(
       "linear_weight_pack(Tensor weight, ScalarType? dtype=None) -> Tensor",
       torch_ipex::cpu::linear_weight_pack);

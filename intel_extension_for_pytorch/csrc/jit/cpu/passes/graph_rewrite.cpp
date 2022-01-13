@@ -1,5 +1,6 @@
 
 #include "graph_rewrite.h"
+#include <torch/csrc/jit/passes/remove_mutation.h>
 
 namespace torch {
 namespace jit {
@@ -20,204 +21,6 @@ c10::optional<IValue> getIValue(
     const std::unordered_map<const Value*, Value*>& match_vmap,
     const std::unordered_map<std::string, Value*>& vmap) {
   return toIValue(getValue(name, match_vmap, vmap));
-}
-
-std::unordered_map<std::string, c10::IValue> getConvParams(
-    const Match& match,
-    const std::unordered_map<std::string, Value*>& vmap) {
-  std::unordered_map<std::string, c10::IValue> calc_values;
-  const auto& match_vmap = match.values_map;
-  auto transposed_value = getIValue("transposed", match_vmap, vmap).value();
-  calc_values["transposed"] = transposed_value;
-  auto benchmark_value = getIValue("benchmark", match_vmap, vmap).value();
-  calc_values["benchmark"] = benchmark_value;
-  auto deterministic_value =
-      getIValue("deterministic", match_vmap, vmap).value();
-  calc_values["deterministic"] = deterministic_value;
-  auto cudnn_enabled_value =
-      getIValue("cudnn_enabled", match_vmap, vmap).value();
-  calc_values["cudnn_enabled"] = cudnn_enabled_value;
-  auto output_padding_value =
-      getIValue("output_padding", match_vmap, vmap).value();
-  calc_values["output_padding"] = output_padding_value;
-  auto stride_value = getIValue("stride", match_vmap, vmap).value();
-  calc_values["stride"] = stride_value;
-  auto padding_value = getIValue("padding", match_vmap, vmap).value();
-  calc_values["padding"] = padding_value;
-  auto dilation_value = getIValue("dilation", match_vmap, vmap).value();
-  calc_values["dilation"] = dilation_value;
-  auto allow_tf32_value = getIValue("allow_tf32", match_vmap, vmap).value();
-  calc_values["allow_tf32_value"] = allow_tf32_value;
-  return calc_values;
-}
-
-void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
-  // TODO: remove constant prop in the pass
-  ConstantPropagation(graph);
-  std::string convolution_deprecated = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
-            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled)
-        return (%r) )";
-
-  std::string convolution = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
-        %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
-            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled, %allow_tf32)
-        return (%r) )";
-
-  std::string conv2d_for_deprecated_conv = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-  std::string conv2d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
-        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-
-  std::string conv1d_for_deprecated_conv = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::conv1d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-  std::string conv1d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
-        %r = aten::conv1d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-
-  std::string conv3d_for_deprecated_conv = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::conv3d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-  std::string conv3d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
-        %r = aten::conv3d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-
-  std::string conv_transpose1d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
-        %r = aten::conv_transpose1d(%a, %w, %b, %stride, %padding, %output_padding, %groups, %dilation)
-        return (%r) )";
-
-  std::string conv_transpose2d_for_deprecated_conv = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::conv_transpose2d(%a, %w, %b, %stride, %padding, %output_padding, %groups, %dilation)
-        return (%r) )";
-
-  std::string conv_transpose2d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
-        %r = aten::conv_transpose2d(%a, %w, %b, %stride, %padding, %output_padding, %groups, %dilation)
-        return (%r) )";
-
-  // Filter the unsupported case
-  auto filter_conv1d = [](const Match& match,
-                          const std::unordered_map<std::string, Value*>& vmap) {
-    auto calc_value_map = getConvParams(match, vmap);
-    if (calc_value_map["output_padding"].toIntList().size() != 1 ||
-        calc_value_map["stride"].toIntList().size() != 1 ||
-        calc_value_map["padding"].toIntList().size() != 1 ||
-        calc_value_map["dilation"].toIntList().size() != 1) {
-      return false;
-    }
-    return !calc_value_map["transposed"].toBool();
-  };
-  auto filter_conv2d = [](const Match& match,
-                          const std::unordered_map<std::string, Value*>& vmap) {
-    auto calc_value_map = getConvParams(match, vmap);
-    if (calc_value_map["output_padding"].toIntList().size() != 2 ||
-        calc_value_map["stride"].toIntList().size() != 2 ||
-        calc_value_map["padding"].toIntList().size() != 2 ||
-        calc_value_map["dilation"].toIntList().size() != 2) {
-      return false;
-    }
-    return !calc_value_map["transposed"].toBool();
-  };
-  auto filter_conv3d = [](const Match& match,
-                          const std::unordered_map<std::string, Value*>& vmap) {
-    auto calc_value_map = getConvParams(match, vmap);
-    if (calc_value_map["output_padding"].toIntList().size() != 3 ||
-        calc_value_map["stride"].toIntList().size() != 3 ||
-        calc_value_map["padding"].toIntList().size() != 3 ||
-        calc_value_map["dilation"].toIntList().size() != 3) {
-      return false;
-    }
-    return !calc_value_map["transposed"].toBool();
-  };
-  auto filter_conv_transpose1d =
-      [](const Match& match,
-         const std::unordered_map<std::string, Value*>& vmap) {
-        auto calc_value_map = getConvParams(match, vmap);
-        if (calc_value_map["output_padding"].toIntList().size() != 1 ||
-            calc_value_map["stride"].toIntList().size() != 1 ||
-            calc_value_map["padding"].toIntList().size() != 1 ||
-            calc_value_map["dilation"].toIntList().size() != 1) {
-          return false;
-        }
-        return calc_value_map["transposed"].toBool();
-      };
-  auto filter_conv_transpose2d =
-      [](const Match& match,
-         const std::unordered_map<std::string, Value*>& vmap) {
-        auto calc_value_map = getConvParams(match, vmap);
-        if (calc_value_map["output_padding"].toIntList().size() != 2 ||
-            calc_value_map["stride"].toIntList().size() != 2 ||
-            calc_value_map["padding"].toIntList().size() != 2 ||
-            calc_value_map["dilation"].toIntList().size() != 2) {
-          return false;
-        }
-        return calc_value_map["transposed"].toBool();
-      };
-
-  IpexSubgraphRewriter rewriter_conv1d;
-  rewriter_conv1d.RegisterRewritePattern(convolution, conv1d);
-  rewriter_conv1d.RegisterRewritePattern(
-      convolution_deprecated, conv1d_for_deprecated_conv);
-  rewriter_conv1d.runOnGraph(graph, filter_conv1d);
-
-  IpexSubgraphRewriter rewriter_conv2d;
-  rewriter_conv2d.RegisterRewritePattern(convolution, conv2d);
-  rewriter_conv2d.RegisterRewritePattern(
-      convolution_deprecated, conv2d_for_deprecated_conv);
-  rewriter_conv2d.runOnGraph(graph, filter_conv2d);
-
-  IpexSubgraphRewriter rewriter_conv3d;
-  rewriter_conv3d.RegisterRewritePattern(convolution, conv3d);
-  rewriter_conv3d.RegisterRewritePattern(
-      convolution_deprecated, conv3d_for_deprecated_conv);
-  rewriter_conv3d.runOnGraph(graph, filter_conv3d);
-
-  IpexSubgraphRewriter rewriter_conv_transpose1d;
-  rewriter_conv_transpose1d.RegisterRewritePattern(
-      convolution, conv_transpose1d);
-  rewriter_conv_transpose1d.runOnGraph(graph, filter_conv_transpose1d);
-
-  IpexSubgraphRewriter rewriter_conv_transpose2d;
-  rewriter_conv_transpose2d.RegisterRewritePattern(
-      convolution, conv_transpose2d);
-  rewriter_conv_transpose2d.RegisterRewritePattern(
-      convolution_deprecated, conv_transpose2d_for_deprecated_conv);
-  rewriter_conv_transpose2d.runOnGraph(graph, filter_conv_transpose2d);
 }
 
 void FuseShuffle(std::shared_ptr<Graph>& graph) {
@@ -309,7 +112,7 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
         return true;
       };
 
-  IpexSubgraphRewriter rewriter_shuffle_2d;
+  SubgraphRewriter rewriter_shuffle_2d;
   rewriter_shuffle_2d.RegisterRewritePattern(shuffle, shuffle_2d_fusion);
   rewriter_shuffle_2d.runOnGraph(graph);
 }
@@ -324,13 +127,19 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
       graph(%add_a, %add_b, %alpha, %shape:int[], %w, %b, %eps:float, %cudnn_enable:bool):
         %r = ipex::add_layernorm(%add_a, %add_b, %alpha, %shape, %w, %b, %eps, %cudnn_enable)
         return (%r) )";
-  IpexSubgraphRewriter rewriter_aten;
+  SubgraphRewriter rewriter_aten;
   rewriter_aten.RegisterRewritePattern(aten_add_layernorm, fused_add_layernorm);
   rewriter_aten.runOnGraph(graph);
 }
 
+// MHA fusion covers aten::softmax, ipex::softmax and ipex::softmax_:
+// (1) MHA obviously shows better performance than aten div/matmul/add/softmax.
+// (2) MHA also shows better performance than aten add + matmul_div fusion
+//     + ipex::softmax/softmax_.
+// (3) Current ipex::softmax/softmax_ is from the replacement of aten::softmax,
+//     it is safe to make MHA cover ipex::softmax/softmax_.
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
-  std::string div_matmul_add_softmax = R"(
+  std::string div_matmul_add_aten_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %_q = aten::div(%q, %dim_per_head)
         %qk = aten::matmul(%_q, %k)
@@ -338,23 +147,64 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
         return (%scores) )";
 
-  std::string matmul_div_add_softmax = R"(
+  std::string div_matmul_add_ipex_softmax = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %_q = aten::div(%q, %dim_per_head)
+        %qk = aten::matmul(%_q, %k)
+        %_scores = aten::add(%qk, %relative_qk, %alpha)
+        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string div_matmul_add_ipex_softmax_ = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %_q = aten::div(%q, %dim_per_head)
+        %qk = aten::matmul(%_q, %k)
+        %_scores = aten::add(%qk, %relative_qk, %alpha)
+        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string matmul_div_add_aten_softmax = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %qk = aten::matmul(%q, %k)
         %_qk = aten::div(%qk, %dim_per_head)
         %_scores = aten::add(%_qk, %relative_qk, %alpha)
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
         return (%scores) )";
+
+  std::string matmul_div_add_ipex_softmax = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha)
+        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string matmul_div_add_ipex_softmax_ = R"(
+      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha)
+        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
+        return (%scores) )";
+
   std::string div_matmul_add_softmax_fusion = R"(
       graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
         return (%scores) )";
 
-  IpexSubgraphRewriter mha_fusion;
+  SubgraphRewriter mha_fusion;
   mha_fusion.RegisterRewritePattern(
-      div_matmul_add_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_aten_softmax, div_matmul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
-      matmul_div_add_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_ipex_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      div_matmul_add_ipex_softmax_, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_aten_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_ipex_softmax, div_matmul_add_softmax_fusion);
+  mha_fusion.RegisterRewritePattern(
+      matmul_div_add_ipex_softmax_, div_matmul_add_softmax_fusion);
   mha_fusion.runOnGraph(graph);
 }
 
@@ -367,13 +217,20 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
       graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
         %r = ipex::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
         return (%r) )";
-  IpexSubgraphRewriter rewriter_max_pool2d;
+  SubgraphRewriter rewriter_max_pool2d;
   rewriter_max_pool2d.RegisterRewritePattern(max_pool2d, ipex_max_pool2d);
   rewriter_max_pool2d.runOnGraph(graph);
 }
 
-// replace aten::softmax to ipex::softmax during jit pass
-// there is better performanc for ipex::softmax with oneDNN than aten::softmax
+// for contiguous input:
+// replace aten::softmax to ipex::softmax/ipex::softmax_ during jit pass
+// there is better performance for ipex::softmax/ipex::softmax_ with oneDNN than
+// aten::softmax
+// for non-contiguous input:
+// (1) oneDNN will use ref path which is not optimized as expected
+// (2) if do contiguous copy then go into oneDNN optimized path, the
+// copy overhead is unneglectable
+// (3) so here will not replace aten::softmax to avoid unexpected regression
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
   std::string aten_softmax = R"(
       graph(%a, %dim:int, %half_to_float:bool):
@@ -383,9 +240,63 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
       graph(%a, %dim:int, %half_to_float:bool):
         %r = ipex::softmax(%a, %dim, %half_to_float)
         return (%r) )";
-  IpexSubgraphRewriter rewriter_aten;
+  std::string ipex_softmax_ = R"(
+      graph(%a, %dim:int, %half_to_float:bool):
+        %r = ipex::softmax_(%a, %dim, %half_to_float)
+        return (%r) )";
+
+  // Filter the unsupported case for inplace softmax
+  auto filter_inplace =
+      [graph](
+          const Match& match,
+          const std::unordered_map<std::string, Value*>& vmap) {
+        Node* node = match.anchor;
+        std::unique_ptr<AliasDb> aliasDb_ = std::make_unique<AliasDb>(graph);
+
+        // check if the input is contiguous, and skip if it is not
+        auto input_value = node->input(0)->type()->cast<TensorType>();
+        auto input_value_contiguous = input_value->contiguous();
+        bool is_contiguous =
+            input_value_contiguous->strides() == input_value->strides();
+        if (!is_contiguous) {
+          return false;
+        }
+
+        // Skip if input has more than one use
+        if (node->input(0)->uses().size() > 1) {
+          return false;
+        }
+        // Skip if input's def node has side effect or input has alias
+        if (MutationRemover::hasSideEffectOrAlias(
+                node->inputs().at(0), aliasDb_.get())) {
+          return false;
+        }
+        return true;
+      };
+
+  auto filter_outplace =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        Node* node = match.anchor;
+        // check if the input is contiguous, and skip if it is not
+        auto input_value = node->input(0)->type()->cast<TensorType>();
+        auto input_value_contiguous = input_value->contiguous();
+        bool is_contiguous =
+            input_value_contiguous->strides() == input_value->strides();
+        if (!is_contiguous) {
+          return false;
+        }
+        return true;
+      };
+
+  // try to replace inplace softmax first
+  SubgraphRewriter rewriter_aten_inplace;
+  rewriter_aten_inplace.RegisterRewritePattern(aten_softmax, ipex_softmax_);
+  rewriter_aten_inplace.runOnGraph(graph, filter_inplace);
+  // if any miss, then try to replace outplace softmax
+  SubgraphRewriter rewriter_aten;
   rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
-  rewriter_aten.runOnGraph(graph);
+  rewriter_aten.runOnGraph(graph, filter_outplace);
 }
 
 void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph) {
@@ -398,7 +309,7 @@ void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph) {
         %r = ipex::batch_norm(%a, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled)
         return (%r) )";
 
-  IpexSubgraphRewriter rewriter_batch_norm;
+  SubgraphRewriter rewriter_batch_norm;
   rewriter_batch_norm.RegisterRewritePattern(batch_norm, ipex_batch_norm);
   rewriter_batch_norm.runOnGraph(graph);
 }
@@ -416,7 +327,7 @@ void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph>& graph) {
         %qout = aten::quantize_per_tensor(%r, %o_scale, %o_zp, %o_dtype)
         return (%qout) )";
 
-  IpexSubgraphRewriter rewriter_qembeddingbag;
+  SubgraphRewriter rewriter_qembeddingbag;
   rewriter_qembeddingbag.RegisterRewritePattern(
       embeddingbag_with_quant_dequant, qembedingbag);
   rewriter_qembeddingbag.runOnGraph(graph);
@@ -485,7 +396,7 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph) {
     }
   }
 
-  IpexSubgraphRewriter rewriter;
+  SubgraphRewriter rewriter;
   for (size_t i = 0; i < patterns.size(); i++) {
     rewriter.RegisterRewritePattern(patterns[i], replacements[i]);
     rewriter.runOnGraph(graph);

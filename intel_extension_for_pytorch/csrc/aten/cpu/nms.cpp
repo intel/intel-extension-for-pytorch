@@ -6,7 +6,6 @@
 #include <torch/csrc/autograd/function.h>
 #include <algorithm>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/autocast/autocast_verbose.h"
 #include "csrc/jit/cpu/kernels/Softmax.h"
 
 namespace torch_ipex {
@@ -967,9 +966,6 @@ at::Tensor nms(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::nms", "")
                        .typed<decltype(nms)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("nms");
-#endif
   return op.call(
       cpu_cached_cast(at::kFloat, dets),
       cpu_cached_cast(at::kFloat, scores),
@@ -986,9 +982,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> batch_score_nms(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::batch_score_nms", "")
                        .typed<decltype(batch_score_nms)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("batch_score_nms");
-#endif
   return op.call(
       cpu_cached_cast(at::kFloat, dets),
       cpu_cached_cast(at::kFloat, scores),
@@ -1007,9 +1000,6 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::rpn_nms", "")
                        .typed<decltype(rpn_nms)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("rpn_nms");
-#endif
   return op.call(
       cpu_cached_cast(at::kFloat, batch_dets),
       cpu_cached_cast(at::kFloat, batch_scores),
@@ -1035,9 +1025,6 @@ box_head_nms(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::box_head_nms", "")
                        .typed<decltype(box_head_nms)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("box_head_nms");
-#endif
   return op.call(
       cpu_cached_cast(at::kFloat, batch_bboxes),
       cpu_cached_cast(at::kFloat, batch_scores),
@@ -1059,9 +1046,6 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
       torch::Dispatcher::singleton()
           .findSchemaOrThrow("torch_ipex::parallel_scale_back_batch", "")
           .typed<decltype(parallel_scale_back_batch)>();
-#if defined(ENABLE_AUTOCAST_VERBOSE)
-  verbose::OpNameGuard op_name("parallel_scale_back_batch");
-#endif
   return op.call(
       cpu_cached_cast(at::kFloat, bboxes_in),
       cpu_cached_cast(at::kFloat, scores_in),
