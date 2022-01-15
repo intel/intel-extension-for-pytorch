@@ -16,7 +16,8 @@ import torch.nn.functional as F
 from torch.nn.functional import _Reduction
 from common.common_utils import TestCase, to_dpcpp, to_dpcpp_in_criterion, freeze_rng_state, is_iterable, \
     TEST_WITH_ROCM, _assertGradAndGradgradChecks
-from torch.autograd.gradcheck import get_numerical_jacobian, iter_tensors
+from torch.autograd.gradcheck import _get_numerical_jacobian as get_numerical_jacobian
+from torch.autograd.gradcheck import _iter_tensors as iter_tensors
 from torch.autograd import Variable
 import torch.backends.cudnn
 

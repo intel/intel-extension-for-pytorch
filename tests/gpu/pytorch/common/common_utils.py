@@ -38,7 +38,7 @@ else:
 import __main__
 import errno
 
-from torch.testing._internal import expecttest
+import expecttest
 
 import torch
 import torch.cuda
