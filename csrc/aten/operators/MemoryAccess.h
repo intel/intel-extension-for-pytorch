@@ -250,13 +250,16 @@ struct unroll {
   template <typename args_t, typename vec_args_t>
   inline void load(vec_args_t& args) {
     constexpr int arity = std::tuple_size<args_t>::value;
+    // only load the operands for the no null arg functor.
+    if constexpr (arity > 0) {
 #pragma unroll
-    for (int i = 0; i < vec_size; i++) {
-      if (i < remaining) {
-        int linear_idx = thread_idx * vec_size + i;
-        auto offset = input_offset_calculator.get(linear_idx);
-        detail::vec_static_unroll<detail::unroll_load_helper, arity, args_t>::
-            with_args(*this, args, offset, loader, i, num_outputs);
+      for (int i = 0; i < vec_size; i++) {
+        if (i < remaining) {
+          int linear_idx = thread_idx * vec_size + i;
+          auto offset = input_offset_calculator.get(linear_idx);
+          detail::vec_static_unroll<detail::unroll_load_helper, arity, args_t>::
+              with_args(*this, args, offset, loader, i, num_outputs);
+        }
       }
     }
   }

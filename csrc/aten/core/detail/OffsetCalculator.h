@@ -65,6 +65,27 @@ struct OffsetCalculator {
   index_t strides_[MAX_DIMS][NARGS];
 };
 
+// This is for the loops kernel with no input operand.
+// TODO: To remove this if the index_t strides_[MAX_DIMS][std::max(NARGS, 1)]
+// can be optimized.
+template <typename index_t>
+struct OffsetCalculator<0, index_t> {
+  static constexpr int MAX_DIMS = 12;
+
+  // The offset for each argument (in bytes). Wrapper around fixed-size array.
+  using offset_type = xpu::dpcpp::Array<index_t, 1>;
+
+  OffsetCalculator(
+      int dims,
+      const int64_t* sizes,
+      const int64_t* const* strides,
+      const int64_t* element_sizes = nullptr) {}
+
+  offset_type get(index_t linear_idx) const {
+    return {};
+  }
+};
+
 template <int NARGS, typename index_t = uint32_t>
 struct TrivialOffsetCalculator {
   // The offset for each argument. Wrapper around fixed-size array.
