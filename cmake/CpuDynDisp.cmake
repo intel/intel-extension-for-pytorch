@@ -4,6 +4,12 @@ set(DPCPP_ISA_SRCS)
 set(DPCPP_ISA_SRCS_ORIGIN)
 include(cmake/Codegen.cmake)
 
+# CodeCheck flag to turn on clang-format check for all *.cpp and *.h files.
+# It is a dev srcript for merge source code.
+if("$ENV{CodeCheck}" STREQUAL "1")
+include(cmake/CodeCheck.cmake)
+endif()
+
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_VERBOSE_MAKEFILE ON)

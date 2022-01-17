@@ -1,8 +1,8 @@
 #pragma once
 
 #include <ATen/Tensor.h>
-#include <vector>
 #include <torch/csrc/autograd/custom_function.h>
+#include <vector>
 
 #include "csrc/cpu/ideep/ideep.hpp"
 
