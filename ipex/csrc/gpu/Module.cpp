@@ -61,9 +61,6 @@ static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
       c10::ScalarType::BFloat16};
   for (auto& backend : backends) {
     for (auto& scalar_type : scalar_types) {
-      fprintf(
-          stderr,
-          "Warning: torch::tensors::register_python_tensor_type() has been removed in torch1.10. \n");
       // torch::tensors::register_python_tensor_type(backend, scalar_type);
     }
   }
