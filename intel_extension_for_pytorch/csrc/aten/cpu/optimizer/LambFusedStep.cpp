@@ -645,7 +645,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
     exp_avg_.copy_(exp_avg);
   }
   if (!exp_avg_sq_.is_contiguous()) {
-    exp_avg_.copy_(exp_avg_sq);
+    exp_avg_sq_.copy_(exp_avg_sq);
   }
   if (!param2_.is_contiguous()) {
     param2_.copy_(param2);

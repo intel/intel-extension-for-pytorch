@@ -12,11 +12,11 @@ Wheel files are avaiable for the following Python versions.
 
 | Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
 | :--: | :--: | :--: | :--: | :--: |
-| 1.10.0 | ✔️ | ✔️ | ✔️ | ✔️ |
+| 1.10.100 | ✔️ | ✔️ | ✔️ | ✔️ |
 
 ```python
 python -m pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
-python -m pip install intel_extension_for_pytorch==1.10.0 -f https://software.intel.com/ipex-whl-stable
+python -m pip install intel_extension_for_pytorch==1.10.100 -f https://software.intel.com/ipex-whl-stable
 python -m pip install psutil
 ```
 

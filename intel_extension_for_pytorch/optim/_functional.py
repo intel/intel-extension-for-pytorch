@@ -3,6 +3,17 @@ import torch
 from torch import Tensor
 from typing import List, Optional
 
+def is_master_weight(param, params_attr):
+    return  (
+        param.dtype == torch.float and
+        param in params_attr and
+        'bf16_param' in params_attr[param]
+    )
+
+def get_bf16_grad(param, params_attr):
+    assert is_master_weight(param, params_attr)
+    return params_attr[param]['bf16_param'].grad
+
 def _make_sparse(grad, grad_indices, values):
     size = grad.size()
     if grad_indices.numel() == 0 or values.numel() == 0:
@@ -19,7 +30,8 @@ def _adagrad_impl(
     weight_decay: float,
     lr_decay: float,
     eps: float,
-    fused: bool):
+    fused: bool,
+):
     r"""Functional API that performs Adagrad algorithm computation.
 
     See :class:`~torch.optim.Adagrad` for details.
@@ -33,8 +45,8 @@ def _adagrad_impl(
                 param2 = attr[param]['trail']
             if 'bf16_param' in attr[param]:
                 assert param.dtype is torch.float
-                param2 = attr[param][bf16_param]
-        if fused and not param.is_sparse:
+                param2 = attr[param]['bf16_param']
+        if fused and not grad.is_sparse:
             torch.ops.torch_ipex.adagrad_fused_step(
                 param,
                 grad,
@@ -89,9 +101,10 @@ def adagrad_step(self, closure=None):
         state_steps = []
 
         for p in group['params']:
-            if p.grad is not None:
+            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+            if grad is not None:
                 params_with_grad.append(p)
-                grads.append(p.grad)
+                grads.append(grad)
                 state = self.state[p]
                 state_sums.append(state['sum'])
                 # update the steps for each param group update
@@ -113,6 +126,35 @@ def adagrad_step(self, closure=None):
 
     return loss
 
+def _sgd_non_fused_micro_step(
+    params: Tensor,
+    d_p_list: Tensor,
+    momentum_buffer_list: Optional[Tensor],
+    weight_decay: float,
+    momentum: float,
+    lr: float,
+    dampening: float,
+    nesterov: bool,
+):
+    if weight_decay != 0:
+        d_p = d_p.add(param, alpha=weight_decay)
+
+    if momentum != 0:
+        buf = momentum_buffer_list[i]
+
+        if buf is None:
+            buf = torch.clone(d_p).detach()
+            momentum_buffer_list[i] = buf
+        else:
+            buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+
+        if nesterov:
+            d_p = d_p.add(buf, alpha=momentum)
+        else:
+            d_p = buf
+
+    param.add_(d_p, alpha=alpha)
+
 def _sgd_impl(
     params: List[Tensor],
     d_p_list: List[Tensor],
@@ -124,7 +166,8 @@ def _sgd_impl(
     lr: float,
     dampening: float,
     nesterov: bool,
-    fused: bool):
+    fused: bool
+):
     r"""Functional API that performs SGD algorithm computation.
 
     See :class:`~torch.optim.SGD` for details.
@@ -139,11 +182,10 @@ def _sgd_impl(
                 param2 = attr[param]['trail']
             if 'bf16_param' in attr[param]:
                 assert param.dtype is torch.float
-                param2 = attr[param][bf16_param]
+                param2 = attr[param]['bf16_param']
 
-        # first iter will init momentum_buffer, not fused on 1st iter
-        if fused and not param.is_sparse and momentum_buffer_list[i] is not None:
-            torch.ops.torch_ipex.sgd_fused_step(
+        if fused and not d_p.is_sparse:
+            momentum_buffer_list[i] = torch.ops.torch_ipex.sgd_fused_step(
                 param,
                 d_p,
                 momentum_buffer_list[i],
@@ -155,43 +197,27 @@ def _sgd_impl(
                 nesterov)
             continue
 
-        float_d_p, float_param = None, None
-        if weight_decay != 0 or momentum != 0:
-            float_d_p = d_p.float()
-            if param.dtype == torch.bfloat16:
-                float_param = torch.ops.torch_ipex.cat_bfloat16_float(param, param2)
-            else:
-                float_param = param.float()
-
-        if weight_decay != 0:
-            float_d_p = float_d_p.add(float_param, alpha=weight_decay)
-
-        if momentum != 0:
-            buf = momentum_buffer_list[i]
-            if buf is None:
-                buf = torch.clone(float_d_p).detach()
-                momentum_buffer_list[i] = buf
-            else:
-                buf.mul_(momentum).add_(float_d_p, alpha=1 - dampening)
-
-            if nesterov:
-                float_d_p = d_p.add(buf, alpha=momentum)
-            else:
-                float_d_p = buf
-
-        if param.dtype is torch.bfloat16:
-            if float_d_p is not None and float_param is not None:
-                float_param.add_(float_d_p, alpha=-lr)
-                top_half, bot_half = torch.ops.torch_ipex.split_float_bfloat16(float_param)
-                param.copy_(top_half)
-                param2.copy_(bot_half)
-            else:
-                torch.ops.torch_ipex.packed_add(param, param2, d_p, alpha=-lr)
+        if (
+            d_p.is_sparse and
+            d_p.dtype == torch.bfloat16 and
+            weight_decay == 0 and
+            momentum == 0
+        ):
+            # packed_add can support sparse tensor
+            torch.ops.torch_ipex.packed_add(param, param2, d_p, alpha=-lr)
         else:
-            if float_d_p is not None:
-                param.add_(float_d_p, alpha=-lr)
-            else:
-                param.add_(d_p, alpha=-lr)
+            # no special optimize for other non fused case, fall back to naive implementation
+            d_p = d_p.to(param.dtype)
+            _sgd_non_fused_micro_step(
+                param,
+                d_p,
+                momentum_buffer_list[i],
+                momentum,
+                lr,
+                weight_decay,
+                dampening,
+                nesterov
+            )
 
 @torch.no_grad()
 def sgd_step(self, closure=None):
@@ -217,9 +243,10 @@ def sgd_step(self, closure=None):
         lr = group['lr']
 
         for p in group['params']:
-            if p.grad is not None:
+            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+            if grad is not None:
                 params_with_grad.append(p)
-                d_p_list.append(p.grad)
+                d_p_list.append(grad)
 
                 state = self.state[p]
                 if 'momentum_buffer' not in state:
@@ -246,7 +273,8 @@ def sgd_step(self, closure=None):
 
     return loss
 
-def lamb_impl(
+
+def _lamb_fused_impl(
     params: List[Tensor],
     grads: List[Tensor],
     exp_avgs: List[Tensor],
@@ -258,7 +286,7 @@ def lamb_impl(
     lr: float,
     weight_decay: float,
     eps: float,
-    fused: bool):
+):
 
     r"""Functional API that performs Lamb algorithm computation.
     See :class:`~torch.optim.Lamb` for details.
@@ -277,25 +305,43 @@ def lamb_impl(
                 param2 = attr[param]['trail']
             if 'bf16_param' in attr[param]:
                 assert param.dtype is torch.float
-                param2 = attr[param][bf16_param]
-        if fused:
-            torch.ops.torch_ipex.lamb_fused_step(
-                param,
-                exp_avg,
-                exp_avg_sq,
-                grad,
-                param2,
-                step,
-                beta1,
-                beta2,
-                lr,
-                weight_decay,
-                eps)
-            continue
+                param2 = attr[param]['bf16_param']
+        torch.ops.torch_ipex.lamb_fused_step(
+            param,
+            exp_avg,
+            exp_avg_sq,
+            grad,
+            param2,
+            step,
+            beta1,
+            beta2,
+            lr,
+            weight_decay,
+            eps)
+
+def _lamb_impl(
+    params: List[Tensor],
+    grads: List[Tensor],
+    exp_avgs: List[Tensor],
+    exp_avg_sqs: List[Tensor],
+    state_steps: List[int],
+    beta1: float,
+    beta2: float,
+    lr: float,
+    weight_decay: float,
+    eps: float,
+):
+    r"""Functional API that performs Lamb algorithm computation.
+    """
+    for i, param in enumerate(params):
+        grad = grads[i]
+        exp_avg = exp_avgs[i]
+        exp_avg_sq = exp_avg_sqs[i]
+        step = state_steps[i]
 
         bias_correction1 = 1 - beta1 ** step
         bias_correction2 = 1 - beta2 ** step
-
+        grad = grad.to(exp_avg.dtype)
         # Decay the first and second moment running average coefficient
         exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
         exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
@@ -310,3 +356,64 @@ def lamb_impl(
         true_ratio = weight_norm / rtw_norm
 
         param.add_(adam_step, alpha=-lr * true_ratio)
+
+@torch.no_grad()
+def lamb_step(self, closure=None):
+    """Performs a single optimization step.
+    Args:
+        closure (callable, optional): A closure that reevaluates the model
+            and returns the loss.
+    """
+    loss = None
+    if closure is not None:
+        with torch.enable_grad():
+            loss = closure()
+
+    for group in self.param_groups:
+        params_with_grad = []
+        grads = []
+        exp_avgs = []
+        exp_avg_sqs = []
+        trails = []
+        state_steps = []
+
+        for p in group['params']:
+            grad = get_bf16_grad(p, self.params_attr) if is_master_weight(p, self.params_attr) else p.grad
+            if grad is not None:
+                params_with_grad.append(p)
+                if grad.is_sparse:
+                    raise RuntimeError('Lamb does not support sparse gradients')
+                if grad.device != torch.device('cpu'):
+                    raise RuntimeError('Lamb supports only CPU device')
+                grads.append(grad)
+
+                state = self.state[p]
+                # Lazy state initialization
+                if len(state) == 0:
+                    state['step'] = 0
+                    buffer_dtype = p.dtype if p.dtype is torch.float64 else torch.float
+                    state['exp_avg'] = torch.zeros(p.shape, dtype=buffer_dtype)
+                    state['exp_avg_sq'] = torch.zeros(p.shape, dtype=buffer_dtype)
+
+                exp_avgs.append(state['exp_avg'])
+                exp_avg_sqs.append(state['exp_avg_sq'])
+
+                # update the steps for each param group update
+                state['step'] += 1
+                # record the step after step update
+                state_steps.append(state['step'])
+
+        beta1, beta2 = group['betas']
+        _lamb_fused_impl(
+            params_with_grad,
+            grads,
+            exp_avgs,
+            exp_avg_sqs,
+            self.params_attr,
+            state_steps,
+            beta1,
+            beta2,
+            group['lr'],
+            group['weight_decay'],
+            group['eps'])
+    return loss

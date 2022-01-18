@@ -21,7 +21,7 @@ Besides that, we continuously optimize the Transformer\* and CNN models by fusin
 <td>
 
 ```
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 ```
 </td>
 <td>
@@ -98,7 +98,7 @@ class SimpleNet(torch.nn.Module):
 
 ```
 # Import the extension
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 # Automatically mix precision
 ipex.enable_auto_mixed_precision(mixed_dtype = torch.bfloat16)
@@ -164,7 +164,7 @@ xx_v = [torch.randn(1, 10, 28, 28) for i in range(20))
 
 ```
 # Import the extension
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 # Convert the model to the Extension device
 model = Model().to(ipex.DEVICE)
@@ -211,7 +211,7 @@ conf.save('configure.json')
 
 ```
 # Import the extension
-import intel_pytorch_extension as ipex
+import intel_extension_for_pytorch as ipex
 
 # Convert the model to the Extension device
 model = Model().to(ipex.DEVICE)

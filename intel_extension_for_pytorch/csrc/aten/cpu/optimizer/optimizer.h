@@ -30,10 +30,10 @@ void packed_add(
     at::Tensor& bot_half,
     const at::Tensor& grad,
     double alpha);
-void sgd_fused_step(
+c10::optional<at::Tensor> sgd_fused_step(
     at::Tensor& param_,
     const at::Tensor& grad_,
-    at::Tensor& momentum_buf_,
+    const c10::optional<at::Tensor>& momentum_buf_,
     at::Tensor& param2_,
     double momentum,
     double learning_rate,

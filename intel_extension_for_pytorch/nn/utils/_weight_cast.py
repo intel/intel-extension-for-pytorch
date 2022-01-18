@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from intel_extension_for_pytorch.optim import _optimizer_utils
+from intel_extension_for_pytorch.optim import _optimizer_utils, _lamb
 import types
 
 # IPEX does not cast all module parameters for acc reason, such as BN
@@ -84,5 +84,6 @@ def weight_dtype_convert_with_ipex(module, optimizer, params_attr, master_weight
         setattr(casted_optimizer, 'params_attr', params_attr)
         if not master_weight_split:
             _optimizer_utils.patch_step_for_master_weight_training(casted_optimizer)
+            _optimizer_utils.patch_zero_grad_for_master_weight_training(casted_optimizer)
 
     return casted_model, casted_optimizer, params_attr
