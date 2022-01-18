@@ -30,7 +30,6 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
     double dropout_p,
     bool train,
     bool bidirectional) {
-  RECORD_FUNCTION("dnnl_lstm", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -339,7 +338,6 @@ lstm_backward(
     double dropout_p,
     bool train,
     bool bidirectional) {
-  RECORD_FUNCTION("dnnl_lstm_bwd", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

@@ -51,7 +51,6 @@ static at::Tensor pooling(
     int padD,
     int padH,
     int padW) {
-  RECORD_FUNCTION("dnnl_pooling", {});
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -174,7 +173,6 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     int padD,
     int padH,
     int padW) {
-  RECORD_FUNCTION("dnnl_pooling", {});
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -345,7 +343,6 @@ static at::Tensor pooling_backward(
     int padD,
     int padH,
     int padW) {
-  RECORD_FUNCTION("dnnl_pooling_backward", {});
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -486,7 +483,6 @@ static at::Tensor pooling_backward(
     int padD,
     int padH,
     int padW) {
-  RECORD_FUNCTION("dnnl_pooling_backward", {});
   at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();

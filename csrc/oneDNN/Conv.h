@@ -192,7 +192,6 @@ static at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     ConvAttr attr) {
-  RECORD_FUNCTION("dnnl_convolution", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

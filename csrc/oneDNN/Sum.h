@@ -21,7 +21,6 @@ static inline Tensor sum(
     Tensor& output,
     const std::vector<Tensor>& inputs,
     const std::vector<float>& scales) {
-  RECORD_FUNCTION("dnnl_sum", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();

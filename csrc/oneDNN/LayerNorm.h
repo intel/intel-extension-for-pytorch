@@ -24,7 +24,6 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     const Tensor& wgh,
     const Tensor& bia,
     double epsilon) {
-  RECORD_FUNCTION("dnnl_layer_norm", {});
   auto engine =
       GpuEngineManager::Instance().get_engine(Device(kXPU, current_device()));
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -149,7 +148,6 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
     const Tensor& rstd,
     const Tensor& wgh,
     double epsilon) {
-  RECORD_FUNCTION("dnnl_layer_norm_backward", {});
   auto engine =
       GpuEngineManager::Instance().get_engine(Device(kXPU, current_device()));
   auto strm = GpuStreamManager::Instance().get_stream();

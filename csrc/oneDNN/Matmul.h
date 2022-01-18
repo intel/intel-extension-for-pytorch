@@ -72,7 +72,6 @@ static inline void matmul(
     const Tensor& m2,
     const Tensor& b,
     MatmulAttr attr) {
-  RECORD_FUNCTION("dnnl_matmul", {});
   size_t dims = dst.dim();
   TORCH_CHECK(
       dims == 2 || dims == 3,

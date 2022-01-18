@@ -32,7 +32,6 @@ static inline void gru_forward(
     bool has_bias,
     bool train,
     bool bidirectional) {
-  RECORD_FUNCTION("dnnl_gru_forward", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -257,7 +256,6 @@ static inline void gru_backward(
     bool has_bias,
     bool train,
     bool bidirectional) {
-  RECORD_FUNCTION("dnnl_gru_backward", {});
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();

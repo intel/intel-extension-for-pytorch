@@ -29,7 +29,6 @@ static inline Tensor bin(
     const Tensor& t1,
     const Tensor& t2,
     const Tensor t3 = at::Tensor()) {
-  RECORD_FUNCTION("dnnl_bin", {});
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
