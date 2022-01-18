@@ -5,7 +5,7 @@
 
 #include "AddLayerNorm.h"
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #include "csrc/cpu/vec512/add_layernorm.h"
 #endif
 #include <torch/csrc/autograd/function.h>
@@ -23,7 +23,7 @@ at::Tensor AddLayerNorm(
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
     float eps) {
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
   const Tensor& weight = *weight_maybe_owned;

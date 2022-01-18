@@ -332,7 +332,7 @@ def get_avx_version():
     if avx_version == '':
         avx_version = 'AVX512'
 
-    print("The extension will be built with {}.".format(avx_version))
+    # print("The extension will be built with {}.".format(avx_version))
     return avx_version
 
 

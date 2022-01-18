@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdlib>
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #include <immintrin.h>
 #else
 #include "csrc/cpu/vec512/ref/add_ker.h"
@@ -13,7 +13,7 @@ static inline __attribute__((always_inline)) void zero_ker(
     int32_t* out,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -33,7 +33,7 @@ static inline __attribute__((always_inline)) void zero_ker(
     int8_t* out,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
   for (i = 0; i < len - 63; i += 64) {
@@ -54,7 +54,7 @@ static inline __attribute__((always_inline)) void move_ker(
     const int64_t* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 7; i += 8) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -76,7 +76,7 @@ static inline __attribute__((always_inline)) void move_ker(
     const int16_t* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -98,7 +98,7 @@ static inline __attribute__((always_inline)) void move_ker(
     const unsigned char* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -120,7 +120,7 @@ static inline __attribute__((always_inline)) void move_ker(
     const bool* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -142,7 +142,7 @@ static inline __attribute__((always_inline)) void move_ker(
     const int8_t* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -161,7 +161,7 @@ static inline __attribute__((always_inline)) void move_ker(
 
 static inline void move_ker(int8_t* out, const int32_t* in, int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -180,7 +180,7 @@ static inline void move_ker(int8_t* out, const int32_t* in, int64_t len) {
 #endif
 }
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 static inline void move_ker(int8_t* out, const __m512i* in, int64_t len) {
   int64_t i;
 #pragma unroll(2)
@@ -197,7 +197,7 @@ static inline void add_ker(int8_t* inout, int8_t* in, int64_t len) {
     }
   */
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -218,7 +218,7 @@ static inline void add_ker(int8_t* inout, int8_t* in, int64_t len) {
 #endif
 }
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 static inline __attribute__((always_inline)) void scale_and_store_int8_128(
     void* out,
     const void* in,
@@ -418,7 +418,7 @@ static inline void scale_and_move_ker(
     float scale,
     int64_t len) {
   int64_t i;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   __m512 scale_vec512 = _mm512_set1_ps(scale);
   for (i = 0; i < len - 127; i += 128) {
     scale_and_store_int8_128(
@@ -448,7 +448,7 @@ static inline void scale_and_move_ker(
 #endif
 }
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 static inline __attribute__((always_inline)) void mul_and_sum_s8x128_to_s32x16(
     __m512i& out,
     const int8_t* a,
@@ -821,7 +821,7 @@ static inline __attribute__((always_inline)) int32_t mul_and_sum_int8_64(
 }
 #endif
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 static inline __attribute__((always_inline)) int32_t _scale_int32(
     int32_t value,
     float scale) {
@@ -859,7 +859,7 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
     float scale) {
   int32_t c = 0;
   size_t i = 0;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   for (; i < len - 127; i += 128) {
     c += mul_and_sum_int8_128(a + i, b + i);
   }

@@ -58,7 +58,7 @@ at::Tensor cat_bfloat16_float(
         }
         for (; d < size; d++) {
           output_ptr[d] =
-              bf16::pack_bfloat16_float(top_half_ptr[d], bottom_half_ptr[d]);
+              at::vec::pack_bfloat16_float(top_half_ptr[d], bottom_half_ptr[d]);
         }
       });
   if (!output.is_contiguous()) {

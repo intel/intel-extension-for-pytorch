@@ -259,7 +259,7 @@ void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
       bVec param2_bvec = bVec::loadu(param2_ptr + d);
       fVec param_fvec, param_fvec2;
       std::tie(param_fvec, param_fvec2) =
-          bf16::pack_bfloat16_float(param_bvec, param2_bvec);
+          at::vec::pack_bfloat16_float(param_bvec, param2_bvec);
 
       adam_step_fvec = adam_step_fvec + param_fvec * fVec(float(weight_decay));
       adam_step_fvec2 =
@@ -280,7 +280,8 @@ void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
       float adam_step_val = (exp_avg_ptr[d] / bias_correction1) /
           (std::sqrt(exp_avg_sq_ptr[d] / bias_correction2) + eps);
 
-      float param_val = bf16::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
+      float param_val =
+          at::vec::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
       adam_step_val += param_val * weight_decay;
       workspace_ptr[d] = adam_step_val;
 
@@ -317,7 +318,7 @@ void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
       bVec param2_bvec = bVec::loadu(param2_ptr + d);
       fVec param_fvec, param_fvec2;
       std::tie(param_fvec, param_fvec2) =
-          bf16::pack_bfloat16_float(param_bvec, param2_bvec);
+          at::vec::pack_bfloat16_float(param_bvec, param2_bvec);
 
       param_fvec -= fVec::loadu(workspace_ptr + d) *
           fVec(float(learning_rate * true_ratio));
@@ -325,15 +326,16 @@ void lamb_fused_step_kernel<at::BFloat16, at::BFloat16>(
           fVec(float(learning_rate * true_ratio));
 
       std::tie(param_bvec, param2_bvec) =
-          bf16::unpack_float_bfloat16(param_fvec, param_fvec2);
+          at::vec::unpack_float_bfloat16(param_fvec, param_fvec2);
       param_bvec.store(param_ptr + d);
       param2_bvec.store(param2_ptr + d);
     }
     for (; d < size; d++) {
-      float param_val = bf16::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
+      float param_val =
+          at::vec::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
       param_val -= workspace_ptr[d] * learning_rate * true_ratio;
       std::tie(param_ptr[d], param2_ptr[d]) =
-          bf16::unpack_float_bfloat16(param_val);
+          at::vec::unpack_float_bfloat16(param_val);
     }
   });
 }

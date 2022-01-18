@@ -1,6 +1,6 @@
 #include "AddSoftmax.h"
 
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 #include "csrc/cpu/vec512/add_softmax.h"
 #endif
 
@@ -13,7 +13,7 @@ at::Tensor DivAddSoftmax(
     at::Tensor& a,
     const at::Tensor& b,
     const float& dim_per_head) {
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
   if (a.scalar_type() == at::kFloat && b.scalar_type() == at::kFloat) {
     return torch_ipex::cpu::kernel::vec::vec512::dil_div_add_softmax<float>(
         a, b, dim_per_head);

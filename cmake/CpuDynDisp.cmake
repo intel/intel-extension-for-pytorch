@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
+set(DPCPP_ISA_SRCS)
+set(DPCPP_ISA_SRCS_ORIGIN)
+include(cmake/Codegen.cmake)
+
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
@@ -15,7 +19,15 @@ set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc")
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
-FIND_PACKAGE(AVX)
+#[[
+IF (C_AVX512_FOUND AND CXX_AVX512_FOUND)
+  message(VERBOSE "Build the extension with AVX512 enabled.")
+ELSEIF(C_AVX2_FOUND AND CXX_AVX2_FOUND)
+  message(VERBOSE "Build the extension with AVX2 enabled.")
+ELSE()
+  message(FATAL_ERROR "Does not support building the extension on non-AVX512/AVX2 machine.")
+ENDIF()
+]]
 
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -74,47 +86,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=pedantic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=redundant-decls")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=old-style-cast")
 
-IF ("${AVX_VERSION}" MATCHES "AVX512")
-  IF (C_AVX512_FOUND OR CXX_AVX512_FOUND)
-    set(IPEX_BUILD_ISA_MODE "AVX512")
-  ELSE()
-    message(WARNING "The build environment does not support AVX512, It will switch to AVX2.")
-    IF (C_AVX2_FOUND OR CXX_AVX2_FOUND)
-      set(IPEX_BUILD_ISA_MODE "AVX2")
-    ENDIF()
-  ENDIF()
-ELSEIF("${AVX_VERSION}" MATCHES "AVX2")
-  IF (C_AVX2_FOUND OR CXX_AVX2_FOUND)
-    set(IPEX_BUILD_ISA_MODE "AVX2")
-  ELSE()
-    message(FATAL_ERROR "The build environment does not support AVX2.")
-  ENDIF()
-ELSE()
-  message(FATAL_ERROR "Wrong AVX version.")
-ENDIF()
-
-IF ("${IPEX_BUILD_ISA_MODE}" MATCHES "AVX512")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY_AVX512")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY=AVX512") 
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512bw")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512vl")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512dq")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mf16c")
-
-  IF (C_AVX512_BF16_FOUND OR CXX_AVX512_BF16_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512bf16 -DCPU_CAPABILITY_AVX512_BF16")
-  ENDIF()
-
-  message("Build the extension with AVX512 enabled.")
-ELSEIF("${IPEX_BUILD_ISA_MODE}" MATCHES "AVX2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY_AVX2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPU_CAPABILITY=AVX2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfma")
-
-  message("Build the extension with AVX2 enabled.")
-ENDIF()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDYN_DISP_BUILD")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 # These flags are not available in GCC-4.8.5. Set only when using clang.
@@ -207,6 +179,10 @@ set(DPCPP_AUTOCAST_SRCS)
 set(DPCPP_ATEN_SRCS)
 set(DPCPP_DYNDISP_SRCS)
 
+foreach(file_path ${DPCPP_ISA_SRCS})
+  message(${file_path})
+endforeach()
+
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/utils)
 add_subdirectory(${DPCPP_ROOT}/quantization)
@@ -216,10 +192,27 @@ add_subdirectory(${DPCPP_ROOT}/dyndisp)
 add_subdirectory(${DPCPP_ROOT}/autocast)
 add_subdirectory(${DPCPP_ROOT}/aten)
 
+file(GLOB_RECURSE EXCLUDE_FILES_1 "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/*.cpp")
+file(GLOB_RECURSE EXCLUDE_FILES_2 "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/cpu/*.cpp")
+
+file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/_DynDispSample.cpp")
+
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
+set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
     ${DPCPP_CPU_SRCS} ${DPCPP_AUTOCAST_SRCS} ${DPCPP_ATEN_SRCS})
+
+list(REMOVE_ITEM DPCPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
+
+list(REMOVE_ITEM DPCPP_SRCS ${EXCLUDE_FILES_1})
+list(REMOVE_ITEM DPCPP_SRCS ${EXCLUDE_FILES_2})
+
+list(APPEND DPCPP_SRCS ${SAMPLE_FILES})
+
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
+
+foreach(file_path ${DPCPP_SRCS})
+  message(${file_path})
+endforeach()
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)

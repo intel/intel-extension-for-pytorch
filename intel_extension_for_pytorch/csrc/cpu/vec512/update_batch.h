@@ -11,6 +11,8 @@ namespace kernel {
 namespace vec {
 namespace vec512 {
 
+#if defined(CPU_CAPABILITY_AVX512)
+
 inline void update_batch_kernel_impl(
     const __m512i& max_symbols_epi32,
     const __m512i& flag_1_epi32,
@@ -422,6 +424,8 @@ inline void update_feature_idx_kernel(
     }
   }
 }
+
+#endif
 
 } // namespace vec512
 } // namespace vec
