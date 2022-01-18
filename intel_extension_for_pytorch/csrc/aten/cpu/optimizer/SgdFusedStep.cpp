@@ -19,10 +19,12 @@ void sgd_fused_step_kernel(
     double learning_rate,
     double weight_decay,
     double dampening,
-    bool nesterov) {
+    bool nesterov,
+    bool momentum_buf_initialized) {
   scalar_t* param_data = param.data_ptr<scalar_t>();
   scalar_t* grad_data = grad.data_ptr<scalar_t>();
-  scalar_t* momentum_buf_data = momentum_buf.data_ptr<scalar_t>();
+  scalar_t* momentum_buf_data =
+      momentum_buf.defined() ? momentum_buf.data_ptr<scalar_t>() : nullptr;
 
   using Vec = at::vec::Vectorized<scalar_t>;
 
@@ -45,9 +47,14 @@ void sgd_fused_step_kernel(
               param_vec * Vec(scalar_t(weight_decay));
 
           if (momentum != 0) {
-            Vec momentum_vec =
-                Vec::loadu(momentum_buf_ptr + d) * Vec(scalar_t(momentum)) +
-                grad_vec * Vec(grad_decay);
+            Vec momentum_vec;
+            if (!momentum_buf_initialized) {
+              momentum_vec = grad_vec;
+            } else {
+              momentum_vec =
+                  Vec::loadu(momentum_buf_ptr + d) * Vec(scalar_t(momentum)) +
+                  grad_vec * Vec(grad_decay);
+            }
             momentum_vec.store(momentum_buf_ptr + d);
             if (nesterov) {
               grad_vec += momentum_vec * Vec(scalar_t(momentum));
@@ -61,8 +68,12 @@ void sgd_fused_step_kernel(
         for (; d < size; d++) {
           scalar_t grad_val = grad_ptr[d] + param_ptr[d] * weight_decay;
           if (momentum != 0) {
-            momentum_buf_ptr[d] =
-                momentum_buf_ptr[d] * momentum + grad_val * grad_decay;
+            if (!momentum_buf_initialized) {
+              momentum_buf_ptr[d] = grad_val;
+            } else {
+              momentum_buf_ptr[d] =
+                  momentum_buf_ptr[d] * momentum + grad_val * grad_decay;
+            }
             if (nesterov) {
               grad_val += momentum_buf_ptr[d] * momentum;
             } else {
@@ -84,7 +95,8 @@ void sgd_fused_step_kernel<at::BFloat16, at::BFloat16>(
     double learning_rate,
     double weight_decay,
     double dampening,
-    bool nesterov) {
+    bool nesterov,
+    bool momentum_buf_initialized) {
   TORCH_CHECK(
       param.scalar_type() == at::kBFloat16,
       "sgd_fused_step_kernel: expect param to be at::BFloat16");
@@ -92,15 +104,16 @@ void sgd_fused_step_kernel<at::BFloat16, at::BFloat16>(
       grad.scalar_type() == at::kBFloat16,
       "sgd_fused_step_kernel: expect grad to be at::BFloat16");
   TORCH_CHECK(
-      momentum_buf.scalar_type() == at::kFloat,
-      "sgd_fused_step_kernel: expect stats_sum to be float32");
+      !momentum_buf.defined() || momentum_buf.scalar_type() == at::kFloat,
+      "sgd_fused_step_kernel: expect momentum_buf to be float32");
   TORCH_CHECK(
       param2.scalar_type() == at::kBFloat16,
       "sgd_fused_step_kernel: expect param2 to be at::BFloat16");
 
   at::BFloat16* param_data = param.data_ptr<at::BFloat16>();
   at::BFloat16* grad_data = grad.data_ptr<at::BFloat16>();
-  float* momentum_buf_data = momentum_buf.data_ptr<float>();
+  float* momentum_buf_data =
+      momentum_buf.defined() ? momentum_buf.data_ptr<float>() : nullptr;
   at::BFloat16* param2_data = param2.data_ptr<at::BFloat16>();
 
   using bVec = at::vec::Vectorized<at::BFloat16>;
@@ -135,13 +148,18 @@ void sgd_fused_step_kernel<at::BFloat16, at::BFloat16>(
           grad_fvec2 = grad_fvec2 + param_fvec2 * fVec(float(weight_decay));
 
           if (momentum != 0) {
-            fVec momentum_vec =
-                fVec::loadu(momentum_buf_ptr + d) * fVec(float(momentum)) +
-                grad_fvec * fVec(grad_decay);
-            fVec momentum_vec2 =
-                fVec::loadu(momentum_buf_ptr + d + fVec::size()) *
-                    fVec(float(momentum)) +
-                grad_fvec2 * fVec(grad_decay);
+            fVec momentum_vec, momentum_vec2;
+            if (!momentum_buf_initialized) {
+              momentum_vec = grad_fvec;
+              momentum_vec2 = grad_fvec2;
+            } else {
+              momentum_vec =
+                  fVec::loadu(momentum_buf_ptr + d) * fVec(float(momentum)) +
+                  grad_fvec * fVec(grad_decay);
+              momentum_vec2 = fVec::loadu(momentum_buf_ptr + d + fVec::size()) *
+                      fVec(float(momentum)) +
+                  grad_fvec2 * fVec(grad_decay);
+            }
             momentum_vec.store(momentum_buf_ptr + d);
             momentum_vec2.store(momentum_buf_ptr + d + fVec::size());
             if (nesterov) {
@@ -166,8 +184,12 @@ void sgd_fused_step_kernel<at::BFloat16, at::BFloat16>(
               bf16::pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
           float grad_val = float(grad_ptr[d]) + param_val * weight_decay;
           if (momentum != 0) {
-            momentum_buf_ptr[d] =
-                momentum_buf_ptr[d] * momentum + grad_val * grad_decay;
+            if (!momentum_buf_initialized) {
+              momentum_buf_ptr[d] = grad_val;
+            } else {
+              momentum_buf_ptr[d] =
+                  momentum_buf_ptr[d] * momentum + grad_val * grad_decay;
+            }
             if (nesterov) {
               grad_val += momentum_buf_ptr[d] * momentum;
             } else {
@@ -191,7 +213,8 @@ void sgd_fused_step_kernel<float, at::BFloat16>(
     double learning_rate,
     double weight_decay,
     double dampening,
-    bool nesterov) {
+    bool nesterov,
+    bool momentum_buf_initialized) {
   TORCH_CHECK(
       param.scalar_type() == at::kFloat,
       "sgd_fused_step_kernel: expect param to be at::kFloat");
@@ -199,15 +222,16 @@ void sgd_fused_step_kernel<float, at::BFloat16>(
       grad.scalar_type() == at::kBFloat16,
       "sgd_fused_step_kernel: expect grad to be at::BFloat16");
   TORCH_CHECK(
-      momentum_buf.scalar_type() == at::kFloat,
-      "sgd_fused_step_kernel: expect stats_sum to be float32");
+      !momentum_buf.defined() || momentum_buf.scalar_type() == at::kFloat,
+      "sgd_fused_step_kernel: expect momentum_buf to be float32");
   TORCH_CHECK(
       param2.scalar_type() == at::kBFloat16,
       "sgd_fused_step_kernel: expect param to be at::kBFloat16");
 
   float* param_data = param.data_ptr<float>();
   at::BFloat16* grad_data = grad.data_ptr<at::BFloat16>();
-  float* momentum_buf_data = momentum_buf.data_ptr<float>();
+  float* momentum_buf_data =
+      momentum_buf.defined() ? momentum_buf.data_ptr<float>() : nullptr;
   at::BFloat16* param2_data = param2.data_ptr<at::BFloat16>();
 
   using bVec = at::vec::Vectorized<at::BFloat16>;
@@ -238,13 +262,18 @@ void sgd_fused_step_kernel<float, at::BFloat16>(
           grad_fvec2 = grad_fvec2 + param_fvec2 * fVec(float(weight_decay));
 
           if (momentum != 0) {
-            fVec momentum_vec =
-                fVec::loadu(momentum_buf_ptr + d) * fVec(float(momentum)) +
-                grad_fvec * fVec(grad_decay);
-            fVec momentum_vec2 =
-                fVec::loadu(momentum_buf_ptr + d + fVec::size()) *
-                    fVec(float(momentum)) +
-                grad_fvec2 * fVec(grad_decay);
+            fVec momentum_vec, momentum_vec2;
+            if (!momentum_buf_initialized) {
+              momentum_vec = grad_fvec;
+              momentum_vec2 = grad_fvec2;
+            } else {
+              momentum_vec =
+                  fVec::loadu(momentum_buf_ptr + d) * fVec(float(momentum)) +
+                  grad_fvec * fVec(grad_decay);
+              momentum_vec2 = fVec::loadu(momentum_buf_ptr + d + fVec::size()) *
+                      fVec(float(momentum)) +
+                  grad_fvec2 * fVec(grad_decay);
+            }
             momentum_vec.store(momentum_buf_ptr + d);
             momentum_vec2.store(momentum_buf_ptr + d + fVec::size());
             if (nesterov) {
@@ -269,8 +298,12 @@ void sgd_fused_step_kernel<float, at::BFloat16>(
           float param_val = param_ptr[d];
           float grad_val = float(grad_ptr[d]) + param_val * weight_decay;
           if (momentum != 0) {
-            momentum_buf_ptr[d] =
-                momentum_buf_ptr[d] * momentum + grad_val * grad_decay;
+            if (!momentum_buf_initialized) {
+              momentum_buf_ptr[d] = grad_val;
+            } else {
+              momentum_buf_ptr[d] =
+                  momentum_buf_ptr[d] * momentum + grad_val * grad_decay;
+            }
             if (nesterov) {
               grad_val += momentum_buf_ptr[d] * momentum;
             } else {
@@ -299,10 +332,10 @@ void sgd_fused_step_kernel<float, at::BFloat16>(
  *@param dampening Attribute for momentum.
  *@param nesterov Attribute for momentum.
  */
-void sgd_fused_step(
+c10::optional<at::Tensor> sgd_fused_step(
     at::Tensor& param_,
     const at::Tensor& grad_,
-    at::Tensor& momentum_buf_,
+    const c10::optional<at::Tensor>& momentum_buf_,
     at::Tensor& param2_,
     double momentum,
     double learning_rate,
@@ -324,11 +357,12 @@ void sgd_fused_step(
       "; grad_ sizes: ",
       grad_.sizes());
   TORCH_CHECK(
-      param_.sizes() == momentum_buf_.sizes(),
+      !momentum_buf_.has_value() ||
+          param_.sizes() == momentum_buf_.value().sizes(),
       "Expect param and momentum_buf have the same sizes, param sizes: ",
       param_.sizes(),
       "; momentum_buf sizes: ",
-      momentum_buf_.sizes());
+      momentum_buf_.value().sizes());
   TORCH_CHECK(
       param2_.numel() == 0 || param_.sizes() == param2_.sizes(),
       "Expect param and param2_ have the same sizes, param sizes: ",
@@ -338,8 +372,21 @@ void sgd_fused_step(
 
   auto param = param_.contiguous();
   auto grad = grad_.contiguous();
-  auto momentum_buf = momentum_buf_.contiguous();
   auto param2 = param2_.contiguous();
+
+  at::Tensor momentum_buf;
+  bool momentum_buf_initialized;
+  if (momentum != 0) {
+    if (!momentum_buf_.has_value()) {
+      auto acc_dtype =
+          param.scalar_type() == at::kDouble ? at::kDouble : at::kFloat;
+      momentum_buf = at::empty_like(param, acc_dtype);
+      momentum_buf_initialized = false;
+    } else {
+      momentum_buf = momentum_buf_.value().contiguous();
+      momentum_buf_initialized = true;
+    }
+  }
 
   auto grad_dtype = grad_.scalar_type();
   auto param_dtype = param_.scalar_type();
@@ -353,7 +400,8 @@ void sgd_fused_step(
         learning_rate,
         weight_decay,
         dampening,
-        nesterov);
+        nesterov,
+        momentum_buf_initialized);
   } else if (at::ScalarType::Double == grad_dtype) {
     sgd_fused_step_kernel<double, double>(
         param,
@@ -364,7 +412,8 @@ void sgd_fused_step(
         learning_rate,
         weight_decay,
         dampening,
-        nesterov);
+        nesterov,
+        momentum_buf_initialized);
   } else if (
       at::ScalarType::BFloat16 == grad_dtype &&
       at::ScalarType::BFloat16 == param_dtype) {
@@ -377,7 +426,8 @@ void sgd_fused_step(
         learning_rate,
         weight_decay,
         dampening,
-        nesterov);
+        nesterov,
+        momentum_buf_initialized);
   } else if (
       at::ScalarType::BFloat16 == grad_dtype &&
       at::ScalarType::Float == param_dtype) {
@@ -390,22 +440,27 @@ void sgd_fused_step(
         learning_rate,
         weight_decay,
         dampening,
-        nesterov);
+        nesterov,
+        momentum_buf_initialized);
   } else {
     TORCH_CHECK(false, "expect bfloat16 or float or double param");
   }
-
   if (!param_.is_contiguous()) {
     param_.copy_(param);
   }
-  if (!momentum_buf_.is_contiguous()) {
-    momentum_buf_.copy_(momentum_buf);
-  }
+
   if (!param2_.is_contiguous()) {
     param2_.copy_(param2);
   }
 
-  return;
+  if (momentum_buf_.has_value() && !momentum_buf_.value().is_contiguous()) {
+    momentum_buf_.value().copy_(momentum_buf);
+  }
+
+  if (momentum == 0) {
+    return c10::nullopt;
+  } else
+    return momentum_buf;
 }
 
 } // namespace cpu
@@ -415,9 +470,9 @@ namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
-      "sgd_fused_step(Tensor param, Tensor grad, Tensor momentum_buf, Tensor "
+      "sgd_fused_step(Tensor param, Tensor grad, Tensor? momentum_buf, Tensor "
       "trail, float momentum, float learning_rate, float weight_decay, float "
-      "dampening, bool nesterov) -> ()",
+      "dampening, bool nesterov) -> Tensor?",
       torch_ipex::cpu::sgd_fused_step);
 }
 

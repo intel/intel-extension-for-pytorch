@@ -1077,15 +1077,17 @@ class VerboseTestCase(TestCase):
         for check in check_format.split(':'):
             if check == "blocked":
                 break
-            format_index = format_index+1
-        format = check_format.split(':')[format_index+1]
+            format_index = format_index + 1
+        format = check_format.split(':')[format_index + 1]
         # ref to https://spec.oneapi.io/versions/latest/elements/oneDNN/source/data_model/memory/formats.html#
-        format_list=["a",
-                     "ab","ba",
-                     "acb","abc","bac","cba","bca",
-                     "abcd","abdc","acdb","bacd","bcda","cdba","dcab",
-                     "abcde","abdec","acbde","acdeb","bacde","bcdea","cdeba","decab",
-                     "abcdef","acbdef","defcab"]
+        format_list = [
+            "a",
+            "ab", "ba",
+            "acb", "abc", "bac", "cba", "bca",
+            "abcd", "abdc", "acdb", "bacd", "bcda", "cdba", "dcab",
+            "abcde", "abdec", "acbde", "acdeb", "bacde", "bcdea", "cdeba", "decab",
+            "abcdef", "acbdef", "defcab"
+        ]
         for f in format_list:
             if f == format:
                 return True
@@ -1101,7 +1103,7 @@ class VerboseTestCase(TestCase):
         if not self.is_dnnl_reorder(line):
             return False
         src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
-        if self.isPlainFormat(src_format) and self.isPlainFormat(dst_format): # for prepack, at least dst should be blocked format and not in the format list
+        if self.isPlainFormat(src_format) and self.isPlainFormat(dst_format):  # for prepack, at least dst should be blocked format and not in the format list
             return False
         return src_dtype[1] == dst_dtype[1]
 
@@ -1115,9 +1117,9 @@ class VerboseTestCase(TestCase):
         if not self.is_dnnl_reorder(line):
             return False
         src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
-        if self.isPlainFormat(src_format) and not self.isPlainFormat(dst_format): # reorder from plain format to blocked, should be prepack reorder
+        if self.isPlainFormat(src_format) and not self.isPlainFormat(dst_format):  # reorder from plain format to blocked, should be prepack reorder
             return False
-        return src_dtype[1] == dst_dtype[1]  and src_format != dst_format
+        return src_dtype[1] == dst_dtype[1] and src_format != dst_format
 
     def assertOnlyReorderDtype(self, line):
         assert OnlyReorderDtype(line), 'the verbose msg shows not only reorder dtype'
@@ -1439,7 +1441,7 @@ dtype2prec_DONTUSE = {torch.float: 1e-5,
                       torch.bfloat16: 1e-1}
 
 # using data to do calibration for model and saving int8 configs at dir
-def  int8_calibration(model, data, dir):
+def int8_calibration(model, data, dir):
     conf = ipex.AmpConf(torch.int8)
     with torch.no_grad():
         for x in data:
@@ -1457,8 +1459,8 @@ class TestModule(torch.nn.Module):
         self.input = (
             torch.ones(10, 1, 5, 5),
             torch.ones(10, 5),
-            torch.arange(0, 9).long(),
-            torch.arange(0, 9).long())
+            torch.arange(0, 10).long(),
+            torch.arange(0, 10).long())
 
     def forward(self, x, y, indices, offsets):
         x = self.conv(x)
@@ -1470,8 +1472,15 @@ class TestModule(torch.nn.Module):
     def attach_grad(self, dtype=torch.float):
         # Instead of .sum().backward(), attach grad to parameters directly can help to check optimizer's correctness
         self.linear.weight.grad = torch.ones(self.linear.weight.shape).to(dtype)
+        self.set_zeros_for_packed_weight(self.linear.weight)
         self.linear.bias.grad = torch.ones(self.linear.bias.shape).to(dtype)
         self.conv.weight.grad = torch.ones(self.conv.weight.shape).to(dtype)
-        self.linear.bias.grad = torch.ones(self.conv.bias.shape).to(dtype)
+        self.set_zeros_for_packed_weight(self.conv.weight)
+        self.conv.bias.grad = torch.ones(self.conv.bias.shape).to(dtype)
         self.embeddingbag.weight.grad = torch.ones(self.embeddingbag.weight.shape).to(dtype)
         self.bn.weight.grad = torch.ones(self.bn.weight.shape)
+
+    def set_zeros_for_packed_weight(self, weight):
+        for idx in range(len(weight.storage())):
+            if weight.storage()[idx] == 0:
+                weight.grad.storage()[idx] = 0
