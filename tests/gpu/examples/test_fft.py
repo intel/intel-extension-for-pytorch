@@ -6,7 +6,8 @@ import ipex
 import pytest
 
 
-@pytest.mark.skipif("not torch.xpu.has_onemkl()")
+@pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="ipex build w/o oneMKL support")
+@pytest.mark.skipif(not torch.has_mkl, reason="torch build w/o mkl support")
 class TestNNMethod(TestCase):
     def test_fft(self, dtype=torch.float):
         x1 = torch.randn(5, 5)
@@ -28,7 +29,8 @@ class TestNNMethod(TestCase):
         self.assertEqual(y4, y4_dpcpp.cpu())
         self.assertEqual(y5, y5_dpcpp.cpu())
 
-    # @pytest.mark.skip(reason="irfft has accuracy issue in oneMKL")
+    # TODO: remove skip when oneMKL is ready
+    @pytest.mark.skip(reason="irfft has accuracy issue in oneMKL, MKLD-12824")
     def test_irfft(self, dtype=torch.float):
         x1 = torch.randn(5, 5)
         x2 = torch.randn(4, 3, 2)
