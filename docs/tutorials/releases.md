@@ -1,6 +1,15 @@
 Releases
 =============
 
+## 1.10.100
+
+This release is meant to fix the following issues:
+- Resolve the issue that the PyTorch Tensor Expression(TE) did not work after importing the extension.
+- Wraps the BactchNorm(BN) as another operator to break the TE's BN-related fusions. Because the BatchNorm performance of PyTorch Tensor Expression can not achieve the same performance as PyTorch ATen BN. 
+- Update the [documentation](https://intel.github.io/intel-extension-for-pytorch/)
+    - Fix the INT8 quantization example issue #205 
+    - Polish the installation guide
+
 ## 1.10.0
 
 The Intel® Extension for PyTorch\* 1.10 is on top of PyTorch 1.10. In this release, we polished the front end APIs. The APIs are more simplible, stable and straightforward now. According to PyTorch community recommendation, we changed the underhood device from `XPU` to `CPU`. With this change, the model and tensor does not need to be converted to the extension device to get performance improvement. It simplifies the model changes.
