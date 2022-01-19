@@ -42,7 +42,7 @@ static CPUCapability compute_cpu_capability() {
     return CPUCapability::AVX512;
   }
   if (CPUFeature::get_instance().os_avx2() &&
-      CPUFeature::get_instance().cpuid_avx2() && 
+      CPUFeature::get_instance().cpuid_avx2() &&
       CPUFeature::get_instance().cpuid_fma()) {
     // CHECK_SSE(C "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
     // CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
