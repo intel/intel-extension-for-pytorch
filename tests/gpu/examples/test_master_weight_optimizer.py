@@ -79,6 +79,7 @@ class TestNNMethod(TestCase):
         for i in range(len(p_ref_list)):
             self.assertEqual(p_real_list[i], p_ref_list[i], atol=1e-3, rtol=1.3e-04)
 
+    # test official torch AdamW
     def test_AdamMasterWeight(self, dtype=torch.float):
         model_real = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
         model_ref = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)

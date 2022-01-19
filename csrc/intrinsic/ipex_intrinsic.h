@@ -22,19 +22,35 @@ void matmul(
 
 at::Tensor interaction(at::Tensor& input_mlp, at::Tensor& input_emb);
 
-at::Tensor& fused_adamW(
-    at::Tensor& master_grad_input,
-    at::Tensor& grad_input,
+at::Tensor& fused_adamWMasterWeight(
+    at::Tensor& master_weight,
+    at::Tensor& weight,
+    at::Tensor& grad,
+    const bool amsgrad,
+    at::Tensor& avg,
+    at::Tensor& avg_sq,
+    at::Tensor& max_avg_sq,
+    int64_t& step,
+    double lr,
+    double eps,
+    double beta1,
+    double beta2,
+    double weight_decay);
+
+at::Tensor& transformer_adamWMasterWeight(
+    at::Tensor& master_weight,
+    at::Tensor& weight,
     at::Tensor& grad,
     at::Tensor& avg,
     at::Tensor& avg_sq,
-    int64_t step = 1.0,
-    double lr = 1.0,
-    double eps = 1.0,
-    double beta1 = 1.0,
-    double beta2 = 1.0,
-    double weight_decay = 0.f,
-    const bool correct_bias = true);
+    at::Tensor& max_avg_sq,
+    int64_t& step,
+    double lr,
+    double eps,
+    double beta1,
+    double beta2,
+    double weight_decay,
+    const bool correct_bias);
 
 at::Tensor& fused_SGDMasterWeight(
     at::Tensor& master_weight,

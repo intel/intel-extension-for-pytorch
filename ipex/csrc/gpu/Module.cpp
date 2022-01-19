@@ -433,25 +433,59 @@ void init_module(pybind11::module& m) {
       "interaction kernel implemtation on Intel device");
 
   m.def(
-      "fused_adamW",
-      [](at::Tensor& master_grad_input,
-         at::Tensor& grad_input,
-         at::Tensor& grad,
-         at::Tensor& avg,
-         at::Tensor& avg_sq,
-         int64_t step,
+      "fused_adamWMasterWeight",
+      [](Tensor& master_weight,
+         Tensor& weight,
+         Tensor& grad,
+         const bool amsgrad,
+         Tensor& avg,
+         Tensor& avg_sq,
+         Tensor& max_avg_sq,
+         int64_t& step,
+         double lr,
+         double eps,
+         double beta1,
+         double beta2,
+         double weight_decay) {
+        return at::AtenIpexTypeXPU::fused_adamWMasterWeight(
+            master_weight,
+            weight,
+            grad,
+            amsgrad,
+            avg,
+            avg_sq,
+            max_avg_sq,
+            step,
+            lr,
+            eps,
+            beta1,
+            beta2,
+            weight_decay);
+      },
+      "optimize official torch AdamW optimizer kernel implemtation");
+
+  m.def(
+      "transformer_adamWMasterWeight",
+      [](Tensor& master_weight,
+         Tensor& weight,
+         Tensor& grad,
+         Tensor& avg,
+         Tensor& avg_sq,
+         Tensor& max_avg_sq,
+         int64_t& step,
          double lr,
          double eps,
          double beta1,
          double beta2,
          double weight_decay,
          const bool correct_bias) {
-        return at::AtenIpexTypeXPU::fused_adamW(
-            master_grad_input,
-            grad_input,
+        return at::AtenIpexTypeXPU::transformer_adamWMasterWeight(
+            master_weight,
+            weight,
             grad,
             avg,
             avg_sq,
+            max_avg_sq,
             step,
             lr,
             eps,
@@ -460,7 +494,7 @@ void init_module(pybind11::module& m) {
             weight_decay,
             correct_bias);
       },
-      "optimized adamW optimizer kernel implemtation on Intel device");
+      "optimize transformer AdamW optimizer kernel implemtation");
 
   m.def(
       "fused_SGDMasterWeight",
