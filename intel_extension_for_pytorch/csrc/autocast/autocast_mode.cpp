@@ -59,10 +59,10 @@ void clear_autocast_cache() {
 
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
   if (is_eligible_cpu(arg) && (arg.scalar_type() != to_type)) {
-    bool can_try_cache = !at::GradMode::is_enabled() &&
+    bool can_try_cache =
         (to_type == at::kBFloat16 && arg.scalar_type() == at::kFloat &&
          arg.requires_grad() && arg.is_leaf() && !arg.is_view() &&
-         !torch::jit::tracer::isTracing()); // Disable cache in jit mode
+         at::autocast::is_autocast_cache_enabled());
 
     if (can_try_cache) {
       auto it = cached_casts.find(arg.unsafeGetTensorImpl());
@@ -152,37 +152,7 @@ struct CPU_WrapFunction_<
   }
 };
 
-// DtypeCastPolicy::promote
-template <class Redispatch, Redispatch* F, class Ret, class... Args>
-struct CPU_WrapFunction_<
-    DtypeCastPolicy::promote,
-    Redispatch,
-    F,
-    Ret,
-    guts::typelist::typelist<Args...>> {
-  static Ret call(Args... args) {
-    c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-    auto to_type = promote_type(at::kBFloat16, args...);
-    return (*F)(cpu_cached_cast(to_type, args)...);
-  }
-};
-
 #define ADD_NS(RAW_OP) at::RAW_OP
-
-#define KERNEL_CPU(FUNC, REGISTER_NAME, SIGNATURE, PRE_DEFINED_POLICY) \
-  m.impl(                                                              \
-      TORCH_SELECTIVE_NAME("aten::" REGISTER_NAME),                    \
-      &CPU_WrapFunction<                                               \
-          DtypeCastPolicy::PRE_DEFINED_POLICY,                         \
-          SIGNATURE,                                                   \
-          SIGNATURE,                                                   \
-          &FUNC>::type::call);
-
-#define TUPLE_TWO_TENSORS std::tuple<Tensor, Tensor>
-
-#define TUPLE_THREE_TENSORS std::tuple<Tensor, Tensor, Tensor>
-
-#define TUPLE_FOUR_TENSORS std::tuple<Tensor, Tensor, Tensor, Tensor>
 
 #define MAKE_REGISTER_FUNC(FUNC, NAME, SIG, CAST_POLICY)                   \
   IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {                          \
@@ -275,6 +245,7 @@ MAKE_REGISTER_FUNC(
         int64_t,
         IntArrayRef),
     user_defined_dtype)
+
 // fp32 cast policy a.k.a BlackList
 MAKE_REGISTER_FUNC(
     ADD_NS(linalg_matrix_rank),
@@ -290,24 +261,7 @@ MAKE_REGISTER_FUNC(
     "linalg_matrix_rank.atol_rtol_float",
     Tensor(const Tensor&, c10::optional<double>, c10::optional<double>, bool),
     fp32)
-// promote
-MAKE_REGISTER_FUNC(ADD_NS(cat), "cat", Tensor(TensorList, int64_t), promote)
-MAKE_REGISTER_FUNC(ADD_NS(stack), "stack", Tensor(TensorList, int64_t), promote)
-MAKE_REGISTER_FUNC(
-    ADD_NS(index_copy),
-    "index_copy",
-    Tensor(const Tensor&, int64_t, const Tensor&, const Tensor&),
-    promote)
-MAKE_REGISTER_FUNC(
-    ADD_NS(index_copy),
-    "index_copy.dimname",
-    Tensor(const Tensor&, at::Dimname, const Tensor&, const Tensor&),
-    promote)
 
-#undef TUPLE_TWO_TENSORS
-#undef TUPLE_THREE_TENSORS
-#undef TUPLE_FOUR_TENSORS
-#undef MAKE_REGISTER_FUNC
 
 IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   // for int8 path
