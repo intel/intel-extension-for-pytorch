@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <csrc/dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -41,15 +42,6 @@ void cpu_adaptive_avg_pool_backward_channels_last(
     at::Tensor& grad_input_,
     const at::Tensor& grad_output_);
 
-void adaptive_avg_pool2d_kernel_impl(
-    at::Tensor& output,
-    const at::Tensor& input,
-    at::IntArrayRef output_size);
-
-void adaptive_avg_pool2d_backward_kernel_impl(
-    at::Tensor& grad_input,
-    const at::Tensor& grad_output);
-
 void adaptive_avg_pool2d_out_cpu_template(
     at::Tensor& output,
     at::Tensor const& input,
@@ -81,6 +73,35 @@ at::Tensor& adaptive_avg_pool2d_backward_out_cpu(
 at::Tensor adaptive_avg_pool2d_backward_cpu(
     const at::Tensor& grad_output,
     const at::Tensor& input);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+void adaptive_avg_pool2d_kernel_impl(
+    at::Tensor& output,
+    const at::Tensor& input,
+    at::IntArrayRef output_size);
+
+void adaptive_avg_pool2d_backward_kernel_impl(
+    at::Tensor& grad_input,
+    const at::Tensor& grad_output);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using adaptive_avg_pool2d_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&, at::IntArrayRef);
+DECLARE_DISPATCH(
+    adaptive_avg_pool2d_kernel_fn,
+    adaptive_avg_pool2d_kernel_stub);
+
+using adaptive_avg_pool2d_backward_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&);
+DECLARE_DISPATCH(
+    adaptive_avg_pool2d_backward_kernel_fn,
+    adaptive_avg_pool2d_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex
