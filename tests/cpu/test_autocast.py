@@ -74,6 +74,24 @@ class TestAutocastWithJit(TestCase):
             torch.randn(32, 3, 64, 64), torch.rand(32, 3, 64, 64),
             torch.rand(1, 1, 32, 32), torch.rand(1, 1, 32, 32)]
 
+    def test_autocast_jit_cache_enable(self):
+        def test_generate_autocast_jit_cache_enable(model, x):
+            model.eval()
+            ipex.enable_onednn_fusion(False)
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                y0 = model(x)
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                traced_model = torch.jit.trace(model, x)
+                y1 = traced_model(x)
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=False):
+                traced_model = torch.jit.trace(model, x)
+                y2 = traced_model(x)
+            self.assertEqual(y0, y1)
+            self.assertEqual(y1, y2)
+            ipex.enable_onednn_fusion(True)
+        for i in range(self.models.__len__()):
+            test_generate_autocast_jit_cache_enable(self.models[i], self.inputs[i])
+
     def test_generate_autocast_jit_trace_model(self):
         def test_generate_autocast_jit_trace_model(model, x):
             model.eval()
