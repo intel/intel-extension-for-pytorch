@@ -204,6 +204,7 @@ file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/a
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ConvTranspose.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Copy.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Cumsum.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Eltwise.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Softmax.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/optimizer/*.cpp")
 
