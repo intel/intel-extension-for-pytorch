@@ -1133,7 +1133,7 @@ class Tester(TestCase):
                     kind_in_graph="ipex_prepack::conv_transpose2d_run",
                     kind_not_in_graph="aten::conv_transpose2d",
                     levels=["O0"])
-                if not re.findall('[\d\.]*', torch.__version__)[0] in ['1.10.0',]:
+                if int(torch.__version__.split('.')[0]) != 1 or int(torch.__version__.split('.')[1]) != 10:
                     self._test_output_bf16(
                         model,
                         x,

@@ -324,8 +324,8 @@ def skipIfSpecificVersions(fn):
     import re
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if re.findall('[\d\.]*', torch.__version__)[0] in ['1.10.0',]:
-            raise unittest.SkipTest('PyTorch 1.10.0')
+        if int(torch.__version__.split('.')[0]) == 1 and int(torch.__version__.split('.')[1]) == 10:
+            raise unittest.SkipTest('PyTorch 1.10')
         else:
             fn(*args, **kwargs)
     return wrapper
