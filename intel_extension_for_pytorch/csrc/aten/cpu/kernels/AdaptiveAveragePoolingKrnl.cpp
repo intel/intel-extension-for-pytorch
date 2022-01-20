@@ -463,39 +463,8 @@ void adaptive_avg_pool2d_backward_kernel_impl(
   }
 }
 
-/*
-void cpu_dyn_disp_test_help_kernel_impl(
-    at::Tensor& output_)
-    {
-#ifdef CPU_CAPABILITY_AVX512_BF16
-        output_.copy_(at::tensor(51201));
-        return;
-#endif
-
-#ifdef CPU_CAPABILITY_AVX512
-        output_.copy_(at::tensor(51200));
-        return;
-#endif
-
-#ifdef CPU_CAPABILITY_AVX2
-        output_.copy_(at::tensor(25600));
-        return;
-#endif
-
-#ifdef CPU_CAPABILITY_DEFAULT
-        output_.copy_(at::tensor(10000));
-        return;
-#endif
-
-        output_.copy_(at::tensor(0));
-    }
-*/
-
 #if defined(DYN_DISP_BUILD)
 } // anonymous namespace
-
-// REGISTER_DISPATCH(cpu_dyn_disp_test_help_stub,
-// &cpu_dyn_disp_test_help_kernel_impl);
 
 REGISTER_DISPATCH(
     adaptive_avg_pool2d_kernel_stub,
