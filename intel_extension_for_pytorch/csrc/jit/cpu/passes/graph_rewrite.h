@@ -1,5 +1,6 @@
 #pragma once
 
+#include <torch/csrc/MemoryFormat.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/irparser.h>
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
@@ -42,6 +43,7 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
+void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTranspose2dOp(std::shared_ptr<Graph>& graph);
 
