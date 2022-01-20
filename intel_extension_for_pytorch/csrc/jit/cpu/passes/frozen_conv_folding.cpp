@@ -89,7 +89,6 @@ bool checkConvAndBroadcastingOpPreConditions(Node* conv, Node* op) {
     return false;
   }
 
-  auto conv_w = constant_as<Tensor>(conv->namedInput("weight")).value();
   Tensor weight_tensor =
       constant_as<Tensor>(conv->namedInput("weight")).value();
 
@@ -210,7 +209,7 @@ void FoldFrozenConvAddOrSub(Block* b) {
 
       auto stack_out = runNodeIfInputsAreConstant(add_or_sub);
       TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
-      Tensor fuse_bias = (*stack_out)[0].toTensor();
+      Tensor fuse_bias = (*stack_out)[0].toTensor().to(bias.dtype());
 
       auto fused_conv_b = b->owningGraph()->insertConstant(fuse_bias);
       auto conv_b_value = conv->namedInput("bias");
@@ -298,10 +297,10 @@ void FoldFrozenConvMulOrDiv(Block* b) {
 
       Tensor fuse_weight;
       if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
-        fuse_weight = (*stack_out)[0].toTensor();
+        fuse_weight = (*stack_out)[0].toTensor().to(weight_tensor.dtype());
       } else {
         fuse_weight = torch_ipex::cpu::convolution_weight_pack(
-            (*stack_out)[0].toTensor(),
+            (*stack_out)[0].toTensor().to(weight_tensor.dtype()),
             toIValue(conv->namedInput("padding"))->toIntVector(),
             toIValue(conv->namedInput("stride"))->toIntVector(),
             toIValue(conv->namedInput("dilation"))->toIntVector(),
@@ -331,7 +330,7 @@ void FoldFrozenConvMulOrDiv(Block* b) {
 
         auto stack_out = runNodeIfInputsAreConstant(mul_or_div);
         TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
-        Tensor fuse_bias = (*stack_out)[0].toTensor();
+        Tensor fuse_bias = (*stack_out)[0].toTensor().to(bias.dtype());
 
         auto fused_conv_bias = b->owningGraph()->insertConstant(fuse_bias);
         auto conv_b_value = conv->namedInput("bias");
