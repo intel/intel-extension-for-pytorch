@@ -198,6 +198,12 @@ file(GLOB_RECURSE EXCLUDE_FILES_2 "${PROJECT_SOURCE_DIR}/intel_extension_for_pyt
 file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/AdaptiveAveragePooling.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/AdaptiveMaxPooling.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/AveragePool.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/BatchNorm.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ChannelShuffle.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Conv.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ConvTranspose.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Copy.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Cumsum.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Softmax.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/optimizer/*.cpp")
 
