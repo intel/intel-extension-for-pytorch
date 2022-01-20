@@ -375,6 +375,11 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // deconvolution fusion
   graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
 
+  // fuse concat+bn+relu for the input float tensors with the same sizes
+  // and channelslast format
+  // hence the concat dim should be the channel
+  graph_rewrite::FuseConcatBnRelu(graph);
+
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
   // Pattern based fusion was lack of alias analysis
