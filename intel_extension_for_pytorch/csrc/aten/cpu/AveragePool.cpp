@@ -160,14 +160,16 @@ at::Tensor avg_pool2d_backward_out_cpu(
       ? kH
       : safe_downcast<int, int64_t>(kernel_size[1]);
 
+// clang-format off
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 2,
       "avg_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints");
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dH
+                                : safe_downcast<int, int64_t>(stride[1]);
+// clang-format on
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
@@ -283,13 +285,17 @@ at::Tensor avg_pool3d_out_cpu(
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 3,
       "avg_pool3d: stride must be omitted, a single int, or a tuple of three ints");
+
+// clang-format off
   const int dT = stride.empty() ? kT : safe_downcast<int, int64_t>(stride[0]);
-  const int dH = stride.empty()
-      ? kH
-      : stride.size() == 1 ? dT : safe_downcast<int, int64_t>(stride[1]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dT : safe_downcast<int, int64_t>(stride[2]);
+  const int dH = stride.empty() ? kH
+      : stride.size() == 1      ? dT
+                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dT
+                                : safe_downcast<int, int64_t>(stride[2]);
+// clang-format on
+
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
       "avg_pool3d: padding must be a single int, or a tuple of three ints");
@@ -432,13 +438,17 @@ at::Tensor avg_pool3d_backward_out_cpu(
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 3,
       "avg_pool3d: stride must be omitted, a single int, or a tuple of three ints");
+
+// clang-format off
   const int dT = stride.empty() ? kT : safe_downcast<int, int64_t>(stride[0]);
-  const int dH = stride.empty()
-      ? kH
-      : stride.size() == 1 ? dT : safe_downcast<int, int64_t>(stride[1]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dT : safe_downcast<int, int64_t>(stride[2]);
+  const int dH = stride.empty() ? kH
+      : stride.size() == 1      ? dT
+                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dT
+                                : safe_downcast<int, int64_t>(stride[2]);
+// clang-format on
+
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
       "avg_pool3d: padding must be a single int, or a tuple of three ints");
