@@ -504,3 +504,16 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
+
+    def test_conv2d_corner_case(self, dtype=torch.float):
+        conv_cpu = nn.Conv2d(3, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+
+        x_cpu = torch.randn([1, 3, 300, 300], dtype=dtype, device=cpu_device)
+        x_cpu = torch.as_strided(x_cpu, x_cpu.shape, (3, 1, 900, 3))
+        y_cpu = conv_cpu(x_cpu)
+
+        x_dpcpp = x_cpu.to(dpcpp_device)
+        conv_dpcpp = conv_cpu.to(dpcpp_device)
+        y_dpcpp = conv_dpcpp(x_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())

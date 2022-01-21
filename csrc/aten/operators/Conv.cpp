@@ -787,16 +787,12 @@ Tensor _convolution_out(
       3 == ndim || 4 == ndim || 5 == ndim,
       "convolution only supports 3D, 4D, 5D tensor");
   auto mem_fmt = get_cl_tag_by_ndim(ndim);
-  auto input = input_r.is_contiguous() || input_r.is_contiguous(mem_fmt)
-      ? input_r
-      : onednn_conv_use_channels_last(input_r, weight_r)
-          ? input_r.contiguous(mem_fmt)
-          : input_r.contiguous();
-  auto weight = weight_r.is_contiguous() || weight_r.is_contiguous(mem_fmt)
-      ? weight_r
-      : onednn_conv_use_channels_last(input_r, weight_r)
-          ? weight_r.contiguous(mem_fmt)
-          : weight_r.contiguous();
+  auto input = onednn_conv_use_channels_last(input_r, weight_r)
+      ? input_r.contiguous(mem_fmt)
+      : input_r.contiguous();
+  auto weight = onednn_conv_use_channels_last(input_r, weight_r)
+      ? weight_r.contiguous(mem_fmt)
+      : weight_r.contiguous();
   auto bias = bias_r;
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
