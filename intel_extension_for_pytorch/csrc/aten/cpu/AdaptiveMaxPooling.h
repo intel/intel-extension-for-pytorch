@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <csrc/dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -46,6 +47,19 @@ void cpu_adaptive_max_pool_backward_channels_last(
     const at::Tensor& grad_output_,
     const at::Tensor& indices_);
 
+std::tuple<at::Tensor, at::Tensor> adaptive_max_pool2d_out_cpu(
+    const at::Tensor& input,
+    at::IntArrayRef output_size);
+
+at::Tensor adaptive_max_pool2d_backward_out_cpu(
+    const at::Tensor& grad_output,
+    const at::Tensor& input,
+    const at::Tensor& indices);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
 void adaptive_max_pool2d_kernel_impl(
     const at::Tensor& output,
     const at::Tensor& indices,
@@ -57,14 +71,24 @@ void adaptive_max_pool2d_backward_kernel_impl(
     const at::Tensor& grad_output,
     const at::Tensor& indices);
 
-std::tuple<at::Tensor, at::Tensor> adaptive_max_pool2d_out_cpu(
-    const at::Tensor& input,
-    at::IntArrayRef output_size);
+#if defined(DYN_DISP_BUILD)
+}
+#endif
 
-at::Tensor adaptive_max_pool2d_backward_out_cpu(
-    const at::Tensor& grad_output,
-    const at::Tensor& input,
-    const at::Tensor& indices);
+using adaptive_max_pool2d_kernel_fn = void (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    at::IntArrayRef);
+DECLARE_DISPATCH(
+    adaptive_max_pool2d_kernel_fn,
+    adaptive_max_pool2d_kernel_stub);
+
+using adaptive_max_pool2d_backward_kernel_fn =
+    void (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
+DECLARE_DISPATCH(
+    adaptive_max_pool2d_backward_kernel_fn,
+    adaptive_max_pool2d_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex
