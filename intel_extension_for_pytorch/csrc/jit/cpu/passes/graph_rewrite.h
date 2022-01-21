@@ -1,6 +1,5 @@
 #pragma once
 
-#include <torch/csrc/MemoryFormat.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/irparser.h>
 #include <torch/csrc/jit/ir/subgraph_matcher.h>

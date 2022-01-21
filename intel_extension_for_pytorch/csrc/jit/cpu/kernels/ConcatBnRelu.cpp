@@ -39,9 +39,14 @@ Tensor ConcatBnRelu(
       at::borrow_from_optional_tensor(bn_scale);
   const Tensor& bn_weight = *weight_maybe_owned;
   std::vector<long int> output_dim(a[0].ndimension());
-  for (int64_t i = 0; i < a[0].ndimension(); ++i)
-    output_dim[i] = a[0].size(i);
-  output_dim[1] = a[0].size(1) * input_len;
+  for (int64_t i = 0; i < input_len; ++i) {
+    output_dim[1] += a[i].size(1);
+  }
+  for (int64_t i = 0; i < a[0].ndimension(); ++i) {
+    if (i != 1) {
+      output_dim[i] = a[0].size(i);
+    }
+  }
   Tensor output = at::empty(
       output_dim,
       a[0].options()

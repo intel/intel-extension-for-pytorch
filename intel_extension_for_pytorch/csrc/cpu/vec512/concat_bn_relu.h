@@ -20,6 +20,7 @@ using Tensor = at::Tensor;
 template <typename T>
 void _concat_bn_relu_kernel_channels_last(
     std::vector<const T*>& in_ptr,
+    std::vector<int64_t>& in_ch,
     T* out_ptr,
     const T* scale_ptr,
     const T* beta_ptr,
@@ -28,19 +29,21 @@ void _concat_bn_relu_kernel_channels_last(
     int64_t co) {
   int64_t i = 0, j = 0, k = 0;
   auto zero = _mm512_set1_ps(0.0);
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for collapse(2)
   for (i = 0; i < total_size; ++i) {
-    for (j = 0; j < ci; j += 16) {
-      for (k = 0; k < in_ptr.size(); ++k) {
+    for (j = 0; j < in_ptr.size(); ++j) {
+      for (k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
         _mm512_store_ps(
-            out_ptr + i * co + j + ci * k,
+            out_ptr + i * co + k,
             _mm512_max_ps(
                 zero,
                 _mm512_add_ps(
-                    _mm512_load_ps(beta_ptr + j + ci * k),
+                    _mm512_load_ps(beta_ptr + k),
                     _mm512_mul_ps(
-                        _mm512_load_ps(scale_ptr + j + ci * k),
-                        _mm512_load_ps(in_ptr[k] + i * ci + j)))));
+                        _mm512_load_ps(scale_ptr + k),
+                        _mm512_load_ps(
+                            in_ptr[j] + i * (in_ch[j + 1] - in_ch[j]) + k -
+                            in_ch[j])))));
       }
     }
   }
@@ -56,8 +59,13 @@ void ConcatBnReluKernelImpl_ChannelsLast(
     Tensor& output) {
   int64_t input_len = a.size();
   int64_t total_size = 1;
-  std::vector<const T*> input_ptr;
+  std::vector<const T*> input_ptr(input_len);
+  std::vector<int64_t> input_channels(input_len + 1);
 
+  for (int64_t i = 0; i < input_len; ++i) {
+    input_channels[i + 1] = input_channels[i] + a[i].size(1);
+    input_ptr[i] = a[i].data_ptr<T>();
+  }
   //  Return the product of all the input dimensions except for the channel
   //  and check if the dimension and sizes of the tensors meet the fusion
   //  requirements.
@@ -66,21 +74,13 @@ void ConcatBnReluKernelImpl_ChannelsLast(
       total_size *= a[0].size(i);
   }
 
-  //  The condition of calling this kernel includes that the memory format
-  //  of all the input & output tensors should be ChannelsLast.
-  //  Thus here the contiguous is applied to ensure the continuity.
-  auto memory_format = a[0].ndimension() == 4
-      ? (at::MemoryFormat::ChannelsLast)
-      : (at::MemoryFormat::ChannelsLast3d);
-  for (int64_t i = 0; i < input_len; ++i) {
-    input_ptr.push_back(a[i].contiguous(memory_format).data_ptr<T>());
-  }
   const T* scale_data = scale.data_ptr<T>();
   const T* beta_data = beta.data_ptr<T>();
-  T* output_data = output.contiguous(memory_format).data_ptr<T>();
+  T* output_data = output.data_ptr<T>();
 
   _concat_bn_relu_kernel_channels_last<T>(
       input_ptr,
+      input_channels,
       output_data,
       scale_data,
       beta_data,

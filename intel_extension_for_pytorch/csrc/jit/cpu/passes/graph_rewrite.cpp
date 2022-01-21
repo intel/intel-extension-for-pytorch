@@ -1,6 +1,7 @@
 
 #include "graph_rewrite.h"
 #include <torch/csrc/jit/passes/remove_mutation.h>
+#include "utils.h"
 
 namespace torch {
 namespace jit {
@@ -444,54 +445,32 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
       input_len++;
     }
     auto tensor1 = listConstruct->input(0)->type()->cast<TensorType>();
-    // Check if the dimension of the first tensor is 4 or 5
-    if (!(tensor1->dim().value() == 4 || tensor1->dim().value() == 5)) {
+    auto check_type_channelsize = [](std::shared_ptr<c10::TensorType> tensor) {
+      return (
+          tensor->scalarType().value() == at::kFloat &&
+          tensor->sizes()[1].value() % 16 == 0 && is_channelslast(tensor));
+    };
+    // Check if the dimension of the first tensor is either 4 or 5.
+    // Check if the data type, the size of Channels, and the memory format are
+    // float, mutiples of 16, and ChannelsLast(3d), respectively.
+    if (!(tensor1->dim().value() == 4 || tensor1->dim().value() == 5) ||
+        !check_type_channelsize(tensor1)) {
       return false;
     }
-    // Check if the data type of the first tensor is float
-    if (!(tensor1->scalarType().value() == at::kFloat)) {
-      return false;
-    }
-    // Check if the size of Channels is mutiples of 16
-    if (!(tensor1->sizes()[1].value() % 16 == 0)) {
-      return false;
-    }
-    // Check if the memory format of the first tensor is ChannelsLast(3d)
-    std::vector<int64_t> sizes_tensor1;
-    std::vector<int64_t> strides_tensor1;
-    for (int64_t i = 0; i < tensor1->dim().value(); ++i) {
-      sizes_tensor1.push_back(tensor1->sizes()[i].value());
-      strides_tensor1.push_back(tensor1->strides()[i].value());
-    }
-    if (!(c10::is_channels_last_strides_2d(sizes_tensor1, strides_tensor1) ||
-          c10::is_channels_last_strides_3d(sizes_tensor1, strides_tensor1))) {
-      return false;
-    }
-    // Check the rest tensors in the Concat List
+    // Check the rest tensors
     for (int64_t i = 1; i < input_len; ++i) {
       auto tensori = listConstruct->input(i)->type()->cast<TensorType>();
-      // Check dimension
-      if (!(tensor1->dim().value() == tensori->dim().value())) {
+      // Check dimension, data type, channel size and memory format
+      if (!(tensor1->dim().value() == tensori->dim().value()) ||
+          !check_type_channelsize(tensori)) {
         return false;
       }
-      // Check data type
-      if (!(tensori->scalarType().value() == at::kFloat)) {
-        return false;
-      }
-      std::vector<int64_t> sizes_tensori;
-      std::vector<int64_t> strides_tensori;
+      // The channel sizes can be different, and check the other dim sizes.
       for (int64_t j = 0; j < tensori->dim().value(); ++j) {
-        sizes_tensori.push_back(tensori->sizes()[j].value());
-        strides_tensori.push_back(tensori->strides()[j].value());
-      }
-      // Check memory format
-      if (!(c10::is_channels_last_strides_2d(sizes_tensori, strides_tensori) ||
-            c10::is_channels_last_strides_3d(sizes_tensori, strides_tensori))) {
-        return false;
-      }
-      // Check sizes
-      if (!(sizes_tensor1 == sizes_tensori)) {
-        return false;
+        if (j != 1 &&
+            tensor1->sizes()[j].value() != tensori->sizes()[j].value()) {
+          return false;
+        }
       }
     }
     return true;
