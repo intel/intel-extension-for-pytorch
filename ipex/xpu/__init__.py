@@ -5,7 +5,7 @@ import torch
 import ipex
 from torch import device as _device
 
-from .streams import Stream
+from .streams import Stream, Event
 from .random import *
 from .memory import *
 from .intrinsic import *
