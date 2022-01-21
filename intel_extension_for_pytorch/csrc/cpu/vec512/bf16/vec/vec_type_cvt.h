@@ -38,7 +38,22 @@ inline __m256i cvt_fp32_to_bf16(const __m512 src) {
 #if (defined CPU_CAPABILITY_AVX512_BF16)
   return reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(src));
 #else
-  return trunc_fp32_to_bf16(src);
+  __m512i value = _mm512_castps_si512(src);
+  __m512i nan = _mm512_set1_epi32(0xffff);
+  auto mask_value = _mm512_cmp_ps_mask(src, src, _CMP_ORD_Q);
+  __m512i ones = _mm512_set1_epi32(0x1);
+  __m512i vec_bias = _mm512_set1_epi32(0x7fff);
+  // uint32_t lsb = (input >> 16) & 1;
+  auto t_value = _mm512_and_si512(_mm512_srli_epi32(value, 16), ones);
+  // uint32_t rounding_bias = 0x7fff + lsb;
+  t_value = _mm512_add_epi32(t_value, vec_bias);
+  // input += rounding_bias;
+  t_value = _mm512_add_epi32(t_value, value);
+  // input = input >> 16;
+  t_value = _mm512_srli_epi32(t_value, 16);
+  // Check NaN before converting back to bf16
+  t_value = _mm512_mask_blend_epi32(mask_value, nan, t_value);
+  return _mm512_cvtusepi32_epi16(t_value);
 #endif
 }
 
