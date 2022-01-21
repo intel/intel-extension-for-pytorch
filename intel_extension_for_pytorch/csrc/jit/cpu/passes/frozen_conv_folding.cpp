@@ -12,6 +12,7 @@
 #include <torch/csrc/jit/tensorexpr/types.h>
 
 #include "csrc/aten/cpu/WeightPack.h"
+#include "folding_common_utils.h"
 #include "frozen_conv_folding.h"
 
 namespace torch {
@@ -21,28 +22,9 @@ namespace {
 
 using Tensor = at::Tensor;
 
-bool nonConstantParameters(Node* n) {
-  // Checks if the parameters, not including the
-  // first param are all constants.
-  for (size_t i = 1; i < n->inputs().size(); i++) {
-    if (n->inputs().at(i)->node()->kind() != prim::Constant) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool supportedConvNode(Node* n) {
   if (n->kind() == aten::conv2d || n->kind() == aten::conv3d ||
       n->kind() == Symbol::fromQualString("torch_ipex::convolution_forward")) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool supportedAddOrSub(Node* n) {
-  if (n->kind() == aten::add || n->kind() == aten::sub) {
     return true;
   } else {
     return false;
@@ -137,33 +119,6 @@ bool checkConvAndBroadcastingOpPreConditions(Node* conv, Node* op) {
   return true;
 }
 
-Tensor resizeConstantScalarOrTensorToShape(
-    Value* v,
-    const std::vector<int64_t>& shape,
-    at::TensorOptions options) {
-  Tensor ret_tensor;
-  if (v->type()->cast<TensorType>()) {
-    ret_tensor = constant_as<Tensor>(v).value();
-  } else {
-    ret_tensor = at::zeros(shape, options);
-    if (v->type()->cast<IntType>()) {
-      ret_tensor.fill_(constant_as<int64_t>(v).value());
-    } else {
-      ret_tensor.fill_(constant_as<double>(v).value());
-    }
-  }
-
-  if (ret_tensor.numel() == 1) {
-    // expand errors if the shape input has less # dims than the tensor input
-    ret_tensor = ret_tensor.reshape({1});
-    ret_tensor = ret_tensor.expand(shape);
-  } else {
-    TORCH_INTERNAL_ASSERT(ret_tensor.numel() == c10::multiply_integers(shape));
-    ret_tensor = ret_tensor.view(shape);
-  }
-  return ret_tensor;
-}
-
 void FoldFrozenConvAddOrSub(Block* b) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
@@ -221,14 +176,6 @@ void FoldFrozenConvAddOrSub(Block* b) {
       add_or_sub->output()->replaceAllUsesWith(conv->output());
       // DCE run after cleans up nodes
     }
-  }
-}
-
-bool supportedMulOrDiv(Node* n) {
-  if (n->kind() == aten::mul || n->kind() == aten::div) {
-    return true;
-  } else {
-    return false;
   }
 }
 

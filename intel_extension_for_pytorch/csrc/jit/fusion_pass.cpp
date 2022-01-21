@@ -8,6 +8,7 @@
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
+#include "cpu/passes/frozen_linear_folding.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -364,6 +365,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::insertPrePackedConvOp(graph);
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
+
+  // linear folding
+  FoldFrozenLinearAddOrSub(graph);
+  FoldFrozenLinearMulOrDiv(graph);
 
   // linear fusion
   graph_rewrite::insertPrePackedLinearOp(graph);

@@ -308,6 +308,29 @@ class CascadedConvBnSumRelu(nn.Module):
         b = self.bn2(b)
         return F.relu(a.add_(b), inplace=True)
 
+class Linear_Scalar_Binary(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Scalar_Binary, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+
+    def forward(self, x):
+        return self.op(self.linear(x), 2.0)
+
+class Linear_Tensor_Binary(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Tensor_Binary, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.randn(out_channels)
+
+    def forward(self, x):
+        return self.op(self.linear(x), self.tensor)
+
 class LinearRelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearRelu, self).__init__()
@@ -1778,6 +1801,114 @@ class Tester(TestCase):
 
                 # for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
                 self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+
+    def test_output_linear_scalar_binary(self):
+        for bias in [True, False]:
+            self._test_output(
+                Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
+                Linear_Scalar_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::sub")
+
+            self._test_output(
+                Linear_Scalar_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::mul")
+
+            self._test_output(
+                Linear_Scalar_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::div")
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::div",
+                prec=0.1)
+
+    def test_output_linear_tensor_binary(self):
+        for bias in [True, False]:
+            self._test_output(
+                Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
+                Linear_Tensor_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::sub")
+
+            self._test_output(
+                Linear_Tensor_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::mul")
+
+            self._test_output(
+                Linear_Tensor_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::div")
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::div",
+                prec=0.2)
 
     def test_output_linear_relu(self):
         self._test_output(
