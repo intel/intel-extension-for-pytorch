@@ -2,7 +2,7 @@ import torch
 import copy
 import types
 import warnings
-from ._functional import sgd_step, adagrad_step
+from ._functional import sgd_step, adagrad_step, lamb_step
 from ._lamb import Lamb
 
 IPEX_FUSED_OPTIMIZER_LIST = [
@@ -14,7 +14,31 @@ IPEX_FUSED_OPTIMIZER_LIST = [
 OPTIMIZER_FUSED_STEP_MAPPING = {
     torch.optim.SGD: sgd_step,
     torch.optim.Adagrad: adagrad_step,
+    Lamb: lamb_step
 }
+
+def patch_zero_grad_for_master_weight_training(optimizer):
+    r"""
+    Patch "zero_grad" method of optimizer to support BFloat16 master weight training
+    Under master weight training case, the grad is actually on 'bf16_params'. So the 'zero_grad'
+    should work on the 'bf16_params' too.
+    """
+    def zero_grad(self, set_to_none: bool = False):
+        for p in self.params_attr:
+            if 'bf16_param' in self.params_attr[p]:
+                bf16_param = self.params_attr[p]['bf16_param']
+            if bf16_param.grad is not None:
+                if set_to_none:
+                    bf16_param.grad = None
+                else:
+                    if bf16_param.grad.grad_fn is not None:
+                        bf16_param.grad.detach_()
+                    else:
+                        bf16_param.grad.requires_grad_(False)
+                    bf16_param.grad.zero_()
+            self._original_zero_grad(set_to_none)
+    setattr(optimizer, '_original_zero_grad', optimizer.zero_grad)
+    setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer))
 
 def patch_step_for_master_weight_training(optimizer):
     r"""
@@ -172,9 +196,6 @@ def optimizer_fusion(optimizer, master_weight_split):
     setattr(optimizer, 'fused', True)
     if not hasattr(optimizer, 'params_attr'):
         setattr(optimizer, 'params_attr', {})
-    if isinstance(optimizer, Lamb):
-        # lamb is ipex customized optimizer, does not to patch "step" method
-        return optimizer
     try:
         step = OPTIMIZER_FUSED_STEP_MAPPING[type(optimizer)]
         if not hasattr(optimizer, '_original_step'):

@@ -8,6 +8,7 @@
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
+#include "cpu/passes/frozen_linear_folding.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -304,6 +305,44 @@ void ApplyInplaceOptimization(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceAtenSoftmaxWithIpexSoftmax(graph);
 }
 
+void RemoveBailOutNodesAndSpecializeTypes(Block* b) {
+  for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
+    if (it->kind() == prim::BailOut) {
+      it->output()->replaceAllUsesWith(it->inputs()[1]);
+      auto profiled_type = it->output()->type()->expect<TensorType>();
+
+      if (profiled_type == TensorType::get()) {
+        continue;
+      }
+
+      auto input_type = it->inputs()[1]->type()->expect<TensorType>();
+      if (input_type == TensorType::get()) {
+        it->inputs()[1]->setType(profiled_type);
+      } else {
+        it->inputs()[1]->setType(input_type->merge(*profiled_type));
+      }
+      it.destroyCurrent();
+
+    } else {
+      for (Block* ib : it->blocks()) {
+        RemoveBailOutNodesAndSpecializeTypes(ib);
+      }
+    }
+  }
+}
+
+void RemoveBailoutTemplateNodes(Block* b) {
+  for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
+    if (it->kind() == prim::BailoutTemplate) {
+      it.destroyCurrent();
+    } else {
+      for (Block* ib : it->blocks()) {
+        RemoveBailoutTemplateNodes(ib);
+      }
+    }
+  }
+}
+
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // remove dropout;
   torch::jit::removeDropout(graph);
@@ -327,6 +366,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
 
+  // linear folding
+  FoldFrozenLinearAddOrSub(graph);
+  FoldFrozenLinearMulOrDiv(graph);
+
   // linear fusion
   graph_rewrite::insertPrePackedLinearOp(graph);
   graph_rewrite::fuseLinearWithEltwise(graph);
@@ -336,6 +379,11 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
   graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
+
+  // fuse concat+bn+relu for the input float tensors with the same sizes
+  // and channelslast format
+  // hence the concat dim should be the channel
+  graph_rewrite::FuseConcatBnRelu(graph);
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
@@ -379,6 +427,10 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
       "optimization pass",
       graph);
   RemoveProfileNodesAndSpecializeTypes(graph);
+
+  // remove BailOut and BailoutTemplate
+  RemoveBailOutNodesAndSpecializeTypes(graph->block());
+  RemoveBailoutTemplateNodes(graph->block());
 
   // ApplyInplaceOptimization is necessary and safe to do before LLGA fusion
   // pass:

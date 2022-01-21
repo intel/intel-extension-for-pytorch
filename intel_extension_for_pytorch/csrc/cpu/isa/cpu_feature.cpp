@@ -50,6 +50,9 @@ void CPUFeature::detect_intel_cpu_feature() {
     MICRO_CLASS_MEMBER(xsave) = check_reg_bit(ecx, 26);
 
     MICRO_CLASS_MEMBER(avx) = check_reg_bit(ecx, 28);
+
+    MICRO_CLASS_MEMBER(fma) = check_reg_bit(ecx, 12);
+    MICRO_CLASS_MEMBER(f16c) = check_reg_bit(ecx, 29);
   }
 
   if (max_basic_id >= 0x00000007) {
@@ -291,6 +294,9 @@ void CPUFeature::show_features() {
   MICRO_CLASS_PRINT_BOOL_STATUS(sha);
 
   MICRO_CLASS_PRINT_BOOL_STATUS(xsave);
+
+  MICRO_CLASS_PRINT_BOOL_STATUS(fma);
+  MICRO_CLASS_PRINT_BOOL_STATUS(f16c);
 
   MICRO_CLASS_PRINT_BOOL_STATUS(avx);
   MICRO_CLASS_PRINT_BOOL_STATUS(avx2);

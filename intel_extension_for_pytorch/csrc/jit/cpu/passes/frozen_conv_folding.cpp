@@ -1,3 +1,4 @@
+#include <ATen/Functions.h>
 #include <ATen/Utils.h>
 #include <c10/core/ScalarType.h>
 #include <c10/util/Exception.h>
@@ -11,6 +12,7 @@
 #include <torch/csrc/jit/tensorexpr/types.h>
 
 #include "csrc/aten/cpu/WeightPack.h"
+#include "folding_common_utils.h"
 #include "frozen_conv_folding.h"
 
 namespace torch {
@@ -20,28 +22,9 @@ namespace {
 
 using Tensor = at::Tensor;
 
-bool nonConstantParameters(Node* n) {
-  // Checks if the parameters, not including the
-  // first param are all constants.
-  for (size_t i = 1; i < n->inputs().size(); i++) {
-    if (n->inputs().at(i)->node()->kind() != prim::Constant) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool supportedConvNode(Node* n) {
   if (n->kind() == aten::conv2d || n->kind() == aten::conv3d ||
       n->kind() == Symbol::fromQualString("torch_ipex::convolution_forward")) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool supportedAddOrSub(Node* n) {
-  if (n->kind() == aten::add || n->kind() == aten::sub) {
     return true;
   } else {
     return false;
@@ -88,7 +71,6 @@ bool checkConvAndBroadcastingOpPreConditions(Node* conv, Node* op) {
     return false;
   }
 
-  auto conv_w = constant_as<Tensor>(conv->namedInput("weight")).value();
   Tensor weight_tensor =
       constant_as<Tensor>(conv->namedInput("weight")).value();
 
@@ -137,33 +119,6 @@ bool checkConvAndBroadcastingOpPreConditions(Node* conv, Node* op) {
   return true;
 }
 
-Tensor resizeConstantScalarOrTensorToShape(
-    Value* v,
-    const std::vector<int64_t>& shape,
-    at::TensorOptions options) {
-  Tensor ret_tensor;
-  if (v->type()->cast<TensorType>()) {
-    ret_tensor = constant_as<Tensor>(v).value();
-  } else {
-    ret_tensor = at::zeros(shape, options);
-    if (v->type()->cast<IntType>()) {
-      ret_tensor.fill_(constant_as<int64_t>(v).value());
-    } else {
-      ret_tensor.fill_(constant_as<double>(v).value());
-    }
-  }
-
-  if (ret_tensor.numel() == 1) {
-    // expand errors if the shape input has less # dims than the tensor input
-    ret_tensor = ret_tensor.reshape({1});
-    ret_tensor = ret_tensor.expand(shape);
-  } else {
-    TORCH_INTERNAL_ASSERT(ret_tensor.numel() == c10::multiply_integers(shape));
-    ret_tensor = ret_tensor.view(shape);
-  }
-  return ret_tensor;
-}
-
 void FoldFrozenConvAddOrSub(Block* b) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
@@ -209,7 +164,7 @@ void FoldFrozenConvAddOrSub(Block* b) {
 
       auto stack_out = runNodeIfInputsAreConstant(add_or_sub);
       TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
-      Tensor fuse_bias = (*stack_out)[0].toTensor();
+      Tensor fuse_bias = (*stack_out)[0].toTensor().to(bias.dtype());
 
       auto fused_conv_b = b->owningGraph()->insertConstant(fuse_bias);
       auto conv_b_value = conv->namedInput("bias");
@@ -221,14 +176,6 @@ void FoldFrozenConvAddOrSub(Block* b) {
       add_or_sub->output()->replaceAllUsesWith(conv->output());
       // DCE run after cleans up nodes
     }
-  }
-}
-
-bool supportedMulOrDiv(Node* n) {
-  if (n->kind() == aten::mul || n->kind() == aten::div) {
-    return true;
-  } else {
-    return false;
   }
 }
 
@@ -297,10 +244,10 @@ void FoldFrozenConvMulOrDiv(Block* b) {
 
       Tensor fuse_weight;
       if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
-        fuse_weight = (*stack_out)[0].toTensor();
+        fuse_weight = (*stack_out)[0].toTensor().to(weight_tensor.dtype());
       } else {
         fuse_weight = torch_ipex::cpu::convolution_weight_pack(
-            (*stack_out)[0].toTensor(),
+            (*stack_out)[0].toTensor().to(weight_tensor.dtype()),
             toIValue(conv->namedInput("padding"))->toIntVector(),
             toIValue(conv->namedInput("stride"))->toIntVector(),
             toIValue(conv->namedInput("dilation"))->toIntVector(),
@@ -330,7 +277,7 @@ void FoldFrozenConvMulOrDiv(Block* b) {
 
         auto stack_out = runNodeIfInputsAreConstant(mul_or_div);
         TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
-        Tensor fuse_bias = (*stack_out)[0].toTensor();
+        Tensor fuse_bias = (*stack_out)[0].toTensor().to(bias.dtype());
 
         auto fused_conv_bias = b->owningGraph()->insertConstant(fuse_bias);
         auto conv_b_value = conv->namedInput("bias");

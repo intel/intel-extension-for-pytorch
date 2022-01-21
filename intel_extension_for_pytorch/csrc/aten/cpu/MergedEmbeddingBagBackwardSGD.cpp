@@ -47,7 +47,7 @@ inline void sgd_update<at::BFloat16, float>(
     bVec trail_bvec = bVec::loadu(trail_ptr + d);
     fVec param_fvec, param_fvec2;
     std::tie(param_fvec, param_fvec2) =
-        torch_ipex::cpu::bf16::pack_bfloat16_float(param_bvec, trail_bvec);
+        at::vec::pack_bfloat16_float(param_bvec, trail_bvec);
 
     fVec grad_fvec = fVec::loadu(grad_ptr + d);
     fVec grad_fvec2 = fVec::loadu(grad_ptr + d + fVec::size());
@@ -59,17 +59,16 @@ inline void sgd_update<at::BFloat16, float>(
     param_fvec2 -= grad_fvec2 * fVec(lr);
 
     std::tie(param_bvec, trail_bvec) =
-        torch_ipex::cpu::bf16::unpack_float_bfloat16(param_fvec, param_fvec2);
+        at::vec::unpack_float_bfloat16(param_fvec, param_fvec2);
     param_bvec.store(param_ptr + d);
     trail_bvec.store(trail_ptr + d);
   }
   for (; d < size; d++) {
-    float param_val =
-        torch_ipex::cpu::bf16::pack_bfloat16_float(param_ptr[d], trail_ptr[d]);
+    float param_val = at::vec::pack_bfloat16_float(param_ptr[d], trail_ptr[d]);
     float grad_val = grad_ptr[d] + param_val * weight_decay;
     param_val -= grad_val * lr;
     std::tie(param_ptr[d], trail_ptr[d]) =
-        torch_ipex::cpu::bf16::unpack_float_bfloat16(param_val);
+        at::vec::unpack_float_bfloat16(param_val);
   }
 }
 

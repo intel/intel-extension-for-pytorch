@@ -1,5 +1,5 @@
 import torch
-from ._functional import lamb_impl
+from ._functional import _lamb_impl
 
 
 class Lamb(torch.optim.Optimizer):
@@ -63,13 +63,14 @@ class Lamb(torch.optim.Optimizer):
             state_steps = []
 
             for p in group['params']:
-                if p.grad is not None:
+                grad = p.grad
+                if grad is not None:
                     params_with_grad.append(p)
-                    if p.grad.is_sparse:
+                    if grad.is_sparse:
                         raise RuntimeError('Lamb does not support sparse gradients')
-                    if p.grad.device != torch.device('cpu'):
+                    if grad.device != torch.device('cpu'):
                         raise RuntimeError('Lamb supports only CPU device')
-                    grads.append(p.grad)
+                    grads.append(grad)
 
                     state = self.state[p]
                     # Lazy state initialization
@@ -88,17 +89,15 @@ class Lamb(torch.optim.Optimizer):
                     state_steps.append(state['step'])
 
             beta1, beta2 = group['betas']
-            lamb_impl(
+            _lamb_impl(
                 params_with_grad,
                 grads,
                 exp_avgs,
                 exp_avg_sqs,
-                self.params_attr,
                 state_steps,
                 beta1,
                 beta2,
                 group['lr'],
                 group['weight_decay'],
-                group['eps'],
-                self.fused)
+                group['eps'])
         return loss

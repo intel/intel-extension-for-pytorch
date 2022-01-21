@@ -1,6 +1,7 @@
 //[This file is from https://github.com/pytorch/pytorch/pull/63198/files and
 // change it to adapt to CPU and IPEX]
 #include "concat_linear.h"
+#include <ATen/Functions.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/jit_log.h>

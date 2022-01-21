@@ -15,7 +15,7 @@ Here we show how to use TorchServe with IPEX.
 
 
 ## Install Intel Extension for PyTorch 
-Refer to the documentation [here](https://github.com/intel/intel-extension-for-pytorch#installation). 
+Refer to the documentation [here](../installation.html). 
 
 ## Serving model with Intel Extension for PyTorch  
 After installation, all it needs to be done to use TorchServe with IPEX is to enable it in `config.properties`. 
@@ -117,11 +117,6 @@ with torch.no_grad():
 jit_inputs = (dummy_tensor, dummy_tensor, dummy_tensor)
 model = ipex.quantization.convert(model, conf, jit_inputs)
 
-# enable fusion path work(need to run forward propagation twice)
-with torch.no_grad():
-    y = model(dummy_tensor,dummy_tensor,dummy_tensor)
-    y = model(dummy_tensor,dummy_tensor,dummy_tensor)
-
 # save to .pt 
 torch.jit.save(model, 'bert_int8_jit.pt')
 ```
@@ -162,11 +157,6 @@ with torch.no_grad():
 # conversion
 jit_inputs = (dummy_tensor)
 model = ipex.quantization.convert(model, conf, jit_inputs)
-
-# enable fusion path work(need to run two iterations)
-with torch.no_grad():
-    y = model(dummy_tensor)
-    y = model(dummy_tensor)
 
 # save to .pt
 torch.jit.save(model, 'rn50_int8_jit.pt')

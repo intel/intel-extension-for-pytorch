@@ -296,7 +296,7 @@ std::vector<at::Tensor> interaction_backward(
 }
 
 namespace cpu {
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
 static inline void _interaction_s8s8_scale_s32s8_128(
     int8_t* out,
     size_t M,
@@ -413,7 +413,7 @@ at::Tensor dil_qinteraction(
       int8_t* out_ptr = &out_data[i * out_data_line_len];
       int8_t* flat_buf = (int8_t*)(out_ptr + vector_size);
       auto row_len = i * vector_size;
-#if defined(CPU_AVX512)
+#if defined(CPU_CAPABILITY_AVX512)
       if (vector_size == 128) {
         int k = 0;
         for (; k < vector_nums - 1; k += 2) {

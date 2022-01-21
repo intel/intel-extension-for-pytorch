@@ -45,6 +45,8 @@ class LlgaKernel {
   // create qtensor for output of public format
   ArgSpec getQuantizedSpec(ArgSpec spec, size_t offset) const;
 
+  std::map<size_t, int64_t> initializeTensorIdToOccurence() const;
+
   // PyTorch copy constants inside the subgraph instead of referencing them.
   // Constants inputs to the partition are no longer in the graph->inputs().
   // Need use the tid retrieved from the partition to find the missing
@@ -103,6 +105,7 @@ class LlgaKernel {
   int64_t nGraphInputs_ = 0; // number of inputs to graph_ on the IR
   int64_t nOutputs_ = 0;
   std::map<size_t, Value*> tensorIdToValue_;
+  std::vector<int64_t> runArgsIdx_;
   dnnl::graph::partition partition_;
   // nPartitionInputs_ is the actual number of inputs to partition_ of graph_
   // needed by the backend.

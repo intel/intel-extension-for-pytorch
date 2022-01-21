@@ -308,6 +308,29 @@ class CascadedConvBnSumRelu(nn.Module):
         b = self.bn2(b)
         return F.relu(a.add_(b), inplace=True)
 
+class Linear_Scalar_Binary(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Scalar_Binary, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+
+    def forward(self, x):
+        return self.op(self.linear(x), 2.0)
+
+class Linear_Tensor_Binary(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Tensor_Binary, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.randn(out_channels)
+
+    def forward(self, x):
+        return self.op(self.linear(x), self.tensor)
+
 class LinearRelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearRelu, self).__init__()
@@ -582,6 +605,36 @@ class AddLayerNorm_v1(torch.nn.Module):
         x = x + y + z
         return self.layernorm(x)
 
+class ConcatBnRelu2d(torch.nn.Module):
+    def __init__(self):
+        super(ConcatBnRelu2d, self).__init__()
+        self.bn = torch.nn.BatchNorm2d(96)
+        self.relu = torch.nn.ReLU()
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = 1)
+        x = self.bn(x)
+        return self.relu(x)
+
+class ConcatBnRelu2d_v1(torch.nn.Module):
+    def __init__(self):
+        super(ConcatBnRelu2d_v1, self).__init__()
+        self.bn = torch.nn.BatchNorm2d(32)
+        self.relu = torch.nn.ReLU()
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = 2)
+        x = self.bn(x)
+        return self.relu(x)
+
+class ConcatBnRelu3d(torch.nn.Module):
+    def __init__(self):
+        super(ConcatBnRelu3d, self).__init__()
+        self.bn = torch.nn.BatchNorm3d(96)
+        self.relu = torch.nn.ReLU()
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), dim = 1)
+        x = self.bn(x)
+        return self.relu(x)
+    
 class ModMultLinear(nn.Module):
     def __init__(self, w1_dim, w2_dim):
          super(ModMultLinear, self).__init__()
@@ -596,6 +649,14 @@ class ModMultLinear(nn.Module):
          res3 = self.linear3(res1)
          res4 = self.linear4(res1)
          return res1, res2, res3, res4
+
+class DisableTexprFuser():
+    def __enter__(self):
+        self.saved = torch._C._jit_texpr_fuser_enabled()
+        torch._C._jit_set_texpr_fuser_enabled(False)
+
+    def __exit__(self, *args, **kwargs):
+        torch._C._jit_set_texpr_fuser_enabled(self.saved)
 
 class Tester(TestCase):
 
@@ -809,6 +870,108 @@ class Tester(TestCase):
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
+    def _test_concat_bn_relu(self, a1, a2, a3, enable_3d=True, use_channels_last=True):
+        if enable_3d:
+            if use_channels_last:
+                model = ConcatBnRelu3d().eval().to(memory_format=torch.channels_last_3d)
+                model = ipex.optimize(model, dtype=torch.float32, level='O0')
+                with torch.no_grad():
+                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+                    jit_model = torch.jit.freeze(jit_model)
+                jit_res = jit_model(a1, a2, a3)
+                ori_res = model(a1, a2, a3)
+                self.assertEqual(jit_res, ori_res)
+            else:
+                model = ConcatBnRelu3d().eval()
+                model = ipex.optimize(model, dtype=torch.float32, level='O0')
+                with torch.no_grad():
+                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+                    jit_model = torch.jit.freeze(jit_model)
+                jit_res = jit_model(a1, a2, a3)
+                ori_res = model(a1, a2, a3)
+                self.assertEqual(jit_res, ori_res)
+        else:
+            if use_channels_last:
+                model = ConcatBnRelu2d().eval().to(memory_format=torch.channels_last)
+                model = ipex.optimize(model, dtype=torch.float32, level='O0')
+                with torch.no_grad():
+                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+                    jit_model = torch.jit.freeze(jit_model)
+                jit_res = jit_model(a1, a2, a3)
+                ori_res = model(a1, a2, a3)
+                self.assertEqual(jit_res, ori_res)
+            else:
+                model = ConcatBnRelu2d().eval()
+                model = ipex.optimize(model, dtype=torch.float32, level='O0')
+                with torch.no_grad():
+                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+                    jit_model = torch.jit.freeze(jit_model)
+                jit_res = jit_model(a1, a2, a3)
+                ori_res = model(a1, a2, a3)
+                self.assertEqual(jit_res, ori_res)
+
+    def test_concat_bn_relu(self):
+        a1 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
+        model = ConcatBnRelu2d().eval().to(memory_format=torch.channels_last)
+        model = ipex.optimize(model, dtype=torch.bfloat16, level='O0')
+        with torch.no_grad():
+            jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+            jit_model = torch.jit.freeze(jit_model)
+        jit_res = jit_model(a1, a2, a3)
+        ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
+
+        a1 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        model = ConcatBnRelu2d_v1().eval().to(memory_format=torch.channels_last)
+        model = ipex.optimize(model, dtype=torch.float32, level='O0')
+        with torch.no_grad():
+            jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+            jit_model = torch.jit.freeze(jit_model)
+        jit_res = jit_model(a1, a2, a3)
+        ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
+
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+
+        a1 = torch.randn(1, 16, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 48, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+
+        a1 = torch.randn(1, 17, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 47, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+
+        a1 = torch.randn(1, 32, 13, 24, dtype=torch.float)
+        a2 = torch.randn(1, 32, 13, 24, dtype=torch.float)
+        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=False)
+
+        a1 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+
+        a1 = torch.randn(1, 16, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a2 = torch.randn(1, 48, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+
+        a1 = torch.randn(1, 17, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a2 = torch.randn(1, 47, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+
+        a1 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
+        a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
+        a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
+        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=False)
+        
     def test_mha_scores_calculation(self):
         def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
             mat1_bf16 = mat1.to(torch.bfloat16)
@@ -1639,6 +1802,114 @@ class Tester(TestCase):
                 # for bfloat16 path, we will use ipex linear for 'O0' and 'O1'
                 self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
 
+    def test_output_linear_scalar_binary(self):
+        for bias in [True, False]:
+            self._test_output(
+                Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
+                Linear_Scalar_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::sub")
+
+            self._test_output(
+                Linear_Scalar_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::mul")
+
+            self._test_output(
+                Linear_Scalar_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::div")
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Scalar_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::div",
+                prec=0.1)
+
+    def test_output_linear_tensor_binary(self):
+        for bias in [True, False]:
+            self._test_output(
+                Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
+                Linear_Tensor_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::sub")
+
+            self._test_output(
+                Linear_Tensor_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::mul")
+
+            self._test_output(
+                Linear_Tensor_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::div")
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::add",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.sub, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::sub",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.mul, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::mul",
+                prec=0.1)
+
+            self._test_output_bf16(
+                Linear_Tensor_Binary(torch.div, 3, 32, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="ipex_prepack::linear_run",
+                kind_not_in_graph="aten::div",
+                prec=0.2)
+
     def test_output_linear_relu(self):
         self._test_output(
             LinearRelu(3, 32, bias=True),
@@ -1842,6 +2113,27 @@ class Tester(TestCase):
                 y = m(x)
                 traced_y = traced(x)
                 self.assertEqual(y, traced_y)
+
+    def test_remove_bailout(self):
+        batch_size = 8
+        out_channels = 32
+        in_channels = 3
+        kernel_size = 3
+        image_size = 64
+        input_size = [batch_size, in_channels, image_size, image_size]
+        x = torch.randn(input_size)
+        with DisableTexprFuser():
+            self._test_output(
+                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="prim::BailOut")
+            self._test_output_bf16(
+                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="prim::BailOut")
+
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

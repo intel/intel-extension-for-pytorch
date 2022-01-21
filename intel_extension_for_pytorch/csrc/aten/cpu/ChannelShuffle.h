@@ -1,5 +1,7 @@
 #pragma once
 
+#include <csrc/dyndisp/DispatchStub.h>
+
 namespace torch_ipex {
 namespace cpu {
 
@@ -23,12 +25,24 @@ void cpu_channel_shuffle_cl(
     const at::Tensor& input,
     int64_t groups);
 
-void channel_shuffle_kernel(
+at::Tensor channel_shuffle(const at::Tensor& self, int64_t groups);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+void channel_shuffle_kernel_impl(
     at::Tensor& output,
     const at::Tensor& input,
     int64_t groups);
 
-at::Tensor channel_shuffle(const at::Tensor& self, int64_t groups);
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using channel_shuffle_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&, int64_t);
+DECLARE_DISPATCH(channel_shuffle_kernel_fn, channel_shuffle_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

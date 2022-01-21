@@ -396,20 +396,23 @@ model = Model()
 model.eval()
 data = torch.rand(<shape>)
 
+# Applying torch.fx.experimental.optimization.fuse against model performs 
+# conv-batchnorm folding for better performance.
+import torch.fx.experimental.optimization as optimization
+model = optimization.fuse(model, inplace=True)
+
 import intel_extension_for_pytorch as ipex
-# For first-time calibration, pass dtype into the QuantConf function to generate a conf
-if os.path.isfile('int8_conf.json'):
-  conf = ipex.QuantConf(dtype=torch.int8) 
-# For re-calibration, pass the generated json file into the QuantConf function to generate a conf
-else:
-  conf = ipex.QuantConf('int8_conf.json')
-model, conf = ipex.quantization.prepare(model, conf)
+conf = ipex.quantization.QuantConf(qscheme=torch.per_tensor_affine) 
+
 for d in calibration_data_loader(): 
   # conf will be updated with observed statistics during calibrating with the dataset 
   with ipex.quantization.calibrate(conf):
     model(d) 
+
 conf.save('int8_conf.json', default_recipe=True)
-model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
+with torch.no_grad():
+  model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
+  model.save('quantization_model.pt')
 ```
 
 #### Deployment
@@ -419,15 +422,20 @@ model = ipex.quantization.convert(model, conf, torch.rand(<shape>))
 ```
 import torch
 
-model = models.Model()
+model = Model()
 model.eval()
 data = torch.rand(<shape>)
 
+# Applying torch.fx.experimental.optimization.fuse against model performs 
+# conv-batchnorm folding for better performance.
+import torch.fx.experimental.optimization as optimization
+model = optimization.fuse(model, inplace=True)
+
 import intel_extension_for_pytorch as ipex
-conf = ipex.QuantConf('int8_conf.json')
-model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
+conf = ipex.quantization.QuantConf('int8_conf.json')
 
 with torch.no_grad():
+  model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
   model(data)
 ```
 
@@ -437,7 +445,7 @@ with torch.no_grad():
 import torch
 import intel_extension_for_pytorch as ipex
 
-model = torch.jit.load('<INT8 model file>')
+model = torch.jit.load('quantization_model.pt')
 model.eval()
 data = torch.rand(<shape>)
 
