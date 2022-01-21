@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Releases &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
+  <title>Releases &mdash; intel_extension_for_pytorch 1.10.0+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.100+cpu
+                1.10.0+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -85,6 +85,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
@@ -148,7 +149,7 @@
 <td>v1.10.0-cpu</td>
 </tr>
 <tr>
-<td><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_pytorch_extension</span> <span class="k">as</span> <span class="nn">ipex</span>
+<td><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 </pre></div>
 </div>
 </td>
@@ -214,7 +215,7 @@
 </tr>
 <tr>
 <td><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import the extension</span>
-<span class="kn">import</span> <span class="nn">intel_pytorch_extension</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 
 <span class="c1"># Automatically mix precision</span>
 <span class="n">ipex</span><span class="o">.</span><span class="n">enable_auto_mixed_precision</span><span class="p">(</span><span class="n">mixed_dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
@@ -277,7 +278,7 @@
 </tr>
 <tr>
 <td><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import the extension</span>
-<span class="kn">import</span> <span class="nn">intel_pytorch_extension</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 
 <span class="c1"># Convert the model to the Extension device</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">ipex</span><span class="o">.</span><span class="n">DEVICE</span><span class="p">)</span>
@@ -320,7 +321,7 @@
 </tr>
 <tr>
 <td><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import the extension</span>
-<span class="kn">import</span> <span class="nn">intel_pytorch_extension</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 
 <span class="c1"># Convert the model to the Extension device</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">ipex</span><span class="o">.</span><span class="n">DEVICE</span><span class="p">)</span>

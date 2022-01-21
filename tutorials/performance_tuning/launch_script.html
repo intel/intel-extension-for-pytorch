@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Launch Script Usage Guide &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
+  <title>Launch Script Usage Guide &mdash; intel_extension_for_pytorch 1.10.0+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.100+cpu
+                1.10.0+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="tuning_guide.html">Performance Tuning Guide</a></li>
@@ -64,6 +65,7 @@
 <li class="toctree-l5"><a class="reference internal" href="#v-throughput-mode">V. Throughput mode</a></li>
 <li class="toctree-l5"><a class="reference internal" href="#vi-latency-mode">VI. Latency mode</a></li>
 <li class="toctree-l5"><a class="reference internal" href="#vii-your-designated-number-of-instances">VII. Your designated number of instances</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#viii-your-designated-number-of-instances-and-instance-index">VIII. Your designated number of instances and instance index</a></li>
 </ul>
 </li>
 <li class="toctree-l4"><a class="reference internal" href="#usage-of-jemalloc-tcmalloc-default-memory-allocator">Usage of Jemalloc/TCMalloc/Default memory allocator</a><ul>
@@ -161,6 +163,12 @@
 <td align="center">int</td>
 <td align="center">-1</td>
 <td align="left">For multi-instance, you should give the cores number you used for per instance.</td>
+</tr>
+<tr>
+<td align="left"><code>--instance_idx</code></td>
+<td align="center">int</td>
+<td align="center">-1</td>
+<td align="left">Specify instance_idx to run single instance among multiple instances. Useful when running each instance independently.</td>
 </tr>
 <tr>
 <td align="left"><code>--ncore_per_instance</code></td>
@@ -267,6 +275,7 @@
 <li><p><a class="reference external" href="#v-throughput-mode">V. Throughput mode (i.e. number of socket instances, each instance runs on 1 socket)</a></p></li>
 <li><p><a class="reference external" href="#vi-latency-mode">VI. Latency mode (Use 4 cores for each instance)</a></p></li>
 <li><p><a class="reference external" href="#vii-your-designated-number-of-instances">VII. Your designated number of instances</a></p></li>
+<li><p><a class="reference external" href="#viii-your-designated-number-of-instances-and-instance-index">VIII. Your designated number of instances and instance index</a></p></li>
 </ul>
 </li>
 <li><p>Usage of Jemalloc/TCMalloc/Default memory allocator</p>
@@ -507,6 +516,34 @@
 2021-07-12 22:13:05,473 - __main__ - INFO - numactl -C 11-21 -m 0 &lt;VIRTUAL_ENV&gt;/bin/python resnet50.py 2&gt;&amp;1 | tee ./logs/run_20210712221305_instance_1_cores_11-21.log
 2021-07-12 22:13:05,476 - __main__ - INFO - numactl -C 22-32 -m 1 &lt;VIRTUAL_ENV&gt;/bin/python resnet50.py 2&gt;&amp;1 | tee ./logs/run_20210712221305_instance_2_cores_22-32.log
 2021-07-12 22:13:05,479 - __main__ - INFO - numactl -C 33-43 -m 1 &lt;VIRTUAL_ENV&gt;/bin/python resnet50.py 2&gt;&amp;1 | tee ./logs/run_20210712221305_instance_3_cores_33-43.log
+</pre></div>
+</div>
+</section>
+<section id="viii-your-designated-number-of-instances-and-instance-index">
+<h4>VIII. Your designated number of instances and instance index<a class="headerlink" href="#viii-your-designated-number-of-instances-and-instance-index" title="Permalink to this headline"></a></h4>
+<p>Launcher by default runs all <code class="docutils literal notranslate"><span class="pre">ninstances</span></code> for multi-instance inference/training as shown above. You can specify <code class="docutils literal notranslate"><span class="pre">instance_idx</span></code> to independely run that instance only among <code class="docutils literal notranslate"><span class="pre">ninstances</span></code></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">launch</span> <span class="o">--</span><span class="n">ninstances</span> <span class="mi">4</span> <span class="o">--</span><span class="n">instance_idx</span> <span class="mi">0</span> <span class="o">--</span><span class="n">log_path</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>you can confirm usage in log file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">175</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">OMP_NUM_THREADS</span><span class="o">=</span><span class="mi">14</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">176</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">Using</span> <span class="n">Intel</span> <span class="n">OpenMP</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">KMP_AFFINITY</span><span class="o">=</span><span class="n">granularity</span><span class="o">=</span><span class="n">fine</span><span class="p">,</span><span class="n">compact</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">KMP_BLOCKTIME</span><span class="o">=</span><span class="mi">1</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">LD_PRELOAD</span><span class="o">=&lt;</span><span class="n">VIRTUAL_ENV</span><span class="o">&gt;/</span><span class="n">lib</span><span class="o">/</span><span class="n">libiomp5</span><span class="o">.</span><span class="n">so</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">numactl</span> <span class="o">-</span><span class="n">C</span> <span class="mi">0</span><span class="o">-</span><span class="mi">10</span> <span class="o">-</span><span class="n">m</span> <span class="mi">0</span> <span class="o">&lt;</span><span class="n">VIRTUAL_ENV</span><span class="o">&gt;/</span><span class="nb">bin</span><span class="o">/</span><span class="n">python</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">tee</span> <span class="o">./</span><span class="n">logs</span><span class="o">/</span><span class="n">run_20220106130151_instance_0_cores_0</span><span class="o">-</span><span class="mf">13.</span><span class="n">log</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">intel_extension_for_pytorch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">launch</span> <span class="o">--</span><span class="n">ninstances</span> <span class="mi">4</span> <span class="o">--</span><span class="n">instance_idx</span> <span class="mi">1</span> <span class="o">--</span><span class="n">log_path</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>you can confirm usage in log file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">175</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">OMP_NUM_THREADS</span><span class="o">=</span><span class="mi">14</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">176</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">Using</span> <span class="n">Intel</span> <span class="n">OpenMP</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">KMP_AFFINITY</span><span class="o">=</span><span class="n">granularity</span><span class="o">=</span><span class="n">fine</span><span class="p">,</span><span class="n">compact</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">KMP_BLOCKTIME</span><span class="o">=</span><span class="mi">1</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">LD_PRELOAD</span><span class="o">=&lt;</span><span class="n">VIRTUAL_ENV</span><span class="o">&gt;/</span><span class="n">lib</span><span class="o">/</span><span class="n">libiomp5</span><span class="o">.</span><span class="n">so</span>
+<span class="mi">2022</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">06</span> <span class="mi">13</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="mi">51</span><span class="p">,</span><span class="mi">177</span> <span class="o">-</span> <span class="n">__main__</span> <span class="o">-</span> <span class="n">INFO</span> <span class="o">-</span> <span class="n">numactl</span> <span class="o">-</span><span class="n">C</span> <span class="mi">11</span><span class="o">-</span><span class="mi">21</span> <span class="o">-</span><span class="n">m</span> <span class="mi">0</span> <span class="o">&lt;</span><span class="n">VIRTUAL_ENV</span><span class="o">&gt;/</span><span class="nb">bin</span><span class="o">/</span><span class="n">python</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">tee</span> <span class="o">./</span><span class="n">logs</span><span class="o">/</span><span class="n">run_20220106130151_instance_0_cores_0</span><span class="o">-</span><span class="mf">13.</span><span class="n">log</span>
 </pre></div>
 </div>
 </section>

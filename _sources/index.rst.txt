@@ -27,6 +27,7 @@ Intel® Extension for PyTorch* has been released as an open–source project at 
    tutorials/releases
    tutorials/installation
    tutorials/examples
+   tutorials/performance
    tutorials/api_doc
    tutorials/performance_tuning
    tutorials/blogs_publications

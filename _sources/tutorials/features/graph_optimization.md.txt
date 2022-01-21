@@ -137,7 +137,7 @@ model = ipex.quantization.convert(model, conf, sample_image)
 output = model(images) 
 
 # Deployment 
-import intel_pytorch_extension as ipex 
+import intel_extension_for_pytorch as ipex
 conf = ipex.QuantConf(‘int8_conf.json’) 
 model = ipex.quantization.convert(model, conf, sample_image) 
 output = model(images) 

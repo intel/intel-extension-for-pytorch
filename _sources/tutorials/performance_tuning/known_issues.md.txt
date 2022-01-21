@@ -24,7 +24,7 @@ Known Issues
 
   A 'Sparse Add' [PR](https://github.com/pytorch/pytorch/pull/23057) is pending on review. The issue will be fixed when the PR is merged.
 
-- If inference is done with a custom function, `ipex.optimize()` function doesn't work.
+- If inference is done with a custom function, `conv+bn` folding feature of the `ipex.optimize()` function doesn't work.
 
   ```
   import torch
@@ -55,4 +55,4 @@ Known Issues
         m.inference(d)
   ```
 
-  This is PyTorch FX limitation, user can avoid this error by calling `m = ipex.optimize(m, level="O0")`, which doesn't apply ipex optimization, or diable `conv+bn` folding by calling `m = ipex.optimize(m, level="O1", conv_bn_folding=False)`.
+  This is PyTorch FX limitation, user can avoid this error by calling `m = ipex.optimize(m, level="O0")`, which doesn't apply ipex optimization, or disable `conv+bn` folding by calling `m = ipex.optimize(m, level="O1", conv_bn_folding=False)`.
