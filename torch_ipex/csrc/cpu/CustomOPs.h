@@ -14,12 +14,6 @@ namespace torch { namespace jit {
 // So we fake some op namespaces to workaround that.
 namespace ipex {
   static auto matmul_div = Symbol::fromQualString("ipex::matmul_div");
-
-  // 3d ops
-  static auto conv3d_relu = Symbol::fromQualString("ipex::conv3d_relu");
-  static auto conv3d_sum = Symbol::fromQualString("ipex::conv3d_sum");
-  static auto conv3d_sum_relu = Symbol::fromQualString("ipex::conv3d_sum_relu");
-
   static auto max_pool2d = Symbol::fromQualString("ipex::max_pool2d");
   static auto softmax = Symbol::fromQualString("ipex::softmax");
 
@@ -32,32 +26,6 @@ namespace cpu {
 
 class AtenIpexJITDev {
  public:
-  // for JIT ops
-   static at::Tensor
-   dil_convolution_base(const at::Tensor &input, const at::Tensor &weight,
-                        const at::Tensor &bias, at::IntArrayRef stride,
-                        at::IntArrayRef padding, at::IntArrayRef dilation,
-                        int64_t groups);
-
-   static at::Tensor
-   dil_convolution_relu(const at::Tensor &input, const at::Tensor &weight,
-                        const at::Tensor &bias, at::IntArrayRef stride,
-                        at::IntArrayRef padding, at::IntArrayRef dilation,
-                        int64_t groups);
-
-   static at::Tensor &
-   dil_convolution_sum(const at::Tensor &input, const at::Tensor &weight,
-                       const at::Tensor &bias, at::IntArrayRef stride,
-                       at::IntArrayRef padding, at::IntArrayRef dilation,
-                       int64_t groups, at::Tensor &accumu, at::Scalar alpha);
-
-   static at::Tensor &
-   dil_convolution_sum_relu(const at::Tensor &input, const at::Tensor &weight,
-                            const at::Tensor &bias, at::IntArrayRef stride,
-                            at::IntArrayRef padding, at::IntArrayRef dilation,
-                            int64_t groups, at::Tensor &accumu,
-                            at::Scalar alpha);
-
    static at::Tensor dil_max_pool2d(const at::Tensor &input,
                                     at::IntArrayRef kernel_size,
                                     at::IntArrayRef stride,

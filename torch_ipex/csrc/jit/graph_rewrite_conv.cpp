@@ -7,13 +7,12 @@ namespace torch {
 namespace jit {
 namespace graph_rewrite {
 
-void insertPrePackedConv2dOp(Block* b) {
+void insertPrePackedConvOp(Block* b) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      insertPrePackedConv2dOp(block);
+      insertPrePackedConvOp(block);
     }
-    // TODO: add conv3d
-    if (n->kind() == aten::conv2d ||
+    if (n->kind() == aten::conv2d || n->kind() == aten::conv3d ||
         n->kind() ==
             Symbol::fromQualString("torch_ipex::convolution_forward")) {
       WithInsertPoint guard(n);
@@ -28,11 +27,12 @@ void insertPrePackedConv2dOp(Block* b) {
                                    .concrete_sizes();
       // if can't get input shape info, will not do weight prepack.
       if (!(input_size_option.has_value() &&
-            input_size_option.value().size() == 4)) {
+            (input_size_option.value().size() == 4 ||
+             input_size_option.value().size() == 5))) {
         continue;
       }
       IValue input_size_value(input_size_option.value());
-      if (n->kind() == aten::conv2d) {
+      if (n->kind() == aten::conv2d || n->kind() == aten::conv3d) {
         auto weight_size_option = n->inputs()
                                       .at(1)
                                       ->type()
@@ -41,11 +41,16 @@ void insertPrePackedConv2dOp(Block* b) {
                                       .concrete_sizes();
         // weight has not shape info, will not do weight prapacked.
         if (!(weight_size_option.has_value() &&
-              weight_size_option.value().size() == 4)) {
+              (weight_size_option.value().size() == 4 ||
+               weight_size_option.value().size() == 5))) {
           continue;
         }
         auto weight_size = weight_size_option.value();
         std::vector<int64_t> k_size = {weight_size[2], weight_size[3]};
+        // 3d case.
+        if (weight_size.size() == 5) {
+          k_size.push_back(weight_size[4]);
+        }
         // w_is_channels_last is invaild, there will has a check the memory
         // format at convolution kernel side.
         bool w_is_channels_last = false;
@@ -95,8 +100,8 @@ void insertPrePackedConv2dOp(Block* b) {
   EliminateDeadCode(b);
 }
 
-void insertPrePackedConv2dOp(std::shared_ptr<Graph>& graph) {
-  insertPrePackedConv2dOp(graph->block());
+void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
+  insertPrePackedConvOp(graph->block());
 }
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {

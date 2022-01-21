@@ -152,18 +152,27 @@ ContextConvolution create(
     const bool weight_is_channels_last,
     const bool weight_is_packed,
     const at::IntArrayRef input_size) {
-  const auto padding_expanded = expand_param_if_needed(padding, "padding", 2);
-  const auto stride_expanded = expand_param_if_needed(stride, "stride", 2);
+  auto dim = input_size.size() - 2;
+  const auto padding_expanded = expand_param_if_needed(padding, "padding", dim);
+  const auto stride_expanded = expand_param_if_needed(stride, "stride", dim);
   const auto dilation_expanded =
-      expand_param_if_needed(dilation, "dilation", 2);
+      expand_param_if_needed(dilation, "dilation", dim);
 
   bool weight_is_channels_last_ = weight_is_channels_last;
   if (!weight_is_packed) {
     weight_is_channels_last_ =
-        weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
+        weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+        weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
   }
-  auto memory_format = weight_is_channels_last_ ? at::MemoryFormat::ChannelsLast
-                                                : at::MemoryFormat::Contiguous;
+
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (weight_is_channels_last_) {
+    if (input_size.size() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   auto weight_ = weight;
   if (!weight_is_packed) {
     weight_ = weight.contiguous(memory_format);
@@ -192,12 +201,10 @@ ContextConvolution create(
   return ContextConvolution{
       std::move(packed_weight),
       bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
-      {output_channel, input_size[1], kernel_size[0], kernel_size[1]},
-      {padding_expanded[0], padding_expanded[1]},
-      {stride_expanded[0], stride_expanded[1]},
-      {dilation_expanded[0], dilation_expanded[1]},
+      padding_expanded,
+      stride_expanded,
+      dilation_expanded,
       groups,
-      {input_size[0], input_size[1], input_size[2], input_size[3]},
       weight_is_channels_last_};
 }
 
@@ -207,9 +214,16 @@ at::Tensor run(
     const ideep::attr_t& attr) {
   bool use_channels_last =
       input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
       context.weight_is_channels_last_;
-  auto memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
-                                         : at::MemoryFormat::Contiguous;
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   auto input_ = input.contiguous(memory_format);
   return convolution_kernel(
       input_,
@@ -229,9 +243,17 @@ at::Tensor& run(
     const ideep::attr_t& attr) {
   bool use_channels_last =
       input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
       context.weight_is_channels_last_;
-  auto memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
-                                         : at::MemoryFormat::Contiguous;
+
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   auto input_ = input.contiguous(memory_format);
   convolution_kernel_output(
       input_,

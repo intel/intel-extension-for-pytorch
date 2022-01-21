@@ -22,20 +22,6 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor AtenIpexJITDev::dil_convolution_base(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_base", std::vector<c10::IValue>({}));
-#endif
-  return convolution_impl(input, weight, bias, stride, padding, dilation, groups, ideep::attr_t());
-}
-
 /**
  * Dispatch at::matmul + at::div pattern to ipex for jit inference, but only
  * one-element tensor and channel dim boadcast is enabled in oneDNN 2.2.0 now.
@@ -94,82 +80,6 @@ at::Tensor  AtenIpexJITDev::dil_matmul_div(
   } else {
     return AtenIpexJITDev::dil_matmul_div(tensor1, tensor2, out, at::native::wrapped_scalar_tensor(div_input));
   }
-}
-
-at::Tensor AtenIpexJITDev::dil_convolution_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_relu", std::vector<c10::IValue>({}));
-#endif
-  return convolution_impl(
-    input,
-    weight,
-    bias,
-    stride,
-    padding,
-    dilation,
-    groups,
-    ideep::attr_t::fuse_relu());
-}
-
-at::Tensor& AtenIpexJITDev::dil_convolution_sum(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    at::Tensor& accumu,
-    at::Scalar alpha) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum", std::vector<c10::IValue>({}));
-#endif
-  auto scale = alpha.to<float>();
-  convolution_inplace_impl(
-    input,
-    weight,
-    bias,
-    accumu,
-    stride,
-    padding,
-    dilation,
-    groups,
-    ideep::attr_t::fuse_sum(scale));
-  return accumu;
-}
-
-at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    at::Tensor& accumu,
-    at::Scalar alpha) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({}));
-#endif
-  auto scale = alpha.to<float>();
-  convolution_inplace_impl(
-    input,
-    weight,
-    bias,
-    accumu,
-    stride,
-    padding,
-    dilation,
-    groups,
-    ideep::attr_t::residual(scale));
-  return accumu;
 }
 
 at::Tensor AtenIpexJITDev::dil_max_pool2d(

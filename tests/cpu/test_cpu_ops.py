@@ -491,6 +491,39 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
+    def test_avg_pool3d_ndhwc(self):
+        def helper(n, c, d, h, w, kernel_size, dtype, contig,
+                   count_include_pad=True, divisor_override=None):
+            input = torch.randint(1, 10, (n, c, d, h, w), device='cpu', dtype=dtype)
+            input = input.contiguous(memory_format=torch.channels_last_3d)
+            if not contig:
+                input = input[:, ::2, :, :, :]
+            input.requires_grad_(True)
+            pool = torch.nn.AvgPool3d(kernel_size=kernel_size, count_include_pad=count_include_pad,
+                                      divisor_override=divisor_override)
+
+            ref_input = input.detach().clone().contiguous().requires_grad_(True)
+            ref_pool = torch.nn.AvgPool3d(kernel_size=kernel_size, count_include_pad=count_include_pad,
+                                          divisor_override=divisor_override)
+
+            out = pool(input)
+            out.sum().backward()
+            ref_out = ref_pool(ref_input)
+            ref_out.sum().backward()
+
+            self.assertTrue(out.is_contiguous(memory_format=torch.channels_last_3d))
+            self.assertTrue(ref_out.is_contiguous())
+            self.assertEqual(out, ref_out)
+            self.assertEqual(input.grad, ref_input.grad)
+
+        for dtype in [torch.float32, torch.double]:
+            for contig in [True, False]:
+                for count_include_pad in [True, False]:
+                    helper(4, 8, 10, 10, 10, (3, 2, 3), dtype, contig, count_include_pad=count_include_pad)
+                    helper(4, 8, 18, 9, 14, (2, 3, 2), dtype, contig, count_include_pad=count_include_pad)
+                    helper(4, 8, 7, 8, 9, (2, 2, 2), dtype, contig,
+                           count_include_pad=count_include_pad, divisor_override=100)
+
     @skipIfNoTorchVision
     def test_torchvision_nms(self):
         num_boxes = 50
@@ -500,6 +533,14 @@ class CPUOPsTester(TestCase):
         y1 = torchvision.ops.nms(boxes, scores, 0.5)
         with torch.cpu.amp.autocast():
             y2 = torchvision.ops.nms(boxes.bfloat16(), scores.bfloat16(), 0.5)
+            self.assertEqual(y1, y2)
+
+    def test_mean(self):
+        x = torch.randn(1, 64, 100, 13, 24, requires_grad=True)
+        for dtype in [torch.float32, torch.double, torch.bfloat16]:
+            y1 = torch.mean(x, dim=(3, 4), keepdim=False, dtype=dtype)
+            x2 = x.clone().detach().to(memory_format=torch.channels_last_3d).requires_grad_()
+            y2 = torch.mean(x2, dim=(3, 4), keepdim=False, dtype=dtype)
             self.assertEqual(y1, y2)
 
 

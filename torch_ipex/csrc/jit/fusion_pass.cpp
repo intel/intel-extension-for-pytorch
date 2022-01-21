@@ -291,14 +291,6 @@ public:
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::matmul, aten::div}, ipex::matmul_div},
-    // 3d ops
-    {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
-    {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
-    {{aten::conv3d, aten::add}, ipex::conv3d_sum},
-    {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
-    {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
-    {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")},
-     ipex::conv3d_sum_relu},
 };
 
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
@@ -321,7 +313,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   FoldFrozenConvMulOrDiv(graph);
 
   // convolution fusion
-  graph_rewrite::insertPrePackedConv2dOp(graph);
+  graph_rewrite::insertPrePackedConvOp(graph);
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
 
@@ -334,6 +326,11 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
   graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
+
+  // fuse concat+bn+relu for the input float tensors with the same sizes
+  // and channelslast format
+  // hence the concat dim should be the channel
+  graph_rewrite::FuseConcatBnRelu(graph);
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);

@@ -249,7 +249,7 @@ void FoldFrozenConvMulOrDiv(Block* b) {
       if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
         weight_tensor = constant_as<Tensor>(conv->namedInput("weight")).value();
       } else {
-        weight_tensor = torch_ipex::cpu::conv2d_weight_unpack(
+        weight_tensor = torch_ipex::cpu::convolution_weight_unpack(
             constant_as<Tensor>(conv->namedInput("weight")).value(),
             toIValue(conv->namedInput("padding"))->toIntVector(),
             toIValue(conv->namedInput("stride"))->toIntVector(),
@@ -298,7 +298,7 @@ void FoldFrozenConvMulOrDiv(Block* b) {
       if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
         fuse_weight = (*stack_out)[0].toTensor().to(weight_tensor.dtype());
       } else {
-        fuse_weight = torch_ipex::cpu::conv2d_weight_pack(
+        fuse_weight = torch_ipex::cpu::convolution_weight_pack(
             (*stack_out)[0].toTensor().to(weight_tensor.dtype()),
             toIValue(conv->namedInput("padding"))->toIntVector(),
             toIValue(conv->namedInput("stride"))->toIntVector(),

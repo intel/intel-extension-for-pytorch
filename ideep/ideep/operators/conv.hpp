@@ -273,14 +273,16 @@ struct convolution_forward
       dst_desc_query = dst_desc.to_format_any();
     }
 
-    // For nhwc path, weight uses format_tag::any,
-    // while activation uses format_tag::nhwc.
-    bool is_nhwc = src_desc.is_nhwc() || weights_desc.is_nhwc();
-    if (is_nhwc) {
-      src_desc_query = src_desc.to_format(tag::nhwc);
+    // For nhwc / ndhwc path, weight uses format_tag::any,
+    // while activation uses format_tag::nhwc / format_tag::ndhwc.
+    bool channels_last =
+        src_desc.is_channels_last() || weights_desc.is_channels_last();
+    if (channels_last) {
+      auto memory_format = src_desc.get_ndims() == 4 ? tag::nhwc : tag::ndhwc;
+      src_desc_query = src_desc.to_format(memory_format);
       weights_desc_query = weights_desc.to_format_any();
       bias_desc_query = with_bias ? bias_desc.to_format_any() : tensor::desc();
-      dst_desc_query = dst_desc.to_format(tag::nhwc);
+      dst_desc_query = dst_desc.to_format(memory_format);
     }
 
     auto key = utils::create_key(aprop_kind, aalgorithm, src_desc_query,
@@ -347,8 +349,11 @@ private:
     if (plain_format) {
       // Used for pytorch default CPU path, i.e. plain-in-plain-out
       // see [keep_format] for more details
-      bool is_nhwc = src.get_desc().is_nhwc() || weights.get_desc().is_nhwc();
-      bool use_plain_dst = use_gemm(src.get_dims(), weights.get_dims(), dst_dims, groups) || is_nhwc;
+      bool channels_last = src.get_desc().is_channels_last() ||
+          weights.get_desc().is_channels_last();
+      bool use_plain_dst =
+          use_gemm(src.get_dims(), weights.get_dims(), dst_dims, groups) ||
+          channels_last;
       if (use_plain_dst) {
         do_prepare<with_bias, /*keep_format=*/true>(
             params, src, weights, bias, dst_dims, dst, strides, dilates,
@@ -590,8 +595,10 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
     auto weights_ = weights.make_grouped_weights(groups);
     auto dilates_ = utils::get_compatible_dilates(dilates);
 
-    bool is_nhwc = diff_dst.get_desc().is_nhwc();
-    auto format_tag = is_nhwc ? tag::nhwc : tag::any;
+    bool channels_last = diff_dst.get_desc().is_channels_last();
+    auto format_tag = channels_last
+        ? (diff_src_dims.size() == 4 ? tag::nhwc : tag::ndhwc)
+        : tag::any;
     auto diff_dst_desc = diff_dst.get_desc().to_format(format_tag);
     // align weight data type with diff_dst for bf16
     auto weights_desc =
@@ -703,8 +710,10 @@ struct convolution_backward_weights
         diff_weights_desc = diff_weights_desc.to_grouped(groups).to_format_any();
     }
 
-    bool is_nhwc = diff_dst.get_desc().is_nhwc();
-    auto format_tag = is_nhwc ? tag::nhwc : tag::any;
+    bool channels_last = diff_dst.get_desc().is_channels_last();
+    auto format_tag = channels_last
+        ? (diff_dst.ndims() == 4 ? tag::nhwc : tag::ndhwc)
+        : tag::any;
     auto diff_dst_desc = diff_dst.get_desc().to_format(format_tag);
     auto src_desc = src.get_desc().to_format(format_tag);
 

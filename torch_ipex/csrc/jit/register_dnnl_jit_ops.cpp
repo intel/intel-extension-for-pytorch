@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 
+#include "ConcatBnRelu.h"
 #include "ConvPacked.h"
 #include "ConvTransposePacked.h"
 #include "LinearPacked.h"
@@ -27,65 +28,8 @@ using namespace torch_ipex::cpu;
 using namespace torch_ipex::cpu::detail::convolution;
 using namespace torch_ipex::cpu::detail::linear;
 using namespace torch_ipex::cpu::detail::conv_transpose2d;
-// Convolution Fusion Ops
-
-#define CONV_ARGS \
-  "Tensor input, Tensor weight, Tensor? bias, " \
-  "int[2] stride, int[2] padding, int[2] dilation, int groups"
-
-#define CreateConvEltwiseOperator(ND, FUSED_OP)                        \
-  Operator(                                                            \
-      "ipex::conv" #ND "_" #FUSED_OP "(" CONV_ARGS ") -> Tensor",      \
-      [](const Node* node) -> Operation {                              \
-          return [](Stack* stack) {                                    \
-            auto result = AtenIpexJITDev::dil_convolution_##FUSED_OP(  \
-                (std::move(peek(stack, 0, 7))).toTensor(),             \
-                (std::move(peek(stack, 1, 7))).toTensor(),             \
-                toOptionalTensor(std::move(peek(stack, 2, 7))),        \
-                (std::move(peek(stack, 3, 7))).toIntVector(),          \
-                (std::move(peek(stack, 4, 7))).toIntVector(),          \
-                (std::move(peek(stack, 5, 7))).toIntVector(),          \
-                (std::move(peek(stack, 6, 7))).toInt());               \
-            drop(stack, 7);                                            \
-            pack(stack, std::move(result));                            \
-            return 0;                                                  \
-          };                                                           \
-      },                                                               \
-      aliasAnalysisFromSchema())
-
-#define _CreateConvSumEltwiseOperator(ND, ...)                                \
-  Operator(                                                                   \
-      "ipex::conv" #ND "_sum" #__VA_ARGS__ "(" CONV_ARGS ", Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)", \
-      [](const Node* node) -> Operation {                                     \
-          return [](Stack* stack) {                                           \
-            auto output = (std::move(peek(stack, 7, 9))).toTensor();          \
-            auto result = AtenIpexJITDev::dil_convolution_sum##__VA_ARGS__(   \
-                (std::move(peek(stack, 0, 9))).toTensor(),                    \
-                (std::move(peek(stack, 1, 9))).toTensor(),                    \
-                toOptionalTensor(std::move(peek(stack, 2, 9))),               \
-                (std::move(peek(stack, 3, 9))).toIntVector(),                 \
-                (std::move(peek(stack, 4, 9))).toIntVector(),                 \
-                (std::move(peek(stack, 5, 9))).toIntVector(),                 \
-                (std::move(peek(stack, 6, 9))).toInt(),                       \
-                output,                                                       \
-                (std::move(peek(stack, 8, 9))).toScalar());                   \
-            drop(stack, 9);                                                   \
-            pack(stack, std::move(result));                                   \
-            return 0;                                                         \
-          };                                                                  \
-      },                                                                      \
-      aliasAnalysisFromSchema())
-
-
-#define CreateConvSumOperator(ND) _CreateConvSumEltwiseOperator(ND)
-#define CreateConvSumEltwiseOperator(ND, FUSED_OP) \
-  _CreateConvSumEltwiseOperator(ND, _##FUSED_OP)
 
 RegisterOperators op({
-    CreateConvEltwiseOperator(3d, relu),
-    CreateConvSumOperator(3d),
-    CreateConvSumEltwiseOperator(3d, relu),
-
     Operator(
         "ipex_prepack::convolution_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack) -> Tensor",
@@ -506,6 +450,31 @@ RegisterOperators op({
                 (std::move(peek(stack, 6, 8))).toDouble(),
                 (std::move(peek(stack, 7, 8))).toBool());
             drop(stack, 8);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::concat_bn_relu(Tensor[] a, Tensor bn_beta, "
+        "Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled, int dim) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = ConcatBnRelu(
+                (std::move(peek(stack, 0, 11))).toTensorList(),
+                (std::move(peek(stack, 1, 11))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 11))),
+                toOptionalTensor(std::move(peek(stack, 3, 11))),
+                toOptionalTensor(std::move(peek(stack, 4, 11))),
+                toOptionalTensor(std::move(peek(stack, 5, 11))),
+                (std::move(peek(stack, 6, 11))).toBool(),
+                (std::move(peek(stack, 7, 11))).toDouble(),
+                (std::move(peek(stack, 8, 11))).toDouble(),
+                (std::move(peek(stack, 9, 11))).toBool(),
+                (std::move(peek(stack, 10, 11))).toInt());
+            drop(stack, 11);
             pack(stack, std::move(result));
             return 0;
           };

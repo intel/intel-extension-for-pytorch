@@ -488,6 +488,106 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph> &graph) {
   }
 }
 
+void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
+  std::string aten_concat_bn_relu = R"(
+      graph(%input : Tensor[], %dim:int, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled):
+        %a = aten::cat(%input, %dim)
+        %b = aten::batch_norm(%a, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled)
+        %c = aten::relu(%b)
+        return (%c) )";
+  std::string fused_concat_bn_relu = R"(
+      graph(%input : Tensor[], %dim:int, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled):
+        %alpha: int = prim::Constant[value=1]()
+        %u1 = aten::add(%running_var, %eps, %alpha)
+        %u2 = aten::sqrt(%u1)
+        %u3 = aten::div(%running_mean, %u2)
+        %u4 = aten::mul(%weight, %u3)
+        %beta = aten::sub(%bias, %u4, %alpha)
+        %b = ipex::concat_bn_relu(%input, %beta, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled, %dim)
+        return (%b) )";
+
+  auto fusion_filter = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    Node* node = match.anchor;
+    const auto& match_vmap = match.values_map;
+    // Check if the Concat Dimension is the channel
+    auto dim_ = getIValue("dim", match_vmap, vmap).value();
+    if (!(dim_.isInt())) {
+      return false;
+    }
+    auto dim = dim_.toInt();
+    if (dim != 1) {
+      return false;
+    }
+    // Find the Concat node
+    auto n = node->input(0)->node()->input(0)->node();
+    TORCH_CHECK(n->kind() == aten::cat);
+
+    auto listConstruct = n->input(0)->node();
+    int64_t input_len = 0;
+    for (auto p : listConstruct->inputs()) {
+      input_len++;
+    }
+    auto tensor1 = listConstruct->input(0)->type()->cast<TensorType>();
+    // Check if the dimension of the first tensor is 4 or 5
+    if (!(tensor1->dim().value() == 4 || tensor1->dim().value() == 5)) {
+      return false;
+    }
+    // Check if the data type of the first tensor is float
+    if (!(tensor1->scalarType().value() == at::kFloat)) {
+      return false;
+    }
+    // Check if the size of Channels is mutiples of 16
+    if (!(tensor1->sizes()[1].value() % 16 == 0)) {
+      return false;
+    }
+    // Check if the memory format of the first tensor is ChannelsLast(3d)
+    std::vector<int64_t> sizes_tensor1;
+    std::vector<int64_t> strides_tensor1;
+    for (int64_t i = 0; i < tensor1->dim().value(); ++i) {
+      sizes_tensor1.push_back(tensor1->sizes()[i].value());
+      strides_tensor1.push_back(tensor1->strides()[i].value());
+    }
+    if (!(c10::is_channels_last_strides_2d(sizes_tensor1, strides_tensor1) ||
+          c10::is_channels_last_strides_3d(sizes_tensor1, strides_tensor1))) {
+      return false;
+    }
+    // Check the rest tensors in the Concat List
+    for (int64_t i = 1; i < input_len; ++i) {
+      auto tensori = listConstruct->input(i)->type()->cast<TensorType>();
+      // Check dimension
+      if (!(tensor1->dim().value() == tensori->dim().value())) {
+        return false;
+      }
+      // Check data type
+      if (!(tensori->scalarType().value() == at::kFloat)) {
+        return false;
+      }
+      std::vector<int64_t> sizes_tensori;
+      std::vector<int64_t> strides_tensori;
+      for (int64_t j = 0; j < tensori->dim().value(); ++j) {
+        sizes_tensori.push_back(tensori->sizes()[j].value());
+        strides_tensori.push_back(tensori->strides()[j].value());
+      }
+      // Check memory format
+      if (!(c10::is_channels_last_strides_2d(sizes_tensori, strides_tensori) ||
+            c10::is_channels_last_strides_3d(sizes_tensori, strides_tensori))) {
+        return false;
+      }
+      // Check sizes
+      if (!(sizes_tensor1 == sizes_tensori)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  SubgraphRewriter rewriter_concatbnrelu;
+  rewriter_concatbnrelu.RegisterRewritePattern(
+      aten_concat_bn_relu, fused_concat_bn_relu);
+  rewriter_concatbnrelu.runOnGraph(graph, fusion_filter);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

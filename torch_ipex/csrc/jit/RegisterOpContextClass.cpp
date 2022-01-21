@@ -73,9 +73,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<11>(state)));
           });
   m.def(
-      "convolution_prepack(Tensor W, Tensor? B, int[2] stride, "
-      "int[2] padding, int[2] dilation, int[2] kernel_size, int groups, int output_channel, "
-      "bool input_is_channels_last, bool weight_is_packed, int[4] input_sizes) "
+      "convolution_prepack(Tensor W, Tensor? B, int[] stride, "
+      "int[] padding, int[] dilation, int[] kernel_size, int groups, int "
+      "output_channel, "
+      "bool input_is_channels_last, bool weight_is_packed, int[] input_sizes) "
       "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext");
   m.def(
       "linear_prepack(Tensor W, Tensor? B, "
