@@ -211,6 +211,9 @@ struct RegisterHIPDispatch {
   REGISTER_AVX2_DISPATCH(name, static_cast<fn_type>(nullptr))          \
   REGISTER_VSX_DISPATCH(name, static_cast<fn_type>(nullptr))
 
+/*
+ToDo: Fix warning: "REGISTER_HIP_DISPATCH" redefined to stock pytorch.
+-----------------------------------------------
 #define REGISTER_CUDA_DISPATCH(name, fn)                                   \
   static RegisterCUDADispatch<decltype(fn), struct name> name##__register( \
       name, fn);
@@ -218,6 +221,7 @@ struct RegisterHIPDispatch {
 #define REGISTER_HIP_DISPATCH(name, fn)                                   \
   static RegisterHIPDispatch<decltype(fn), struct name> name##__register( \
       name, fn);
+*/
 
 // NB: This macro must be used in an actual 'cu' file; if you try using
 // it from a 'cpp' file it will not work!

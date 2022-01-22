@@ -8,6 +8,7 @@
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
+#include "cpu/passes/frozen_linear_folding.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -365,6 +366,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
 
+  // linear folding
+  FoldFrozenLinearAddOrSub(graph);
+  FoldFrozenLinearMulOrDiv(graph);
+
   // linear fusion
   graph_rewrite::insertPrePackedLinearOp(graph);
   graph_rewrite::fuseLinearWithEltwise(graph);
@@ -374,6 +379,11 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
   graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
+
+  // fuse concat+bn+relu for the input float tensors with the same sizes
+  // and channelslast format
+  // hence the concat dim should be the channel
+  graph_rewrite::FuseConcatBnRelu(graph);
 
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);

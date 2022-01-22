@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <csrc/dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -43,12 +44,23 @@ at::Tensor& quantized_copy_from_float_cpu_(
     at::Tensor& self,
     const at::Tensor& src);
 
-static at::Tensor& copy_impl(
+at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+at::Tensor& copy_kernel_impl(
     at::Tensor& self,
     const at::Tensor& src,
     bool non_blocking);
 
-at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using copy_kernel_fn = at::Tensor& (*)(at::Tensor&, const at::Tensor&, bool);
+DECLARE_DISPATCH(copy_kernel_fn, copy_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

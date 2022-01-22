@@ -4,6 +4,7 @@
 #include <torch/csrc/jit/runtime/operator.h>
 
 #include "csrc/jit/cpu/kernels/AddLayerNorm.h"
+#include "csrc/jit/cpu/kernels/ConcatBnRelu.h"
 #include "csrc/jit/cpu/kernels/ConvPacked.h"
 #include "csrc/jit/cpu/kernels/ConvTransposePacked.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
@@ -493,6 +494,31 @@ RegisterOperators op({
                 (std::move(peek(stack, 6, 8))).toDouble(),
                 (std::move(peek(stack, 7, 8))).toBool());
             drop(stack, 8);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::concat_bn_relu(Tensor[] a, Tensor bn_beta, "
+        "Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled, int dim) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = ConcatBnRelu(
+                (std::move(peek(stack, 0, 11))).toTensorList(),
+                (std::move(peek(stack, 1, 11))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 11))),
+                toOptionalTensor(std::move(peek(stack, 3, 11))),
+                toOptionalTensor(std::move(peek(stack, 4, 11))),
+                toOptionalTensor(std::move(peek(stack, 5, 11))),
+                (std::move(peek(stack, 6, 11))).toBool(),
+                (std::move(peek(stack, 7, 11))).toDouble(),
+                (std::move(peek(stack, 8, 11))).toDouble(),
+                (std::move(peek(stack, 9, 11))).toBool(),
+                (std::move(peek(stack, 10, 11))).toInt());
+            drop(stack, 11);
             pack(stack, std::move(result));
             return 0;
           };
