@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Intel® Extension for PyTorch* optimizations for quantization (Experimental) &mdash; intel_extension_for_pytorch 1.10.0+cpu documentation</title>
+  <title>Intel® Extension for PyTorch* optimizations for quantization (Experimental) &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.0+cpu
+                1.10.100+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -152,58 +152,58 @@
 </pre></div>
 </div>
 <p>In the last line, a <code class="docutils literal notranslate"><span class="pre">.json</span></code> file is saved. The file contains info of quantization, such as observer algorithm, activations, and weights scales:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
-    <span class="p">{</span>
-        <span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;conv2d&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;algorithm&quot;</span><span class="p">:</span> <span class="s2">&quot;min_max&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;weight_granularity&quot;</span><span class="p">:</span> <span class="s2">&quot;per_channel&quot;</span><span class="p">,</span>
-        <span class="nt">&quot;input_scales&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="mf">0.02742583677172661</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;input_zero_points&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="mi">125</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;output_scales&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="mf">0.01582648977637291</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;output_zero_points&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="mi">120</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;weight_scales&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="p">[</span>
-                <span class="mf">0.0008243077900260687</span><span class="p">,</span>
-                <span class="mf">0.0008239267044700682</span><span class="p">,</span>
-                <span class="mf">0.0008076696540229023</span><span class="p">,</span>
-                <span class="mf">0.000826483650598675</span><span class="p">,</span>
-                <span class="mf">0.0008274353458546102</span><span class="p">,</span>
-                <span class="mf">0.0008290993282571435</span><span class="p">,</span>
-                <span class="mf">0.0007878943579271436</span><span class="p">,</span>
-                <span class="mf">0.0008173943497240543</span><span class="p">,</span>
-                <span class="mf">0.0008244941127486527</span><span class="p">,</span>
-                <span class="mf">0.0008231988758780062</span>
-            <span class="p">]</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;input_quantized_dtypes&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;uint8&quot;</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;output_quantized_dtypes&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;uint8&quot;</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;inputs_quantized&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="kc">true</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;outputs_quantized&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="kc">false</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;inputs_flow&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;conv2d0.input0&quot;</span>
-        <span class="p">],</span>
-        <span class="nt">&quot;outputs_flow&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;conv2d0.output0&quot;</span>
-        <span class="p">]</span>
-    <span class="p">}</span>
-<span class="p">]</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;conv2d&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;algorithm&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;min_max&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;weight_granularity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;per_channel&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;input_scales&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="mf">0.02742583677172661</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;input_zero_points&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="mi">125</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;output_scales&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="mf">0.01582648977637291</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;output_zero_points&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="mi">120</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;weight_scales&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="p">[</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008243077900260687</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008239267044700682</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008076696540229023</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.000826483650598675</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008274353458546102</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008290993282571435</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0007878943579271436</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008173943497240543</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008244941127486527</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="mf">0.0008231988758780062</span><span class="w"></span>
+<span class="w">            </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;input_quantized_dtypes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;uint8&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;output_quantized_dtypes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;uint8&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;inputs_quantized&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="kc">true</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;outputs_quantized&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="kc">false</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;inputs_flow&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;conv2d0.input0&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="nt">&quot;outputs_flow&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">            </span><span class="s2">&quot;conv2d0.output0&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">]</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Description of the json file can be found at <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/master/intel_extension_for_pytorch/quantization/conf.py">conf.py</a>.</p>
