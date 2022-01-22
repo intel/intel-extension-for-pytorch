@@ -143,9 +143,9 @@ unpack_float_bfloat16(const Vectorized<float>& a, const Vectorized<float>& b) {
 
   __m512i idx = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
   __m512i y0 = _mm512_packus_epi32(x0_hi, x1_hi);
-  y0 =  _mm512_permutexvar_epi64(idx, y0);
+  y0 = _mm512_permutexvar_epi64(idx, y0);
   __m512i y1 = _mm512_packus_epi32(x0_lo, x1_lo);
-  y1 =  _mm512_permutexvar_epi64(idx, y1);
+  y1 = _mm512_permutexvar_epi64(idx, y1);
   return std::make_tuple(y0, y1);
 }
 #else
