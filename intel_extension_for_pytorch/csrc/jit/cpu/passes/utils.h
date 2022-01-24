@@ -2,7 +2,7 @@
 
 #include <torch/csrc/MemoryFormat.h>
 
-// Check if the memory format of the first tensor is ChannelsLast(3d)
+// Check if the memory format of the tensor is ChannelsLast(3d)
 bool is_channelslast(std::shared_ptr<c10::TensorType> tensor) {
   TORCH_CHECK(tensor->dim().has_value());
   int64_t dim = tensor->dim().value();

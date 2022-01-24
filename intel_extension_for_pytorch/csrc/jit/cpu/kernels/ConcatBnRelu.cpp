@@ -33,13 +33,13 @@ Tensor ConcatBnRelu(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ConcatBnRelu", std::vector<c10::IValue>({}));
 #endif
-  int64_t input_len = a.size();
+  int64_t list_length = a.size();
 
   c10::MaybeOwned<Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(bn_scale);
   const Tensor& bn_weight = *weight_maybe_owned;
   std::vector<long int> output_dim(a[0].ndimension());
-  for (int64_t i = 0; i < input_len; ++i) {
+  for (int64_t i = 0; i < list_length; ++i) {
     output_dim[1] += a[i].size(1);
   }
   for (int64_t i = 0; i < a[0].ndimension(); ++i) {
@@ -58,8 +58,8 @@ Tensor ConcatBnRelu(
       float>(a, bn_weight, bn_beta, output);
   return output;
 #else
-  std::vector<Tensor> concat_input(input_len);
-  for (int64_t i = 0; i < input_len; ++i)
+  std::vector<Tensor> concat_input(list_length);
+  for (int64_t i = 0; i < list_length; ++i)
     concat_input[i] = a[i];
   auto bn_res = at::batch_norm(
       at::cat(concat_input, (int64_t)dim),

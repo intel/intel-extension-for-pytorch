@@ -440,10 +440,13 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     TORCH_CHECK(n->kind() == aten::cat);
 
     auto listConstruct = n->input(0)->node();
-    int64_t input_len = 0;
+    int64_t list_length = 0;
     for (auto p : listConstruct->inputs()) {
-      input_len++;
+      list_length++;
     }
+    // Check if the Concat list is not empty
+    TORCH_CHECK(list_length);
+
     auto tensor1 = listConstruct->input(0)->type()->cast<TensorType>();
     auto check_type_channelsize = [](std::shared_ptr<c10::TensorType> tensor) {
       return (
@@ -458,7 +461,7 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
       return false;
     }
     // Check the rest tensors
-    for (int64_t i = 1; i < input_len; ++i) {
+    for (int64_t i = 1; i < list_length; ++i) {
       auto tensori = listConstruct->input(i)->type()->cast<TensorType>();
       // Check dimension, data type, channel size and memory format
       if (!(tensor1->dim().value() == tensori->dim().value()) ||

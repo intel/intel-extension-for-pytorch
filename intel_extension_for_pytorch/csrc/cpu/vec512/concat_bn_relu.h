@@ -19,18 +19,18 @@ using Tensor = at::Tensor;
 
 template <typename T>
 void _concat_bn_relu_kernel_channels_last(
-    std::vector<const T*>& in_ptr,
-    std::vector<int64_t>& in_ch,
+    const std::vector<const T*>& in_ptr,
+    const std::vector<int64_t>& in_ch,
     T* out_ptr,
     const T* scale_ptr,
     const T* beta_ptr,
-    int64_t total_size,
+    int64_t total_size_except_channels,
     int64_t ci,
     int64_t co) {
   int64_t i = 0, j = 0, k = 0;
   auto zero = _mm512_set1_ps(0.0);
 #pragma omp parallel for collapse(2)
-  for (i = 0; i < total_size; ++i) {
+  for (i = 0; i < total_size_except_channels; ++i) {
     for (j = 0; j < in_ptr.size(); ++j) {
       for (k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
         _mm512_store_ps(
@@ -57,12 +57,12 @@ void ConcatBnReluKernelImpl_ChannelsLast(
     const Tensor& scale,
     const Tensor& beta,
     Tensor& output) {
-  int64_t input_len = a.size();
-  int64_t total_size = 1;
-  std::vector<const T*> input_ptr(input_len);
-  std::vector<int64_t> input_channels(input_len + 1);
+  int64_t list_length = a.size();
+  int64_t total_size_except_channels = 1;
+  std::vector<const T*> input_ptr(list_length);
+  std::vector<int64_t> input_channels(list_length + 1);
 
-  for (int64_t i = 0; i < input_len; ++i) {
+  for (int64_t i = 0; i < list_length; ++i) {
     input_channels[i + 1] = input_channels[i] + a[i].size(1);
     input_ptr[i] = a[i].data_ptr<T>();
   }
@@ -71,7 +71,7 @@ void ConcatBnReluKernelImpl_ChannelsLast(
   //  requirements.
   for (int64_t i = 0; i < a[0].ndimension(); ++i) {
     if (i != 1)
-      total_size *= a[0].size(i);
+      total_size_except_channels *= a[0].size(i);
   }
 
   const T* scale_data = scale.data_ptr<T>();
@@ -84,7 +84,7 @@ void ConcatBnReluKernelImpl_ChannelsLast(
       output_data,
       scale_data,
       beta_data,
-      total_size,
+      total_size_except_channels,
       a[0].size(1),
       output.size(1));
 }
