@@ -38,7 +38,22 @@ inline __m256i cvt_fp32_to_bf16(const __m512 src) {
 #if (defined CPU_CAPABILITY_AVX512_BF16)
   return reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(src));
 #else
-  return trunc_fp32_to_bf16(src);
+  __m512i value = _mm512_castps_si512(src);
+  __m512i nan = _mm512_set1_epi32(0xffff);
+  auto mask_value = _mm512_cmp_ps_mask(src, src, _CMP_ORD_Q);
+  __m512i ones = _mm512_set1_epi32(0x1);
+  __m512i vec_bias = _mm512_set1_epi32(0x7fff);
+  // uint32_t lsb = (input >> 16) & 1;
+  auto t_value = _mm512_and_si512(_mm512_srli_epi32(value, 16), ones);
+  // uint32_t rounding_bias = 0x7fff + lsb;
+  t_value = _mm512_add_epi32(t_value, vec_bias);
+  // input += rounding_bias;
+  t_value = _mm512_add_epi32(t_value, value);
+  // input = input >> 16;
+  t_value = _mm512_srli_epi32(t_value, 16);
+  // Check NaN before converting back to bf16
+  t_value = _mm512_mask_blend_epi32(mask_value, nan, t_value);
+  return _mm512_cvtusepi32_epi16(t_value);
 #endif
 }
 
@@ -104,122 +119,33 @@ inline std::tuple<at::BFloat16, at::BFloat16> unpack_float_bfloat16(float a) {
 inline std::tuple<Vectorized<float>, Vectorized<float>> pack_bfloat16_float(
     const Vectorized<at::BFloat16>& a,
     const Vectorized<at::BFloat16>& b) {
-  // TODO: Vectorized version
-  Vectorized<float> y0 = Vectorized<float>(
-      pack_bfloat16_float(__m512i(a)[0], __m512i(b)[0]),
-      pack_bfloat16_float(__m512i(a)[1], __m512i(b)[1]),
-      pack_bfloat16_float(__m512i(a)[2], __m512i(b)[2]),
-      pack_bfloat16_float(__m512i(a)[3], __m512i(b)[3]),
-      pack_bfloat16_float(__m512i(a)[4], __m512i(b)[4]),
-      pack_bfloat16_float(__m512i(a)[5], __m512i(b)[5]),
-      pack_bfloat16_float(__m512i(a)[6], __m512i(b)[6]),
-      pack_bfloat16_float(__m512i(a)[7], __m512i(b)[7]),
-      pack_bfloat16_float(__m512i(a)[8], __m512i(b)[8]),
-      pack_bfloat16_float(__m512i(a)[9], __m512i(b)[9]),
-      pack_bfloat16_float(__m512i(a)[10], __m512i(b)[10]),
-      pack_bfloat16_float(__m512i(a)[11], __m512i(b)[11]),
-      pack_bfloat16_float(__m512i(a)[12], __m512i(b)[12]),
-      pack_bfloat16_float(__m512i(a)[13], __m512i(b)[13]),
-      pack_bfloat16_float(__m512i(a)[14], __m512i(b)[14]),
-      pack_bfloat16_float(__m512i(a)[15], __m512i(b)[15]));
-  Vectorized<float> y1 = Vectorized<float>(
-      pack_bfloat16_float(__m512i(a)[16], __m512i(b)[16]),
-      pack_bfloat16_float(__m512i(a)[17], __m512i(b)[17]),
-      pack_bfloat16_float(__m512i(a)[18], __m512i(b)[18]),
-      pack_bfloat16_float(__m512i(a)[19], __m512i(b)[19]),
-      pack_bfloat16_float(__m512i(a)[20], __m512i(b)[20]),
-      pack_bfloat16_float(__m512i(a)[21], __m512i(b)[21]),
-      pack_bfloat16_float(__m512i(a)[22], __m512i(b)[22]),
-      pack_bfloat16_float(__m512i(a)[23], __m512i(b)[23]),
-      pack_bfloat16_float(__m512i(a)[24], __m512i(b)[24]),
-      pack_bfloat16_float(__m512i(a)[25], __m512i(b)[25]),
-      pack_bfloat16_float(__m512i(a)[26], __m512i(b)[26]),
-      pack_bfloat16_float(__m512i(a)[27], __m512i(b)[27]),
-      pack_bfloat16_float(__m512i(a)[28], __m512i(b)[28]),
-      pack_bfloat16_float(__m512i(a)[29], __m512i(b)[29]),
-      pack_bfloat16_float(__m512i(a)[30], __m512i(b)[30]),
-      pack_bfloat16_float(__m512i(a)[31], __m512i(b)[31]));
+  __m512i a0 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(a), 0));
+  __m512i a1 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(a), 1));
+  __m512i b0 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(b), 0));
+  __m512i b1 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(b), 1));
+  __m512 y0 =
+      _mm512_castsi512_ps(_mm512_add_epi32(_mm512_slli_epi32(a0, 16), b0));
+  __m512 y1 =
+      _mm512_castsi512_ps(_mm512_add_epi32(_mm512_slli_epi32(a1, 16), b1));
   return std::make_tuple(y0, y1);
 }
 
 inline std::tuple<Vectorized<at::BFloat16>, Vectorized<at::BFloat16>>
 unpack_float_bfloat16(const Vectorized<float>& a, const Vectorized<float>& b) {
-  // TODO: Vectorized version
-  std::vector<at::BFloat16> lo_val(32);
-  std::vector<at::BFloat16> hi_val(32);
-  for (int i = 0; i < 16; i++) {
-    std::tie(lo_val[i], hi_val[i]) = unpack_float_bfloat16(__m512(a)[i]);
-  }
-  for (int i = 0; i < 16; i++) {
-    std::tie(lo_val[i + 16], hi_val[i + 16]) =
-        unpack_float_bfloat16(__m512(b)[i]);
-  }
-  Vectorized<at::BFloat16> y0 = Vectorized<at::BFloat16>(
-      lo_val[0],
-      lo_val[1],
-      lo_val[2],
-      lo_val[3],
-      lo_val[4],
-      lo_val[5],
-      lo_val[6],
-      lo_val[7],
-      lo_val[8],
-      lo_val[9],
-      lo_val[10],
-      lo_val[11],
-      lo_val[12],
-      lo_val[13],
-      lo_val[14],
-      lo_val[15],
-      lo_val[16],
-      lo_val[17],
-      lo_val[18],
-      lo_val[19],
-      lo_val[20],
-      lo_val[21],
-      lo_val[22],
-      lo_val[23],
-      lo_val[24],
-      lo_val[25],
-      lo_val[26],
-      lo_val[27],
-      lo_val[28],
-      lo_val[29],
-      lo_val[30],
-      lo_val[31]);
-  Vectorized<at::BFloat16> y1 = Vectorized<at::BFloat16>(
-      hi_val[0],
-      hi_val[1],
-      hi_val[2],
-      hi_val[3],
-      hi_val[4],
-      hi_val[5],
-      hi_val[6],
-      hi_val[7],
-      hi_val[8],
-      hi_val[9],
-      hi_val[10],
-      hi_val[11],
-      hi_val[12],
-      hi_val[13],
-      hi_val[14],
-      hi_val[15],
-      hi_val[16],
-      hi_val[17],
-      hi_val[18],
-      hi_val[19],
-      hi_val[20],
-      hi_val[21],
-      hi_val[22],
-      hi_val[23],
-      hi_val[24],
-      hi_val[25],
-      hi_val[26],
-      hi_val[27],
-      hi_val[28],
-      hi_val[29],
-      hi_val[30],
-      hi_val[31]);
+  __m512i x0 = _mm512_castps_si512(__m512(a));
+  __m512i x1 = _mm512_castps_si512(__m512(b));
+  __m512i x0_hi = _mm512_srli_epi32(x0, 16);
+  __m512i x1_hi = _mm512_srli_epi32(x1, 16);
+
+  __m512i zeros = _mm512_set1_epi32(0xffff);
+  __m512i x0_lo = _mm512_and_si512(x0, zeros);
+  __m512i x1_lo = _mm512_and_si512(x1, zeros);
+
+  __m512i idx = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
+  __m512i y0 = _mm512_packus_epi32(x0_hi, x1_hi);
+  y0 = _mm512_permutexvar_epi64(idx, y0);
+  __m512i y1 = _mm512_packus_epi32(x0_lo, x1_lo);
+  y1 = _mm512_permutexvar_epi64(idx, y1);
   return std::make_tuple(y0, y1);
 }
 #else
