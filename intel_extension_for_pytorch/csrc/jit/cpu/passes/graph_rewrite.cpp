@@ -448,16 +448,16 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     TORCH_CHECK(list_length);
 
     auto tensor1 = listConstruct->input(0)->type()->cast<TensorType>();
-    auto check_type_channelsize = [](std::shared_ptr<c10::TensorType> tensor) {
+    auto check_type_channelsize = [](c10::TensorType tensor) {
       return (
-          tensor->scalarType().value() == at::kFloat &&
-          tensor->sizes()[1].value() % 16 == 0 && is_channelslast(tensor));
+          tensor.scalarType().value() == at::kFloat &&
+          tensor.sizes()[1].value() % 16 == 0 && is_channelslast(tensor));
     };
     // Check if the dimension of the first tensor is either 4 or 5.
     // Check if the data type, the size of Channels, and the memory format are
     // float, mutiples of 16, and ChannelsLast(3d), respectively.
     if (!(tensor1->dim().value() == 4 || tensor1->dim().value() == 5) ||
-        !check_type_channelsize(tensor1)) {
+        !check_type_channelsize(*tensor1)) {
       return false;
     }
     // Check the rest tensors
@@ -465,7 +465,7 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
       auto tensori = listConstruct->input(i)->type()->cast<TensorType>();
       // Check dimension, data type, channel size and memory format
       if (!(tensor1->dim().value() == tensori->dim().value()) ||
-          !check_type_channelsize(tensori)) {
+          !check_type_channelsize(*tensori)) {
         return false;
       }
       // The channel sizes can be different, and check the other dim sizes.
