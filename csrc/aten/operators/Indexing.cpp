@@ -338,14 +338,15 @@ void indexAdd(
           auto dst_ptr = dst_data;
           auto idx_ptr = idx_data;
 
-          auto dst_slice_id = item_id.get_group(0);
-          // auto slice_off = IndexToOffset<int64_t, unsigned
-          // int>::get(dst_slice_id, indices_info);
-          auto g_idx_ptr = idx_ptr;
+          auto src_slice_id = item_id.get_group(0);
+          auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
+              src_slice_id, indices_info);
+          auto dst_slice_id = idx_ptr[slice_off];
+
           auto g_dst_ptr =
-              dst_ptr + g_idx_ptr[dst_slice_id] * dst_info.strides[dst_add_dim];
+              dst_ptr + dst_slice_id * dst_info.strides[dst_add_dim];
           auto g_src_ptr =
-              src_ptr + dst_slice_id * src_info.strides[src_add_dim];
+              src_ptr + src_slice_id * src_info.strides[src_add_dim];
 
           auto ii_ = item_id.get_local_id(0);
           auto dst_offset_ =
@@ -355,16 +356,12 @@ void indexAdd(
           g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
 
           for (int iter = 1; iter < n_work_item_iter; iter++) {
-            auto idx_offset_ =
-                IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-            auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
-            auto __src_idx = idx_offset_ * wgroup_size + ii_;
-
-            if (__src_idx < srcTotalSize) {
+            auto __inner_idx = iter * wgroup_size + ii_;
+            if (__inner_idx < sliceSize) {
               dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
                   __inner_idx, dst_info);
               src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                  __src_idx, src_info);
+                  __inner_idx, src_info);
               g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
             }
           }
@@ -435,12 +432,12 @@ void indexFill(
           auto dst_ptr = dst_data;
           auto idx_ptr = idx_data;
 
-          auto dst_slice_id = item_id.get_group(0);
-          // auto slice_off = IndexToOffset<int64_t, unsigned
-          // int>::get(dst_slice_id, indices_info);
-          auto g_idx_ptr = idx_ptr;
-          auto g_dst_ptr = dst_ptr +
-              g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
+          auto src_slice_id = item_id.get_group(0);
+          auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
+              src_slice_id, indices_info);
+          auto dst_slice_id = idx_ptr[slice_off];
+          auto g_dst_ptr =
+              dst_ptr + dst_slice_id * dst_info.strides[dst_fill_dim];
 
           auto ii_ = item_id.get_local_id(0);
           auto dst_offset_ =
@@ -448,10 +445,7 @@ void indexFill(
           g_dst_ptr[dst_offset_] = val;
 
           for (int iter = 1; iter < n_work_item_iter; iter++) {
-            auto idx_offset_ =
-                IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-            auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
-
+            auto __inner_idx = iter * wgroup_size + ii_;
             if (__inner_idx < dstTotalSize) {
               dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
                   __inner_idx, dst_info);
@@ -528,11 +522,12 @@ void indexCopy(
       auto src_ptr = src_data;
       auto idx_ptr = idx_data;
 
-      auto dst_slice_id = item_id.get_group(0);
-      auto g_idx_ptr = idx_ptr;
-      auto g_dst_ptr =
-          dst_ptr + g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
-      auto g_src_ptr = src_ptr + dst_slice_id * src_info.strides[src_dim];
+      auto src_slice_id = item_id.get_group(0);
+      auto slice_off =
+          IndexToOffset<int64_t, unsigned int>::get(src_slice_id, indices_info);
+      auto dst_slice_id = idx_ptr[slice_off];
+      auto g_dst_ptr = dst_ptr + dst_slice_id * dst_info.strides[dst_fill_dim];
+      auto g_src_ptr = src_ptr + src_slice_id * src_info.strides[src_dim];
 
       auto ii_ = item_id.get_local_id(0);
       auto dst_offset_ =
@@ -542,15 +537,14 @@ void indexCopy(
       g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
 
       for (int iter = 1; iter < n_work_item_iter; iter++) {
-        auto idx_offset_ =
-            IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-        auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
-
-        if (__inner_idx < dstTotalSize) {
+        auto __inner_idx = iter * wgroup_size + ii_;
+        if (__inner_idx < sliceSize) {
+          src_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, src_info);
           dst_offset_ =
               IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
 
-          g_dst_ptr[dst_offset_] = src_ptr[ii_];
+          g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
         }
       }
     };
