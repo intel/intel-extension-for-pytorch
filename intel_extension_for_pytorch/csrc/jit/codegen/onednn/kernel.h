@@ -83,22 +83,6 @@ class LlgaKernel {
     return s.logical_tensor();
   }
 
-  void lock_read() {
-    rw_mutex_.lock_read();
-  }
-
-  void lock_write() {
-    rw_mutex_.lock_write();
-  }
-
-  void unlock_read() {
-    rw_mutex_.unlock_read();
-  }
-
-  void unlock_write() {
-    rw_mutex_.unlock_write();
-  }
-
   at::Device device_ = at::kCPU;
   const Node* fusionNode_;
   std::shared_ptr<Graph> graph_;
@@ -121,8 +105,7 @@ class LlgaKernel {
   std::unordered_map<size_t, size_t> inplacePairs_; // output id -> input offset
   std::string debugName_;
   std::string profileName_;
-  torch_ipex::ReadWriteMutex rw_mutex_;
-  bool is_initialized_ = false;
+  std::once_flag initialized_flag_;
 };
 
 } // namespace onednn
