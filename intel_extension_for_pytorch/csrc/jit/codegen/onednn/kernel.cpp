@@ -259,24 +259,17 @@ void LlgaKernel::run(Stack& stack) {
     return v.toTensor();
   });
 
-  lock_read();
-  if (is_initialized_) {
-    unlock_read();
-  } else {
-    unlock_read();
-
-    lock_write();
-    if (!is_initialized_) {
-      GRAPH_DEBUG("Initializing input logical tensors");
-      inputSpecs_ = initializeInputSpecs(inputs);
-      GRAPH_DEBUG("Initializing output logical tensors");
-      outputSpecs_ = initializeOutputSpecs();
-      GRAPH_DEBUG("Compiling partition");
-      compilation_ = compile(partition_);
-      is_initialized_ = true;
-    }
-    unlock_write();
-  }
+  std::call_once(
+      initialized_flag_,
+      [&](const TensorArgs& inputs) {
+        GRAPH_DEBUG("Initializing input logical tensors");
+        inputSpecs_ = initializeInputSpecs(inputs);
+        GRAPH_DEBUG("Initializing output logical tensors");
+        outputSpecs_ = initializeOutputSpecs();
+        GRAPH_DEBUG("Compiling partition");
+        compilation_ = compile(partition_);
+      },
+      inputs);
 
   GRAPH_DEBUG("Preparing runtime tensors");
   TensorArgs outputs;
