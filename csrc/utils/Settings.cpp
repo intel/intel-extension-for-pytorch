@@ -1,5 +1,6 @@
 #include <oneDNN/Runtime.h>
 #include <utils/Settings.h>
+#include <utils/oneMKLUtils.h>
 
 #include <iostream>
 #include <mutex>
@@ -245,6 +246,10 @@ void Settings::disable_tf32_mode() {
 
 bool Settings::set_onednn_verbose(int level) {
   return xpu::oneDNN::set_onednn_verbose(level);
+}
+
+bool Settings::set_onemkl_verbose(int level) {
+  return xpu::oneMKL::set_onemkl_verbose(level);
 }
 
 bool Settings::is_onedpl_enabled() const {

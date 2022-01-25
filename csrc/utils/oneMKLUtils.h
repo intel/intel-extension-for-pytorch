@@ -1,6 +1,11 @@
 #pragma once
 #include <utils/DPCPP.h>
 
+#ifdef USE_ONEMKL
+#include <mkl.h>
+#include <oneapi/mkl.hpp>
+#endif
+
 #define DPCPP_ONEMKL_SUBMIT(q, routine, ...) \
   { DPCPP_EXT_SUBMIT((q), "onemkl_kernel", routine(__VA_ARGS__)); }
 
@@ -36,6 +41,8 @@ class oneMKLExpInfo {
   }
   ~oneMKLExpInfo() {}
 };
+
+bool set_onemkl_verbose(int level);
 
 } // namespace oneMKL
 } // namespace xpu

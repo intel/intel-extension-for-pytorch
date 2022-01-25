@@ -3,16 +3,11 @@
 #include <ATen/native/LinearAlgebraUtils.h>
 
 #include <runtime/Utils.h>
+#include <utils/oneMKLUtils.h>
 
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 using namespace xpu::dpcpp;
 

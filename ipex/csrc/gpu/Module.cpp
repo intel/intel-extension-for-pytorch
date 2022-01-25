@@ -624,6 +624,10 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_onednn_verbose(level);
   });
 
+  m.def("_set_onemkl_verbose", [](const int level) {
+    return Settings::I().set_onemkl_verbose(level);
+  });
+
   auto set_module_attr = [&](const char* name, PyObject* v) {
     // PyObject_SetAttrString doesn't steal reference. So no need to incref.
     if (PyObject_SetAttrString(m.ptr(), name, v) < 0) {

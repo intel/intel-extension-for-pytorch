@@ -3,12 +3,7 @@
 
 #include <c10/util/Exception.h>
 #include <utils/Macros.h>
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
 #include <utils/oneMKLUtils.h>
-#endif
 
 namespace xpu {
 namespace dpcpp {

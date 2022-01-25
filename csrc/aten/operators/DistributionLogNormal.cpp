@@ -5,16 +5,12 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 
 #include "Distributions.h"
 #include "Random.h"
-
-#ifdef USE_ONEMKL
-#include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 namespace at {
 namespace AtenIpexTypeXPU {

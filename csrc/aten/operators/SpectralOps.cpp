@@ -2,16 +2,10 @@
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
+#include <utils/oneMKLUtils.h>
 #include "Utils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
-#include <oneapi/mkl/dfti.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;

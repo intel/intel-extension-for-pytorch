@@ -6,14 +6,9 @@
 #include "comm/ATDispatch.h"
 
 #include <ATen/AtenIpexTypeXPU.h>
+#include <utils/oneMKLUtils.h>
 #include "Distributions.h"
 #include "Random.h"
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 namespace at {
 namespace AtenIpexTypeXPU {

@@ -3,15 +3,10 @@
 #include <ATen/record_function.h>
 #include <core/Generator.h>
 #include <runtime/Utils.h>
+#include <utils/oneMKLUtils.h>
 #include "Distributions.h"
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 #include <aten/operators/MemoryAccess.h>
 

@@ -43,6 +43,7 @@ class IPEX_API Settings final {
   void disable_tf32_mode();
 
   bool set_onednn_verbose(int level);
+  bool set_onemkl_verbose(int level);
 
   bool is_onedpl_enabled() const;
 

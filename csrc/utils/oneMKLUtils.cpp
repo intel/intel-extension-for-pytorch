@@ -8,5 +8,14 @@ oneMKLExpInfo& oneMKLExpInfo::Instance() {
   return myInstance;
 }
 
+bool set_onemkl_verbose(int level) {
+#ifdef USE_ONEMKL
+  auto status = mkl_verbose(level);
+  return status != -1;
+#else
+  return false;
+#endif
+}
+
 } // namespace oneMKL
 } // namespace xpu

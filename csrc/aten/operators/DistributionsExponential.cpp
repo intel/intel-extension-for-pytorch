@@ -5,18 +5,13 @@
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
+#include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 
 #include "Distributions.h"
 #include "Loops.h"
 #include "Random.h"
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;

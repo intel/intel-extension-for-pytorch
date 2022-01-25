@@ -6,16 +6,11 @@
 
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <utils/oneMKLUtils.h>
 #include <vector>
 
 #include <quantized/QUtil.h>
 #include "comm/ATDispatch.h"
-
-#ifdef USE_ONEMKL
-#include <mkl.h>
-#include <oneapi/mkl.hpp>
-#include <utils/oneMKLUtils.h>
-#endif
 
 #include <c10/util/typeid.h>
 

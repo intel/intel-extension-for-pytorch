@@ -71,6 +71,30 @@ class onednn_verbose(object):
         set_onednn_verbose(ONEDNN_VERB_LEVEL.OFF)
         return False
 
+# oneMKL Verbose
+class ONEMKL_VERB_LEVEL(EnumBase):
+    OFF = 0
+    ON = 1
+    ON_SYNC = 2
+
+def set_onemkl_verbose(level):
+    st = _C._set_onemkl_verbose(ONEMKL_VERB_LEVEL.convert(level).value)
+    assert bool(st), "WARNING: Failed to turn on oneMKL verbose!"
+
+class onemkl_verbose(object):
+    def __init__(self, level):
+        self.level = ONEMKL_VERB_LEVEL.convert(level)
+
+    def __enter__(self):
+        if self.level == ONEMKL_VERB_LEVEL.OFF:
+            return self
+        set_onemkl_verbose(self.level)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        set_onemkl_verbose(ONEMKL_VERB_LEVEL.OFF)
+        return False
+
 # Force Sync Execution
 def using_force_sync_exec():
     return _C._is_force_sync_exec()
