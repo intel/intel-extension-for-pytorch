@@ -11,7 +11,7 @@
 #include <runtime/Utils.h>
 #include "MemoryAccess.h"
 
-#define UNROLLED_ELEM_PER_WORK_ITEM 1
+#define UNROLLED_ELEM_PER_WORK_ITEM 4
 
 using namespace xpu::dpcpp;
 
@@ -193,7 +193,7 @@ struct apply_func_helper {
 };
 
 template <int vec_size, typename func_t, typename policy_t>
-inline void elementwise_kernel_helper(func_t f, policy_t& policy) {
+inline void vec_elementwise_kernel_helper(func_t f, policy_t& policy) {
   using traits = function_traits<func_t>;
   using args_t = typename traits::ArgsTuple;
   using vectorized_args_t =
@@ -214,6 +214,29 @@ inline void elementwise_kernel_helper(func_t f, policy_t& policy) {
 
   // store
   policy.template store<return_t>(results);
+}
+
+template <typename func_t, typename policy_t>
+inline void elementwise_kernel_helper(func_t f, policy_t policy) {
+  using traits = function_traits<func_t>;
+  using return_t = typename traits::result_type;
+  using args_t = typename traits::ArgsTuple;
+
+  return_t results[THREAD_WORK_SIZE];
+  args_t args[THREAD_WORK_SIZE];
+
+  // load
+  policy.load(args);
+
+  // compute
+  for (int i = 0; i < THREAD_WORK_SIZE; i++) {
+    if (policy.check_inbounds(i)) {
+      results[i] = c10::guts::apply(f, args[i]);
+    }
+  }
+
+  // store
+  policy.store(results);
 }
 
 template <
@@ -237,9 +260,9 @@ static inline void unrolled_elementwise_kernel(
 
   int remaining = numel - thread_idx * vec_size;
   auto policy = at::native::Memory::policies::
-      unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
+      vec_unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
           data, remaining, ic, oc, l, s, thread_idx);
-  elementwise_kernel_helper<vec_size>(f, policy);
+  vec_elementwise_kernel_helper<vec_size>(f, policy);
 }
 
 template <
@@ -299,12 +322,12 @@ void vectorized_elementwise_kernel(
         at::native::Memory::LoadWithoutCast,
         at::native::Memory::StoreWithoutCast>(
         data, remaining, input_calc, output_calc, loader, storer, thread_idx);
-    elementwise_kernel_helper<vec_size>(fn, policy);
+    elementwise_kernel_helper(fn, policy);
   } else { // if this block has a full `block_work_size` data to handle, use
     // vectorized memory access
     auto policy = at::native::Memory::policies::vectorized<vec_size, array_t>(
         data, thread_idx);
-    elementwise_kernel_helper<vec_size>(fn, policy);
+    vec_elementwise_kernel_helper<vec_size>(fn, policy);
   }
 }
 

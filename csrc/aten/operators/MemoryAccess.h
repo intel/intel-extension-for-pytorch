@@ -88,7 +88,7 @@ struct vectorized_load_helper {
 };
 
 template <int arg_index>
-struct unroll_load_helper {
+struct vec_unroll_load_helper {
   template <
       typename args_t,
       typename policy_t,
@@ -111,6 +111,28 @@ struct unroll_load_helper {
         self.data[arg_index + num_outputs], offset[arg_index], arg_index);
     std::get<arg_index>(args)[unroll_index] =
         at::native::Memory::detail::bitwise_cast<vec_arg_t>(arg);
+  }
+};
+
+template <int arg_index>
+struct unroll_load_helper {
+  template <
+      typename args_t,
+      typename policy_t,
+      typename offset_t,
+      typename loader_t>
+  static void apply(
+      policy_t& self,
+      args_t* args,
+      offset_t offset,
+      loader_t loader,
+      int j,
+      int num_outputs) {
+    using arg_t = std::tuple_element_t<arg_index, args_t>;
+    // `data` hold the data_ptr for tensors [output, input0, input1, ...], so we
+    // need a +1 offset to get the input
+    std::get<arg_index>(args[j]) = loader.template load<arg_t>(
+        self.data[arg_index + num_outputs], offset[arg_index], arg_index);
   }
 };
 
@@ -218,7 +240,7 @@ template <
     typename loader_t,
     typename storer_t,
     int num_outputs = 1>
-struct unroll {
+struct vec_unroll {
   data_t data;
   int remaining;
   inp_calc_t& input_offset_calculator;
@@ -227,7 +249,7 @@ struct unroll {
   storer_t& storer;
   int thread_idx;
 
-  unroll(
+  vec_unroll(
       data_t data,
       int remaining,
       inp_calc_t& ic,
@@ -257,8 +279,10 @@ struct unroll {
         if (i < remaining) {
           int linear_idx = thread_idx * vec_size + i;
           auto offset = input_offset_calculator.get(linear_idx);
-          detail::vec_static_unroll<detail::unroll_load_helper, arity, args_t>::
-              with_args(*this, args, offset, loader, i, num_outputs);
+          detail::vec_static_unroll<
+              detail::vec_unroll_load_helper,
+              arity,
+              args_t>::with_args(*this, args, offset, loader, i, num_outputs);
         }
       }
     }
@@ -274,6 +298,72 @@ struct unroll {
         auto ret = at::native::Memory::detail::bitwise_cast<return_t>(from[i]);
         storer.template store<return_t>(ret, data[0], offset);
       }
+    }
+  }
+};
+
+// Assumption:
+// all tensors are contiguous, that is: stride == sizeof(type) for all tensors
+template <
+    int vec_size,
+    typename data_t,
+    typename inp_calc_t,
+    typename out_calc_t,
+    typename loader_t,
+    typename storer_t,
+    int num_outputs = 1>
+struct unroll {
+  data_t data;
+  int remaining;
+  inp_calc_t input_offset_calculator;
+  out_calc_t output_offset_calculator;
+  loader_t loader;
+  storer_t storer;
+  int thread_idx;
+
+  unroll(
+      data_t data,
+      int remaining,
+      inp_calc_t ic,
+      out_calc_t oc,
+      loader_t l,
+      storer_t s,
+      int thread_idx)
+      : data(data),
+        remaining(remaining),
+        input_offset_calculator(ic),
+        output_offset_calculator(oc),
+        loader(l),
+        storer(s),
+        thread_idx(thread_idx) {}
+
+  inline bool check_inbounds(int thread_work_elem) const {
+    return (thread_work_elem < remaining);
+  }
+
+  template <typename args_t>
+  inline void load(args_t* args) {
+    constexpr int arity = std::tuple_size<args_t>::value;
+    for (int i = 0; i < THREAD_WORK_SIZE; i++) {
+      if (i >= remaining) {
+        return;
+      }
+      int linear_idx = thread_idx * vec_size + i;
+      auto offset = input_offset_calculator.get(linear_idx);
+      detail::static_unroll<detail::unroll_load_helper, arity>::with_args(
+          *this, args, offset, loader, i, num_outputs);
+    }
+  }
+
+  template <typename scalar_t>
+  inline void store(scalar_t* from) {
+    for (int i = 0; i < THREAD_WORK_SIZE; i++) {
+      if (i >= remaining) {
+        return;
+      }
+      int linear_idx = thread_idx * vec_size + i;
+      int offset = output_offset_calculator.get(linear_idx)[0];
+      storer.store(from[i], data[0], offset);
     }
   }
 };
