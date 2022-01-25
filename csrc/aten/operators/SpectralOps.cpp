@@ -102,8 +102,8 @@ template <
     oneapi::mkl::dft::domain signal_type,
     typename scalar_t>
 void _mkl_dft(
-    Tensor input,
-    Tensor output,
+    const Tensor input,
+    Tensor& output,
     int64_t signal_ndim,
     bool complex_input,
     bool complex_output,
@@ -210,20 +210,20 @@ Tensor _fft_with_size(
     IntArrayRef output_sizes) {
 #ifdef USE_ONEMKL
   int64_t batch = self.size(0);
-  Tensor input_ = self;
+  Tensor _input = self;
   // real/imag dimension must aligned when viewed as of complex type
 
   if (complex_input) {
-    bool need_contiguous = input_.stride(-1) != 1;
+    bool need_contiguous = _input.stride(-1) != 1;
     for (int64_t i = 0; !need_contiguous && i <= signal_ndim; i++) {
-      need_contiguous |= input_.stride(i) % 2 != 0;
+      need_contiguous |= _input.stride(i) % 2 != 0;
     }
     if (need_contiguous) {
-      input_ = input_.contiguous();
+      _input = _input.contiguous();
     }
   }
 
-  Tensor output = at::empty(output_sizes, input_.options());
+  Tensor output = at::empty(output_sizes, _input.options());
 
   bool complex_type;
   if (!inverse) {
@@ -233,21 +233,21 @@ Tensor _fft_with_size(
   }
 
   Tensor input;
-  if (input_.scalar_type() == ScalarType::BFloat16) {
-    input = at::empty(input_.numel(), input_.options().dtype(at::kFloat));
+  if (_input.scalar_type() == ScalarType::BFloat16) {
+    input = at::empty(_input.sizes(), _input.options().dtype(at::kFloat));
     dtype_convert_by_scalar(
         input.data_ptr<float>(),
-        input_.data_ptr<at::BFloat16>(),
-        input_.numel());
-    auto output_ =
-        at::empty(output.numel(), output.options().dtype(at::kFloat));
+        _input.data_ptr<at::BFloat16>(),
+        _input.numel());
+    auto _output =
+        at::empty(output.sizes(), output.options().dtype(at::kFloat));
     if (complex_type) {
       impl::_mkl_dft<
           oneapi::mkl::dft::precision::SINGLE,
           oneapi::mkl::dft::domain::COMPLEX,
           float>(
           input,
-          output_,
+          _output,
           signal_ndim,
           complex_input,
           complex_output,
@@ -262,7 +262,7 @@ Tensor _fft_with_size(
           oneapi::mkl::dft::domain::REAL,
           float>(
           input,
-          output_,
+          _output,
           signal_ndim,
           complex_input,
           complex_output,
@@ -274,7 +274,7 @@ Tensor _fft_with_size(
     }
     dtype_convert_by_scalar(
         output.data_ptr<at::BFloat16>(),
-        output_.data_ptr<float>(),
+        _output.data_ptr<float>(),
         output.numel());
 
   } else {

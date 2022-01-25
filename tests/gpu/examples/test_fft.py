@@ -29,6 +29,14 @@ class TestNNMethod(TestCase):
         self.assertEqual(y4, y4_dpcpp.cpu())
         self.assertEqual(y5, y5_dpcpp.cpu())
 
+    def test_fft_bf16(self, dtype=torch.float):
+        # Just for bf16 runtime test, there isn't cpu reference.
+        var = torch.randn(2, 72, 72, 2).bfloat16()
+        var_xpu = var.to("xpu")
+        for i in range(2):
+            dst_rfft = torch.rfft(var_xpu, 2, onesided=True, normalized=False)
+            dst_ifft = torch.ifft(dst_rfft, signal_ndim=2, normalized=False)
+
     # TODO: remove skip when oneMKL is ready
     @pytest.mark.skip(reason="irfft has accuracy issue in oneMKL, MKLD-12824")
     def test_irfft(self, dtype=torch.float):
