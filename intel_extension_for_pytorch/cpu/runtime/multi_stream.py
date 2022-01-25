@@ -35,31 +35,47 @@ class MultiStreamModule(nn.Module):
     def __init__(self, model, num_streams: int, cpu_pool: CPUPool, concat_output: bool = True):
         super(MultiStreamModule, self).__init__()
         assert type(cpu_pool) is CPUPool
-        core_list = cpu_pool.core_ids
+        self.core_list = cpu_pool.core_ids
         self.num_streams = num_streams
-        self.cores_per_instance = core_list.__len__() // self.num_streams
-        num_stream_allocated_extra_core = core_list.__len__() % self.num_streams
-        self.tasks = []
-        start_core_list_idx = 0
-        end_core_list_idx = 0
-        for j in range(self.num_streams):
-            if j < num_stream_allocated_extra_core:
-                end_core_list_idx += (self.cores_per_instance + 1)
-            else:
-                end_core_list_idx += self.cores_per_instance
-            self.tasks.append(ipex.cpu.runtime.Task(model, ipex.cpu.runtime.CPUPool(core_list[start_core_list_idx:end_core_list_idx])))
-            start_core_list_idx = end_core_list_idx
+        if self.num_streams == 1:
+            # Sync execution path if num_stream is 1.
+            self.model = model
+        else:
+            self.cores_per_instance = self.core_list.__len__() // self.num_streams
+            num_stream_allocated_extra_core = self.core_list.__len__() % self.num_streams
+            self.tasks = []
+            start_core_list_idx = 0
+            end_core_list_idx = 0
+            for j in range(self.num_streams):
+                if j < num_stream_allocated_extra_core:
+                    # If the core number is not divisible by stream number,
+                    # the remainder streams(num_stream_allocated_extra_core) will be allocated one extra core.
+                    end_core_list_idx += (self.cores_per_instance + 1)
+                else:
+                    end_core_list_idx += self.cores_per_instance
+                self.tasks.append(ipex.cpu.runtime.Task(model, ipex.cpu.runtime.CPUPool(self.core_list[start_core_list_idx:end_core_list_idx])))
+                start_core_list_idx = end_core_list_idx
         self.concat_output = concat_output
 
     def forward(self, inputs):
+        if self.num_streams == 1:
+            # Sync execution path if num_stream is 1
+            if not ipex._C.is_same_core_affinity_setting(self.core_list):
+                # If the main thread's core affinity has been changed, we should set it again.
+                ipex._C.pin_cpu_cores(self.core_list)
+            results_raw = self.model(inputs)
+            return results_raw if self.concat_output else [results_raw]
         # Ensure each instance has input offload
         batch_per_instance = inputs.size(0) // self.num_streams
         if batch_per_instance >= 1:
-            # the input size large or equal number of instance
+            # The input batchsize larger or equal to num_streams.
             used_num_streams = self.num_streams
-            instance_need_extra_input = inputs.size(0) % self.num_streams # input image size large than num_streams and not divisible
+            # If input batchsize larger than num_streams and not divisible,
+            # the first remainder streams will have (mini_batch + 1) input size.
+            instance_need_extra_input = inputs.size(0) % self.num_streams
         else:
-            # the input size less than number of instance
+            # The input batchsize less than num_streams,
+            # only the first batchsize stream will have mini_batch(1) input.
             batch_per_instance = 1
             used_num_streams = inputs.size(0)
             instance_need_extra_input = 0
@@ -69,10 +85,11 @@ class MultiStreamModule(nn.Module):
         end_idx = 0
         for j in range(used_num_streams):
             if j < instance_need_extra_input:
-                # tail case, when the input image size large than num_streams and not divisible
+                # Tail case, when the input image size larger than num_streams and not divisible,
+                # the first remainder streams will have (mini_batch + 1) input size.
                 end_idx = end_idx + (batch_per_instance + 1)
             else:
-                # input image size divisible of num_streams or input image size less than num_streams
+                # Input image size divisible of num_streams or input image size less than num_streams.
                 end_idx = end_idx + batch_per_instance
             results_raw_future.append(self.tasks[j](inputs[start_idx:end_idx]))
             start_idx = end_idx

@@ -317,6 +317,12 @@ void InitIpexModuleBindings(py::module m) {
         py::cast<std::vector<int32_t>>(core_list));
     return;
   });
+  m.def("is_same_core_affinity_setting", [](const py::list& core_list) {
+    return torch_ipex::runtime::is_same_core_affinity_setting(
+        // Here converting py::list to std::vector<int32_t> will have the data
+        // copy.
+        py::cast<std::vector<int32_t>>(core_list));
+  });
   m.def("get_current_cpu_pool", []() {
     return std::make_shared<torch_ipex::runtime::CPUPool>(
         torch_ipex::runtime::get_cpu_pool_from_mask_affinity());
