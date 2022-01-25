@@ -15,16 +15,6 @@ set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc")
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
-#[[
-IF (C_AVX512_FOUND AND CXX_AVX512_FOUND)
-  message(VERBOSE "Build the extension with AVX512 enabled.")
-ELSEIF(C_AVX2_FOUND AND CXX_AVX2_FOUND)
-  message(VERBOSE "Build the extension with AVX2 enabled.")
-ELSE()
-  message(FATAL_ERROR "Does not support building the extension on non-AVX512/AVX2 machine.")
-ENDIF()
-]]
-
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   message("Debug build.")
@@ -205,8 +195,20 @@ file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/a
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Copy.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Cumsum.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Eltwise.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/embeddingbag.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/interaction.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/LayerNorm.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Linear.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Matmul.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/MaxPooling.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Mean.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/MergedEmbeddingBag.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/MergedEmbeddingBagBackwardSGD.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Pooling.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Softmax.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/optimizer/*.cpp")
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/WeightPack.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/optimizer/*.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/utils/*.cpp")
 
 # Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}

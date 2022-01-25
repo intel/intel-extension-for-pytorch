@@ -2,6 +2,7 @@
 
 #include <ATen/Tensor.h>
 #include <c10/core/CPUAllocator.h>
+#include <csrc/dyndisp/DispatchStub.h>
 #include <omp.h>
 #include <torch/extension.h>
 
@@ -75,6 +76,33 @@ void sort_based_batched_csr2csc_opt(
     const Tensor& indices,
     std::vector<int64_t> pooling_modes,
     int64_t max_embeddings);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+void sort_based_batched_csr2csc_opt_kernel_impl(
+    BatchedHyperCompressedSparseColumn& batched_csc,
+    int B,
+    const Tensor& offsets,
+    const Tensor& indices,
+    std::vector<int64_t> pooling_modes,
+    int64_t max_embeddings);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using sort_based_batched_csr2csc_opt_kernel_fn = void (*)(
+    BatchedHyperCompressedSparseColumn&,
+    int,
+    const Tensor&,
+    const Tensor&,
+    std::vector<int64_t>,
+    int64_t);
+DECLARE_DISPATCH(
+    sort_based_batched_csr2csc_opt_kernel_fn,
+    sort_based_batched_csr2csc_opt_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

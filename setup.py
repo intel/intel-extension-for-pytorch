@@ -332,6 +332,9 @@ def get_avx_version():
     if avx_version == '':
         avx_version = 'AVX512'
 
+    if _check_env_flag('DYN_DISP'):
+        avx_version = 'AVX2'
+
     # print("The extension will be built with {}.".format(avx_version))
     return avx_version
 

@@ -1,4 +1,5 @@
 #include <ATen/Tensor.h>
+#include <intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h>
 #include <torch/extension.h>
 
 namespace torch_ipex {
@@ -8,4 +9,51 @@ std::vector<at::Tensor> interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input);
 
+} // namespace torch_ipex
+
+namespace torch_ipex {
+namespace cpu {
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+at::Tensor interaction_forward_kernel_impl(
+    const std::vector<at::Tensor>& input);
+
+std::vector<at::Tensor> interaction_backward_kernel_impl(
+    const at::Tensor& grad_out,
+    const std::vector<at::Tensor>& input);
+
+at::Tensor dil_qinteraction_kernel_impl(
+    const std::vector<at::Tensor> input,
+    double o_scale,
+    int64_t o_zp,
+    at::ScalarType o_dtype);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using interaction_forward_kernel_fn =
+    at::Tensor (*)(const std::vector<at::Tensor>&);
+DECLARE_DISPATCH(
+    interaction_forward_kernel_fn,
+    interaction_forward_kernel_stub);
+
+using interaction_backward_kernel_fn = std::vector<at::Tensor> (*)(
+    const at::Tensor&,
+    const std::vector<at::Tensor>&);
+DECLARE_DISPATCH(
+    interaction_backward_kernel_fn,
+    interaction_backward_kernel_stub);
+
+using dil_qinteraction_kernel_fn = at::Tensor (*)(
+    const std::vector<at::Tensor>,
+    double,
+    int64_t,
+    at::ScalarType);
+DECLARE_DISPATCH(dil_qinteraction_kernel_fn, dil_qinteraction_kernel_stub);
+
+} // namespace cpu
 } // namespace torch_ipex
