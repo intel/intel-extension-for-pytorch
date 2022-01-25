@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <csrc/dyndisp/DispatchStub.h>
 #include <torch/csrc/autograd/custom_function.h>
 
 namespace torch_ipex {
@@ -29,26 +30,6 @@ void cpu_pixel_shuffle_backward_channels_last(
     at::Tensor& grad_input,
     const at::Tensor& grad_output,
     int64_t upscale_factor);
-
-void pixel_shuffle_kernel(
-    at::Tensor& output,
-    const at::Tensor& input,
-    int64_t upscale_factor);
-
-void pixel_shuffle_backward_kernel(
-    at::Tensor& grad_input,
-    const at::Tensor& grad_output,
-    int64_t upscale_factor);
-
-void pixel_unshuffle_kernel(
-    at::Tensor& output,
-    const at::Tensor& input,
-    int64_t downscale_factor);
-
-void pixel_unshuffle_backward_kernel(
-    at::Tensor& grad_input,
-    const at::Tensor& grad_output,
-    int64_t downscale_factor);
 
 at::Tensor pixel_shuffle_cpu(const at::Tensor& self, int64_t upscale_factor);
 
@@ -107,6 +88,54 @@ class PixelUnshuffleOp : public torch::autograd::Function<PixelUnshuffleOp> {
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs);
 };
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+void pixel_shuffle_kernel_impl(
+    at::Tensor& output,
+    const at::Tensor& input,
+    int64_t upscale_factor);
+
+void pixel_shuffle_backward_kernel_impl(
+    at::Tensor& grad_input,
+    const at::Tensor& grad_output,
+    int64_t upscale_factor);
+
+void pixel_unshuffle_kernel_impl(
+    at::Tensor& output,
+    const at::Tensor& input,
+    int64_t downscale_factor);
+
+void pixel_unshuffle_backward_kernel_impl(
+    at::Tensor& grad_input,
+    const at::Tensor& grad_output,
+    int64_t downscale_factor);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using pixel_shuffle_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&, int64_t);
+DECLARE_DISPATCH(pixel_shuffle_kernel_fn, pixel_shuffle_kernel_stub);
+
+using pixel_shuffle_backward_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&, int64_t);
+DECLARE_DISPATCH(
+    pixel_shuffle_backward_kernel_fn,
+    pixel_shuffle_backward_kernel_stub);
+
+using pixel_unshuffle_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&, int64_t);
+DECLARE_DISPATCH(pixel_unshuffle_kernel_fn, pixel_unshuffle_kernel_stub);
+
+using pixel_unshuffle_backward_kernel_fn =
+    void (*)(at::Tensor&, const at::Tensor&, int64_t);
+DECLARE_DISPATCH(
+    pixel_unshuffle_backward_kernel_fn,
+    pixel_unshuffle_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex
