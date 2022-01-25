@@ -209,7 +209,10 @@ file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/a
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Pooling.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/RNN.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/RnntEmbedding.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ROIAlign.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Softmax.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/torchvision_nms.cpp"
+  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/UpdateBatch.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/WeightPack.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/optimizer/*.cpp"
   "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/utils/*.cpp")

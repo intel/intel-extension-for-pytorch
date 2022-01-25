@@ -22,7 +22,7 @@ void cpu_upsample_linear_channels_last(
     const scale_type& scales);
 
 template <int out_ndims, typename scale_type, class F>
-void upsample_generic_Nd_kernel_impl(
+void upsample_generic_Nd_kernel_body(
     const at::Tensor& output,
     const at::Tensor& input,
     bool align_corners,

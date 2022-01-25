@@ -751,7 +751,7 @@ void cpu_upsample_linear_channels_last(
   }
 }
 
-// Helper structs to use with upsample_generic_Nd_kernel_impl
+// Helper structs to use with upsample_generic_Nd_kernel_body
 struct HelperInterpBase {
   static inline void init_indices_weights(
       at::ScalarType output_type,
@@ -992,7 +992,7 @@ struct HelperInterpCubic : public HelperInterpBase {
 // - template<typename> class F is one of the above structs to compute indices
 // and weights
 template <int out_ndims, typename scale_type, class F>
-void upsample_generic_Nd_kernel_impl(
+void upsample_generic_Nd_kernel_body(
     const at::Tensor& output,
     const at::Tensor& input,
     bool align_corners,
@@ -1074,7 +1074,7 @@ void upsample_nearest1d_kernel_impl(
     const at::Tensor& output,
     const at::Tensor& input,
     c10::optional<double> scales_w) {
-  upsample_generic_Nd_kernel_impl<1, scale_t, HelperInterpNearest>(
+  upsample_generic_Nd_kernel_body<1, scale_t, HelperInterpNearest>(
       output, input, false, {scales_w});
 }
 
@@ -1094,7 +1094,7 @@ void upsample_nearest2d_kernel_impl(
               output, input, {scales_h, scales_w});
         });
   } else {
-    upsample_generic_Nd_kernel_impl<2, scale_t, HelperInterpNearest>(
+    upsample_generic_Nd_kernel_body<2, scale_t, HelperInterpNearest>(
         output, input, false, {scales_h, scales_w});
   }
 }
@@ -1116,7 +1116,7 @@ void upsample_nearest3d_kernel_impl(
               output, input, {scales_d, scales_h, scales_w});
         });
   } else {
-    upsample_generic_Nd_kernel_impl<3, scale_t, HelperInterpNearest>(
+    upsample_generic_Nd_kernel_body<3, scale_t, HelperInterpNearest>(
         output, input, false, {scales_d, scales_h, scales_w});
   }
 }
@@ -1126,7 +1126,7 @@ void upsample_linear1d_kernel_impl(
     const at::Tensor& input,
     bool align_corners,
     c10::optional<double> scales_w) {
-  upsample_generic_Nd_kernel_impl<1, scale_t, HelperInterpLinear>(
+  upsample_generic_Nd_kernel_body<1, scale_t, HelperInterpLinear>(
       output, input, align_corners, {scales_w});
 }
 
@@ -1147,7 +1147,7 @@ void upsample_bilinear2d_kernel_impl(
               output, input, align_corners, {scales_h, scales_w});
         });
   } else {
-    upsample_generic_Nd_kernel_impl<2, scale_t, HelperInterpLinear>(
+    upsample_generic_Nd_kernel_body<2, scale_t, HelperInterpLinear>(
         output, input, align_corners, {scales_h, scales_w});
   }
 }
@@ -1169,7 +1169,7 @@ void upsample_trilinear3d_kernel_impl(
               output, input, align_corners, {scales_d, scales_h, scales_w});
         });
   } else {
-    upsample_generic_Nd_kernel_impl<3, scale_t, HelperInterpLinear>(
+    upsample_generic_Nd_kernel_body<3, scale_t, HelperInterpLinear>(
         output, input, align_corners, {scales_d, scales_h, scales_w});
   }
 }
@@ -1180,7 +1180,7 @@ void upsample_bicubic2d_kernel_impl(
     bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  upsample_generic_Nd_kernel_impl<2, scale_t, HelperInterpCubic>(
+  upsample_generic_Nd_kernel_body<2, scale_t, HelperInterpCubic>(
       output, input, align_corners, {scales_h, scales_w});
 }
 
