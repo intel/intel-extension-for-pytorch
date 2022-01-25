@@ -10,7 +10,6 @@ M = 5
 
 class TestTorchMethod(TestCase):
 
-    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_single_unique(self):
         a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
         a_xpu = a_cpu.xpu()
@@ -32,7 +31,6 @@ class TestTorchMethod(TestCase):
             self.assertTrue(item in list_output_cpu)
 
 
-    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_inverse_unique(self):
         a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
         a_xpu = a_cpu.xpu()
@@ -43,7 +41,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(inverse_cpu, inverse_xpu)
 
 
-    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_inverse_counts_unique(self):
         a_cpu = torch.randint(0, 100, [N], dtype=torch.long)
         a_xpu = a_cpu.xpu()
@@ -55,7 +52,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(counts_cpu, counts_xpu)
 
 
-    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_dim0_unique(self):
         a_cpu = torch.randint(0, 5, [N, M], dtype=torch.long)
         a_xpu = a_cpu.xpu()
@@ -67,7 +63,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(counts_cpu, counts_xpu)
 
 
-    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_dim1_unique(self):
         a_cpu = torch.randint(0, 5, [N, M], dtype=torch.long)
         a_xpu = a_cpu.xpu()

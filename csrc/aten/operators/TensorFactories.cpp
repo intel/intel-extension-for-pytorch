@@ -11,15 +11,10 @@
 #include <core/Generator.h>
 #include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
+#include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-
-#ifdef USE_ONEDPL
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/iterator>
-#include <oneapi/dpl/numeric>
-#endif
+#include "comm/PSTLFunctions.h"
 
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -104,9 +99,7 @@ Tensor randperm_dpcpp(
     Tensor& result,
     int64_t n,
     c10::optional<Generator> generator) {
-#ifdef USE_ONEDPL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
 
   auto keys = at::empty(result.sizes(), result.options()).random_(generator);
   scalar_t* keys_data = keys.data_ptr<scalar_t>();
@@ -121,24 +114,21 @@ Tensor randperm_dpcpp(
     shuffled_data = shuffled.data_ptr<scalar_t>();
   }
 
-  auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
-  std::copy(policy, count_begin, count_begin + n, shuffled_data);
-  auto zipped_begin = oneapi::dpl::make_zip_iterator(keys_data, shuffled_data);
-  std::stable_sort(
-      policy, zipped_begin, zipped_begin + n, [](auto lhs, auto rhs) {
-        using std::get;
-        return get<0>(lhs) < get<0>(rhs);
-      });
+  at::AtenIpexTypeXPU::iota(shuffled_data, shuffled_data + n, scalar_t(0));
+  at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, scalar_t>(
+      keys_data,
+      shuffled_data,
+      keys.size(0), // prb_size
+      1, // batch_size
+      keys.stride(0), // stride
+      Numerics<scalar_t>::upper_bound(), // padding
+      [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); },
+      [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::eq(a, b); });
 
   if (!result.is_contiguous()) {
     result.copy_(shuffled);
   }
   return result;
-#else
-  AT_ERROR(
-      "Without ONEDPL support, randperm is not implemented for backend: ",
-      result.device());
-#endif
 }
 
 namespace triangle_dpcpp {
@@ -391,23 +381,23 @@ Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  return impl::empty_dpcpp(size, options, optional_memory_format);
+  return at::impl::empty_dpcpp(size, options, optional_memory_format);
 }
 
 Tensor empty_strided(
     IntArrayRef size,
     IntArrayRef stride,
     const TensorOptions& options) {
-  return impl::empty_strided_dpcpp(size, stride, options);
+  return at::impl::empty_strided_dpcpp(size, stride, options);
 }
 
 Tensor& eye_out(Tensor& out, int64_t n) {
-  impl::eye_out_dpcpp(out, n);
+  at::impl::eye_out_dpcpp(out, n);
   return out;
 }
 
 Tensor& eye_out(Tensor& out, int64_t n, int64_t m) {
-  impl::eye_out_dpcpp(out, n, m);
+  at::impl::eye_out_dpcpp(out, n, m);
   return out;
 }
 
@@ -420,7 +410,7 @@ Tensor& randperm_out(
   result.resize_({n});
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
-        impl::randperm_dpcpp<scalar_t>(result, n, generator);
+        at::impl::randperm_dpcpp<scalar_t>(result, n, generator);
       });
 
   return result;
@@ -447,7 +437,7 @@ Tensor tril_indices(
     int64_t col,
     int64_t offset,
     const TensorOptions& options) {
-  return impl::tril_indices_dpcpp(row, col, offset, options);
+  return at::impl::tril_indices_dpcpp(row, col, offset, options);
 }
 
 Tensor triu_indices(
@@ -455,7 +445,7 @@ Tensor triu_indices(
     int64_t col,
     int64_t offset,
     const TensorOptions& options) {
-  return impl::triu_indices_dpcpp(row, col, offset, options);
+  return at::impl::triu_indices_dpcpp(row, col, offset, options);
 }
 
 Tensor var(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
@@ -557,13 +547,13 @@ Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  return impl::empty_dpcpp(size, options, optional_memory_format);
+  return at::impl::empty_dpcpp(size, options, optional_memory_format);
 }
 Tensor empty_strided(
     IntArrayRef size,
     IntArrayRef stride,
     const TensorOptions& options) {
-  return impl::empty_strided_dpcpp(size, stride, options);
+  return at::impl::empty_strided_dpcpp(size, stride, options);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 

@@ -13,7 +13,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_index_and_index_put(self, dtype=torch.float):
         x_cpu = torch.randn([3, 3], dtype=torch.float, device=cpu_device)
         y_cpu = torch.randn([3, 3], dtype=torch.float, device=cpu_device)

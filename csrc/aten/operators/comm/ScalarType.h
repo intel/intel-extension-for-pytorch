@@ -1,0 +1,14 @@
+#pragma once
+
+#include <c10/core/ScalarType.h>
+
+namespace at {
+namespace AtenIpexTypeXPU {
+
+#define IPEX_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS \
+  AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS
+
+#define IPEX_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF \
+  AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF
+} // namespace AtenIpexTypeXPU
+} // namespace at

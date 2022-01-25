@@ -170,7 +170,6 @@ The following build options are supported in Intel GPU Extension for PyTorch.
 | **Build Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
 | USE_AOT_DEVLIST | "" | device list for AOT compilation. Now only ats is supported. | 
-| USE_ONEDPL | ON | Use oneDPL library under <PATH_To_frameworks.ai.pytorch.ipex-gpu>/<br>third_party/ if set to ON. |
 | USE_ONEMKL | ON | Use oneMKL BLAS library if set to ON. |
 | USE_PERSIST_STREAM | ON | Use persistent oneDNN stream if set to ON.|
 | USE_PRIMITIVE_CACHE | OFF | Use IPEX solution to cache oneDNN primtives if set to ON. <br> Otherwise use oneDNN cache solution.|

@@ -22,13 +22,6 @@
 #include "Loops.h"
 #include "ParttenScan.h"
 
-#ifdef USE_ONEDPL
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/iterator>
-#include <oneapi/dpl/numeric>
-#endif
-
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -154,69 +147,85 @@ void indexSelect(
   return;
 }
 
-template <typename T>
-struct NonZeroOp {
-  NonZeroOp() {}
-  bool operator()(T lhs) const {
-    if (Numerics<T>::ne(lhs, ScalarConvert<float, T>::to(0.0))) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-};
-
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   Tensor self = self_.contiguous();
-  int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
+  const int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
   int64_t N = self.numel();
 
   if (N > 0) {
-    Tensor idx_tensor = at::empty(
+    Tensor idx_flat = at::empty(
         {N}, tensor.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
-    Tensor idx_vec = at::empty(
+    Tensor range = at::empty(
         {N}, tensor.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
 
-    auto self_begin = (scalar_t*)self.data_ptr();
-    auto idx_begin = (int64_t*)idx_tensor.data_ptr();
-    auto idx_vec_begin = (int64_t*)idx_vec.data_ptr();
-    at::AtenIpexTypeXPU::iota(idx_vec_begin, idx_vec_begin + N, (int64_t)0);
+    scalar_t* self_begin = self.data_ptr<scalar_t>();
+    int64_t* idx_flat_begin = idx_flat.data_ptr<int64_t>();
+    int64_t* range_begin = range.data_ptr<int64_t>();
 
-    at::AtenIpexTypeXPU::transform(
-        self_begin,
-        self_begin + N,
-        idx_vec_begin,
-        idx_vec_begin,
-        [](scalar_t x, int64_t idx) -> int64_t {
-          return (NonZeroOp<scalar_t>{}(x) == scalar_t(0)) ? -1 : idx;
+    at::AtenIpexTypeXPU::iota(range_begin, range_begin + N, (int64_t)0);
+
+    auto idx_flat_end = at::AtenIpexTypeXPU::copy_if<int64_t>(
+        range_begin, range_begin + N, idx_flat_begin, [=](int64_t x) {
+          return Numerics<scalar_t>::ne(self_begin[x], scalar_t(0));
         });
 
-    auto idx_end = at::AtenIpexTypeXPU::copy_if(
-        idx_vec_begin, idx_vec_begin + N, idx_begin, [](int64_t idx) {
-          return idx != -1;
-        });
+    auto num_nonzeros = std::distance(idx_flat_begin, idx_flat_end);
 
-    auto num_nonzeros = std::distance(idx_begin, idx_end);
-
-    if (num_nonzeros > 0 && num_dim > 0) {
-      tensor = tensor.resize_({num_dim, num_nonzeros}).contiguous();
-      auto tensor_begin = (int64_t*)tensor.data_ptr();
-
-      int64_t div = 1;
-      for (int64_t dim = num_dim - 1; dim >= 0; dim -= 1) {
-        int64_t dim_size = self.size(dim);
-        at::AtenIpexTypeXPU::transform(
-            idx_begin,
-            idx_begin + num_nonzeros,
-            tensor_begin + dim * num_nonzeros,
-            [=](int64_t linear_id) { return (linear_id / div) % dim_size; });
-        div *= dim_size;
-      }
-
-      tensor = tensor.t_();
-    }
     tensor = tensor.resize_({num_nonzeros, num_dim}).contiguous();
+    if (num_nonzeros > 0 && num_dim > 0) {
+      int64_t* tensor_begin = tensor.data_ptr<int64_t>();
+
+      std::vector<int64_t> self_sizes = self.sizes().vec();
+      Tensor self_sizes_cpu = at::empty(
+          {num_dim},
+          at::TensorOptions().dtype(kLong).device(kCPU).memory_format(
+              LEGACY_CONTIGUOUS_MEMORY_FORMAT));
+      std::copy(
+          self_sizes.begin(),
+          self_sizes.end(),
+          self_sizes_cpu.template data_ptr<int64_t>());
+      Tensor self_sizes_xpu = self_sizes_cpu.to(kXPU);
+      int64_t* self_sizes_ptr = self_sizes_xpu.data_ptr<int64_t>();
+
+      const int64_t N = num_nonzeros * num_dim;
+      auto& dpcpp_queue = dpcppGetCurrentQueue();
+      const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+      const auto wgroup_size = std::min(dpcppMaxWorkGroupSize(dev_id), N);
+      const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+
+      // restore flatten idx to indices
+      auto cgf = DPCPP_Q_CGF(__cgh) {
+        dpcpp_local_acc_t<int64_t> size_vec(num_dim, __cgh);
+        dpcpp_local_acc_t<int64_t> divisor(num_dim, __cgh);
+
+        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+          auto local_id = item_id.get_local_linear_id();
+          auto global_id = item_id.get_global_linear_id();
+          // preload sizes into size_vec (SLM)
+          if (global_id < num_dim)
+            size_vec[global_id] = self_sizes_ptr[global_id];
+          group_barrier(item_id.get_group());
+          // preload divisor with serial operations
+          if (local_id == 0) {
+            divisor[num_dim - 1] = 1;
+            for (auto dim = num_dim - 2; dim >= 0; dim--) {
+              divisor[dim] = divisor[dim + 1] * size_vec[dim];
+            }
+          }
+          group_barrier(item_id.get_group());
+
+          auto index = global_id / num_dim;
+          auto dim = global_id % num_dim;
+          tensor_begin[global_id] =
+              idx_flat_begin[index] / divisor[dim] % size_vec[dim];
+        };
+
+        __cgh.parallel_for(
+            DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+      };
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    }
   }
 }
 

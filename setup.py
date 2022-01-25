@@ -3,7 +3,6 @@
 ##############################################################
 # Build options:
 #
-# USE_ONEDPL            - to use oneDPL in operators
 # USE_ONEMKL            - to use oneMKL in operators
 # USE_MICROBENCH        - to build with Microbench
 # USE_CHANNELS_LAST_1D  - to use channels last 1d feature
@@ -153,7 +152,6 @@ git_sha_dict = {
     "__torch_git_sha__": torch.version.git_version,
     "__ittapi_git_sha__": get_submodule_commit(base_dir, "third_party/ittapi"),
     "__onednn_git_sha__": get_submodule_commit(base_dir, "third_party/oneDNN"),
-    "__onedpl_git_sha__": get_submodule_commit(base_dir, "third_party/oneDPL")
 }
 
 version, version_sha = get_build_version(git_sha_dict.get('__ipex_git_sha__', 'Unknown'))

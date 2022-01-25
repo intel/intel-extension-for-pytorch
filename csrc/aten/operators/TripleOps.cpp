@@ -15,13 +15,6 @@
 #include "comm/PSTLFunctions.h"
 #include "comm/Pointwise.h"
 
-#ifdef USE_ONEDPL
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/iterator>
-#include <oneapi/dpl/numeric>
-#endif
-
 using namespace xpu::dpcpp;
 using namespace at::sparse;
 
@@ -178,9 +171,6 @@ static inline void sparse_packed_add_kernel(
     int64_t stride,
     int64_t nnz,
     float lr) {
-#ifndef USE_ONEDPL
-  throw std::runtime_error("no oneDPL found when compile");
-#else
   using accscalar_t = acc_type<scalar_t>;
   union packed_bf16 {
     unsigned short s[2];
@@ -188,16 +178,14 @@ static inline void sparse_packed_add_kernel(
   };
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t newNnz;
-  {
-    auto indices1D_end = indices1D;
-    auto uniqueOffsets_end = uniqueOffsets;
-    std::tie(indices1D_end, uniqueOffsets_end) =
-        at::AtenIpexTypeXPU::unique_with_zip(
-            indices1D, indices1D + nnz, uniqueOffsets, [](auto lhs, auto rhs) {
-              return lhs == rhs;
-            });
-    newNnz = std::distance(indices1D, indices1D_end);
-  }
+  auto indices1D_end = indices1D;
+  auto uniqueOffsets_end = uniqueOffsets;
+  std::tie(indices1D_end, uniqueOffsets_end) =
+      at::AtenIpexTypeXPU::unique_with_zip<int64_t, int64_t, int64_t>(
+          indices1D, indices1D + nnz, uniqueOffsets, [](auto lhs, auto rhs) {
+            return lhs == rhs;
+          });
+  newNnz = std::distance(indices1D, indices1D_end);
 
   const int num_group_0 = CeilDiv(newNnz, (int64_t)4);
   const int num_group_1 = CeilDiv(stride, (int64_t)64);
@@ -250,7 +238,6 @@ static inline void sparse_packed_add_kernel(
         kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-#endif
 }
 
 Tensor packed_add(

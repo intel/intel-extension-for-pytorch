@@ -3,17 +3,11 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 
+#include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/PSTLFunctions.h"
-
-#ifdef USE_ONEDPL
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/iterator>
-#include <oneapi/dpl/numeric>
-#endif
 
 using namespace xpu::dpcpp;
 using namespace at::sparse;
@@ -134,9 +128,6 @@ int64_t _nnz(const Tensor& self) {
 }
 
 Tensor coalesce(const Tensor& self) {
-#ifndef USE_ONEDPL
-  throw std::runtime_error("no oneDPL found when compile");
-#else
   int64_t nnz = self._nnz();
   if (self.is_coalesced()) {
     return self;
@@ -162,38 +153,34 @@ Tensor coalesce(const Tensor& self) {
   LongTensor origIndices = at::empty({nnz}, self._indices().options());
   LongTensor uniqueOffsets = at::empty({nnz}, self._indices().options());
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
+  auto origIndices_ptr = origIndices.data_ptr<int64_t>();
+  auto uniqueOffsets_ptr = uniqueOffsets.data_ptr<int64_t>();
 
-  {
-    auto countIterI = oneapi::dpl::counting_iterator<int64_t>(0);
-    auto countIterO = oneapi::dpl::counting_iterator<int64_t>(0);
+  at::AtenIpexTypeXPU::iota<int64_t>(
+      origIndices_ptr, origIndices_ptr + nnz, (int64_t)0);
+  at::AtenIpexTypeXPU::iota<int64_t>(
+      uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
-    auto origIndices_ptr = origIndices.data_ptr<int64_t>();
-    auto uniqueOffsets_ptr = uniqueOffsets.data_ptr<int64_t>();
+  auto indices1D_ptr = indices1D.data_ptr<int64_t>();
+  at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<int64_t, int64_t>(
+      indices1D_ptr,
+      origIndices_ptr,
+      indices1D.size(0), // prb_size
+      1, // batch_size
+      indices1D.stride(0), // stride
+      Numerics<int64_t>::upper_bound(), // padding
+      [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); },
+      [](int64_t a, int64_t b) { return Numerics<int64_t>::eq(a, b); });
 
-    std::copy(policy, countIterI, countIterI + nnz, origIndices_ptr);
-    std::copy(policy, countIterO, countIterO + nnz, uniqueOffsets_ptr);
-
-    auto indices1D_ptr = indices1D.data_ptr<int64_t>();
-    auto zipped_indices =
-        oneapi::dpl::make_zip_iterator(indices1D_ptr, origIndices_ptr);
-    std::sort(
-        policy, zipped_indices, zipped_indices + nnz, [](auto lhs, auto rhs) {
-          using std::get;
-          return get<0>(lhs) < get<0>(rhs);
-        });
-
-    auto indices1D_end = indices1D_ptr;
-    auto uniqueOffsets_end = uniqueOffsets_ptr;
-    std::tie(indices1D_end, uniqueOffsets_end) =
-        at::AtenIpexTypeXPU::unique_with_zip(
-            indices1D_ptr,
-            indices1D_ptr + nnz,
-            uniqueOffsets_ptr,
-            [](auto lhs, auto rhs) { return Numerics<int64_t>::eq(lhs, rhs); });
-    newNnz = std::distance(indices1D_ptr, indices1D_end);
-  }
+  auto indices1D_end = indices1D_ptr;
+  auto uniqueOffsets_end = uniqueOffsets_ptr;
+  std::tie(indices1D_end, uniqueOffsets_end) =
+      at::AtenIpexTypeXPU::unique_with_zip<int64_t, int64_t, int64_t>(
+          indices1D_ptr,
+          indices1D_ptr + nnz,
+          uniqueOffsets_ptr,
+          [](auto lhs, auto rhs) { return Numerics<int64_t>::eq(lhs, rhs); });
+  newNnz = std::distance(indices1D_ptr, indices1D_end);
 
   indices1D.resize_({1, newNnz});
   auto newValues_size = values.sizes().vec();
@@ -245,8 +232,6 @@ Tensor coalesce(const Tensor& self) {
           ._coalesced_(true);
 
   return dst;
-
-#endif
 }
 
 Tensor sparse_mask(const Tensor& self, const Tensor& mask) {

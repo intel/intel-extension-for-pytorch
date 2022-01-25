@@ -14,7 +14,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    # @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_embedding_bag(self, dtype=torch.float):
         weight_elem = 10
         weight_feature_size = 256
@@ -98,7 +97,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(output, output_dpcpp.to(cpu_device))
         self.assertEqual(grad_weight_cpu, grad_weight_dpcpp.to(cpu_device))
 
-    # @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_embedding_bag_large(self, dtype=torch.float):
         weight_elem = 1024
         for weight_feature_size in [127, 128, 512, 5000]:
@@ -184,7 +182,6 @@ class TestTorchMethod(TestCase):
             self.assertEqual(output, output_dpcpp.to(cpu_device))
             self.assertEqual(grad_weight_cpu, grad_weight_dpcpp)
 
-    # @pytest.mark.skipif("not torch.xpu.has_onedpl()")
     def test_embedding_bag_DLRM(self, dtype=torch.float16):
         weight_elem = 1024
         weight_feature_size = 128

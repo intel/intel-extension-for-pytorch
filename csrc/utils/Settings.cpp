@@ -252,14 +252,6 @@ bool Settings::set_onemkl_verbose(int level) {
   return xpu::oneMKL::set_onemkl_verbose(level);
 }
 
-bool Settings::is_onedpl_enabled() const {
-#if defined(USE_ONEDPL)
-  return true;
-#else
-  return false;
-#endif
-}
-
 bool Settings::is_onemkl_enabled() const {
 #if defined(USE_ONEMKL)
   return true;

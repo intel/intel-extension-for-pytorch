@@ -17,7 +17,6 @@ set(CMAKE_GENERATOR "Unix Makefiles")
 
 # The options to build ipex
 include(CMakeDependentOption)
-option(USE_ONEDPL "Use oneDPL" ON)
 option(USE_ONEMKL "Use oneMKL BLAS" ON)
 option(USE_MICROBENCH "Use microbench" OFF)
 option(USE_CHANNELS_LAST_1D "Use channels last 1d" ON)
@@ -93,8 +92,6 @@ function (print_configuration_summary)
 
     message(STATUS "  OpenCL include        : ${OpenCL_INCLUDE_DIR}")
     message(STATUS "  OpenCL library        : ${OpenCL_LIBRARY}")
-
-    message(STATUS "  USE_ONEDPL            : ${USE_ONEDPL}")
 
     message(STATUS "  USE_ONEMKL            : ${USE_ONEMKL}")
   if (USE_ONEMKL)

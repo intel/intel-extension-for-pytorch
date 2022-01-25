@@ -6,6 +6,7 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
+#include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Algorithm.h"
@@ -14,13 +15,6 @@
 #include "comm/PSTLFunctions.h"
 
 #include <aten/operators/MemoryAccess.h>
-
-#ifdef USE_ONEDPL
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/iterator>
-#include <oneapi/dpl/numeric>
-#endif
 
 using namespace xpu::dpcpp;
 
@@ -362,12 +356,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     const Tensor& offset2bag,
     const Tensor& bag_size,
     const Tensor& per_sample_weights) {
-#ifndef USE_ONEDPL
-  throw std::runtime_error(
-      "no oneDPL found when compile. USM embedding not supported");
-#else
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
   const int64_t numel = sorted_indices.numel();
   auto grad_weight = at::zeros({num_weights, grad.size(-1)}, grad.options());
   const int64_t stride = grad_weight.stride(0);
@@ -383,8 +372,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     auto dummy_begin = dummy.data_ptr<int64_t>();
     auto idx_tensor = at::empty_like(sorted_indices);
     auto idx_begin = idx_tensor.data_ptr<int64_t>();
-    std::adjacent_difference(
-        policy,
+    at::AtenIpexTypeXPU::adjacent_difference<int64_t>(
         sorted_indices_begin,
         sorted_indices_begin + numel,
         dummy_begin,
@@ -403,13 +391,13 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     auto count_begin = count_tensor.data_ptr<int64_t>();
     at::AtenIpexTypeXPU::iota(count_begin, count_begin + numel, (int64_t)0);
     auto segment_offsets_begin = segment_offsets.data_ptr<int64_t>();
-    at::AtenIpexTypeXPU::transform(
+    at::AtenIpexTypeXPU::transform<int64_t>(
         dummy_begin,
         dummy_begin + numel,
         count_begin,
         idx_begin,
         [](auto d, auto idx) { return d ? idx : -1; });
-    auto ends = at::AtenIpexTypeXPU::copy_if(
+    auto ends = at::AtenIpexTypeXPU::copy_if<int64_t>(
         idx_begin, idx_begin + numel, segment_offsets_begin, [](auto x) {
           return x != -1;
         });
@@ -435,8 +423,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
       partials_per_segment.data_ptr<int64_t>(),
       partials_per_segment.data_ptr<int64_t>() + num_of_segments,
       partials_per_segment_offset.data_ptr<int64_t>(),
-      (int64_t)0,
-      partials_per_segment.options());
+      (int64_t)0);
 
   // The total number of partial-segments is the sum of
   // `partials_per_segment_offset`
@@ -506,7 +493,6 @@ Tensor embedding_bag_backward_dpcpp_kernel(
       });
 
   return grad_weight;
-#endif
 }
 
 template <
@@ -938,10 +924,6 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     bool scale_grad_by_freq,
     int64_t mode,
     const Tensor& per_sample_weights) {
-#ifndef USE_ONEDPL
-  throw std::runtime_error(
-      "no oneDPL found when compile. USM embedding not supported");
-#else
   auto grad_weight = at::zeros({num_weights, grad.size(1)}, grad.options());
 
   ptrdiff_t numel = indices.numel();
@@ -954,54 +936,38 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   int64_t stride = grad_weight.stride(0);
 
   auto sorted_indices = at::empty_like(indices);
+  auto sorted_begin = sorted_indices.data_ptr<int64_t>();
   auto orig_indices = at::empty_like(indices);
+  auto orig_begin = orig_indices.data_ptr<int64_t>();
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
   // directly
   {
     sorted_indices.copy_(indices);
-
-    auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
-    auto orig_begin = orig_indices.data_ptr<int64_t>();
-    std::copy(policy, count_begin, count_begin + numel, orig_begin);
-
-    auto sorted_begin = sorted_indices.data_ptr<int64_t>();
-    auto zipped_begin =
-        oneapi::dpl::make_zip_iterator(sorted_begin, orig_begin);
-    std::sort(
-        policy, zipped_begin, zipped_begin + numel, [](auto lhs, auto rhs) {
-          using std::get;
-          return get<0>(lhs) < get<0>(rhs);
-        });
+    at::AtenIpexTypeXPU::iota(orig_begin, orig_begin + numel, (int64_t)0);
+    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<int64_t, int64_t>(
+        sorted_begin,
+        orig_begin,
+        sorted_indices.size(0), // prb_size
+        1, // batch_size
+        sorted_indices.stride(0), // stride
+        Numerics<int64_t>::upper_bound(), // padding
+        [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); },
+        [](int64_t a, int64_t b) { return Numerics<int64_t>::eq(a, b); });
   }
 
   Tensor count;
   if (scale_grad_by_freq) {
-    count = at::empty_like(indices);
-    count.fill_(1);
-
-    // Compute an increasing sequence per unique item in sortedIndices:
-    // sorted: 2 5 5 5 7 7 8 9 9
-    //  count: 1 1 2 3 1 2 1 1 2
-    auto sorted_begin = sorted_indices.data_ptr<int64_t>();
-    auto count_begin = count.data_ptr<int64_t>();
-    oneapi::dpl::inclusive_scan_by_segment(
-        policy, sorted_begin, sorted_begin + numel, count_begin, count_begin);
-
-    // Take the maximum of each count per unique key in reverse:
+    count = at::empty_like(sorted_indices);
+    int64_t* count_begin = count.data_ptr<int64_t>();
+    // Take the maximum of each count per unique key:
     // sorted: 2 5 5 5 7 7 8 9 9
     //  count: 1 3 3 3 2 2 1 2 2
-    auto revers_sorted_begin = std::make_reverse_iterator(sorted_begin + numel);
-    auto revers_count_begin = std::make_reverse_iterator(count_begin + numel);
-    oneapi::dpl::inclusive_scan_by_segment(
-        policy,
-        revers_sorted_begin,
-        revers_sorted_begin + numel,
-        revers_count_begin,
-        revers_count_begin,
-        std::equal_to<int64_t>(),
-        oneapi::dpl::maximum<int64_t>());
+    //
+    at::AtenIpexTypeXPU::count_by_segment<int64_t, int64_t, int64_t>(
+        sorted_begin,
+        sorted_begin + numel,
+        count_begin,
+        [](int64_t a, int64_t b) { return Numerics<int64_t>::eq(a, b); });
   }
 
   return embedding_bag_backward_dpcpp_kernel(
@@ -1016,7 +982,6 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
       offset2bag,
       bag_size,
       per_sample_weights);
-#endif
 }
 
 template <typename scalar_t>

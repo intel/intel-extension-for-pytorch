@@ -1,9 +1,6 @@
 from .. import _C
 from enum import Enum
 
-def has_onedpl():
-    return _C._is_onedpl_enabled()
-
 def has_onemkl():
     return _C._is_onemkl_enabled()
 

@@ -192,8 +192,9 @@ void bitonic_merge_sort_kernel(
           for (auto loc = item_id; loc < bitonic_blk_sort_sz; loc += local_sz) {
             auto loc_off = loc;
             auto gbl_off = blk_off + loc * inner_sz;
-            s_key[loc_off] = blk + loc < sort_sz ? g_key[gbl_off] : pad_k;
-            s_val[loc_off] = blk + loc < sort_sz ? g_val[gbl_off] : 0;
+            s_key[loc_off] = (blk + loc < sort_sz) ? g_key[gbl_off] : pad_k;
+            s_val[loc_off] = (blk + loc < sort_sz) ? g_val[gbl_off]
+                                                   : static_cast<ValueType>(0);
           }
 
           impl::bitonic_sort<KeyType, ValueType, dpcpp_mem_scp_wg>(

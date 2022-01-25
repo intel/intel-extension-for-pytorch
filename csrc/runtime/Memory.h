@@ -17,5 +17,8 @@ void memcpyDeviceToDevice(
 
 void memsetDevice(void* dst, int value, size_t n_bytes, bool async);
 
+template <class T>
+void fillDevice(T* dst, T value, size_t n_elems, bool async);
+
 } // namespace dpcpp
 } // namespace xpu

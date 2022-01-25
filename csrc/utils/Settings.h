@@ -45,8 +45,6 @@ class IPEX_API Settings final {
   bool set_onednn_verbose(int level);
   bool set_onemkl_verbose(int level);
 
-  bool is_onedpl_enabled() const;
-
   bool is_onemkl_enabled() const;
 
   bool is_channels_last_1d_enabled() const;

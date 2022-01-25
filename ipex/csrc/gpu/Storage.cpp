@@ -12,13 +12,6 @@
 #include <torch/csrc/autograd/utils/wrap_outputs.h>
 #include <torch/csrc/copy_utils.h>
 
-#ifdef USE_ONEDPL
-#include <oneapi/dpl/algorithm>
-#include <oneapi/dpl/execution>
-#include <oneapi/dpl/iterator>
-#include <oneapi/dpl/numeric>
-#endif
-
 template <typename scalar_t>
 scalar_t THPUtils_unpackReal(PyObject*) {
   throw std::runtime_error("Could not parse Scalar");
@@ -467,20 +460,10 @@ class THXPStorage_Bridge {
   }
 
   static void THXStorage_fill(at::StorageImpl* storage, scalar_t value) {
-#if defined(USE_ONEDPL)
     // TODO: only dpcpp runtime here. naive CPU TBD.
     auto dpcpp_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
-    auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     scalar_t* data_ptr = THXStorage_data(storage);
-    auto self_begin = data_ptr;
-    std::fill(
-        policy,
-        self_begin,
-        self_begin + (storage->nbytes() / sizeof(scalar_t)),
-        value);
-#else
-    AT_ERROR("no pstl");
-#endif
+    dpcppFill(data_ptr, value, storage->nbytes() / sizeof(scalar_t));
   }
 
   static void THXStorage_set(
