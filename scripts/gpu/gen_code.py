@@ -208,9 +208,6 @@ all_backends = ['XPU', 'SparseXPU', 'QuantizedXPU']
 default_backends = ['XPU']
 
 
-use_microbench = os.environ.get("USE_MICROBENCH", "OFF").upper() in ["1", "Y", "ON", "YES", "TRUE"]
-
-
 def process_types_and_backends(option):
     # if specific pairs were not listed, then enumerate them
     # based on the backend and type attributes
@@ -329,7 +326,6 @@ NATIVE_DISPATCH_DEFENITION_HACKY_WRAPPER = CodeTemplate("""\
 ${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
   ${xpu_guard}
   ${lazy_reorder}
-  ${bench_verbose}
   ${return_call} decltype(c10::impl::hacky_wrapper_for_legacy_signatures<${schema_order_cpp_signature}>(
   ::c10::CompileTimeFunctionPointer<${native_order_cpp_signature}, ${Type}::${native_type_method_decl}>()))::func_ptr()(${actuals});
 }
@@ -339,7 +335,6 @@ NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND = CodeTemplate("""\
 ${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
   ${xpu_guard}
   ${lazy_reorder}
-  ${bench_verbose}
   ${return_call} ${Type}::${native_type_method_decl}(${actuals});
 }
 """)
@@ -528,11 +523,6 @@ def create_derived(backend_type_env, declarations):
 
         # create native signature as legacy
         option['Backend'] = backend_type_env['Backend']
-        global use_microbench
-        if use_microbench:
-            option['bench_verbose'] = get_bench_verbose(option)
-        else:
-            option['bench_verbose'] = ''
         env = nested_dict(option, backend_type_env)
 
         if isinstance(dispatch, dict):
@@ -668,73 +658,6 @@ def get_lazy_reorder(schema_name, argument):
     return '', change_dict['name']
 
 
-bench_global_symbols = []
-
-
-def get_bench_verbose(option,
-                      op_class_outer=['empty_strided', 'copy_', 'empty', 'as_strided',
-                                      'resize_', 'view', 'clone', 'resize_as_',
-                                      '_empty_affine_quantized', '_empty_per_channel_affine_quantized'],
-                      type_inner=[
-                          'Tensor &', 'const Tensor &', 'IntArrayRef',
-                          'int64_t', 'double', 'bool', 'Scalar', 'ScalarType', 'std::array<bool,3>',
-        'c10::optional<IntArrayRef>', 'c10::optional<int64_t>', 'c10::optional<ScalarType>',
-        'c10::optional<double>', 'c10::optional<Scalar>', 'const c10::optional<Tensor>&', 'c10::optional<Generator>',
-                      ]):
-    op_name = option['type_wrapper_name']
-    op_class_name = option['name']
-    if op_class_name in op_class_outer:
-        return ''
-    head = "static unsigned long ct=0; int bv_; try { bv_ = std::stoi(std::getenv(\"BENCH_VERBOSE\"), 0, 10); } "
-    head += "catch (...) { bv_ = 0; } \nif (bv_) { auto id_ = \"bench\" + std::to_string(ct++) + \"_" 
-    head += op_class_name + "\"; RECORD_FUNCTION(id_, {}); std::cout<<"
-    head += "\"[" + op_class_name + "] \"<<"
-    data = ''
-    c_types = []
-    c_names = []
-    for argument in option['declaration_formals']:
-        arg_type = argument[:argument.rfind(' ')].strip()
-        if arg_type not in type_inner:
-            return ''
-        arg_name = argument[argument.rfind(' ') + 1:].strip()
-        c_types.append(arg_type)
-        c_names.append(arg_name)
-        if 'optional<Generator>' in arg_type:
-            head_local = "\"{0}({1}):\"<<{0}.has_value()<<\",\";".format(arg_name, arg_type)
-            tail_local = ' std::cout<<\"0; \"<<'
-            data = data[:-2] + ';std::cout<<' + head_local + tail_local
-        elif 'optional<Tensor>' in arg_type:
-            head_local = "\"{0}({1}):\"<<{0}.has_value()<<\",\";".format(arg_name, arg_type)
-            try_local = 'try{std::cout<<' + arg_name + '.value().dtype()<<' + arg_name + \
-                '.value().sizes();} catch(...) {std::cout<<0;}'
-            tail_local = ' std::cout<<\"; \"<<'
-            data = data[:-2] + ';std::cout<<' + head_local + try_local + tail_local
-        elif 'Tensor' in arg_type:
-            data += "\"{0}({1}):\"<<{0}.dtype()<<{0}.sizes()<<\"; \"<<".format(arg_name, arg_type)
-        elif 'optional' in arg_type:
-            head_local = "\"{0}({1}):\"<<{0}.has_value()<<\",\";".format(arg_name, arg_type)
-            try_local = 'try{std::cout<<' + arg_name + '.value();} catch(...) {std::cout<<0;}'
-            tail_local = ' std::cout<<\"; \"<<'
-            data = data[:-2] + ';std::cout<<' + head_local + try_local + tail_local
-        elif 'std::array<bool,3>' in arg_type:
-            data += "\"{0}({1}):\"<<\"[\"<<{0}[0]<<\",\"<<{0}[1]<<\",\"<<{0}[2]<<\"]; \"<<".format(arg_name, arg_type)
-        else:
-            data += "\"{0}({1}):\"<<{0}<<\"; \"<<".format(arg_name, arg_type)
-    global bench_global_symbols
-    backends = [t for t in option['backend_types'].keys()]
-    for backend in backends:
-        bench_global_symbols.append({
-            'op_name': op_name,
-            'backend': backend,
-            'argtypes': ", ".join(c_types),
-            'argnames': ", ".join(c_names),
-            'rettype': option['return_type']
-        })
-    OP_FUNC_ = CodeTemplate("at__AtenIpexType${Backend}__")
-    func_name = OP_FUNC_.substitute(option) + op_name
-    return head + data + "\"{" + func_name + ', \"<<id_<<\"}\"<<std::endl; }'
-
-
 def preprocess_decl(declarations):
     for declaration in declarations:
         common_with_cwrap.set_declaration_defaults(declaration)
@@ -825,43 +748,6 @@ def process_dpcpp_declarations(declarations, script_path):
     return preprocess_decl(dpcpp_decls)
 
 
-def add_micro_bench_register(root_dir):
-    global bench_global_symbols
-    outpath = os.path.join(root_dir, "MicroBenchRegister.h")
-    backends_dict = {}
-    for symbol in bench_global_symbols:
-        try:
-            backends_dict[symbol['backend']].append(symbol)
-        except Exception as e:
-            backends_dict[symbol['backend']] = []
-            backends_dict[symbol['backend']].append(symbol)
-    data = "#pragma once\n\n#include <ATen/Tensor.h>\n#include <intrinsic/ipex_intrinsic.h>\n\nnamespace at {\n"
-    for backend in backends_dict.keys():
-        data += "namespace AtenIpexType" + backend + "_impl {\n"
-        for item in backends_dict[backend]:
-            data += "{0} {1}({2});\n".format(item['rettype'], item['op_name'], item['argtypes'])
-        data += "}\n"
-    data += "}\n\n"
-    data += "#define MICRO_BENCH_REGISTER \\\n"
-    data += "py::class_<at::Scalar>(m, \"Scalar\").def(py::init<>()); \\\n"
-    data += "m.def(\"bench_scalar_slow\", [](py::handle t) { return scalar_slow(t.ptr());}); \\\n"
-    for symbol in bench_global_symbols:
-        op_name = symbol['op_name']
-        backend = symbol['backend']
-        argtypes = symbol['argtypes']
-        argnames = symbol['argnames']
-        args = []
-        for t, n in zip(argtypes.split(', '), argnames.split(', ')):
-            args.append(t.strip() + " " + n.strip())
-        args = ", ".join(args)
-        func_for_call = "at__AtenIpexType" + backend + "__" + op_name
-        data += "m.def(\"" + func_for_call + "\", [](" + args + \
-            "){ RECORD_FUNCTION(\"" + func_for_call + "\", {}); " + \
-            "return at::AtenIpexType" + backend + "_impl::" + op_name + '(' + argnames + "); }); \\\n"
-    with open(outpath, 'w') as f:
-        f.write(data + ' ')
-
-
 def add_op_registrations(per_type_registrations, op_registrations):
     for op_registration in op_registrations:
         registration = op_registration.registration_code
@@ -896,9 +782,6 @@ def gen_code(aten_path, out, script_path, selected_op_list=None):
         file_manager = FileManager(out)
         file_manager.write('{}.cpp'.format(env['Type']), output)
         file_manager.write('{}.h'.format(env['Type']), TYPE_DERIVED_H, env)
-    global use_microbench
-    if use_microbench:
-        add_micro_bench_register(out)
 
 
 def main():

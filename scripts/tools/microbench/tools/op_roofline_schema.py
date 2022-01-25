@@ -47,12 +47,15 @@ def get_roofline_of_memboundop(info, spec, time_unit=1.0e6):
     peak_bw = spec['peak_bw']
     if total_bytes <= latency_bytes:
         print('Latency bound op is not in consideration now.')
-        info['roofline'] = float('nan')
-        info['efficiency'] = float('nan')
+        # info['roofline'] = float('nan')
+        # info['efficiency'] = float('nan')
+        info['roofline'] = total_bytes / float(peak_bw)
+        info['roofline'] *= time_unit  # time unit from s to us
+        info['efficiency'] = float(info['roofline']) / (info['time'] + 1e-10) * 100.0
     else:
         info['roofline'] = total_bytes / float(peak_bw)
         info['roofline'] *= time_unit  # time unit from s to us
-        info['efficiency'] = float(info['roofline']) / info['time'] * 100.0
+        info['efficiency'] = float(info['roofline']) / (info['time'] + 1e-10) * 100.0
     info['input_bytes'] = input_bytes
     info['output_bytes'] = output_bytes
     info['bw'] = peak_bw
@@ -72,15 +75,16 @@ cfg = Dict()
 
 
 def default_roofline_func(info, spec):
-    input_bytes = get_total_bytes(info, 'inputs')
-    output_bytes = get_total_bytes(info, 'outputs')
-    total_bytes = input_bytes + output_bytes
-    peak_bw = spec['peak_bw']
-    info['roofline'] = float('nan')
-    info['efficiency'] = float('nan')
-    info['input_bytes'] = input_bytes
-    info['output_bytes'] = output_bytes
-    info['bw'] = peak_bw
+    # input_bytes = get_total_bytes(info, 'inputs')
+    # output_bytes = get_total_bytes(info, 'outputs')
+    # total_bytes = input_bytes + output_bytes
+    # peak_bw = spec['peak_bw']
+    # info['roofline'] = float('nan')
+    # info['efficiency'] = float('nan')
+    # info['input_bytes'] = input_bytes
+    # info['output_bytes'] = output_bytes
+    # info['bw'] = peak_bw
+    get_roofline_of_memboundop(info, spec)
     info['eff_type'] = 'other'
     info['class'] = 'other'
     return None

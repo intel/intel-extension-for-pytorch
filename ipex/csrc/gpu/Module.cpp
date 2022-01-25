@@ -15,10 +15,6 @@
 #include "Storage.h"
 #include "Stream.h"
 
-#ifdef USE_MICROBENCH
-#include <ATen/MicroBenchRegister.h>
-#endif
-
 #define ASSERT_TRUE(cmd) \
   if (!(cmd))            \
   return
@@ -364,10 +360,6 @@ at::Scalar scalar_slow(PyObject* object) {
 }
 
 void init_module(pybind11::module& m) {
-#ifdef USE_MICROBENCH
-  MICRO_BENCH_REGISTER
-#endif
-
   m.def(
       "linear_relu",
       [](const at::Tensor& input,

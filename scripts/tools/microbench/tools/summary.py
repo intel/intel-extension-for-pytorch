@@ -8,7 +8,7 @@ import re
 
 
 class SummaryManager:
-    def __init__(self, dirname='.', endswith='roofline.csv') -> None:
+    def __init__(self, dirname='.', endswith='report.csv') -> None:
         self.dirname = dirname
         self.items = []
         for root, _, files in os.walk(dirname):
@@ -75,7 +75,7 @@ class SummaryManager:
 
     def merge_items_(self):
         new_order = ['Class', 'OP', 'input_tensor_shapes',
-                     'output_tensor_shapes', 'BW', 'Type', 'ModelTime(us)']
+                     'output_tensor_shapes', 'BW', 'Type']
         items_ = []
         for key in self.items:
             infos = self.items[key]
@@ -100,9 +100,9 @@ class SummaryManager:
 
     def sort_items_(self):
         def get_key(row):
-            iof32 = row[7]
-            iof16 = row[11]
-            iobf16 = row[15]
+            iof32 = row[6]
+            iof16 = row[10]
+            iobf16 = row[14]
             key = 0
             if not isinstance(iof32, str):
                 key = float(iof32)
@@ -118,7 +118,7 @@ class SummaryManager:
         self.items = sorted(self.items, key=get_key)
 
     def write_to_csv(self, filename):
-        line0 = ['Class', 'Operator', 'Inputs', 'Outputs', 'BW', 'Type', 'ModelTime',
+        line0 = ['Class', 'Operator', 'Inputs', 'Outputs', 'BW', 'Type',
                  'IOBytes(float32)', 'BenchTime(float32)', 'Roofline(float32)', 'Efficiency(%)(float32)',
                  'IOBytes(float16)', 'BenchTime(float16)', 'Roofline(float16)', 'Efficiency(%)(float16)',
                  'IOBytes(bfloat16)', 'BenchTime(bfloat16)', 'Roofline(bfloat16)', 'Efficiency(%)(bfloat16)']

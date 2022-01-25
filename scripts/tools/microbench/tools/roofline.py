@@ -4,6 +4,23 @@ from op_roofline_schema import cfg, default_roofline_func
 
 
 def get_spec(spec_file):
+    '''
+    e.g.
+    {
+        'freq': 1400000000.0, 
+        'int32': 11000000000000.0, 
+        'float32': 11000000000000.0, 
+        'half': 22000000000000.0, 
+        'bfloat16': 22000000000000.0, 
+        'int64': 5500000000000.0, 
+        'bool': 44000000000000.0, 
+        'int8': 44000000000000.0, 
+        'peak_bw': 307863255777.27997, 
+        'bw_eff': 0.4, 
+        'hbm_latency': 1000, 
+        'latency_bytes': 219902.32555519996
+    }
+    '''
     spec = {}
     with open(spec_file) as f:
         f_csv = csv.reader(f)
@@ -35,12 +52,13 @@ def get_spec(spec_file):
 class RooflineManager:
     def __init__(self, spec_file):
         self.spec = get_spec(spec_file)
+        print('device spec: ', self.spec)
 
     def _get_input_pattern(self, info):
         name = info['op_class_name']
         pattern = ''
         for input in info['inputs']:
-            if isinstance(input, str):
+            if isinstance(input, str) and '[' in input and ']' in input:
                 pattern += 't'
             else:
                 pattern += 'x'
@@ -56,23 +74,3 @@ class RooflineManager:
         if isinstance(f, dict):
             f = default_roofline_func
         return f(info, self.spec)
-
-
-if __name__ == '__main__':
-    from opruntime import run_op
-    parser = argparse.ArgumentParser(description='MicroBench for Pytorch')
-    parser.add_argument('--log', help='path to log file')
-    parser.add_argument('--spec', help='path to log file')
-    args = parser.parse_args()
-    infos = run_op(args.log)
-    mng = RooflineManager(args.spec)
-    infos_out = []
-    for info in infos:
-        try:
-            mng.get_roofline(info)
-            infos_out.append(info)
-        except Exception as e:
-            print('skipping ' + str(info) + ' ' + str(e))
-    print('-------------------- roofline out --------------------')
-    for info in infos_out:
-        print(info)

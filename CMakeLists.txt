@@ -18,7 +18,6 @@ set(CMAKE_GENERATOR "Unix Makefiles")
 # The options to build ipex
 include(CMakeDependentOption)
 option(USE_ONEMKL "Use oneMKL BLAS" ON)
-option(USE_MICROBENCH "Use microbench" OFF)
 option(USE_CHANNELS_LAST_1D "Use channels last 1d" ON)
 option(USE_LEVEL_ZERO_ONLY "Only enumerate devices with Level Zero" ON)
 option(USE_PERSIST_STREAM "Use persistent oneDNN stream" ON)
@@ -98,7 +97,6 @@ function (print_configuration_summary)
     message(STATUS "  ONEMKL include        : ${ONEMKL_INCLUDE_DIR}")
   endif(USE_ONEMKL)
 
-    message(STATUS "  USE_MICROBENCH        : ${USE_MICROBENCH}")
     message(STATUS "  USE_CHANNELS_LAST_1D  : ${USE_CHANNELS_LAST_1D}")
 
     message(STATUS "  USE_LEVEL_ZERO_ONLY   : ${USE_LEVEL_ZERO_ONLY}")
