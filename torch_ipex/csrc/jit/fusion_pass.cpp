@@ -293,6 +293,44 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::matmul, aten::div}, ipex::matmul_div},
 };
 
+void RemoveBailOutNodesAndSpecializeTypes(Block* b) {
+  for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
+    if (it->kind() == prim::BailOut) {
+      it->output()->replaceAllUsesWith(it->inputs()[1]);
+      auto profiled_type = it->output()->type()->expect<TensorType>();
+
+      if (profiled_type == TensorType::get()) {
+        continue;
+      }
+
+      auto input_type = it->inputs()[1]->type()->expect<TensorType>();
+      if (input_type == TensorType::get()) {
+        it->inputs()[1]->setType(profiled_type);
+      } else {
+        it->inputs()[1]->setType(input_type->merge(*profiled_type));
+      }
+      it.destroyCurrent();
+
+    } else {
+      for (Block* ib : it->blocks()) {
+        RemoveBailOutNodesAndSpecializeTypes(ib);
+      }
+    }
+  }
+}
+
+void RemoveBailoutTemplateNodes(Block* b) {
+  for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
+    if (it->kind() == prim::BailoutTemplate) {
+      it.destroyCurrent();
+    } else {
+      for (Block* ib : it->blocks()) {
+        RemoveBailoutTemplateNodes(ib);
+      }
+    }
+  }
+}
+
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // remove dropout;
   torch::jit::removeDropout(graph);
@@ -377,6 +415,10 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
       graph);
   RemoveProfileNodesAndSpecializeTypes(graph);
 
+  // remove BailOut and BailoutTemplate
+  RemoveBailOutNodesAndSpecializeTypes(graph->block());
+  RemoveBailoutTemplateNodes(graph->block());
+
   // LLGA fusion pass for int8
   GRAPH_DUMP(
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
@@ -396,7 +438,10 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // specializations
   LowerSimpleTuples(graph);
   BatchMM(graph);
-  FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+
+  if (tensorExprFuserEnabled()) {
+    FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+  }
 
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(

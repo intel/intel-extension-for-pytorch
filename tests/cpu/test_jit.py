@@ -628,6 +628,14 @@ class ModMultLinear(nn.Module):
          res4 = self.linear4(res1)
          return res1, res2, res3, res4
 
+class DisableTexprFuser():
+    def __enter__(self):
+        self.saved = torch._C._jit_texpr_fuser_enabled()
+        torch._C._jit_set_texpr_fuser_enabled(False)
+
+    def __exit__(self, *args, **kwargs):
+        torch._C._jit_set_texpr_fuser_enabled(self.saved)
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
@@ -1973,6 +1981,28 @@ class Tester(TestCase):
                 y = m(x)
                 traced_y = traced(x)
                 self.assertEqual(y, traced_y)
+
+    def test_remove_bailout(self):
+        batch_size = 8
+        out_channels = 32
+        in_channels = 3
+        kernel_size = 3
+        image_size = 64
+        input_size = [batch_size, in_channels, image_size, image_size]
+        x = torch.randn(input_size)
+        with DisableTexprFuser():
+            self._test_output(
+                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="prim::BailOut")
+            self._test_output_bf16(
+                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="prim::BailOut",
+                prec=0.02)
+
 
 if __name__ == '__main__':
     torch.manual_seed(2020)
