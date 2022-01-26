@@ -1,4 +1,4 @@
-#include "embeddingbag.h"
+#include "EmbeddingBag.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/quantization/AutoCast.hpp"

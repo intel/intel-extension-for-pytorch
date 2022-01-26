@@ -1,5 +1,47 @@
 #include <ATen/Tensor.h>
+#include <csrc/dyndisp/DispatchStub.h>
 #include <torch/extension.h>
+
+namespace torch_ipex {
+namespace cpu {
+
+at::Tensor nms_cpu_kernel_impl(
+    const at::Tensor& dets,
+    const at::Tensor& scores,
+    const float threshold,
+    const bool sorted);
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+batch_score_nms_cpu_kernel_impl(
+    const at::Tensor& dets,
+    const at::Tensor& scores,
+    const float threshold,
+    const int max_output);
+
+std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>>
+rpn_nms_cpu_kernel_impl(
+    const at::Tensor& batch_dets,
+    const at::Tensor& batch_scores,
+    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+    const int min_size,
+    const float threshold,
+    const int max_output);
+
+std::tuple<
+    std::vector<at::Tensor>,
+    std::vector<at::Tensor>,
+    std::vector<at::Tensor>>
+box_head_nms_cpu_kernel_impl(
+    const std::vector<at::Tensor>& batch_bboxes,
+    const std::vector<at::Tensor>& batch_scores,
+    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
+    const float score_thresh,
+    const float threshold,
+    const int detections_per_img,
+    const int num_classes);
+
+} // namespace cpu
+} // namespace torch_ipex
 
 namespace torch_ipex {
 

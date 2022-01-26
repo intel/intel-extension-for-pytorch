@@ -36,7 +36,7 @@
 #include "intel_extension_for_pytorch/csrc/autocast/autocast_mode.h"
 
 #include "TaskModule.h"
-#include "intel_extension_for_pytorch/csrc/aten/cpu/embeddingbag.h"
+#include "intel_extension_for_pytorch/csrc/aten/cpu/EmbeddingBag.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/CPUPool.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/TaskExecutor.h"
 #include "intel_extension_for_pytorch/csrc/cpu/utils/CPUISA.h"

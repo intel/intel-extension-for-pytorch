@@ -1,4 +1,4 @@
-#include <csrc/aten/cpu/embeddingbag.h>
+#include <csrc/aten/cpu/EmbeddingBag.h>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"

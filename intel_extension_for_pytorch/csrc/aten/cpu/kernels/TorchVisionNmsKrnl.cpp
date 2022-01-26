@@ -5,7 +5,7 @@
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/utils/library.h"
 
-#include <csrc/aten/cpu/torchvision_nms.h>
+#include <csrc/aten/cpu/TorchVisionNms.h>
 
 namespace torch_ipex {
 namespace cpu {

@@ -1,5 +1,5 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#include <csrc/aten/cpu/interaction.h>
+#include <csrc/aten/cpu/Interaction.h>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
