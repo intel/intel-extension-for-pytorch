@@ -21,7 +21,7 @@ Please check `API Documentation <api_doc.html>`_ page for details of API functio
         - package name
       * - 1.2.0 ~ 1.9.0
         - intel_pytorch_extension
-      * - 1.10.0
+      * - 1.10.0 ~
         - intel_extension_for_pytorch
 
 Channels Last
