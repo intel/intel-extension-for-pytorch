@@ -36,7 +36,7 @@ def patch_zero_grad_for_master_weight_training(optimizer):
                     else:
                         bf16_param.grad.requires_grad_(False)
                     bf16_param.grad.zero_()
-            self._original_zero_grad(set_to_none)
+        self._original_zero_grad(set_to_none)
     setattr(optimizer, '_original_zero_grad', optimizer.zero_grad)
     setattr(optimizer, 'zero_grad', types.MethodType(zero_grad, optimizer))
 
