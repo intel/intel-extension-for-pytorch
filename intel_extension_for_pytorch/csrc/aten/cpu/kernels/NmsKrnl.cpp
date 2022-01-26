@@ -12,6 +12,10 @@
 namespace torch_ipex {
 namespace cpu {
 
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
 /*
  When calculating the Intersection over Union:
   MaskRCNN: bias = 1
@@ -746,6 +750,21 @@ box_head_nms_cpu_kernel_impl(
       });
   return result;
 }
+
+#if defined(DYN_DISP_BUILD)
+} // anonymous namespace
+
+REGISTER_DISPATCH(nms_cpu_kernel_stub, &nms_cpu_kernel_impl);
+
+REGISTER_DISPATCH(
+    batch_score_nms_cpu_kernel_stub,
+    &batch_score_nms_cpu_kernel_impl);
+
+REGISTER_DISPATCH(rpn_nms_cpu_kernel_stub, &rpn_nms_cpu_kernel_impl);
+
+REGISTER_DISPATCH(box_head_nms_cpu_kernel_stub, &box_head_nms_cpu_kernel_impl);
+
+#endif
 
 } // namespace cpu
 } // namespace torch_ipex

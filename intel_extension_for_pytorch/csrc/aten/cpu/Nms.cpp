@@ -9,7 +9,14 @@
 #include "csrc/jit/cpu/kernels/Softmax.h"
 
 namespace torch_ipex {
-namespace cpu {} // namespace cpu
+namespace cpu {
+
+DEFINE_DISPATCH(nms_cpu_kernel_stub);
+DEFINE_DISPATCH(batch_score_nms_cpu_kernel_stub);
+DEFINE_DISPATCH(rpn_nms_cpu_kernel_stub);
+DEFINE_DISPATCH(box_head_nms_cpu_kernel_stub);
+
+} // namespace cpu
 } // namespace torch_ipex
 
 namespace torch_ipex {
@@ -27,7 +34,14 @@ at::Tensor nms(
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
+
+#if defined(DYN_DISP_BUILD)
+  auto&& result =
+      cpu::nms_cpu_kernel_stub(kCPU, dets, scores, threshold, sorted);
+#else
   auto&& result = cpu::nms_cpu_kernel_impl(dets, scores, threshold, sorted);
+#endif
+
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
 }
@@ -46,8 +60,15 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> batch_score_nms(
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
+
+#if defined(DYN_DISP_BUILD)
+  auto&& result = cpu::batch_score_nms_cpu_kernel_stub(
+      kCPU, dets, scores, threshold, max_output);
+#else
   auto&& result =
       cpu::batch_score_nms_cpu_kernel_impl(dets, scores, threshold, max_output);
+#endif
+
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
 }
@@ -67,8 +88,21 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_scores.layout() == c10::kStrided);
+
+#if defined(DYN_DISP_BUILD)
+  auto&& result = cpu::rpn_nms_cpu_kernel_stub(
+      kCPU,
+      batch_dets,
+      batch_scores,
+      image_shapes,
+      min_size,
+      threshold,
+      max_output);
+#else
   auto&& result = cpu::rpn_nms_cpu_kernel_impl(
       batch_dets, batch_scores, image_shapes, min_size, threshold, max_output);
+#endif
+
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
 }
@@ -91,6 +125,18 @@ box_head_nms(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("IpexExternal::box_head_nms", std::vector<c10::IValue>({}));
 #endif
+
+#if defined(DYN_DISP_BUILD)
+  auto&& result = cpu::box_head_nms_cpu_kernel_stub(
+      kCPU,
+      batch_bboxes,
+      batch_scores,
+      image_shapes,
+      score_thresh,
+      threshold,
+      detections_per_img,
+      num_classes);
+#else
   auto&& result = cpu::box_head_nms_cpu_kernel_impl(
       batch_bboxes,
       batch_scores,
@@ -99,6 +145,8 @@ box_head_nms(
       threshold,
       detections_per_img,
       num_classes);
+#endif
+
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
 }

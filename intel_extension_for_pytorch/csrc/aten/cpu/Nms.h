@@ -5,6 +5,10 @@
 namespace torch_ipex {
 namespace cpu {
 
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
 at::Tensor nms_cpu_kernel_impl(
     const at::Tensor& dets,
     const at::Tensor& scores,
@@ -39,6 +43,50 @@ box_head_nms_cpu_kernel_impl(
     const float threshold,
     const int detections_per_img,
     const int num_classes);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using nms_cpu_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const float,
+    const bool);
+DECLARE_DISPATCH(nms_cpu_kernel_fn, nms_cpu_kernel_stub);
+
+using batch_score_nms_cpu_kernel_fn =
+    std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> (*)(
+        const at::Tensor&,
+        const at::Tensor&,
+        const float,
+        const int);
+DECLARE_DISPATCH(
+    batch_score_nms_cpu_kernel_fn,
+    batch_score_nms_cpu_kernel_stub);
+
+using rpn_nms_cpu_kernel_fn =
+    std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> (*)(
+        const at::Tensor&,
+        const at::Tensor&,
+        const std::vector<std::tuple<int64_t, int64_t>>&,
+        const int,
+        const float,
+        const int);
+DECLARE_DISPATCH(rpn_nms_cpu_kernel_fn, rpn_nms_cpu_kernel_stub);
+
+using box_head_nms_cpu_kernel_fn = std::tuple<
+    std::vector<at::Tensor>,
+    std::vector<at::Tensor>,
+    std::vector<at::Tensor>> (*)(
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const std::vector<std::tuple<int64_t, int64_t>>&,
+    const float,
+    const float,
+    const int,
+    const int);
+DECLARE_DISPATCH(box_head_nms_cpu_kernel_fn, box_head_nms_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex
