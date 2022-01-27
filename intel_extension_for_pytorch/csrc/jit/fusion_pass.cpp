@@ -471,7 +471,10 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // specializations
   LowerSimpleTuples(graph);
   BatchMM(graph);
-  FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+
+  if (tensorExprFuserEnabled()) {
+    FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+  }
 
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(
