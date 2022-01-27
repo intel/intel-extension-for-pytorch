@@ -91,6 +91,8 @@ class SummaryManager:
                     offset = obase + 4
                 elif dtype == 'bfloat16':
                     offset = obase + 4 * 2
+                else:
+                    continue
                 t_ = ['total_bytes',
                       'BenchTime(us)', 'Roofline[us]', 'Efficiency(%)']
                 for i in range(4):
