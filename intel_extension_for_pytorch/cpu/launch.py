@@ -30,22 +30,22 @@ For memory management, it configures NUMA binding and preload optimized memory a
 
 *** Single instance inference/training ***
 
-1. Run single-instance inference or training on a single node with all CPU sockets.
+1. Run single-instance inference or training on a single node with all CPU nodes.
 
 ::
 
    >>> python -m intel_extension_for_pytorch.cpu.launch --throughput_mode script.py args
 
-2. Run single-instance inference or training on a single CPU socket.
+2. Run single-instance inference or training on a single CPU node.
 
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch --socket_id 1 script.py args
+   >>> python -m intel_extension_for_pytorch.cpu.launch --node_id 1 script.py args
 
 *** Multi-instance inference ***
 
 1. Multi-instance
-   By default, one instance per socket. if you want to set the instance numbers and core per instance,
+   By default, one instance per node. if you want to set the instance numbers and core per instance,
    --ninstances and  --ncore_per_instance should be set.
 
 
@@ -62,13 +62,13 @@ For memory management, it configures NUMA binding and preload optimized memory a
    eg: run 0th instance among SKX with 2 instance (i.e., numactl -C 0-27)
 ::
 
-   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 0 python_script args 
+   >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 0 python_script args
 
    eg: run 1st instance among SKX with 2 instance (i.e., numactl -C 28-55)
 ::
 
    >>> python -m intel_extension_for_pytorch.cpu.launch  --ninstances 2 --instance_idx 1 python_script args
-   
+
    eg: run 0th instance among SKX with 2 instance, 2 cores per instance, first four cores (i.e., numactl -C 0-1)
 ::
 
@@ -141,55 +141,77 @@ class CPUinfo():
             self.get_socket_info()
 
     def get_socket_info(self):
-
+        self.sockets = int(max([line[2] for line in self.cpuinfo])) + 1
         self.socket_physical_cores = []  # socket_id is index
         self.socket_logical_cores = []   # socket_id is index
+        self.physical_core_socket_map = {}  # phyical core to numa node id
+        self.logical_core_socket_map = {}   # logical core to numa node id
+
+        self.nodes = int(max([line[3] for line in self.cpuinfo])) + 1
+        self.node_physical_cores = []  # node_id is index
+        self.node_logical_cores = []   # node_id is index
         self.physical_core_node_map = {}  # phyical core to numa node id
         self.logical_core_node_map = {}   # logical core to numa node id
-        self.sockets = int(max([line[2] for line in self.cpuinfo])) + 1
+
         for socket_id in range(self.sockets):
             cur_socket_physical_core = []
             cur_socket_logical_core = []
             for line in self.cpuinfo:
                 if socket_id == int(line[2]):
-                    node_id = line[3] if line[3] != '' else '0'
                     if int(line[1]) not in cur_socket_physical_core:
                         cur_socket_physical_core.append(int(line[1]))
-                        self.physical_core_node_map[int(line[1])] = int(node_id)
+                        self.physical_core_socket_map[int(line[1])] = int(socket_id)
                     cur_socket_logical_core.append(int(line[0]))
-                    self.logical_core_node_map[int(line[0])] = int(node_id)
+                    self.logical_core_socket_map[int(line[0])] = int(socket_id)
             self.socket_physical_cores.append(cur_socket_physical_core)
             self.socket_logical_cores.append(cur_socket_logical_core)
+
+        for node_id in range(self.nodes):
+            cur_node_physical_core = []
+            cur_node_logical_core = []
+            for line in self.cpuinfo:
+                nid = line[3] if line[3] != '' else '0'
+                if node_id == int(nid):
+                    if int(line[1]) not in cur_node_physical_core:
+                        cur_node_physical_core.append(int(line[1]))
+                        self.physical_core_node_map[int(line[1])] = int(node_id)
+                    cur_node_logical_core.append(int(line[0]))
+                    self.logical_core_node_map[int(line[0])] = int(node_id)
+            self.node_physical_cores.append(cur_node_physical_core)
+            self.node_logical_cores.append(cur_node_logical_core)
 
     def socket_nums(self):
         return self.sockets
 
+    def node_nums(self):
+        return self.nodes
+
     def physical_core_nums(self):
-        return len(self.socket_physical_cores) * len(self.socket_physical_cores[0])
+        return len(self.node_physical_cores) * len(self.node_physical_cores[0])
 
     def logical_core_nums(self):
-        return len(self.socket_logical_cores) * len(self.socket_logical_cores[0])
+        return len(self.node_logical_cores) * len(self.node_logical_cores[0])
 
-    def get_socket_physical_cores(self, socket_id):
-        if socket_id < 0 or socket_id > self.sockets - 1:
-            logger.error("Invalid socket id")
-        return self.socket_physical_cores[socket_id]
+    def get_node_physical_cores(self, node_id):
+        if node_id < 0 or node_id > self.nodes - 1:
+            logger.error("Invalid node id")
+        return self.node_physical_cores[node_id]
 
-    def get_socket_logical_cores(self, socket_id):
-        if socket_id < 0 or socket_id > self.sockets - 1:
-            logger.error("Invalid socket id")
-        return self.socket_logical_cores[socket_id]
+    def get_node_logical_cores(self, node_id):
+        if node_id < 0 or node_id > self.nodes - 1:
+            logger.error("Invalid node id")
+        return self.node_logical_cores[node_id]
 
     def get_all_physical_cores(self):
-        return np.array(self.socket_physical_cores).flatten().tolist()
+        return np.array(self.node_physical_cores).flatten().tolist()
 
     def get_all_logical_cores(self):
-        return np.array(self.socket_logical_cores).flatten().tolist()
+        return np.array(self.node_logical_cores).flatten().tolist()
 
     def numa_aware_check(self, core_list):
         '''
         Check whether all cores in core_list are in the same NUMA node. cross NUMA will reduce perforamnce.
-        We strongly advice to not use cores in different node.
+        We strongly advice to not use cores on different nodes.
         '''
         cores_numa_map = self.logical_core_node_map
         if len(core_list) <= 1:
@@ -197,7 +219,7 @@ class CPUinfo():
         numa_id = cores_numa_map[core_list[0]]
         for core in core_list:
             if numa_id != cores_numa_map[core]:
-                logger.warning("Numa Aware: cores:{} in different NUMA node".format(str(core_list)))
+                logger.warning("Numa Aware: cores:{} on different NUMA nodes".format(str(core_list)))
                 return False
         return True
 
@@ -282,7 +304,7 @@ class Launcher():
             if find_je:
                 logger.info("Use JeMallocl memory allocator")
                 return
-            logger.warning("Both TCMalloc and JeMalloc are not found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
+            logger.warning("Neither TCMalloc nor JeMalloc is found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
                            " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
                            "{}/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance"
                            .format(expanduser("~")))
@@ -300,7 +322,7 @@ class Launcher():
             logger.warning("{} in environment variable is {} while the value you set is {}".format(env_name, os.environ[env_name], env_value))
         self.logger_env(env_name)
 
-    # set_kmp_affinity is used to control whether to set KMP_AFFINITY or not. In scenario that use all cores on all sockets, including logical cores, setting KMP_AFFINITY disables logical cores. In this case, KMP_AFFINITY should not be set.
+    # set_kmp_affinity is used to control whether to set KMP_AFFINITY or not. In scenario that use all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. In this case, KMP_AFFINITY should not be set.
     def set_multi_thread_and_allocator(self, ncore_per_instance, disable_iomp=False, set_kmp_affinity=True, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
         '''
         Set multi-thread configuration and enable Intel openMP and TCMalloc/JeMalloc.
@@ -341,18 +363,18 @@ class MultiInstanceLauncher(Launcher):
                 logger.warning("only first {} cores will be used, but you specify {} cores in core_list".format(args.ncore_per_instance * args.ninstances, len(cores)))
             else:
                 args.ninstances = len(cores) // args.ncore_per_instance
-            
+
         else:
             if args.use_logical_core:
-                if args.socket_id != -1:
-                    cores = self.cpuinfo.get_socket_logical_cores(args.socket_id)
+                if args.node_id != -1:
+                    cores = self.cpuinfo.get_node_logical_cores(args.node_id)
                 else:
                     cores = self.cpuinfo.get_all_logical_cores()
-                    # When using all cores on all sockets, including logical cores, setting KMP_AFFINITY disables logical cores. Thus, KMP_AFFINITY should not be set.
+                    # When using all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. Thus, KMP_AFFINITY should not be set.
                     set_kmp_affinity = False
             else:
-                if args.socket_id != -1:
-                    cores = self.cpuinfo.get_socket_physical_cores(args.socket_id)
+                if args.node_id != -1:
+                    cores = self.cpuinfo.get_node_physical_cores(args.node_id)
                 else:
                     cores = self.cpuinfo.get_all_physical_cores()
             if not args.multi_instance and args.ninstances == -1 and args.ncore_per_instance == -1:
@@ -373,19 +395,19 @@ class MultiInstanceLauncher(Launcher):
                     logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
                     exit(-1)
             if args.latency_mode:
-                print('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --socket_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                print('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
                 args.ncore_per_instance = 4
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ninstances = len(cores) // args.ncore_per_instance
 
             if args.throughput_mode:
-                print('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --socket_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
-                args.ninstances = self.cpuinfo.socket_nums()
+                print('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                args.ninstances = self.cpuinfo.node_nums()
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
-            
+
         if args.ninstances > 1 and args.instance_idx != -1:
-            logger.info("assigning {} cores for instance {}".format(args.ncore_per_instance, args.instance_idx)) 
+            logger.info("assigning {} cores for instance {}".format(args.ncore_per_instance, args.instance_idx))
 
         self.set_multi_thread_and_allocator(args.ncore_per_instance,
                                             args.disable_iomp,
@@ -400,9 +422,9 @@ class MultiInstanceLauncher(Launcher):
             if not args.disable_numactl:
                 cmd = ["numactl"]
                 cores = sorted(cores)
-                if args.instance_idx == -1: # sequentially assign ncores_per_instance to ninstances 
+                if args.instance_idx == -1: # sequentially assign ncores_per_instance to ninstances
                     core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
-                else: # assign ncores_per_instance from instance_idx 
+                else: # assign ncores_per_instance from instance_idx
                     core_list = cores[args.instance_idx * args.ncore_per_instance : (args.instance_idx + 1) * args.ncore_per_instance]
 
                 same_numa = self.cpuinfo.numa_aware_check(core_list)
@@ -441,10 +463,10 @@ class MultiInstanceLauncher(Launcher):
             logger.info(cmd_s)
             process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
             processes.append(process)
-            
-            if args.instance_idx != -1: # launches single instance, instance_idx, only 
-                break 
-                
+
+            if args.instance_idx != -1: # launches single instance, instance_idx, only
+                break
+
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
         for process in processes:
             process.wait()
@@ -586,13 +608,13 @@ class DistributedTrainingLauncher(Launcher):
 def add_distributed_training_params(parser):
 
     cpuinfo = CPUinfo()
-    socket_nums = cpuinfo.socket_nums()
+    node_nums = cpuinfo.node_nums()
 
     group = parser.add_argument_group("Distributed Training Parameters With oneCCL backend")
     group.add_argument("--nnodes", metavar='\b', type=int, default=1,
                        help="The number of nodes to use for distributed "
                        "training")
-    group.add_argument("--nproc_per_node", metavar='\b', type=int, default=socket_nums,
+    group.add_argument("--nproc_per_node", metavar='\b', type=int, default=node_nums,
                        help="The number of processes to launch on each node")
     # ccl control
     group.add_argument("--ccl_worker_count", metavar='\b', default=4, type=int,
@@ -636,13 +658,13 @@ def add_multi_instance_params(parser):
     group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
                        help="For multi-instance, you should give the cores number you used for per instance.")
     group.add_argument("--instance_idx", metavar='\b', default="-1", type=int,
-                       help="Specify instance index to assign ncores_per_instance for instance_idx; otherwise ncore_per_instance will be assigned sequentially to ninstances. Please refer to https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/performance_tuning/launch_script.md") 
+                       help="Specify instance index to assign ncores_per_instance for instance_idx; otherwise ncore_per_instance will be assigned sequentially to ninstances. Please refer to https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/performance_tuning/launch_script.md")
     group.add_argument("--latency_mode", action='store_true', default=False,
                        help="By detault 4 core per instance and use all physical cores")
     group.add_argument("--throughput_mode", action='store_true', default=False,
-                       help="By default one instance per socket and use all physical cores")
-    group.add_argument("--socket_id", metavar='\b', default=-1, type=int,
-                       help="Socket id for multi-instance, by default all sockets will be used")
+                       help="By default one instance per node and use all physical cores")
+    group.add_argument("--node_id", metavar='\b', default=-1, type=int,
+                       help="node id for multi-instance, by default all nodes will be used")
     group.add_argument("--use_logical_core", action='store_true', default=False,
                        help="Whether only use physical cores")
     group.add_argument("--disable_numactl", action='store_true', default=False,
@@ -688,7 +710,7 @@ def parse_args():
                                         formatter_class=RawTextHelpFormatter)
 
     parser.add_argument("--multi_instance", action='store_true', default=False,
-                        help="Enable multi-instance, by default one instance per socket")
+                        help="Enable multi-instance, by default one instance per node")
 
     parser.add_argument('--distributed', action='store_true', default=False,
                         help='Enable distributed training.')
