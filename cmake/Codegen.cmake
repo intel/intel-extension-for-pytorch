@@ -20,11 +20,10 @@ endif()
 file(GLOB_RECURSE cpu_kernel_cpp_in "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/kernels/*.cpp")
 
 list(APPEND DPCPP_ISA_SRCS_ORIGIN ${cpu_kernel_cpp_in})
-# set(DPCPP_ISA_SRCS_ORIGIN ${DPCPP_ISA_SRCS_ORIGIN} PARENT_SCOPE)
 
-foreach(file_path ${cpu_kernel_cpp_in})
-  message(${file_path})
-endforeach()
+# foreach(file_path ${cpu_kernel_cpp_in})
+#   message(${file_path})
+# endforeach()
 
 
 # Some versions of GCC pessimistically split unaligned load and store
@@ -125,9 +124,8 @@ foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
 endforeach()
 
 list(APPEND DPCPP_ISA_SRCS ${cpu_kernel_cpp})
-# set(DPCPP_ISA_SRCS ${DPCPP_ISA_SRCS} PARENT_SCOPE)
 
-foreach(file_path ${cpu_kernel_cpp})
-  message(${file_path})
-endforeach()
+# foreach(file_path ${cpu_kernel_cpp})
+#   message(${file_path})
+# endforeach()
 

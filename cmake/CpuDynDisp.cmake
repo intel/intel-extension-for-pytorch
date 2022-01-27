@@ -169,9 +169,9 @@ set(DPCPP_AUTOCAST_SRCS)
 set(DPCPP_ATEN_SRCS)
 set(DPCPP_DYNDISP_SRCS)
 
-foreach(file_path ${DPCPP_ISA_SRCS})
-  message(${file_path})
-endforeach()
+# foreach(file_path ${DPCPP_ISA_SRCS})
+#   message(${file_path})
+# endforeach()
 
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/utils)
@@ -182,58 +182,17 @@ add_subdirectory(${DPCPP_ROOT}/dyndisp)
 add_subdirectory(${DPCPP_ROOT}/autocast)
 add_subdirectory(${DPCPP_ROOT}/aten)
 
-file(GLOB_RECURSE EXCLUDE_FILES_1 "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/*.cpp")
-file(GLOB_RECURSE EXCLUDE_FILES_2 "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/cpu/*.cpp")
-
-file(GLOB SAMPLE_FILES "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/AdaptiveAveragePooling.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/AdaptiveMaxPooling.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/AveragePool.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/BatchNorm.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ChannelShuffle.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Conv.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ConvTranspose.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Copy.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Cumsum.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Eltwise.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/EmbeddingBag.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Interaction.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/LayerNorm.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Linear.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Matmul.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/MaxPooling.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Mean.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/MergedEmbeddingBag.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/MergedEmbeddingBagBackwardSGD.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Nms.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Normalization.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/PixelShuffle.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Pooling.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/RNN.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/RnntEmbedding.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/ROIAlign.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/Softmax.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/torchvision_nms.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/UpdateBatch.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/WeightPack.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/optimizer/*.cpp"
-  "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/utils/*.cpp")
-
 # Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_UTILS_SRCS} ${DPCPP_QUANTIZATION_SRCS} ${DPCPP_JIT_SRCS}
     ${DPCPP_CPU_SRCS} ${DPCPP_AUTOCAST_SRCS} ${DPCPP_ATEN_SRCS})
 
 list(REMOVE_ITEM DPCPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
 
-list(REMOVE_ITEM DPCPP_SRCS ${EXCLUDE_FILES_1})
-#list(REMOVE_ITEM DPCPP_SRCS ${EXCLUDE_FILES_2})
-
-list(APPEND DPCPP_SRCS ${SAMPLE_FILES})
-
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
-foreach(file_path ${DPCPP_SRCS})
-  message(${file_path})
-endforeach()
+# foreach(file_path ${DPCPP_SRCS})
+#   message(${file_path})
+# endforeach()
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
