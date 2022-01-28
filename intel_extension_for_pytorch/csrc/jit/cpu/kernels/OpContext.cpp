@@ -18,7 +18,8 @@ c10::intrusive_ptr<ConvolutionOpContext> IpexConvolutionOpContext::
         int64_t output_channel,
         bool weight_is_channels_last,
         bool weight_is_packed,
-        std::vector<int64_t>&& input_size) {
+        std::vector<int64_t>&& input_size,
+        const ideep::attr_t& attr) {
   auto op_context = torch_ipex::cpu::detail::convolution::create(
       weight,
       bias,
@@ -30,7 +31,8 @@ c10::intrusive_ptr<ConvolutionOpContext> IpexConvolutionOpContext::
       output_channel,
       weight_is_channels_last,
       weight_is_packed,
-      input_size);
+      input_size,
+      attr);
   return c10::make_intrusive<IpexConvolutionOpContext>(
       std::move(weight),
       std::move(bias),

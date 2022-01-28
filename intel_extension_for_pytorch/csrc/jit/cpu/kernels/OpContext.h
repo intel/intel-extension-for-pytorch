@@ -115,7 +115,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
       int64_t output_channel,
       bool weight_is_channels_last,
       bool weight_is_packed,
-      std::vector<int64_t>&& input_size);
+      std::vector<int64_t>&& input_size,
+      const ideep::attr_t& attr);
 };
 
 // linear op
