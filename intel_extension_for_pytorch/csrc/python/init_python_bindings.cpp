@@ -26,7 +26,6 @@
 #include "intel_extension_for_pytorch/csrc/quantization/Observer.hpp"
 #include "intel_extension_for_pytorch/csrc/quantization/auto_opt_config.hpp"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
-#include "intel_extension_for_pytorch/csrc/utils/utils.h"
 #include "intel_extension_for_pytorch/csrc/utils/verbose.hpp"
 
 #include <c10/core/DeviceType.h>

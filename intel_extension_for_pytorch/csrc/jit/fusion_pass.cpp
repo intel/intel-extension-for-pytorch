@@ -4,7 +4,6 @@
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
 
-#include "aten/cpu/Pooling.h"
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"

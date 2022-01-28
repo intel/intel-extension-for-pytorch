@@ -7,7 +7,6 @@
 #include <c10/util/intrusive_ptr.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/library.h>
-#include "intel_extension_for_pytorch/csrc/utils/utils.h"
 
 namespace torch_ipex {
 namespace autocast {

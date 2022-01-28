@@ -17,8 +17,6 @@
 #include "csrc/jit/cpu/kernels/Shuffle.h"
 #include "csrc/jit/cpu/kernels/Softmax.h"
 
-#include "csrc/aten/cpu/Pooling.h"
-#include "csrc/utils/utils.h"
 
 namespace torch {
 namespace jit {

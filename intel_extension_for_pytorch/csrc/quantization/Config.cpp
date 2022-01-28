@@ -3,7 +3,6 @@
 #include <torch/csrc/autograd/function.h>
 
 #include "auto_opt_config.hpp"
-#include "csrc/utils/utils.h"
 
 #include "Config.hpp"
 

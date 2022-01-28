@@ -3,7 +3,7 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/utils.h"
+#include "utils/utils.h"
 
 namespace torch_ipex {
 namespace cpu {
