@@ -511,13 +511,13 @@ int main(int argc, const char* argv[]) {
 }
 ```
 
-**CMakeList.txt**
+**CMakeLists.txt**
 
 ```cmake
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(example-app)
 
-find_package(intel-ext-pt-cpu REQUIRED)
+find_package(intel_ext_pt_cpu REQUIRED)
 
 add_executable(example-app example-app.cpp)
 target_link_libraries(example-app "${TORCH_LIBRARIES}")

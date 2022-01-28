@@ -646,11 +646,11 @@
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-<p><strong>CMakeList.txt</strong></p>
+<p><strong>CMakeLists.txt</strong></p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span><span class="w"> </span><span class="s">3.0</span><span class="w"> </span><span class="s">FATAL_ERROR</span><span class="p">)</span>
 <span class="nb">project</span><span class="p">(</span><span class="s">example-app</span><span class="p">)</span>
 
-<span class="nb">find_package</span><span class="p">(</span><span class="s">intel-ext-pt-cpu</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="nb">find_package</span><span class="p">(</span><span class="s">intel_ext_pt_cpu</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
 
 <span class="nb">add_executable</span><span class="p">(</span><span class="s">example-app</span><span class="w"> </span><span class="s">example-app.cpp</span><span class="p">)</span>
 <span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">example-app</span><span class="w"> </span><span class="s2">&quot;${TORCH_LIBRARIES}&quot;</span><span class="p">)</span>
