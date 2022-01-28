@@ -24,7 +24,6 @@ Available knobs are listed below:
 | ```-m```, ```--module``` | - | False | Changes each process to interpret the launch script  as a python module, executing with the same behavior as 'python -m'. |
 | ```--no_python``` | - | False | Do not prepend the --program script with \python\ - just exec  it directly. Useful when the script is not a Python script. |
 | ```--ninstances``` | int | -1 | For multi-instance, you should give the cores number you used for per instance. |
-| ```--instance_idx``` | int | -1 | Specify instance_idx to run single instance among multiple instances. Useful when running each instance independently. |
 | ```--ncore_per_instance``` | int | -1 | Cores per instance |
 | ```--latency_mode``` | - | False | By default 4 core per instance and use all physical cores |
 | ```--throughput_mode``` | - | False | By default one instance per socket and use all physical cores |
@@ -64,7 +63,6 @@ Example script [resnet50.py](../examples/resnet50.py) will be used in this guide
   - [V. Throughput mode (i.e. number of socket instances, each instance runs on 1 socket)](#v-throughput-mode)
   - [VI. Latency mode (Use 4 cores for each instance)](#vi-latency-mode)
   - [VII. Your designated number of instances](#vii-your-designated-number-of-instances)
-  - [VIII. Your designated number of instances and instance index](#viii-your-designated-number-of-instances-and-instance-index)
 - Usage of Jemalloc/TCMalloc/Default memory allocator
   - [Jemalloc](#jemalloc)
   - [TCMalloc](#tcmalloc)
@@ -333,39 +331,6 @@ $ cat logs/run_20210712221305_instances.log
 2021-07-12 22:13:05,473 - __main__ - INFO - numactl -C 11-21 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_1_cores_11-21.log
 2021-07-12 22:13:05,476 - __main__ - INFO - numactl -C 22-32 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_2_cores_22-32.log
 2021-07-12 22:13:05,479 - __main__ - INFO - numactl -C 33-43 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_3_cores_33-43.log
-```
-#### VIII. Your designated number of instances and instance index 
-
-Launcher by default runs all `ninstances` for multi-instance inference/training as shown above. You can specify `instance_idx` to independely run that instance only among `ninstances`
-
-```
-python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 0 --log_path ./logs resnet50.py
-```
-
-you can confirm usage in log file:
-
-```
-2022-01-06 13:01:51,175 - __main__ - INFO - OMP_NUM_THREADS=14
-2022-01-06 13:01:51,176 - __main__ - INFO - Using Intel OpenMP
-2022-01-06 13:01:51,177 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
-2022-01-06 13:01:51,177 - __main__ - INFO - KMP_BLOCKTIME=1
-2022-01-06 13:01:51,177 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2022-01-06 13:01:51,177 - __main__ - INFO - numactl -C 0-10 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20220106130151_instance_0_cores_0-13.log
-```
-
-```
-python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 1 --log_path ./logs resnet50.py
-```
-
-you can confirm usage in log file:
-
-```
-2022-01-06 13:01:51,175 - __main__ - INFO - OMP_NUM_THREADS=14
-2022-01-06 13:01:51,176 - __main__ - INFO - Using Intel OpenMP
-2022-01-06 13:01:51,177 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
-2022-01-06 13:01:51,177 - __main__ - INFO - KMP_BLOCKTIME=1
-2022-01-06 13:01:51,177 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2022-01-06 13:01:51,177 - __main__ - INFO - numactl -C 11-21 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20220106130151_instance_0_cores_0-13.log
 ```
 
 ### Usage of Jemalloc/TCMalloc/Default memory allocator
