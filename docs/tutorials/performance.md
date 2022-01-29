@@ -3,7 +3,7 @@ Performance
 
 ## Overview
 
-This page shows performance boost with Intel® Extension for PyTorch\* on a couple of topologies.
+This page shows performance boost with Intel® Extension for PyTorch\* on several popular topologies.
 
 ## Performance Numbers
 
@@ -19,10 +19,10 @@ This page shows performance boost with Intel® Extension for PyTorch\* on a coup
   <col>
   <tr>
     <th rowspan="2" scope="col">Hardware</th>
-    <th rowspan="2" scope="col">Workload</th>
+    <th rowspan="2" scope="col">Workload<sup>1</sup></th>
     <th rowspan="2" scope="col">Precision</th>
-    <th colspan="2" scope="colgroup">Throughput Inference<sup>1</sup></th>
-    <th colspan="2" scope="colgroup">Realtime Inference<sup>2</sup></th>
+    <th colspan="2" scope="colgroup">Throughput Inference<sup>2</sup></th>
+    <th colspan="2" scope="colgroup">Realtime Inference<sup>3</sup></th>
     <th rowspan="2" scope="col">Model Type</th>
     <th rowspan="2" scope="col">Dataset</th>
     <th rowspan="2" scope="col">Misc.</th>
@@ -171,9 +171,14 @@ This page shows performance boost with Intel® Extension for PyTorch\* on a coup
 </table>
 
 <br />
-<sup>1. Throughput inference runs with single instance per socket.</sup>
+<sup>1. <a href="https://github.com/IntelAI/models/tree/pytorch-r1.10-models">Model Zoo for Intel® Architecture</a></sup>
 <br />
-<sup>2. Realtime inference runs with multiple instances, 4 cores per instance.</sup>
+<sup>2. Throughput inference runs with single instance per socket.</sup>
+<br />
+<sup>3. Realtime inference runs with multiple instances, 4 cores per instance.</sup>
+<br />
+
+*Note:* Performance numbers with stock PyTorch are measured with its most performant configuration.
 
 ## Configuration
 

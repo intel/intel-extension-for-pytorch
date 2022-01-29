@@ -207,11 +207,12 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
+model = model.to(memory_format=torch.channels_last)
+data = data.to(memory_format=torch.channels_last)
+
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
-model = model.to(memory_format=torch.channels_last)
 model = ipex.optimize(model)
-data = data.to(memory_format=torch.channels_last)
 ######################################################
 
 with torch.no_grad():
@@ -253,11 +254,12 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
+model = model.to(memory_format=torch.channels_last)
+data = data.to(memory_format=torch.channels_last)
+
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
-model = model.to(memory_format=torch.channels_last)
 model = ipex.optimize(model)
-data = data.to(memory_format=torch.channels_last)
 ######################################################
 
 with torch.no_grad():
@@ -309,11 +311,12 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
+model = model.to(memory_format=torch.channels_last)
+data = data.to(memory_format=torch.channels_last)
+
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
-model = model.to(memory_format=torch.channels_last)
 model = ipex.optimize(model, dtype=torch.bfloat16)
-data = data.to(memory_format=torch.channels_last)
 ######################################################
 
 with torch.no_grad():
@@ -357,11 +360,12 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
+model = model.to(memory_format=torch.channels_last)
+data = data.to(memory_format=torch.channels_last)
+
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
-model = model.to(memory_format=torch.channels_last)
 model = ipex.optimize(model, dtype=torch.bfloat16)
-data = data.to(memory_format=torch.channels_last)
 ######################################################
 
 with torch.no_grad():
@@ -507,13 +511,13 @@ int main(int argc, const char* argv[]) {
 }
 ```
 
-**CMakeList.txt**
+**CMakeLists.txt**
 
 ```cmake
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(example-app)
 
-find_package(intel-ext-pt-cpu REQUIRED)
+find_package(intel_ext_pt_cpu REQUIRED)
 
 add_executable(example-app example-app.cpp)
 target_link_libraries(example-app "${TORCH_LIBRARIES}")
