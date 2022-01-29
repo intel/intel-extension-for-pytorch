@@ -39,6 +39,13 @@ $extra_cuda_headers
 $external_backend_headers
 $namespaced_headers
 
+#include <utils/Settings.h>
+namespace xpu {
+namespace dpcpp {
+  void wait_for_queue_finish();
+}
+}
+
 namespace at {
 
 // NB: TORCH_LIBRARY_IMPL must be in an anonymous namespace to avoid
@@ -56,6 +63,9 @@ public:
     fflush(stdout);
   }
   ~IpexSimpleTrace() {
+    if (Settings::I().is_force_sync_exec()) {
+      wait_for_queue_finish();
+    }
     print_indent();
     printf("step out of %s\n", _name);
     fflush(stdout);
