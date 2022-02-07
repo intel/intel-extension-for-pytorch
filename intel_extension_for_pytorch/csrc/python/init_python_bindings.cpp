@@ -26,7 +26,6 @@
 #include "intel_extension_for_pytorch/csrc/quantization/Observer.hpp"
 #include "intel_extension_for_pytorch/csrc/quantization/auto_opt_config.hpp"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
-#include "intel_extension_for_pytorch/csrc/utils/utils.h"
 #include "intel_extension_for_pytorch/csrc/utils/verbose.hpp"
 
 #include <c10/core/DeviceType.h>
@@ -36,7 +35,7 @@
 #include "intel_extension_for_pytorch/csrc/autocast/autocast_mode.h"
 
 #include "TaskModule.h"
-#include "intel_extension_for_pytorch/csrc/aten/cpu/embeddingbag.h"
+#include "intel_extension_for_pytorch/csrc/aten/cpu/EmbeddingBag.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/CPUPool.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/TaskExecutor.h"
 #include "intel_extension_for_pytorch/csrc/cpu/utils/CPUISA.h"
@@ -317,6 +316,12 @@ void InitIpexModuleBindings(py::module m) {
         py::cast<std::vector<int32_t>>(core_list));
     return;
   });
+  m.def("is_same_core_affinity_setting", [](const py::list& core_list) {
+    return torch_ipex::runtime::is_same_core_affinity_setting(
+        // Here converting py::list to std::vector<int32_t> will have the data
+        // copy.
+        py::cast<std::vector<int32_t>>(core_list));
+  });
   m.def("get_current_cpu_pool", []() {
     return std::make_shared<torch_ipex::runtime::CPUPool>(
         torch_ipex::runtime::get_cpu_pool_from_mask_affinity());
@@ -333,13 +338,6 @@ using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
-
-  // jit fusion pass
-  torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
-    if (AutoOptConfig::singleton().get_jit_fuse()) {
-      torch::jit::FusionPass(g);
-    }
-  });
 }
 
 } // namespace torch_ipex

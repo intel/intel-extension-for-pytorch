@@ -1,8 +1,6 @@
 #include "Mha.h"
 #include "AddSoftmax.h"
 #include "Softmax.h"
-#include "csrc/aten/cpu/Softmax.h"
-#include "csrc/utils/utils.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>

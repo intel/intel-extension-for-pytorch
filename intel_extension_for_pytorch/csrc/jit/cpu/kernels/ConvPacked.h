@@ -76,7 +76,8 @@ ContextConvolution create(
     const int64_t output_channel,
     const bool weight_is_channels_last,
     const bool weight_is_packed,
-    const at::IntArrayRef input_size);
+    const at::IntArrayRef input_size,
+    const ideep::attr_t& attr);
 
 at::Tensor run(
     const ContextConvolution& context,
@@ -88,6 +89,7 @@ at::Tensor& run(
     const at::Tensor& input,
     at::Tensor& accumu,
     const ideep::attr_t& attr);
+
 } // namespace convolution
 } // namespace detail
 } // namespace cpu

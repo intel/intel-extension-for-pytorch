@@ -14,6 +14,11 @@ std::once_flag
                                         // symbol loaded once globally
 bool iomp_symbol_loaded{
     false}; // Notice: iomp_symbol_loaded is not thread safe.
+
+// current_cpu_core_list is only used to cache the cpu_core_list setting
+// of _pin_cpu_cores. It's thread_local, so different task thread can have
+// different settings to support task API.
+thread_local std::vector<int32_t> current_cpu_core_list{-1};
 } // namespace
 
 void loading_iomp_symbol() {
@@ -73,7 +78,13 @@ void _pin_cpu_cores(const std::vector<int32_t>& cpu_core_list) {
     kmp_set_affinity_ext(&mask);
     kmp_destroy_affinity_mask_ext(&mask);
   }
+  // Cache the cpu_core_list for query.
+  current_cpu_core_list = cpu_core_list;
   return;
+}
+
+bool is_same_core_affinity_setting(const std::vector<int32_t>& cpu_core_list) {
+  return current_cpu_core_list == cpu_core_list;
 }
 
 CPUPool get_cpu_pool_from_mask_affinity() {

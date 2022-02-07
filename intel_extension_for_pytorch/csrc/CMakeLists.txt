@@ -1,4 +1,4 @@
-FILE(GLOB _CPU_SRCS version.cpp)
+FILE(GLOB _CPU_SRCS version.cpp initialization.cpp)
 LIST(APPEND DPCPP_COMMON_SRCS ${_CPU_SRCS})
 
 # Pass to parent

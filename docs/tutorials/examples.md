@@ -207,10 +207,13 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-import intel_extension_for_pytorch as ipex
 model = model.to(memory_format=torch.channels_last)
-model = ipex.optimize(model)
 data = data.to(memory_format=torch.channels_last)
+
+#################### code changes ####################
+import intel_extension_for_pytorch as ipex
+model = ipex.optimize(model)
+######################################################
 
 with torch.no_grad():
   model(data)
@@ -230,8 +233,10 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model)
+######################################################
 
 with torch.no_grad():
   model(data)
@@ -249,10 +254,13 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-import intel_extension_for_pytorch as ipex
 model = model.to(memory_format=torch.channels_last)
-model = ipex.optimize(model)
 data = data.to(memory_format=torch.channels_last)
+
+#################### code changes ####################
+import intel_extension_for_pytorch as ipex
+model = ipex.optimize(model)
+######################################################
 
 with torch.no_grad():
   d = torch.rand(1, 3, 224, 224)
@@ -276,8 +284,10 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model)
+######################################################
 
 with torch.no_grad():
   d = torch.randint(vocab_size, size=[batch_size, seq_length])
@@ -301,10 +311,13 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-import intel_extension_for_pytorch as ipex
 model = model.to(memory_format=torch.channels_last)
-model = ipex.optimize(model, dtype=torch.bfloat16)
 data = data.to(memory_format=torch.channels_last)
+
+#################### code changes ####################
+import intel_extension_for_pytorch as ipex
+model = ipex.optimize(model, dtype=torch.bfloat16)
+######################################################
 
 with torch.no_grad():
   with torch.cpu.amp.autocast():
@@ -325,8 +338,10 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.bfloat16)
+######################################################
 
 with torch.no_grad():
   with torch.cpu.amp.autocast():
@@ -345,10 +360,13 @@ model = models.resnet50(pretrained=True)
 model.eval()
 data = torch.rand(1, 3, 224, 224)
 
-import intel_extension_for_pytorch as ipex
 model = model.to(memory_format=torch.channels_last)
-model = ipex.optimize(model, dtype=torch.bfloat16)
 data = data.to(memory_format=torch.channels_last)
+
+#################### code changes ####################
+import intel_extension_for_pytorch as ipex
+model = ipex.optimize(model, dtype=torch.bfloat16)
+######################################################
 
 with torch.no_grad():
   with torch.cpu.amp.autocast():
@@ -372,8 +390,10 @@ batch_size = 1
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.bfloat16)
+######################################################
 
 with torch.no_grad():
   with torch.cpu.amp.autocast():
@@ -401,8 +421,10 @@ data = torch.rand(<shape>)
 import torch.fx.experimental.optimization as optimization
 model = optimization.fuse(model, inplace=True)
 
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 conf = ipex.quantization.QuantConf(qscheme=torch.per_tensor_affine) 
+######################################################
 
 for d in calibration_data_loader(): 
   # conf will be updated with observed statistics during calibrating with the dataset 
@@ -431,8 +453,10 @@ data = torch.rand(<shape>)
 import torch.fx.experimental.optimization as optimization
 model = optimization.fuse(model, inplace=True)
 
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
 conf = ipex.quantization.QuantConf('int8_conf.json')
+######################################################
 
 with torch.no_grad():
   model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
@@ -487,13 +511,13 @@ int main(int argc, const char* argv[]) {
 }
 ```
 
-**CMakeList.txt**
+**CMakeLists.txt**
 
 ```cmake
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(example-app)
 
-find_package(intel-ext-pt-cpu REQUIRED)
+find_package(intel_ext_pt_cpu REQUIRED)
 
 add_executable(example-app example-app.cpp)
 target_link_libraries(example-app "${TORCH_LIBRARIES}")

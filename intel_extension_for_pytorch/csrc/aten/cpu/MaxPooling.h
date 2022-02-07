@@ -3,6 +3,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Parallel.h>
 #include <ATen/native/DispatchStub.h>
+#include <csrc/dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -71,6 +72,28 @@ void cpu_max_pool_backward_channels_last(
     const at::Tensor& grad_output_,
     const at::Tensor& indices_);
 
+std::tuple<at::Tensor, at::Tensor> max_pool2d_with_indices_out_cpu(
+    const at::Tensor& input,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool ceil_mode);
+
+at::Tensor max_pool2d_with_indices_backward_out_cpu(
+    const at::Tensor& gradOutput,
+    const at::Tensor& input,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool ceil_mode,
+    const at::Tensor& indices);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
 void max_pool2d_kernel_impl(
     const at::Tensor& output,
     const at::Tensor& indices,
@@ -89,23 +112,29 @@ void max_pool2d_backward_kernel_impl(
     const at::Tensor& grad_output,
     const at::Tensor& indices);
 
-std::tuple<at::Tensor, at::Tensor> max_pool2d_with_indices_out_cpu(
-    const at::Tensor& input,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode);
+#if defined(DYN_DISP_BUILD)
+}
+#endif
 
-at::Tensor max_pool2d_with_indices_backward_out_cpu(
-    const at::Tensor& gradOutput,
-    const at::Tensor& input,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode,
-    const at::Tensor& indices);
+using max_pool2d_kernel_fn = void (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int);
+DECLARE_DISPATCH(max_pool2d_kernel_fn, max_pool2d_kernel_stub);
+
+using max_pool2d_backward_kernel_fn =
+    void (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
+DECLARE_DISPATCH(
+    max_pool2d_backward_kernel_fn,
+    max_pool2d_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -2,6 +2,7 @@
 
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
+#include <csrc/dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -185,37 +186,6 @@ void batch_norm_cpu_backward_channels_last_impl(
     bool train,
     double eps);
 
-void batch_norm_cpu_kernel(
-    at::Tensor& output,
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& save_mean,
-    const at::Tensor& save_invstd,
-    const at::Tensor& running_mean,
-    const at::Tensor& running_var,
-    bool train,
-    double eps);
-
-void batch_norm_cpu_collect_stats_kernel(
-    at::Tensor& mean,
-    at::Tensor& var_sum,
-    const at::Tensor& input);
-
-void batch_norm_cpu_backward_kernel(
-    at::Tensor& grad_input,
-    at::Tensor& grad_weight,
-    at::Tensor& grad_bias,
-    const at::Tensor& grad_output,
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& running_mean,
-    const at::Tensor& running_var,
-    const at::Tensor& save_mean,
-    const at::Tensor& save_invstd,
-    bool train,
-    double eps);
-
 template <typename scalar_t, typename param_t>
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 batch_norm_cpu_transform_input_template(
@@ -281,6 +251,81 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu(
     bool train,
     double eps,
     std::array<bool, 3> grad_input_mask);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+void batch_norm_cpu_kernel_impl(
+    at::Tensor& output,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& save_mean,
+    const at::Tensor& save_invstd,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    bool train,
+    double eps);
+
+void batch_norm_cpu_collect_stats_kernel_impl(
+    at::Tensor& mean,
+    at::Tensor& var_sum,
+    const at::Tensor& input);
+
+void batch_norm_cpu_backward_kernel_impl(
+    at::Tensor& grad_input,
+    at::Tensor& grad_weight,
+    at::Tensor& grad_bias,
+    const at::Tensor& grad_output,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    const at::Tensor& save_mean,
+    const at::Tensor& save_invstd,
+    bool train,
+    double eps);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using batch_norm_cpu_kernel_fn = void (*)(
+    at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    bool train,
+    double eps);
+DECLARE_DISPATCH(batch_norm_cpu_kernel_fn, batch_norm_cpu_kernel_stub);
+
+using batch_norm_cpu_collect_stats_kernel_fn =
+    void (*)(at::Tensor&, at::Tensor&, const at::Tensor&);
+DECLARE_DISPATCH(
+    batch_norm_cpu_collect_stats_kernel_fn,
+    batch_norm_cpu_collect_stats_kernel_stub);
+
+using batch_norm_cpu_backward_kernel_fn = void (*)(
+    at::Tensor&,
+    at::Tensor&,
+    at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    bool,
+    double);
+DECLARE_DISPATCH(
+    batch_norm_cpu_backward_kernel_fn,
+    batch_norm_cpu_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

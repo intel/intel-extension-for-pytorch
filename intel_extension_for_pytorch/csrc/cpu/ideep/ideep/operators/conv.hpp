@@ -9,8 +9,8 @@ struct convolution_forward_params {
   attr_t bias_attr;
   scale_t dst_scales;
   int groups;
-  tensor scratchpad;
   attr_t op_attr;
+  int pd_use_threads;
 };
 
 struct convolution_forward
@@ -107,21 +107,23 @@ struct convolution_forward
   // compute with bias
   static void compute(
       const convolution_forward_params& param,
+      const dnnl::convolution_forward& prim,
       const tensor& src,
       const tensor& weights,
       const tensor& bias,
       tensor& dst) {
-    do_compute</*with_bias=*/true>(param, src, weights, bias, dst);
+    do_compute</*with_bias=*/true>(param, prim, src, weights, bias, dst);
   }
 
   // compute without bias
   static void compute(
       const convolution_forward_params& param,
+      const dnnl::convolution_forward& prim,
       const tensor& src,
       const tensor& weights,
       tensor& dst) {
     static tensor dummy_bias;
-    do_compute</*with_bias=*/false>(param, src, weights, dummy_bias, dst);
+    do_compute</*with_bias=*/false>(param, prim, src, weights, dummy_bias, dst);
   }
 
   // 2-in-1 compute (prepare & compute) with bias
@@ -677,10 +679,7 @@ struct convolution_forward
         aprop_kind,
         aengine);
 
-    // allocate scratchpad
-    tensor scratchpad(pd.scratchpad_desc());
-
-    param = {pd, bias_attr, dst_scales, groups, scratchpad, op_attr};
+    param = {pd, bias_attr, dst_scales, groups, op_attr, omp_get_max_threads()};
   }
 
   template <bool with_bias>
@@ -691,7 +690,8 @@ struct convolution_forward
       const tensor& bias,
       tensor& dst) {
     auto& pd = param.pd;
-    auto scratchpad = param.scratchpad;
+    // allocate scratchpad
+    tensor scratchpad(pd.scratchpad_desc());
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
     tensor expected_weights;
     // it will be removed after block format reorder performance improved.
@@ -734,6 +734,72 @@ struct convolution_forward
            {DNNL_ARG_SCRATCHPAD, scratchpad}});
     } else {
       super(pd).execute(
+          stream::default_stream(),
+          {{DNNL_ARG_SRC, expected_src},
+           {DNNL_ARG_WEIGHTS, expected_weights},
+           {DNNL_ARG_DST, expected_dst},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    }
+
+    // dst has been init in FW side, but has diff desc with expected_dst.
+    if (dst.get_desc() != expected_dst.get_desc()) {
+      dst.feed_from(expected_dst);
+    }
+  }
+
+  template <bool with_bias>
+  static void do_compute(
+      const convolution_forward_params& param,
+      const dnnl::convolution_forward& prim,
+      const tensor& src,
+      const tensor& weights,
+      const tensor& bias,
+      tensor& dst) {
+    auto& pd = param.pd;
+    // allocate scratchpad
+    tensor scratchpad(pd.scratchpad_desc());
+    auto expected_src = src.reorder_if_differ_in(pd.src_desc());
+    tensor expected_weights;
+    // it will be removed after block format reorder performance improved.
+    if (!weights.get_desc().is_plain() &&
+        weights.get_desc() != pd.weights_desc()) {
+      auto temp = weights.to_public(nullptr, weights.get_data_type());
+      expected_weights = temp.reorder_if_differ_in(pd.weights_desc());
+    } else {
+      expected_weights = weights.make_grouped_weights(param.groups)
+                             .reorder_if_differ_in(pd.weights_desc());
+    }
+
+    auto expected_dst_desc = pd.dst_desc();
+    tensor expected_dst;
+    // dst not init in FW or has same desc with expected desc.
+    if (dst.is_empty() || dst.get_desc() == expected_dst_desc) {
+      dst.reinit_if_possible(expected_dst_desc);
+      // For int8 case, dst is empty or dst.get_desc() == expected_dst_desc,
+      // because dst always acdb.
+      if (!param.dst_scales.empty() && dst.get_data_type() != data_type::f32) {
+        dst.set_scale(param.dst_scales);
+      }
+      expected_dst = dst;
+    } else {
+      expected_dst.init(expected_dst_desc);
+      if (param.op_attr.has_op_kind(kind::sum)) {
+        expected_dst.feed_from(dst);
+      }
+    }
+
+    if (with_bias) {
+      auto expected_bias =
+          bias.reorder_if_differ_in(pd.bias_desc(), param.bias_attr);
+      prim.execute(
+          stream::default_stream(),
+          {{DNNL_ARG_SRC, expected_src},
+           {DNNL_ARG_WEIGHTS, expected_weights},
+           {DNNL_ARG_BIAS, expected_bias},
+           {DNNL_ARG_DST, expected_dst},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    } else {
+      prim.execute(
           stream::default_stream(),
           {{DNNL_ARG_SRC, expected_src},
            {DNNL_ARG_WEIGHTS, expected_weights},

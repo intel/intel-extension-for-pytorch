@@ -178,6 +178,7 @@ Operator createOperator(Node* node) {
     return Operator(node, opkind::Convolution)
         .setInput(0, 1, 2)
         .setOutput(0)
+        .setAttr("data_format", std::string("NCX"))
         .setAttr("strides", Operator::Ints, 3)
         .setAttr("pads_begin", Operator::Ints, 4)
         .setAttr("pads_end", Operator::Ints, 4)
@@ -191,6 +192,7 @@ Operator createOperator(Node* node) {
     return Operator(node, opkind::Convolution)
         .setInput(0, 1, 2)
         .setOutput(0)
+        .setAttr("data_format", std::string("NCX"))
         .setAttr("strides", Operator::Ints, 3)
         .setAttr("pads_begin", Operator::Ints, 4)
         .setAttr("pads_end", Operator::Ints, 4)
@@ -204,6 +206,7 @@ Operator createOperator(Node* node) {
     return Operator(node, opkind::BatchNormInference)
         .setInput(0, 1, 2, 3, 4)
         .setOutput(0)
+        .setAttr("data_format", std::string("NCX"))
         .setAttr("epsilon", Operator::Float, 7);
   } else if (node->kind() == Symbol::aten("layer_norm")) {
     auto normalized_shape = Operator::Ints(node, 1);
@@ -275,6 +278,7 @@ Operator createOperator(Node* node) {
     return Operator(node, opkind::MaxPool)
         .setInput(0)
         .setOutput(0)
+        .setAttr("data_format", std::string("NCX"))
         .setAttr("kernel", Operator::Ints, 1)
         .setAttr("strides", Operator::Ints, 2)
         .setAttr("pads_begin", Operator::Ints, 3)
@@ -288,6 +292,7 @@ Operator createOperator(Node* node) {
     return Operator(node, opkind::AvgPool)
         .setInput(0)
         .setOutput(0)
+        .setAttr("data_format", std::string("NCX"))
         .setAttr("kernel", Operator::Ints, 1)
         .setAttr("strides", Operator::Ints, 2)
         .setAttr("pads_begin", Operator::Ints, 3)

@@ -1,10 +1,52 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <csrc/dyndisp/DispatchStub.h>
 #include <torch/extension.h>
 
 namespace torch_ipex {
 namespace cpu {
+
+class IPEXROIAlignOp : public torch::autograd::Function<IPEXROIAlignOp> {
+ public:
+  // forward function without autograd overhead, will go this way when only do
+  // forward
+  static at::Tensor _forward(
+      const at::Tensor& input,
+      const at::Tensor& rois,
+      double spatial_scale,
+      int64_t pooled_height,
+      int64_t pooled_width,
+      int64_t sampling_ratio,
+      bool aligned);
+
+  static at::Tensor forward(
+      torch::autograd::AutogradContext* ctx,
+      const at::Tensor& input,
+      const at::Tensor& rois,
+      double spatial_scale,
+      int64_t pooled_height,
+      int64_t pooled_width,
+      int64_t sampling_ratio,
+      bool aligned);
+
+  static torch::autograd::variable_list backward(
+      torch::autograd::AutogradContext* ctx,
+      torch::autograd::variable_list grad_outputs);
+};
+
+at::Tensor ROIAlign_forward(
+    const at::Tensor& input,
+    const at::Tensor& rois,
+    double spatial_scale,
+    int64_t pooled_height,
+    int64_t pooled_width,
+    int64_t sampling_ratio,
+    bool aligned);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
 
 template <typename T>
 struct PreCalc {
@@ -17,20 +59,6 @@ struct PreCalc {
   T w3;
   T w4;
 };
-
-template <typename T>
-void pre_calc_for_bilinear_interpolate(
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    T roi_start_h,
-    T roi_start_w,
-    T bin_size_h,
-    T bin_size_w,
-    int roi_bin_grid_h,
-    int roi_bin_grid_w,
-    std::vector<PreCalc<T>>& pre_calc);
 
 template <typename T, typename ACC_T>
 inline void roi_align_single_framework_forward(
@@ -76,22 +104,6 @@ inline void roi_align_single_framework_channels_last_forward<
     const std::vector<PreCalc<float>>& pre_calc,
     at::BFloat16* output);
 
-template <typename T, typename ACC_T>
-void roi_align_forward_kernel_impl(
-    int n_rois,
-    const T* input,
-    const ACC_T& spatial_scale,
-    int channels,
-    int height,
-    int width,
-    int pooled_height,
-    int pooled_width,
-    int sampling_ratio,
-    bool aligned,
-    const ACC_T* rois,
-    T* output,
-    bool is_channels_last);
-
 template <class T>
 inline void add(T* address, const T& val);
 
@@ -124,7 +136,23 @@ inline void roi_align_single_framework_channels_last_backward(
     T* grad_input);
 
 template <typename T, typename ACC_T>
-void roi_align_backward_kernel_impl(
+void roi_align_forward_kernel_body(
+    int n_rois,
+    const T* input,
+    const ACC_T& spatial_scale,
+    int channels,
+    int height,
+    int width,
+    int pooled_height,
+    int pooled_width,
+    int sampling_ratio,
+    bool aligned,
+    const ACC_T* rois,
+    T* output,
+    bool is_channels_last);
+
+template <typename T, typename ACC_T>
+void roi_align_backward_kernel_body(
     int n_rois,
     const T* grad_output,
     const ACC_T& spatial_scale,
@@ -139,7 +167,7 @@ void roi_align_backward_kernel_impl(
     const ACC_T* rois,
     bool is_channels_last);
 
-at::Tensor roi_align_forward_kernel(
+at::Tensor roi_align_forward_kernel_impl(
     const at::Tensor& input,
     const at::Tensor& rois,
     double spatial_scale,
@@ -148,7 +176,7 @@ at::Tensor roi_align_forward_kernel(
     int64_t sampling_ratio,
     bool aligned);
 
-at::Tensor roi_align_backward_kernel(
+at::Tensor roi_align_backward_kernel_impl(
     const at::Tensor& grad,
     const at::Tensor& rois,
     double spatial_scale,
@@ -162,42 +190,34 @@ at::Tensor roi_align_backward_kernel(
     bool aligned,
     bool is_channels_last);
 
-class IPEXROIAlignOp : public torch::autograd::Function<IPEXROIAlignOp> {
- public:
-  // forward function without autograd overhead, will go this way when only do
-  // forward
-  static at::Tensor _forward(
-      const at::Tensor& input,
-      const at::Tensor& rois,
-      double spatial_scale,
-      int64_t pooled_height,
-      int64_t pooled_width,
-      int64_t sampling_ratio,
-      bool aligned);
+#if defined(DYN_DISP_BUILD)
+}
+#endif
 
-  static at::Tensor forward(
-      torch::autograd::AutogradContext* ctx,
-      const at::Tensor& input,
-      const at::Tensor& rois,
-      double spatial_scale,
-      int64_t pooled_height,
-      int64_t pooled_width,
-      int64_t sampling_ratio,
-      bool aligned);
+using roi_align_forward_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    double,
+    int64_t,
+    int64_t,
+    int64_t,
+    bool);
+DECLARE_DISPATCH(roi_align_forward_kernel_fn, roi_align_forward_kernel_stub);
 
-  static torch::autograd::variable_list backward(
-      torch::autograd::AutogradContext* ctx,
-      torch::autograd::variable_list grad_outputs);
-};
-
-at::Tensor ROIAlign_forward(
-    const at::Tensor& input,
-    const at::Tensor& rois,
-    double spatial_scale,
-    int64_t pooled_height,
-    int64_t pooled_width,
-    int64_t sampling_ratio,
-    bool aligned);
+using roi_align_backward_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    double,
+    int64_t,
+    int64_t,
+    int64_t,
+    int64_t,
+    int64_t,
+    int64_t,
+    int64_t,
+    bool,
+    bool);
+DECLARE_DISPATCH(roi_align_backward_kernel_fn, roi_align_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -20,11 +20,10 @@ endif()
 file(GLOB_RECURSE cpu_kernel_cpp_in "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/kernels/*.cpp")
 
 list(APPEND DPCPP_ISA_SRCS_ORIGIN ${cpu_kernel_cpp_in})
-# set(DPCPP_ISA_SRCS_ORIGIN ${DPCPP_ISA_SRCS_ORIGIN} PARENT_SCOPE)
 
-foreach(file_path ${cpu_kernel_cpp_in})
-  message(${file_path})
-endforeach()
+# foreach(file_path ${cpu_kernel_cpp_in})
+#   message(${file_path})
+# endforeach()
 
 
 # Some versions of GCC pessimistically split unaligned load and store
@@ -50,7 +49,7 @@ if(CXX_AVX512_BF16_FOUND)
   if(MSVC)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}/arch:AVX512") # TODO: CHECK HERE
   else(MSVC)
-    list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ -DCPU_AVX512_BF16 -DCPU_CAPABILITY_AVX512
+    list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ -DCPU_CAPABILITY_AVX512
      -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512bf16 -mfma")
   endif(MSVC)
 endif(CXX_AVX512_BF16_FOUND)
@@ -87,12 +86,6 @@ if(CXX_AVX2_FOUND)
     endif(MSVC)
   endif()
 endif(CXX_AVX2_FOUND)
-
-if(CXX_VSX_FOUND)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_VSX_CPU_DEFINITION")
-  LIST(APPEND CPU_CAPABILITY_NAMES "VSX")
-  LIST(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}  ${CXX_VSX_FLAGS}")
-endif(CXX_VSX_FOUND)
 
 list(LENGTH CPU_CAPABILITY_NAMES NUM_CPU_CAPABILITY_NAMES)
 math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
@@ -131,9 +124,8 @@ foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
 endforeach()
 
 list(APPEND DPCPP_ISA_SRCS ${cpu_kernel_cpp})
-# set(DPCPP_ISA_SRCS ${DPCPP_ISA_SRCS} PARENT_SCOPE)
 
-foreach(file_path ${cpu_kernel_cpp})
-  message(${file_path})
-endforeach()
+# foreach(file_path ${cpu_kernel_cpp})
+#   message(${file_path})
+# endforeach()
 

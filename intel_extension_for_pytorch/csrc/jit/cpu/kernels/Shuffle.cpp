@@ -1,6 +1,4 @@
 #include "Shuffle.h"
-#include "csrc/aten/cpu/Matmul.h"
-#include "csrc/utils/utils.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
@@ -10,6 +8,7 @@
 
 #include <limits>
 
+#include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 
 namespace torch_ipex {

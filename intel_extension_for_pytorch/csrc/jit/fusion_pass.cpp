@@ -4,7 +4,6 @@
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
 
-#include "aten/cpu/Pooling.h"
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
@@ -471,7 +470,10 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // specializations
   LowerSimpleTuples(graph);
   BatchMM(graph);
-  FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+
+  if (tensorExprFuserEnabled()) {
+    FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+  }
 
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(

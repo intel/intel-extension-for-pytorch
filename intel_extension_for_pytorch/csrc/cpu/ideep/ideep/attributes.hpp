@@ -194,6 +194,30 @@ struct attr_t : public dnnl::primitive_attr {
     return true;
   }
 
+  bool operator==(const attr_t& rhs) const {
+    auto l_po = get_post_ops();
+    auto r_po = rhs.get_post_ops();
+    if (l_po.len() != r_po.len() ||
+        get_output_scales() != rhs.get_output_scales()) {
+      return false;
+    }
+    for (auto index = 0; index < l_po.len(); index++) {
+      kind l_akind, r_akind;
+      ;
+      algorithm l_alg, r_alg;
+      float l_scale = 1.0, l_alpha = 1.0, l_beta = 0.0;
+      float r_scale = 1.0, r_alpha = 1.0, r_beta = 0.0;
+      std::tie(l_akind, l_scale, l_alpha, l_beta, l_alg) = get_params(index);
+      std::tie(r_akind, r_scale, r_alpha, r_beta, r_alg) =
+          rhs.get_params(index);
+      if (l_akind != r_akind || l_alg != r_alg || l_scale != r_scale ||
+          l_alpha != r_alpha || l_beta != r_beta) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   void to_bytes(utils::bytestring& bytes) const {
     // encode post ops
     auto num_ops = get_post_ops().len();
