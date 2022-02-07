@@ -14,7 +14,7 @@ class TestTorchMethod(TestCase):
         # print("cpu result:", dst_cpu)
 
         src_gpu = src_cpu.to("xpu")
-        dst_gpu = torch._aminmax(src_cpu)
+        dst_gpu = torch._aminmax(src_gpu)
         # print("gpu result:", dst_gpu[0].cpu(), dst_gpu[1].cpu())
 
         self.assertEqual(dst_cpu, dst_gpu)
