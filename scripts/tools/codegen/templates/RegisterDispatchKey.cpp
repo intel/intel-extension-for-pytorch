@@ -50,8 +50,9 @@ class IpexSimpleTrace {
 public:
   IpexSimpleTrace(const char * name) : _name(name) {
     indent++;
+    gindex++;
     print_indent();
-    printf("step into %s\n", _name);
+    printf("step into %s (%d)\n", _name, gindex);
     fflush(stdout);
   }
   ~IpexSimpleTrace() {
@@ -67,10 +68,12 @@ private:
     }
   }
   static int indent;
+  static int gindex;
   const char * _name;
 };
 
 int IpexSimpleTrace::indent = -1;
+int IpexSimpleTrace::gindex = -1;
 
 ${dispatch_helpers}
 
