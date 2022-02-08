@@ -1,5 +1,4 @@
 #include "graph_rewrite.h"
-#include "graph_rewrite_utils.h"
 
 #include <torch/csrc/jit/frontend/code_template.h>
 
