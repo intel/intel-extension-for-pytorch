@@ -25,6 +25,7 @@
 #include "intel_extension_for_pytorch/csrc/quantization/Config.hpp"
 #include "intel_extension_for_pytorch/csrc/quantization/Observer.hpp"
 #include "intel_extension_for_pytorch/csrc/quantization/auto_opt_config.hpp"
+#include "intel_extension_for_pytorch/csrc/utils/env_settings.h"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
 #include "intel_extension_for_pytorch/csrc/utils/verbose.hpp"
 
@@ -337,6 +338,7 @@ void InitIpexModuleBindings(py::module m) {
 using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
+  EnvSettings::get_instance().initialize_all_settings();
   InitIpexModuleBindings(m);
 }
 
