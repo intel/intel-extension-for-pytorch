@@ -1,5 +1,6 @@
 import torch
 import ipex
+import random
 from torch.testing._internal.common_utils import (TestCase,
                                                   repeat_test_for_types)
 from torch.nn import functional as F
@@ -25,3 +26,22 @@ class TestTorchMethod(TestCase):
         outp_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bilinear', align_corners=True)
         print("xpu result ", outp_xpu.to("cpu"))
         self.assertEqual(outp.to(cpu_device), outp_xpu.to(cpu_device))
+
+    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
+    def test_gridSampler_3d(self, dtype=torch.float):
+        N = random.randint(2, 5)
+        C = random.randint(2, 4)
+        ID = random.randint(2, 5)
+        IH = random.randint(2, 5)
+        IW = random.randint(2, 5)
+        D = random.randint(ID + 1, 7)
+        H = random.randint(IH + 1, 7)
+        W = random.randint(IW + 1, 7)
+        input_cpu = torch.randn(C, N, ID, IH, IW).transpose(0, 1).requires_grad_()
+        grid_cpu = torch.randn(D, N, H, W, 3).transpose(0, 1).requires_grad_()
+        out_cpu = F.grid_sample(input_cpu, grid_cpu, mode='bilinear', align_corners=True)
+
+        grid_xpu = grid_cpu.to(dpcpp_device)
+        inp_xpu = input_cpu.to(dpcpp_device)
+        out_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bilinear', align_corners=True)
+        self.assertEqual(out_cpu.to(cpu_device), out_xpu.to(cpu_device))
