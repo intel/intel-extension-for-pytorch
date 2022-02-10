@@ -242,7 +242,6 @@ at::Tensor max_pool2d_with_indices_backward_out_cpu(
   }
 
   /* sizes */
-  const int64_t nbatch = input.ndimension() == 4 ? input.size(-4) : 1;
   const int64_t nInputPlane = input.size(-3);
   const int64_t inputHeight = input.size(-2);
   const int64_t inputWidth = input.size(-1);
@@ -259,7 +258,6 @@ at::Tensor max_pool2d_with_indices_backward_out_cpu(
       input,
       gradOutput,
       indices,
-      nbatch,
       kH,
       kW,
       dH,

@@ -1,11 +1,13 @@
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
-#include <torch/csrc/jit/frontend/code_template.h>
+#include <ATen/code_template.h>
 
 namespace torch {
 namespace jit {
 namespace graph_rewrite {
+
+using namespace at::jit;
 
 void insertPrePackedLinearOp(Block* b) {
   for (Node* n : b->nodes()) {

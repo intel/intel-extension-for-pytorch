@@ -224,13 +224,13 @@ static inline __attribute__((always_inline)) void scale_and_store_int8_128(
     const void* in,
     __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
-  auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
-  auto in0_2_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 32)));
-  auto in0_3_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 48)));
-  auto in0_4_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 64)));
-  auto in0_5_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 80)));
-  auto in0_6_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 96)));
-  auto in0_7_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 112)));
+  auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 16)));
+  auto in0_2_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 32)));
+  auto in0_3_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 48)));
+  auto in0_4_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 64)));
+  auto in0_5_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 80)));
+  auto in0_6_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 96)));
+  auto in0_7_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 112)));
   auto in0_0_32f = _mm512_cvt_roundepi32_ps(
       in0_0_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
   auto in0_1_32f = _mm512_cvt_roundepi32_ps(
@@ -280,13 +280,13 @@ static inline __attribute__((always_inline)) void scale_and_store_int8_128(
   in0_7_32i = _mm512_cvt_roundps_epi32(
       in0_7_32f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
   _mm_storeu_si128((__m128i*)out, _mm512_cvtsepi32_epi8(in0_0_32i));
-  _mm_storeu_si128((__m128i*)(out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
-  _mm_storeu_si128((__m128i*)(out + 32), _mm512_cvtsepi32_epi8(in0_2_32i));
-  _mm_storeu_si128((__m128i*)(out + 48), _mm512_cvtsepi32_epi8(in0_3_32i));
-  _mm_storeu_si128((__m128i*)(out + 64), _mm512_cvtsepi32_epi8(in0_4_32i));
-  _mm_storeu_si128((__m128i*)(out + 80), _mm512_cvtsepi32_epi8(in0_5_32i));
-  _mm_storeu_si128((__m128i*)(out + 96), _mm512_cvtsepi32_epi8(in0_6_32i));
-  _mm_storeu_si128((__m128i*)(out + 112), _mm512_cvtsepi32_epi8(in0_7_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 32), _mm512_cvtsepi32_epi8(in0_2_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 48), _mm512_cvtsepi32_epi8(in0_3_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 64), _mm512_cvtsepi32_epi8(in0_4_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 80), _mm512_cvtsepi32_epi8(in0_5_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 96), _mm512_cvtsepi32_epi8(in0_6_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 112), _mm512_cvtsepi32_epi8(in0_7_32i));
 }
 
 static inline void scale_and_store_int8_64(
@@ -294,9 +294,9 @@ static inline void scale_and_store_int8_64(
     const void* in,
     __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
-  auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
-  auto in0_2_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 32)));
-  auto in0_3_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 48)));
+  auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 16)));
+  auto in0_2_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 32)));
+  auto in0_3_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 48)));
   auto in0_0_32f = _mm512_cvt_roundepi32_ps(
       in0_0_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
   auto in0_1_32f = _mm512_cvt_roundepi32_ps(
@@ -322,9 +322,9 @@ static inline void scale_and_store_int8_64(
   in0_3_32i = _mm512_cvt_roundps_epi32(
       in0_3_32f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
   _mm_storeu_si128((__m128i*)out, _mm512_cvtsepi32_epi8(in0_0_32i));
-  _mm_storeu_si128((__m128i*)(out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
-  _mm_storeu_si128((__m128i*)(out + 32), _mm512_cvtsepi32_epi8(in0_2_32i));
-  _mm_storeu_si128((__m128i*)(out + 48), _mm512_cvtsepi32_epi8(in0_3_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 32), _mm512_cvtsepi32_epi8(in0_2_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 48), _mm512_cvtsepi32_epi8(in0_3_32i));
 }
 
 static inline void scale_and_store_int8_32(
@@ -332,7 +332,7 @@ static inline void scale_and_store_int8_32(
     const void* in,
     __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
-  auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
+  auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)((int8_t*)in + 16)));
   auto in0_0_32f = _mm512_cvt_roundepi32_ps(
       in0_0_32i, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
   auto in0_1_32f = _mm512_cvt_roundepi32_ps(
@@ -346,7 +346,7 @@ static inline void scale_and_store_int8_32(
   in0_1_32i = _mm512_cvt_roundps_epi32(
       in0_1_32f, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
   _mm_storeu_si128((__m128i*)out, _mm512_cvtsepi32_epi8(in0_0_32i));
-  _mm_storeu_si128((__m128i*)(out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
+  _mm_storeu_si128((__m128i*)((int8_t*)out + 16), _mm512_cvtsepi32_epi8(in0_1_32i));
 }
 
 static inline void scale_and_store_int8_16(
