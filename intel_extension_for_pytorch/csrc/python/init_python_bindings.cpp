@@ -1,5 +1,6 @@
 #include "init_python_bindings.h"
 
+#include "intel_extension_for_pytorch/csrc/aten/cpu/utils/isa_help.h"
 #include "intel_extension_for_pytorch/csrc/jit/codegen/onednn/interface.h"
 #include "intel_extension_for_pytorch/csrc/version.h"
 
@@ -65,6 +66,11 @@ void InitIpexModuleBindings(py::module m) {
   m.def("_does_support_avx512", []() {
     using namespace torch_ipex::cpu::utils;
     return CPUISA::info().does_support_avx512();
+  });
+
+  m.def("_get_current_isa_level", []() {
+    using namespace torch_ipex::cpu;
+    return get_current_isa_level();
   });
 
   m.def("mkldnn_set_verbose", &torch_ipex::verbose::_mkldnn_set_verbose);
