@@ -543,6 +543,14 @@ class CPUOPsTester(TestCase):
             y2 = torch.mean(x2, dim=(3, 4), keepdim=False, dtype=dtype)
             self.assertEqual(y1, y2)
 
+    def test_sum(self):
+        x = torch.randn(32, 2, 128, 56, 56, requires_grad=True)
+        for dtype in [torch.float32, torch.double, torch.bfloat16]:
+            for dim in [(1), (2, 1), (1, 3, 4)]:
+                y1 = torch.sum(x, dim=dim, keepdim=False, dtype=dtype)
+                x2 = x.clone().detach().to(memory_format=torch.channels_last_3d).requires_grad_()
+                y2 = torch.sum(x2, dim=dim, keepdim=False, dtype=dtype)
+                self.assertEqual(y1, y2)
 
 if __name__ == '__main__':
     test = unittest.main()
