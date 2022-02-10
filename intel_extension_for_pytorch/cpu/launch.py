@@ -216,12 +216,14 @@ class CPUinfo():
         cores_numa_map = self.logical_core_node_map
         if len(core_list) <= 1:
             return True
-        numa_id = cores_numa_map[core_list[0]]
+        numa_ids = []
         for core in core_list:
-            if numa_id != cores_numa_map[core]:
-                logger.warning("Numa Aware: cores:{} on different NUMA nodes".format(str(core_list)))
-                return False
-        return True
+            numa_id = cores_numa_map[core]
+            if not numa_id in numa_ids:
+                numa_ids.append(numa_id)
+        if len(numa_ids) > 1:
+            logger.warning("Numa Aware: cores:{} on different NUMA nodes:{}".format(str(core_list), str(numa_ids)))
+        return numa_ids
 
 class Launcher():
     r"""
@@ -245,18 +247,25 @@ class Launcher():
 
         library_paths += ["{}/.local/lib/".format(expanduser("~")), "/usr/local/lib/",
                           "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
+
         lib_find = False
-        for lib_path in library_paths:
-            library_file = lib_path + "lib" + lib_type + ".so"
-            matches = glob.glob(library_file)
-            if len(matches) > 0:
-                if "LD_PRELOAD" in os.environ:
-                    os.environ["LD_PRELOAD"] = matches[0] + ":" + os.environ["LD_PRELOAD"]
-                else:
-                    os.environ["LD_PRELOAD"] = matches[0]
-                lib_find = True
+        lib_set = False
+        for item in os.getenv("LD_PRELOAD", "").split(":"):
+            if item.endswith('lib{}.so'.format(lib_type)):
+                lib_set = True
                 break
-        return lib_find
+        if not lib_set:
+            for lib_path in library_paths:
+                library_file = lib_path + "lib" + lib_type + ".so"
+                matches = glob.glob(library_file)
+                if len(matches) > 0:
+                    if "LD_PRELOAD" in os.environ:
+                        os.environ["LD_PRELOAD"] = matches[0] + ":" + os.environ["LD_PRELOAD"]
+                    else:
+                        os.environ["LD_PRELOAD"] = matches[0]
+                    lib_find = True
+                    break
+        return lib_set or lib_find
 
 
     def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
@@ -289,7 +298,7 @@ class Launcher():
                                "you can use 'conda install -c conda-forge jemalloc' to install jemalloc"
                                .format("JeMalloc", "jemalloc", expanduser("~")))
             else:
-                logger.info("Use JeMallocl memory allocator")
+                logger.info("Use JeMalloc memory allocator")
                 self.set_env('MALLOC_CONF', "oversize_threshold:1,background_thread:true,metadata_thp:auto")
 
         elif use_default_allocator:
@@ -302,7 +311,7 @@ class Launcher():
                 return
             find_je = self.add_lib_preload(lib_type="jemalloc")
             if find_je:
-                logger.info("Use JeMallocl memory allocator")
+                logger.info("Use JeMalloc memory allocator")
                 return
             logger.warning("Neither TCMalloc nor JeMalloc is found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib"
                            " or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
@@ -395,13 +404,13 @@ class MultiInstanceLauncher(Launcher):
                     logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
                     exit(-1)
             if args.latency_mode:
-                print('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                logger.warning('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
                 args.ncore_per_instance = 4
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ninstances = len(cores) // args.ncore_per_instance
 
             if args.throughput_mode:
-                print('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                logger.warning('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
                 args.ninstances = self.cpuinfo.node_nums()
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
@@ -423,11 +432,10 @@ class MultiInstanceLauncher(Launcher):
                 cmd = ["numactl"]
                 cores = sorted(cores)
                 if args.instance_idx == -1: # sequentially assign ncores_per_instance to ninstances
-                    core_list = cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]
+                    core_list = cores[i * args.ncore_per_instance : (i + 1) * args.ncore_per_instance]
                 else: # assign ncores_per_instance from instance_idx
                     core_list = cores[args.instance_idx * args.ncore_per_instance : (args.instance_idx + 1) * args.ncore_per_instance]
 
-                same_numa = self.cpuinfo.numa_aware_check(core_list)
                 core_ranges = []
                 for core in core_list:
                     if len(core_ranges) == 0:
@@ -443,8 +451,7 @@ class MultiInstanceLauncher(Launcher):
                     cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
                 cur_process_cores = cur_process_cores[:-1]
                 numa_params = "-C {} ".format(cur_process_cores)
-                if same_numa:
-                    numa_params += "-m {}".format(self.cpuinfo.logical_core_node_map[core_list[0]])
+                numa_params += "-m {}".format(",".join([str(numa_id) for numa_id in self.cpuinfo.numa_aware_check(core_list)]))
                 cmd.extend(numa_params.split())
             with_python = not args.no_python
             if with_python:
@@ -768,6 +775,21 @@ def main():
     if not args.no_python and not args.program.endswith(".py"):
         logger.error("For non Python script, you should use '--no_python' parameter.")
         exit()
+
+    # Verify LD_PRELOAD
+    if "LD_PRELOAD" in os.environ:
+        lst_valid = []
+        tmp_ldpreload = os.environ["LD_PRELOAD"]
+        for item in tmp_ldpreload.split(":"):
+            matches = glob.glob(item)
+            if len(matches) > 0:
+                lst_valid.append(item)
+            else:
+                logger.warning("{} doesn't exist. Removing it from LD_PRELOAD.".format(item))
+        if len(lst_valid) > 0:
+            os.environ["LD_PRELOAD"] = ":".join(lst_valid)
+        else:
+            os.environ["LD_PRELOAD"] = ""
 
     launcher = None
     if args.distributed:
