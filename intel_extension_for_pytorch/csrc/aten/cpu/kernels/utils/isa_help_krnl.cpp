@@ -1,7 +1,7 @@
 #include <csrc/aten/cpu/utils/isa_help.h>
 
-#define MICRO_TO_STRING(x) #x
-#define MICRO_VALUE_TO_STRING(x) MICRO_TO_STRING(x)
+#define MACRO_TO_STRING(x) #x
+#define MACRO_VALUE_TO_STRING(x) MACRO_TO_STRING(x)
 
 namespace torch_ipex {
 namespace cpu {
@@ -11,7 +11,7 @@ namespace {
 #endif
 
 std::string get_current_isa_level_kernel_impl() {
-  return MICRO_VALUE_TO_STRING(CPU_CAPABILITY);
+  return MACRO_VALUE_TO_STRING(CPU_CAPABILITY);
 }
 
 #if defined(DYN_DISP_BUILD)

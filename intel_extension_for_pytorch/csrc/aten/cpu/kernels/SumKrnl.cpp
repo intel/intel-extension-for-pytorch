@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 
 #include <ATen/AccumulateType.h>
-#include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/Parallel.h>
 #include <ATen/cpu/vec/vec.h>
@@ -697,7 +696,7 @@ void sum_kernel_impl(at::TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), /*includeBool=*/true)) {
     AT_DISPATCH_INTEGRAL_TYPES_AND(
         at::ScalarType::Bool, iter.dtype(), "sum_cpu", [&] {
-          at::native::CPU_CAPABILITY::binary_kernel_reduce_vec(
+          at::native::binary_kernel_reduce_vec(
               iter,
               [=](scalar_t a, scalar_t b) -> scalar_t { return a + b; },
               [=](at::native::Vectorized<scalar_t> a,
