@@ -80,7 +80,8 @@ void sort_based_batched_csr2csc_opt_kernel_impl(
     num_uniq[i][0] += num_uniq[i - 1][0];
   int U = num_uniq[max_thds - 1][0];
 
-  batched_csc.segment_ptr = (int*)allocator->raw_allocate(U * sizeof(int));
+  batched_csc.segment_ptr =
+      (int*)allocator->raw_allocate((U + 1) * sizeof(int));
   batched_csc.segment_indices = (int*)allocator->raw_allocate(U * sizeof(int));
   batched_csc.output_row_indices =
       (int*)allocator->raw_allocate(n_indices * sizeof(int));
