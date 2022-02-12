@@ -11,6 +11,7 @@
 #include <limits>
 
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -30,9 +31,8 @@ at::Tensor dil_mha_scores_calc(
     const at::Scalar& dim_per_head,
     const int64_t& softmax_dim,
     const at::IValue& dtype) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_mha_scores_calc", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_mha_scores_calc", std::vector<c10::IValue>({}));
+
   auto _dim_per_head = dim_per_head.to<float>();
   auto _alpha = alpha.to<float>();
   auto qk = at::Tensor();

@@ -8,6 +8,7 @@
 #include <c10/util/irange.h>
 
 #include "Sum.h"
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -24,9 +25,8 @@ at::Tensor sum_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::sum_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::sum_out_cpu", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("torch_ipex::sum_out_cpu", std::vector<c10::IValue>({}));
+
   at::Tensor output;
   auto out_dtype = dtype.has_value() ? dtype.value() : input_.scalar_type();
   at::DimVector dims_(dim);

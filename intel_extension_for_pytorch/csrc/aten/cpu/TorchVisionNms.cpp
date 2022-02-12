@@ -6,6 +6,7 @@
 #include "csrc/utils/library.h"
 
 #include "TorchVisionNms.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -19,9 +20,7 @@ at::Tensor nms_kernel(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::nms\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::nms", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("torch_ipex::nms", std::vector<c10::IValue>({}));
 
   TORCH_CHECK(
       dets.dim() == 2, "boxes should be a 2d tensor, got ", dets.dim(), "D");

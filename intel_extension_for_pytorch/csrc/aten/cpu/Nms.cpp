@@ -7,6 +7,7 @@
 #include <algorithm>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/jit/cpu/kernels/Softmax.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -29,9 +30,8 @@ at::Tensor nms(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::nms\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::nms", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IpexExternal::nms", std::vector<c10::IValue>({}));
+
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
 
@@ -54,10 +54,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> batch_score_nms(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::batch_score_nms\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "IpexExternal::batch_score_nms", std::vector<c10::IValue>({}));
-#endif
+
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
 
@@ -83,9 +82,8 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::rpn_nms\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::rpn_nms", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IpexExternal::rpn_nms", std::vector<c10::IValue>({}));
+
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_scores.layout() == c10::kStrided);
 
@@ -122,9 +120,8 @@ box_head_nms(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::box_head_nms\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::box_head_nms", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IpexExternal::box_head_nms", std::vector<c10::IValue>({}));
 
 #if defined(DYN_DISP_BUILD)
   auto&& result = cpu::box_head_nms_cpu_kernel_stub(
@@ -246,10 +243,9 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::parallel_scale_back_batch\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "IpexExternal::parallel_scale_back_batch", std::vector<c10::IValue>({}));
-#endif
+
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bboxes_in.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dboxes_xywh.layout() == c10::kStrided);
 

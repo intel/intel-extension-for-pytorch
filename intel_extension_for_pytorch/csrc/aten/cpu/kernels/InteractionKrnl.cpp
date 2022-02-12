@@ -12,6 +12,7 @@
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
 #include <algorithm>
+#include "csrc/utils/ipex_op_profile.h"
 
 /*
  Custom op to optimize DLRM interaction part
@@ -107,9 +108,8 @@ static inline void transpose_add(T* out, const T* in, uint32_t vector_nums) {
 
 template <typename T>
 inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
+
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -176,9 +176,8 @@ inline std::vector<at::Tensor> _interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({}));
+
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];

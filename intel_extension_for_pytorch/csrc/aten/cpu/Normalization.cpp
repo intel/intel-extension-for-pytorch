@@ -16,7 +16,7 @@
 #include "Normalization.h"
 
 #include <vector>
-
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 static const int MIOPEN_DIM_MAX = 5;
@@ -526,10 +526,9 @@ std::tuple<at::Tensor, at::Tensor> batch_norm_update_stats_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::batch_norm_update_stats_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::batch_norm_update_stats_cpu", std::vector<c10::IValue>({}));
-#endif
+
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> running_mean_maybe_owned =
       at::borrow_from_optional_tensor(running_mean_opt);
@@ -566,9 +565,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::batch_norm_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::batch_norm_cpu", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::batch_norm_cpu", std::vector<c10::IValue>({}));
+
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);
@@ -669,10 +668,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::batch_norm_backward_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::batch_norm_backward_cpu", std::vector<c10::IValue>({}));
-#endif
+
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =
       at::borrow_from_optional_tensor(weight_opt);

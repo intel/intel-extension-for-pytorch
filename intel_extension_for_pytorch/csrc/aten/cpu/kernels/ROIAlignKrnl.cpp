@@ -5,6 +5,7 @@
 #include <csrc/aten/cpu/ROIAlign.h>
 #include <torch/library.h>
 #include "csrc/autocast/autocast_mode.h"
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 // use float as accumulation type for BFloat16
@@ -678,9 +679,9 @@ at::Tensor roi_align_forward_kernel_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::ROIAlign_forward\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::ROIAlign_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::ROIAlign_forward", std::vector<c10::IValue>({}));
+
   TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
   TORCH_CHECK(rois.size(1) == 5, "rois must have shape as Tensor[K, 5]");
@@ -746,10 +747,9 @@ at::Tensor roi_align_backward_kernel_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::ROIAlign_backward\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::ROIAlign_backward", std::vector<c10::IValue>({}));
-#endif
+
   TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
 

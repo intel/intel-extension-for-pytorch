@@ -3,6 +3,7 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -16,11 +17,10 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     int64_t in_features,
     int64_t batch_size,
     bool weight_is_packed) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::createLinearPrePackOpContext",
       std::vector<c10::IValue>({}));
-#endif
+
   return IpexLinearOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -33,29 +33,27 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
 at::Tensor linear_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("ipex_prepack::linear_run", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::linear_run", std::vector<c10::IValue>({}));
+
   return op_context->run(input, ideep::attr_t());
 }
 
 at::Tensor linear_relu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::linear_relu_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t::fuse_relu());
 }
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::linear_gelu_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t::fuse_gelu());
 }
 
@@ -64,9 +62,9 @@ at::Tensor linear_add_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("ipex_prepack::linear_add_run", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::linear_add_run", std::vector<c10::IValue>({}));
+
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
 }

@@ -1,5 +1,6 @@
 #include <csrc/aten/cpu/utils/csr2csc.h>
 #include <csrc/aten/cpu/utils/radix_sort.h>
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -15,9 +16,8 @@ void sort_based_batched_csr2csc_opt_kernel_impl(
     const Tensor& indices,
     std::vector<int64_t> pooling_modes,
     int64_t max_embeddings) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
+
   Allocator* allocator = c10::GetAllocator(c10::DeviceType::CPU);
   TensorAccessor<int64_t, 1> offsets_data = offsets.accessor<int64_t, 1>();
   TensorAccessor<int64_t, 1> batched_csr_indices =

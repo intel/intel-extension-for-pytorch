@@ -1,5 +1,6 @@
 #include "interface.h"
 #include <oneapi/dnnl/dnnl_graph.hpp>
+#include "csrc/utils/ipex_op_profile.h"
 #include "defer_size_check.h"
 #include "fusion_group_name.h"
 #include "graph_fuser.h"
@@ -102,9 +103,8 @@ bool getLlgaWeightCacheEnabled() {
 Operation createLlgaKernel(const Node* node) {
   auto kernel = std::make_shared<fuser::onednn::LlgaKernel>(node);
   return [kernel](Stack* stack) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION(kernel->profileName(), std::vector<c10::IValue>());
-#endif
+    IPEX_RECORD_FUNCTION(kernel->profileName(), std::vector<c10::IValue>());
+
     kernel->run(*stack);
     return 0;
   };
@@ -119,9 +119,9 @@ RegisterOperators LLGAFusionGroupOp({
 
 Operation createLlgaGuardKernel(const Node* node) {
   return [node](Stack* stack) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION(fuser::onednn::LlgaGuardName(), std::vector<c10::IValue>());
-#endif
+    IPEX_RECORD_FUNCTION(
+        fuser::onednn::LlgaGuardName(), std::vector<c10::IValue>());
+
     GRAPH_DEBUG("Guarding node: ", node->kind().toQualString());
     std::vector<TypePtr> types = node->tys(attr::types);
     const auto num_inputs = types.size();

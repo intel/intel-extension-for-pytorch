@@ -1,9 +1,9 @@
 #include <torch/extension.h>
 
 #include "BatchNorm.h"
-#include "csrc/cpu/ideep/IDeepConversions.h"
-
 #include "csrc/autocast/autocast_mode.h"
+#include "csrc/cpu/ideep/IDeepConversions.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -175,9 +175,9 @@ at::Tensor IPEXBatchNormOp::forward(
     bool train,
     double momentum,
     double eps) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXBatchNormOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXBatchNormOp::forward", std::vector<c10::IValue>({}));
+
   ctx->saved_data["train"] = train;
   ctx->saved_data["eps"] = eps;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
@@ -203,9 +203,9 @@ at::Tensor IPEXBatchNormOp::forward(
 torch::autograd::variable_list IPEXBatchNormOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXBatchNormOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXBatchNormOp::backward", std::vector<c10::IValue>({}));
+
   auto train = ctx->saved_data["train"].toBool();
   auto eps = ctx->saved_data["eps"].toDouble();
 
@@ -252,9 +252,8 @@ at::Tensor batch_norm(
     double momentum,
     double eps,
     bool cudnn_enabled) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::batch_norm", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("torch_ipex::batch_norm", std::vector<c10::IValue>({}));
+
   // Only 2d bfloat16 training calling onednn path, and this path will be
   // discarded after aten batchnorm optimized well.
   if (weight_opt.has_value() && weight_opt.value().defined() &&
@@ -291,10 +290,9 @@ at::Tensor frozen_batch_norm(
     const at::Tensor& bias,
     const at::Tensor& running_mean,
     const at::Tensor& running_var) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::frozen_batch_norm", std::vector<c10::IValue>({}));
-#endif
+
   return IPEXBatchNormOp::apply(
       input, weight, bias, running_mean, running_var, false, 0, 0);
 }

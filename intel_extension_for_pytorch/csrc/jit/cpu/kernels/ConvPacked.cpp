@@ -5,6 +5,7 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/cpu/ideep/ideep/utils.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -23,11 +24,10 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     bool weight_is_channels_last,
     bool weight_is_packed,
     std::vector<int64_t>&& input_size) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvolutionPrePackOpContext",
       std::vector<c10::IValue>({}));
-#endif
+
   return IpexConvolutionOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -46,30 +46,27 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
 at::Tensor convolution_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t());
 }
 
 at::Tensor convolution_relu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_relu_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t::fuse_relu());
 }
 
 at::Tensor convolution_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_sigmoid_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t::fuse_sigmoid());
 }
 
@@ -78,10 +75,9 @@ at::Tensor convolution_hardtanh_run(
     at::Scalar lower_bound,
     at::Scalar upper_bound,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_hardtanh_run", std::vector<c10::IValue>({}));
-#endif
+
   auto lower_bound_value = lower_bound.to<float>();
   auto upper_bound_value = upper_bound.to<float>();
   return op_context->run(
@@ -94,10 +90,9 @@ at::Tensor convolution_elu_run(
     at::Scalar scale,
     at::Scalar input_scale,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_elu_run", std::vector<c10::IValue>({}));
-#endif
+
   auto alpha_value = alpha.to<float>();
   auto scale_value = scale.to<float>();
   auto input_scale_value = input_scale.to<float>();
@@ -109,10 +104,9 @@ at::Tensor convolution_elu_run(
 at::Tensor convolution_swish_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_swish_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t::fuse_swish());
 }
 
@@ -121,10 +115,9 @@ at::Tensor convolution_add_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_add_run", std::vector<c10::IValue>({}));
-#endif
+
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
 }
@@ -134,10 +127,9 @@ at::Tensor convolution_add_relu_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_add_relu_run", std::vector<c10::IValue>({}));
-#endif
+
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::residual(scale));
 }

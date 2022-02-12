@@ -1,5 +1,7 @@
 #include "ConcatBnRelu.h"
 
+#include "csrc/utils/ipex_op_profile.h"
+
 #if defined(CPU_CAPABILITY_AVX512)
 #include "csrc/cpu/vec512/concat_bn_relu.h"
 #endif
@@ -30,9 +32,8 @@ Tensor ConcatBnRelu(
     double bn_eps,
     bool bn_cudnn_enabled,
     int dim) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("ConcatBnRelu", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("ConcatBnRelu", std::vector<c10::IValue>({}));
+
   int64_t list_length = a.size();
 
   c10::MaybeOwned<Tensor> weight_maybe_owned =

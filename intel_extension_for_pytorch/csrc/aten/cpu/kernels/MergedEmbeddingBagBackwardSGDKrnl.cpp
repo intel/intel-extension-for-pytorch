@@ -2,6 +2,7 @@
 #include <csrc/aten/cpu/MergedEmbeddingBag.h>
 #include <omp.h>
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -139,9 +140,7 @@ void merged_embeddingbag_backward_cpu_kernel(
       indices_with_row_offset,
       pooling_modes,
       max_embeddings);
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
 
   auto get_table_id = [&](int index) {
     int table_id = 0;

@@ -1,3 +1,4 @@
+#include "RnntEmbedding.h"
 #include <ATen/Parallel.h>
 #include <ATen/Tensor.h>
 #include <c10/util/Exception.h>
@@ -6,8 +7,7 @@
 #include <torch/csrc/autograd/function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
-
-#include "RnntEmbedding.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -44,9 +44,7 @@ static void rnnt_embedding(
 #if defined(IPEX_DISP_OP)
   printf("IPEX::rnnt_embedding\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEX::rnnt_embedding", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEX::rnnt_embedding", std::vector<c10::IValue>({}));
 
 #if defined(DYN_DISP_BUILD)
   torch_ipex::cpu::rnnt_embedding_kernel_stub(

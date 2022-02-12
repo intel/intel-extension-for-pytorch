@@ -21,6 +21,7 @@
 
 #include "Copy.h"
 
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -32,9 +33,8 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::copy_\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::copy_", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("torch_ipex::copy_", std::vector<c10::IValue>({}));
+
   auto maybe_outnames =
       at::namedinference::compute_broadcast_outnames(self, src);
   {

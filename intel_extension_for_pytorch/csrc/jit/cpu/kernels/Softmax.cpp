@@ -11,6 +11,7 @@
 #include <limits>
 
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -46,9 +47,8 @@ at::Tensor dil_softmax(
     const at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_softmax", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_softmax", std::vector<c10::IValue>({}));
+
   auto half_to_float = false;
 
   if (!dtype.isNone()) {
@@ -68,9 +68,8 @@ at::Tensor& dil_softmax_(
     at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_softmax_", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_softmax_", std::vector<c10::IValue>({}));
+
   auto half_to_float = false;
   if (!dtype.isNone()) {
     auto outtype = dtype.toScalarType();

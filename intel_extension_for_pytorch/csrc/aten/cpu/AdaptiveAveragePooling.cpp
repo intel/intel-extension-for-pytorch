@@ -7,7 +7,7 @@
 #include <ATen/record_function.h>
 
 #include "AdaptiveAveragePooling.h"
-
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -125,10 +125,9 @@ at::Tensor& adaptive_avg_pool2d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::adaptive_avg_pool2d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adaptive_avg_pool2d_out_cpu", std::vector<c10::IValue>({}));
-#endif
+
   adaptive_avg_pool2d_out_cpu_template(output, input, output_size);
   return output;
 }
@@ -139,10 +138,9 @@ at::Tensor adaptive_avg_pool2d_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::adaptive_avg_pool2d_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adaptive_avg_pool2d_cpu", std::vector<c10::IValue>({}));
-#endif
+
   auto output = at::empty({0}, input.options());
   adaptive_avg_pool2d_out_cpu_template(output, input, output_size);
   return output;
@@ -187,11 +185,10 @@ at::Tensor& adaptive_avg_pool2d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::adaptive_avg_pool2d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adaptive_avg_pool2d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
+
   adaptive_avg_pool2d_backward_out_cpu_template(grad_input, grad_output, input);
   return grad_input;
 }
@@ -202,11 +199,10 @@ at::Tensor adaptive_avg_pool2d_backward_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::adaptive_avg_pool2d_backward_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adaptive_avg_pool2d_backward_cpu",
       std::vector<c10::IValue>({}));
-#endif
+
   auto grad_input = at::empty({0}, input.options());
   adaptive_avg_pool2d_backward_out_cpu_template(grad_input, grad_output, input);
   return grad_input;

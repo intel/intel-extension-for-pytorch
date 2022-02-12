@@ -5,6 +5,7 @@
 #include <ATen/cpu/vec/vec.h>
 #include <torch/library.h>
 #include "csrc/autocast/autocast_mode.h"
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -21,9 +22,8 @@ at::Tensor IPEXROIAlignOp::_forward(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXROIAlignOp::_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXROIAlignOp::_forward", std::vector<c10::IValue>({}));
 
 #if defined(DYN_DISP_BUILD)
   return roi_align_forward_kernel_stub(
@@ -56,9 +56,8 @@ at::Tensor IPEXROIAlignOp::forward(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXROIAlignOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEXROIAlignOp::forward", std::vector<c10::IValue>({}));
+
   ctx->saved_data["input_shape"] = input.sizes();
   ctx->saved_data["spatial_scale"] = spatial_scale;
   ctx->saved_data["pooled_height"] = pooled_height;
@@ -94,9 +93,9 @@ at::Tensor IPEXROIAlignOp::forward(
 torch::autograd::variable_list IPEXROIAlignOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXROIAlignOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXROIAlignOp::backward", std::vector<c10::IValue>({}));
+
   auto input_shape = ctx->saved_data["input_shape"].toIntVector();
   auto spatial_scale = ctx->saved_data["spatial_scale"].toDouble();
   auto pooled_height = ctx->saved_data["pooled_height"].toInt();

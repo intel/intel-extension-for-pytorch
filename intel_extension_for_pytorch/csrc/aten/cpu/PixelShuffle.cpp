@@ -12,6 +12,7 @@
 #include "PixelShuffle.h"
 
 #include "csrc/autocast/autocast_mode.h"
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -115,9 +116,9 @@ at::Tensor pixel_shuffle(const at::Tensor& self, int64_t upscale_factor) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::pixel_shuffle\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::pixel_shuffle", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::pixel_shuffle", std::vector<c10::IValue>({}));
+
   TORCH_CHECK(
       self.dim() >= 3,
       "pixel_shuffle expects input to have at least 3 dimensions, but "
@@ -153,9 +154,9 @@ at::Tensor pixel_unshuffle(const at::Tensor& self, int64_t downscale_factor) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::pixel_unshuffle\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::pixel_unshuffle", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::pixel_unshuffle", std::vector<c10::IValue>({}));
+
   TORCH_CHECK(
       self.dim() >= 3,
       "pixel_unshuffle expects input to have at least 3 dimensions, "
@@ -191,9 +192,9 @@ at::Tensor pixel_unshuffle(const at::Tensor& self, int64_t downscale_factor) {
 at::Tensor PixelShuffleOp::_forward(
     const at::Tensor& self,
     int64_t upscale_factor) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelShuffleOp::_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "PixelShuffleOp::_forward", std::vector<c10::IValue>({}));
+
   return pixel_shuffle_cpu(self, upscale_factor);
 }
 
@@ -201,9 +202,8 @@ at::Tensor PixelShuffleOp::forward(
     torch::autograd::AutogradContext* ctx,
     const at::Tensor& self,
     int64_t upscale_factor) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelShuffleOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("PixelShuffleOp::forward", std::vector<c10::IValue>({}));
+
   at::AutoNonVariableTypeMode g;
   ctx->saved_data["upscale_factor"] = upscale_factor;
   ctx->saved_data["input_sizes"] = self.sizes();
@@ -213,9 +213,9 @@ at::Tensor PixelShuffleOp::forward(
 torch::autograd::tensor_list PixelShuffleOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelShuffleOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "PixelShuffleOp::backward", std::vector<c10::IValue>({}));
+
   at::Tensor grad_output = grad_outputs[0];
   int64_t upscale_factor = ctx->saved_data["upscale_factor"].toInt();
   auto input_sizes = ctx->saved_data["input_sizes"].toIntList().vec();
@@ -227,9 +227,9 @@ torch::autograd::tensor_list PixelShuffleOp::backward(
 at::Tensor PixelUnshuffleOp::_forward(
     const at::Tensor& self,
     int64_t downscale_factor) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelUnshuffleOp::_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "PixelUnshuffleOp::_forward", std::vector<c10::IValue>({}));
+
   return pixel_unshuffle_cpu(self, downscale_factor);
 }
 
@@ -237,9 +237,9 @@ at::Tensor PixelUnshuffleOp::forward(
     torch::autograd::AutogradContext* ctx,
     const at::Tensor& self,
     int64_t downscale_factor) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelUnshuffleOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "PixelUnshuffleOp::forward", std::vector<c10::IValue>({}));
+
   at::AutoNonVariableTypeMode g;
   ctx->saved_data["downscale_factor"] = downscale_factor;
   ctx->saved_data["input_sizes"] = self.sizes();
@@ -249,9 +249,9 @@ at::Tensor PixelUnshuffleOp::forward(
 torch::autograd::tensor_list PixelUnshuffleOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("PixelUnshuffleOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "PixelUnshuffleOp::backward", std::vector<c10::IValue>({}));
+
   at::Tensor grad_output = grad_outputs[0];
   int64_t downscale_factor = ctx->saved_data["downscale_factor"].toInt();
   auto input_sizes = ctx->saved_data["input_sizes"].toIntList().vec();

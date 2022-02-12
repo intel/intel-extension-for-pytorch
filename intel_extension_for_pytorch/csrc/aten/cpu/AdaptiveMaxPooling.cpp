@@ -9,7 +9,7 @@
 #include <c10/util/irange.h>
 
 #include "AdaptiveMaxPooling.h"
-
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -24,10 +24,9 @@ std::tuple<at::Tensor, at::Tensor> adaptive_max_pool2d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::adaptive_max_pool2d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adaptive_max_pool2d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   int ndim = input.ndimension();
   TORCH_CHECK(
@@ -99,11 +98,9 @@ at::Tensor adaptive_max_pool2d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::adaptive_max_pool2d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adaptive_max_pool2d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
 
   int64_t ndim = grad_output.ndimension();
   TORCH_CHECK(

@@ -13,6 +13,7 @@
 #include "csrc/aten/cpu/utils/utils.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -164,9 +165,8 @@ at::Tensor dil_max_pool2d(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     bool ceil_mode) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_max_pool2d", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_max_pool2d", std::vector<c10::IValue>({}));
+
   TORCH_CHECK(
       std::all_of(
           dilation.cbegin(), dilation.cend(), [](int64_t i) { return 1 == i; }),

@@ -8,6 +8,7 @@
 #include <torch/script.h>
 
 #include "UpdateBatch.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -44,9 +45,7 @@ static bool rnnt_update_batch(
 #if defined(IPEX_DISP_OP)
   printf("IPEX::rnnt_update_batch\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEX::rnnt_update_batch", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEX::rnnt_update_batch", std::vector<c10::IValue>({}));
 
 #if defined(DYN_DISP_BUILD)
   return torch_ipex::cpu::rnnt_update_batch_kernel_stub(

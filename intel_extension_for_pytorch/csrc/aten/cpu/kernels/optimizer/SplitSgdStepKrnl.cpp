@@ -3,6 +3,7 @@
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -28,9 +29,7 @@ void packed_add_kernel_impl(
   at::Tensor bot_half = bot_half_.contiguous();
   at::Tensor grad = grad_.is_sparse() ? grad_ : grad_.contiguous();
 
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({}));
 
   float alpha_ = static_cast<float>(alpha);
   if (grad.is_sparse()) {

@@ -18,6 +18,7 @@
 
 #include <torch/extension.h>
 #include "csrc/autocast/autocast_mode.h"
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -29,9 +30,9 @@ at::Tensor channel_shuffle(const at::Tensor& self, int64_t groups) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::channel_shuffle\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::channel_shuffle", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::channel_shuffle", std::vector<c10::IValue>({}));
+
   TORCH_CHECK(
       self.dim() > 2,
       "channel_shuffle expects input with > 2 dims, but got input with sizes ",

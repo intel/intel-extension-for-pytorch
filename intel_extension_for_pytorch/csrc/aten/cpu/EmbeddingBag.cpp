@@ -14,6 +14,7 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 #include <algorithm>
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -30,10 +31,8 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       const at::Tensor& offsets,
       bool sparse,
       bool include_last_offset) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION(
+    IPEX_RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::_forward", std::vector<c10::IValue>({}));
-#endif
 
 #if defined(DYN_DISP_BUILD)
     auto ret = embedding_bag_kernel_stub(
@@ -53,10 +52,9 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       const at::Tensor& offsets,
       bool sparse,
       bool include_last_offset) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION(
+    IPEX_RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::forward", std::vector<c10::IValue>({}));
-#endif
+
     at::AutoNonVariableTypeMode g;
     ctx->saved_data["sparse"] = sparse;
     auto ret = _forward(weight, indices, offsets, sparse, include_last_offset);
@@ -67,10 +65,9 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION(
+    IPEX_RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::backward", std::vector<c10::IValue>({}));
-#endif
+
     at::AutoNonVariableTypeMode g;
     auto saved = ctx->get_saved_variables();
     at::Tensor weight = saved[0];

@@ -10,6 +10,7 @@
 
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -78,9 +79,8 @@ at::Tensor dil_matmul_div(
     const at::Tensor& tensor2,
     at::Tensor out,
     const at::Tensor& div_input) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_matmul_div_fallback", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_matmul_div_fallback", std::vector<c10::IValue>({}));
+
   if (out.defined()) {
     at::matmul_out(out, tensor1, tensor2);
     return out.div(div_input);
@@ -108,9 +108,8 @@ at::Tensor dil_matmul_div(
     const at::Tensor& tensor2,
     at::Tensor out,
     const c10::Scalar& div_input) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_matmul_div_scalar", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_matmul_div_scalar", std::vector<c10::IValue>({}));
+
   auto dim_tensor1 = tensor1.dim();
   auto dim_tensor2 = tensor2.dim();
   if (dim_tensor1 == dim_tensor2 && dim_tensor1 >= 3) {

@@ -3,6 +3,7 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -204,10 +205,8 @@ at::Tensor IPEXConvTransposeOp::_forward(
     bool weight_channels_last,
     bool weight_prepacked) {
   at::AutoNonVariableTypeMode g;
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", std::vector<c10::IValue>({}));
-#endif
 
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose2d", "")
@@ -241,9 +240,9 @@ at::Tensor IPEXConvTransposeOp::forward(
     int64_t output_channel,
     bool weight_channels_last,
     bool weight_prepacked) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXConvTransposeOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXConvTransposeOp::forward", std::vector<c10::IValue>({}));
+
   ctx->saved_data["stride"] = stride;
   ctx->saved_data["padding"] = padding;
   ctx->saved_data["dilation"] = dilation;
@@ -457,10 +456,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> conv_transpose2d_backward(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::conv_transpose2d_backward\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::conv_transpose2d_backward", std::vector<c10::IValue>({}));
-#endif
+
   auto memory_format = input.suggest_memory_format();
   at::Tensor grad_output = grad_output_t.contiguous(memory_format);
 
@@ -501,10 +499,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> conv_transpose2d_backward(
 torch::autograd::variable_list IPEXConvTransposeOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::backward", std::vector<c10::IValue>({}));
-#endif
+
   auto stride = ctx->saved_data["stride"].toIntVector();
   auto padding = ctx->saved_data["padding"].toIntVector();
   auto output_padding = ctx->saved_data["output_padding"].toIntVector();

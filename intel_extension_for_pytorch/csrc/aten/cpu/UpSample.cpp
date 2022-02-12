@@ -14,6 +14,7 @@
 
 #include "UpSample.h"
 
+#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -42,10 +43,8 @@ at::Tensor upsample_nearest1d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_nearest1d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_nearest1d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_1d_common_check(input.sizes(), output_size);
@@ -75,11 +74,9 @@ at::Tensor upsample_nearest1d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_nearest1d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_nearest1d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_1d_common_check(input_size, output_size);
@@ -108,10 +105,8 @@ at::Tensor upsample_nearest2d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_nearest2d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_nearest2d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_2d_common_check(input.sizes(), output_size);
@@ -146,11 +141,9 @@ at::Tensor upsample_nearest2d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_nearest2d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_nearest2d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_2d_common_check(input_size, output_size);
@@ -202,10 +195,8 @@ at::Tensor upsample_nearest3d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_nearest3d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_nearest3d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_3d_common_check(input.sizes(), output_size);
@@ -242,11 +233,9 @@ at::Tensor upsample_nearest3d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_nearest3d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_nearest3d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_3d_common_check(input_size, output_size);
@@ -291,10 +280,8 @@ at::Tensor upsample_linear1d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_linear1d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_linear1d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_1d_common_check(input.sizes(), output_size);
@@ -325,11 +312,9 @@ at::Tensor upsample_linear1d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_linear1d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_linear1d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_1d_common_check(input_size, output_size);
@@ -365,10 +350,8 @@ at::Tensor upsample_bilinear2d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_bilinear2d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_bilinear2d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_2d_common_check(input.sizes(), output_size);
@@ -406,11 +389,9 @@ at::Tensor upsample_bilinear2d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_bilinear2d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_bilinear2d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_2d_common_check(input_size, output_size);
@@ -463,10 +444,8 @@ at::Tensor upsample_trilinear3d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_trilinear3d_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_trilinear3d_out_cpu", std::vector<c10::IValue>({}));
-#endif
 
   auto full_output_size =
       at::native::upsample_3d_common_check(input.sizes(), output_size);
@@ -505,11 +484,10 @@ at::Tensor upsample_trilinear3d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::upsample_trilinear3d_backward_out_cpu\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::upsample_trilinear3d_backward_out_cpu",
       std::vector<c10::IValue>({}));
-#endif
+
   auto full_output_size =
       at::native::upsample_3d_common_check(input_size, output_size);
 
