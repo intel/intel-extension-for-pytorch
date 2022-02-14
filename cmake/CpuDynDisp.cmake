@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
-set(CMAKE_VERBOSE_MAKEFILE ON)
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
@@ -29,7 +29,7 @@ ENDIF()
 
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
 # use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
-SET(DNNL_GRAPH_LIBRARY_TYPE SDL CACHE STRING "" FORCE)
+SET(DNNL_GRAPH_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
 # add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
 
@@ -189,10 +189,6 @@ set(DPCPP_SRCS ${DPCPP_DYNDISP_SRCS} ${DPCPP_ISA_SRCS} ${DPCPP_COMMON_SRCS} ${DP
 list(REMOVE_ITEM DPCPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
 
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
-
-# foreach(file_path ${DPCPP_SRCS})
-#   message(${file_path})
-# endforeach()
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
