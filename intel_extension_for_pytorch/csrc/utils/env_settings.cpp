@@ -5,6 +5,10 @@
 
 namespace torch_ipex {
 
+EnvSettings::EnvSettings() {
+  initialize_all_settings();
+}
+
 EnvSettings& EnvSettings::get_instance() {
   static EnvSettings _instance;
 

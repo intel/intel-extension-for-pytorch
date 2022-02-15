@@ -6,6 +6,7 @@ namespace torch_ipex {
 
 class EnvSettings {
  private:
+  EnvSettings();
   bool m_b_profile_op_ = false;
 
  public:
