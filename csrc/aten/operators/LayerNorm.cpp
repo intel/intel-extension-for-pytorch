@@ -77,9 +77,9 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
 
   if (!(input.size(0) == M && input.size(1) == N)) {
     Tensor output, mean, rstd;
-    std::tie(output, mean, rstd) =
-        xpu::oneDNN::layer_norm(input.view({1, M, N}), weight, bias, epsilon);
-    return std::make_tuple(output.view(input.sizes()), mean, rstd);
+    std::tie(output, mean, rstd) = xpu::oneDNN::layer_norm(
+        input.reshape({1, M, N}), weight, bias, epsilon);
+    return std::make_tuple(output.reshape(input.sizes()), mean, rstd);
   } else {
     // by pass reshape (reorder)
     return xpu::oneDNN::layer_norm(input, weight, bias, epsilon);
@@ -110,14 +110,14 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   if (!(input.size(0) == M && input.size(1) == N)) {
     std::tie(grad_input, grad_weight, grad_bias) =
         xpu::oneDNN::layer_norm_backward(
-            grad_output.view({{1, M, N}}),
-            input.view({1, M, N}),
+            grad_output.reshape({{1, M, N}}),
+            input.reshape({1, M, N}),
             mean,
             rstd,
             weight,
             1e-5);
     return std::make_tuple(
-        grad_input.view(input.sizes()), grad_weight, grad_bias);
+        grad_input.reshape(input.sizes()), grad_weight, grad_bias);
   } else {
     return xpu::oneDNN::layer_norm_backward(
         grad_output, input, mean, rstd, weight, 1e-5);
