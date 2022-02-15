@@ -1,3 +1,5 @@
+#include <omp.h>
+
 #include "kernel.h"
 #include "graph_helper.h"
 #include "operator.h"
@@ -249,6 +251,18 @@ compiled_partition LlgaKernel::compile(const partition& partition) {
   return compilation;
 }
 
+dnnl::graph::compiled_partition& LlgaKernel::compileAndCache(
+    const dnnl::graph::partition& partition,
+    int n_thread) {
+  // index starts from 0 while min(omp_get_max_threads) = 1
+  int i_thread = n_thread - 1;
+  std::call_once(compilation_initialized_flags_[i_thread], [&]() {
+    GRAPH_DEBUG("Compiling partition for i_thread ", i_thread);
+    compilations_[i_thread] = compile(partition_);
+  });
+  return compilations_[i_thread];
+}
+
 void LlgaKernel::run(Stack& stack) {
   GRAPH_DEBUG("In ", debugName(), "\n");
 
@@ -260,25 +274,35 @@ void LlgaKernel::run(Stack& stack) {
     return v.toTensor();
   });
 
+  // Input and output specs are not related to omp_num_threads
   std::call_once(
-      initialized_flag_,
+      spec_initialized_flag_,
       [&](const TensorArgs& inputs) {
         GRAPH_DEBUG("Initializing input logical tensors");
         inputSpecs_ = initializeInputSpecs(inputs);
         GRAPH_DEBUG("Initializing output logical tensors");
         outputSpecs_ = initializeOutputSpecs();
-        GRAPH_DEBUG("Compiling partition");
-        compilation_ = compile(partition_);
       },
       inputs);
 
-  GRAPH_DEBUG("Preparing runtime tensors");
   TensorArgs outputs;
   RunArgs runInputs, runOutputs;
+  dnnl::graph::compiled_partition compilation;
+
+  int n_thread = omp_get_max_threads();
+  if (n_thread > 0 && n_thread <= MAX_COMPILATION_CACHE_SIZE) {
+    GRAPH_DEBUG("Cached compilation");
+    compilation = compileAndCache(partition_, n_thread);
+  } else {
+    GRAPH_DEBUG("Runtime compilation");
+    compilation = compile(partition_);
+  }
+
+  GRAPH_DEBUG("Preparing runtime tensors");
   std::tie(runInputs, runOutputs) = prepareRunArgs(inputs, outputs);
 
   GRAPH_DEBUG("Executing partition");
-  compilation_.execute(Stream::getStream(), runInputs, runOutputs);
+  compilation.execute(Stream::getStream(), runInputs, runOutputs);
   GRAPH_DEBUG("Partition executed");
 
   // Update the stack.
