@@ -274,8 +274,11 @@ ITT is Intel® VTune™ Profiler's Instrumentation and Tracing Technology. To en
 build Intel® Extension for PyTorch* GPU with USE_ITT=ON and update model as below:
 
 ```bash
-with ipex.profiler.emit_itt():
+with torch.xpu.emit_itt():
+    torch.xpu.itt.mark('single shot marker')
+    torch.xpu.itt.range_push('custom range')
     output = YourModel(input)
+    torch.xpu.itt.range_pop()
 ```
 Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set for VTune.
 

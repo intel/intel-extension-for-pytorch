@@ -6,9 +6,7 @@ from ._version import (__version__, __ipex_git_sha__,
                        __torch_version__, __torch_git_sha__,
                        __ittapi_git_sha__, __onednn_git_sha__)
 
-from . import itt as itt
 from . import optim
-from . import profiler as profiler
 from .autograd import inference_mode
 
 
