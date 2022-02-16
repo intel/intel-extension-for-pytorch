@@ -54,6 +54,14 @@ class TestOptimizeCases(TestCase):
                                    "WARNING: Can't convert model's parameters dtype"):
             optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
 
+    def test_optimize_unsupport_freeze_optimization(self):
+        model = ConvBatchNorm().eval()
+        x = torch.randn(1, 3, 224, 224)
+        with torch.no_grad():
+            traced_model = torch.jit.trace(model, x)
+            frozen_model = torch.jit.freeze(traced_model)
+        optimized_model = ipex.optimize(frozen_model)
+        self.assertTrue(frozen_model == optimized_model)
 
     def test_optimize_inplace_behavior_eval_mode(self):
         M_ori = TestModule()

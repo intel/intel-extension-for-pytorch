@@ -67,6 +67,8 @@ def replace_lstm_with_ipex_lstm(model):
 def replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
     # This optimization may provide more fusion opportunites on the graph.
+    if isinstance(model, torch.jit.ScriptModule):
+        return
     if not model.training:
         for child_name, child in model.named_children():
             if isinstance(child, torch.nn.Dropout):
