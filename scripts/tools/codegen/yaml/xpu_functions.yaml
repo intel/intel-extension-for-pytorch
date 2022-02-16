@@ -14,10 +14,10 @@ supported:
   - _cdist_forward
   - _ctc_loss
   - _ctc_loss_backward
-#  - _cumprod  # disabled in torch
+#  - _cumprod
   - cumprod.out
 #  - _cumsum	# diabled in torch
-#  - _cumsum.out	# disabled in torch
+#  - _cumsum.out
   - cumsum.out  # newly added
   - _embedding_bag
   - _embedding_bag_dense_backward
@@ -103,7 +103,7 @@ supported:
   - atan2
   - atan2.out
   - atan2_
-#  - atan_  # disabled in torch
+#  - atan_
   - avg_pool2d
   - avg_pool2d.out
   - avg_pool2d_backward
@@ -161,7 +161,7 @@ supported:
   - convolution_overrideable
   - copy_
   - cos.out
-#  - cos_  # disabled in torch
+#  - cos_
   - cosh.out
   - cross
   - cross.out
@@ -189,14 +189,14 @@ supported:
   - eq.Tensor_out
   - equal
   - erf.out
-#  - erf_  # disabled in torch
+#  - erf_
   - erfc.out
-#  - erfc_  # disabled in torch
+#  - erfc_
   - erfinv
   - erfinv.out
   - erfinv_
   - exp.out
-#  - exp_  # disabled in torch
+#  - exp_
   - expm1.out
   - exponential_
   - eye.m_out
@@ -488,8 +488,8 @@ supported:
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
   - scatter_.src
-#  - scatter_.value  # disabled in torch
-#  - scatter_add_  # disabled in torch
+#  - scatter_.value
+#  - scatter_add_
   - scatter.value_out
   - scatter_add.out  # newly added
   - set_
@@ -497,10 +497,10 @@ supported:
   - set_.source_Storage_storage_offset
   - set_.source_Tensor
   - sgn.out
-#  - sigmoid  # disabled in torch
+#  - sigmoid
   - sigmoid.out
-#  - sigmoid_  # disabled in torch
-#  - sigmoid_backward  # disabled in torch
+#  - sigmoid_
+#  - sigmoid_backward
   - sigmoid_backward.grad_input
   - sign
   - sign.out
@@ -549,10 +549,10 @@ supported:
   - take
   - take.out
   - tan.out
-#  - tan_  # disabled in torch
-#  - tanh  # disabled in torch
+#  - tan_
+#  - tanh
   - tanh.out
-#  - tanh_  # disabled in torch
+#  - tanh_
   - tanh_backward
   - tanh_backward.grad_input
   - threshold
