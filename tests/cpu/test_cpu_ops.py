@@ -551,6 +551,10 @@ class CPUOPsTester(TestCase):
                 x2 = x.clone().detach().to(memory_format=torch.channels_last_3d).requires_grad_()
                 y2 = torch.sum(x2, dim=dim, keepdim=False, dtype=dtype)
                 self.assertEqual(y1, y2)
+        a = torch.randn([3, 2, 3])
+        mask = a.ge(0.5)
+        s = mask.sum()
+        self.assertTrue(s.dtype != torch.bool)
 
 if __name__ == '__main__':
     test = unittest.main()
