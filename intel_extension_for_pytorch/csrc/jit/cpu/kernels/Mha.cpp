@@ -53,7 +53,7 @@ at::Tensor dil_mha_scores_calc(
   bool is_contiguous = rel_kv.is_contiguous() && qk.is_contiguous();
   if (is_last_dim && not_last_dim_broadcast && not_one_dim &&
       aligned_64_bytes && is_contiguous && dtype.isNone() && _alpha == 1.0f) {
-    return jit::cpu::kernels::DivAddSoftmax(qk, rel_kv, _dim_per_head);
+    return DivAddSoftmax(qk, rel_kv, _dim_per_head);
   } else {
     qk = at::div(qk, dim_per_head);
     qk = at::add(qk, rel_kv, _alpha);
