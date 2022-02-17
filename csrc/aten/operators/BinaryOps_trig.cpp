@@ -41,8 +41,7 @@ Tensor tanh_backward(const Tensor& grad_output, const Tensor& output) {
   return at::tanh_backward_out(grad_input, grad_output, output);
 }
 
-Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
-  auto iter = TensorIterator::binary_op(result, self, other);
+void atan2_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -54,12 +53,19 @@ Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
               return Numerics<scalar_t>::atan2(a, b);
             });
       });
+}
+
+Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
+  auto iter = TensorIterator::binary_float_op(result, self, other);
+  atan2_kernel(iter);
   return result;
 }
 
 Tensor atan2(const Tensor& self, const Tensor& other) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::atan2_out(result, self, other);
+  Tensor result;
+  auto iter = TensorIterator::binary_float_op(result, self, other);
+  atan2_kernel(iter);
+  return iter.output();
 }
 
 Tensor& atan2_(Tensor& self, const Tensor& other) {

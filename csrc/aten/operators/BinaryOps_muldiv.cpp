@@ -100,7 +100,7 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
     result = to_plain_if_needed_(result);
     _self = to_plain_if_needed(self);
     _other = to_plain_if_needed(other);
-    auto iter = TensorIterator::binary_op(result, _self, _other);
+    auto iter = TensorIterator::binary_float_op(result, _self, _other);
     impl::div_kernel_dpcpp(iter);
     auto smf = self.suggest_memory_format();
     if (is_channels_last(smf)) {
@@ -139,7 +139,7 @@ Tensor div(const Tensor& self, const Tensor& other) {
     result = to_plain_if_needed_(result);
     _self = to_plain_if_needed(self);
     _other = to_plain_if_needed(other);
-    auto iter = TensorIterator::binary_op(result, _self, _other);
+    auto iter = TensorIterator::binary_float_op(result, _self, _other);
     impl::div_kernel_dpcpp(iter);
     auto smf = self.suggest_memory_format();
     if (is_channels_last(smf)) {
