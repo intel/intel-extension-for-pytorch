@@ -260,9 +260,9 @@ static inline void unrolled_elementwise_kernel(
 
   int remaining = numel - thread_idx * vec_size;
   auto policy = at::native::Memory::policies::
-      vec_unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
+      unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
           data, remaining, ic, oc, l, s, thread_idx);
-  vec_elementwise_kernel_helper<vec_size>(f, policy);
+  elementwise_kernel_helper(f, policy);
 }
 
 template <
