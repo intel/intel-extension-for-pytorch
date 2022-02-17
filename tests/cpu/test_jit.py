@@ -1727,9 +1727,31 @@ class Tester(TestCase):
                 params_list.append(value)
             return params_list
 
+        def _deconv_with_output_padding():
+            params_dict = {
+                "input_height": 8,
+                "input_width": 8,
+                "input_depth": 8,
+                "input_channel_per_group": 10,
+                "output_channel_per_group": 10,
+                "kernel_size": 3,
+                "bias": False,
+                "stride": 2,
+                "padding": 1,
+                "output_padding": 2,
+                "groups": 1,
+                "dilation": 3,
+            }
+            
+            params_list = []
+
+            for key, value in params_dict.items():
+                params_list.append(value)
+            return params_list 
+
         params_list = _deconv_params_list()
 
-        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
+        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in list(itertools.product(*params_list)) + [_deconv_with_output_padding()]:
             if (output_padding < stride or output_padding < dilation) \
                     and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
                     and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \

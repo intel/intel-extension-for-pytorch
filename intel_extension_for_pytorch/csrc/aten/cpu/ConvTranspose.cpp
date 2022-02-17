@@ -33,6 +33,29 @@ std::vector<int64_t> conv_input_size(
   return input_size;
 }
 
+static inline std::vector<int64_t> padding_r(
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding) {
+  // ConvTranpose padding adjustment
+  //
+  // PyTorch uses padding/output_padding:
+  //   osize = (isize - 1) * stride - 2 * padding + dilation * (kernel_size - 1)
+  //   + output_padding + 1
+  //
+  // MKLDNN uses padding_l/padding_r:
+  //   osize = (isize - 1) * stride - padding_l - padding_r + dilation *
+  //   (kernel_size - 1) + 1
+  //
+  // So: padding_l = padding, padding_r = padding - output_padding
+  //
+  auto dim = padding.size();
+  std::vector<int64_t> pad_r(dim);
+  for (const auto d : c10::irange(dim)) {
+    pad_r[d] = padding[d] - output_padding[d];
+  }
+  return pad_r;
+}
+
 at::Tensor conv_transpose2d_kernel_impl(
     const at::Tensor& input,
     const ideep::tensor& w,
@@ -77,7 +100,7 @@ at::Tensor conv_transpose2d_kernel_impl(
         y,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   } else {
@@ -88,7 +111,7 @@ at::Tensor conv_transpose2d_kernel_impl(
         y,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   }
@@ -329,7 +352,7 @@ at::Tensor conv_transpose2d_backward_input(
       grad_x,
       stride.vec(),
       padding.vec(),
-      padding.vec(),
+      padding_r(padding, output_padding),
       dilation.vec(),
       groups);
 
@@ -400,7 +423,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose2d_backward_weights(
         mkldnn_grad_bias,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   } else {
@@ -411,7 +434,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose2d_backward_weights(
         mkldnn_grad_weight,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   }
