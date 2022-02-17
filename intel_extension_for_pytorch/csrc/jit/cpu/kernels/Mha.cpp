@@ -47,12 +47,10 @@ at::Tensor dil_mha_scores_calc(
   bool not_last_dim_broadcast = (rel_kv.size(rel_kv.ndimension() - 1) != 1);
   // Only support >=2D
   bool not_one_dim = q_dim >= 2;
-  // Only support 64byte aligned
-  bool aligned_64_bytes = rel_kv.size(rel_kv.ndimension() - 1) % 16 == 0;
   // Only support contiguous tensor
   bool is_contiguous = rel_kv.is_contiguous() && qk.is_contiguous();
-  if (is_last_dim && not_last_dim_broadcast && not_one_dim &&
-      aligned_64_bytes && is_contiguous && dtype.isNone() && _alpha == 1.0f) {
+  if (is_last_dim && not_last_dim_broadcast && not_one_dim && is_contiguous &&
+      dtype.isNone() && _alpha == 1.0f) {
     return DivAddSoftmax(qk, rel_kv, _dim_per_head);
   } else {
     qk = at::div(qk, dim_per_head);
