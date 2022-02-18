@@ -108,16 +108,7 @@ elseif(USE_AOT_DEVLIST)
     set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${BACKEND_TARGET}")
-    string(REGEX MATCHALL "[^,]+" DEV_LIST "${USE_AOT_DEVLIST}")
-    foreach(dev_name IN LISTS DEV_LIST)
-      ## FIXME: Provide revision ID to IGC for PVC platform to avoid AOT bug,
-      ## only one device is passed if pvc in USE_AOT_DEVLIST
-      if(dev_name STREQUAL "pvc" OR dev_name STREQUAL "0xbd5")
-        set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device pvc -revision_id 3'")
-      else()
-        set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${dev_name}'")
-      endif()
-    endforeach()
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
 else()
     # Use auto mode of device code split
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")
