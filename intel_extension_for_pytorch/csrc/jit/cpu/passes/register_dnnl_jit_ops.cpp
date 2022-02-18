@@ -254,6 +254,54 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::convolution_bottleneck_run(Tensor(a!) input, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack1, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack2, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack3"
+        ") -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto output = (std::move(peek(stack, 0, 4))).toTensor();
+            auto result = convolution_bottleneck_run(
+                output,
+                (std::move(peek(stack, 1, 4)))
+                    .toCustomClass<ConvolutionOpContext>(),
+                (std::move(peek(stack, 2, 4)))
+                    .toCustomClass<ConvolutionOpContext>(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<ConvolutionOpContext>());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::convolution_bottleneck_run(Tensor input, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack1, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack2, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack3, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack4"
+        ") -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = convolution_bottleneck_run(
+                (std::move(peek(stack, 0, 5))).toTensor(),
+                (std::move(peek(stack, 1, 5)))
+                    .toCustomClass<ConvolutionOpContext>(),
+                (std::move(peek(stack, 2, 5)))
+                    .toCustomClass<ConvolutionOpContext>(),
+                (std::move(peek(stack, 3, 5)))
+                    .toCustomClass<ConvolutionOpContext>(),
+                (std::move(peek(stack, 4, 5)))
+                    .toCustomClass<ConvolutionOpContext>());
+            drop(stack, 5);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex_prepack::conv_transpose2d_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
         "W_prepack) -> Tensor",

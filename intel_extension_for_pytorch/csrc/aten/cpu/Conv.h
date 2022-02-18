@@ -11,7 +11,7 @@ namespace cpu {
 void convolution_kernel_output(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const ideep::tensor& bias_opt,
     at::Tensor& output,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
@@ -22,7 +22,7 @@ void convolution_kernel_output(
 at::Tensor convolution_kernel(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const ideep::tensor& bias_opt,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,

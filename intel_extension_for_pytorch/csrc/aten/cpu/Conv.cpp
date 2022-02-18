@@ -5,6 +5,7 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/ipex_op_profile.h"
 #include "utils/utils.h"
+
 namespace torch_ipex {
 namespace cpu {
 
@@ -29,7 +30,7 @@ std::vector<int64_t> calc_conv_output_size(
 void convolution_kernel_output(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const ideep::tensor& mkldnn_bias,
     at::Tensor& output,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
@@ -47,21 +48,15 @@ void convolution_kernel_output(
       (IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
       "input and output are need contiguous tensor for "
       "convolution_kernel_output");
-  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(bias_opt);
-  const at::Tensor& bias = *bias_maybe_owned;
   const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
   auto output_sizes = output.sizes();
 
   ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
-  if (bias.defined()) {
-    auto bias_ = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
-    const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
+  if (mkldnn_bias.is_empty()) {
     ideep::convolution_forward::compute(
         mkldnn_input,
         mkldnn_weight,
-        mkldnn_bias,
         {output_sizes.begin(), output_sizes.end()},
         mkldnn_output,
         {stride.begin(), stride.end()},
@@ -77,6 +72,7 @@ void convolution_kernel_output(
     ideep::convolution_forward::compute(
         mkldnn_input,
         mkldnn_weight,
+        mkldnn_bias,
         {output_sizes.begin(), output_sizes.end()},
         mkldnn_output,
         {stride.begin(), stride.end()},
@@ -94,7 +90,7 @@ void convolution_kernel_output(
 at::Tensor convolution_kernel(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const ideep::tensor& mkldnn_bias,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
@@ -119,7 +115,7 @@ at::Tensor convolution_kernel(
   convolution_kernel_output(
       input,
       mkldnn_weight,
-      bias_opt,
+      mkldnn_bias,
       output,
       stride,
       padding,
@@ -200,8 +196,24 @@ at::Tensor convolution_forward_impl(
       {},
       attr);
 
+  ideep::tensor mkldnn_bias;
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias_opt);
+  const at::Tensor& bias = *bias_maybe_owned;
+  if (bias.defined()) {
+    auto bias_ = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
+    mkldnn_bias = itensor_view_from_dense(bias_);
+  }
+
   return convolution_kernel(
-      input_, mkldnn_weight, bias_opt, stride, padding, dilation, groups, attr);
+      input_,
+      mkldnn_weight,
+      mkldnn_bias,
+      stride,
+      padding,
+      dilation,
+      groups,
+      attr);
 }
 
 at::Tensor convolution_backward_input(

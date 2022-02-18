@@ -37,6 +37,7 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
 void insertPrePackedConvOp(std::shared_ptr<Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
+void fuseBottleneck(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph);
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);

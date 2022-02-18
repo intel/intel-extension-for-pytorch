@@ -65,6 +65,19 @@ at::Tensor convolution_add_relu_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+at::Tensor& convolution_bottleneck_run(
+    at::Tensor& input,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context3);
+
+at::Tensor convolution_bottleneck_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context3,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context4);
+
 ContextConvolution create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,

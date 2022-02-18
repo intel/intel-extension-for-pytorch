@@ -62,6 +62,8 @@ class ConvolutionOpContext : public torch::jit::CustomClassHolder {
       const at::Tensor& input,
       at::Tensor& accumu,
       const ideep::attr_t& attr) = 0;
+
+  virtual detail::ContextConvolution& get_conetxt() = 0;
 };
 
 class IpexConvolutionOpContext final : public ConvolutionOpContext {
@@ -103,6 +105,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
       const at::Tensor& input,
       at::Tensor& accumu,
       const ideep::attr_t& attr) override;
+
+  virtual detail::ContextConvolution& get_conetxt() override;
 
   static c10::intrusive_ptr<ConvolutionOpContext> create_context(
       at::Tensor&& weight,

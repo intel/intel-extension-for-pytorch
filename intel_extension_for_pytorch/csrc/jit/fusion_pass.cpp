@@ -365,6 +365,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::insertPrePackedConvOp(graph);
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
+  graph_rewrite::fuseBottleneck(graph);
 
   // linear folding
   FoldFrozenLinearAddOrSub(graph);

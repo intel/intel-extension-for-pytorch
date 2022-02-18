@@ -62,6 +62,10 @@ at::Tensor& IpexConvolutionOpContext::run(
       op_context_, input, accumu, attr);
 }
 
+detail::ContextConvolution& IpexConvolutionOpContext::get_conetxt() {
+  return op_context_;
+}
+
 c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,

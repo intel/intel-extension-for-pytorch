@@ -311,6 +311,116 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
   rewriter_add_relu.runOnGraph(graph);
 }
 
+void fuseBottleneck(std::shared_ptr<Graph>& graph) {
+  SubgraphRewriter rewriter_v1, rewriter_v2;
+  std::string bottleneck_v1 = R"(
+    graph(%input, %packed_weight1, %packed_weight2, %packed_weight3, %alpha):
+        %res1 = ipex_prepack::convolution_relu_run(%input, %packed_weight1)
+        %res2 = ipex_prepack::convolution_relu_run(%res1, %packed_weight2)
+        %res = ipex_prepack::convolution_add_relu_run(%res2, %input, %alpha, %packed_weight3)
+        return (%res))";
+  std::string bottleneck_fused_v1 = R"(
+    graph(%input, %packed_weight1, %packed_weight2, %packed_weight3, %alpha):
+        %res = ipex_prepack::convolution_bottleneck_run(%input, %packed_weight1, %packed_weight2, %packed_weight3)
+        return (%res))";
+
+  std::string bottleneck_v2 = R"(
+    graph(%input, %packed_weight1, %packed_weight2, %packed_weight3, %packed_weight4, %alpha):
+        %res1 = ipex_prepack::convolution_relu_run(%input, %packed_weight1)
+        %res2 = ipex_prepack::convolution_relu_run(%res1, %packed_weight2)
+        %res3 = ipex_prepack::convolution_run(%input, %packed_weight3)
+        %res = ipex_prepack::convolution_add_relu_run(%res2, %res3, %alpha, %packed_weight4)
+        return (%res))";
+  std::string bottleneck_fused_v2 = R"(
+    graph(%input, %packed_weight1, %packed_weight2, %packed_weight3, %packed_weight4, %alpha):
+        %res = ipex_prepack::convolution_bottleneck_run(%input, %packed_weight1, %packed_weight2, %packed_weight3, %packed_weight4)
+        return (%res))";
+
+  // Requires weights are prepacked and expect channels last activation, biases
+  // exist and alpha is constant. For this case, there will support a fast path
+  // which has't check in convolution ops(such as format check and desc check)
+  // and format reorder, which can reduce many integration overhead in FW dide.
+  auto filter_v1 = [](const Match& match,
+                      const std::unordered_map<std::string, Value*>& vmap) {
+    auto packed_weight1 =
+        match.values_map.at(vmap.at("packed_weight1"))->node();
+    auto packed_weight2 =
+        match.values_map.at(vmap.at("packed_weight2"))->node();
+    auto packed_weight3 =
+        match.values_map.at(vmap.at("packed_weight3"))->node();
+
+    auto weight1_is_channels_last =
+        constant_as<bool>(packed_weight1->inputs().at(9)).value();
+    auto weight2_is_channels_last =
+        constant_as<bool>(packed_weight2->inputs().at(9)).value();
+    auto weight3_is_channels_last =
+        constant_as<bool>(packed_weight3->inputs().at(9)).value();
+    if (!weight1_is_channels_last || !weight2_is_channels_last ||
+        !weight3_is_channels_last) {
+      return false;
+    }
+
+    auto bias1_type = packed_weight1->inputs().at(1)->type();
+    auto bias2_type = packed_weight2->inputs().at(1)->type();
+    auto bias3_type = packed_weight3->inputs().at(1)->type();
+    if (bias1_type == NoneType::get() || bias2_type == NoneType::get() ||
+        bias3_type == NoneType::get()) {
+      return false;
+    }
+
+    auto alpha = packed_weight3->inputs().at(11)->node();
+    if (alpha->kind() != prim::Constant) {
+      return false;
+    }
+    return true;
+  };
+
+  auto filter_v2 = [](const Match& match,
+                      const std::unordered_map<std::string, Value*>& vmap) {
+    auto packed_weight1 =
+        match.values_map.at(vmap.at("packed_weight1"))->node();
+    auto packed_weight2 =
+        match.values_map.at(vmap.at("packed_weight2"))->node();
+    auto packed_weight3 =
+        match.values_map.at(vmap.at("packed_weight3"))->node();
+    auto packed_weight4 =
+        match.values_map.at(vmap.at("packed_weight4"))->node();
+
+    auto weight1_is_channels_last =
+        constant_as<bool>(packed_weight1->inputs().at(9)).value();
+    auto weight2_is_channels_last =
+        constant_as<bool>(packed_weight2->inputs().at(9)).value();
+    auto weight3_is_channels_last =
+        constant_as<bool>(packed_weight3->inputs().at(9)).value();
+    auto weight4_is_channels_last =
+        constant_as<bool>(packed_weight4->inputs().at(9)).value();
+    if (!weight1_is_channels_last || !weight2_is_channels_last ||
+        !weight3_is_channels_last || !weight4_is_channels_last) {
+      return false;
+    }
+
+    auto bias1_type = packed_weight1->inputs().at(1)->type();
+    auto bias2_type = packed_weight2->inputs().at(1)->type();
+    auto bias3_type = packed_weight3->inputs().at(1)->type();
+    auto bias4_type = packed_weight3->inputs().at(1)->type();
+    if (bias1_type == NoneType::get() || bias2_type == NoneType::get() ||
+        bias3_type == NoneType::get() || bias4_type == NoneType::get()) {
+      return false;
+    }
+
+    auto alpha = packed_weight4->inputs().at(11)->node();
+    if (alpha->kind() != prim::Constant) {
+      return false;
+    }
+    return true;
+  };
+
+  rewriter_v1.RegisterRewritePattern(bottleneck_v1, bottleneck_fused_v1);
+  rewriter_v2.RegisterRewritePattern(bottleneck_v2, bottleneck_fused_v2);
+  rewriter_v1.runOnGraph(graph, filter_v1);
+  rewriter_v2.runOnGraph(graph, filter_v2);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

@@ -159,7 +159,7 @@ struct attr_t : public dnnl::primitive_attr {
     auto po = get_post_ops();
     IDEEP_ENFORCE(index < po.len(), "post_ops index is out of range");
 
-    algorithm alg;
+    algorithm alg = algorithm::undef;
     float scale = 1.0, alpha = 1.0, beta = 0.0;
 
     auto akind = po.kind(index);
@@ -203,7 +203,6 @@ struct attr_t : public dnnl::primitive_attr {
     }
     for (auto index = 0; index < l_po.len(); index++) {
       kind l_akind, r_akind;
-      ;
       algorithm l_alg, r_alg;
       float l_scale = 1.0, l_alpha = 1.0, l_beta = 0.0;
       float r_scale = 1.0, r_alpha = 1.0, r_beta = 0.0;
@@ -223,7 +222,7 @@ struct attr_t : public dnnl::primitive_attr {
     auto num_ops = get_post_ops().len();
     for (int i = 0; i < num_ops; i++) {
       kind akind;
-      algorithm alg;
+      algorithm alg = algorithm::undef;
       float scale = 1.0, alpha = 1.0, beta = 0.0;
       std::tie(akind, scale, alpha, beta, alg) = get_params(i);
 

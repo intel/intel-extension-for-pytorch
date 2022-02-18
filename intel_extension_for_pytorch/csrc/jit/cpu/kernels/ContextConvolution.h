@@ -10,7 +10,7 @@ namespace detail {
 
 struct ContextConvolution final {
   ideep::tensor weight_packed_;
-  c10::optional<at::Tensor> bias_;
+  ideep::tensor bias_;
   std::vector<int64_t> padding_;
   std::vector<int64_t> stride_;
   std::vector<int64_t> dilation_;
@@ -23,7 +23,7 @@ struct ContextConvolution final {
 
   ContextConvolution(
       ideep::tensor&& weight_packed,
-      c10::optional<at::Tensor>&& bias,
+      ideep::tensor&& bias,
       std::vector<int64_t> padding,
       std::vector<int64_t> stride,
       std::vector<int64_t> dilation,

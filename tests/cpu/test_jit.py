@@ -661,7 +661,7 @@ class ConcatBnRelu3d(torch.nn.Module):
         x = torch.cat((x1, x2, x3), dim = 1)
         x = self.bn(x)
         return self.relu(x)
-    
+
 class ModMultLinear(nn.Module):
     def __init__(self, w1_dim, w2_dim):
          super(ModMultLinear, self).__init__()
@@ -684,6 +684,37 @@ class DisableTexprFuser():
 
     def __exit__(self, *args, **kwargs):
         torch._C._jit_set_texpr_fuser_enabled(self.saved)
+
+class Bottleneck_v1(nn.Module):
+    def __init__(self):
+        super(Bottleneck_v1, self).__init__()
+        self.conv1 = nn.Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=True)
+        self.conv3 = nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.downsample = nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+
+    def forward(self, x):
+        y1 = self.conv1(x).relu_()
+        y2 = self.conv2(y1).relu_()
+        y3 = self.conv3(y2)
+        y3 += self.downsample(x)
+        return y3.relu_()
+
+class Bottleneck_v2(nn.Module):
+    def __init__(self):
+        super(Bottleneck_v2, self).__init__()
+        self.conv =  nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.conv1 = nn.Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=True)
+        self.conv3 = nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        y1 = self.conv1(x).relu_()
+        y2 = self.conv2(y1).relu_()
+        y3 = self.conv3(y2)
+        y3 += x
+        return y3.relu_()
 
 class Tester(TestCase):
 
@@ -721,6 +752,7 @@ class Tester(TestCase):
             with torch.no_grad():
                 trace_fused_model = torch.jit.trace(model, x)
                 trace_fused_model = torch.jit.freeze(trace_fused_model)
+                y = trace_fused_model(x)
 
                 # enable fusiong in ipex.
                 fused_tresult = trace_fused_model(x)
@@ -1768,6 +1800,35 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_add_relu_run",
                 kind_not_in_graph="ipex::batch_norm",
                 prec=0.02)
+
+    def test_bottleneck_fusion(self):
+        x1 = torch.randn(1, 64, 56, 56)
+        self._test_output(
+            Bottleneck_v1(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            use_channels_last=[True],
+            levels=['O1'])
+        self._test_output_bf16(
+            Bottleneck_v1(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            prec=0.03,
+            use_channels_last=[True],
+            levels=['O1'])
+        self._test_output(
+            Bottleneck_v2(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            use_channels_last=[True],
+            levels=['O1'])
+        self._test_output_bf16(
+            Bottleneck_v2(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            prec=0.03,
+            use_channels_last=[True],
+            levels=['O1'])
 
     def test_jit_conv_sum_in_diff_block(self):
         batch_size = 8
