@@ -159,11 +159,7 @@ class TestOp(JitLlgaTestCase):
     def test_softmax(self):
         for dim in [-4, -3, -2, -1, 0, 1, 2, 3]:
             m = nn.Softmax(dim=dim)
-            x = torch.rand(8, 12, 12, 12).transpose(2,3)
-            # Here for aten::softmax, inplace optimization comes before LLGA fusion pass,
-            # which will replace aten::softmax with ipex::softmax_/ipex::softmax.
-            # Therefore, to make LLGA fusion pass to take effect on aten::softmax, we have
-            # to make the input non-contiguous to skip inplace optimization.
+            x = torch.rand(8, 12, 12, 12)
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 

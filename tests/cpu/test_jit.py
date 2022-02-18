@@ -573,6 +573,33 @@ class MHAScoresCalculation(nn.Module):
         scores = qk + bias
         return self.softmax(scores)
 
+class DistilMHAScoresCalculation_v1(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(DistilMHAScoresCalculation_v1, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, mask):
+        mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
+        mat1 = mat1 / math.sqrt(self.dim_per_head)
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk.masked_fill_(mask, -float("inf"))
+        return self.softmax(qk)
+
+class DistilMHAScoresCalculation_v2(nn.Module):
+    def __init__(self, dim_per_head):
+        super(DistilMHAScoresCalculation_v2, self).__init__()
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, mask):
+        mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
+        mat1 = mat1 / math.sqrt(self.dim_per_head)
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk = qk.masked_fill(mask, -float("inf"))
+        return nn.functional.softmax(qk, dim=-1)
+
 class AtenSoftmaxRepalce(nn.Module):
     def __init__(self, dim=-1):
         super(AtenSoftmaxRepalce, self).__init__()
@@ -971,8 +998,12 @@ class Tester(TestCase):
         a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
         self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=False)
-        
+
     def test_mha_scores_calculation(self):
+        def _check_match_mha(trace_model, mat1, mat2, bias, node = "ipex::mha_scores_calc"):
+            graph = trace_model.graph_for((mat1, mat2, bias))
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
         def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
             mat1_bf16 = mat1.to(torch.bfloat16)
             mat2_bf16 = mat2.to(torch.bfloat16)
@@ -980,11 +1011,11 @@ class Tester(TestCase):
             res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
             res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
+            _check_match_mha(trace_model, mat1, mat2, bias)
 
         mat1 = torch.randn(56, 16, 384, 384)
         mat2 = torch.randn(56, 16, 384, 384)
         bias = torch.randn(56, 16, 384, 384)
-
         for softmax_dim in [0, 1, 2, -1]:
             mha = MHAScoresCalculation(4, softmax_dim)
             with torch.no_grad():
@@ -994,6 +1025,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
@@ -1002,6 +1034,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
@@ -1010,6 +1043,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
@@ -1018,6 +1052,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(2, 3, 4, 6)
@@ -1026,6 +1061,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 # Test broadcast
@@ -1033,25 +1069,75 @@ class Tester(TestCase):
                 mat2 = torch.randn(2, 3, 16, 10)
                 bias = torch.randn(1, 1, 1, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(3, 1, 1)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 1, 1)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(3, 4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 1, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+
+    @unittest.skipIf(True, 'distil mha is will be supported later')
+    def test_distil_mha_scores_calculation(self):
+        def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
+            graph = trace_model.graph_for((mat1, mat2, mask))
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
+        def _test_pure_bf16(model, trace_model, mat1, mat2, mask, prec=3e-2):
+            mat1_bf16 = mat1.to(torch.bfloat16)
+            mat2_bf16 = mat2.to(torch.bfloat16)
+            bias_bf16 = mask.to(torch.bfloat16)
+            res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
+            res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
+            self.assertEqual(res_ref, res_jit, prec=prec)
+            _check_match_mha(trace_model, mat1, mat2, mask)
+
+        mat1 = torch.randn(56, 12, 384, 384)
+        mat2 = torch.randn(56, 12, 384, 384)
+        mask = torch.randn(56, 384)
+        mask = (mask > 0.5)
+
+        mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v1(mat1, mat2, mask)
+            res_jit = mha_jit(mat1, mat2, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha(mha_jit, mat1, mat2, mask)
+            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+
+        mha_v2 = DistilMHAScoresCalculation_v2(4)
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v2(mat1, mat2, mask)
+            res_jit = mha_jit(mat1, mat2, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha(mha_jit, mat1, mat2, mask)
+            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+
 
     def test_conv_fusion(self):
         batch_size = 8
@@ -2097,7 +2183,7 @@ class Tester(TestCase):
             kind_in_graph="ipex::batch_norm",
             prec=5e-3)
 
-    def test_restore_inplace(self):
+    def test_restore_and_enable_inplace(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
                 super(M, self).__init__()
@@ -2116,7 +2202,9 @@ class Tester(TestCase):
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
                 # use torch.sigmoid_(x)
                 eltwise_fn = getattr(torch, eltwise_fn_name)
+                eltwise_fn_outplace = getattr(torch, eltwise)
                 m = M(eltwise_fn)
+                m_outplace = M(eltwise_fn_outplace)
             elif eltwise == 'clamp':
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn, {"min": 0, "max": 2})
@@ -2124,10 +2212,15 @@ class Tester(TestCase):
                 # use F.elu(x, inplace=True)
                 eltwise_fn = getattr(F, eltwise)
                 m = M(eltwise_fn, {"inplace": True})
+                m_outplace = M(eltwise_fn)
 
             with torch.no_grad():
                 m.eval()
+                m_outplace.eval()
                 x = torch.randn(1, 3, 16, 16)
+                x_outplace = torch.randn(1, 3, 16, 16)
+
+                # test restore inplace
                 traced = torch.jit.trace(m, x)
                 trace_graph = traced.graph_for(x)
                 self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
@@ -2135,6 +2228,17 @@ class Tester(TestCase):
                 y = m(x)
                 traced_y = traced(x)
                 self.assertEqual(y, traced_y)
+
+                # test enable inplace
+                if eltwise == 'clamp':
+                    continue
+                traced_outplace = torch.jit.trace(m_outplace, x_outplace)
+                trace_graph_outplace = traced_outplace.graph_for(x_outplace)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_outplace.nodes()))
+
+                y_outplace = m_outplace(x_outplace)
+                traced_y_outplace = traced_outplace(x_outplace)
+                self.assertEqual(y_outplace, traced_y_outplace)
 
     def test_remove_bailout(self):
         batch_size = 8

@@ -26,7 +26,8 @@ c10::optional<IValue> getIValue(
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
-
+void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph);
+void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph);
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph);
 void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph);
 void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph>& graph);

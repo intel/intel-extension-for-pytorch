@@ -223,15 +223,10 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   rewriter_max_pool2d.runOnGraph(graph);
 }
 
-// for contiguous input:
-// replace aten::softmax to ipex::softmax/ipex::softmax_ during jit pass
-// there is better performance for ipex::softmax/ipex::softmax_ with oneDNN than
-// aten::softmax
-// for non-contiguous input:
-// (1) oneDNN will use ref path which is not optimized as expected
-// (2) if do contiguous copy then go into oneDNN optimized path, the
-// copy overhead is unneglectable
-// (3) so here will not replace aten::softmax to avoid unexpected regression
+// ipex::softmax shows better performance than aten::softmax, but compared with
+// ipex::softmax_, it is slower.
+// Like ipex::softmax_, we only do the replacement when the input
+// is contiguous.
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
   std::string aten_softmax = R"(
       graph(%a, %dim:int, %half_to_float:bool):
@@ -241,60 +236,21 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
       graph(%a, %dim:int, %half_to_float:bool):
         %r = ipex::softmax(%a, %dim, %half_to_float)
         return (%r) )";
-  std::string ipex_softmax_ = R"(
-      graph(%a, %dim:int, %half_to_float:bool):
-        %r = ipex::softmax_(%a, %dim, %half_to_float)
-        return (%r) )";
 
   // Filter the unsupported case for inplace softmax
-  auto filter_inplace =
-      [graph](
-          const Match& match,
-          const std::unordered_map<std::string, Value*>& vmap) {
-        Node* node = match.anchor;
-        std::unique_ptr<AliasDb> aliasDb_ = std::make_unique<AliasDb>(graph);
-
-        // check if the input is contiguous, and skip if it is not
-        auto input_value = node->input(0)->type()->cast<TensorType>();
-        auto input_value_contiguous = input_value->contiguous();
-        bool is_contiguous =
-            input_value_contiguous->strides() == input_value->strides();
-        if (!is_contiguous) {
-          return false;
-        }
-
-        // Skip if input has more than one use
-        if (node->input(0)->uses().size() > 1) {
-          return false;
-        }
-        // Skip if input's def node has side effect or input has alias
-        if (MutationRemover::hasSideEffectOrAlias(
-                node->inputs().at(0), aliasDb_.get())) {
-          return false;
-        }
-        return true;
-      };
-
   auto filter_outplace =
       [](const Match& match,
          const std::unordered_map<std::string, Value*>& vmap) {
         Node* node = match.anchor;
         // check if the input is contiguous, and skip if it is not
         auto input_value = node->input(0)->type()->cast<TensorType>();
-        auto input_value_contiguous = input_value->contiguous();
-        bool is_contiguous =
-            input_value_contiguous->strides() == input_value->strides();
-        if (!is_contiguous) {
+        if (!is_contiguous(input_value)) {
           return false;
         }
+
         return true;
       };
 
-  // try to replace inplace softmax first
-  SubgraphRewriter rewriter_aten_inplace;
-  rewriter_aten_inplace.RegisterRewritePattern(aten_softmax, ipex_softmax_);
-  rewriter_aten_inplace.runOnGraph(graph, filter_inplace);
-  // if any miss, then try to replace outplace softmax
   SubgraphRewriter rewriter_aten;
   rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
   rewriter_aten.runOnGraph(graph, filter_outplace);
