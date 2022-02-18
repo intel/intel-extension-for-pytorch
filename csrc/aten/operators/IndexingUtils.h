@@ -28,25 +28,32 @@ static std::vector<Tensor> expandTensors(
     const c10::List<c10::optional<Tensor>>& indices) {
   std::vector<Tensor> result;
   for (c10::optional<Tensor> index_opt : indices) {
-    Tensor index = std::move(*index_opt);
-    if (index.scalar_type() == kByte || index.scalar_type() == kBool) {
-      if (index.scalar_type() == kByte) {
-        TORCH_WARN(
-            "indexing with dtype torch.uint8 is now deprecated,"
-            " please use a dtype torch.bool instead.");
-      }
-      for (int64_t j = 0; j < index.dim(); j++) {
-        int64_t srcIdx = result.size() + j;
-        if (index.size(j) != self.size(srcIdx)) {
-          invalid_mask(self, srcIdx, index, j);
-        }
-      }
-      auto nonzero = index.nonzero();
-      for (int64_t j = 0; j < index.dim(); j++) {
-        result.emplace_back(nonzero.select(1, j));
-      }
+    if (!index_opt.has_value()) {
+      result.emplace_back();
     } else {
-      result.emplace_back(index);
+      Tensor index = std::move(*index_opt);
+      if (index.scalar_type() == kByte || index.scalar_type() == kBool) {
+        if (index.scalar_type() == kByte) {
+          TORCH_WARN(
+              "indexing with dtype torch.uint8 is now deprecated,"
+              " please use a dtype torch.bool instead.");
+        }
+        // The sizes of the ByteTensor mask or bool tensor must match the sizes
+        // of the corresponding dimensions in self
+        for (int64_t j = 0; j < index.dim(); j++) {
+          int64_t srcIdx = result.size() + j;
+          if (index.size(j) != self.size(srcIdx)) {
+            invalid_mask(self, srcIdx, index, j);
+          }
+        }
+        // Replace with nonzeros
+        auto nonzero = index.nonzero();
+        for (int64_t j = 0; j < index.dim(); j++) {
+          result.emplace_back(nonzero.select(1, j));
+        }
+      } else {
+        result.emplace_back(std::move(index));
+      }
     }
   }
   return result;
@@ -55,9 +62,8 @@ static std::vector<Tensor> expandTensors(
 static void checkIndexTensorTypes(
     const c10::List<c10::optional<Tensor>>& indices) {
   for (c10::optional<Tensor> tensor_opt : indices) {
-    Tensor tensor = std::move(*tensor_opt);
-    if (tensor.defined()) {
-      auto scalarType = tensor.scalar_type();
+    if (tensor_opt.has_value() && tensor_opt->defined()) {
+      auto scalarType = tensor_opt->scalar_type();
       if (scalarType != kLong && scalarType != kByte && scalarType != kBool) {
         TORCH_CHECK(
             "tensors used as indices must be long, byte or bool tensors");
