@@ -140,73 +140,145 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
 // (3) Current ipex::softmax/softmax_ is from the replacement of aten::softmax,
 //     it is safe to make MHA cover ipex::softmax/softmax_.
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
-  std::string div_matmul_add_aten_softmax = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+  // below are basic patterns for MHA matching
+  std::string div_matmul_add = R"(
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %_q = aten::div(%q, %dim_per_head)
         %qk = aten::matmul(%_q, %k)
-        %_scores = aten::add(%qk, %relative_qk, %alpha)
-        %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
-        return (%scores) )";
+        %_scores = aten::add(%qk, %relative_qk, %alpha) )";
 
-  std::string div_matmul_add_ipex_softmax = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+  std::string matmul_div_add = R"(
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %qk = aten::matmul(%q, %k)
+        %_qk = aten::div(%qk, %dim_per_head)
+        %_scores = aten::add(%_qk, %relative_qk, %alpha) )";
+
+  std::string div_matmul_expand = R"(
+      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
         %_q = aten::div(%q, %dim_per_head)
-        %qk = aten::matmul(%_q, %k)
-        %_scores = aten::add(%qk, %relative_qk, %alpha)
-        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
+        %_k = aten::transpose(%k, %transpose_dim_a, %transpose_dim_b)
+        %qk = aten::matmul(%_q, %_k)
+        %_mask_qk_view = aten::view(%mask_qk, %mask_qk_reshp)
+        %_mask_qk_shape = aten::expand_as(%_mask_qk_view, %qk) )";
+
+  std::string aten_masked_fill = R"(
+        %_scores = aten::masked_fill(%qk, %_mask_qk_shape, %fill) )";
+
+  std::string aten_masked_fill_ = R"(
+        %_scores = aten::masked_fill_(%qk, %_mask_qk_shape, %fill) )";
+
+  std::string aten_softmax = R"(
+        %scores = aten::softmax(%_scores, %softmax_dim, %dtype) )";
+
+  std::string set_return = R"(
         return (%scores) )";
 
-  std::string div_matmul_add_ipex_softmax_ = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
-        %_q = aten::div(%q, %dim_per_head)
-        %qk = aten::matmul(%_q, %k)
-        %_scores = aten::add(%qk, %relative_qk, %alpha)
-        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
-        return (%scores) )";
+  auto filter_distil_mha =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        const auto& match_vmap = match.values_map;
 
-  std::string matmul_div_add_aten_softmax = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
-        %qk = aten::matmul(%q, %k)
-        %_qk = aten::div(%qk, %dim_per_head)
-        %_scores = aten::add(%_qk, %relative_qk, %alpha)
-        %scores = aten::softmax(%_scores, %softmax_dim, %dtype)
-        return (%scores) )";
+        // Only support last dimension for softmax
+        auto dim_ = getIValue("softmax_dim", match_vmap, vmap).value();
+        if (!(dim_.isInt())) {
+          return false;
+        }
+        auto dim = dim_.toInt();
+        if (dim != -1) {
+          return false;
+        }
 
-  std::string matmul_div_add_ipex_softmax = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
-        %qk = aten::matmul(%q, %k)
-        %_qk = aten::div(%qk, %dim_per_head)
-        %_scores = aten::add(%_qk, %relative_qk, %alpha)
-        %scores = ipex::softmax(%_scores, %softmax_dim, %dtype)
-        return (%scores) )";
+        Node* node = match.anchor;
+        // Find the masked_fill node to get the qk value
+        auto qk_node = node->input(0)->node();
+        TORCH_CHECK(
+            qk_node->kind() == aten::masked_fill ||
+            qk_node->kind() == aten::masked_fill_);
+        // Find the view node to get the mask value
+        auto mask_node =
+            node->input(0)->node()->input(1)->node()->input(0)->node();
+        TORCH_CHECK(mask_node->kind() == aten::view);
+        auto mask_value = mask_node->input(0)->type()->cast<TensorType>();
+        // Only support contiguous tensor for qk and mask
+        auto qk_value = qk_node->input(0)->type()->cast<TensorType>();
+        auto qk_value_contiguous = qk_value->contiguous();
+        auto mask_value_contiguous = mask_value->contiguous();
+        bool is_contiguous_qk =
+            qk_value_contiguous->strides() == qk_value->strides();
+        bool is_contiguous_mask =
+            mask_value_contiguous->strides() == mask_value->strides();
+        if (!is_contiguous_qk || !is_contiguous_mask) {
+          return false;
+        }
 
-  std::string matmul_div_add_ipex_softmax_ = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
-        %qk = aten::matmul(%q, %k)
-        %_qk = aten::div(%qk, %dim_per_head)
-        %_scores = aten::add(%_qk, %relative_qk, %alpha)
-        %scores = ipex::softmax_(%_scores, %softmax_dim, %dtype)
-        return (%scores) )";
+        // Only support qk.dim >=2D
+        bool not_one_dim = qk_value->dim().value() >= 2;
+        if (!not_one_dim) {
+          return false;
+        }
+
+        // Only support 64byte aligned
+        auto qk_tensor = *qk_value;
+        bool aligned_64_bytes =
+            qk_tensor.sizes()[qk_value->dim().value() - 1].value() % 16 == 0;
+        if (!aligned_64_bytes) {
+          return false;
+        }
+
+        // Only support when expand from the mid dims shape (bs :: seq_length)
+        auto mask_reshape_node = mask_node->input(1)->node();
+        for (int i = 1; i < qk_value->dim().value() - 1; i++) {
+          auto expand_check =
+              toIValue(mask_reshape_node->inputs().at(i)).value().toInt();
+          if (!(expand_check == 1)) {
+            return false;
+          }
+        }
+
+        // Checking the dtype as None
+        auto dtype_value = getIValue("dtype", match_vmap, vmap).value();
+        if (!dtype_value.isNone()) {
+          return false;
+        }
+
+        return true;
+      };
 
   std::string div_matmul_add_softmax_fusion = R"(
-      graph(%q:Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
         return (%scores) )";
 
+  std::string div_matmul_maskedfill_softmax_fusion = R"(
+      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
+        %scores = ipex::distil_mha_scores_calc(%q, %k, %mask_qk, %mask_qk_reshp, %transpose_dim_a, %transpose_dim_b, %fill, %dim_per_head, %softmax_dim, %dtype)
+        return (%scores) )";
+
   SubgraphRewriter mha_fusion;
+  SubgraphRewriter distil_mha_fusion;
+
+  // below are MHA combinations for Bert Model (div+matmul+add+softmax)
+  std::string div_matmul_add_softmax =
+      div_matmul_add + aten_softmax + set_return;
+  std::string matmul_div_add_softmax =
+      matmul_div_add + aten_softmax + set_return;
   mha_fusion.RegisterRewritePattern(
-      div_matmul_add_aten_softmax, div_matmul_add_softmax_fusion);
+      div_matmul_add_softmax, div_matmul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
-      div_matmul_add_ipex_softmax, div_matmul_add_softmax_fusion);
-  mha_fusion.RegisterRewritePattern(
-      div_matmul_add_ipex_softmax_, div_matmul_add_softmax_fusion);
-  mha_fusion.RegisterRewritePattern(
-      matmul_div_add_aten_softmax, div_matmul_add_softmax_fusion);
-  mha_fusion.RegisterRewritePattern(
-      matmul_div_add_ipex_softmax, div_matmul_add_softmax_fusion);
-  mha_fusion.RegisterRewritePattern(
-      matmul_div_add_ipex_softmax_, div_matmul_add_softmax_fusion);
+      matmul_div_add_softmax, div_matmul_add_softmax_fusion);
+  // below are MHA combinations for DistilBert Model
+  // (div+matmul+masked_fill+softmax)
+  std::string div_matmul_maskfill__softmax =
+      div_matmul_expand + aten_masked_fill_ + aten_softmax + set_return;
+  std::string div_matmul_maskfill_softmax =
+      div_matmul_expand + aten_masked_fill + aten_softmax + set_return;
+  distil_mha_fusion.RegisterRewritePattern(
+      div_matmul_maskfill__softmax, div_matmul_maskedfill_softmax_fusion);
+  distil_mha_fusion.RegisterRewritePattern(
+      div_matmul_maskfill_softmax, div_matmul_maskedfill_softmax_fusion);
+
   mha_fusion.runOnGraph(graph);
+  distil_mha_fusion.runOnGraph(graph, filter_distil_mha);
 }
 
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {

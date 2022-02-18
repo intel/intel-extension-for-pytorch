@@ -1128,7 +1128,6 @@ class Tester(TestCase):
                 _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
-    @unittest.skipIf(True, 'distil mha is will be supported later')
     def test_distil_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
             graph = trace_model.graph_for((mat1, mat2, mask))

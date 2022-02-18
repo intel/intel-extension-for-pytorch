@@ -2,7 +2,6 @@
 #include <ATen/AccumulateType.h>
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/Config.h>
-#include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/Parallel.h>
 #include <ATen/cpu/vec/functional.h>

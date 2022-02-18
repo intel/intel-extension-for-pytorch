@@ -1,6 +1,5 @@
 #include "MaxPooling.h"
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/NamedTensorUtils.h>
 #include <ATen/Parallel.h>
 #include <ATen/core/grad_mode.h>

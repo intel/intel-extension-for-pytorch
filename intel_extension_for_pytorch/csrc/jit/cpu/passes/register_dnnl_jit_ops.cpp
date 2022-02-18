@@ -490,6 +490,28 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::distil_mha_scores_calc(Tensor q, Tensor k, Tensor mask_qk, "
+        "int[] mask_qk_reshp, int transpose_dim_a, int transpose_dim_b, "
+        "Scalar fill, Scalar dim_per_head, int softmax_dim, ScalarType ? dtype) "
+        "-> Tensor",
+        [](Stack& stack) {
+          auto result = dil_distil_mha_scores_calc(
+              peek(stack, 0, 10).toTensor(),
+              peek(stack, 1, 10).toTensor(),
+              peek(stack, 2, 10).toTensor(),
+              peek(stack, 3, 10).toIntVector(),
+              peek(stack, 4, 10).toInt(),
+              peek(stack, 5, 10).toInt(),
+              peek(stack, 6, 10).toScalar(),
+              peek(stack, 7, 10).toScalar(),
+              peek(stack, 8, 10).toInt(),
+              peek(stack, 9, 10));
+          drop(stack, 10);
+          pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::softmax(Tensor self, int dim, ScalarType ? dtype) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {

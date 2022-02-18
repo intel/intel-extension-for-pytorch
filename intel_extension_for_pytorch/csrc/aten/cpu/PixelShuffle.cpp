@@ -2,7 +2,6 @@
 #include <c10/util/Exception.h>
 
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/Parallel.h>
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/cpu/utils.h>

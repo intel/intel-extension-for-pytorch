@@ -159,6 +159,48 @@ inline void _dil_div_add_reduce_max_fusion_kernel(
   max = _mm512_reduce_max_ps(vec_ps_min);
 }
 
+template <typename scalar_t>
+inline void _dil_maskedfill_div_max_fusion_kernel(
+    const scalar_t* a,
+    const float* b,
+    const float& fill_value,
+    const float& dim_per_head,
+    const int& size,
+    float* out,
+    float& max) {
+  auto vec_fill = _mm512_set1_ps(fill_value);
+  auto vec_ps_min = vec_fill;
+  auto mask_c = _mm512_set1_ps(1.0);
+  auto vec_dim_per_head = _mm512_set1_ps(dim_per_head);
+
+  auto vec_a = vec_ps_min;
+  auto vec_b = vec_ps_min;
+  auto vec_out = vec_ps_min;
+
+  int i = 0;
+  for (; i <= size - 16; i += 16) {
+    vec_a = _load_f32_data(a + i);
+    vec_b = _load_f32_data(b + i);
+    __mmask16 fill_mask = _mm512_cmp_ps_mask(vec_b, mask_c, 12);
+    vec_out = _mm512_mask_div_ps(vec_fill, fill_mask, vec_a, vec_dim_per_head);
+    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
+    _mm512_store_ps(out + i, vec_out);
+  }
+
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    vec_a = _maskz_load_f32_data(a + i, mask);
+    vec_b = _maskz_load_f32_data(b + i, mask);
+    __mmask16 fill_mask = _mm512_cmp_ps_mask(vec_b, mask_c, 12);
+    vec_out = _mm512_mask_div_ps(vec_fill, fill_mask, vec_a, vec_dim_per_head);
+    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
+    _mm512_mask_store_ps(out + i, mask, vec_out);
+  }
+
+  // NOTE: _mm512_reduce_max_ps is sequence instruction
+  max = _mm512_reduce_max_ps(vec_ps_min);
+}
+
 inline void _dil_exp_reduce_sum_fusion_kernel(
     const float* a,
     const int& size,
@@ -311,6 +353,98 @@ at::Tensor dil_div_add_softmax(
   });
   return output;
 } // dil_add_softmax
+
+/**
+ * @brief Fuse the div (div scalar or mul 1/scalar), masked_fill operator and
+ * softmax operator. softmax(mask? a/dim_per_head : fill value)
+ *
+ * @attention
+ * There are some assumptions for this operator.
+ * - The reduce dimension for softmax is the last dimension
+ * - The reduce dimension for softmax is the leading dimension
+ * - The elements number of the reduce dimension for softmax is n*16
+ * - The input tensors are contiguous
+ * - The number of the input tensor dimension should be >=2
+ * - The mask b can be expand_as a with the mask_reshape (bs :: seq_length),
+ * i.e., from mid dims
+ * - The datatype for inpust a and output are same.
+ *
+ * @param[in] a a contiguous tensor to do div and softmax
+ * @param[in] b a mask tensor to be masked_fill into tensor a after div and
+ * before softmax
+ * @return The tensor stores the result of @code softmax(mask? a/dim_per_head :
+ * fill value) @endcode
+ */
+template <typename scalar_t>
+at::Tensor dil_div_maskfill_softmax(
+    const at::Tensor& a, // qk scores
+    const at::Tensor& b, // mask
+    const float& fill_value,
+    const float& dim_per_head) {
+  scalar_t* a_data_base = a.data_ptr<scalar_t>();
+  float* b_data_base = b.data_ptr<float>();
+
+  auto infered_size = a.sizes().vec();
+
+  // Create an new tensor to store the output
+  at::Tensor output = at::empty_like(a);
+  scalar_t* output_data_base = output.data_ptr<scalar_t>();
+
+  std::vector<int64_t> outer_size_per_dim;
+  int64_t dim_size = infered_size[infered_size.size() - 1];
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim_size != 1);
+
+  int64_t outer_size = 1;
+  // The last dim is the loop unit. We need to minus 2 to exclude the last dim.
+  // infered_size.size() - 2 is the -2th dimension.
+  for (int64_t i = infered_size.size() - 2; i >= 0; i--) {
+    // Record outer dimensions
+    outer_size_per_dim.insert(outer_size_per_dim.begin(), outer_size);
+    // Calculate outer loop number;
+    outer_size *= infered_size[i];
+  }
+
+  auto mask_offset = outer_size / infered_size[0];
+
+  int64_t grain_size = at::internal::GRAIN_SIZE / (16 * dim_size);
+  if (grain_size < 1)
+    grain_size = 1;
+  int64_t outer_dims_num = outer_size_per_dim.size();
+  at::parallel_for(0, outer_size, grain_size, [&](int64_t begin, int64_t end) {
+    float val = 0.0;
+    at::Tensor tmp_out = at::empty({dim_size});
+    float* tmp_out_ptr = tmp_out.data_ptr<float>();
+    for (int64_t i = begin; i < end; i++) {
+      // mask fill and do div on a and get the maximum value:
+      //    output_data = mask? a/dim_per_head : fill value
+      //    val = max(output_data)
+      int b_offset = (i / mask_offset);
+      // b_offset takes mid dims because the mask is
+      // expand_as a with the mid dims (bs :: seq_length)
+      _dil_maskedfill_div_max_fusion_kernel<scalar_t>(
+          a_data_base + i * dim_size,
+          b_data_base + b_offset * dim_size,
+          fill_value,
+          dim_per_head,
+          dim_size,
+          tmp_out_ptr,
+          val);
+      // Calculate the e^x and get the sum value:
+      //    output_data = output_data - max(output_data)
+      //    output_data = e^(output_data)
+      //    val = sum(output_data)
+
+      _dil_exp_reduce_sum_fusion_kernel(
+          tmp_out_ptr, dim_size, tmp_out_ptr, val);
+      // Calculat the normalization [e^x / sum(e^x)]:
+      //    output_data = output_data / sum(output_data)
+
+      _dil_normalization_kernel<scalar_t>(
+          tmp_out_ptr, val, dim_size, output_data_base + i * dim_size);
+    }
+  });
+  return output;
+} // dil_div_maskfill_softmax
 
 } // namespace vec512
 } // namespace vec
