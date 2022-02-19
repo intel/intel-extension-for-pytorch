@@ -33,9 +33,6 @@
 #   IPEX_DISP_OP=1
 #     output the extension operators name for debug purpose
 #
-#   IPEX_PROFILE_OP=1
-#     Record the extension operators for profiling
-#
 # Environment variables we respect (these environment variables are
 # conventional and are often understood/set by other software.)
 #
@@ -452,9 +449,6 @@ class IPEXCPPLibBuild(build_clib, object):
 
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
-
-        if os.getenv("IPEX_PROFILE_OP", "") != "0":
-            cmake_args += ['-DIPEX_PROFILE_OP=1']
 
         if _check_env_flag("USE_SYCL"):
             cmake_args += ['-DUSE_SYCL=1']
