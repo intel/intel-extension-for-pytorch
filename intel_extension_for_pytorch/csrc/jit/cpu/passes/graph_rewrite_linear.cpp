@@ -98,8 +98,12 @@ void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_gelu;
+  SubgraphRewriter rewriter_relu, rewriter_gelu, rewriter_silu,
+      rewriter_sigmoid, rewriter_swish;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
+  std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
+  std::array<std::string, 2> silu_operators = {"silu", "silu_"};
+  std::array<std::string, 2> mul_operators = {"mul", "mul_"};
 
   auto linear_relu_rstring = CodeTemplate(R"(
      graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
@@ -127,6 +131,40 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::linear_gelu_run(%input, %packed_weight)
         return (%res))";
 
+  auto linear_sigmoid_rstring = CodeTemplate(R"(
+    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res= aten::${sigmoid}(%x)
+        return (%res))");
+
+  auto linear_silu_rstring = CodeTemplate(R"(
+    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res= aten::${silu}(%x)
+        return (%res))");
+
+  auto linear_sigmoid_mul_rstring = CodeTemplate(R"(
+    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %y = aten::${sigmoid}(%x)
+        %res = aten::${mul}(%x, %y)
+        return (%res))");
+
+  std::string linear_swish_fused = R"(
+    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %res = ipex_prepack::linear_swish_run(%input, %packed_weight)
+        return (%res))";
+
+  std::string linear_sigmoid_fused = R"(
+    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %res = ipex_prepack::linear_sigmoid_run(%input, %packed_weight)
+        return (%res))";
+
   for (const auto& relu : relu_operators) {
     TemplateEnv env;
     env.s("relu", relu);
@@ -134,6 +172,27 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
         linear_relu_rstring.format(env), linear_relu_fused);
   }
 
+  for (const auto& silu : silu_operators) {
+    TemplateEnv env;
+    env.s("silu", silu);
+    rewriter_silu.RegisterRewritePattern(
+        linear_silu_rstring.format(env), linear_swish_fused);
+  }
+
+  for (const auto& sigmoid : sigmoid_operators) {
+    TemplateEnv env;
+    env.s("sigmoid", sigmoid);
+    rewriter_sigmoid.RegisterRewritePattern(
+        linear_sigmoid_rstring.format(env), linear_sigmoid_fused);
+    for (const auto& mul : mul_operators) {
+      env.s("mul", mul);
+      rewriter_swish.RegisterRewritePattern(
+          linear_sigmoid_mul_rstring.format(env), linear_swish_fused);
+    }
+  }
+  rewriter_silu.runOnGraph(graph);
+  rewriter_sigmoid.runOnGraph(graph);
+  rewriter_swish.runOnGraph(graph);
   rewriter_gelu.RegisterRewritePattern(linear_gelu, linear_gelu_fused);
 
   rewriter_relu.runOnGraph(graph);

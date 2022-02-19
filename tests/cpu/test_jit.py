@@ -351,6 +351,38 @@ class LinearGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.linear(x))
 
+class LinearSigmoid(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSigmoid, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return F.sigmoid(self.linear(x))
+
+class LinearSwish(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSwish, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        linear_res = self.linear(x)
+        return F.silu(linear_res)
+
+class LinearSwish_v1(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSwish_v1, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        linear_res = self.linear(x)
+        return torch.mul(linear_res, F.sigmoid(linear_res))
+
 class LinearAdd(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearAdd, self).__init__()
@@ -2151,6 +2183,63 @@ class Tester(TestCase):
             LinearGelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_gelu_run",
+            prec=5e-3)
+    
+    def test_output_linear_swish(self):
+        self._test_output(
+            LinearSwish_v1(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish_v1(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSwish_v1(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish_v1(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSwish(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSwish(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run", prec=5e-3)
+
+    def test_output_linear_sigmoid(self):
+        self._test_output(
+            LinearSigmoid(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSigmoid(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_sigmoid_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSigmoid(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSigmoid(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_sigmoid_run",
             prec=5e-3)
 
     def test_channel_shuffle(self):

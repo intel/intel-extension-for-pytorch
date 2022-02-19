@@ -57,6 +57,24 @@ at::Tensor linear_gelu_run(
   return op_context->run(input, ideep::attr_t::fuse_gelu());
 }
 
+at::Tensor linear_sigmoid_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::linear_sigmoid_run", std::vector<c10::IValue>({}));
+
+  return op_context->run(input, ideep::attr_t::fuse_sigmoid());
+}
+
+at::Tensor linear_swish_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::linear_swish_run", std::vector<c10::IValue>({}));
+
+  return op_context->run(input, ideep::attr_t::fuse_swish());
+}
+
 at::Tensor linear_add_run(
     const at::Tensor& input,
     at::Tensor& accumu,
