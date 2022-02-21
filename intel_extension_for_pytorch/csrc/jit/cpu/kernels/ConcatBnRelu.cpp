@@ -23,8 +23,9 @@ DEFINE_DISPATCH(concat_bn_relu_kernel_stub);
  **/
 at::Tensor ConcatBnRelu(
     const c10::List<at::Tensor>& a,
+    const at::Tensor& bn_scale,
     const at::Tensor& bn_beta,
-    const c10::optional<at::Tensor>& bn_scale,
+    const c10::optional<at::Tensor>& bn_weight,
     const c10::optional<at::Tensor>& bn_bias,
     const c10::optional<at::Tensor>& bn_mean,
     const c10::optional<at::Tensor>& bn_var,
@@ -33,14 +34,15 @@ at::Tensor ConcatBnRelu(
     double bn_eps,
     bool bn_cudnn_enabled,
     int dim) {
-  IPEX_RECORD_FUNCTION("ConcatBnRelu", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("ipex::concat_bn_relu", std::vector<c10::IValue>({}));
 
 #if defined(DYN_DISP_BUILD)
   return concat_bn_relu_kernel_stub(
       kCPU,
       a,
-      bn_beta,
       bn_scale,
+      bn_beta,
+      bn_weight,
       bn_bias,
       bn_mean,
       bn_var,
@@ -52,8 +54,9 @@ at::Tensor ConcatBnRelu(
 #else
   return concat_bn_relu_kernel_impl(
       a,
-      bn_beta,
       bn_scale,
+      bn_beta,
+      bn_weight,
       bn_bias,
       bn_mean,
       bn_var,

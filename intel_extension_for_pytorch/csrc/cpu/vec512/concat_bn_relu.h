@@ -64,7 +64,7 @@ void ConcatBnReluKernelImpl_ChannelsLast(
 
   for (int64_t i = 0; i < list_length; ++i) {
     input_channels[i + 1] = input_channels[i] + a[i].size(1);
-    input_ptr[i] = a[i].data_ptr<T>();
+    input_ptr[i] = a[i].contiguous(a[i].suggest_memory_format()).data_ptr<T>();
   }
   //  Return the product of all the input dimensions except for the channel
   //  and check if the dimension and sizes of the tensors meet the fusion

@@ -444,10 +444,10 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
         %alpha: int = prim::Constant[value=1]()
         %u1 = aten::add(%running_var, %eps, %alpha)
         %u2 = aten::sqrt(%u1)
-        %u3 = aten::div(%running_mean, %u2)
-        %u4 = aten::mul(%weight, %u3)
-        %beta = aten::sub(%bias, %u4, %alpha)
-        %b = ipex::concat_bn_relu(%input, %beta, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled, %dim)
+        %scale = aten::div(%weight, %u2)
+        %u3 = aten::mul(%running_mean, %scale)
+        %beta = aten::sub(%bias, %u3, %alpha)
+        %b = ipex::concat_bn_relu(%input, %scale, %beta, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled, %dim)
         return (%b) )";
 
   auto fusion_filter = [](const Match& match,
