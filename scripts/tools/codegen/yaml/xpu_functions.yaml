@@ -246,6 +246,8 @@ supported:
   - gt.Scalar_out
   - gt.Tensor
   - gt.Tensor_out
+  - grid_sampler_2d
+  - grid_sampler_3d
   - hardshrink
   - hardshrink.out
   - hardshrink_backward
