@@ -71,10 +71,10 @@ import warnings
 import urllib.request
 import re
 
-TORCH_VERSION = '1.10.0'
+TORCH_VERSION = '1.11.0'
 TORCH_VERSION = os.getenv('TORCH_VERSION', TORCH_VERSION)
 
-TORCH_IPEX_VERSION = '1.10.0+cpu'
+TORCH_IPEX_VERSION = '1.11.0+cpu'
 PYTHON_VERSION = sys.version_info
 
 package_name = "intel_extension_for_pytorch"
