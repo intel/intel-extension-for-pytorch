@@ -8,7 +8,7 @@ from functools import wraps
 from torch.testing._internal.jit_utils import JitTestCase, warmup_backward, \
     get_execution_plan
 from torch.testing._internal.common_utils import freeze_rng_state, run_tests, \
-    get_function_arglist, load_tests, repeat_test_for_types, TemporaryFileName
+    get_function_arglist, load_tests, TemporaryFileName
 
 from torch.jit._recursive import wrap_cpp_module
 
