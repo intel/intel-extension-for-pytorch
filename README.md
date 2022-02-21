@@ -52,3 +52,11 @@ Use cases that had already been optimized by Intel engineers are available at [M
 ## License
 
 _Apache License_, Version _2.0_. As found in [LICENSE](https://github.com/intel/intel-extension-for-pytorch/blob/master/LICENSE.txt) file.
+
+## Security
+
+See Intel's [Security Center](https://www.intel.com/content/www/us/en/security-center/default.html)
+for information on how to report a potential security issue or vulnerability.
+
+See also: [Security Policy](SECURITY.md)
+
