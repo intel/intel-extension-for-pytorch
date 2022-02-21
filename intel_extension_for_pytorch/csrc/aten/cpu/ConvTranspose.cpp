@@ -3,7 +3,7 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/utils.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -31,6 +31,29 @@ std::vector<int64_t> conv_input_size(
         (2 * padding[d - 2]) + kernel + output_padding[d - 2];
   }
   return input_size;
+}
+
+static inline std::vector<int64_t> padding_r(
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding) {
+  // ConvTranpose padding adjustment
+  //
+  // PyTorch uses padding/output_padding:
+  //   osize = (isize - 1) * stride - 2 * padding + dilation * (kernel_size - 1)
+  //   + output_padding + 1
+  //
+  // MKLDNN uses padding_l/padding_r:
+  //   osize = (isize - 1) * stride - padding_l - padding_r + dilation *
+  //   (kernel_size - 1) + 1
+  //
+  // So: padding_l = padding, padding_r = padding - output_padding
+  //
+  auto dim = padding.size();
+  std::vector<int64_t> pad_r(dim);
+  for (const auto d : c10::irange(dim)) {
+    pad_r[d] = padding[d] - output_padding[d];
+  }
+  return pad_r;
 }
 
 at::Tensor conv_transpose2d_kernel_impl(
@@ -77,7 +100,7 @@ at::Tensor conv_transpose2d_kernel_impl(
         y,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   } else {
@@ -88,7 +111,7 @@ at::Tensor conv_transpose2d_kernel_impl(
         y,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   }
@@ -205,10 +228,8 @@ at::Tensor IPEXConvTransposeOp::_forward(
     bool weight_channels_last,
     bool weight_prepacked) {
   at::AutoNonVariableTypeMode g;
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", std::vector<c10::IValue>({}));
-#endif
 
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose2d", "")
@@ -242,9 +263,9 @@ at::Tensor IPEXConvTransposeOp::forward(
     int64_t output_channel,
     bool weight_channels_last,
     bool weight_prepacked) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXConvTransposeOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXConvTransposeOp::forward", std::vector<c10::IValue>({}));
+
   ctx->saved_data["stride"] = stride;
   ctx->saved_data["padding"] = padding;
   ctx->saved_data["dilation"] = dilation;
@@ -331,7 +352,7 @@ at::Tensor conv_transpose2d_backward_input(
       grad_x,
       stride.vec(),
       padding.vec(),
-      padding.vec(),
+      padding_r(padding, output_padding),
       dilation.vec(),
       groups);
 
@@ -402,7 +423,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose2d_backward_weights(
         mkldnn_grad_bias,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   } else {
@@ -413,7 +434,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose2d_backward_weights(
         mkldnn_grad_weight,
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r(padding, output_padding),
         dilation.vec(),
         groups);
   }
@@ -458,10 +479,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> conv_transpose2d_backward(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::conv_transpose2d_backward\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::conv_transpose2d_backward", std::vector<c10::IValue>({}));
-#endif
+
   auto memory_format = input.suggest_memory_format();
   at::Tensor grad_output = grad_output_t.contiguous(memory_format);
 
@@ -502,10 +522,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> conv_transpose2d_backward(
 torch::autograd::variable_list IPEXConvTransposeOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::backward", std::vector<c10::IValue>({}));
-#endif
+
   auto stride = ctx->saved_data["stride"].toIntVector();
   auto padding = ctx->saved_data["padding"].toIntVector();
   auto output_padding = ctx->saved_data["output_padding"].toIntVector();

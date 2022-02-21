@@ -21,6 +21,7 @@ using RunArg = dnnl::graph::tensor;
 using RunArgs = std::vector<RunArg>;
 using TensorArgs = std::vector<at::Tensor>;
 
+constexpr int MAX_COMPILATION_CACHE_SIZE = 1024;
 class LlgaKernel {
  public:
   explicit LlgaKernel(const Node* fusionNode);
@@ -60,6 +61,10 @@ class LlgaKernel {
   dnnl::graph::compiled_partition compile(
       const dnnl::graph::partition& partition);
 
+  dnnl::graph::compiled_partition& compileAndCache(
+      const dnnl::graph::partition& partition,
+      int n_thread);
+
   std::tuple<RunArgs, RunArgs> prepareRunArgs(
       const TensorArgs& inputs,
       TensorArgs& outputs) const;
@@ -83,22 +88,6 @@ class LlgaKernel {
     return s.logical_tensor();
   }
 
-  void lock_read() {
-    rw_mutex_.lock_read();
-  }
-
-  void lock_write() {
-    rw_mutex_.lock_write();
-  }
-
-  void unlock_read() {
-    rw_mutex_.unlock_read();
-  }
-
-  void unlock_write() {
-    rw_mutex_.unlock_write();
-  }
-
   at::Device device_ = at::kCPU;
   const Node* fusionNode_;
   std::shared_ptr<Graph> graph_;
@@ -112,7 +101,9 @@ class LlgaKernel {
   // nPartitionInputs_ = nGraphInputs_ + constantInputs_.size() since Constant
   // inputs are copied to the inside of the subgraph
   int64_t nPartitionInputs_;
-  dnnl::graph::compiled_partition compilation_;
+  // We cache the compilation for each omp_num_threads
+  std::vector<dnnl::graph::compiled_partition> compilations_ =
+      std::vector<dnnl::graph::compiled_partition>(MAX_COMPILATION_CACHE_SIZE);
   std::set<size_t> initializedInputIds_;
   std::vector<Value*> constantValues_;
   TensorArgs constantInputs_;
@@ -121,8 +112,9 @@ class LlgaKernel {
   std::unordered_map<size_t, size_t> inplacePairs_; // output id -> input offset
   std::string debugName_;
   std::string profileName_;
-  torch_ipex::ReadWriteMutex rw_mutex_;
-  bool is_initialized_ = false;
+  std::once_flag spec_initialized_flag_;
+  std::vector<std::once_flag> compilation_initialized_flags_ =
+      std::vector<std::once_flag>(MAX_COMPILATION_CACHE_SIZE);
 };
 
 } // namespace onednn

@@ -31,16 +31,12 @@ ENDIF()
 
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
 # use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
-SET(DNNL_GRAPH_LIBRARY_TYPE SDL CACHE STRING "" FORCE)
+SET(DNNL_GRAPH_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
 # add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
 
 IF("${IPEX_DISP_OP}" STREQUAL "1")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
-ENDIF()
-
-IF("${IPEX_PROFILE_OP}" STREQUAL "1")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_PROFILE_OP")
 ENDIF()
 
 

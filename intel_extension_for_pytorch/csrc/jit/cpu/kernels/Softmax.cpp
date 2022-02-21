@@ -1,7 +1,6 @@
 #include "Softmax.h"
 #include "AddSoftmax.h"
-#include "csrc/aten/cpu/Softmax.h"
-#include "csrc/utils/utils.h"
+#include "csrc/cpu/ideep/IDeepConversions.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
@@ -12,18 +11,44 @@
 #include <limits>
 
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
+
+// softmax kernel for inference mode with oneDNN implementation
+at::Tensor softmax_impl(const at::Tensor& input, const int64_t dim) {
+  // do not support non-contiguous input, which should go into aten::softmax
+  TORCH_CHECK(
+      input.is_contiguous(),
+      "ipex::softmax: Expected contiguous tensor input!");
+  const int64_t wrapped_dim = at::maybe_wrap_dim(dim, input.dim());
+  ideep::tensor mkldnn_input = itensor_view_from_dense(input);
+  auto output = at::empty_like(input);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
+  ideep::softmax_forward::compute(mkldnn_input, mkldnn_output, wrapped_dim);
+  return output;
+}
+
+// inplace softmax kernel for inference mode with oneDNN implementation
+void softmax_impl_(at::Tensor& input, const int64_t dim) {
+  // do not support non-contiguous input, which should go into aten::softmax
+  TORCH_CHECK(
+      input.is_contiguous(),
+      "ipex::softmax_: Expected contiguous tensor input!");
+  const int64_t wrapped_dim = at::maybe_wrap_dim(dim, input.dim());
+  ideep::tensor mkldnn_input = itensor_view_from_dense(input);
+  ideep::tensor mkldnn_output = itensor_view_from_dense(input);
+  ideep::softmax_forward::compute(mkldnn_input, mkldnn_output, wrapped_dim);
+}
 
 // Dispatch softmax to oneDNN path for jit inference
 at::Tensor dil_softmax(
     const at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_softmax", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_softmax", std::vector<c10::IValue>({}));
+
   auto half_to_float = false;
 
   if (!dtype.isNone()) {
@@ -43,9 +68,8 @@ at::Tensor& dil_softmax_(
     at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_softmax_", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("dil_softmax_", std::vector<c10::IValue>({}));
+
   auto half_to_float = false;
   if (!dtype.isNone()) {
     auto outtype = dtype.toScalarType();

@@ -3,7 +3,8 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/utils.h"
+#include "csrc/utils/ipex_op_profile.h"
+#include "utils/utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -29,7 +30,7 @@ std::vector<int64_t> calc_conv_output_size(
 void convolution_kernel_output(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const ideep::tensor& mkldnn_bias,
     at::Tensor& output,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
@@ -47,21 +48,15 @@ void convolution_kernel_output(
       (IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
       "input and output are need contiguous tensor for "
       "convolution_kernel_output");
-  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(bias_opt);
-  const at::Tensor& bias = *bias_maybe_owned;
   const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
   auto output_sizes = output.sizes();
 
   ideep::tensor mkldnn_output = itensor_view_from_dense(output);
 
-  if (bias.defined()) {
-    auto bias_ = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
-    const ideep::tensor mkldnn_bias = itensor_view_from_dense(bias_);
+  if (mkldnn_bias.is_empty()) {
     ideep::convolution_forward::compute(
         mkldnn_input,
         mkldnn_weight,
-        mkldnn_bias,
         {output_sizes.begin(), output_sizes.end()},
         mkldnn_output,
         {stride.begin(), stride.end()},
@@ -77,6 +72,7 @@ void convolution_kernel_output(
     ideep::convolution_forward::compute(
         mkldnn_input,
         mkldnn_weight,
+        mkldnn_bias,
         {output_sizes.begin(), output_sizes.end()},
         mkldnn_output,
         {stride.begin(), stride.end()},
@@ -94,7 +90,7 @@ void convolution_kernel_output(
 at::Tensor convolution_kernel(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const ideep::tensor& mkldnn_bias,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
@@ -119,7 +115,7 @@ at::Tensor convolution_kernel(
   convolution_kernel_output(
       input,
       mkldnn_weight,
-      bias_opt,
+      mkldnn_bias,
       output,
       stride,
       padding,
@@ -145,10 +141,10 @@ at::Tensor convolution_forward_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
-      "torch_ipex::convolution_forward_impl", std::vector<c10::IValue>({}));
-#endif
+  if (torch_ipex::EnvSettings::get_instance().get_settings_profile_op()) {
+    IPEX_RECORD_FUNCTION(
+        "torch_ipex::convolution_forward_impl", std::vector<c10::IValue>({}));
+  }
   TORCH_CHECK(
       weight.scalar_type() == input.scalar_type(),
       "the input and weight need have same data type");
@@ -200,8 +196,24 @@ at::Tensor convolution_forward_impl(
       {},
       attr);
 
+  ideep::tensor mkldnn_bias;
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias_opt);
+  const at::Tensor& bias = *bias_maybe_owned;
+  if (bias.defined()) {
+    auto bias_ = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
+    mkldnn_bias = itensor_view_from_dense(bias_);
+  }
+
   return convolution_kernel(
-      input_, mkldnn_weight, bias_opt, stride, padding, dilation, groups, attr);
+      input_,
+      mkldnn_weight,
+      mkldnn_bias,
+      stride,
+      padding,
+      dilation,
+      groups,
+      attr);
 }
 
 at::Tensor convolution_backward_input(
@@ -384,12 +396,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward(
     bool weight_channels_last,
     bool weight_packed) {
 #if defined(IPEX_DISP_OP)
-  printf("torch_ipex::convolution_backward\n");
+  printf("torch_ipeIPEX_RECORD_FUNCTIONx::convolution_backward\n");
 #endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::convolution_backward", std::vector<c10::IValue>({}));
-#endif
+
   TORCH_CHECK(
       weight.scalar_type() == input.scalar_type() &&
           weight.scalar_type() == grad_output_t.scalar_type(),
@@ -468,9 +479,9 @@ at::Tensor IPEXConvolutionOp::_forward(
     int64_t output_channel,
     bool weight_channels_last,
     bool weight_packed) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXConvolutionOp::_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXConvolutionOp::_forward", std::vector<c10::IValue>({}));
+
   return convolution_forward_impl(
       input,
       weight,
@@ -499,9 +510,9 @@ at::Tensor IPEXConvolutionOp::forward(
     int64_t output_channel,
     bool weight_channels_last,
     bool weight_packed) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXConvolutionOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXConvolutionOp::forward", std::vector<c10::IValue>({}));
+
   ctx->saved_data["stride"] = stride;
   ctx->saved_data["padding"] = padding;
   ctx->saved_data["dilation"] = dilation;
@@ -533,9 +544,9 @@ at::Tensor IPEXConvolutionOp::forward(
 torch::autograd::variable_list IPEXConvolutionOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXConvolutionOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "IPEXConvolutionOp::backward", std::vector<c10::IValue>({}));
+
   auto stride = ctx->saved_data["stride"].toIntVector();
   auto padding = ctx->saved_data["padding"].toIntVector();
   auto dilation = ctx->saved_data["dilation"].toIntVector();

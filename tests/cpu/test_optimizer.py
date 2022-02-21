@@ -5,6 +5,8 @@ import unittest
 from torch.testing._internal.common_utils import TestCase
 from common_utils import TestModule
 import bench.custom_op_bench.optimizer
+from torch.optim import Adadelta, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
+import copy
 
 class TestOptimizers(TestCase):
 
@@ -34,7 +36,6 @@ class TestOptimizers(TestCase):
         for var_name in origin_optimizer_state:
             if var_name == 'state':
                 self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name], atol=atol, rtol=rtol)
-
 
     def test_sgd(self):
         M = TestModule()
@@ -291,6 +292,65 @@ class TestFusedSteps(TestCase):
         trail = trail[10:20, 10:20]
         grad2 = base_grad.bfloat16()[10:20, 10:20]
         self._test_packed_add(param, grad, param2, trail, grad2)
+
+class TestPatchedMethod(TestCase):
+
+    def test_zero_grad(self):
+
+        def count_zero_grad(evt_list):
+            count = 0
+            for evt in evt_list:
+                if 'zero_grad' in evt.name:
+                    count +=1
+            return count
+
+        M = TestModule().train()
+        optimizers_list = [Adadelta, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop]
+        for optimizer, set_to_none in itertools.product(optimizers_list, [True, False]):
+            ori_model = copy.deepcopy(M)
+            ori_optimizer = optimizer(ori_model.parameters(), lr=0.1)
+            ipex_model, ipex_optimizer = ipex.optimize(ori_model, torch.bfloat16, ori_optimizer)
+
+            # original
+            with torch.cpu.amp.autocast():
+                y = ori_model(*ori_model.input).sum()
+            y.backward()
+            with torch.autograd.profiler.profile() as ori_prof:
+                ori_optimizer.zero_grad(set_to_none=set_to_none)
+            
+            # ipex
+            with torch.cpu.amp.autocast():
+                y1 = ipex_model(*ipex_model.input).sum()
+            y1.backward()
+            # check grad are correctly attached
+            for param in ipex_model.parameters():
+                self.assertTrue(param.grad != None)
+            uncast_weight = [ipex_model.bn.weight.data_ptr(), ipex_model.bn.bias.data_ptr()]
+            for param in ipex_optimizer.param_groups[0]['params']:
+                if param.data_ptr() not in uncast_weight:
+                    self.assertTrue(param.grad == None)
+                    self.assertTrue(ipex_optimizer.params_attr[param]['bf16_param'].grad != None)
+                else:
+                    self.assertTrue(param.grad != None)
+
+            with torch.autograd.profiler.profile() as ipex_prof:
+                ipex_optimizer.zero_grad(set_to_none=set_to_none)
+            # check grad are zeroed or are set to none
+            for param in ipex_model.parameters():
+                expected_grad = None if set_to_none else torch.zeros_like(param)
+                self.assertEqual(expected_grad, param.grad)
+
+            for param in ipex_optimizer.param_groups[0]['params']:
+                if param.data_ptr() not in uncast_weight:
+                    expected_grad = None if set_to_none else torch.zeros_like(param).bfloat16()
+                    self.assertEqual(expected_grad, ipex_optimizer.params_attr[param]['bf16_param'].grad)
+                else:
+                    expected_grad = None if set_to_none else torch.zeros_like(param)
+                    self.assertEqual(expected_grad, param.grad)
+
+            # check the num of calls for 'zero_grad' are same
+            self.assertEqual(count_zero_grad(ori_prof.function_events), count_zero_grad(ipex_prof.function_events))
+
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -4,6 +4,7 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -23,11 +24,10 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     bool weight_is_channels_last,
     bool weight_is_packed,
     std::vector<int64_t>&& input_size) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvTransposePrePackOpContext",
       std::vector<c10::IValue>({}));
-#endif
+
   return IpexConvTransposeOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -46,10 +46,9 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
 at::Tensor conv_transpose2d_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::conv_transpose2d_run", std::vector<c10::IValue>({}));
-#endif
+
   return op_context->run(input, ideep::attr_t());
 }
 

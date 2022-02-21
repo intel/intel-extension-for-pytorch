@@ -2,10 +2,12 @@ import torch
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.nn.utils._weight_prepack import _IPEXLinear as _IPEXLinear, _IPEXConv2d as _IPEXConv2d
 from torch.testing._internal.common_utils import TestCase
+from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
 import unittest
 import itertools
 import copy
 from common_utils import TestModule
+from intel_extension_for_pytorch.optim._lamb import Lamb
 
 class ConvBatchNorm(torch.nn.Module):
     def __init__(self,):
@@ -39,6 +41,41 @@ class TestOptimizeCases(TestCase):
         optimized_model, optimized_sgd = ipex.optimize(model.train(), optimizer=sgd, dtype=torch.bfloat16, split_master_weight_for_bf16=False)
         self.assertTrue(hasattr(optimized_model.conv, 'master_weight'))
 
+    def test_optimize_pretrain_model(self):
+        optimizer_options = [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
+
+        options = itertools.product([torch.float, torch.bfloat16], optimizer_options)
+        for dtype, optimizer in options:
+            model = ConvBatchNorm().to(memory_format=torch.channels_last).train()
+            model.conv.weight.requires_grad_(False)
+            origin_model = copy.deepcopy(model)
+            lr = 1e-4 if optimizer is SGD else 1e-2
+            origin_optimizer = optimizer(origin_model.parameters(), lr=lr)
+            ipex_model, ipex_optimizer = ipex.optimize(origin_model, optimizer=origin_optimizer, dtype=dtype)
+            for origi_p, opti_p in zip(origin_model.parameters(), ipex_model.parameters()):
+                self.assertEqual(origi_p.requires_grad, opti_p.requires_grad)
+
+            x = torch.randn(1, 3, 224, 224).to(memory_format=torch.channels_last)
+            origin_x = x.clone()
+            ipex_x = x.clone()
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                y1 = origin_model(origin_x)
+                grad_y = torch.ones_like(y1)
+                origin_optimizer.zero_grad()
+                y1.backward(grad_y)
+                origin_optimizer.step()
+                # train one step for ipex.
+                y2 = ipex_model(ipex_x)
+                ipex_optimizer.zero_grad()
+                y2.backward(grad_y)
+                ipex_optimizer.step()
+                self.assertEqual(y1, y2, rtol=1e-4, atol=5e-02)
+                origin_model_state = origin_model.state_dict()
+                ipex_model_state = ipex_model.state_dict()
+                for var_name in origin_model_state:
+                    self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name], rtol=1e-4, atol=5e-02)
+                self.assertTrue(origin_model.conv.weight.grad==None)
+                self.assertTrue(ipex_model.conv.weight.grad==None)
 
     def test_optimize_unsupport_dtype_conversion(self):
         class Conv(torch.nn.Module):
@@ -54,6 +91,14 @@ class TestOptimizeCases(TestCase):
                                    "WARNING: Can't convert model's parameters dtype"):
             optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
 
+    def test_optimize_unsupport_freeze_optimization(self):
+        model = ConvBatchNorm().eval()
+        x = torch.randn(1, 3, 224, 224)
+        with torch.no_grad():
+            traced_model = torch.jit.trace(model, x)
+            frozen_model = torch.jit.freeze(traced_model)
+        optimized_model = ipex.optimize(frozen_model)
+        self.assertTrue(frozen_model == optimized_model)
 
     def test_optimize_inplace_behavior_eval_mode(self):
         M_ori = TestModule()

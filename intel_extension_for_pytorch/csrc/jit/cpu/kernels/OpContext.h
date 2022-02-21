@@ -62,6 +62,8 @@ class ConvolutionOpContext : public torch::jit::CustomClassHolder {
       const at::Tensor& input,
       at::Tensor& accumu,
       const ideep::attr_t& attr) = 0;
+
+  virtual detail::ContextConvolution& get_conetxt() = 0;
 };
 
 class IpexConvolutionOpContext final : public ConvolutionOpContext {
@@ -104,6 +106,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
       at::Tensor& accumu,
       const ideep::attr_t& attr) override;
 
+  virtual detail::ContextConvolution& get_conetxt() override;
+
   static c10::intrusive_ptr<ConvolutionOpContext> create_context(
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
@@ -115,7 +119,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
       int64_t output_channel,
       bool weight_is_channels_last,
       bool weight_is_packed,
-      std::vector<int64_t>&& input_size);
+      std::vector<int64_t>&& input_size,
+      const ideep::attr_t& attr);
 };
 
 // linear op

@@ -65,6 +65,19 @@ at::Tensor convolution_add_relu_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+at::Tensor& convolution_bottleneck_run(
+    at::Tensor& input,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context3);
+
+at::Tensor convolution_bottleneck_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context3,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context4);
+
 ContextConvolution create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
@@ -76,7 +89,8 @@ ContextConvolution create(
     const int64_t output_channel,
     const bool weight_is_channels_last,
     const bool weight_is_packed,
-    const at::IntArrayRef input_size);
+    const at::IntArrayRef input_size,
+    const ideep::attr_t& attr);
 
 at::Tensor run(
     const ContextConvolution& context,
@@ -88,6 +102,7 @@ at::Tensor& run(
     const at::Tensor& input,
     at::Tensor& accumu,
     const ideep::attr_t& attr);
+
 } // namespace convolution
 } // namespace detail
 } // namespace cpu

@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <cstdint>
 #include <utility>
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -19,7 +20,7 @@ Key_Value_Weight_Tuple<T>* radix_sort_parallel(
     Key_Value_Weight_Tuple<T>* tmp_buf,
     int64_t elements_count,
     int64_t max_value) {
-  RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
   int maxthreads = omp_get_max_threads();
   alignas(64) int histogram[HIST_SIZE * maxthreads],
       histogram_ps[HIST_SIZE * maxthreads + 1];

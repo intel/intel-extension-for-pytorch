@@ -1,9 +1,12 @@
 #include "ConvPacked.h"
+#include <dnnl.hpp>
 #include "csrc/aten/cpu/Conv.h"
 #include "csrc/aten/cpu/ParamUtils.h"
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/cpu/ideep/ideep/utils.hpp"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -22,11 +25,9 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     bool weight_is_channels_last,
     bool weight_is_packed,
     std::vector<int64_t>&& input_size) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvolutionPrePackOpContext",
       std::vector<c10::IValue>({}));
-#endif
   return IpexConvolutionOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -38,36 +39,31 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
       output_channel,
       weight_is_channels_last,
       weight_is_packed,
-      std::move(input_size));
+      std::move(input_size),
+      ideep::attr_t());
 }
 
 at::Tensor convolution_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_run", std::vector<c10::IValue>({}));
-#endif
   return op_context->run(input, ideep::attr_t());
 }
 
 at::Tensor convolution_relu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_relu_run", std::vector<c10::IValue>({}));
-#endif
   return op_context->run(input, ideep::attr_t::fuse_relu());
 }
 
 at::Tensor convolution_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_sigmoid_run", std::vector<c10::IValue>({}));
-#endif
   return op_context->run(input, ideep::attr_t::fuse_sigmoid());
 }
 
@@ -76,10 +72,8 @@ at::Tensor convolution_hardtanh_run(
     at::Scalar lower_bound,
     at::Scalar upper_bound,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_hardtanh_run", std::vector<c10::IValue>({}));
-#endif
   auto lower_bound_value = lower_bound.to<float>();
   auto upper_bound_value = upper_bound.to<float>();
   return op_context->run(
@@ -92,10 +86,8 @@ at::Tensor convolution_elu_run(
     at::Scalar scale,
     at::Scalar input_scale,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_elu_run", std::vector<c10::IValue>({}));
-#endif
   auto alpha_value = alpha.to<float>();
   auto scale_value = scale.to<float>();
   auto input_scale_value = input_scale.to<float>();
@@ -107,10 +99,8 @@ at::Tensor convolution_elu_run(
 at::Tensor convolution_swish_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_swish_run", std::vector<c10::IValue>({}));
-#endif
   return op_context->run(input, ideep::attr_t::fuse_swish());
 }
 
@@ -119,10 +109,8 @@ at::Tensor convolution_add_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_add_run", std::vector<c10::IValue>({}));
-#endif
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
 }
@@ -132,17 +120,174 @@ at::Tensor convolution_add_relu_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_add_relu_run", std::vector<c10::IValue>({}));
-#endif
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::residual(scale));
 }
 
+at::Tensor& convolution_bottleneck_run(
+    at::Tensor& input,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context3) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::convolution_bottleneck_runi_v1",
+      std::vector<c10::IValue>({}));
+
+  auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
+                                        : at::MemoryFormat::ChannelsLast3d;
+  input = input.contiguous(memory_format);
+
+  auto& context1 = op_context1->get_conetxt();
+  auto& context2 = op_context2->get_conetxt();
+  auto& context3 = op_context3->get_conetxt();
+  if (input.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
+      omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
+    auto mkldnn_input = dnnl::memory(
+        context1.conv_params_.pd.src_desc(),
+        ideep::engine::cpu_engine(),
+        input.data_ptr());
+    auto ouput1 = dnnl::memory(
+        context1.conv_params_.pd.dst_desc(), ideep::engine::cpu_engine());
+    auto ouput2 = dnnl::memory(
+        context2.conv_params_.pd.dst_desc(), ideep::engine::cpu_engine());
+
+    auto desc = context1.conv_params_.pd.scratchpad_desc();
+    if (context2.conv_params_.pd.scratchpad_desc().get_size() >
+        desc.get_size()) {
+      desc = context2.conv_params_.pd.scratchpad_desc();
+    }
+    if (context3.conv_params_.pd.scratchpad_desc().get_size() >
+        desc.get_size()) {
+      desc = context3.conv_params_.pd.scratchpad_desc();
+    }
+
+    auto scratchpad = dnnl::memory(desc, ideep::engine::cpu_engine());
+
+    context1.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, mkldnn_input},
+         {DNNL_ARG_WEIGHTS, context1.weight_packed_},
+         {DNNL_ARG_BIAS, context1.bias_},
+         {DNNL_ARG_DST, ouput1},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    context2.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, ouput1},
+         {DNNL_ARG_WEIGHTS, context2.weight_packed_},
+         {DNNL_ARG_BIAS, context2.bias_},
+         {DNNL_ARG_DST, ouput2},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    context3.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, ouput2},
+         {DNNL_ARG_WEIGHTS, context3.weight_packed_},
+         {DNNL_ARG_BIAS, context3.bias_},
+         {DNNL_ARG_DST, mkldnn_input},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    return input;
+  } else {
+    auto output1 = run(context1, input, context1.conv_params_.op_attr);
+    auto output2 = run(context2, output1, context2.conv_params_.op_attr);
+    return run(context3, output2, input, context3.conv_params_.op_attr);
+  }
+}
+
+at::Tensor convolution_bottleneck_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context1,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context2,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context3,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context4) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::convolution_bottleneck_run_v2",
+      std::vector<c10::IValue>({}));
+
+  auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
+                                        : at::MemoryFormat::ChannelsLast3d;
+  auto input_ = input.contiguous(memory_format);
+
+  auto& context1 = op_context1->get_conetxt();
+  auto& context2 = op_context2->get_conetxt();
+  auto& context4 = op_context4->get_conetxt();
+  auto& context3 = op_context3->get_conetxt();
+
+  if (input_.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
+      omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
+    auto mkldnn_input = dnnl::memory(
+        context1.conv_params_.pd.src_desc(),
+        ideep::engine::cpu_engine(),
+        input.data_ptr());
+
+    auto ouput1 = dnnl::memory(
+        context1.conv_params_.pd.dst_desc(), ideep::engine::cpu_engine());
+    auto ouput2 = dnnl::memory(
+        context2.conv_params_.pd.dst_desc(), ideep::engine::cpu_engine());
+
+    auto result = at::empty(
+        context3.conv_params_.pd.dst_desc().dims(),
+        input_.options().memory_format(input_.suggest_memory_format()));
+
+    auto ouput3 = dnnl::memory(
+        context3.conv_params_.pd.dst_desc(),
+        ideep::engine::cpu_engine(),
+        result.data_ptr());
+
+    auto desc = context1.conv_params_.pd.scratchpad_desc();
+    if (context2.conv_params_.pd.scratchpad_desc().get_size() >
+        desc.get_size()) {
+      desc = context2.conv_params_.pd.scratchpad_desc();
+    }
+    if (context3.conv_params_.pd.scratchpad_desc().get_size() >
+        desc.get_size()) {
+      desc = context3.conv_params_.pd.scratchpad_desc();
+    }
+    if (context4.conv_params_.pd.scratchpad_desc().get_size() >
+        desc.get_size()) {
+      desc = context4.conv_params_.pd.scratchpad_desc();
+    }
+    auto scratchpad = dnnl::memory(desc, ideep::engine::cpu_engine());
+    context1.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, mkldnn_input},
+         {DNNL_ARG_WEIGHTS, context1.weight_packed_},
+         {DNNL_ARG_BIAS, context1.bias_},
+         {DNNL_ARG_DST, ouput1},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    context2.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, ouput1},
+         {DNNL_ARG_WEIGHTS, context2.weight_packed_},
+         {DNNL_ARG_BIAS, context2.bias_},
+         {DNNL_ARG_DST, ouput2},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    context3.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, mkldnn_input},
+         {DNNL_ARG_WEIGHTS, context3.weight_packed_},
+         {DNNL_ARG_BIAS, context3.bias_},
+         {DNNL_ARG_DST, ouput3},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    context4.conv_desc_.execute(
+        ideep::stream::default_stream(),
+        {{DNNL_ARG_SRC, ouput2},
+         {DNNL_ARG_WEIGHTS, context4.weight_packed_},
+         {DNNL_ARG_BIAS, context4.bias_},
+         {DNNL_ARG_DST, ouput3},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    return result;
+  } else {
+    auto output1 = run(context1, input, context1.conv_params_.op_attr);
+    auto output2 = run(context2, output1, context2.conv_params_.op_attr);
+    auto output3 = run(context3, input, context3.conv_params_.op_attr);
+    return run(context4, output2, output3, context4.conv_params_.op_attr);
+  }
+}
+
 ContextConvolution create(
     const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias,
+    const c10::optional<at::Tensor>& bias_opt,
     const at::IntArrayRef stride,
     const at::IntArrayRef padding,
     const at::IntArrayRef dilation,
@@ -151,7 +296,8 @@ ContextConvolution create(
     const int64_t output_channel,
     const bool weight_is_channels_last,
     const bool weight_is_packed,
-    const at::IntArrayRef input_size) {
+    const at::IntArrayRef input_size,
+    const ideep::attr_t& attr) {
   auto dim = input_size.size() - 2;
   const auto padding_expanded = expand_param_if_needed(padding, "padding", dim);
   const auto stride_expanded = expand_param_if_needed(stride, "stride", dim);
@@ -166,11 +312,15 @@ ContextConvolution create(
   }
 
   auto memory_format = at::MemoryFormat::Contiguous;
+  auto format_tag = input_size.size() == 4 ? ideep::format_tag::nchw
+                                           : ideep::format_tag::ncdhw;
   if (weight_is_channels_last_) {
     if (input_size.size() == 4) {
       memory_format = at::MemoryFormat::ChannelsLast;
+      format_tag = ideep::format_tag::nhwc;
     } else {
       memory_format = at::MemoryFormat::ChannelsLast3d;
+      format_tag = ideep::format_tag::ndhwc;
     }
   }
   auto weight_ = weight;
@@ -198,14 +348,75 @@ ContextConvolution create(
       input_size,
       ideep::attr_t());
 
+  ideep::convolution_forward_params conv_params;
+  std::vector<int64_t> output_sizes = calc_conv_output_size(
+      input_size,
+      origin_weight_dims,
+      padding_expanded,
+      stride_expanded,
+      dilation_expanded);
+
+  // src and weight always have same dtype and data format.
+  auto data_type = get_mkldnn_dtype(weight_.scalar_type());
+
+  ideep::tensor src = ideep::tensor(
+      {input_size.begin(), input_size.end()}, data_type, format_tag);
+  ideep::tensor dst = ideep::tensor(
+      {output_sizes.begin(), output_sizes.end()}, data_type, format_tag);
+
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias_opt);
+  const at::Tensor& bias = *bias_maybe_owned;
+  ideep::tensor mkldnn_bias;
+  if (bias.defined()) {
+    mkldnn_bias = itensor_view_from_dense(bias);
+    ideep::convolution_forward::prepare(
+        conv_params,
+        src,
+        packed_weight,
+        mkldnn_bias,
+        {output_sizes.begin(), output_sizes.end()},
+        dst,
+        {stride_expanded.begin(), stride_expanded.end()},
+        {dilation.begin(), dilation.end()},
+        {padding.begin(), padding.end()},
+        {padding.begin(), padding.end()},
+        groups,
+        ideep::scale_t(),
+        ideep::scale_t(),
+        ideep::scale_t(),
+        attr,
+        ideep::algorithm::convolution_direct,
+        ideep::prop_kind::forward_inference);
+  } else {
+    ideep::convolution_forward::prepare(
+        conv_params,
+        src,
+        packed_weight,
+        {output_sizes.begin(), output_sizes.end()},
+        dst,
+        {stride_expanded.begin(), stride_expanded.end()},
+        {dilation.begin(), dilation.end()},
+        {padding.begin(), padding.end()},
+        {padding.begin(), padding.end()},
+        groups,
+        ideep::scale_t(),
+        ideep::scale_t(),
+        ideep::scale_t(),
+        attr,
+        ideep::algorithm::convolution_direct,
+        ideep::prop_kind::forward_inference);
+  }
   return ContextConvolution{
       std::move(packed_weight),
-      bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
+      std::move(mkldnn_bias),
       padding_expanded,
       stride_expanded,
       dilation_expanded,
       groups,
-      weight_is_channels_last_};
+      weight_is_channels_last_,
+      conv_params,
+      ideep::convolution_forward::super(conv_params.pd)};
 }
 
 at::Tensor run(
@@ -225,6 +436,32 @@ at::Tensor run(
     }
   }
   auto input_ = input.contiguous(memory_format);
+  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
+      attr == context.conv_params_.op_attr &&
+      omp_get_max_threads() == context.conv_params_.pd_use_threads) {
+    auto output = at::empty(
+        context.conv_params_.pd.dst_desc().dims(),
+        input_.options().memory_format(input_.suggest_memory_format()));
+    const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
+    ideep::tensor mkldnn_output = itensor_view_from_dense(output);
+    if (context.bias_.is_empty()) {
+      ideep::convolution_forward::compute(
+          context.conv_params_,
+          context.conv_desc_,
+          mkldnn_input,
+          context.weight_packed_,
+          mkldnn_output);
+    } else {
+      ideep::convolution_forward::compute(
+          context.conv_params_,
+          context.conv_desc_,
+          mkldnn_input,
+          context.weight_packed_,
+          context.bias_,
+          mkldnn_output);
+    }
+    return output;
+  }
   return convolution_kernel(
       input_,
       context.weight_packed_,
@@ -257,16 +494,40 @@ at::Tensor& run(
   auto input_ = input.contiguous(memory_format);
   // always align accumu format with inputs' format.
   accumu = accumu.contiguous(memory_format);
-  convolution_kernel_output(
-      input_,
-      context.weight_packed_,
-      context.bias_,
-      accumu,
-      context.stride_,
-      context.padding_,
-      context.dilation_,
-      context.groups_,
-      attr);
+  if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
+      attr == context.conv_params_.op_attr &&
+      omp_get_max_threads() == context.conv_params_.pd_use_threads) {
+    const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
+    ideep::tensor mkldnn_output = itensor_view_from_dense(accumu);
+
+    if (context.bias_.is_empty()) {
+      ideep::convolution_forward::compute(
+          context.conv_params_,
+          context.conv_desc_,
+          mkldnn_input,
+          context.weight_packed_,
+          mkldnn_output);
+    } else {
+      ideep::convolution_forward::compute(
+          context.conv_params_,
+          context.conv_desc_,
+          mkldnn_input,
+          context.weight_packed_,
+          context.bias_,
+          mkldnn_output);
+    }
+  } else {
+    convolution_kernel_output(
+        input_,
+        context.weight_packed_,
+        context.bias_,
+        accumu,
+        context.stride_,
+        context.padding_,
+        context.dilation_,
+        context.groups_,
+        attr);
+  }
   return accumu;
 }
 

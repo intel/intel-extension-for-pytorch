@@ -5,11 +5,9 @@ Installation Guide
 
 |Category|Content|
 |--|--|
-|Compiler|GCC version greater than 7\*|
+|Compiler|Verified with GCC 9|
 |Operating System|CentOS 7, RHEL 8, Ubuntu newer than 18.04|
 |Python|3.6, 3.7, 3.8, 3.9|
-
-\* Verified with GCC 7, 8 and 9.
 
 ## Install PyTorch
 
@@ -26,11 +24,7 @@ You need to make sure PyTorch is installed in order to get the extension working
 |[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|
 |[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|
 
-Here is an example showing how to install PyTorch (1.10.0). For more details, please refer to [pytorch.org](https://pytorch.org/)
-
-```
-python -m pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
-```
+Here is an example showing how to install PyTorch (1.10.0). For more details, please refer to [pytorch.org](https://pytorch.org/get-started/locally/)
 
 ---
 

@@ -33,7 +33,6 @@ using kind = dnnl::primitive::kind;
 using prop_kind = dnnl::prop_kind;
 using algorithm = dnnl::algorithm;
 using batch_normalization_flag = dnnl::normalization_flags;
-using query = dnnl::query;
 using scale_t = std::vector<float>;
 using exec_args = std::unordered_map<int, memory>;
 using rnn_direction = dnnl::rnn_direction;

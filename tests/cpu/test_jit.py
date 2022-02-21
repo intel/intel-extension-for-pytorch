@@ -351,6 +351,38 @@ class LinearGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.linear(x))
 
+class LinearSigmoid(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSigmoid, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return F.sigmoid(self.linear(x))
+
+class LinearSwish(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSwish, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        linear_res = self.linear(x)
+        return F.silu(linear_res)
+
+class LinearSwish_v1(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSwish_v1, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        linear_res = self.linear(x)
+        return torch.mul(linear_res, F.sigmoid(linear_res))
+
 class LinearAdd(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearAdd, self).__init__()
@@ -573,6 +605,33 @@ class MHAScoresCalculation(nn.Module):
         scores = qk + bias
         return self.softmax(scores)
 
+class DistilMHAScoresCalculation_v1(nn.Module):
+    def __init__(self, dim_per_head, softmax_dim=-1):
+        super(DistilMHAScoresCalculation_v1, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, mask):
+        mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
+        mat1 = mat1 / math.sqrt(self.dim_per_head)
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk.masked_fill_(mask, -float("inf"))
+        return self.softmax(qk)
+
+class DistilMHAScoresCalculation_v2(nn.Module):
+    def __init__(self, dim_per_head):
+        super(DistilMHAScoresCalculation_v2, self).__init__()
+        self.dim_per_head = dim_per_head
+
+    def forward(self, mat1, mat2, mask):
+        mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
+        mat1 = mat1 / math.sqrt(self.dim_per_head)
+        qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk = qk.masked_fill(mask, -float("inf"))
+        return nn.functional.softmax(qk, dim=-1)
+
 class AtenSoftmaxRepalce(nn.Module):
     def __init__(self, dim=-1):
         super(AtenSoftmaxRepalce, self).__init__()
@@ -634,7 +693,7 @@ class ConcatBnRelu3d(torch.nn.Module):
         x = torch.cat((x1, x2, x3), dim = 1)
         x = self.bn(x)
         return self.relu(x)
-    
+
 class ModMultLinear(nn.Module):
     def __init__(self, w1_dim, w2_dim):
          super(ModMultLinear, self).__init__()
@@ -657,6 +716,37 @@ class DisableTexprFuser():
 
     def __exit__(self, *args, **kwargs):
         torch._C._jit_set_texpr_fuser_enabled(self.saved)
+
+class Bottleneck_v1(nn.Module):
+    def __init__(self):
+        super(Bottleneck_v1, self).__init__()
+        self.conv1 = nn.Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=True)
+        self.conv3 = nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.downsample = nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+
+    def forward(self, x):
+        y1 = self.conv1(x).relu_()
+        y2 = self.conv2(y1).relu_()
+        y3 = self.conv3(y2)
+        y3 += self.downsample(x)
+        return y3.relu_()
+
+class Bottleneck_v2(nn.Module):
+    def __init__(self):
+        super(Bottleneck_v2, self).__init__()
+        self.conv =  nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.conv1 = nn.Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=True)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=True)
+        self.conv3 = nn.Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        y1 = self.conv1(x).relu_()
+        y2 = self.conv2(y1).relu_()
+        y3 = self.conv3(y2)
+        y3 += x
+        return y3.relu_()
 
 class Tester(TestCase):
 
@@ -694,6 +784,7 @@ class Tester(TestCase):
             with torch.no_grad():
                 trace_fused_model = torch.jit.trace(model, x)
                 trace_fused_model = torch.jit.freeze(trace_fused_model)
+                y = trace_fused_model(x)
 
                 # enable fusiong in ipex.
                 fused_tresult = trace_fused_model(x)
@@ -870,46 +961,6 @@ class Tester(TestCase):
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
-    def _test_concat_bn_relu(self, a1, a2, a3, enable_3d=True, use_channels_last=True):
-        if enable_3d:
-            if use_channels_last:
-                model = ConcatBnRelu3d().eval().to(memory_format=torch.channels_last_3d)
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-            else:
-                model = ConcatBnRelu3d().eval()
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-        else:
-            if use_channels_last:
-                model = ConcatBnRelu2d().eval().to(memory_format=torch.channels_last)
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-            else:
-                model = ConcatBnRelu2d().eval()
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-
     def test_concat_bn_relu(self):
         a1 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
         a2 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
@@ -919,8 +970,10 @@ class Tester(TestCase):
         with torch.no_grad():
             jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
             jit_model = torch.jit.freeze(jit_model)
-        jit_res = jit_model(a1, a2, a3)
-        ori_res = model(a1, a2, a3)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
         self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
@@ -931,48 +984,98 @@ class Tester(TestCase):
         with torch.no_grad():
             jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
             jit_model = torch.jit.freeze(jit_model)
-        jit_res = jit_model(a1, a2, a3)
-        ori_res = model(a1, a2, a3)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
         self.assertEqual(jit_res, ori_res)
 
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+        model = ConcatBnRelu2d().eval().to(memory_format=torch.channels_last)
+        model = ipex.optimize(model, dtype=torch.float32, level='O0')
+        with torch.no_grad():
+            jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+            jit_model = torch.jit.freeze(jit_model)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
-        a1 = torch.randn(1, 16, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a2 = torch.randn(1, 48, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+        a1 = torch.randn(1, 32, 18, 53, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 32, 18, 53, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 18, 53, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
-        a1 = torch.randn(1, 17, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a2 = torch.randn(1, 47, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+        a1 = torch.randn(1, 16, 24, 116, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 48, 24, 116, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 24, 116, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
+
+        a1 = torch.randn(1, 17, 15, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 47, 15, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 15, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, dtype=torch.float)
         a2 = torch.randn(1, 32, 13, 24, dtype=torch.float)
         a3 = torch.randn(1, 32, 13, 24, dtype=torch.float)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=False)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+        model = ConcatBnRelu3d().eval().to(memory_format=torch.channels_last_3d)
+        model = ipex.optimize(model, dtype=torch.float32, level='O0')
+        with torch.no_grad():
+            jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+            jit_model = torch.jit.freeze(jit_model)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
-        a1 = torch.randn(1, 16, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        a2 = torch.randn(1, 48, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+        a1 = torch.randn(1, 16, 17, 14, 31, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a2 = torch.randn(1, 48, 17, 14, 31, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a3 = torch.randn(1, 32, 17, 14, 31, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 17, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a2 = torch.randn(1, 47, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
         a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=False)
-        
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
+
     def test_mha_scores_calculation(self):
+        def _check_match_mha(trace_model, mat1, mat2, bias, node = "ipex::mha_scores_calc"):
+            graph = trace_model.graph_for((mat1, mat2, bias))
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
         def _test_pure_bf16(model, trace_model, mat1, mat2, bias, prec=3e-2):
             mat1_bf16 = mat1.to(torch.bfloat16)
             mat2_bf16 = mat2.to(torch.bfloat16)
@@ -980,11 +1083,11 @@ class Tester(TestCase):
             res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
             res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
+            _check_match_mha(trace_model, mat1, mat2, bias)
 
         mat1 = torch.randn(56, 16, 384, 384)
         mat2 = torch.randn(56, 16, 384, 384)
         bias = torch.randn(56, 16, 384, 384)
-
         for softmax_dim in [0, 1, 2, -1]:
             mha = MHAScoresCalculation(4, softmax_dim)
             with torch.no_grad():
@@ -994,6 +1097,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
@@ -1002,6 +1106,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
@@ -1010,6 +1115,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(1, 1, 2, 3)
@@ -1018,6 +1124,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 mat1 = torch.randn(2, 3, 4, 6)
@@ -1026,6 +1133,7 @@ class Tester(TestCase):
                 res_ref = mha(mat1, mat2, bias)
                 res_jit = mha_jit(mat1, mat2, bias)
                 self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
 
                 # Test broadcast
@@ -1033,25 +1141,74 @@ class Tester(TestCase):
                 mat2 = torch.randn(2, 3, 16, 10)
                 bias = torch.randn(1, 1, 1, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(3, 1, 1)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 1, 1)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(3, 4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 1, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
                 bias = torch.randn(2, 1, 4, 16)
                 self.assertEqual(mha(mat1, mat2, bias), mha_jit(mat1, mat2, bias))
+                _check_match_mha(mha_jit, mat1, mat2, bias)
                 _test_pure_bf16(mha, mha_jit, mat1, mat2, bias)
+
+    def test_distil_mha_scores_calculation(self):
+        def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
+            graph = trace_model.graph_for((mat1, mat2, mask))
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
+        def _test_pure_bf16(model, trace_model, mat1, mat2, mask, prec=3e-2):
+            mat1_bf16 = mat1.to(torch.bfloat16)
+            mat2_bf16 = mat2.to(torch.bfloat16)
+            bias_bf16 = mask.to(torch.bfloat16)
+            res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
+            res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
+            self.assertEqual(res_ref, res_jit, prec=prec)
+            _check_match_mha(trace_model, mat1, mat2, mask)
+
+        mat1 = torch.randn(56, 12, 384, 384)
+        mat2 = torch.randn(56, 12, 384, 384)
+        mask = torch.randn(56, 384)
+        mask = (mask > 0.5)
+
+        mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v1(mat1, mat2, mask)
+            res_jit = mha_jit(mat1, mat2, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha(mha_jit, mat1, mat2, mask)
+            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+
+        mha_v2 = DistilMHAScoresCalculation_v2(4)
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v2(mat1, mat2, mask)
+            res_jit = mha_jit(mat1, mat2, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha(mha_jit, mat1, mat2, mask)
+            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+
 
     def test_conv_fusion(self):
         batch_size = 8
@@ -1683,6 +1840,35 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex::batch_norm",
                 prec=0.02)
 
+    def test_bottleneck_fusion(self):
+        x1 = torch.randn(1, 64, 56, 56)
+        self._test_output(
+            Bottleneck_v1(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            use_channels_last=[True],
+            levels=['O1'])
+        self._test_output_bf16(
+            Bottleneck_v1(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            prec=0.03,
+            use_channels_last=[True],
+            levels=['O1'])
+        self._test_output(
+            Bottleneck_v2(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            use_channels_last=[True],
+            levels=['O1'])
+        self._test_output_bf16(
+            Bottleneck_v2(),
+            x1,
+            kind_in_graph="ipex_prepack::convolution_bottleneck_run",
+            prec=0.03,
+            use_channels_last=[True],
+            levels=['O1'])
+
     def test_jit_conv_sum_in_diff_block(self):
         batch_size = 8
         out_channels = 32
@@ -1727,9 +1913,31 @@ class Tester(TestCase):
                 params_list.append(value)
             return params_list
 
+        def _deconv_with_output_padding():
+            params_dict = {
+                "input_height": 8,
+                "input_width": 8,
+                "input_depth": 8,
+                "input_channel_per_group": 10,
+                "output_channel_per_group": 10,
+                "kernel_size": 3,
+                "bias": False,
+                "stride": 2,
+                "padding": 1,
+                "output_padding": 2,
+                "groups": 1,
+                "dilation": 3,
+            }
+            
+            params_list = []
+
+            for key, value in params_dict.items():
+                params_list.append(value)
+            return params_list 
+
         params_list = _deconv_params_list()
 
-        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
+        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in list(itertools.product(*params_list)) + [_deconv_with_output_padding()]:
             if (output_padding < stride or output_padding < dilation) \
                     and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
                     and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
@@ -1984,6 +2192,63 @@ class Tester(TestCase):
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_gelu_run",
             prec=5e-3)
+    
+    def test_output_linear_swish(self):
+        self._test_output(
+            LinearSwish_v1(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish_v1(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSwish_v1(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish_v1(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSwish(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSwish(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSwish(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_swish_run", prec=5e-3)
+
+    def test_output_linear_sigmoid(self):
+        self._test_output(
+            LinearSigmoid(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSigmoid(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_sigmoid_run",
+            prec=5e-3)
+        self._test_output(
+            LinearSigmoid(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearSigmoid(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_sigmoid_run",
+            prec=5e-3)
 
     def test_channel_shuffle(self):
         self._test_output(
@@ -2075,7 +2340,7 @@ class Tester(TestCase):
             kind_in_graph="ipex::batch_norm",
             prec=5e-3)
 
-    def test_restore_inplace(self):
+    def test_restore_and_enable_inplace(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
                 super(M, self).__init__()
@@ -2094,7 +2359,9 @@ class Tester(TestCase):
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
                 # use torch.sigmoid_(x)
                 eltwise_fn = getattr(torch, eltwise_fn_name)
+                eltwise_fn_outplace = getattr(torch, eltwise)
                 m = M(eltwise_fn)
+                m_outplace = M(eltwise_fn_outplace)
             elif eltwise == 'clamp':
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn, {"min": 0, "max": 2})
@@ -2102,10 +2369,15 @@ class Tester(TestCase):
                 # use F.elu(x, inplace=True)
                 eltwise_fn = getattr(F, eltwise)
                 m = M(eltwise_fn, {"inplace": True})
+                m_outplace = M(eltwise_fn)
 
             with torch.no_grad():
                 m.eval()
+                m_outplace.eval()
                 x = torch.randn(1, 3, 16, 16)
+                x_outplace = torch.randn(1, 3, 16, 16)
+
+                # test restore inplace
                 traced = torch.jit.trace(m, x)
                 trace_graph = traced.graph_for(x)
                 self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph.nodes()))
@@ -2113,6 +2385,17 @@ class Tester(TestCase):
                 y = m(x)
                 traced_y = traced(x)
                 self.assertEqual(y, traced_y)
+
+                # test enable inplace
+                if eltwise == 'clamp':
+                    continue
+                traced_outplace = torch.jit.trace(m_outplace, x_outplace)
+                trace_graph_outplace = traced_outplace.graph_for(x_outplace)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_outplace.nodes()))
+
+                y_outplace = m_outplace(x_outplace)
+                traced_y_outplace = traced_outplace(x_outplace)
+                self.assertEqual(y_outplace, traced_y_outplace)
 
     def test_remove_bailout(self):
         batch_size = 8

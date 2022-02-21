@@ -2,6 +2,8 @@
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
+#include "csrc/utils/ipex_op_profile.h"
+
 namespace torch_ipex {
 namespace cpu {
 
@@ -17,10 +19,9 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
     double weight_decay,
     double lr_decay,
     double eps) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::adagrad_fused_step", std::vector<c10::IValue>({}));
-#endif
+
   TORCH_CHECK(
       learning_rate >= 0, "Expect learning rate >= 0.0, got ", learning_rate);
   TORCH_CHECK(lr_decay >= 0, "Expect lr_decay >=0.0 , got ", lr_decay);

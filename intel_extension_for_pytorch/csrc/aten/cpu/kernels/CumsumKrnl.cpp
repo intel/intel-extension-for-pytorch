@@ -8,6 +8,7 @@
 #include <csrc/aten/cpu/Cumsum.h>
 
 #include <immintrin.h>
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -200,9 +201,9 @@ class NewCumSumOp : public torch::autograd::Function<NewCumSumOp> {
       const at::Tensor& self,
       int64_t dim,
       c10::optional<at::ScalarType> dtype) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXCumSumOp::_forward", std::vector<c10::IValue>({}));
-#endif
+    IPEX_RECORD_FUNCTION(
+        "IPEXCumSumOp::_forward", std::vector<c10::IValue>({}));
+
     if (result.sizes() != self.sizes()) {
       at::native::resize_output(result, self.sizes());
     }
@@ -222,9 +223,8 @@ class NewCumSumOp : public torch::autograd::Function<NewCumSumOp> {
       const at::Tensor& self,
       int64_t dim,
       c10::optional<at::ScalarType> dtype) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXCumSumOp::forward", std::vector<c10::IValue>({}));
-#endif
+    IPEX_RECORD_FUNCTION("IPEXCumSumOp::forward", std::vector<c10::IValue>({}));
+
     at::AutoNonVariableTypeMode g;
     ctx->saved_data["dim"] = dim;
     auto ret = _forward(result, self, dim, dtype);
@@ -234,9 +234,9 @@ class NewCumSumOp : public torch::autograd::Function<NewCumSumOp> {
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXCumSumOp::backward", std::vector<c10::IValue>({}));
-#endif
+    IPEX_RECORD_FUNCTION(
+        "IPEXCumSumOp::backward", std::vector<c10::IValue>({}));
+
     at::AutoNonVariableTypeMode g;
     int64_t dim = ctx->saved_data["dim"].toInt();
 

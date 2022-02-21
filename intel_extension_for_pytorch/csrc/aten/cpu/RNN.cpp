@@ -10,7 +10,7 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/utils.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -392,9 +392,8 @@ std::vector<at::Tensor> IPEXLSTMOp::forward(
     bool bidirectional,
     bool batch_first,
     bool train) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLSTMOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEXLSTMOp::forward", std::vector<c10::IValue>({}));
+
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::forward\n");
 #endif
@@ -444,9 +443,8 @@ std::vector<at::Tensor> IPEXLSTMOp::forward(
 torch::autograd::tensor_list IPEXLSTMOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLSTMOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEXLSTMOp::backward", std::vector<c10::IValue>({}));
+
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::backward\n");
 #endif
@@ -537,10 +535,9 @@ std::vector<at::Tensor> ipex_lstm_layer(
     bool bidirectional,
     bool batch_first,
     bool train) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION(
+  IPEX_RECORD_FUNCTION(
       "torch_ipex::cpu::ipex_lstm_layer", std::vector<c10::IValue>({}));
-#endif
+
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::cpu::ipex_lstm_layer\n");
 #endif
@@ -914,9 +911,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
     bool train,
     bool bidirectional,
     bool batch_first) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("ipex_lstm", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("ipex_lstm", std::vector<c10::IValue>({}));
+
 #if defined(IPEX_DISP_OP)
   printf("ipex_lstm\n");
 #endif

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/irparser.h>
 
@@ -5,7 +7,8 @@ namespace torch {
 namespace jit {
 namespace graph_rewrite {
 
-auto accumu_use_check = [](const Node* add_node, const Value* accumu_value) {
+inline auto accumu_use_check = [](const Node* add_node,
+                                  const Value* accumu_value) {
   bool accumu_same_used = false;
   auto accumu_uses = accumu_value->uses();
   std::for_each(accumu_uses.begin(), accumu_uses.end(), [&](Use& u) {
@@ -21,7 +24,7 @@ auto accumu_use_check = [](const Node* add_node, const Value* accumu_value) {
 //   \   /
 //    add
 // output = op_output + alpha*Y
-auto fuse_add_filter_v1 =
+inline auto fuse_add_filter_v1 =
     [](const Match& match,
        const std::unordered_map<std::string, Value*>& vmap) {
       auto accumu = match.values_map.at(vmap.at("accumu"));
@@ -61,7 +64,7 @@ auto fuse_add_filter_v1 =
 //   \   /
 //    add
 // output = Y + alpha*op_output
-auto fuse_add_filter_v2 =
+inline auto fuse_add_filter_v2 =
     [](const Match& match,
        const std::unordered_map<std::string, Value*>& vmap) {
       auto accumu = match.values_map.at(vmap.at("accumu"));

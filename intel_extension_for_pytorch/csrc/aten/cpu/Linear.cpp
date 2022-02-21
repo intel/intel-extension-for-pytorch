@@ -5,7 +5,7 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/utils.h"
+#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -182,9 +182,8 @@ at::Tensor IPEXLinearOp::_forward(
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise) {
   at::AutoNonVariableTypeMode g;
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({}));
+
   if (eltwise == NotFused) {
     static auto op = torch::Dispatcher::singleton()
                          .findSchemaOrThrow("torch_ipex::ipex_linear", "")
@@ -207,9 +206,8 @@ at::Tensor IPEXLinearOp::forward(
     const int64_t in_features,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({}));
+
   at::AutoNonVariableTypeMode g;
   ctx->saved_data["out_features"] = out_features;
   ctx->saved_data["in_features"] = in_features;
@@ -230,9 +228,8 @@ at::Tensor IPEXLinearOp::forward(
 torch::autograd::tensor_list IPEXLinearOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}));
+
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
   at::Tensor weight = saved[1];

@@ -47,6 +47,7 @@ class CPUPool {
 bool is_runtime_ext_enabled();
 void init_runtime_ext();
 void _pin_cpu_cores(const std::vector<int32_t>& cpu_core_list);
+bool is_same_core_affinity_setting(const std::vector<int32_t>& cpu_core_list);
 CPUPool get_cpu_pool_from_mask_affinity();
 void set_mask_affinity_from_cpu_pool(const CPUPool& cpu_pool);
 

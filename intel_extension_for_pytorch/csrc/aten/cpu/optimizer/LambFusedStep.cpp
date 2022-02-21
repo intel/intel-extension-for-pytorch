@@ -2,6 +2,8 @@
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
+#include "csrc/utils/ipex_op_profile.h"
+
 namespace torch_ipex {
 namespace cpu {
 
@@ -19,9 +21,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
     double learning_rate,
     double weight_decay,
     double eps) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::lamb_fused_step", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::lamb_fused_step", std::vector<c10::IValue>({}));
+
   TORCH_CHECK(
       learning_rate >= 0, "Expect learning rate >= 0.0, got ", learning_rate);
   TORCH_CHECK(eps >= 0, "Expect eps >= 0.0, got ", eps);

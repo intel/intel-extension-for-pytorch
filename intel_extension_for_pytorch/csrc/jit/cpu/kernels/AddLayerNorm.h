@@ -1,11 +1,11 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <csrc/dyndisp/DispatchStub.h>
 
 namespace torch_ipex {
-namespace jit {
 namespace cpu {
-namespace kernels {
+
 using Tensor = at::Tensor;
 using IntArrayRef = at::IntArrayRef;
 C10_ALWAYS_INLINE std::pair<int64_t, int64_t> _check_layer_norm_inputs(
@@ -71,13 +71,6 @@ at::Tensor AddLayerNorm(
     const c10::optional<at::Tensor>& bias_opt,
     float eps);
 
-} // namespace kernels
-} // namespace cpu
-} // namespace jit
-} // namespace torch_ipex
-
-namespace torch_ipex {
-namespace cpu {
 at::Tensor dil_add_layernorm(
     const at::Tensor& input,
     const at::Tensor& b,
@@ -87,5 +80,33 @@ at::Tensor dil_add_layernorm(
     const c10::optional<at::Tensor>& bias_opt,
     float eps,
     bool cuda_enable);
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
+at::Tensor add_layer_norm_kernel_impl(
+    const at::Tensor& a,
+    const at::Tensor& b,
+    int alpha,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& bias_opt,
+    float eps);
+
+#if defined(DYN_DISP_BUILD)
 }
+#endif
+
+using add_layer_norm_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    int,
+    at::IntArrayRef,
+    const c10::optional<at::Tensor>&,
+    const c10::optional<at::Tensor>&,
+    float);
+DECLARE_DISPATCH(add_layer_norm_kernel_fn, add_layer_norm_kernel_stub);
+
+} // namespace cpu
 } // namespace torch_ipex

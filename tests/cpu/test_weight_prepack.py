@@ -18,6 +18,14 @@ from intel_extension_for_pytorch.optim._lamb import Lamb
 
 conv_module = {1: torch.nn.Conv1d, 2: torch.nn.Conv2d, 3: torch.nn.Conv3d}
 
+def module_found(model, type):
+    for child_name, child in model.named_children():
+        if isinstance(child, type):
+            return True
+        else:
+            module_found(child, type)
+    return False
+
 class TestPrepackCases(TestCase):
     def _test_convolution_training_base(self, dim):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
@@ -425,22 +433,6 @@ class TestPrepackCases(TestCase):
                         self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state[var_name], rtol=1e-2, atol=1e-1)
 
     def _deconv_params_list(self):
-        # TODO: shapes to cover
-        # params_dict = {
-        #     "input_height": [8],
-        #     "input_width": [8],
-        #     "input_depth": [8],
-        #     "input_channel_per_group": [10],
-        #     "output_channel_per_group": [10],
-        #     "kernel_size": [3, 4],
-        #     "bias": [False, True],
-        #     "stride": [2], # [1, 2]
-        #     "padding": [1, 2],
-        #     "output_padding": [2],
-        #     "groups": [1, 2],
-        #     "dilation": [1, 3, 4],
-        # }
-
         # shapes that works:
         params_dict = {
             "input_height": [12],
@@ -457,46 +449,58 @@ class TestPrepackCases(TestCase):
             "dilation": [1, 2],
         }
 
-        # TODO: fix output_padding for both CPU and IPEX
-        # params_dict = {
-        #     "input_height": [8],
-        #     "input_width": [8],
-        #     "input_depth": [8],
-        #     "input_channel_per_group": [10],
-        #     "output_channel_per_group": [10],
-        #     "kernel_size": [3],
-        #     "bias": [False],
-        #     "stride": [2], # [1, 2]
-        #     "padding": [1],
-        #     "output_padding": [2],
-        #     "groups": [1],
-        #     "dilation": [3],
-        # }
-
-        # TODO: fix the fallback
-        # mkldnn does not support the case where:
-        # padding - output_padding + stride <= 0
-        # while PyTorch supports this case, need to fallback in this case
-        # params_dict = {
-        #     "input_height": [8],
-        #     "input_width": [8],
-        #     "input_depth": [8],
-        #     "input_channel_per_group": [10],
-        #     "output_channel_per_group": [10],
-        #     "kernel_size": [4],
-        #     "bias": [False],
-        #     "stride": [1],
-        #     "padding": [1],
-        #     "output_padding": [2], # TODO: fix output_padding == 2 and etc.
-        #     "groups": [1],
-        #     "dilation": [3],
-        # }
-
         params_list = []
 
         for key, value in params_dict.items():
             params_list.append(value)
         return params_list
+
+    def _deconv_with_output_padding(self):
+        params_dict = {
+            "input_height": 8,
+            "input_width": 8,
+            "input_depth": 8,
+            "input_channel_per_group": 10,
+            "output_channel_per_group": 10,
+            "kernel_size": 3,
+            "bias": False,
+            "stride": 2,
+            "padding": 1,
+            "output_padding": 2,
+            "groups": 1,
+            "dilation": 3,
+        }
+        
+        params_list = []
+
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list        
+
+    # mkldnn does not support the case where:
+    # padding - output_padding + stride <= 0
+    # while PyTorch supports this case, need to fallback in this case
+    def _deconv_fallback_shape(self):
+        params_dict = {
+            "input_height": 8,
+            "input_width": 8,
+            "input_depth": 8,
+            "input_channel_per_group": 10,
+            "output_channel_per_group": 10,
+            "kernel_size": 4,
+            "bias": False,
+            "stride": 1,
+            "padding": 1,
+            "output_padding": 2,
+            "groups": 1,
+            "dilation": 3,
+        }
+
+        params_list = []
+
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list        
 
     def _test_deconv(self, dims, inference):
         class Deconv2d(torch.nn.Module):
@@ -517,7 +521,7 @@ class TestPrepackCases(TestCase):
 
         params_list = self._deconv_params_list()
         torch.manual_seed(0)
-        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
+        for input_height, input_width, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in list(itertools.product(*params_list)) + [self._deconv_with_output_padding()] + [self._deconv_fallback_shape()]:
             if (output_padding < stride or output_padding < dilation) \
                     and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
                     and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1 > 0) \
@@ -538,6 +542,14 @@ class TestPrepackCases(TestCase):
                         model.eval()
                         origin_model = copy.deepcopy(model).eval()
                         ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
+
+                        if padding - output_padding + stride <= 0:
+                            # unsupported in mkldnn, should not replace the original ConvTranspose module
+                            self.assertTrue(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))
+                            continue
+                        else:
+                            self.assertFalse(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))
+
                         self.assertEqual(ipex_model.deconv.weight.dtype, dtype)
 
                         with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
@@ -550,6 +562,14 @@ class TestPrepackCases(TestCase):
                         origin_model = copy.deepcopy(model).train()
                         origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                         ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+                        
+                        if padding - output_padding + stride <= 0:
+                            # unsupported in mkldnn, should not replace the original ConvTranspose module
+                            self.assertTrue(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))
+                            continue
+                        else:
+                            self.assertFalse(module_found(ipex_model, torch.nn.ConvTranspose2d if dims == 2 else torch.nn.ConvTranspose3d))                        
+                        
                         x1 = x.clone().requires_grad_()
                         x2 = x.clone().requires_grad_()
                         with torch.cpu.amp.autocast(enabled=True, dtype=dtype):

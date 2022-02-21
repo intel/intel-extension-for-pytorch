@@ -195,6 +195,10 @@ def optimize(
         >>> # running training step.
 
     """
+    if isinstance(model, torch.jit.ScriptModule):
+        if optimizer is None:
+            return model
+        return model, optimizer
 
     if model.training:
         assert optimizer is not None, "The optimizer should be given for training mode"

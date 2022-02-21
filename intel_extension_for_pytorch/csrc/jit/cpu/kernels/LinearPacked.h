@@ -29,6 +29,14 @@ at::Tensor linear_gelu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context);
 
+at::Tensor linear_sigmoid_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_swish_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
 at::Tensor linear_add_run(
     const at::Tensor& input,
     at::Tensor& accumu,

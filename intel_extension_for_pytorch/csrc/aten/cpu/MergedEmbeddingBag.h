@@ -1,11 +1,15 @@
 #include <ATen/AccumulateType.h>
 #include <ATen/Tensor.h>
+#include <csrc/dyndisp/DispatchStub.h>
 #include <torch/extension.h>
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
 #include "utils/csr2csc.h"
 
 namespace torch_ipex {
 namespace cpu {
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
 
 struct SGDArgs {
   SGDArgs(
@@ -35,6 +39,52 @@ class AccGradUpdate<T, SGDArgs> {
       int table_id,
       const SGDArgs& args);
 };
+
+std::vector<Tensor> merged_embeddingbag_forward_cpu_kernel_impl(
+    const Tensor& indices,
+    const Tensor& offsets,
+    const std::vector<Tensor>& weights,
+    const std::vector<int64_t> pooling_modes);
+
+void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
+    const std::vector<Tensor>& grads_y_,
+    const Tensor& indices,
+    const Tensor& offsets,
+    const std::vector<Tensor>& weights,
+    const Tensor& indices_with_row_offset,
+    const Tensor& row_offsets,
+    std::vector<int64_t> pooling_modes,
+    const std::vector<Tensor>& bf16_trail,
+    double weight_decay,
+    double lr);
+
+#if defined(DYN_DISP_BUILD)
+}
+#endif
+
+using merged_embeddingbag_forward_cpu_kernel_fn = std::vector<Tensor> (*)(
+    const Tensor&,
+    const Tensor&,
+    const std::vector<Tensor>&,
+    const std::vector<int64_t>);
+DECLARE_DISPATCH(
+    merged_embeddingbag_forward_cpu_kernel_fn,
+    merged_embeddingbag_forward_cpu_kernel_stub);
+
+using merged_embeddingbag_backward_sgd_cpu_kernel_fn = void (*)(
+    const std::vector<Tensor>&,
+    const Tensor&,
+    const Tensor&,
+    const std::vector<Tensor>&,
+    const Tensor&,
+    const Tensor&,
+    std::vector<int64_t>,
+    const std::vector<Tensor>&,
+    double,
+    double);
+DECLARE_DISPATCH(
+    merged_embeddingbag_backward_sgd_cpu_kernel_fn,
+    merged_embeddingbag_backward_sgd_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -1,5 +1,5 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#include "interaction.h"
+#include <csrc/aten/cpu/Interaction.h>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
@@ -12,12 +12,18 @@
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
 #include <algorithm>
+#include "csrc/utils/ipex_op_profile.h"
 
 /*
  Custom op to optimize DLRM interaction part
 */
 
 namespace torch_ipex {
+namespace cpu {
+
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
 
 template <typename T>
 static inline void cat(
@@ -102,9 +108,8 @@ static inline void transpose_add(T* out, const T* in, uint32_t vector_nums) {
 
 template <typename T>
 inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
+
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -171,9 +176,8 @@ inline std::vector<at::Tensor> _interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({}));
-#endif
+  IPEX_RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({}));
+
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -263,7 +267,8 @@ inline std::vector<at::Tensor> _interaction_backward(
   return output;
 }
 
-at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
+at::Tensor interaction_forward_kernel_impl(
+    const std::vector<at::Tensor>& input) {
   if (input[0].scalar_type() == at::kFloat) {
     for (auto& in : input) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
@@ -278,7 +283,7 @@ at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
   }
 }
 
-std::vector<at::Tensor> interaction_backward(
+std::vector<at::Tensor> interaction_backward_kernel_impl(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   if (grad_out.scalar_type() == at::kFloat) {
@@ -295,7 +300,6 @@ std::vector<at::Tensor> interaction_backward(
   }
 }
 
-namespace cpu {
 #if defined(CPU_CAPABILITY_AVX512)
 static inline void _interaction_s8s8_scale_s32s8_128(
     int8_t* out,
@@ -354,7 +358,7 @@ static inline void _interaction_s8s8_scale_s32s8(
   }
 }
 
-at::Tensor dil_qinteraction(
+at::Tensor dil_qinteraction_kernel_impl(
     const std::vector<at::Tensor> input,
     double output_scale,
     int64_t o_zp,
@@ -446,46 +450,18 @@ at::Tensor dil_qinteraction(
   return output;
 }
 
+#if defined(DYN_DISP_BUILD)
+} // anonymous namespace
+
+REGISTER_DISPATCH(
+    interaction_forward_kernel_stub,
+    &interaction_forward_kernel_impl);
+REGISTER_DISPATCH(
+    interaction_backward_kernel_stub,
+    &interaction_backward_kernel_impl);
+REGISTER_DISPATCH(dil_qinteraction_kernel_stub, &dil_qinteraction_kernel_impl);
+
+#endif
+
 } // namespace cpu
-} // namespace torch_ipex
-
-namespace {
-TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      torch::schema(
-          "torch_ipex::interaction_forward(Tensor[] input) -> Tensor",
-          c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::interaction_forward);
-  m.def(
-      torch::schema(
-          "torch_ipex::interaction_backward(Tensor grad_out, "
-          "Tensor[] input) -> Tensor[]",
-          c10::AliasAnalysisKind::PURE_FUNCTION),
-      torch_ipex::interaction_backward);
-}
-} // namespace
-
-namespace torch_ipex {
-namespace autocast {
-
-at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::interaction_forward", "")
-                       .typed<decltype(interaction_forward)>();
-
-  auto target_type = get_autocast_dtype();
-  if (is_quantization_enabled()) {
-    return int8::interaction_forward(input);
-  }
-
-  auto type = promote_type(get_autocast_dtype(), input);
-  return op.call(cpu_cached_cast(type, input));
-}
-
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl("interaction_forward", torch_ipex::autocast::interaction_forward);
-}
-
-} // namespace autocast
 } // namespace torch_ipex

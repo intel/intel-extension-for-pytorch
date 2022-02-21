@@ -1,6 +1,5 @@
 #pragma once
 
-#include <torch/csrc/MemoryFormat.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/irparser.h>
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
@@ -27,7 +26,8 @@ c10::optional<IValue> getIValue(
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
-
+void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph);
+void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph);
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph);
 void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph);
 void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph>& graph);
@@ -37,6 +37,7 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
 void insertPrePackedConvOp(std::shared_ptr<Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
+void fuseBottleneck(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph);
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);

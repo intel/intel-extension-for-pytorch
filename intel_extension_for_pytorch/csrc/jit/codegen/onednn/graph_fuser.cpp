@@ -52,13 +52,6 @@ class GraphRewriter {
       // Save the previous node, since we might delete `curNode` in next block
       auto prevNode = curNode->prev();
       if (llgaHelper.isLlgaSubgraph(curNode)) {
-        // Inlining nodes may cause some subexpression to come back in the
-        // subgraphs (for example, copying constants in repeatedly will generate
-        // redundant prim::Constants). Run CSE to clean them up.
-        auto subgraph = curNode->g(attr::Subgraph);
-        EliminateCommonSubexpression(subgraph);
-        EliminateDeadCode(subgraph);
-
         // Unmerge subgraph if we don't get every nodes of a partition
         // into the subgraph due to failed alias check
         llgaHelper.unmergeIfAnyNodeIsMissing(curNode);

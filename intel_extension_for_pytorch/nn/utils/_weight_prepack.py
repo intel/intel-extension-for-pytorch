@@ -28,7 +28,7 @@ class _IPEXConvNd(nn.Module):
             self.padding,
             self.stride,
             self.dilation,
-            self.groups))
+            self.groups), requires_grad = dense_module.weight.requires_grad)
 
         if hasattr(dense_module, 'master_weight'):
             self.master_weight = torch.ops.torch_ipex.convolution_weight_pack(
@@ -46,7 +46,9 @@ class _IPEXConvNd(nn.Module):
                 self.dilation,
                 self.groups)
         if dense_module.bias is not None:
-            self.bias = nn.Parameter(dense_module.bias.detach().clone())
+            self.bias = nn.Parameter(
+                dense_module.bias.detach().clone(),
+                requires_grad = dense_module.bias.requires_grad)
             if hasattr(dense_module, 'master_bias'):
                 self.master_bias = dense_module.master_bias
             elif hasattr(dense_module, 'bias_trail'):
@@ -123,8 +125,9 @@ class _IPEXLinear(torch.nn.Module):
         # TODO:".clone()" will make weight shared by multiple module not shared anymore
         # related issues: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/issues/65
         self.weight = torch.nn.Parameter(
-            torch.ops.torch_ipex.linear_weight_pack(dense_module.weight.detach().clone())
-        )
+            torch.ops.torch_ipex.linear_weight_pack(dense_module.weight.detach().clone()),
+            requires_grad = dense_module.weight.requires_grad)
+
         if hasattr(dense_module, 'master_weight'):
             self.master_weight = torch.ops.torch_ipex.linear_weight_pack(
                 dense_module.master_weight.detach().clone(),
@@ -134,7 +137,9 @@ class _IPEXLinear(torch.nn.Module):
                 dense_module.weight_trail.detach().clone())
 
         if dense_module.bias is not None:
-            self.bias = nn.Parameter(dense_module.bias.detach().clone())
+            self.bias = nn.Parameter(
+                dense_module.bias.detach().clone(),
+                requires_grad = dense_module.bias.requires_grad)
             if hasattr(dense_module, 'master_bias'):
                 self.master_bias = dense_module.master_bias
             elif hasattr(dense_module, 'bias_trail'):
@@ -218,7 +223,8 @@ class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
             self.padding,
             self.output_padding,
             self.groups,
-            self.dilation))
+            self.dilation), requires_grad = dense_module.weight.requires_grad)
+
         if hasattr(dense_module, 'master_weight'):
             self.master_weight = torch.ops.torch_ipex.conv_transpose2d_weight_pack(
                 dense_module.master_weight.detach().clone(),
@@ -237,7 +243,9 @@ class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
                 self.groups,
                 self.dilation)
         if dense_module.bias is not None:
-            self.bias = nn.Parameter(dense_module.bias.detach().clone())
+            self.bias = nn.Parameter(
+                dense_module.bias.detach().clone(),
+                requires_grad = dense_module.bias.requires_grad)
             if hasattr(dense_module, 'master_bias'):
                 self.master_bias = dense_module.master_bias
             elif hasattr(dense_module, 'bias_trail'):
@@ -326,17 +334,19 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
                         'in_features': new_m.in_features,
                         'weight_transposed': new_m.weight_transposed})
                 except RuntimeError:
-                    warnings.warn(m.__str__() + " not be packed because weight is not transposed or contiguous")
                     new_m = m
             elif isinstance(m, torch.nn.ConvTranspose2d):
-                new_m = _IPEXConvTranspose2d(m)
-                params_attr[weight].update({'op': torch.nn.ConvTranspose2d, \
-                                              'padding': new_m.padding, 'stride': new_m.stride, \
-                                              'dilation': new_m.dilation, 'kernel_size': new_m.kernel_size, \
-                                              'groups': new_m.groups, 'out_channels': new_m.out_channels, \
-                                              'in_channels': new_m.in_channels, \
-                                              'output_padding': new_m.output_padding, \
-                                              'weight_channels_last': new_m.weight_channels_last})
+                if m.padding[0] - m.output_padding[0] + m.stride[0] <= 0 or m.padding[1] - m.output_padding[1] + m.stride[1] <= 0:
+                    new_m = m
+                else:
+                    new_m = _IPEXConvTranspose2d(m)
+                    params_attr[weight].update({'op': torch.nn.ConvTranspose2d, \
+                                                'padding': new_m.padding, 'stride': new_m.stride, \
+                                                'dilation': new_m.dilation, 'kernel_size': new_m.kernel_size, \
+                                                'groups': new_m.groups, 'out_channels': new_m.out_channels, \
+                                                'in_channels': new_m.in_channels, \
+                                                'output_padding': new_m.output_padding, \
+                                                'weight_channels_last': new_m.weight_channels_last})
             if 'bf16_param' in params_attr[weight]:
                 params_attr[weight]['bf16_param'] = new_m.weight
             elif 'trail' in params_attr[weight]:

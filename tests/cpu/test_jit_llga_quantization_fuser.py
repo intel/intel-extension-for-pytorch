@@ -946,6 +946,8 @@ class TestModel(JitLlgaTestCase):
                 # TODO: aten::adaptive_avg_pool2d also need to be fused once backend supported it
                 self.assertFused(graph, ['aten::_convolution', 'aten::relu',
                                         'aten::max_pool2d', 'aten::linear', 'aten::quantize_per_channel'])
+                # large partition: 7 fusion group in total
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 7)
 
 
 for model_name, enabled in [

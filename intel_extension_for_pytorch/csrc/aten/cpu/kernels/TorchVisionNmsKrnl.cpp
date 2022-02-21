@@ -5,13 +5,17 @@
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/utils/library.h"
 
-#include "torchvision_nms.h"
+#include <csrc/aten/cpu/TorchVisionNms.h>
 
 namespace torch_ipex {
 namespace cpu {
 
+#if defined(DYN_DISP_BUILD)
+namespace {
+#endif
+
 template <typename scalar_t>
-at::Tensor nms_kernel_impl(
+at::Tensor nms_kernel_body(
     const at::Tensor& dets,
     const at::Tensor& scores,
     double iou_threshold) {
@@ -81,78 +85,24 @@ at::Tensor nms_kernel_impl(
   return keep_t.narrow(/*dim=*/0, /*start=*/0, /*length=*/num_to_keep);
 }
 
-at::Tensor nms_kernel(
+at::Tensor nms_kernel_impl(
     const at::Tensor& dets,
     const at::Tensor& scores,
     double iou_threshold) {
-#if defined(IPEX_DISP_OP)
-  printf("torch_ipex::nms\n");
-#endif
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("torch_ipex::nms", std::vector<c10::IValue>({}));
-#endif
-
-  TORCH_CHECK(
-      dets.dim() == 2, "boxes should be a 2d tensor, got ", dets.dim(), "D");
-  TORCH_CHECK(
-      dets.size(1) == 4,
-      "boxes should have 4 elements in dimension 1, got ",
-      dets.size(1));
-  TORCH_CHECK(
-      scores.dim() == 1,
-      "scores should be a 1d tensor, got ",
-      scores.dim(),
-      "D");
-  TORCH_CHECK(
-      dets.size(0) == scores.size(0),
-      "boxes and scores should have same number of elements in ",
-      "dimension 0, got ",
-      dets.size(0),
-      " and ",
-      scores.size(0));
-
   auto result = at::empty({0}, dets.options());
 
-  AT_DISPATCH_FLOATING_TYPES(dets.scalar_type(), "nms_kernel", [&] {
-    result = nms_kernel_impl<scalar_t>(dets, scores, iou_threshold);
+  AT_DISPATCH_FLOATING_TYPES(dets.scalar_type(), "nms_kernel_body", [&] {
+    result = nms_kernel_body<scalar_t>(dets, scores, iou_threshold);
   });
   return result;
 }
 
-IPEX_TORCH_LIBRARY_IMPL(torchvision, CPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("torchvision::nms"),
-      TORCH_FN((&torch_ipex::cpu::nms_kernel)));
-}
+#if defined(DYN_DISP_BUILD)
+} // anonymous namespace
+
+REGISTER_DISPATCH(nms_kernel_stub, &nms_kernel_impl);
+
+#endif
 
 } // namespace cpu
-} // namespace torch_ipex
-
-namespace torch_ipex {
-namespace autocast {
-
-at::Tensor nms_autocast(
-    const at::Tensor& dets,
-    const at::Tensor& scores,
-    double iou_threshold) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torchvision::nms", "")
-                       .typed<at::Tensor(
-                           const at::Tensor& dets,
-                           const at::Tensor& scores,
-                           double iou_threshold)>();
-  return op.call(
-      cpu_cached_cast(at::kFloat, dets),
-      cpu_cached_cast(at::kFloat, scores),
-      iou_threshold);
-}
-
-IPEX_TORCH_LIBRARY_IMPL(torchvision, AutocastCPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("torchvision::nms"),
-      TORCH_FN((&torch_ipex::autocast::nms_autocast)));
-}
-
-} // namespace autocast
 } // namespace torch_ipex
