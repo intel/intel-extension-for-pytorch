@@ -675,24 +675,25 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex::concat_bn_relu(Tensor[] a, Tensor bn_beta, "
+        "ipex::concat_bn_relu(Tensor[] a, Tensor bn_scale, Tensor bn_beta, "
         "Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled, int dim) -> "
         "Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = ConcatBnRelu(
-                (std::move(peek(stack, 0, 11))).toTensorList(),
-                (std::move(peek(stack, 1, 11))).toTensor(),
-                toOptionalTensor(std::move(peek(stack, 2, 11))),
-                toOptionalTensor(std::move(peek(stack, 3, 11))),
-                toOptionalTensor(std::move(peek(stack, 4, 11))),
-                toOptionalTensor(std::move(peek(stack, 5, 11))),
-                (std::move(peek(stack, 6, 11))).toBool(),
-                (std::move(peek(stack, 7, 11))).toDouble(),
-                (std::move(peek(stack, 8, 11))).toDouble(),
-                (std::move(peek(stack, 9, 11))).toBool(),
-                (std::move(peek(stack, 10, 11))).toInt());
-            drop(stack, 11);
+                (std::move(peek(stack, 0, 12))).toTensorList(),
+                (std::move(peek(stack, 1, 12))).toTensor(),
+                (std::move(peek(stack, 2, 12))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 3, 12))),
+                toOptionalTensor(std::move(peek(stack, 4, 12))),
+                toOptionalTensor(std::move(peek(stack, 5, 12))),
+                toOptionalTensor(std::move(peek(stack, 6, 12))),
+                (std::move(peek(stack, 7, 12))).toBool(),
+                (std::move(peek(stack, 8, 12))).toDouble(),
+                (std::move(peek(stack, 9, 12))).toDouble(),
+                (std::move(peek(stack, 10, 12))).toBool(),
+                (std::move(peek(stack, 11, 12))).toInt());
+            drop(stack, 12);
             pack(stack, std::move(result));
             return 0;
           };

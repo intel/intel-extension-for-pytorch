@@ -961,46 +961,6 @@ class Tester(TestCase):
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
-    def _test_concat_bn_relu(self, a1, a2, a3, enable_3d=True, use_channels_last=True):
-        if enable_3d:
-            if use_channels_last:
-                model = ConcatBnRelu3d().eval().to(memory_format=torch.channels_last_3d)
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-            else:
-                model = ConcatBnRelu3d().eval()
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-        else:
-            if use_channels_last:
-                model = ConcatBnRelu2d().eval().to(memory_format=torch.channels_last)
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-            else:
-                model = ConcatBnRelu2d().eval()
-                model = ipex.optimize(model, dtype=torch.float32, level='O0')
-                with torch.no_grad():
-                    jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
-                    jit_model = torch.jit.freeze(jit_model)
-                jit_res = jit_model(a1, a2, a3)
-                ori_res = model(a1, a2, a3)
-                self.assertEqual(jit_res, ori_res)
-
     def test_concat_bn_relu(self):
         a1 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
         a2 = torch.randn(1, 32, 13, 24, dtype=torch.bfloat16).contiguous(memory_format=torch.channels_last)
@@ -1010,8 +970,10 @@ class Tester(TestCase):
         with torch.no_grad():
             jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
             jit_model = torch.jit.freeze(jit_model)
-        jit_res = jit_model(a1, a2, a3)
-        ori_res = model(a1, a2, a3)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
         self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
@@ -1022,46 +984,92 @@ class Tester(TestCase):
         with torch.no_grad():
             jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
             jit_model = torch.jit.freeze(jit_model)
-        jit_res = jit_model(a1, a2, a3)
-        ori_res = model(a1, a2, a3)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
         self.assertEqual(jit_res, ori_res)
 
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+        model = ConcatBnRelu2d().eval().to(memory_format=torch.channels_last)
+        model = ipex.optimize(model, dtype=torch.float32, level='O0')
+        with torch.no_grad():
+            jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+            jit_model = torch.jit.freeze(jit_model)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
-        a1 = torch.randn(1, 16, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a2 = torch.randn(1, 48, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+        a1 = torch.randn(1, 32, 18, 53, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 32, 18, 53, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 18, 53, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
-        a1 = torch.randn(1, 17, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a2 = torch.randn(1, 47, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        a3 = torch.randn(1, 32, 13, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=True)
+        a1 = torch.randn(1, 16, 24, 116, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 48, 24, 116, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 24, 116, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
+
+        a1 = torch.randn(1, 17, 15, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a2 = torch.randn(1, 47, 15, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        a3 = torch.randn(1, 32, 15, 24, dtype=torch.float).contiguous(memory_format=torch.channels_last)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, dtype=torch.float)
         a2 = torch.randn(1, 32, 13, 24, dtype=torch.float)
         a3 = torch.randn(1, 32, 13, 24, dtype=torch.float)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=False, use_channels_last=False)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+        model = ConcatBnRelu3d().eval().to(memory_format=torch.channels_last_3d)
+        model = ipex.optimize(model, dtype=torch.float32, level='O0')
+        with torch.no_grad():
+            jit_model = torch.jit.trace(model, (a1, a2, a3)).eval()
+            jit_model = torch.jit.freeze(jit_model)
+            #warmup run
+            for _ in range(2):
+                jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
-        a1 = torch.randn(1, 16, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        a2 = torch.randn(1, 48, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+        a1 = torch.randn(1, 16, 17, 14, 31, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a2 = torch.randn(1, 48, 17, 14, 31, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        a3 = torch.randn(1, 32, 17, 14, 31, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 17, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a2 = torch.randn(1, 47, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float).contiguous(memory_format=torch.channels_last_3d)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=True)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
         a1 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
         a2 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
         a3 = torch.randn(1, 32, 13, 24, 33, dtype=torch.float)
-        self._test_concat_bn_relu(a1, a2, a3, enable_3d=True, use_channels_last=False)
+        with torch.no_grad():
+            jit_res = jit_model(a1, a2, a3)
+            ori_res = model(a1, a2, a3)
+        self.assertEqual(jit_res, ori_res)
 
     def test_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, bias, node = "ipex::mha_scores_calc"):

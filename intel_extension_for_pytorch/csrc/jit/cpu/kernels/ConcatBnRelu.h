@@ -15,8 +15,9 @@ namespace cpu {
  * */
 at::Tensor ConcatBnRelu(
     const c10::List<at::Tensor>& a,
+    const at::Tensor& bn_scale,
     const at::Tensor& bn_beta,
-    const c10::optional<at::Tensor>& bn_scale,
+    const c10::optional<at::Tensor>& bn_weight,
     const c10::optional<at::Tensor>& bn_bias,
     const c10::optional<at::Tensor>& bn_mean,
     const c10::optional<at::Tensor>& bn_var,
@@ -32,8 +33,9 @@ namespace {
 
 at::Tensor concat_bn_relu_kernel_impl(
     const c10::List<at::Tensor>& a,
+    const at::Tensor& bn_scale,
     const at::Tensor& bn_beta,
-    const c10::optional<at::Tensor>& bn_scale,
+    const c10::optional<at::Tensor>& bn_weight,
     const c10::optional<at::Tensor>& bn_bias,
     const c10::optional<at::Tensor>& bn_mean,
     const c10::optional<at::Tensor>& bn_var,
@@ -49,6 +51,7 @@ at::Tensor concat_bn_relu_kernel_impl(
 
 using concat_bn_relu_kernel_fn = at::Tensor (*)(
     const c10::List<at::Tensor>&,
+    const at::Tensor&,
     const at::Tensor&,
     const c10::optional<at::Tensor>&,
     const c10::optional<at::Tensor>&,
