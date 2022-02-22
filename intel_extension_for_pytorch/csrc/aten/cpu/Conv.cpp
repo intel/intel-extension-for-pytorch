@@ -233,9 +233,18 @@ at::Tensor convolution_backward_input(
       "Only support 2d or 3d convolution for convolution_backward_input");
 
   const ideep::tensor mkldnn_grad_output = itensor_view_from_dense(grad_output);
-  bool is_channels_last =
-      grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
+  bool is_channels_last_contiguous =
+      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d);
+
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (is_channels_last_contiguous) {
+    if (input_size.size() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
 
   std::vector<int64_t> origin_weight_dims;
   origin_weight_dims.push_back(grad_output.size(1));
@@ -256,11 +265,10 @@ at::Tensor convolution_backward_input(
       {},
       ideep::attr_t());
 
-  auto grad_input = at::empty(
-      input_size,
-      grad_output.options().memory_format(grad_output.suggest_memory_format()));
+  auto grad_input =
+      at::empty(input_size, grad_output.options().memory_format(memory_format));
   ideep::tensor mkldnn_grad_input;
-  if (is_channels_last) {
+  if (is_channels_last_contiguous) {
     mkldnn_grad_input = itensor_view_from_dense(grad_input);
   }
 
@@ -275,7 +283,7 @@ at::Tensor convolution_backward_input(
       padding.vec(),
       groups);
 
-  if (is_channels_last) {
+  if (is_channels_last_contiguous) {
     return grad_input;
   } else {
     return mkldnn_to_dense(new_with_itensor_mkldnn(
@@ -302,9 +310,10 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
       "Only support 2d or 3d convolution for convolution_backward_weights");
   const ideep::tensor mkldnn_grad_output = itensor_view_from_dense(grad_output);
   const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
-  bool is_channels_last =
-      grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
+
+  bool is_channels_last_contiguous =
+      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      grad_output.is_contiguous(at::MemoryFormat::ChannelsLast3d);
 
   auto grad_weight = at::empty(weight_size, grad_output.options());
   at::Tensor grad_bias;
@@ -361,7 +370,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   if (weight_packed) {
     return std::make_tuple(grad_weight, grad_bias);
   } else {
-    if (is_channels_last) {
+    if (is_channels_last_contiguous) {
       auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
                                             : at::MemoryFormat::ChannelsLast3d;
       return std::make_tuple(
