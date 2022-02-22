@@ -375,6 +375,8 @@ setup(
               'ipex.xpu.intrinsic',
               'ipex.xpu.intrinsic.modules',
               'ipex.optim'],
+    install_requires=['torch',
+                      'typing_extensions'],
     package_data={
         'ipex': [
             'README.md',
