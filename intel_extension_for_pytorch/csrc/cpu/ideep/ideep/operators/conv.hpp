@@ -697,8 +697,7 @@ struct convolution_forward
     // it will be removed after block format reorder performance improved.
     if (!weights.get_desc().is_plain() &&
         weights.get_desc() != pd.weights_desc()) {
-      auto temp = weights.to_public(nullptr, weights.get_data_type());
-      expected_weights = temp.reorder_if_differ_in(pd.weights_desc());
+      expected_weights = weights.reorder_if_differ_in(pd.weights_desc());
     } else {
       expected_weights = weights.make_grouped_weights(param.groups)
                              .reorder_if_differ_in(pd.weights_desc());
@@ -763,8 +762,7 @@ struct convolution_forward
     // it will be removed after block format reorder performance improved.
     if (!weights.get_desc().is_plain() &&
         weights.get_desc() != pd.weights_desc()) {
-      auto temp = weights.to_public(nullptr, weights.get_data_type());
-      expected_weights = temp.reorder_if_differ_in(pd.weights_desc());
+      expected_weights = weights.reorder_if_differ_in(pd.weights_desc());
     } else {
       expected_weights = weights.make_grouped_weights(param.groups)
                              .reorder_if_differ_in(pd.weights_desc());
@@ -1074,12 +1072,7 @@ struct convolution_backward_weights
     // diff_weights has been init in FW side, but has diff desc with
     // expected_diff_weights.
     if (diff_weights.get_desc() != expected_diff_weights_desc) {
-      // TODO: there has an issue when reorder block to block,
-      //  will be removed after
-      //  https://jira.devtools.intel.com/browse/MFDNN-5557 is fixed.
-      auto temp = expected_diff_weights.to_public(
-          nullptr, expected_diff_weights.get_data_type());
-      diff_weights.feed_from(temp);
+      diff_weights.feed_from(expected_diff_weights);
     }
   }
 };

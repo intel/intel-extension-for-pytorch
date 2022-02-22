@@ -325,17 +325,9 @@ def get_build_type():
 
 
 def get_avx_version():
-    avx_version = ''
-    if _check_env_flag('AVX2'):
-        avx_version = 'AVX2'
-    elif _check_env_flag('AVX512'):
-        avx_version = 'AVX512'
-
-    if avx_version == '':
-        avx_version = 'AVX512'
-
-    if _check_env_flag('DYN_DISP'):
-        avx_version = 'AVX2'
+    # disable isa level check for dyndisp turn on.
+    # need restruct all isa check code later.
+    avx_version = 'AVX2'
 
     # print("The extension will be built with {}.".format(avx_version))
     return avx_version

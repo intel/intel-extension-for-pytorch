@@ -2,6 +2,7 @@
 
 #include <oneapi/dnnl/dnnl_graph.hpp>
 #include <torch/csrc/jit/ir/ir.h>
+#include <torch/csrc/jit/passes/utils/subgraph_utils.h>
 #include "jit/codegen/onednn/operator.h"
 
 namespace torch {
@@ -62,10 +63,18 @@ class LlgaGraphHelper {
 
   std::map<size_t, Value*> getTensorIdToValue() const;
 
+  dnnl::graph::op createLlgaOp(Node* node);
+
+  Operator createOperator(Node* node) const;
+
+  bool isSupported(Node* node) const;
+
  private:
   size_t countSupportedOps(const std::shared_ptr<Graph>& graph) const;
 
   bool isSingleQuantDequantTo(Node* node);
+
+  std::unique_ptr<AliasDb> aliasDb_ = nullptr;
 
   OpPartitionMap opToOwningPartition_;
   std::vector<dnnl::graph::partition> partitions_;

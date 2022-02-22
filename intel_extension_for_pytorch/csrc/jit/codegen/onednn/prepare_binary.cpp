@@ -27,7 +27,13 @@ void mayConvertScalarInputToTensor(Node* node) {
     auto t = g->insert(
         aten::as_tensor, {scalar}, {{"dtype", at::ScalarType::Float}});
     // tensor(42.0) : Float([])  -->  tensor([42.0]) : Float([1])
+    c10::optional<size_t> t_dim = 1;
+    auto target_type = TensorTypePtr(
+        TensorType::create(at::ScalarType::Float, at::kCPU, t_dim, false));
+    target_type = target_type->withSizes({1});
+    t->setType(target_type);
     auto unsqueezed = g->insert(aten::unsqueeze, {t, 0});
+    unsqueezed->setType(target_type);
     node->replaceInput(1, unsqueezed);
     // Add a mark here and convert tensor back to scalar later on for unfused
     // add/div
