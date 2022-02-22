@@ -69,11 +69,11 @@ class TestOptimizeCases(TestCase):
                 ipex_optimizer.zero_grad()
                 y2.backward(grad_y)
                 ipex_optimizer.step()
-                self.assertEqual(y1, y2, rtol=1e-4, atol=5e-02)
+                self.assertEqual(y1, y2, rtol=1e-4, atol=5e-01)
                 origin_model_state = origin_model.state_dict()
                 ipex_model_state = ipex_model.state_dict()
                 for var_name in origin_model_state:
-                    self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name], rtol=1e-4, atol=5e-02)
+                    self.assertEqual(origin_model_state[var_name], ipex_model_state[var_name], rtol=1e-4, atol=5e-01)
                 self.assertTrue(origin_model.conv.weight.grad==None)
                 self.assertTrue(ipex_model.conv.weight.grad==None)
 

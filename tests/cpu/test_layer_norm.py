@@ -2,8 +2,7 @@ import unittest
 
 import torch
 import intel_extension_for_pytorch as ipex
-from common_utils import TestCase
-
+from torch.testing._internal.common_utils import TestCase
 
 class M1(torch.nn.Module):
     def __init__(self):
@@ -37,7 +36,7 @@ class LayerNormTester(TestCase):
             y2_bf16 = trace_model(x)
             self.assertEqual(y1_bf16.dtype, torch.bfloat16)
             self.assertEqual(y2_bf16.dtype, torch.bfloat16)
-            self.assertEqual(y1_bf16, y2_bf16, prec=0.03)
+            self.assertEqual(y1_bf16, y2_bf16, rtol=1e-4, atol=5e-02)
 
             # layernorm input is fp32
             model = M2().eval()
