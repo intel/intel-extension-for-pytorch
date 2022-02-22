@@ -195,7 +195,11 @@ class TestJITMultiStreamModule(JitTestCase):
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
-        
+
+        # Warm Up
+        for i in range(3):
+            traced_model(x)
+
         # Calculate the reference result
         y = traced_model(x)
 
@@ -207,8 +211,8 @@ class TestJITMultiStreamModule(JitTestCase):
 
         y_runtime = multi_stream_model(x)
         y_runtime2 = multi_stream_model2(x)
-        self.assertEqual(y, y_runtime)
-        self.assertEqual(y, torch.cat(y_runtime2))
+        self.assertEqual(y, y_runtime, atol=0.02, rtol=0.02)
+        self.assertEqual(y, torch.cat(y_runtime2), atol=0.02, rtol=0.02)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     def test_bf16_batchsize_less_than_stream_number(self):
@@ -223,6 +227,10 @@ class TestJITMultiStreamModule(JitTestCase):
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
 
+        # Warm Up
+        for i in range(3):
+            traced_model(x)
+
         # Calculate the reference result
         y = traced_model(x)
 
@@ -234,8 +242,9 @@ class TestJITMultiStreamModule(JitTestCase):
 
         y_runtime = multi_stream_model(x)
         y_runtime2 = multi_stream_model2(x)
-        self.assertEqual(y, y_runtime)
-        self.assertEqual(y, torch.cat(y_runtime2))
+
+        self.assertEqual(y, y_runtime, atol=0.02, rtol=0.02)
+        self.assertEqual(y, torch.cat(y_runtime2), atol=0.02, rtol=0.02)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     def test_bf16_batchsize_not_divisible_stream_number(self):
@@ -250,6 +259,10 @@ class TestJITMultiStreamModule(JitTestCase):
             traced_model = torch.jit.trace(model, x)
         traced_model = torch.jit.freeze(traced_model)
 
+        # Warm Up
+        for i in range(3):
+            traced_model(x)
+
         # Calculate the reference result
         y = traced_model(x)
 
@@ -262,8 +275,8 @@ class TestJITMultiStreamModule(JitTestCase):
         y_runtime = multi_stream_model(x)
         y_runtime2 = multi_stream_model2(x)
 
-        self.assertEqual(y, y_runtime)
-        self.assertEqual(y, torch.cat(y_runtime2))
+        self.assertEqual(y, y_runtime, atol=0.02, rtol=0.02)
+        self.assertEqual(y, torch.cat(y_runtime2), atol=0.02, rtol=0.02)
         self.assertEqual(y_runtime2[0].size(0), 2)
         self.assertEqual(y_runtime2[1].size(0), 1)
         self.assertEqual(y_runtime2[2].size(0), 1)
