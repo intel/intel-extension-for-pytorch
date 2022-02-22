@@ -795,6 +795,74 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::div', 'aten::add'])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skip("Graph Compiler unit-test")
+    def test_mha_pattern_int8_fp32(self):
+        class M(torch.nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(1024, 1024, False)
+
+            def forward(self, x, y, z, a):
+                x = x.permute(0, 2, 1, 3)
+
+                y = y.permute(0, 2, 1, 3)
+                y = y.transpose(-1, -2)
+
+                z = z.permute(0, 2, 1, 3)
+                tmp = torch.matmul(x, y) / 8. + a
+                tmp = torch.softmax(tmp, -1)
+                tmp = tmp.matmul(z)
+                tmp = tmp.permute(0, 2, 1, 3)
+                tmp = tmp.contiguous()
+                tmp = tmp.view(1, 16, 1024)
+                tmp = self.linear(tmp)
+                return tmp
+
+        x = torch.randn(1, 16, 16, 64)
+        y = torch.randn(1, 16, 16, 64)
+        z = torch.randn(1, 16, 16, 64)
+        m = M()
+        a = torch.randn(1, 1, 1, 16)
+        graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, config_name="mha_pattern",
+                                        qscheme=torch.per_tensor_affine, int8_bf16=False)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertFused(graph, ['aten::matmul', 'aten::div', 'aten:add', 'aten:softmax',
+                                 'aten::contiguous', 'aten::dequantize'])
+
+    @unittest.skip("Graph Compiler unit-test")
+    def test_mha_pattern_int8_bf16(self):
+        class M(torch.nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(1024, 1024, False)
+
+            def forward(self, x, y, z, a):
+                x = x.permute(0, 2, 1, 3)
+
+                y = y.permute(0, 2, 1, 3)
+                y = y.transpose(-1, -2)
+
+                z = z.permute(0, 2, 1, 3)
+                tmp = torch.matmul(x, y) / 8. + a
+                tmp = torch.softmax(tmp, -1)
+                tmp = tmp.matmul(z)
+                tmp = tmp.permute(0, 2, 1, 3)
+                tmp = tmp.contiguous()
+                tmp = tmp.view(1, 16, 1024)
+                tmp = self.linear(tmp)
+                return tmp
+
+        x = torch.randn(1, 16, 16, 64)
+        y = torch.randn(1, 16, 16, 64)
+        z = torch.randn(1, 16, 16, 64)
+        m = M()
+        a = torch.randn(1, 1, 1, 16, dtype=torch.bfloat16)
+        graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, config_name="mha_pattern",
+                                        qscheme=torch.per_tensor_affine, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
+        self.assertFused(graph, ['aten::matmul', 'aten::div', 'aten:add', 'aten:softmax',
+                                 'aten::contiguous', 'aten::dequantize','aten::quantize_per_tensor'])
+
     def test_bmm_div_add_int8_bf16(self):
         class M(nn.Module):
             def __init__(self):

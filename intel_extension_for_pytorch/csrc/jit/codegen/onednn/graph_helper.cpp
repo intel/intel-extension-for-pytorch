@@ -168,12 +168,15 @@ Operator makeDequantOp(Node* node, Node* input_node) {
   }
 }
 
-Operator createOperator(Node* node) {
+Operator LlgaGraphHelper::createOperator(Node* node) const {
   // switch does not allow non-constexpr function, to make the Symbol constexpr,
   // we must add them to the list in aten/src/ATen/core/interned_strings.h to
   // explicitly use interned strings as symbols. Thus, we use if-else here
   // instead of switch to avoid having to apply patch on PyTorch.
-  if (node->kind() == Symbol::aten("conv2d")) {
+  auto nodeKind = node->kind();
+  // Calling node->kind() only once so that the compiler would create a
+  // jump-table
+  if (nodeKind == Symbol::aten("conv2d")) {
     fixConvOptionalBias(node);
     return Operator(node, opkind::Convolution)
         .setInput(0, 1, 2)
@@ -185,7 +188,7 @@ Operator createOperator(Node* node) {
         .setAttr("dilations", Operator::Ints, 5)
         .setAttr("groups", Operator::Int, 6)
         .setAttr("filter_format", std::string("OIX"));
-  } else if (node->kind() == Symbol::aten("_convolution")) {
+  } else if (nodeKind == Symbol::aten("_convolution")) {
     bool transposed = Operator::Bool(node, 6);
     REQ(!transposed);
 
@@ -199,7 +202,7 @@ Operator createOperator(Node* node) {
         .setAttr("dilations", Operator::Ints, 5)
         .setAttr("groups", Operator::Int, 8)
         .setAttr("filter_format", std::string("OIX"));
-  } else if (node->kind() == Symbol::aten("batch_norm")) {
+  } else if (nodeKind == Symbol::aten("batch_norm")) {
     auto training = toIValue(node->input(5));
     REQ(training.has_value()); // cannot get training status in script mode
     REQ(!training->toBool()); // TODO: support bn training
@@ -208,7 +211,7 @@ Operator createOperator(Node* node) {
         .setOutput(0)
         .setAttr("data_format", std::string("NCX"))
         .setAttr("epsilon", Operator::Float, 7);
-  } else if (node->kind() == Symbol::aten("layer_norm")) {
+  } else if (nodeKind == Symbol::aten("layer_norm")) {
     auto normalized_shape = Operator::Ints(node, 1);
     REQ(normalized_shape.size() == 1);
     return Operator(node, opkind::LayerNorm)
@@ -216,32 +219,32 @@ Operator createOperator(Node* node) {
         .setOutput(0)
         .setAttr("epsilon", Operator::Float, 4)
         .setAttr("keep_stats", false);
-  } else if (node->kind() == Symbol::aten("add")) {
+  } else if (nodeKind == Symbol::aten("add")) {
     return makeBinaryOp(node, opkind::Add);
-  } else if (node->kind() == Symbol::aten("div")) {
+  } else if (nodeKind == Symbol::aten("div")) {
     return makeBinaryOp(node, opkind::Divide);
-  } else if (node->kind() == Symbol::aten("tanh")) {
+  } else if (nodeKind == Symbol::aten("tanh")) {
     return makeEltwiseOp(node, opkind::Tanh);
-  } else if (node->kind() == Symbol::aten("relu")) {
+  } else if (nodeKind == Symbol::aten("relu")) {
     return makeEltwiseOp(node, opkind::ReLU);
-  } else if (node->kind() == Symbol::aten("elu")) {
+  } else if (nodeKind == Symbol::aten("elu")) {
     return makeEltwiseOp(node, opkind::Elu)
         .setAttr("alpha", Operator::Float, 1);
-  } else if (node->kind() == Symbol::aten("sigmoid")) {
+  } else if (nodeKind == Symbol::aten("sigmoid")) {
     return makeEltwiseOp(node, opkind::Sigmoid);
-  } else if (node->kind() == Symbol::aten("gelu")) {
+  } else if (nodeKind == Symbol::aten("gelu")) {
     return makeEltwiseOp(node, opkind::GELU);
-  } else if (node->kind() == Symbol::aten("sqrt")) {
+  } else if (nodeKind == Symbol::aten("sqrt")) {
     return makeEltwiseOp(node, opkind::Sqrt);
-  } else if (node->kind() == Symbol::aten("abs")) {
+  } else if (nodeKind == Symbol::aten("abs")) {
     return makeEltwiseOp(node, opkind::Abs);
-  } else if (node->kind() == Symbol::aten("square")) {
+  } else if (nodeKind == Symbol::aten("square")) {
     return makeEltwiseOp(node, opkind::Square);
-  } else if (node->kind() == Symbol::aten("hardtanh")) {
+  } else if (nodeKind == Symbol::aten("hardtanh")) {
     return makeEltwiseOp(node, opkind::HardTanh)
         .setAttr("min", Operator::Float, 1)
         .setAttr("max", Operator::Float, 2);
-  } else if (node->kind() == Symbol::aten("softmax")) {
+  } else if (nodeKind == Symbol::aten("softmax")) {
     auto dim0 = getDimensions(node->input(0));
     REQ(dim0.has_value());
 
@@ -253,7 +256,7 @@ Operator createOperator(Node* node) {
         .setInput(0)
         .setOutput(0)
         .setAttr("axis", axis);
-  } else if (node->kind() == Symbol::aten("cat")) {
+  } else if (nodeKind == Symbol::aten("cat")) {
     return makeWildcardOp(node); // TODO: remove once Concat is supported
 
     auto o = Operator(node, opkind::Concat);
@@ -273,7 +276,7 @@ Operator createOperator(Node* node) {
     for (auto input : listConstruct->inputs())
       o.setInputValue(input);
     return o.setOutput(0).setAttr("axis", Operator::Int, 1);
-  } else if (node->kind() == Symbol::aten("max_pool2d")) {
+  } else if (nodeKind == Symbol::aten("max_pool2d")) {
     auto rounding_type = Operator::Bool(node, 5) ? "ceil" : "floor";
     return Operator(node, opkind::MaxPool)
         .setInput(0)
@@ -285,7 +288,7 @@ Operator createOperator(Node* node) {
         .setAttr("pads_end", Operator::Ints, 3)
         .setAttr("dilations", Operator::Ints, 4)
         .setAttr("rounding_type", std::string(rounding_type));
-  } else if (node->kind() == Symbol::aten("avg_pool2d")) {
+  } else if (nodeKind == Symbol::aten("avg_pool2d")) {
     auto rounding_type = Operator::Bool(node, 4) ? "ceil" : "floor";
     auto divisor_override = toIValue(node->input(6));
     REQ(divisor_override->isNone());
@@ -299,7 +302,7 @@ Operator createOperator(Node* node) {
         .setAttr("pads_end", Operator::Ints, 3)
         .setAttr("exclude_pad", !Operator::Bool(node, 5))
         .setAttr("rounding_type", std::string(rounding_type));
-  } else if (node->kind() == Symbol::aten("matmul")) {
+  } else if (nodeKind == Symbol::aten("matmul")) {
     auto dim0 = getDimensions(node->input(0)).value_or(-1);
     auto dim1 = getDimensions(node->input(1)).value_or(-1);
     // TODO: support all shape combinations
@@ -307,9 +310,9 @@ Operator createOperator(Node* node) {
         (dim0 == 3 && dim1 == 2));
     // fall through
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
-  } else if (node->kind() == Symbol::aten("mm")) {
+  } else if (nodeKind == Symbol::aten("mm")) {
     return Operator(node, opkind::MatMul).setInput(0, 1).setOutput(0);
-  } else if (node->kind() == Symbol::aten("linear")) {
+  } else if (nodeKind == Symbol::aten("linear")) {
     auto dim0 = getDimensions(node->input(0)).value_or(-1);
     auto dim1 = getDimensions(node->input(1)).value_or(-1);
     // REQ(dim1 == 2);
@@ -318,9 +321,9 @@ Operator createOperator(Node* node) {
         .setInput(0, 1, 2)
         .setOutput(0)
         .setAttr("transpose_b", true);
-  } else if (node->kind() == Symbol::aten("to")) {
+  } else if (nodeKind == Symbol::aten("to")) {
     return Operator(node, opkind::TypeCast).setInput(0).setOutput(0);
-  } else if (node->kind() == Symbol::aten("quantize_per_tensor")) {
+  } else if (nodeKind == Symbol::aten("quantize_per_tensor")) {
     // TODO: how to handle this case
     REQ(node->input(1)->node()->kind() != Symbol::aten("q_scale"));
 
@@ -337,7 +340,7 @@ Operator createOperator(Node* node) {
         .setAttr("zps", Operator::IntToVector, 2)
         .setAttr("out_type", Operator::String, 3)
         .setAttr("qtype", std::string("per_tensor"));
-  } else if (node->kind() == Symbol::aten("quantize_per_channel")) {
+  } else if (nodeKind == Symbol::aten("quantize_per_channel")) {
     return Operator(node, opkind::Quantize)
         .setInput(0)
         .setOutput(0)
@@ -346,7 +349,7 @@ Operator createOperator(Node* node) {
         .setAttr("axis", Operator::Int, 3)
         .setAttr("out_type", Operator::String, 4)
         .setAttr("qtype", std::string("per_channel"));
-  } else if (node->kind() == Symbol::aten("dequantize")) {
+  } else if (nodeKind == Symbol::aten("dequantize")) {
     if (node->numAttributes() == 0) {
       Node* input_node = node->input(0)->node();
       TORCH_CHECK(
@@ -384,17 +387,36 @@ Operator createOperator(Node* node) {
             .setAttr("qtype", node->s(Symbol::attr("qtype")));
       }
     }
+  } else if (nodeKind == Symbol::aten("permute")) {
+    REQ(aliasDb_->hasInputWriters(node) == false) {
+      return Operator(node, opkind::StaticTranspose)
+          .setInput(0)
+          .setOutput(0)
+          .setAttr("order", toIValue(node->input(1))->toIntVector());
+    }
+  } else if (nodeKind == Symbol::aten("contiguous")) {
+    // Contiguous should only be mapped to oneDNN Graph if the destination
+    // memory-layout is different than the source memory-format
+    // Strides would be different, but shape would be same
+    auto typeOfInput = node->input(0)->type()->expect<TensorType>();
+    auto typeOfOutput = node->output(0)->type()->expect<TensorType>();
+    auto inputStrides = typeOfInput->strides().concrete_sizes();
+    auto outputStrides = typeOfOutput->strides().concrete_sizes();
+    REQ(inputStrides != outputStrides);
+    return Operator(node, opkind::Reorder).setInput(0).setOutput(0);
   }
+
+  GRAPH_DEBUG("Making ", nodeKind.toQualString(), " a wildcard");
   return makeWildcardOp(node);
 }
 
-dnnl::graph::op createLlgaOp(Node* node) {
+dnnl::graph::op LlgaGraphHelper::createLlgaOp(Node* node) {
   return createOperator(node).llgaOp();
 }
 
-bool isSupported(Node* node) {
+bool LlgaGraphHelper::isSupported(Node* node) const {
   return createOperator(node).kind() != opkind::Wildcard;
-};
+}
 
 DeviceType inferDeviceFromValue(Value* v) {
   auto tt = v->type()->cast<TensorType>();
@@ -470,21 +492,20 @@ LlgaGraphHelper::LlgaGraphHelper(
   auto deviceType = inferDevice(graph);
   auto engineKind = getLlgaEngineKind(deviceType);
   dnnl::graph::graph g{engineKind};
-
+  aliasDb_ = torch::make_unique<torch::jit::AliasDb>(graph);
   GRAPH_DEBUG("Constructing LLGA graph");
   // TODO: select nodes in top-level block for now
   for (auto* node : graph->block()->nodes()) {
+    auto kindOfNode = node->kind();
     auto op = createLlgaOp(node);
 
     try {
       g.add_op(op);
+      GRAPH_DEBUG("  Added node ", kindOfNode.toQualString());
     } catch (std::exception& e) {
-      GRAPH_DEBUG(
-          "The backend failed to add node ", node->kind().toQualString());
+      GRAPH_DEBUG("The backend failed to add node ", kindOfNode.toQualString());
       g.add_op(makeWildcardOp(node).llgaOp());
     }
-
-    GRAPH_DEBUG("  Added node ", node->kind().toQualString());
 
     for (Value* input : node->inputs()) {
       tensorIdToValue_.emplace(input->unique(), input);
@@ -528,20 +549,6 @@ bool LlgaGraphHelper::shouldMerge(Node* toMerge, Node* subgraph) {
       opToOwningPartition_.get(subgraph);
 }
 
-bool isViewOp(Node* n) {
-  switch (n->kind()) {
-    case aten::view:
-    case aten::view_as:
-    case aten::reshape:
-    case aten::reshape_as:
-    case aten::transpose:
-    case aten::expand:
-    case aten::expand_as:
-      return true;
-  }
-  return false;
-}
-
 void checkAndRemoveAttr(Node* n, std::string attr) {
   TORCH_CHECK(
       n->hasAttributeS(attr),
@@ -583,9 +590,6 @@ bool LlgaGraphHelper::shouldConsiderForMerge(Node* node) {
   // if we're already in the process of merging
   if (isLlgaSubgraph(node)) {
     return true;
-  }
-  if (isViewOp(node)) {
-    return false;
   }
   // For a partition composed of 1 single quant, 1 single dequant or 1 single to
   // do not rewrite it in the bridge, so that the FWK may have chances
@@ -662,9 +666,11 @@ size_t LlgaGraphHelper::countSupportedOps(
     const std::shared_ptr<Graph>& graph) const {
   // TODO: count nodes in top-level block for now
   size_t cnt = 0;
-  for (auto* node : graph->block()->nodes())
-    if (isSupported(node))
+  for (auto* node : graph->block()->nodes()) {
+    if (isSupported(node)) {
       cnt++;
+    }
+  }
   return cnt;
 }
 
