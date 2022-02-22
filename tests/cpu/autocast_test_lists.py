@@ -108,3 +108,15 @@ class AutocastCPUTestLists(object):
         ]
         self.nn_fp32_multi_output = [
         ]
+        self.torch_fallthrough = [
+            ("avg_pool1d", torch.tensor([[[1, 2, 3, 4, 5, 6, 7]]], dtype=torch.bfloat16), {"kernel_size": 3, "stride": 2}),
+            ("adaptive_max_pool1d", (torch.randn(1, 64, 8, dtype=torch.bfloat16), 5)),
+            ("binary_cross_entropy_with_logits", (torch.randn(3, dtype=torch.bfloat16), torch.rand(3, dtype=torch.bfloat16).random_(2))),
+            ("tril", (torch.randn((3, 3), dtype=torch.bfloat16), 1)),
+            ("triu", (torch.randn((3, 3), dtype=torch.bfloat16), 1)),
+            ("dot", (torch.randn((3,), dtype=torch.bfloat16), torch.randn((3,), dtype=torch.bfloat16))),
+            ("vdot", (torch.randn((3,), dtype=torch.bfloat16), torch.randn((3,), dtype=torch.bfloat16))),
+            ("cummax", (torch.randn((3, 3), dtype=torch.bfloat16), 0)),
+            ("cummin", (torch.randn((3, 3), dtype=torch.bfloat16), 0)),
+            ("lu_unpack", (torch.tensor([[ 0.3184, -2.5522,  1.5607]], dtype=torch.bfloat16), torch.tensor([1], dtype=torch.int32)))
+        ]
