@@ -219,18 +219,19 @@ static at::Tensor convolution(
   auto wei_data_t =
       src.is_quantized() ? memory::data_type::s8 : get_onednn_dtype(wgh);
   auto dst_data_t = dst.defined() ? get_onednn_dtype(dst) : src_data_t;
-  auto bia_data_t = memory::data_type::f32;
-  auto usr_bia_data_t = memory::data_type::f32;
 
-  if (bia.defined()) {
-    bia_data_t = get_onednn_dtype(bia);
-  }
+  // if src is quant, set bia data type to f32
+  // if src is not quant, get user demanded data type
+  auto bia_data_t = bia.defined() && src.is_quantized()
+      ? memory::data_type::f32
+      : bia.defined() ? get_onednn_dtype(bia) : memory::data_type::undef;
 
-  // master wgh
-  if (src_data_t == memory::data_type::bf16) {
-    wei_data_t = memory::data_type::bf16;
-    bia_data_t = memory::data_type::bf16;
-    dst_data_t = src_data_t;
+  if (memory::data_type::bf16 == src_data_t && bia.defined()) {
+    // if src data type is bf16 and bia is defined, bia data type must be bf16
+    // or f32
+    TORCH_CHECK(
+        memory::data_type::f32 == bia_data_t ||
+        memory::data_type::bf16 == bia_data_t);
   }
 
   auto ic = src.size(1);
@@ -431,10 +432,7 @@ static at::Tensor convolution(
       }
       wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
     } else {
-      auto wgh_opt = wgh.options();
-      wgh_opt = src_data_t == memory::data_type::bf16 ? wgh_opt.dtype(kBFloat16)
-                                                      : wgh_opt;
-      wgh_ = empty_opaque_tensor(expected_wgh_md, wgh_opt, c10::nullopt);
+      wgh_ = empty_opaque_tensor(expected_wgh_md, wgh.options(), c10::nullopt);
     }
 
     wgh_m = dpcpp_onednn_memory(expected_wgh_md, engine, wgh_.data_ptr());
@@ -470,15 +468,9 @@ static at::Tensor convolution(
   if (bia.defined()) {
     auto bia_ctx = DPCPPTensorContext::get_tensor_ctx(bia);
 
-    auto real_bia_data_t = usr_bia_data_t;
-    auto bia_ptr = bia.data_ptr();
-    if (src_data_t == memory::data_type::bf16) {
-      real_bia_data_t = bia_data_t;
-      bia_ptr = bia.to(ScalarType::BFloat16).data_ptr();
-    }
     bia_m = bia_ctx.is_plain()
         ? dpcpp_onednn_memory(
-              {bia_tz, real_bia_data_t, fmt_bia}, engine, bia_ptr)
+              {bia_tz, bia_data_t, fmt_bia}, engine, bia.data_ptr())
         : dpcpp_onednn_memory({bia_ctx.meta()}, engine, bia.data_ptr());
 
     if (bia_ctx.is_plain() && src.is_quantized()) {
