@@ -340,6 +340,54 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::matmul"),
       TORCH_FN((&torch_ipex::autocast::matmul)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::avg_pool1d"),
+      TORCH_FN((&torch_ipex::autocast::avg_pool1d)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::binary_cross_entropy_with_logits"),
+      TORCH_FN((&torch_ipex::autocast::binary_cross_entropy_with_logits)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::searchsorted.Tensor"),
+      TORCH_FN((&torch_ipex::autocast::searchsorted_tensor)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::searchsorted.Scalar"),
+      TORCH_FN((&torch_ipex::autocast::searchsorted_scalar)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::tril"),
+      TORCH_FN((&torch_ipex::autocast::tril)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::triu"),
+      TORCH_FN((&torch_ipex::autocast::triu)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::dot"),
+      TORCH_FN((&torch_ipex::autocast::dot)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::vdot"),
+      TORCH_FN((&torch_ipex::autocast::vdot)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::im2col"),
+      TORCH_FN((&torch_ipex::autocast::im2col)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::col2im"),
+      TORCH_FN((&torch_ipex::autocast::col2im)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::cummax"),
+      TORCH_FN((&torch_ipex::autocast::cummax)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::cummax.dimname"),
+      TORCH_FN((&torch_ipex::autocast::cummax_dimname)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::cummin"),
+      TORCH_FN((&torch_ipex::autocast::cummin)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::cummin.dimname"),
+      TORCH_FN((&torch_ipex::autocast::cummin_dimname)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::lu_unpack"),
+      TORCH_FN((&torch_ipex::autocast::lu_unpack)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::adaptive_max_pool1d"),
+      TORCH_FN((&torch_ipex::autocast::adaptive_max_pool1d)));
 }
 
 } // namespace autocast
