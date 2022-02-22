@@ -506,187 +506,127 @@ at::Tensor avg_pool1d(
     bool count_include_pad) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   return at::avg_pool1d(
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
+      input, kernel_size, stride, padding, ceil_mode, count_include_pad);
 }
 
 at::Tensor binary_cross_entropy_with_logits(
-    const at::Tensor & self,
-    const at::Tensor & target,
-    const c10::optional<at::Tensor> & weight,
-    const c10::optional<at::Tensor> & pos_weight,
+    const at::Tensor& self,
+    const at::Tensor& target,
+    const c10::optional<at::Tensor>& weight,
+    const c10::optional<at::Tensor>& pos_weight,
     int64_t reduction) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   return at::binary_cross_entropy_with_logits(
-      self,
-      target,
-      weight,
-      pos_weight,
-      reduction);
+      self, target, weight, pos_weight, reduction);
 }
 
 at::Tensor searchsorted_tensor(
-    const at::Tensor & sorted_sequence,
-    const at::Tensor & self,
+    const at::Tensor& sorted_sequence,
+    const at::Tensor& self,
     bool out_int32,
     bool right,
     c10::optional<c10::string_view> side,
-    const c10::optional<at::Tensor> & sorter) {
+    const c10::optional<at::Tensor>& sorter) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   return at::searchsorted(
-      sorted_sequence,
-      self,
-      out_int32,
-      right,
-      side,
-      sorter);
+      sorted_sequence, self, out_int32, right, side, sorter);
 }
 
 at::Tensor searchsorted_scalar(
-    const at::Tensor & sorted_sequence,
-    const at::Scalar & self,
+    const at::Tensor& sorted_sequence,
+    const at::Scalar& self,
     bool out_int32,
     bool right,
     c10::optional<c10::string_view> side,
-    const c10::optional<at::Tensor> & sorter) {
+    const c10::optional<at::Tensor>& sorter) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   return at::searchsorted(
-      sorted_sequence,
-      self,
-      out_int32,
-      right,
-      side,
-      sorter);
+      sorted_sequence, self, out_int32, right, side, sorter);
 }
 
-at::Tensor tril(
-    const at::Tensor & self,
-    int64_t diagonal) {
+at::Tensor tril(const at::Tensor& self, int64_t diagonal) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::tril(
-      self,
-      diagonal);
+  return at::tril(self, diagonal);
 }
 
-at::Tensor triu(
-    const at::Tensor & self,
-    int64_t diagonal) {
+at::Tensor triu(const at::Tensor& self, int64_t diagonal) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::triu(
-      self,
-      diagonal);
+  return at::triu(self, diagonal);
 }
 
-at::Tensor dot(
-    const at::Tensor & self,
-    const at::Tensor & tensor) {
+at::Tensor dot(const at::Tensor& self, const at::Tensor& tensor) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::dot(
-      self,
-      tensor);
+  return at::dot(self, tensor);
 }
 
-at::Tensor vdot(
-    const at::Tensor & self,
-    const at::Tensor & other) {
+at::Tensor vdot(const at::Tensor& self, const at::Tensor& other) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::vdot(
-      self,
-      other);
+  return at::vdot(self, other);
 }
 
 at::Tensor im2col(
-    const at::Tensor & self,
+    const at::Tensor& self,
     at::IntArrayRef kernel_size,
     at::IntArrayRef dilation,
     at::IntArrayRef padding,
     at::IntArrayRef stride) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::im2col(
-      self,
-      kernel_size, 
-      dilation,
-      padding,
-      stride);
+  return at::im2col(self, kernel_size, dilation, padding, stride);
 }
 
 at::Tensor col2im(
-    const at::Tensor & self,
+    const at::Tensor& self,
     at::IntArrayRef output_size,
     at::IntArrayRef kernel_size,
     at::IntArrayRef dilation,
     at::IntArrayRef padding,
     at::IntArrayRef stride) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::col2im(
-      self,
-      output_size,
-      kernel_size, 
-      dilation,
-      padding,
-      stride);
+  return at::col2im(self, output_size, kernel_size, dilation, padding, stride);
 }
 
-::std::tuple<at::Tensor,at::Tensor> cummax(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummax(
+    const at::Tensor& self,
     int64_t dim) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::cummax(
-      self,
-      dim);
+  return at::cummax(self, dim);
 }
 
-::std::tuple<at::Tensor,at::Tensor> cummax_dimname(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummax_dimname(
+    const at::Tensor& self,
     at::Dimname dim) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::cummax(
-      self,
-      dim);
+  return at::cummax(self, dim);
 }
 
-::std::tuple<at::Tensor,at::Tensor> cummin(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummin(
+    const at::Tensor& self,
     int64_t dim) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::cummin(
-      self,
-      dim);
+  return at::cummin(self, dim);
 }
 
-::std::tuple<at::Tensor,at::Tensor> cummin_dimname(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummin_dimname(
+    const at::Tensor& self,
     at::Dimname dim) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::cummin(
-      self,
-      dim);
+  return at::cummin(self, dim);
 }
 
-::std::tuple<at::Tensor,at::Tensor,at::Tensor> lu_unpack(
-    const at::Tensor & LU_data,
-    const at::Tensor & LU_pivots,
+::std::tuple<at::Tensor, at::Tensor, at::Tensor> lu_unpack(
+    const at::Tensor& LU_data,
+    const at::Tensor& LU_pivots,
     bool unpack_data,
     bool unpack_pivots) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::lu_unpack(
-      LU_data,
-      LU_pivots,
-      unpack_data,
-      unpack_pivots);
+  return at::lu_unpack(LU_data, LU_pivots, unpack_data, unpack_pivots);
 }
 
-::std::tuple<at::Tensor,at::Tensor> adaptive_max_pool1d(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> adaptive_max_pool1d(
+    const at::Tensor& self,
     at::IntArrayRef output_size) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  return at::adaptive_max_pool1d(
-      self,
-      output_size);
+  return at::adaptive_max_pool1d(self, output_size);
 }
 
 } // namespace autocast

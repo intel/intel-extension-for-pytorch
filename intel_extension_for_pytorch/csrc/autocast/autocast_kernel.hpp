@@ -219,83 +219,75 @@ at::Tensor avg_pool1d(
     bool count_include_pad);
 
 at::Tensor binary_cross_entropy_with_logits(
-    const at::Tensor & self,
-    const at::Tensor & target,
-    const c10::optional<at::Tensor> & weight,
-    const c10::optional<at::Tensor> & pos_weight,
+    const at::Tensor& self,
+    const at::Tensor& target,
+    const c10::optional<at::Tensor>& weight,
+    const c10::optional<at::Tensor>& pos_weight,
     int64_t reduction);
 
 at::Tensor searchsorted_tensor(
-    const at::Tensor & sorted_sequence,
-    const at::Tensor & self,
+    const at::Tensor& sorted_sequence,
+    const at::Tensor& self,
     bool out_int32,
     bool right,
     c10::optional<c10::string_view> side,
-    const c10::optional<at::Tensor> & sorter);
+    const c10::optional<at::Tensor>& sorter);
 
 at::Tensor searchsorted_scalar(
-    const at::Tensor & sorted_sequence,
-    const at::Scalar & self,
+    const at::Tensor& sorted_sequence,
+    const at::Scalar& self,
     bool out_int32,
     bool right,
     c10::optional<c10::string_view> side,
-    const c10::optional<at::Tensor> & sorter);
+    const c10::optional<at::Tensor>& sorter);
 
-at::Tensor tril(
-    const at::Tensor & self,
-    int64_t diagonal);
+at::Tensor tril(const at::Tensor& self, int64_t diagonal);
 
-at::Tensor triu(
-    const at::Tensor & self,
-    int64_t diagonal);
+at::Tensor triu(const at::Tensor& self, int64_t diagonal);
 
-at::Tensor dot(
-    const at::Tensor & self,
-    const at::Tensor & tensor);
+at::Tensor dot(const at::Tensor& self, const at::Tensor& tensor);
 
-at::Tensor vdot(
-    const at::Tensor & self,
-    const at::Tensor & other);
+at::Tensor vdot(const at::Tensor& self, const at::Tensor& other);
 
 at::Tensor im2col(
-    const at::Tensor & self,
+    const at::Tensor& self,
     at::IntArrayRef kernel_size,
     at::IntArrayRef dilation,
     at::IntArrayRef padding,
     at::IntArrayRef stride);
 
 at::Tensor col2im(
-    const at::Tensor & self,
+    const at::Tensor& self,
     at::IntArrayRef output_size,
     at::IntArrayRef kernel_size,
     at::IntArrayRef dilation,
     at::IntArrayRef padding,
     at::IntArrayRef stride);
 
-::std::tuple<at::Tensor,at::Tensor> cummax(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummax(
+    const at::Tensor& self,
     int64_t dim);
 
-::std::tuple<at::Tensor,at::Tensor> cummax_dimname(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummax_dimname(
+    const at::Tensor& self,
     at::Dimname dim);
 
-::std::tuple<at::Tensor,at::Tensor> cummin(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummin(
+    const at::Tensor& self,
     int64_t dim);
 
-::std::tuple<at::Tensor,at::Tensor> cummin_dimname(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> cummin_dimname(
+    const at::Tensor& self,
     at::Dimname dim);
 
-::std::tuple<at::Tensor,at::Tensor,at::Tensor> lu_unpack(
-    const at::Tensor & LU_data,
-    const at::Tensor & LU_pivots,
+::std::tuple<at::Tensor, at::Tensor, at::Tensor> lu_unpack(
+    const at::Tensor& LU_data,
+    const at::Tensor& LU_pivots,
     bool unpack_data,
     bool unpack_pivots);
 
-::std::tuple<at::Tensor,at::Tensor> adaptive_max_pool1d(
-    const at::Tensor & self,
+::std::tuple<at::Tensor, at::Tensor> adaptive_max_pool1d(
+    const at::Tensor& self,
     at::IntArrayRef output_size);
 } // namespace autocast
 } // namespace torch_ipex

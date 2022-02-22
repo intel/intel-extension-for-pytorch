@@ -1231,74 +1231,90 @@ class Tester(TestCase):
                 ConvSwishOutplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
                 prec=0.02)
             self._test_output(
                 ConvSwishInplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_swish_run")
+                kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
             self._test_output_bf16(
                 ConvSwishInplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
                 prec=0.02)
             self._test_output(
                 ConvSiluOutplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_swish_run")
+                kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
             self._test_output(
                 ConvSiluInplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_swish_run")
+                kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
             self._test_output_bf16(
                 ConvSiluOutplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
                 prec=0.02)
             self._test_output_bf16(
                 ConvSiluInplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
+                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
                 prec=0.02)
             self._test_output(
                 ConvSigmoidOutplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run")
+                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
+                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack")
             self._test_output_bf16(
                 ConvSigmoidOutplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_sigmoid_run",
+                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack",
                 prec=0.02)
             self._test_output(
                 ConvSigmoidInplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run")
+                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
+                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack")
             self._test_output_bf16(
                 ConvSigmoidInplace(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_sigmoid_run",
+                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack",
                 prec=0.02)
             self._test_output(
                 ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size, True),
                 x,
-                kind_in_graph="ipex_prepack::convolution_hardtanh_run")
+                kind_in_graph="ipex_prepack::convolution_hardtanh_run",
+                kind_not_in_graph="ipex_prepack::convolution_hardtanh_prepack")
             self._test_output_bf16(
                 ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size, True),
                 x,
                 kind_in_graph="ipex_prepack::convolution_hardtanh_run",
+                kind_not_in_graph="ipex_prepack::convolution_hardtanh_prepack",
                 prec=0.02)
             self._test_output(
                 ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_hardtanh_run")
+                kind_in_graph="ipex_prepack::convolution_hardtanh_run",
+                kind_not_in_graph="ipex_prepack::convolution_hardtanhprepack")
             self._test_output_bf16(
                 ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
                 kind_in_graph="ipex_prepack::convolution_hardtanh_run",
+                kind_not_in_graph="ipex_prepack::convolution_hardtanh_prepack",
                 prec=0.02)
             self._test_output(
                 ConvElu(dim, in_channels, out_channels, kernel_size, image_size, True),
                 x,
-                kind_in_graph="ipex_prepack::convolution_elu_run")
+                kind_in_graph="ipex_prepack::convolution_elu_run",
+                kind_not_in_graph="ipex_prepack::convolution_elu_prepack")
             # self._test_output_bf16(
             #     ConvElu(in_channels, out_channels, kernel_size, image_size, True),
             #     torch.randn(batch_size, in_channels, image_size, image_size),
@@ -1307,7 +1323,8 @@ class Tester(TestCase):
             self._test_output(
                 ConvElu(dim, in_channels, out_channels, kernel_size, image_size),
                 x,
-                kind_in_graph="ipex_prepack::convolution_elu_run")
+                kind_in_graph="ipex_prepack::convolution_elu_run",
+                kind_not_in_graph="ipex_prepack::convolution_elu_prepack")
             # self._test_output_bf16(
             #     ConvElu(in_channels, out_channels, kernel_size, image_size),
             #     torch.randn(batch_size, in_channels, image_size, image_size),
@@ -1408,7 +1425,7 @@ class Tester(TestCase):
                 Conv_Conv_Concat(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
                 kind_in_graph="ipex_prepack::convolution_run",
-                kind_not_in_graph=None)
+                kind_not_in_graph="ipex_prepack::convolution_prepack")
 
     def test_output_conv_relu_add(self):
         batch_size = 8
@@ -1424,7 +1441,8 @@ class Tester(TestCase):
             self._test_output(
                 Conv_Relu_Add(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
-                kind_in_graph="ipex_prepack::convolution_relu_run")
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_relu_prepack")
 
     def test_output_conv_scalar_binary(self):
         for bias in [True, False]:
@@ -1658,7 +1676,8 @@ class Tester(TestCase):
             self._test_output(
                 Conv_Bn_Relu(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
-                kind_in_graph="ipex_prepack::convolution_relu_run")
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_relu_prepack")
 
     def test_output_conv_reshape_relu(self):
         batch_size = 8
@@ -1737,11 +1756,13 @@ class Tester(TestCase):
             self._test_output(
                 ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
-                kind_in_graph="ipex_prepack::convolution_add_run")
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack")
             self._test_output_bf16(
                 ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
                 kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 prec=0.1)
 
             # add outputs' have different data format
@@ -1754,6 +1775,7 @@ class Tester(TestCase):
                 m,
                 x,
                 kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 use_channels_last=[False])
             m = ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
             if dim == 2:
@@ -1764,6 +1786,7 @@ class Tester(TestCase):
                 m,
                 x,
                 kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 prec=0.1,
                 use_channels_last=[False])
 
@@ -1928,12 +1951,12 @@ class Tester(TestCase):
                 "groups": 1,
                 "dilation": 3,
             }
-            
+
             params_list = []
 
             for key, value in params_dict.items():
                 params_list.append(value)
-            return params_list 
+            return params_list
 
         params_list = _deconv_params_list()
 
@@ -1953,27 +1976,26 @@ class Tester(TestCase):
                     model,
                     x,
                     kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="aten::conv_transpose2d",
+                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
                     levels=["O0"])
-                if int(torch.__version__.split('.')[0]) != 1 or int(torch.__version__.split('.')[1]) != 11:
-                    self._test_output_bf16(
-                        model,
-                        x,
-                        kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                        kind_not_in_graph="aten::conv_transpose2d",
-                        levels=["O0"],
-                        prec=0.02)
+                self._test_output_bf16(
+                    model,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
+                    levels=["O0"],
+                    prec=0.02)
                 self._test_output(
                     model,
                     x,
                     kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="torch_ipex::conv_transpose2d",
+                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
                     levels=["O1"])
                 self._test_output_bf16(
                     model,
                     x,
                     kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="torch_ipex::conv_transpose2d",
+                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
                     levels=["O1"],
                     prec=0.02)
 
@@ -2128,6 +2150,7 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_relu_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
             prec=0.02)
         self._test_output(
             LinearRelu(3, 32, bias=False),
@@ -2137,6 +2160,7 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_relu_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
             prec=0.02)
 
     def test_output_linear_add(self):
@@ -2160,6 +2184,7 @@ class Tester(TestCase):
             LinearSigmoid(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
             prec=0.02)
 
     def test_output_linear_bn(self):
@@ -2183,6 +2208,7 @@ class Tester(TestCase):
             LinearGelu(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_gelu_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
             prec=5e-3)
         self._test_output(
             LinearGelu(3, 32, bias=False),
@@ -2192,8 +2218,9 @@ class Tester(TestCase):
             LinearGelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_gelu_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
             prec=5e-3)
-    
+
     def test_output_linear_swish(self):
         self._test_output(
             LinearSwish_v1(3, 32, bias=True),
