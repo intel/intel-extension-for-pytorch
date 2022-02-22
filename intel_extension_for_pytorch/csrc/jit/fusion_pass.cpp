@@ -3,6 +3,7 @@
 #include "autocast/autocast_mode.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
+#include "cpu/passes/prepack_folding.h"
 
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
@@ -407,6 +408,8 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
+  // folding prepacking ops.
+  PrePackingOpsFolder(graph);
 }
 
 bool checkQuantization(Block* block) {
