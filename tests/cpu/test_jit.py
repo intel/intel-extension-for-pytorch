@@ -1955,13 +1955,14 @@ class Tester(TestCase):
                     kind_in_graph="ipex_prepack::conv_transpose2d_run",
                     kind_not_in_graph="aten::conv_transpose2d",
                     levels=["O0"])
-                self._test_output_bf16(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="aten::conv_transpose2d",
-                    levels=["O0"],
-                    prec=0.02)
+                if int(torch.__version__.split('.')[0]) != 1 or int(torch.__version__.split('.')[1]) != 11:
+                    self._test_output_bf16(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose2d_run",
+                        kind_not_in_graph="aten::conv_transpose2d",
+                        levels=["O0"],
+                        prec=0.02)
                 self._test_output(
                     model,
                     x,
