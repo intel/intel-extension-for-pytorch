@@ -35,6 +35,22 @@ Ret FallThroughFuction(
   }
 }
 
+template <class Ret, class F, class... Args>
+Ret FP32CastFunction(
+    F Quant,
+    F At,
+    std::string register_op_name,
+    Args... args) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto at_target_type = at::kFloat;
+  auto target_type = get_autocast_dtype();
+  if (is_quantization_enabled()) {
+    return Quant(cpu_cached_cast(target_type, args)...);
+  } else {
+    return At(cpu_cached_cast(at_target_type, args)...);
+  }
+}
+
 at::Tensor conv2d(
     const at::Tensor& input,
     const at::Tensor& weight,
@@ -86,7 +102,7 @@ at::Tensor conv_transpose3d(
     at::IntArrayRef output_padding,
     int64_t groups,
     at::IntArrayRef dilation) {
-  return DataTypeCastFuction<at::Tensor>(
+  return FP32CastFunction<at::Tensor>(
       int8::conv_transpose3d,
       at::conv_transpose3d,
       "conv_transpose3d",

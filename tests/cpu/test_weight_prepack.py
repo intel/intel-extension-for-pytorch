@@ -556,7 +556,7 @@ class TestPrepackCases(TestCase):
                             y_origin = origin_model(x)
                             y_ipex = ipex_model(x)
 
-                        self.assertEqual(y_origin, y_ipex)
+                        self.assertEqual(y_origin, y_ipex, exact_dtype=False)
                     else:
                         model.train()
                         origin_model = copy.deepcopy(model).train()
@@ -583,9 +583,9 @@ class TestPrepackCases(TestCase):
                             ipex_optimizer.zero_grad()
                             loss2.backward()
                             ipex_optimizer.step()
-                            self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1)
-                            self.assertEqual(loss1, loss2, rtol=1e-1, atol=1e-1)  # TODO: 1e-2 cannot pass, check it
-                            self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-1)
+                            self.assertEqual(y1, y2, rtol=1e-2, atol=1e-1, exact_dtype=False)
+                            self.assertEqual(loss1, loss2, rtol=1e-1, atol=1e-1, exact_dtype=False)  # TODO: 1e-2 cannot pass, check it
+                            self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-1, exact_dtype=False)
                             if bias:
                                 self.assertEqual(origin_model.deconv.bias.grad, ipex_model.deconv.bias.grad.float())
 

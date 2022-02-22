@@ -219,32 +219,6 @@ MAKE_REGISTER_FUNC(
         const Scalar&,
         const Scalar&),
     user_defined_dtype)
-MAKE_REGISTER_FUNC(
-    ADD_NS(conv_transpose1d),
-    "conv_transpose1d",
-    Tensor(
-        const Tensor&,
-        const Tensor&,
-        const c10::optional<Tensor>&,
-        IntArrayRef,
-        IntArrayRef,
-        IntArrayRef,
-        int64_t,
-        IntArrayRef),
-    user_defined_dtype)
-MAKE_REGISTER_FUNC(
-    ADD_NS(conv_transpose2d),
-    "conv_transpose2d.input",
-    Tensor(
-        const Tensor&,
-        const Tensor&,
-        const c10::optional<Tensor>&,
-        IntArrayRef,
-        IntArrayRef,
-        IntArrayRef,
-        int64_t,
-        IntArrayRef),
-    user_defined_dtype)
 
 // fp32 cast policy a.k.a BlackList
 MAKE_REGISTER_FUNC(
