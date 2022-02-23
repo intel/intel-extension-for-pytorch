@@ -10,6 +10,7 @@
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
+#include "csrc/jit/cpu/kernels/LinearSwishCustomized.h"
 #include "csrc/jit/cpu/kernels/Matmul.h"
 #include "csrc/jit/cpu/kernels/MaxPool2D.h"
 #include "csrc/jit/cpu/kernels/Mha.h"
@@ -522,6 +523,18 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::linear_swish_customized(Tensor x, Tensor weight, Tensor ? bias) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_linear_swish_customized(
+              peek(stack, 0, 3).toTensor(),
+              peek(stack, 1, 3).toTensor(),
+              toOptionalTensor(std::move(peek(stack, 2, 3))));
+          drop(stack, 3);
+          pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::distil_mha_scores_calc(Tensor q, Tensor k, Tensor mask_qk, "
         "int[] mask_qk_reshp, int transpose_dim_a, int transpose_dim_b, "
         "Scalar fill, Scalar dim_per_head, int softmax_dim, ScalarType ? dtype) "
@@ -539,6 +552,20 @@ RegisterOperators op({
               peek(stack, 8, 10).toInt(),
               peek(stack, 9, 10));
           drop(stack, 10);
+
+          pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::linear_swish_customized(Tensor x, Tensor weight, Tensor ? bias) -> Tensor",
+        [](Stack& stack) {
+          auto result = dil_linear_swish_customized(
+              peek(stack, 0, 3).toTensor(),
+              peek(stack, 1, 3).toTensor(),
+              toOptionalTensor(std::move(peek(stack, 2, 3))));
+          drop(stack, 3);
+
           pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
