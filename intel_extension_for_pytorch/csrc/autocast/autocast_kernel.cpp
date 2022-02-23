@@ -42,12 +42,10 @@ Ret FP32CastFunction(
     std::string register_op_name,
     Args... args) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  auto at_target_type = at::kFloat;
-  auto target_type = get_autocast_dtype();
   if (is_quantization_enabled()) {
-    return Quant(cpu_cached_cast(target_type, args)...);
+    return Quant(cpu_cached_cast(at::kFloat, args)...);
   } else {
-    return At(cpu_cached_cast(at_target_type, args)...);
+    return At(cpu_cached_cast(at::kFloat, args)...);
   }
 }
 
