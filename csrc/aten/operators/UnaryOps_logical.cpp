@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
@@ -30,15 +29,6 @@ void logical_not_kernel(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor logical_not(const Tensor& self) {
-  Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::logical_not_out(result, self);
-}
-
-Tensor& logical_not_(Tensor& self) {
-  return at::AtenIpexTypeXPU::logical_not_out(self, self);
-}
-
 Tensor& logical_not_out(Tensor& result, const Tensor& self) {
   TensorIterator iter = TensorIteratorConfig()
                             .check_all_same_dtype(false)
@@ -48,6 +38,15 @@ Tensor& logical_not_out(Tensor& result, const Tensor& self) {
                             .build();
   impl::logical_not_kernel(iter);
   return result;
+}
+
+Tensor logical_not(const Tensor& self) {
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::AtenIpexTypeXPU::logical_not_out(result, self);
+}
+
+Tensor& logical_not_(Tensor& self) {
+  return at::AtenIpexTypeXPU::logical_not_out(self, self);
 }
 
 } // namespace AtenIpexTypeXPU

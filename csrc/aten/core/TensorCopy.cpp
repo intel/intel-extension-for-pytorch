@@ -1,9 +1,14 @@
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/core/Tensor.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <core/TensorCopy.h>
 #include <core/TensorImplUtils.h>
+
+namespace at {
+namespace AtenIpexTypeXPU {
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking);
+}
+} // namespace at
 
 namespace xpu {
 namespace dpcpp {

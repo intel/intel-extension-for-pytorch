@@ -1,4 +1,3 @@
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/Functions.h>
 #include <ATen/ScalarOps.h>
@@ -16,6 +15,10 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Scalar _local_scalar_dense(const Tensor& self);
+Tensor min(const Tensor& self);
+
 namespace impl {
 
 void eq_kernel_dpcpp(TensorIterator& iter) {

@@ -1,7 +1,6 @@
 #include <torch/csrc/THP.h>
 #include <torch/csrc/utils.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <c10/core/ScalarType.h>
 #include <core/Allocator.h>
 #include <core/Memory.h>
@@ -11,6 +10,12 @@
 #include <torch/csrc/DynamicTypes.h>
 #include <torch/csrc/autograd/utils/wrap_outputs.h>
 #include <torch/csrc/copy_utils.h>
+
+namespace at {
+namespace AtenIpexTypeXPU {
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking);
+}
+} // namespace at
 
 template <typename scalar_t>
 scalar_t THPUtils_unpackReal(PyObject*) {

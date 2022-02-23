@@ -6,7 +6,6 @@
 #include <iterator>
 #include <tuple>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
 #include "comm/PSTLFunctions.h"

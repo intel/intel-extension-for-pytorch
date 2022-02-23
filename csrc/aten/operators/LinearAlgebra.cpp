@@ -13,6 +13,12 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+const Tensor& resize_as_(
+    const Tensor& self,
+    const Tensor& the_template,
+    c10::optional<MemoryFormat> memory_format);
+
 namespace impl {
 
 template <typename scalar_t>

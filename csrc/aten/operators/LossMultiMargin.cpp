@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 #include <ATen/core/Reduction.h>

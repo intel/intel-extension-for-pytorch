@@ -2,7 +2,6 @@
 
 #include <ATen/ATen.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/record_function.h>
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Reorder.h>

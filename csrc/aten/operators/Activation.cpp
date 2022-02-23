@@ -22,6 +22,9 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor& mul_out(Tensor& out, const Tensor& self, const Tensor& other);
+
 namespace impl {
 
 template <typename scalar_t>

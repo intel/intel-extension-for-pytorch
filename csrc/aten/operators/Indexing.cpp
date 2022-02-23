@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Memory.h>
@@ -26,6 +25,9 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype);
+
 namespace impl {
 
 template <typename scalar_t>

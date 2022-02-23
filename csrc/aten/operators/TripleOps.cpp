@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Context.h>
 #include <ATen/SparseTensorUtils.h>
 #include <ATen/native/BinaryOps.h>
@@ -20,6 +19,12 @@ using namespace at::sparse;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+std::tuple<Tensor, Tensor> sort(
+    const Tensor& self,
+    int64_t dim,
+    bool descending);
+
 namespace impl {
 
 static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {

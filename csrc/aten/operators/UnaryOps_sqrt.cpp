@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>

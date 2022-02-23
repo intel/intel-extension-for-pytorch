@@ -11,6 +11,11 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+const Tensor& resize_as_(
+    const Tensor& self,
+    const Tensor& the_template,
+    c10::optional<MemoryFormat> memory_format);
+
 #define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)             \
   template <typename scalar_t>                                   \
   struct Tensor_##NAME##_##REAL##_Op {                           \

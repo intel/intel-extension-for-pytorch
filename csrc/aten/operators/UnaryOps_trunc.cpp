@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"

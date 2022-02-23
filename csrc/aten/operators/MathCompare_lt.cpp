@@ -1,4 +1,3 @@
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/Functions.h>
 #include <ATen/ScalarOps.h>

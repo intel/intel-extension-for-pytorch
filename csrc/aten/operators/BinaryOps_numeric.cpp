@@ -1,4 +1,3 @@
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>

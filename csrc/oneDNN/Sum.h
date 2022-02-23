@@ -3,7 +3,6 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/Utils.h>
 #include <runtime/Utils.h>

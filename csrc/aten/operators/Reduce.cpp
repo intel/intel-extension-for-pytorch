@@ -1,4 +1,3 @@
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/Context.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
@@ -19,6 +18,9 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor& mul_out(Tensor& out, const Tensor& self, const Tensor& other);
+
 namespace impl {
 
 using DimMask = TensorIterator::DimMask;
@@ -805,10 +807,6 @@ Tensor& mean_out(
   return result;
 }
 
-Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
-  return at::AtenIpexTypeXPU::mean(self, IntArrayRef{}, false, dtype);
-}
-
 Tensor mean(
     const Tensor& self,
     IntArrayRef dim,
@@ -816,6 +814,10 @@ Tensor mean(
     optional<ScalarType> dtype) {
   Tensor result;
   return at::AtenIpexTypeXPU::mean_out(result, self, dim, keepdim, dtype);
+}
+
+Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
+  return at::AtenIpexTypeXPU::mean(self, IntArrayRef{}, false, dtype);
 }
 
 Tensor min_out(

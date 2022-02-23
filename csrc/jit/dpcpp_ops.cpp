@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
 #include <intrinsic/ipex_intrinsic.h>
@@ -8,6 +7,13 @@
 #include <oneDNN/oneDNN.h>
 
 using namespace xpu::oneDNN;
+
+namespace at {
+namespace AtenIpexTypeXPU {
+Tensor add(const Tensor& self, const Tensor& other, const Scalar& alpha);
+Tensor mul(const Tensor& self, Scalar other);
+} // namespace AtenIpexTypeXPU
+} // namespace at
 
 namespace torch {
 namespace jit {

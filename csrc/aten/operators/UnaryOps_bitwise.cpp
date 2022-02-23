@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
@@ -28,15 +27,6 @@ void bitwise_not_kernel_dpcpp(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor bitwise_not(const Tensor& self) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::bitwise_not_out(result, self);
-}
-
-Tensor& bitwise_not_(Tensor& self) {
-  return at::AtenIpexTypeXPU::bitwise_not_out(self, self);
-}
-
 Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
   auto iter = TensorIterator::unary_op(out, self);
   impl::bitwise_not_kernel_dpcpp(iter);
@@ -44,6 +34,15 @@ Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
   at::namedinference::propagate_names(out, self);
 #endif
   return out;
+}
+
+Tensor bitwise_not(const Tensor& self) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::bitwise_not_out(result, self);
+}
+
+Tensor& bitwise_not_(Tensor& self) {
+  return at::AtenIpexTypeXPU::bitwise_not_out(self, self);
 }
 
 } // namespace AtenIpexTypeXPU

@@ -1,5 +1,3 @@
-
-#include <ATen/AtenIpexTypeXPU.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -14,6 +12,8 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor& fill_slice_with_index(at::Tensor& t, int dim);
 
 std::tuple<Tensor&, Tensor&> sort_out(
     Tensor& sorted,

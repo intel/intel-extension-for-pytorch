@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/div_rtn.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -19,6 +18,16 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor& col2im_out(
+    Tensor& out,
+    const Tensor& self,
+    IntArrayRef output_size,
+    IntArrayRef kernel_size,
+    IntArrayRef dilation,
+    IntArrayRef padding,
+    IntArrayRef stride);
+
 namespace impl {
 
 static void im2col_out_template(

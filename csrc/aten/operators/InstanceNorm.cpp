@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/MatrixRef.h>
 #include <ATen/cpp_custom_type_hack.h>

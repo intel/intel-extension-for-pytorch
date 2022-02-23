@@ -1,7 +1,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/WrapDimUtils.h>
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <assert.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
@@ -18,6 +17,12 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+const Tensor& resize_(
+    const Tensor& self,
+    IntArrayRef size,
+    c10::optional<MemoryFormat> memory_format);
+
 namespace {
 
 template <typename T>

@@ -5,7 +5,6 @@
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include <utils/oneMKLUtils.h>
 #include "Distributions.h"
 #include "Random.h"

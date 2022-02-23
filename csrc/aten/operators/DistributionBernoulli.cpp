@@ -5,12 +5,17 @@
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 
-#include <ATen/AtenIpexTypeXPU.h>
 #include "Distributions.h"
 #include "Random.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+Tensor& uniform_(
+    Tensor& self,
+    double from,
+    double to,
+    c10::optional<Generator> generator);
 
 Tensor& bernoulli_(
     Tensor& self,

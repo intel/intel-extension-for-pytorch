@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/InitialTensorOptions.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/ReduceOpsUtils.h>
@@ -538,6 +537,12 @@ Tensor var(
       result, self, dim, correction, keepdim, false);
 }
 
+Tensor _var(const Tensor& self, bool unbiased) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::std_var_out(
+      result, self, IntArrayRef{}, unbiased, false, false);
+}
+
 Tensor var(const Tensor& self, bool unbiased) {
   auto trivial_return =
       _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
@@ -545,10 +550,10 @@ Tensor var(const Tensor& self, bool unbiased) {
                                     : at::AtenIpexTypeXPU::_var(self, unbiased);
 }
 
-Tensor _var(const Tensor& self, bool unbiased) {
+Tensor _std(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
-      result, self, IntArrayRef{}, unbiased, false, false);
+      result, self, IntArrayRef{}, unbiased, false, true);
 }
 
 Tensor std(const Tensor& self, bool unbiased) {
@@ -604,12 +609,6 @@ Tensor std_out(
   auto dim = _dim.value_or(IntArrayRef{});
   return at::AtenIpexTypeXPU::std_var_out(
       result, self, dim, correction, keepdim, true);
-}
-
-Tensor _std(const Tensor& self, bool unbiased) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_out(
-      result, self, IntArrayRef{}, unbiased, false, true);
 }
 
 std::tuple<Tensor, Tensor> var_mean(

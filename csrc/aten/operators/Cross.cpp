@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/AtenIpexTypeXPU.h>
 
 #include "comm/Pointwise.h"
 
@@ -26,15 +25,6 @@ void cross(Tensor& self_, const Tensor& x, const Tensor& y, int dimension) {
 }
 
 } // namespace impl
-
-Tensor cross(
-    const Tensor& input,
-    const Tensor& other,
-    const c10::optional<int64_t> dimension) {
-  Tensor out = at::empty_like(input);
-  at::AtenIpexTypeXPU::cross_out(out, input, other, dimension);
-  return out;
-}
 
 Tensor& cross_out(
     Tensor& out,
@@ -83,5 +73,15 @@ Tensor& cross_out(
 
   return out;
 }
+
+Tensor cross(
+    const Tensor& input,
+    const Tensor& other,
+    const c10::optional<int64_t> dimension) {
+  Tensor out = at::empty_like(input);
+  at::AtenIpexTypeXPU::cross_out(out, input, other, dimension);
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
