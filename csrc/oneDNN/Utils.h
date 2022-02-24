@@ -100,6 +100,10 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
   return strides;
 }
 
+static inline bool is_onednn_layout(const at::Tensor& tensor) {
+  return !at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor);
+}
+
 static inline bool eltwise_forward_valid(const at::Tensor& tensor) {
   switch (tensor.scalar_type()) {
     // return false if scalar_type not supported

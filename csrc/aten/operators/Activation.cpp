@@ -714,7 +714,8 @@ Tensor hardshrink_backward(
 }
 
 Tensor gelu(const Tensor& self) {
-  if (xpu::oneDNN::eltwise_forward_valid(self)) {
+  if (xpu::oneDNN::is_onednn_layout(self) &&
+      xpu::oneDNN::eltwise_forward_valid(self)) {
     Tensor result;
     xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
         result, self, 0.0f, 0.0f);
@@ -737,7 +738,8 @@ Tensor gelu(const Tensor& self) {
 }
 
 Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
-  if (xpu::oneDNN::eltwise_backward_valid(self)) {
+  if (xpu::oneDNN::is_onednn_layout(self) &&
+      xpu::oneDNN::eltwise_backward_valid(self)) {
     Tensor dX;
     xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
         dX, self, grad, 0.0f, 0.0f);
