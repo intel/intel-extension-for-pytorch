@@ -274,7 +274,7 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_ormqr(self, dtype=torch.float):
         A = torch.randn(8, 5)
-        c = torch.randn(5, 7)
+        c = torch.randn(8, 8)
 
         for left, transpose in itertools.product([True, False], [True, False]):
             print("torch.ormqr:")
