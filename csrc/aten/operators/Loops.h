@@ -130,16 +130,13 @@ struct vectorized_args_tuple {};
 
 template <int vec_size, typename... Args>
 struct vectorized_args_tuple<vec_size, std::tuple<Args...>> {
-  using vec_args_t = std::tuple<sycl::vec<
-      typename native::Memory::aligned_element<sizeof(Args)>::element_type,
-      vec_size>...>;
+  using vec_args_t =
+      std::tuple<native::Memory::aligned_vector_loop<Args, vec_size>...>;
 };
 
 template <int vec_size, typename T>
 struct vectorized_return_type {
-  using vec_ret_t = sycl::vec<
-      typename native::Memory::aligned_element<sizeof(T)>::element_type,
-      vec_size>;
+  using vec_ret_t = native::Memory::aligned_vector_loop<T, vec_size>;
 };
 
 template <
@@ -158,14 +155,9 @@ constexpr void apply_fun_impl(
   using traits = function_traits<F>;
   using result_t = std::decay_t<decltype(results[unroll_index])>;
   if (policy.check_inbounds(unroll_index)) {
-    auto ret = std::__invoke(
+    results[unroll_index] = std::__invoke(
         std::forward<F>(f),
-        at::native::Memory::detail::bitwise_cast<
-            typename traits::template arg<I>::type>(
-            std::get<I>(std::forward<TupleVector>(t))[unroll_index])...);
-
-    results[unroll_index] =
-        at::native::Memory::detail::bitwise_cast<result_t>(ret);
+        std::get<I>(std::forward<TupleVector>(t))[unroll_index]...);
   }
 }
 
@@ -260,9 +252,9 @@ static inline void unrolled_elementwise_kernel(
 
   int remaining = numel - thread_idx * vec_size;
   auto policy = at::native::Memory::policies::
-      unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
+      vec_unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
           data, remaining, ic, oc, l, s, thread_idx);
-  elementwise_kernel_helper(f, policy);
+  vec_elementwise_kernel_helper<vec_size>(f, policy);
 }
 
 template <
@@ -341,7 +333,7 @@ static inline void launch_vectorized_kernel(
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto vec_size = at::native::Memory::can_vectorize_up_to<func_t>(
+  auto vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
       getDeviceIdOfCurrentQueue(), data);
   auto thread_num = (N + vec_size - 1) / vec_size;
 

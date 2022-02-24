@@ -107,10 +107,8 @@ struct vec_unroll_load_helper {
         typename std::decay<decltype(std::get<arg_index>(args)[0])>::type;
     // `data` hold the data_ptr for tensors [output, input0, input1, ...], so we
     // need a +1 offset to get the input
-    auto arg = loader.template load<arg_t>(
+    std::get<arg_index>(args)[unroll_index] = loader.template load<arg_t>(
         self.data[arg_index + num_outputs], offset[arg_index], arg_index);
-    std::get<arg_index>(args)[unroll_index] =
-        at::native::Memory::detail::bitwise_cast<vec_arg_t>(arg);
   }
 };
 
@@ -230,6 +228,20 @@ struct aligned_vector {
   using type = DPCPP::vec<element_type, vec_size>;
 };
 
+// aligned vector generates vectorized load/store on XPU
+template <typename scalar_t, int vec_size>
+struct alignas(sizeof(scalar_t) * vec_size) aligned_vector_loop {
+  scalar_t val[vec_size];
+
+  scalar_t& operator[](int index) {
+    return val[index];
+  }
+
+  scalar_t const& operator[](int index) const {
+    return val[index];
+  }
+};
+
 namespace policies {
 
 template <
@@ -295,8 +307,7 @@ struct vec_unroll {
       if (i < remaining) {
         int linear_idx = thread_idx * vec_size + i;
         int offset = output_offset_calculator.get(linear_idx)[0];
-        auto ret = at::native::Memory::detail::bitwise_cast<return_t>(from[i]);
-        storer.template store<return_t>(ret, data[0], offset);
+        storer.template store<return_t>(from[i], data[0], offset);
       }
     }
   }
@@ -488,6 +499,59 @@ inline int can_vectorize_up_to(DeviceId dev_id, array_t pointers) {
   // We need to get the type for each argument of `func_t`, this can only
   // be done at compile time.
   detail::static_unroll<can_vectorize_up_to_helper, arity>::with_args(
+      result, dev_id, pointers, traits());
+  return result;
+}
+
+// This is only used in host, but we will wrap this into some templates
+// which is , so we have to make this
+// in order to compile
+template <typename scalar_t>
+inline int can_vectorize_up_to_loop(DeviceId dev_id, char* pointer) {
+  int elem_size = sizeof(scalar_t);
+  int preferred_width = preferred_vector_width(dev_id, elem_size);
+  uint64_t address = reinterpret_cast<uint64_t>(pointer);
+  constexpr int vec2_alignment =
+      std::alignment_of<aligned_vector_loop<scalar_t, 2>>::value;
+  constexpr int vec4_alignment =
+      std::alignment_of<aligned_vector_loop<scalar_t, 4>>::value;
+  constexpr int vec8_alignment =
+      std::alignment_of<aligned_vector_loop<scalar_t, 8>>::value;
+  constexpr int vec16_alignment =
+      std::alignment_of<aligned_vector_loop<scalar_t, 16>>::value;
+  if (address % vec16_alignment == 0) {
+    return std::min<int>(preferred_width, 16);
+  } else if (address % vec8_alignment == 0) {
+    return std::min<int>(preferred_width, 8);
+  } else if (address % vec4_alignment == 0) {
+    return std::min<int>(preferred_width, 4);
+  } else if (address % vec2_alignment == 0) {
+    return std::min<int>(preferred_width, 2);
+  }
+  return 1;
+}
+
+template <int i>
+struct can_vectorize_up_to_helper_loop {
+  template <typename array_t, typename traits>
+  static void apply(int& result, DeviceId dev_id, array_t pointers, traits _) {
+    using arg_t = typename traits::template arg<i>::type;
+    // `pointers` hold the data_ptr for tensors [output, input0, input1, ...],
+    // so we need a +1 offset to get the input
+    result = std::min<int>(
+        result, can_vectorize_up_to_loop<arg_t>(dev_id, pointers[i + 1]));
+  }
+};
+
+template <typename func_t, typename array_t>
+inline int can_vectorize_up_to_loop(DeviceId dev_id, array_t pointers) {
+  using traits = function_traits<func_t>;
+  using return_t = typename traits::result_type;
+  constexpr int arity = traits::arity;
+  int result = can_vectorize_up_to_loop<return_t>(dev_id, pointers[0]);
+  // We need to get the type for each argument of `func_t`, this can only
+  // be done at compile time.
+  detail::static_unroll<can_vectorize_up_to_helper_loop, arity>::with_args(
       result, dev_id, pointers, traits());
   return result;
 }
