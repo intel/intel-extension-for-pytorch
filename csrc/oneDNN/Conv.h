@@ -11,7 +11,6 @@
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include "Reorder.h"
-#include "Types.h"
 #include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>

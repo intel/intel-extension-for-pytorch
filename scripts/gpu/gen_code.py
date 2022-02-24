@@ -386,6 +386,8 @@ lazy_reorder_block_list = set([
     'convolution_backward_overrideable',
     'relu',
     'relu_',
+    'gelu',
+    'gelu_backward',
     'threshold_backward',
     'native_batch_norm',
     'native_batch_norm_backward',

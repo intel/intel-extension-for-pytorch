@@ -17,4 +17,3 @@
 #include "Reduce.h"
 #include "Reorder.h"
 #include "Sum.h"
-#include "Types.h"

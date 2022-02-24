@@ -2,11 +2,24 @@
 
 #include <ATen/ATen.h>
 #include <oneapi/dnnl/dnnl.hpp>
+#include <tensor/Context.h>
 
 using namespace dnnl;
 
+#define ONEDNN_SCALES_MASK_BY_CHANNEL(x) (1 << x)
+
 namespace xpu {
 namespace oneDNN {
+
+enum post_attr {
+  with_relu = 0b01,
+  with_sum = 0b10,
+  with_sigmoid = 0b100,
+  with_bin_mul = 0b1000,
+  with_bin_add = 0b10000,
+  with_bin_sub = 0b100000,
+  with_gelu = 0b1000000,
+};
 
 static inline dnnl::memory::format_tag get_dnnl_default_format(
     int ndims,
@@ -85,6 +98,47 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
   for (int i = 0; i < tensor.strides().size(); i++)
     strides.push_back(tensor.stride(i));
   return strides;
+}
+
+static inline bool eltwise_forward_valid(const at::Tensor& tensor) {
+  switch (tensor.scalar_type()) {
+    // return false if scalar_type not supported
+    case at::ScalarType::Float:
+      break;
+    case at::ScalarType::BFloat16:
+      break;
+    case at::ScalarType::Half:
+      break;
+    case at::ScalarType::Int:
+      break;
+    case at::ScalarType::Char:
+      break;
+    case at::ScalarType::Byte:
+      break;
+    default:
+      return false;
+  };
+  if (!at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor))
+    return true;
+  if (tensor.is_contiguous() || tensor.dim() == 1)
+    return true;
+  return false;
+}
+
+static inline bool eltwise_backward_valid(const at::Tensor& tensor) {
+  switch (tensor.scalar_type()) {
+    case at::ScalarType::Float:
+      break;
+    case at::ScalarType::BFloat16:
+      break;
+    default:
+      return false;
+  };
+  if (!at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor))
+    return true;
+  if (tensor.is_contiguous() || tensor.dim() == 1)
+    return true;
+  return false;
 }
 
 } // namespace oneDNN

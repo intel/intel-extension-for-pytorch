@@ -6,9 +6,11 @@
 #include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include <utils/Macros.h>
 #include "comm/ApplyUtils.h"
 
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 
 #include <oneDNN/oneDNN.h>
@@ -336,55 +338,20 @@ void inline prelu_backward_kernel_multi_weights(
 }
 
 template <typename scalar_t>
-void GeluKernelImpl(const Tensor& X, Tensor& Y) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto total_threads = X.numel();
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto X_data = X.data_ptr<scalar_t>();
-    auto Y_data = Y.data_ptr<scalar_t>();
-
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto X_ptr = X_data;
-          auto Y_ptr = Y_data;
-          auto id = itemId.get_id(0);
-
-          Y_ptr[id] = DPCPP::erf(X_ptr[id] * M_SQRT1_2);
-          Y_ptr[id] = (static_cast<scalar_t>(Y_ptr[id]) + scalar_t(1)) *
-              static_cast<scalar_t>(X_ptr[id]) * scalar_t(0.5);
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+inline scalar_t gelu_erf_forward(scalar_t self) {
+  using accscalar_t = acc_type<scalar_t>;
+  auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
+  return (scalar_t)(M_SQRT1_2 * v * (1.0 + Numerics<accscalar_t>::erf(v)));
 }
 
 template <typename scalar_t>
-void GeluBackwardKernelImpl(const Tensor& dY, const Tensor& X, Tensor& dX) {
-  auto kAlpha = M_2_SQRTPI * M_SQRT1_2 * scalar_t(0.5);
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto total_threads = X.numel();
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto dY_data = dY.data_ptr<scalar_t>();
-    auto X_data = X.data_ptr<scalar_t>();
-    auto dX_data = dX.data_ptr<scalar_t>();
-
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto dY_ptr = dY_data;
-          auto X_ptr = X_data;
-          auto dX_ptr = dX_data;
-          auto id = itemId.get_id(0);
-
-          dX_ptr[id] = Numerics<scalar_t>::exp(
-              -scalar_t(0.5) * static_cast<scalar_t>(X_ptr[id]) *
-              static_cast<scalar_t>(X_ptr[id]));
-          dX_ptr[id] = dY_ptr[id] *
-              (scalar_t(0.5) *
-                   (scalar_t(1) + DPCPP::erf(X_ptr[id] * M_SQRT1_2)) +
-               X_ptr[id] * kAlpha * dX_ptr[id]);
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+inline scalar_t gelu_erf_backward(scalar_t grad, scalar_t self) {
+  using accscalar_t = acc_type<scalar_t>;
+  auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
+  return (scalar_t)(
+      grad * 0.5 *
+      (1.0 + Numerics<accscalar_t>::erf(v) +
+       v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
 }
 
 } // namespace impl
@@ -747,28 +714,46 @@ Tensor hardshrink_backward(
 }
 
 Tensor gelu(const Tensor& self) {
-  Tensor result;
-  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
-      result, self, 0.0f, 0.0f);
-  return result;
-}
-
-inline Tensor gelu_backward_dpcpp(const Tensor& grad, const Tensor& self) {
-  auto self_ = self.contiguous();
-  Tensor dX = at::empty_like(self_);
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      self_.scalar_type(),
-      "GeluBackwardKernelImpl",
-      [&]() { impl::GeluBackwardKernelImpl<scalar_t>(grad, self_, dX); });
-  return dX;
+  if (xpu::oneDNN::eltwise_forward_valid(self)) {
+    Tensor result;
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
+        result, self, 0.0f, 0.0f);
+    return result;
+  } else {
+    Tensor result = at::empty_like(self);
+    auto iter = TensorIterator::unary_op(result, self);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "gelu",
+        [&]() {
+          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
+            return impl::gelu_erf_forward<scalar_t>(self);
+          });
+        });
+    return result;
+  }
 }
 
 Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
-  Tensor dX;
-  xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
-      dX, self, grad, 0.0f, 0.0f);
-  return dX;
+  if (xpu::oneDNN::eltwise_backward_valid(self)) {
+    Tensor dX;
+    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
+        dX, self, grad, 0.0f, 0.0f);
+    return dX;
+  } else {
+    Tensor dX = at::empty_like(self);
+    auto iter = TensorIterator::binary_op(dX, grad, self);
+    IPEX_DISPATCH_FLOATING_TYPES_AND(
+        at::ScalarType::BFloat16, iter.dtype(), "gelu_backward", [&]() {
+          dpcpp_kernel_with_scalars(
+              iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
+                return impl::gelu_erf_backward<scalar_t>(grad, self);
+              });
+        });
+    return dX;
+  }
 }
 
 } // namespace AtenIpexTypeXPU
