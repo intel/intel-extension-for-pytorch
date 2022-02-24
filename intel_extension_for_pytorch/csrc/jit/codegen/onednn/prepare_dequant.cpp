@@ -93,14 +93,10 @@ void addInformationForDequant(Node* node, Node* input_node) {
 
     double scale = Operator::Float(input_node, 1);
     node->fs_(Symbol::attr("scales"), {scale});
-
-    node->s_(Symbol::attr("in_type"), Operator::String(input_node, 3));
-
   } else if (input_node->kind() == Symbol::aten("quantize_per_channel")) {
     node->s_(Symbol::attr("qtype"), std::string("per_channel"));
     node->t_(Symbol::attr("zps"), Operator::Tensor(input_node, 2));
     node->t_(Symbol::attr("scales"), Operator::Tensor(input_node, 1));
-    node->s_(Symbol::attr("in_type"), Operator::String(input_node, 4));
     node->i_(Symbol::attr("axis"), Operator::Int(input_node, 3));
   } else {
     TORCH_CHECK(
@@ -128,13 +124,11 @@ void addInformationForDequant(Node* node, Node* input_node) {
             Symbol::attr("zps"),
             Operator::IntValueToVector(qtensor.q_zero_point()));
         node->fs_(Symbol::attr("scales"), {qtensor.q_scale()});
-        node->s_(Symbol::attr("in_type"), Operator::QuantString(scalar_type));
         break;
       case at::kPerChannelAffine:
         node->s_(Symbol::attr("qtype"), std::string("per_channel"));
         node->t_(Symbol::attr("zps"), qtensor.q_per_channel_zero_points());
         node->t_(Symbol::attr("scales"), qtensor.q_per_channel_scales());
-        node->s_(Symbol::attr("in_type"), Operator::QuantString(scalar_type));
         node->i_(Symbol::attr("axis"), qtensor.q_per_channel_axis());
         break;
       default:
