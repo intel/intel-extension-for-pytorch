@@ -95,6 +95,11 @@ set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-unnamed-lambda")
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
+# Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
+# allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
+# change below for best outcome: disable, using RPATH, enable, using RUNPATH
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,--disable-new-dtags")
+
 include(ProcessorCount)
 ProcessorCount(proc_cnt)
 set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-max-parallel-link-jobs=${proc_cnt}")
