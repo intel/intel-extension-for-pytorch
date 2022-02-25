@@ -6,10 +6,10 @@
 
 | **GPU HW** | **OS** | **GPU User Mode Driver** | Python |
 | ------ | ------ | ------ | ------ |
-| **ATS-P** | Ubuntu-20.04.3 |  agama-ci-prerelease-272 | 3.x |
-| **ATS-P** | OpenSUSE Leap 15sp3| agama-ci-prerelease-272 | 3.x |
-| **PVC** | Ubuntu-20.04.3 |  agama-ci-prerelease-272 | 3.x |
-| **PVC** | OpenSUSE Leap 15sp3| agama-ci-prerelease-272 | 3.x |
+| **ATS-P** | Ubuntu-20.04.3 |  agama-ci-prerelease-335 | 3.x |
+| **ATS-P** | OpenSUSE Leap 15sp3| agama-ci-prerelease-335 | 3.x |
+| **PVC** | Ubuntu-20.04.3 |  agama-ci-prerelease-335 | 3.x |
+| **PVC** | OpenSUSE Leap 15sp3| agama-ci-prerelease-335 | 3.x |
 
 ### **Dependencies**
 
@@ -210,7 +210,7 @@ IPEX_VERBOSE=1 IPEX_ONEDNN_LAYOUT=1 python ResNet50.py
 ## Feature Introduction
 
 ### AOT compilation:
-AOT compilation is supported on ATS-P and PVC. Set USE_AOT_DEVLIST="xe_hp_sdv" to enable for ATS-P. Set USE_AOT_DEVLIST="pvc" to enable for PVC.
+AOT compilation is supported on ATS-P and PVC. Set USE_AOT_DEVLIST="12.1.0" to enable for ATS-P. Set USE_AOT_DEVLIST="12.4.0" to enable for PVC A0.
 
 ### oneDNN specific layouts:
 All models listed in above "Verified Models" can run with IPEX_ONEDNN_LAYOUT=1 on ATS-P L0 backend. However, not all supported models can gain performance improvement through this feature.
