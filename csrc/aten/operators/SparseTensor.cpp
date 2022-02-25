@@ -169,8 +169,7 @@ Tensor coalesce(const Tensor& self) {
       1, // batch_size
       indices1D.stride(0), // stride
       Numerics<int64_t>::upper_bound(), // padding
-      [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); },
-      [](int64_t a, int64_t b) { return Numerics<int64_t>::eq(a, b); });
+      [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); });
 
   auto indices1D_end = indices1D_ptr;
   auto uniqueOffsets_end = uniqueOffsets_ptr;

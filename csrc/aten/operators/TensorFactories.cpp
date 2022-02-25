@@ -122,8 +122,7 @@ Tensor randperm_dpcpp(
       1, // batch_size
       keys.stride(0), // stride
       Numerics<scalar_t>::upper_bound(), // padding
-      [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); },
-      [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::eq(a, b); });
+      [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
 
   if (!result.is_contiguous()) {
     result.copy_(shuffled);

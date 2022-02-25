@@ -951,8 +951,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
         1, // batch_size
         sorted_indices.stride(0), // stride
         Numerics<int64_t>::upper_bound(), // padding
-        [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); },
-        [](int64_t a, int64_t b) { return Numerics<int64_t>::eq(a, b); });
+        [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); });
   }
 
   Tensor count;

@@ -2,6 +2,7 @@ import torch
 import ipex
 import numpy as np
 import random
+import pytest
 from torch.testing._internal.common_utils import TestCase
 
 
@@ -31,6 +32,7 @@ class TestNNMethod(TestCase):
             print(abcd, ', dim:', dim, ', maxdiff:', maxdiff)
             assert(maxdiff < 1e-5)
 
+    @pytest.mark.skipif(True, reason="stable sort is not supported until Py1.10")
     def test_sort_focus_case(self, dtype=torch.float):
         ''' There is no `stable` option in sort Op
             Sort of IPEX backend supports stable, we construct a stable index

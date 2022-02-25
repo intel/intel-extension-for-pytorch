@@ -45,7 +45,6 @@ Tensor compute_inverse(
     inv_loc[0] = 0;
     at::AtenIpexTypeXPU::inclusive_scan<index_t>(
         inv_loc_begin, inv_loc_begin + num_inp, inv_loc_begin, (index_t)0);
-    // Here this sort must be stable-sort
     at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<index_t, index_t>(
         sorted_indices_ptr,
         inv_loc_ptr,
@@ -53,8 +52,7 @@ Tensor compute_inverse(
         1, // batch_size
         sorted_indices.stride(0), // stride
         Numerics<index_t>::upper_bound(), // padding
-        [](index_t a, index_t b) { return Numerics<index_t>::lt(a, b); },
-        [](index_t a, index_t b) { return Numerics<index_t>::eq(a, b); });
+        [](index_t a, index_t b) { return Numerics<index_t>::lt(a, b); });
     inverse_indices = inv_loc;
   }
 
@@ -91,7 +89,6 @@ std::tuple<Tensor, index_t> compute_unique(
     range[num_out] = num_inp;
     counts.resize_(num_out);
     int64_t* counts_ptr = counts.data_ptr<index_t>();
-    // auto counts_begin = oneapi::dpl::begin(counts_ptr);
     auto counts_begin = counts_ptr;
     at::AtenIpexTypeXPU::adjacent_difference<index_t>(
         range_begin + 1, range_begin + num_out + 1, counts_begin);
@@ -123,8 +120,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
         1, // batch_size
         output.stride(0), // stride
         Numerics<scalar_t>::upper_bound(),
-        [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); },
-        [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::eq(a, b); });
+        [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
   }
 
   Tensor inverse_indices, counts;
@@ -248,8 +244,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
         1, // batch_size
         indices.stride(0), // stride
         Numerics<int64_t>::upper_bound(), // padding
-        less_comp,
-        equal_comp);
+        less_comp);
   }
   Tensor origin_indices = indices.clone();
   int64_t* origin_indices_data = origin_indices.data_ptr<int64_t>();
