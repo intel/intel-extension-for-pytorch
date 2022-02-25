@@ -4,7 +4,6 @@ from typing_extensions import Literal
 from dataclasses import dataclass
 import textwrap
 
-from tools.codegen.code_template import CodeTemplate
 from tools.codegen.context import method_with_native_function, native_function_manager
 from tools.codegen.utils import Target, mapMaybe, assert_never
 from tools.codegen.model import (DispatchKey, NativeFunction,
@@ -20,51 +19,76 @@ from tools.codegen.api.types import (BaseCType, Binding, ConstRefCType,
                                      DispatcherSignature)
 import tools.codegen.api.meta as meta
 import tools.codegen.api.cpp as cpp
-from tools.codegen.api.types import functions_out_from_last_to_first
-from tools.codegen.api.types import functions_two_pars_reorder
 import tools.codegen.api.structured as structured
 from tools.codegen.api.translate import translate
 from tools.codegen.selective_build.selector import SelectiveBuilder
 
+def gen_registration_headers(
+        backend_index: BackendIndex,
+        per_operator_headers: bool,
+        rocm: bool,
+) -> List[str]:
+    if per_operator_headers:
+        headers = ["#include <ATen/ops/as_strided_native.h>"]
+    else:
+        headers = ["#include <ATen/NativeFunctions.h>"]
+
+    if backend_index.dispatch_key in (DispatchKey.CPU, DispatchKey.Meta):
+        headers.append("#include <ATen/EmptyTensor.h>")
+    elif backend_index.dispatch_key == DispatchKey.CUDA:
+        if rocm:
+            headers.append("#include <ATen/hip/EmptyTensor.h>")
+        else:
+            headers.append("#include <ATen/cuda/EmptyTensor.h>")
+    elif per_operator_headers:
+        headers += [
+            "#include <ATen/ops/empty.h>",
+            "#include <ATen/ops/empty_strided.h>"]
+    else:
+        headers.append("#include <ATen/Functions.h>")
+
+    return headers
 
 def gen_create_out_helper(backend_index: BackendIndex) -> List[str]:
     if backend_index.dispatch_key == DispatchKey.Meta:
-        # TODO: dedupe this with below
-        core = """
-if (strides.empty()) {
-    return at::empty(sizes, options.device(at::kMeta));
-} else {
-    return at::empty_strided(sizes, strides, options.device(at::kMeta));
-}
-"""
+        empty_options = "options.device(at::kMeta)"
     else:
-        expanded_topts = "optTypeMetaToScalarType(options.dtype_opt()), options.layout_opt(), " \
-            "options.device_opt(), options.pinned_memory_opt()"
-        empty_init = ""
-        if backend_index.dispatch_key == DispatchKey.CPU:
-            empty_impl = "at::native::empty_cpu"
-            empty_strided_impl = "at::native::empty_strided_cpu"
-        elif backend_index.dispatch_key == DispatchKey.CUDA:
-            empty_init = "globalContext().lazyInitCUDA();"
-            empty_impl = "at::native::empty_cuda"
-            empty_strided_impl = "at::native::empty_strided_cuda"
-        elif backend_index.dispatch_key == DispatchKey.CompositeExplicitAutograd:
-            empty_impl = "at::empty"
-            empty_strided_impl = "at::empty_strided"
-        else:
-            return []
-        core = f"""
-  {empty_init}
-  if (strides.empty()) {{
-      return {empty_impl}(sizes, {expanded_topts}, options.memory_format_opt());
-  }} else {{
-      // TODO: assert options.memory_format_opt() is nullopt (debug only?)
-      return {empty_strided_impl}(sizes, strides, {expanded_topts});
+        empty_options = "options"
+
+    if backend_index.dispatch_key in (
+            DispatchKey.Meta, DispatchKey.CPU, DispatchKey.CUDA):
+        dispatch = str(backend_index.dispatch_key).lower()
+        empty_impl = f"at::detail::empty_{dispatch}"
+        empty_strided_impl = f"at::detail::empty_strided_{dispatch}"
+        runtime_empty_supported_check = ""
+    elif backend_index.dispatch_key == DispatchKey.CompositeExplicitAutograd:
+        empty_impl = "at::empty"
+        empty_strided_impl = "at::empty_strided"
+        runtime_empty_supported_check = """\
+  if (!c10::detail::backend_supports_empty_operator(options)) {{
+    // The main purpose of this CompositeExplicitAutograd kernel is to provide
+    // a "free" implementation of out-of-place operators.
+    // If a backend hasn't implemented an out-of-place op but has implemented
+    // the out= variant, then this kernel will call their out= variant.
+    // It does that by using at::empty() to create the tensor to pass to the out= variant though,
+    // so this "default" kernel doesn't actually handle backends that don't support at::empty
+    // (e.g. quantized backends).
+    // Returning an undefined tensor here allows us to reach the out= kernel and give a better error.
+    // Longer term, this could be better fixed by https://github.com/pytorch/pytorch/issues/52680
+    return at::Tensor();
   }}
 """
+    else:
+        return []
+
     return [f"""
 Tensor create_out(IntArrayRef sizes, IntArrayRef strides, const TensorOptions &options) {{
-{core}
+  {runtime_empty_supported_check}
+  if (strides.empty()) {{
+      return {empty_impl}(sizes, {empty_options});
+  }} else {{
+      return {empty_strided_impl}(sizes, strides, {empty_options});
+  }}
 }}
 """]
 
@@ -159,9 +183,6 @@ class RegisterDispatchKey:
     # The namespace that the kernels are written in. This is just `at::native` for in-tree kernels.
     cpp_namespace: str
 
-    # simple trace
-    simple_trace: bool
-
     # The class that all unstructured native functions live under. This is used to improve
     # compiler error messages when a kernel writer adds a native function with the wrong signature.
     # This is only used in unstructured kernels, since structured kernels already live in a class.
@@ -169,103 +190,6 @@ class RegisterDispatchKey:
     # It would be nice if we can add the same logic to in-tree kernels too, but that requires updating
     # all of the existing kernel signatures scattered across aten/src/ATen/native.
     class_method_name: Optional[str]
-
-    lazy_reorder_no_variable_list = dict({'resize_': ['self'], 'as_strided': ['self'], 'resize_as_': ['self', 'the_template']})
-
-    lazy_reorder_block_list = set([
-        'convolution_overrideable',
-        'convolution_backward_overrideable',
-        'relu',
-        'relu_',
-        'threshold_backward',
-        'native_batch_norm',
-        'native_batch_norm_backward',
-        'native_layer_norm',
-        'native_layer_norm_backward',
-        'add_',
-        'add',
-        'add_out',
-        'addmm',
-        'addmm_',
-        'mm',
-        'mm_out',
-        'avg_pool2d',
-        'avg_pool2d_out',
-        'avg_pool2d_backward',
-        'avg_pool2d_backward_out',
-        'adaptive_avg_pool2d',
-        '_adaptive_avg_pool2d',
-        'adaptive_avg_pool2d',
-        '_adaptive_avg_pool2d_backward',
-        'max_pool2d_with_indices',
-        'max_pool2d_with_indices_out',
-        'max_pool2d_with_indices_backward',
-        'max_pool2d_with_indices_backward_out',
-        'adaptive_max_pool2d',
-        'adaptive_max_pool2d_out',
-        'adaptive_max_pool2d_backward',
-        'adaptive_max_pool2d_backward_out',
-        'quantize_per_tensor',
-        'quantize_per_channel',
-        'dequantize',
-        '_softmax',
-        '_softmax_backward_data',
-        'upsample_trilinear3d_out',
-        'upsample_trilinear3d',
-        'upsample_trilinear3d_backward_out',
-        'upsample_trilinear3d_backward',
-        'upsample_bilinear2d_out',
-        'upsample_bilinear2d',
-        'upsample_bilinear2d_backward_out',
-        'upsample_bilinear2d_backward',
-        'upsample_linear1d_out',
-        'upsample_linear1d',
-        'upsample_linear1d_backward_out',
-        'upsample_linear1d_backward',
-        'upsample_nearest3d_out',
-        'upsample_nearest3d',
-        'upsample_nearest3d_backward_out',
-        'upsample_nearest3d_backward',
-        'upsample_nearest2d_out',
-        'upsample_nearest2d',
-        'upsample_nearest2d_backward_out',
-        'upsample_nearest2d_backward',
-        'upsample_nearest1d_out',
-        'upsample_nearest1d',
-        'upsample_nearest1d_backward_out',
-        'upsample_nearest1d_backward',
-        'q_zero_point',
-        'q_scale',
-        'qscheme',
-        'q_per_channel_scales',
-        'q_per_channel_zero_points',
-        'q_per_channel_axis',
-        'set_quantizer_',
-        'quantized_max_pool2d',
-    ])
-
-    LAZY_REORDER_TENSORLIST = CodeTemplate("""\
-auto ${name}_vec = AtenIpexTypeXPU::to_plain_if_needed(${name});
-auto ${temp_name} = at::TensorList(${name}_vec);
-""")
-
-    LAZY_REORDER_TENSOR = CodeTemplate("""\
-${name} = AtenIpexTypeXPU::to_plain_if_needed_(${name});
-""")
-
-    LAZY_REORDER_CONST_TENSOR = CodeTemplate("""\
-auto ${temp_name} = AtenIpexTypeXPU::to_plain_if_needed(${name});
-""")
-
-    LAZY_REORDER_CONST_NO_VARIABLE_TENSOR = CodeTemplate("""\
-AtenIpexTypeXPU::to_plain_if_needed_(${name});
-""")
-
-    LAZY_REORDER_OPTIONAL_TENSOR = CodeTemplate("""\
-c10::optional<Tensor> ${temp_name};
-if (${name}.has_value())
-${temp_name} = c10::optional<Tensor>(AtenIpexTypeXPU::to_plain_if_needed(${name}.value()));
-""")
 
     @staticmethod
     def gen_device_check(type: DeviceCheckType, args: List[Argument], method_name: str) -> str:
@@ -337,41 +261,6 @@ ${temp_name} = c10::optional<Tensor>(AtenIpexTypeXPU::to_plain_if_needed(${name}
   return {returns};
 }}
 """
-
-    @staticmethod
-    def parse_args(args):
-        new_args = []
-        for arg in args:
-            # Simple arg declaration of form "<type> <name>"
-            argument = arg.argument
-            if isinstance(argument, str):
-                t, _, name = argument.partition(' ')
-                new_args.append({'type': t, 'name': name})
-            elif isinstance(argument, dict):
-                if 'arg' in argument:
-                    argument['type'], _, argument['name'] = argument['arg'].partition(' ')
-                    del argument['arg']
-                new_args.append(argument)
-            else:
-                raise AssertionError()
-        return new_args
-
-    def get_lazy_reorder(self, schema_name, arg):
-        cptype = str(arg.argument.type)
-        change_dict = {'name': arg.name, 'temp_name': '_' + arg.name}
-        if schema_name not in self.lazy_reorder_block_list:
-            if cptype == 'Tensor[]':
-                return self.LAZY_REORDER_TENSORLIST.substitute(change_dict), change_dict['temp_name']
-            elif cptype == 'Tensor':
-                if arg.type == 'const c10::optional<Tensor>&':
-                    return self.LAZY_REORDER_OPTIONAL_TENSOR.substitute(change_dict), change_dict['temp_name']
-                elif not arg.type.startswith('const'):
-                    return self.LAZY_REORDER_TENSOR.substitute(change_dict), change_dict['name']
-                elif schema_name in self.lazy_reorder_no_variable_list.keys() and arg.name in self.lazy_reorder_no_variable_list[schema_name]:
-                    return self.LAZY_REORDER_CONST_NO_VARIABLE_TENSOR.substitute(change_dict), change_dict['name']
-                else:
-                    return self.LAZY_REORDER_CONST_TENSOR.substitute(change_dict), change_dict['temp_name']
-        return '', change_dict['name']
 
     def gen_structured(self, g: NativeFunctionsGroup) -> List[str]:
         metadata = self.backend_index.get_kernel(g)
@@ -474,7 +363,8 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                 else:
                     impl_name = f"{self.cpp_namespace}::{self.class_method_name}::{metadata.kernel}"
 
-                # device check
+                args_exprs_str = ', '.join(a.name for a in args)
+
                 device_check = '  // No device check\n'
                 # Backends that require device guards presumably also require device checks.
                 if self.backend_index.device_guard:
@@ -512,55 +402,13 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                         if device_of is not None:
                             device_guard = f"const OptionalDeviceGuard device_guard(device_of({device_of}));"
 
-                simple_trace_code = ''
-                if self.simple_trace:
-                    simple_trace_code = f'IpexSimpleTrace trace(\"{name} -> {impl_name}\");'
-
-                # lazy_reorder
-                lazy_reorder = "  // no lazy reorder"
-                lazy_reorder_info = [self.get_lazy_reorder(metadata.kernel, arg) for arg in args]
-                lazy_reorder_list = [elem[0] for elem in lazy_reorder_info if len(elem[0]) > 0]
-                arg_name_list = [elem[1] for elem in lazy_reorder_info]
-                if len(lazy_reorder_list) == 0:
-                    lazy_reorder = ""
-                else:
-                    lazy_reorder = '  '.join(lazy_reorder_list)
-                    lazy_reorder = "\n".join(lazy_reorder.split("\n")[:-1]).strip()
-
-                # args_exprs_str
-                # args_exprs_str = ', '.join(a.name for a in args)
-                args_exprs_list = []
-                for arg_name in arg_name_list:
-                    args_exprs_list.append(arg_name)
-
-                if metadata.kernel in functions_out_from_last_to_first:
-                    assert 'out' in args_exprs_list[-1] or 'grad_input' in args_exprs_list[-1]
-                    out = args_exprs_list.pop()
-                    args_exprs_list.reverse()
-                    args_exprs_list.append(out)
-                    args_exprs_list.reverse()
-                elif metadata.kernel in functions_two_pars_reorder:
-                    last = args_exprs_list.pop()
-                    last2 = args_exprs_list.pop()
-                    args_exprs_list.reverse()
-                    args_exprs_list.append(last)
-                    args_exprs_list.append(last2)
-                    args_exprs_list.reverse()
-
-                args_exprs_str = ', '.join(args_exprs_list)
-
                 return f"""\
 namespace {{
 
 {returns_type} {name}({args_str}) {{
-  {simple_trace_code}
-
   {device_check}
 
   {device_guard}
-
-  {lazy_reorder}
-
   return {impl_name}({args_exprs_str});
 }}
 
@@ -801,7 +649,8 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                 # Put all of the contents of the precompute struct into the context
                 # so that translate will be able to return the correct args for the
                 # call to the impl.
-                for precomputed_elems in self.g.out.precomputed.replace.values():
+                precomputed_values = [*self.g.out.precomputed.replace.values(), self.g.out.precomputed.add]
+                for precomputed_elems in precomputed_values:
                     for arg in precomputed_elems:
                         context.append(Expr(
                             expr=f"precompute.{arg.name}",

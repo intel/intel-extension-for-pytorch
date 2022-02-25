@@ -436,124 +436,6 @@ class CppSignatureGroup:
             faithful_signature=faithful_signature,
         )
 
-functions_two_pars_reorder = [
-    'adaptive_max_pool2d_out',
-    'adaptive_max_pool3d_out',
-    'fractional_max_pool2d_out',
-    'fractional_max_pool3d_out',
-    'geqrf_out',
-    'log_sigmoid_forward_out',
-    'max_out',
-    'max_pool2d_with_indices_out',
-    'max_pool3d_with_indices_out',
-    'min_out',
-    'mode_out',
-    'multilabel_margin_loss_forward_out',
-    'solve_out',
-    'sort_out',
-    'topk_out',
-    'triangular_solve_out',
-
-]
-
-functions_out_from_last_to_first = [
-    'adaptive_avg_pool2d_out',
-    'adaptive_avg_pool3d_out',
-    'all_out',
-    '_cat_out',
-    'amax_out',
-    'any_out',
-    'atan2_out',
-    'avg_pool2d_out',
-    'avg_pool3d_out',
-    'bitwise_not_out',
-    'bitwise_or_out',
-    'bitwise_xor_out',
-    'bmm_out',
-    'cholesky_out',
-    'cholesky_inverse_out',
-    'cholesky_solve_out',
-    'col2im_out',
-    'cross_out',
-    'diag_out',
-    'digamma_out',
-    'div_out',
-    'erfinv_out',
-    'eye_out',
-    'floor_divide_out',
-    'fmod_out',
-    'frac_out',
-    'gather_out',
-    'glu_out',
-    'im2col_out',
-    'index_select_out',
-    'inverse_out',
-    'l1_loss_out',
-    'logical_not_out',
-    'lu_solve_out',
-    'masked_select_out',
-    'max_unpool2d_out',
-    'max_unpool3d_out',
-    'maximum_out',
-    'mean_out',
-    'minimum_out',
-    'mm_out',
-    'mse_loss_out',
-    'mul_out',
-    'nonzero_out',
-    'ormqr_out',
-    'polygamma_out',
-    'pow_out',
-    'prod_out',
-    'reciprocal_out',
-    'reflection_pad1d_out',
-    'remainder_out',
-    'replication_pad2d_out',
-    'sign_out',
-    'smooth_l1_loss_out',
-    'soft_margin_loss_out',
-    'sqrt_out',
-    'sum_out',
-    'upsample_bicubic2d_out',
-    'upsample_bilinear2d_out',
-    'upsample_linear1d_out',
-    'upsample_nearest1d_out',
-    'upsample_nearest2d_out',
-    'upsample_nearest3d_out',
-    'upsample_trilinear3d_out',
-
-    'adaptive_avg_pool3d_backward_out',
-    'adaptive_max_pool2d_backward_out',
-    'adaptive_max_pool3d_backward_out',
-    'avg_pool2d_backward_out',
-    'avg_pool3d_backward_out',
-    'col2im_backward_out',
-    'fractional_max_pool2d_backward_out',
-    'fractional_max_pool3d_backward_out',
-    'glu_backward_out',
-    'im2col_backward_out',
-    'l1_loss_backward_out',
-    'log_sigmoid_backward_out',
-    'max_pool2d_with_indices_backward_out',
-    'max_pool3d_with_indices_backward_out',
-    'max_unpool2d_backward_out',
-    'max_unpool3d_backward_out',
-    'mse_loss_backward_out',
-    'multilabel_margin_loss_backward_out',
-    'reflection_pad1d_backward_out',
-    'replication_pad2d_backward_out',
-    'smooth_l1_loss_backward_out',
-    'soft_margin_loss_backward_out',
-    'upsample_bicubic2d_backward_out',
-    'upsample_bilinear2d_backward_out',
-    'upsample_linear1d_backward_out',
-    'upsample_nearest1d_backward_out',
-    'upsample_nearest2d_backward_out',
-    'upsample_nearest3d_backward_out',
-    'upsample_trilinear3d_backward_out',
-
-]
-
 @dataclass(frozen=True)
 class DispatcherSignature:
     # The schema this signature is derived from
@@ -571,27 +453,9 @@ class DispatcherSignature:
         return self.prefix + dispatcher.name(self.func)
 
     def decl(self, name: Optional[str] = None) -> str:
-        # args_str = ', '.join(a.decl() for a in self.arguments())
-        args_list = []
-        for a in self.arguments():
-            adecl = a.decl()
-            args_list.append(adecl)
+        args_str = ', '.join(a.decl() for a in self.arguments())
         if name is None:
             name = self.name()
-        if name in functions_out_from_last_to_first:
-            assert 'out' in args_list[-1] or 'grad_input' in args_list[-1]
-            out = args_list.pop()
-            args_list.reverse()
-            args_list.append(out)
-            args_list.reverse()
-        elif name in functions_two_pars_reorder:
-            last = args_list.pop()
-            last2 = args_list.pop()
-            args_list.reverse()
-            args_list.append(last)
-            args_list.append(last2)
-            args_list.reverse()
-        args_str = ', '.join(args_list)
         return f"{self.returns_type().cpp_type()} {name}({args_str})"
 
     def defn(self, name: Optional[str] = None, *, is_redispatching_fn: bool = False) -> str:
