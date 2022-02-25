@@ -36,6 +36,33 @@ class TestNNMethod(TestCase):
         print("dpcpp relu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
+    def test_activation_relu_block(self, dtype=torch.float):
+        to_block_cpu = torch.nn.Conv2d(4, 4, kernel_size=3, padding=1)
+        to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
+        test_shape = [1, 4, 3, 3]
+        with torch.xpu.onednn_layout():
+            relu_ = torch.nn.functional.relu_
+            relu = torch.nn.functional.relu
+            x_cpu = torch.randn(test_shape)
+            x_dpcpp = x_cpu.to("xpu")
+            relu_(to_block_cpu(x_cpu))
+            relu_(to_block_dpcpp(x_dpcpp))
+            print("cpu relu_ ", x_cpu)
+            print("dpcpp relu_ ", x_dpcpp.cpu())
+            self.assertEqual(x_cpu, x_dpcpp.cpu())
+            x_cpu.requires_grad_(True)
+            x_dpcpp.requires_grad_(True)
+            y_cpu = relu(to_block_cpu(x_cpu))
+            y_dpcpp = relu(to_block_dpcpp(x_dpcpp))
+            print("cpu relu ", y_cpu)
+            print("dpcpp relu ", y_dpcpp.cpu())
+            self.assertEqual(y_cpu, y_dpcpp.cpu())
+            y_cpu.backward(x_cpu)
+            y_dpcpp.backward(x_dpcpp)
+            print("cpu relu bwd", x_cpu.grad)
+            print("dpcpp relu bwd", x_dpcpp.grad.cpu())
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
     def test_activation_relu_channels_last(self, dtype=torch.float):
         x = torch.randn(1, 2, 3, 3, dtype=torch.float)
         w = torch.randn(2, 2, 3, 3, dtype=torch.float)

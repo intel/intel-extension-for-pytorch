@@ -30,30 +30,6 @@ static inline bool is_contiguous(const int64_t* strides) {
       strides[2] == sizeof(scalar_t);
 }
 
-static void threshold_kernel(
-    TensorIterator& iter,
-    Scalar threshold_scalar,
-    Scalar value_scalar) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      iter.dtype(),
-      "threshold",
-      [&] {
-        scalar_t threshold = threshold_scalar.to<scalar_t>();
-        scalar_t value = value_scalar.to<scalar_t>();
-        bool all_contiguous = true;
-        for (int i = 0; i < iter.ntensors(); i++) {
-          all_contiguous = all_contiguous && iter.tensor(i).is_contiguous();
-        }
-
-        dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t x, scalar_t other) -> scalar_t {
-              return x <= threshold ? value : other;
-            });
-      });
-}
-
 template <typename scalar_t>
 static void RReLU_updateOutput(
     const Tensor& input,
@@ -337,6 +313,50 @@ void inline prelu_backward_kernel_multi_weights(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+inline Tensor threshold_out(
+    optional<Tensor> opt_result,
+    const Tensor& self,
+    Scalar threshold,
+    Scalar value,
+    const Tensor& other) {
+  Tensor result = opt_result.value_or(Tensor());
+  if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, self, other) &&
+      0.0 == threshold.to<float>() && 0.0 == value.to<float>() &&
+      IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, self, other)) {
+    // need or not
+    // 1. input is oneDNN layout
+    // 2. it is a relu bwd (threshold and value)
+    // can or not
+    // 1. input is a valid memory supported by oneDNN
+    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(
+        result, self, other, 0.0f, 0.0f);
+    return result;
+  } else {
+    auto _self = to_plain_if_needed(self);
+    auto _other = to_plain_if_needed(other);
+    auto iter = TensorIterator::binary_op(result, _self, _other);
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "threshold",
+        [&] {
+          scalar_t _threshold = threshold.to<scalar_t>();
+          scalar_t _value = value.to<scalar_t>();
+          dpcpp_kernel_for_tensor_iter(
+              iter, [=](scalar_t x, scalar_t other) -> scalar_t {
+                return x <= _threshold ? _value : other;
+              });
+        });
+    return iter.output();
+  }
+}
+
+template <typename scalar_t>
+inline scalar_t relu_forward(scalar_t self) {
+  return self > 0 ? self : static_cast<scalar_t>(0);
+}
+
 template <typename scalar_t>
 inline scalar_t gelu_erf_forward(scalar_t self) {
   using accscalar_t = acc_type<scalar_t>;
@@ -357,41 +377,59 @@ inline scalar_t gelu_erf_backward(scalar_t grad, scalar_t self) {
 } // namespace impl
 
 Tensor relu(const Tensor& self) {
-  Tensor result;
-  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
-  return result;
+  if (xpu::oneDNN::is_onednn_layout(self) &&
+      xpu::oneDNN::eltwise_forward_valid(self)) {
+    Tensor result;
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
+        result, self, 0.0f, 0.0f);
+    return result;
+  } else {
+    auto _self = to_plain_if_needed(self);
+    auto result = at::empty_like(_self);
+    auto iter = TensorIterator::unary_op(result, _self);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "relu",
+        [&]() {
+          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
+            return impl::relu_forward<scalar_t>(self);
+          });
+        });
+    return result;
+  }
 }
 
 Tensor& relu_(Tensor& self) {
-  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
-  return self;
-}
-
-static Tensor threshold_out(
-    optional<Tensor> opt_result,
-    const Tensor& self,
-    Scalar threshold,
-    Scalar value,
-    const Tensor& other) {
-  Tensor result = opt_result.value_or(Tensor());
-  if (0.0 == threshold.to<float>() && 0.0 == value.to<float>()) {
-    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(
-        result, self, other, 0.0f, 0.0f);
-    return result;
+  if (xpu::oneDNN::is_onednn_layout(self) &&
+      xpu::oneDNN::eltwise_forward_valid(self)) {
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
+    return self;
   } else {
-    auto iter = TensorIterator::binary_op(result, self, other);
-    impl::threshold_kernel(iter, threshold, value);
-    return iter.output();
+    self = to_plain_if_needed_(self);
+    auto iter = TensorIterator::unary_op(self, self);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "relu_",
+        [&]() {
+          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t self) -> scalar_t {
+            return impl::relu_forward<scalar_t>(self);
+          });
+        });
+    return self;
   }
 }
 
 Tensor& threshold_(Tensor& self, Scalar threshold, Scalar value) {
-  threshold_out(make_optional(self), self, threshold, value, self);
+  impl::threshold_out(make_optional(self), self, threshold, value, self);
   return self;
 }
 
 Tensor threshold(const Tensor& self, Scalar threshold, Scalar value) {
-  return threshold_out(nullopt, self, threshold, value, self);
+  return impl::threshold_out(nullopt, self, threshold, value, self);
 }
 
 Tensor& threshold_out(
@@ -399,7 +437,7 @@ Tensor& threshold_out(
     const Tensor& self,
     Scalar threshold,
     Scalar value) {
-  threshold_out(make_optional(result), self, threshold, value, self);
+  impl::threshold_out(make_optional(result), self, threshold, value, self);
   return result;
 }
 
@@ -407,7 +445,7 @@ Tensor threshold_backward(
     const Tensor& grad,
     const Tensor& self,
     Scalar threshold) {
-  return threshold_out(nullopt, self, threshold, 0, grad);
+  return impl::threshold_out(nullopt, self, threshold, 0, grad);
 }
 
 Tensor rrelu_with_noise(
@@ -721,8 +759,9 @@ Tensor gelu(const Tensor& self) {
         result, self, 0.0f, 0.0f);
     return result;
   } else {
-    Tensor result = at::empty_like(self);
-    auto iter = TensorIterator::unary_op(result, self);
+    auto _self = to_plain_if_needed(self);
+    auto result = at::empty_like(_self);
+    auto iter = TensorIterator::unary_op(result, _self);
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
@@ -738,15 +777,17 @@ Tensor gelu(const Tensor& self) {
 }
 
 Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
-  if (xpu::oneDNN::is_onednn_layout(self) &&
-      xpu::oneDNN::eltwise_backward_valid(self)) {
+  if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
+      IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
     Tensor dX;
     xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_gelu_erf>(
         dX, self, grad, 0.0f, 0.0f);
     return dX;
   } else {
-    Tensor dX = at::empty_like(self);
-    auto iter = TensorIterator::binary_op(dX, grad, self);
+    auto _self = to_plain_if_needed(self);
+    auto _grad = to_plain_if_needed(grad);
+    auto dX = at::empty_like(_self);
+    auto iter = TensorIterator::binary_op(dX, _grad, _self);
     IPEX_DISPATCH_FLOATING_TYPES_AND(
         at::ScalarType::BFloat16, iter.dtype(), "gelu_backward", [&]() {
           dpcpp_kernel_with_scalars(
