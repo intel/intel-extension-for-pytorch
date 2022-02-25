@@ -6,7 +6,6 @@
 # USE_ONEMKL            - to use oneMKL in operators
 # USE_MICROBENCH        - to build with Microbench
 # USE_CHANNELS_LAST_1D  - to use channels last 1d feature
-# USE_LEVEL_ZERO_ONLY   - to enumerate devices only with Level Zero
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
 # USE_QUEUE_BARRIER     - to use queue submit_barrier API
@@ -16,7 +15,6 @@
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
-# BUILD_NO_L0_ONEDNN    - to build oneDNN without LevelZero support
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
 # BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)

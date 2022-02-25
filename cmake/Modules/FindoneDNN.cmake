@@ -41,14 +41,6 @@ ELSE()
   SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "oneDNN sycl primitive cache" FORCE)
 ENDIF()
 
-IF(BUILD_NO_L0_ONEDNN)
-  MACRO(unset_onednn_l0)
-    UNSET(DNNL_WITH_LEVEL_ZERO)
-    MESSAGE(WARNING "LevelZero is being forced to disable in oneDNN!")
-  ENDMACRO()
-  VARIABLE_WATCH(DNNL_WITH_LEVEL_ZERO unset_onednn_l0)
-ENDIF()
-
 IF(ONEDNN_USE_NATIVE_ARCH)  # Disable HostOpts in oneDNN unless ONEDNN_USE_NATIVE_ARCH is set.
   SET(DNNL_ARCH_OPT_FLAGS "HostOpts" CACHE STRING "" FORCE)
 ELSE()

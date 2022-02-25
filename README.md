@@ -161,7 +161,6 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | USE_AOT_DEVLIST | "" | device list for AOT compilation. Now only ATS-P and PVC are supported. | 
 | USE_ONEMKL | ON | Use oneMKL BLAS library if set to ON. |
 | USE_CHANNELS_LAST_1D | ON | Support channels last 1D memory format if set to ON. |
-| USE_LEVEL_ZERO_ONLY | ON | Enumerate devices only with Level Zero if set to ON. |
 | USE_PERSIST_STREAM | ON | Use persistent oneDNN stream if set to ON.|
 | USE_PRIMITIVE_CACHE | OFF | Use Intel® Extension for PyTorch* GPU solution to cache oneDNN primtives if set to ON. <br> Otherwise use oneDNN cache solution.|
 | USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
@@ -171,7 +170,6 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | BUILD_STATS | OFF | Count statistics for each component during build process if set to ON. |
 | BUILD_SEPARATE_OPS | OFF | Build each operator in separate library if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |
-| BUILD_NO_L0_ONEDNN | OFF | Build oneDNN without LevelZero support if set to ON. |
 | BUILD_STRIPPED_BIN | OFF | Strip all symbols when building Intel® Extension for PyTorch* GPU libraries. |
 | BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path if set to ON. |
 | BUILD_DOUBLE_KERNEL | OFF | Build double data type kernels. This option is set to ON only if <br> BUILD_INTERNAL_DEBUG is set to ON. |

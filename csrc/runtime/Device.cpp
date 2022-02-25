@@ -30,29 +30,14 @@ static void clearDPCPPContextAndDevices() {
   gDevPool.devices.clear();
 }
 
-static inline std::string getPreferredPlatform() {
-  // TODO: To use more stable api from dpc++ runtime to preferred select
-  // platform Following code logic based upon the assumption: gpu_selector will
-  // select gpu device with priority considering platform: 1) level_zero 2)
-  // opencl JIRA CMPLRLLVM-19937 is tracking this.
-  DPCPP::device dev{DPCPP::gpu_selector{}};
-  return dev.get_platform().get_info<DPCPP::info::platform::name>();
-}
-
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
   auto plaform_list = DPCPP::platform::get_platforms();
   std::vector<DPCPP::device> root_devices;
   // Enumerated root devices(GPU cards) from GPU Platform firstly.
   for (const auto& platform : plaform_list) {
-#ifdef USE_LEVEL_ZERO_ONLY
     if (platform.get_backend() != DPCPP::backend::ext_oneapi_level_zero)
       continue;
-#else
-    auto plat_name = platform.get_info<DPCPP::info::platform::name>();
-    if (plat_name.compare(getPreferredPlatform()) != 0)
-      continue;
-#endif
     auto device_list = platform.get_devices();
     for (const auto& device : device_list) {
       if (device.is_gpu()) {

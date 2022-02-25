@@ -5,25 +5,10 @@
 namespace xpu {
 namespace dpcpp {
 
+#if defined(USE_MULTI_CONTEXT)
 static std::once_flag initFlag;
-#if !defined(USE_MULTI_CONTEXT)
-static std::unique_ptr<DPCPP::context> gContext;
-#else
 static std::vector<std::unique_ptr<DPCPP::context>> gCtxPool;
-#endif
 
-#if !defined(USE_MULTI_CONTEXT)
-static void initDeviceContext() {
-  int cnt;
-  std::vector<DPCPP::device> devs;
-  dpcppGetDeviceCount(&cnt);
-  for (int i = 0; i < cnt; i++) {
-    devs.push_back(dpcppGetRawDevice(i));
-  }
-
-  gContext.reset(new DPCPP::context(devs, dpcppAsyncHandler));
-}
-#else
 static void initDeviceContext() {
   int cnt;
   dpcppGetDeviceCount(&cnt);
@@ -35,33 +20,26 @@ static void initDeviceContext() {
 }
 #endif
 
-#if !defined(USE_MULTI_CONTEXT)
 void clearDeviceContext() {
-  gContext.reset(NULL);
-}
-#else
-void clearDeviceContext() {
+#if defined(USE_MULTI_CONTEXT)
   for (auto& ctx : gCtxPool) {
     ctx.reset(NULL);
   }
-}
 #endif
-
-#if !defined(USE_MULTI_CONTEXT)
-DPCPP::context getDeviceContext(DeviceId device_id) {
-  // If we use global shared context, we just ignore device_id
-  std::call_once(initFlag, initDeviceContext);
-  return *gContext;
 }
-#else
+
 DPCPP::context getDeviceContext(DeviceId device_id) {
+#if defined(USE_MULTI_CONTEXT)
   std::call_once(initFlag, initDeviceContext);
   int dev_cnt = -1;
   dpcppGetDeviceCount(&dev_cnt);
   AT_ASSERT(device_id < dev_cnt);
   return *gCtxPool[device_id];
-}
+#else
+  auto dev = dpcppGetRawDevice(device_id);
+  return dev.get_platform().ext_oneapi_get_default_context();
 #endif
+}
 
 } // namespace dpcpp
 } // namespace xpu
