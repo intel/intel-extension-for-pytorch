@@ -93,7 +93,7 @@ else()
 endif()
 
 add_library(ipex_gpu_core SHARED ${IPEX_GPU_CORE_SRC})
-append_target_property(ipex_gpu_core LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
+append_target_property(ipex_gpu_core LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${OPT_LEVEL}")
 target_include_directories(ipex_gpu_core PUBLIC ${IPEX_INCLUDE_DIRS})
 target_link_directories(ipex_gpu_core PUBLIC ${SYCL_LIBRARY_DIR})
 
