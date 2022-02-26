@@ -502,6 +502,35 @@ functions_out_from_last_to_first = [
     'upsample_nearest2d_out',
     'upsample_nearest3d_out',
     'upsample_trilinear3d_out',
+    'adaptive_avg_pool3d_backward_out',
+    'adaptive_max_pool2d_backward_out',
+    'adaptive_max_pool3d_backward_out',
+    'avg_pool2d_backward_out',
+    'avg_pool3d_backward_out',
+    'col2im_backward_out',
+    'fractional_max_pool2d_backward_out',
+    'fractional_max_pool3d_backward_out',
+    'glu_backward_out',
+    'im2col_backward_out',
+    'l1_loss_backward_out',
+    'log_sigmoid_backward_out',
+    'max_pool2d_with_indices_backward_out',
+    'max_pool3d_with_indices_backward_out',
+    'max_unpool2d_backward_out',
+    'max_unpool3d_backward_out',
+    'mse_loss_backward_out',
+    'multilabel_margin_loss_backward_out',
+    'reflection_pad1d_backward_out',
+    'replication_pad2d_backward_out',
+    'smooth_l1_loss_backward_out',
+    'soft_margin_loss_backward_out',
+    'upsample_bicubic2d_backward_out',
+    'upsample_bilinear2d_backward_out',
+    'upsample_linear1d_backward_out',
+    'upsample_nearest1d_backward_out',
+    'upsample_nearest2d_backward_out',
+    'upsample_nearest3d_backward_out',
+    'upsample_trilinear3d_backward_out',
 ]
 
 @dataclass(frozen=True)
@@ -529,7 +558,7 @@ class DispatcherSignature:
         if name is None:
             name = self.name()
         if name in functions_out_from_last_to_first:
-            assert 'out' in args_list[-1]
+            assert 'out' in args_list[-1] or 'grad_input' in args_list[-1]
             out = args_list.pop()
             args_list.reverse()
             args_list.append(out)
