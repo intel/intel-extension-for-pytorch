@@ -19,6 +19,7 @@ from tools.codegen.api.types import (BaseCType, Binding, ConstRefCType,
                                      DispatcherSignature)
 import tools.codegen.api.meta as meta
 import tools.codegen.api.cpp as cpp
+from tools.codegen.api.types import functions_out_from_last_to_first
 import tools.codegen.api.structured as structured
 from tools.codegen.api.translate import translate
 from tools.codegen.selective_build.selector import SelectiveBuilder
@@ -363,7 +364,18 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                 else:
                     impl_name = f"{self.cpp_namespace}::{self.class_method_name}::{metadata.kernel}"
 
-                args_exprs_str = ', '.join(a.name for a in args)
+                # args_exprs_str = ', '.join(a.name for a in args)
+                args_exprs_list = []
+                for a in args:
+                    args_exprs_list.append(a.name)
+
+                if metadata.kernel in functions_out_from_last_to_first:
+                    assert 'out' in args_exprs_list[-1]
+                    out = args_exprs_list.pop()
+                    args_exprs_list.reverse()
+                    args_exprs_list.append(out)
+                    args_exprs_list.reverse()
+                args_exprs_str = ', '.join(args_exprs_list)
 
                 device_check = '  // No device check\n'
                 # Backends that require device guards presumably also require device checks.

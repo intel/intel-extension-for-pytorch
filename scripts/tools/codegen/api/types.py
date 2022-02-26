@@ -436,6 +436,12 @@ class CppSignatureGroup:
             faithful_signature=faithful_signature,
         )
 
+functions_out_from_last_to_first = [
+    'adaptive_avg_pool2d_out',
+    'adaptive_avg_pool3d_out',
+    'all_out',
+]
+
 @dataclass(frozen=True)
 class DispatcherSignature:
     # The schema this signature is derived from
@@ -453,9 +459,20 @@ class DispatcherSignature:
         return self.prefix + dispatcher.name(self.func)
 
     def decl(self, name: Optional[str] = None) -> str:
-        args_str = ', '.join(a.decl() for a in self.arguments())
+        # args_str = ', '.join(a.decl() for a in self.arguments())
+        args_list = []
+        for a in self.arguments():
+            adecl = a.decl()
+            args_list.append(adecl)
         if name is None:
             name = self.name()
+        if name in functions_out_from_last_to_first:
+            assert 'out' in args_list[-1]
+            out = args_list.pop()
+            args_list.reverse()
+            args_list.append(out)
+            args_list.reverse()
+        args_str = ', '.join(args_list)
         return f"{self.returns_type().cpp_type()} {name}({args_str})"
 
     def defn(self, name: Optional[str] = None, *, is_redispatching_fn: bool = False) -> str:
