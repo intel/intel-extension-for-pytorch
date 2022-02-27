@@ -20,6 +20,7 @@ from tools.codegen.api.types import (BaseCType, Binding, ConstRefCType,
 import tools.codegen.api.meta as meta
 import tools.codegen.api.cpp as cpp
 from tools.codegen.api.types import functions_out_from_last_to_first
+from tools.codegen.api.types import functions_two_pars_reorder
 import tools.codegen.api.structured as structured
 from tools.codegen.api.translate import translate
 from tools.codegen.selective_build.selector import SelectiveBuilder
@@ -375,6 +376,14 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
                     args_exprs_list.reverse()
                     args_exprs_list.append(out)
                     args_exprs_list.reverse()
+                elif metadata.kernel in functions_two_pars_reorder:
+                    last = args_exprs_list.pop()
+                    last2 = args_exprs_list.pop()
+                    args_exprs_list.reverse()
+                    args_exprs_list.append(last)
+                    args_exprs_list.append(last2)
+                    args_exprs_list.reverse()
+
                 args_exprs_str = ', '.join(args_exprs_list)
 
                 device_check = '  // No device check\n'

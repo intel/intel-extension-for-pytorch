@@ -436,6 +436,25 @@ class CppSignatureGroup:
             faithful_signature=faithful_signature,
         )
 
+functions_two_pars_reorder = [
+    'adaptive_max_pool2d_out',
+    'adaptive_max_pool3d_out',
+    'fractional_max_pool2d_out',
+    'fractional_max_pool3d_out',
+    'geqrf_out',
+    'log_sigmoid_forward_out',
+    'max_out',
+    'max_pool2d_with_indices_out',
+    'max_pool3d_with_indices_out',
+    'min_out',
+    'mode_out',
+    'multilabel_margin_loss_forward_out',
+    'solve_out',
+    'sort_out',
+    'topk_out',
+    'triangular_solve_out',
+]
+
 functions_out_from_last_to_first = [
     'adaptive_avg_pool2d_out',
     'adaptive_avg_pool3d_out',
@@ -563,6 +582,14 @@ class DispatcherSignature:
             args_list.reverse()
             args_list.append(out)
             args_list.reverse()
+        elif name in functions_two_pars_reorder:
+            last = args_list.pop()
+            last2 = args_list.pop()
+            args_list.reverse()
+            args_list.append(last)
+            args_list.append(last2)
+            args_list.reverse()
+
         args_str = ', '.join(args_list)
         return f"{self.returns_type().cpp_type()} {name}({args_str})"
 
