@@ -269,7 +269,6 @@ class RegisterDispatchKey:
         'q_per_channel_axis',
         'set_quantizer_',
         'quantized_max_pool2d',
-        '_reshape_alias'
     ])
 
     LAZY_REORDER_TENSORLIST = CodeTemplate("""\
