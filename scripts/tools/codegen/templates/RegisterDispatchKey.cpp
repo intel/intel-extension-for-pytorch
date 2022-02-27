@@ -46,6 +46,13 @@ namespace dpcpp {
 }
 }
 
+#include <utils/Settings.h>
+namespace xpu {
+namespace dpcpp {
+  void wait_for_queue_finish();
+}
+}
+
 namespace at {
 
 // NB: TORCH_LIBRARY_IMPL must be in an anonymous namespace to avoid
