@@ -37,7 +37,6 @@
 #include <intrinsic/ipex_intrinsic.h>
 $extra_cuda_headers
 $external_backend_headers
-$namespaced_headers
 
 #include <utils/Settings.h>
 namespace xpu {
