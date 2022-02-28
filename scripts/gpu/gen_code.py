@@ -416,8 +416,6 @@ lazy_reorder_block_list = set([
     'adaptive_max_pool2d_out',
     'adaptive_max_pool2d_backward',
     'adaptive_max_pool2d_backward_out',
-    'quantize_per_tensor',
-    'quantize_per_channel',
     'dequantize',
     '_softmax',
     '_softmax_backward_data',

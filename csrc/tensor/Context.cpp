@@ -41,6 +41,11 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   if (!ctx.permution().empty())
     to = at::native::permute(to, IntArrayRef(ctx.permution())).contiguous();
 
+  // group convolution case 5D(oneDNN) -> 4D(PyTorch)
+  if (from.ndimension() != ctx.dims().size()) {
+    to = to.reshape(from.sizes());
+  }
+
   // case-2. int32 opaque tensor in block fmt
   // 1. convert to plain 2. copy to int64
   if (from.scalar_type() == at::ScalarType::Long) {

@@ -4,6 +4,7 @@
 #include <ATen/core/grad_mode.h>
 #include <ATen/record_function.h>
 #include <core/MemoryFormat.h>
+#include <core/TensorImplUtils.h>
 
 #include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
@@ -435,7 +436,18 @@ static at::Tensor convolution(
     }
 
     wgh_m = dpcpp_onednn_memory(expected_wgh_md, engine, wgh_.data_ptr());
-    xpu::oneDNN::reorder(wgh, wgh_);
+    auto reshaped_wgh = wgh;
+    // reshape for group convolution weight
+    if (wgh_.ndimension() == 5 && wgh.ndimension() == 4) {
+      reshaped_wgh = share_storage_and_set_strided_as(
+          wgh,
+          wgh_.sizes(),
+          /*compatible with different strides of weight (including contiguous,
+             channels_last and non-contiguous) */
+          compatible_groups_conv_strides(wgh, wgh_),
+          c10::nullopt);
+    }
+    xpu::oneDNN::reorder(reshaped_wgh, wgh_);
 
     if (weight_cache_optimization) {
       strm.wait();

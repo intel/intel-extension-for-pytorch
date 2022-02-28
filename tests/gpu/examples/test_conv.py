@@ -134,6 +134,20 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
         self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
+    def test_conv3d_channels_last(self, dtype=torch.float):
+        x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+        conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, bias=False)
+        y_cpu = conv_cpu(x_cpu)
+
+        x_dpcpp = x_cpu.to(dpcpp_device).to(memory_format=torch.channels_last_3d)
+        conv_dpcpp = conv_cpu.to(dpcpp_device).to(memory_format=torch.channels_last_3d)
+        y_dpcpp = conv_dpcpp(x_dpcpp)
+
+        print("ref (cpu):\n", "output:\n", y_cpu)
+        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu())
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+
     def test_conv3d_with_bias(self, dtype=torch.float):
         x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
         grad_cpu = torch.full([2, 32, 10, 128, 128], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
@@ -258,6 +272,20 @@ class TestNNMethod(TestCase):
         conv = conv.cpu()
         x = x.cpu()
         ref = conv(x)
+
+        print("real: ", real.cpu())
+        print("ref: ", ref)
+
+        self.assertEqual(real.cpu(), ref)
+
+    def test_group_conv_channels_last_fwd(self, dtype=torch.float):
+        conv = nn.Conv2d(256, 64, kernel_size=3, stride=1, padding=1, bias=False, groups=2).to(cpu_device)
+        x = torch.randn([1, 256, 3, 3], dtype=torch.float, device=cpu_device, requires_grad=True).to(cpu_device)
+        ref = conv(x)
+
+        conv_xpu = conv.to(dpcpp_device).to(memory_format=torch.channels_last)
+        x_xpu = x.to(dpcpp_device).to(memory_format=torch.channels_last)
+        real = conv_xpu(x_xpu)
 
         print("real: ", real.cpu())
         print("ref: ", ref)

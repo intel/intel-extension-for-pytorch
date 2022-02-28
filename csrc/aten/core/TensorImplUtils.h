@@ -1,6 +1,8 @@
 #pragma once
 
 #include <ATen/TensorUtils.h>
+#include <ATen/native/Resize.h>
+#include <ATen/quantized/QTensorImpl.h>
 #include <c10/core/DeviceType.h>
 #include <c10/core/StorageImpl.h>
 #include <c10/core/TensorImpl.h>
@@ -135,6 +137,25 @@ static inline bool IsOnSameDevice(const at::TensorList& tensor_list) {
       return false;
   }
   return true;
+}
+
+static inline Tensor share_storage_and_set_strided_as(
+    const Tensor& self,
+    IntArrayRef size,
+    IntArrayRef stride,
+    c10::optional<int64_t> storage_offset_) {
+  auto storage_offset = storage_offset_.value_or(self.storage_offset());
+  at::Tensor result;
+  if (self.is_quantized()) {
+    auto quantizer = get_qtensorimpl(self)->quantizer();
+    result = at::detail::make_tensor<QTensorImpl>(
+        Storage(self.storage()), self.key_set(), self.dtype(), quantizer);
+  } else {
+    result = at::detail::make_tensor<TensorImpl>(
+        Storage(self.storage()), self.key_set(), self.dtype());
+  }
+  native::setStrided(result, size, stride, storage_offset);
+  return result;
 }
 
 } // namespace dpcpp

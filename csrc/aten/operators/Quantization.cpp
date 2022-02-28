@@ -109,50 +109,13 @@ Tensor quantize_tensor_per_tensor_affine(
     }
   }
 
-  memory::dims r_dims = rtensor.dim() == 4
-      ? memory::dims(
-            {rtensor.size(0),
-             rtensor.size(1),
-             rtensor.size(2),
-             rtensor.size(3)})
-      : rtensor.dim() == 2 ? memory::dims({rtensor.size(0), rtensor.size(1)})
-                           : memory::dims({rtensor.size(0)});
-  memory::format_tag r_fmt = rtensor.dim() == 4
-      ? memory::format_tag::nchw
-      : rtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
-
-  memory::dims q_dims = r_dims;
-  memory::data_type q_dt = get_onednn_dtype(qtensor);
-  memory::format_tag q_fmt = r_fmt;
-  memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
-
-  Tensor qtensor_opt = qtensor;
-  if (!r_ctx.is_plain() && Settings::I().is_onednn_layout_enabled()) {
-    if (rtensor.is_quantized())
-      return rtensor;
-    auto q_type = qtensor.scalar_type();
-    auto quantizer =
-        dpcpp_make_per_tensor_affine_quantizer(scale, zero_point, q_type);
-    qtensor_opt =
-        AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
-  }
-
   ReorderAttr rattr = ReorderAttr();
   int mask = 0;
   std::vector<float> scls = {static_cast<float>(1.0f / scale)};
   std::vector<int> zps = {static_cast<int>(zero_point)};
 
   rattr.set_dst_sc_and_zp(mask, scls, mask, zps);
-  xpu::oneDNN::reorder(rtensor, qtensor_opt, rattr);
-
-  if (!r_ctx.is_plain() && Settings::I().is_onednn_layout_enabled()) {
-    auto q_opt_ctx =
-        at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(
-            qtensor_opt);
-    at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(
-        rtensor, std::move(q_opt_ctx));
-    return rtensor;
-  }
+  xpu::oneDNN::reorder(rtensor, qtensor, rattr);
 
   return qtensor;
 }

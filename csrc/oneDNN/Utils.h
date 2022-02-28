@@ -100,6 +100,18 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
   return strides;
 }
 
+static inline std::vector<int64_t> compatible_groups_conv_strides(
+    const at::Tensor& wgh,
+    const at::Tensor& wgh_) {
+  std::vector<int64_t> strides(wgh_.sizes().size());
+  strides[4] = wgh.strides()[3];
+  strides[3] = wgh.strides()[2];
+  strides[2] = wgh.strides()[1];
+  strides[1] = wgh.strides()[0];
+  strides[0] = wgh_.sizes()[1] * wgh.strides()[0];
+  return strides;
+}
+
 static inline bool is_onednn_layout(const at::Tensor& tensor) {
   return !at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor);
 }
