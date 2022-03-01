@@ -66,14 +66,17 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
         auto local_id = item_id.get_local_linear_id();
 
         // initialize local_input
+        auto cur_init = init;
         if (scan_type == 1) {
-          local_scan[local_id] = first[local_id] + init;
+          local_scan[local_id] = first[local_id];
         } else {
           if (local_id > 0)
-            local_scan[local_id] = first[local_id - 1] + init;
+            local_scan[local_id] = first[local_id - 1];
           else
-            local_scan[local_id] = init;
+            local_scan[local_id] = 0;
         }
+        if (local_id == 0)
+          local_scan[local_id] += cur_init;
         group_barrier(item_id.get_group());
 
         // body of KS algo
@@ -107,21 +110,23 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
       auto group_id = item_id.get_group_linear_id();
 
       // initialize local_input
+      auto cur_init = (group_id == 0 ? init : 0);
       if (global_id < N) {
         if (scan_type == 1) {
-          local_scan[local_id] = first[global_id] + init;
+          local_scan[local_id] = first[global_id];
         } else {
           if (local_id > 0)
-            local_scan[local_id] = first[global_id - 1] + init;
+            local_scan[local_id] = first[global_id - 1];
           else
-            local_scan[local_id] = init;
+            local_scan[local_id] = 0;
+        }
+        if (local_id == 0)
+          local_scan[local_id] += cur_init;
+        if (local_id == wgroup_size - 1) {
+          carry_ptr[group_id] = first[global_id];
         }
       }
       group_barrier(item_id.get_group());
-
-      if (local_id == wgroup_size - 1) {
-        carry_ptr[group_id] = local_scan[local_id];
-      }
 
       // body of KS algo
       for (auto __k = 1; __k < wgroup_size; __k <<= 1) {
@@ -132,10 +137,15 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
       }
 
       // flush result into dst
-      if (global_id < N)
+      if (global_id < N) {
         d_first[global_id] = local_scan[local_id];
-      if (local_id == wgroup_size - 1)
-        carry_ptr[group_id] += local_scan[local_id];
+      }
+      if (local_id == wgroup_size - 1) {
+        if (scan_type == 1)
+          carry_ptr[group_id] = local_scan[local_id];
+        else
+          carry_ptr[group_id] += local_scan[local_id];
+      }
     };
 
     __cgh.parallel_for(

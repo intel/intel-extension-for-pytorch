@@ -72,3 +72,16 @@ class TestTorchMethod(TestCase):
         self.assertEqual(output_cpu, output_xpu)
         self.assertEqual(inverse_cpu, inverse_xpu)
         self.assertEqual(counts_cpu, counts_xpu)
+
+    def test_corner_unique(self):
+        # this case is aimed to check https://jira.devtools.intel.com/browse/PYTORCHDGQ-1225
+        a_cpu = torch.tensor([i for i in range(2048)])
+        a_cpu[1023] = 1022
+        a_cpu[2047] = 2046
+        a_xpu = a_cpu.xpu()
+
+        output_cpu, inverse_cpu, counts_cpu = torch.unique(a_cpu, sorted=True, return_inverse=True, return_counts=True)
+        output_xpu, inverse_xpu, counts_xpu = torch.unique(a_xpu, sorted=True, return_inverse=True, return_counts=True)
+        self.assertEqual(output_cpu, output_xpu)
+        self.assertEqual(inverse_cpu, inverse_xpu)
+        self.assertEqual(counts_cpu, counts_xpu)
