@@ -588,7 +588,7 @@ Tensor _softmax_onednn(
   auto input_ctx =
       at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   auto input_md = input_ctx.is_plain()
-      ? memory::desc({input_tz}, data_t, dnnl_format)
+      ? memory::desc({input_tz}, data_t, get_onednn_strides(input))
       : input_ctx.meta();
 
   auto axis = dim < 0 ? dim + input.dim() : dim;
