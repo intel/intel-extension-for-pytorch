@@ -3,8 +3,8 @@
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 
-#include "csrc/jit/cpu/kernels/AddLayerNorm.h"
-#include "csrc/jit/cpu/kernels/ConcatBnRelu.h"
+#include "csrc/aten/cpu/AddLayerNorm.h"
+#include "csrc/aten/cpu/ConcatBnRelu.h"
 #include "csrc/jit/cpu/kernels/ConvPacked.h"
 #include "csrc/jit/cpu/kernels/ConvTransposePacked.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"

@@ -2,9 +2,6 @@
 
 #include "csrc/utils/ipex_op_profile.h"
 
-#if defined(CPU_CAPABILITY_AVX512)
-#include "csrc/cpu/vec512/concat_bn_relu.h"
-#endif
 #include <torch/csrc/autograd/function.h>
 
 namespace torch_ipex {

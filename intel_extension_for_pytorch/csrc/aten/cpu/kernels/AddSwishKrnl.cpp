@@ -1,4 +1,4 @@
-#include <csrc/jit/cpu/kernels/AddSwish.h>
+#include <csrc/aten/cpu/AddSwish.h>
 
 #if defined(CPU_CAPABILITY_AVX512)
 #include "csrc/cpu/vec512/add_swish.h"

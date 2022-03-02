@@ -1,4 +1,4 @@
-#include <csrc/jit/cpu/kernels/ConcatBnRelu.h>
+#include <csrc/aten/cpu/ConcatBnRelu.h>
 
 #include "csrc/utils/ipex_op_profile.h"
 

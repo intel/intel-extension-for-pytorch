@@ -1,5 +1,5 @@
 #include "LinearSwishCustomized.h"
-#include "AddSwish.h"
+#include "csrc/aten/cpu/AddSwish.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
