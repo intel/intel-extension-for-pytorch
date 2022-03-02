@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 
+#include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
 
 #include "comm/ATDispatch.h"
@@ -627,6 +628,7 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm(
     int64_t HxW,
     int64_t group,
     double eps) {
+  auto smf = X.suggest_memory_format();
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
   const Tensor& gamma = *gamma_maybe_owned;
@@ -635,10 +637,15 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm(
       at::borrow_from_optional_tensor(beta_opt);
   const Tensor& beta = *beta_maybe_owned;
 
-  Tensor Y = at::empty_like(X);
+  Tensor X_cont = X.contiguous();
+  Tensor Y = at::empty_like(X_cont);
   Tensor mean = at::empty({N, group}, X.options());
   Tensor rstd = at::empty({N, group}, X.options());
-  GroupNormKernelImpl(X, gamma, beta, N, C, HxW, group, eps, &Y, &mean, &rstd);
+  GroupNormKernelImpl(
+      X_cont, gamma, beta, N, C, HxW, group, eps, &Y, &mean, &rstd);
+  if (is_smf_channels_last(X)) {
+    Y = Y.contiguous(smf);
+  }
   return std::make_tuple(Y, mean, rstd);
 }
 
@@ -653,15 +660,19 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
     int64_t HxW,
     int64_t group,
     std::array<bool, 3> grad_input_mask) {
+  auto smf = X.suggest_memory_format();
+
   c10::MaybeOwned<Tensor> gamma_maybe_owned =
       at::borrow_from_optional_tensor(gamma_opt);
   const Tensor& gamma = *gamma_maybe_owned;
   Tensor dX;
   Tensor dgamma;
   Tensor dbeta;
+  Tensor X_cont = X.contiguous();
   if (grad_input_mask[0]) {
-    dX = at::empty_like(X);
+    dX = at::empty_like(X_cont);
   }
+
   if (grad_input_mask[1]) {
     dgamma = at::empty_like(gamma);
   }
@@ -669,7 +680,22 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
     dbeta = at::empty_like(gamma);
   }
   GroupNormBackwardKernelImpl(
-      dY, X, mean, rstd, gamma, N, C, HxW, group, &dX, &dgamma, &dbeta);
+      dY.contiguous(),
+      X_cont,
+      mean,
+      rstd,
+      gamma,
+      N,
+      C,
+      HxW,
+      group,
+      &dX,
+      &dgamma,
+      &dbeta);
+  if (is_smf_channels_last(X)) {
+    dX = dX.contiguous(smf);
+  }
+
   return std::make_tuple(dX, dgamma, dbeta);
 }
 
