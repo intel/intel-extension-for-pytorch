@@ -1,6 +1,6 @@
 #include <c10/util/Exception.h>
 #include <runtime/CachingHostAllocator.h>
-#include <runtime/Context.h>
+#include <runtime/Device.h>
 #include <utils/Macros.h>
 
 #include <deque>
@@ -68,7 +68,7 @@ void CachingHostAllocator::processEvents() {
 
 bool CachingHostAllocator::isHostPtr(void* ptr) {
   return DPCPP::usm::alloc::host ==
-      DPCPP::get_pointer_type(ptr, getDeviceContext());
+      DPCPP::get_pointer_type(ptr, dpcppGetDeviceContext());
 }
 
 void CachingHostAllocator::emptyCache() {
@@ -78,7 +78,7 @@ void CachingHostAllocator::emptyCache() {
   for (auto& blk : mAvailable) {
     auto it = mBlocks.find(blk.getPtr());
     AT_ASSERT(it != mBlocks.end() && !it->second.isAllocated());
-    DPCPP::free(blk.getPtr(), getDeviceContext());
+    DPCPP::free(blk.getPtr(), dpcppGetDeviceContext());
     mBlocks.erase(it);
   }
 
@@ -117,9 +117,11 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     return DPCPP_SUCCESS;
   }
 
-  *ptr = DPCPP::aligned_alloc_host(kHostAlignment, size, getDeviceContext());
+  *ptr =
+      DPCPP::aligned_alloc_host(kHostAlignment, size, dpcppGetDeviceContext());
   if (*ptr == NULL) {
-    *ptr = DPCPP::aligned_alloc_host(kHostAlignment, size, getDeviceContext());
+    *ptr = DPCPP::aligned_alloc_host(
+        kHostAlignment, size, dpcppGetDeviceContext());
     if (*ptr == NULL) {
       return DPCPP_FAILURE;
     }

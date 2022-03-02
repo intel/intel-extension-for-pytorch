@@ -1,4 +1,3 @@
-#include <runtime/Context.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
 #include <utils/DPCPP.h>
@@ -22,11 +21,16 @@ static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
   std::vector<DPCPP::device> devices;
+#if defined(USE_MULTI_CONTEXT)
+  std::vector<DPCPP::context> contexts;
+#endif
   std::mutex devices_mutex;
 } gDevPool;
 
 static void clearDPCPPContextAndDevices() {
-  clearDeviceContext();
+#if defined(USE_MULTI_CONTEXT)
+  gDevPool.contexts.clear();
+#endif
   gDevPool.devices.clear();
 }
 
@@ -80,7 +84,17 @@ static void initGlobalDevicePoolState() {
   }
 
   auto device_count = gDevPool.devices.size();
-  TORCH_CHECK(device_count > 0, "DPCPP Device count is zero");
+  if (device_count <= 0) {
+    TORCH_WARN("DPCPP Device count is zero!");
+  }
+
+#if defined(USE_MULTI_CONTEXT)
+  gDevPool.contexts.resize(device_count);
+  for (int i = 0; i < device_count; i++) {
+    gDevPool.contexts[i] =
+        DPCPP::context({gDevPool.devices[i]}, dpcppAsyncHandler);
+  }
+#endif
 
   // Note: DPCPPRuntime's destruction happens before the destroy of the
   // global vars except the global vars with dpcpp type. This will make
@@ -140,7 +154,7 @@ DeviceId dpcppGetDeviceIndex(DPCPP::device device) {
 }
 
 int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr) {
-  auto raw_device = DPCPP::get_pointer_device(ptr, getDeviceContext());
+  auto raw_device = DPCPP::get_pointer_device(ptr, dpcppGetDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
   return DPCPP_SUCCESS;
 }
@@ -245,6 +259,20 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
   AT_ASSERT(device_id >= 0 && device_id < num_gpus);
   std::call_once(device_prop_flags[device_id], initDeviceProperty, device_id);
   return &device_properties[device_id];
+}
+
+DPCPP::context dpcppGetDeviceContext(DeviceId device) {
+  std::call_once(init_prop_flag, initContextVectors);
+  DeviceId device_id = device;
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
+  }
+#if defined(USE_MULTI_CONTEXT)
+  return gDevPool.contexts[device_id];
+#else
+  auto dev = dpcppGetRawDevice(device_id);
+  return dev.get_platform().ext_oneapi_get_default_context();
+#endif
 }
 
 } // namespace dpcpp

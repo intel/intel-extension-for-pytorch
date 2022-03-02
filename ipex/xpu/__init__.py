@@ -27,12 +27,11 @@ def _lazy_init():
 
 def is_available() -> bool:
     r"""Returns a bool indicating if XPU is currently available."""
-    # if not hasattr(torch._C, '_xpu_getDeviceCount'):
-    #     return False
+    if not hasattr(ipex._C, '_getDeviceCount'):
+        return False
     # This function never throws and returns 0 if driver is missing or can't
     # be initialized
-    # return _C._xpu_getDeviceCount() > 0
-    return True
+    return ipex._C._getDeviceCount() > 0
 
 
 def device_count() -> int:

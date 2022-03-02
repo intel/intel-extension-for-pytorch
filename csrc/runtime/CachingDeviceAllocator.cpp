@@ -1,5 +1,5 @@
 #include <runtime/CachingDeviceAllocator.h>
-#include <runtime/Context.h>
+#include <runtime/Device.h>
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 #include <utils/Helpers.h>
@@ -140,14 +140,14 @@ int CachingDeviceAllocator::malloc_with_retry(
   auto syclDev = dpcppGetRawDevice(di);
   // Our minimum allocated memory is 512. Thus we set mem align to 512.
   *devPtr = DPCPP::aligned_alloc_device(
-      kDevAlignment, size, syclDev, getDeviceContext(di));
+      kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
 
   if (*devPtr == NULL) {
     DeviceStats& stats = get_stats_for_device(di);
     stats.num_alloc_retries += 1;
     free_cached_blocks(di);
     *devPtr = DPCPP::aligned_alloc_device(
-        kDevAlignment, size, syclDev, getDeviceContext(di));
+        kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
     if (*devPtr == NULL) {
       return DPCPP_FAILURE;
     }
@@ -514,7 +514,8 @@ void CachingDeviceAllocator::free_blocks(
   while (it != end) {
     Block* block = *it;
     if (!block->m_prev && !block->m_next) {
-      DPCPP::free((void*)block->m_buffer, getDeviceContext(block->m_device));
+      DPCPP::free(
+          (void*)block->m_buffer, dpcppGetDeviceContext(block->m_device));
 
       DeviceStats& stats = get_stats_for_device(block->m_device);
       StatTypes stat_types;

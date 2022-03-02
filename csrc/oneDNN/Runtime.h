@@ -4,7 +4,6 @@
 
 #include <core/Device.h>
 #include <core/Memory.h>
-#include <runtime/Context.h>
 #include <runtime/Utils.h>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
@@ -62,7 +61,7 @@ struct GpuEngineManager {
     for (int i = 0; i < device_count; i++) {
       engine_pool.push_back(
           std::make_shared<dnnl::engine>(dnnl::sycl_interop::make_engine(
-              dpcppGetRawDevice(i), getDeviceContext(i))));
+              dpcppGetRawDevice(i), dpcppGetDeviceContext(i))));
     }
   }
   ~GpuEngineManager() {}

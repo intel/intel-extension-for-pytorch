@@ -1,6 +1,5 @@
 #pragma once
 
-#include <runtime/Context.h>
 #include <runtime/Device.h>
 #include <runtime/Queue.h>
 #include <utils/DPCPP.h>

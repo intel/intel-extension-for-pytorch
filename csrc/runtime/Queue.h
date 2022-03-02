@@ -24,11 +24,13 @@ class Queue {
       : queue_([&]() -> DPCPP::queue {
           return Settings::I().is_event_profiling_enabled()
               ? DPCPP::queue(
+                    dpcppGetDeviceContext(di),
                     dpcppGetRawDevice(di),
                     asyncHandler,
                     {DPCPP::property::queue::in_order(),
                      DPCPP::property::queue::enable_profiling()})
               : DPCPP::queue(
+                    dpcppGetDeviceContext(di),
                     dpcppGetRawDevice(di),
                     asyncHandler,
                     {DPCPP::property::queue::in_order()});
