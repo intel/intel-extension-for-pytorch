@@ -1,15 +1,17 @@
 #pragma once
 
 #include <ATen/ATen.h>
-
+#include <ATen/native/ReduceOpsUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include <cmath>
 
 #include "Algorithm.h"
 #include "Numerics.h"
-
+#include "Pointwise.h"
+#include "SimpleReduce.h"
 using namespace at::native;
 using namespace xpu::dpcpp;
 
@@ -70,124 +72,143 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     at::Tensor& src,
     std::pair<K, Index> init,
     BinaryFunction binary_op) {
-  auto& queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
-  auto totalElements = src.numel();
+  auto rdim = tgt1.dim() - 1;
+  const auto N = src.size(rdim);
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  const auto max_wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  const auto wgroup_size = std::min(max_wgroup_size, N);
+  const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
 
-  auto dim = tgt1.dim() - 1;
-  int64_t n = src.size(dim);
-  // stride == 1 due to we have ensured src is contiguous before
-  int64_t batch = totalElements / n;
+  tgt1.copy_(src);
+  K* tgt1_ptr = tgt1.data_ptr<K>();
+  Index* tgt2_ptr = tgt2.data_ptr<Index>();
 
-  auto num_groups = CeilDiv(totalElements / n, group_size);
-  auto total_items = num_groups * group_size;
+  const auto num_per_batch = src.numel() / N;
+  const auto num_dim = (src.dim() == 0) ? 1 : src.dim();
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = src.data_ptr<K>();
-    auto tgt1_data = tgt1.data_ptr<K>();
-    auto tgt2_data = tgt2.data_ptr<Index>();
+  auto size_rdim = src.size(rdim);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = src_data;
-      auto tgt1_ptr = tgt1_data;
-      auto tgt2_ptr = tgt2_data;
+  using max_t = std::pair<K, Index>;
 
-      int64_t linearIndex = item.get_global_id(0);
-      if (linearIndex < batch) {
-        int64_t start = linearIndex % batch * n;
-
-        std::pair<K, Index> acc = init;
-        for (int64_t j = 0; j < n; ++j) {
-          //
-          // The explicit typecast looks weired but is necessory to solve the
-          // build error
-          // "candidate function not viable: no known conversion from '__global
-          // long' to
-          // '__global long &&' for 1st argument."
-          //
-          K data = src_ptr[start + j];
-          Index idx = j /* + TH_INDEX_BASE */;
-          acc = binary_op(acc, std::make_pair<K, Index>((K)data, (Index)idx));
-        }
-        tgt1_ptr[linearIndex] = acc.first;
-        tgt2_ptr[linearIndex] = acc.second;
-      }
+  // initialize tgt2
+  auto cgf_0 = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      tgt2_ptr[item_id] = item_id % size_rdim;
     };
 
-    // kick off kernel
-    cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
-        kfn);
+    __cgh.parallel_for(DPCPP::range<1>(src.numel()), kfn);
   };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_0);
 
-  // submit to DPCPP queue
-  DPCPP_Q_SUBMIT(queue, cgf);
+  for (auto ng = ngroups; ng >= 1; ng = (ng + wgroup_size - 1) / wgroup_size) {
+    for (auto i = 0; i < num_per_batch; i++) {
+      auto cgf = DPCPP_Q_CGF(__cgh) {
+        dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
+        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+          auto local_id = item_id.get_local_linear_id();
+          auto global_id = item_id.get_global_linear_id();
+          auto group_id = item_id.get_group_linear_id();
+          auto group_size = item_id.get_local_range().size();
+
+          auto index = i * size_rdim + global_id;
+          // init local shared memory of input
+          if (global_id < N) {
+            local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+          }
+
+          simple_reduce(item_id, local_max_buf, binary_op);
+
+          auto target_idx = i * size_rdim + group_id;
+          if (local_id == 0) {
+            tgt1_ptr[target_idx] = local_max_buf[local_id].first;
+            tgt2_ptr[target_idx] = local_max_buf[local_id].second;
+          }
+        };
+
+        __cgh.parallel_for(
+            DPCPP::nd_range<1>(ng * wgroup_size, wgroup_size), kfn);
+      };
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    }
+    if (ng == 1)
+      break;
+  }
 }
 
 template <typename K, typename Index, class BinaryFunction>
 DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
     at::Tensor& tgt1,
     at::Tensor& tgt2,
-    at::Tensor& src,
+    const at::Tensor& src,
     int64_t rdim,
     std::pair<K, Index> init,
     BinaryFunction binary_op) {
-  auto& queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
-  auto totalElements = src.numel();
+  const auto N = src.size(rdim);
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  const auto max_wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  const auto wgroup_size = std::min(max_wgroup_size, N);
+  const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
 
-  int64_t n = src.size(rdim);
-  int64_t stride = src.stride(rdim);
-  int64_t batch = totalElements / (n * stride);
+  tgt1.copy_(src);
+  K* tgt1_ptr = tgt1.data_ptr<K>();
+  Index* tgt2_ptr = tgt2.data_ptr<Index>();
 
-  auto num_groups = CeilDiv(totalElements / n, group_size);
-  auto total_items = num_groups * group_size;
+  const auto num_per_batch = src.numel() / N;
+  const auto num_dim = (src.dim() == 0) ? 1 : src.dim();
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = src.data_ptr<K>();
-    auto tgt1_data = tgt1.data_ptr<K>();
-    auto tgt2_data = tgt2.data_ptr<Index>();
+  auto stride_rdim = src.stride(rdim);
+  auto size_rdim = src.size(rdim);
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = src_data;
-      auto tgt1_ptr = tgt1_data;
-      auto tgt2_ptr = tgt2_data;
+  using max_t = std::pair<K, Index>;
 
-      int64_t linearIndex = item.get_global_id(0);
-      if (linearIndex < totalElements / n) {
-        int64_t start =
-            (linearIndex / stride) * n * stride + linearIndex % stride;
-        std::pair<K, Index> acc = init;
-        for (int64_t j = 0; j < n; ++j) {
-          //
-          // The explicit typecast looks weired but is necessory to solve the
-          // build error
-          // "candidate function not viable: no known conversion from '__global
-          // long' to
-          // '__global long &&' for 1st argument."
-          //
-          K data = src_ptr[start + j * stride];
-          Index idx = j /* + TH_INDEX_BASE */;
-          acc = binary_op(acc, std::make_pair<K, Index>((K)data, (Index)idx));
-          tgt1_ptr[linearIndex] = acc.first;
-          tgt2_ptr[linearIndex] = acc.second;
-        }
-      }
+  // initialize tgt2
+  auto cgf_0 = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      tgt2_ptr[item_id] = item_id / stride_rdim % size_rdim;
     };
 
-    // kick off kernel
-    cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
-        kfn);
+    __cgh.parallel_for(DPCPP::range<1>(src.numel()), kfn);
   };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_0);
 
-  // submit to DPCPP queue
-  DPCPP_Q_SUBMIT(queue, cgf);
-};
+  for (auto ng = ngroups; ng >= 1; ng = (ng + wgroup_size - 1) / wgroup_size) {
+    for (auto i = 0; i < num_per_batch; i++) {
+      auto cgf = DPCPP_Q_CGF(__cgh) {
+        dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
+        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+          auto local_id = item_id.get_local_linear_id();
+          auto global_id = item_id.get_global_linear_id();
+          auto group_id = item_id.get_group_linear_id();
+          auto group_size = item_id.get_local_range().size();
+
+          auto index = i / stride_rdim * stride_rdim * size_rdim +
+              i % stride_rdim + global_id * stride_rdim;
+          // init local shared memory of input
+          if (global_id < N) {
+            local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+          }
+
+          simple_reduce(item_id, local_max_buf, binary_op);
+
+          auto target_idx = i / stride_rdim * stride_rdim * size_rdim +
+              i % stride_rdim + group_id * stride_rdim;
+          if (local_id == 0) {
+            tgt1_ptr[target_idx] = local_max_buf[local_id].first;
+            tgt2_ptr[target_idx] = local_max_buf[local_id].second;
+          }
+        };
+
+        __cgh.parallel_for(
+            DPCPP::nd_range<1>(ng * wgroup_size, wgroup_size), kfn);
+      };
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    }
+    if (ng == 1)
+      break;
+  }
+}
 
 template <
     typename ScalarTypeK,
@@ -196,7 +217,7 @@ template <
 DPCPP_HOST void transformReduceOuterDimIndex(
     at::Tensor& tgt1,
     at::Tensor& tgt2,
-    at::Tensor& src,
+    const at::Tensor& src,
     int64_t rdim,
     const std::pair<ScalarTypeK, ScalarTypeIndex>& init,
     BinaryFunction binary_op) {
@@ -239,22 +260,22 @@ DPCPP_HOST void reduceDimIndex(
   TensorImpl_preserveReduceDimSemantics(
       TensorImpl_Unwrap(tgt2_), src_dims, dimension, keepdim);
 
-  std::vector<int64_t> dim;
-  for (int i = 0; i < src_.dim(); i++)
-    dim.push_back(src_.sizes()[i]);
-  dim[dimension] = 1;
-  tgt1_.resize_(dim);
-  tgt2_.resize_(dim);
-
+  auto src = src_.contiguous();
   auto tgt1 = tgt1_.contiguous();
   auto tgt2 = tgt2_.contiguous();
-  auto src = src_.contiguous();
+  tgt1.resize_as_(src);
+  tgt2.resize_as_(src);
 
-  if (dimension == ((src.dim() == 0 ? 1 : src.dim()) - 1)) {
+  if (dimension == ((src_.dim() == 0 ? 1 : src_.dim()) - 1)) {
     transformReduceInnermostDimIndex(tgt1, tgt2, src, init, binary_op);
   } else {
     transformReduceOuterDimIndex(tgt1, tgt2, src, dimension, init, binary_op);
   }
+
+  std::vector<int64_t> dim = src_.sizes().vec();
+  dim[dimension] = 1;
+  tgt1_ = tgt1_.narrow(dimension, 0, 1).contiguous();
+  tgt2_ = tgt2_.narrow(dimension, 0, 1).contiguous();
 
   if (!keepdim) {
     TensorImpl_squeeze1d(
