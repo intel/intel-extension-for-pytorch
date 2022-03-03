@@ -176,6 +176,11 @@ if (USE_ITT)
     endif()
 endif()
 
+if (USE_PROFILER)
+    # Enable Profiler
+    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_PROFILER")
+endif()
+
 # XXX: Try to find ITT & oneMKL support before oneDNN settings
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)

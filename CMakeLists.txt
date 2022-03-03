@@ -35,7 +35,7 @@ option(BUILD_SEPARATE_OPS "Build each operator in separate library" ON)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 option(USE_HOOKS "Use XPU Hooks in build. Should turn off it for 1.10 rebase" OFF)
-option(USE_PROFILER "USE XPU Profiler in build. Should turn off it for 1.10 rebase" OFF)
+option(USE_PROFILER "USE XPU Profiler in build." ON)
 option(BUILD_SIMPLE_TRACE_IPEX_ENTRY "Build simple trace for ipex entry" OFF)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 

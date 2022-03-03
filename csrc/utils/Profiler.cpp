@@ -1,6 +1,6 @@
 #include <c10/core/Allocator.h>
 #include <runtime/Utils.h>
-#include <torch/csrc/autograd/profiler.h>
+#include <torch/csrc/autograd/profiler_legacy.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include <utils/Profiler.h>
@@ -14,7 +14,7 @@
 using namespace torch::autograd::profiler;
 
 #if defined(USE_PROFILER)
-struct DPCPPEventStubImpl : public XPUEventStubBase {
+struct DPCPPEventStubImpl : public KernelEventBase {
  public:
   DPCPPEventStubImpl() = delete;
   DPCPPEventStubImpl(DPCPP::event event)
@@ -37,13 +37,15 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
 };
 
 struct DPCPPProfilerStubsImpl : public XPUStubs {
-  void record(XPUEventStub& event) override {
+  void record(int* device, KernelEventStub* event, int64_t* cpu_ns)
+      const override {
     auto& Q = xpu::dpcpp::dpcppGetCurrentQueue();
     auto evt = xpu::dpcpp::queue_barrier(Q);
-    event.reset(new DPCPPEventStubImpl(evt));
+    event->reset(new DPCPPEventStubImpl(evt));
   }
 
-  float elapsed(XPUEventStub event, XPUEventStub event2) override {
+  float timeDiff(const KernelEventStub& event, const KernelEventStub& event2)
+      const override {
     DPCPPEventStubImpl* dpcpp_event =
         dynamic_cast<DPCPPEventStubImpl*>(event.get());
     DPCPPEventStubImpl* dpcpp_event2 =
@@ -51,29 +53,29 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
     return dpcpp_event->elapsed(*dpcpp_event2);
   }
 
-  float elapsed(XPUEventStub event) override {
+  float elapsed(const KernelEventStub& event) const override {
     DPCPPEventStubImpl* dpcpp_event =
         dynamic_cast<DPCPPEventStubImpl*>(event.get());
     return dpcpp_event->elapsed();
   }
-  bool enabled() override {
+  bool enabled() const override {
     return true;
   }
-  void ittMark(const char* name) override {
+  void ittMark(const char* name) const override {
 #if defined(USE_ITT)
     itt_mark(name);
 #else
     AT_ERROR("ipex is not compiled with ITT.");
 #endif
   }
-  void ittRangePush(const char* name) override {
+  void ittRangePush(const char* name) const override {
 #if defined(USE_ITT)
     itt_range_push(name);
 #else
     AT_ERROR("ipex is not compiled with ITT.");
 #endif
   }
-  void ittRangePop() override {
+  void ittRangePop() const override {
 #if defined(USE_ITT)
     itt_range_pop();
 #else
@@ -170,9 +172,9 @@ bool is_profiler_enabled() {
 
 void dpcpp_mark(std::string name, DPCPP::event& event) {
 #if defined(USE_PROFILER)
-  XPUEventStub dpcpp_evt_stub;
+  KernelEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
-  mark_xpu(std::move(name), dpcpp_evt_stub);
+  markKernel(std::move(name), dpcpp_evt_stub);
 #endif
 }
 
@@ -181,9 +183,9 @@ void dpcpp_mark(
     DPCPP::event& start_event,
     DPCPP::event& end_event) {
 #if defined(USE_PROFILER)
-  XPUEventStub dpcpp_evt_stub;
+  KernelEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
-  mark_xpu(std::move(name), dpcpp_evt_stub);
+  markKernel(std::move(name), dpcpp_evt_stub);
 #endif
 }
 
@@ -208,6 +210,6 @@ void reportMemoryUsage(
     at::DeviceIndex device_id) {
 #if defined(USE_PROFILER)
   c10::reportMemoryUsageToProfiler(
-      ptr, alloc_size, c10::Device(c10::DeviceType::XPU, device_id));
+      ptr, alloc_size, -1, -1, c10::Device(c10::DeviceType::XPU, device_id));
 #endif
 }
