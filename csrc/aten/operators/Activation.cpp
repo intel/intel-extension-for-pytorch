@@ -174,64 +174,6 @@ static void RReLU_updateGradInput(
 }
 
 template <typename scalar_t>
-void inline prelu_kernel_share_weights(
-    Tensor& result,
-    const Tensor& input,
-    const Tensor& weight) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto total_threads = input.numel();
-  auto weight_val = weight.data_ptr<scalar_t>();
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = result.data_ptr<scalar_t>();
-    auto in_data = input.data_ptr<scalar_t>();
-
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto out_ptr = out_data;
-          auto in_ptr = in_data;
-          auto id = itemId.get_id(0);
-          out_ptr[id] = (in_ptr[id] >= 0)
-              ? in_ptr[id]
-              : (*weight_val) * static_cast<scalar_t>(in_ptr[id]);
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
-template <typename scalar_t>
-void inline prelu_kernel_multi_weights(
-    Tensor& result,
-    const Tensor& input,
-    const Tensor& weight,
-    int64_t input_dim0_size,
-    int64_t channel_size,
-    int64_t input_stride0,
-    int64_t input_stride1) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto total_threads = input.numel();
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_data = result.data_ptr<scalar_t>();
-    auto in_data = input.data_ptr<scalar_t>();
-    auto weight_data = weight.data_ptr<scalar_t>();
-    cgh.parallel_for(
-        DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto out_ptr = out_data;
-          auto in_ptr = in_data;
-          auto weight_ptr = weight_data;
-          auto id = itemId.get_id(0);
-
-          int64_t channel = (id % input_stride0) / input_stride1;
-          scalar_t input_data_val = in_ptr[id];
-          out_ptr[id] = (input_data_val > 0)
-              ? input_data_val
-              : static_cast<scalar_t>(weight_ptr[channel]) * input_data_val;
-        });
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
-template <typename scalar_t>
 void inline prelu_backward_kernel_share_weights(
     const Tensor& input,
     const Tensor& weight,
@@ -350,6 +292,11 @@ inline Tensor threshold_out(
         });
     return iter.output();
   }
+}
+
+template <typename scalar_t>
+inline scalar_t relu_forward(scalar_t self, scalar_t alpha) {
+  return self >= 0 ? self : self * alpha;
 }
 
 template <typename scalar_t>
@@ -568,63 +515,20 @@ Tensor& rrelu_(
       self, at::empty_like(self), lower, upper, training, generator);
 }
 
-Tensor prelu(const Tensor& self, const Tensor& weight_) {
-  auto input = self.contiguous();
-  auto weight = weight_.contiguous();
-
-  TORCH_CHECK(input.is_contiguous());
-  TORCH_CHECK(weight.is_contiguous());
-
-  int64_t weight_num = weight.numel();
-  Tensor result = at::empty_like(input);
-  auto strides = input.strides();
-
-  if (weight_num == 1) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        input.scalar_type(),
-        "prelu",
-        [&] {
-          impl::prelu_kernel_share_weights<scalar_t>(result, input, weight);
-        });
-  } else {
-    int64_t input_ndim = input.dim();
-    TORCH_CHECK(input_ndim > 0, "Not allow zero-dim input tensor.");
-
-    int64_t channel_size = 1;
-    int64_t input_dim0_size = 1, input_stride0 = 1, input_stride1 = 1;
-
-    if (input_ndim > 1) {
-      channel_size = input.size(1);
-      input_dim0_size = input.size(0);
-      input_stride0 = strides[0];
-      input_stride1 = strides[1];
-    }
-    TORCH_CHECK(
-        channel_size == weight_num,
-        "Mismatch of parameter numbers and input channel size. Found parameter numbers = ",
-        weight_num,
-        " and channel size = ",
-        channel_size,
-        ".");
-
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        input.scalar_type(),
-        "prelu",
-        [&] {
-          impl::prelu_kernel_multi_weights<scalar_t>(
-              result,
-              input,
-              weight,
-              input_dim0_size,
-              channel_size,
-              input_stride0,
-              input_stride1);
-        });
-  }
+Tensor prelu(const Tensor& self, const Tensor& weight) {
+  auto result = at::empty_like(self);
+  auto iter = TensorIterator::binary_op(result, self, weight);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "prelu",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t x, scalar_t w) -> scalar_t {
+              return impl::relu_forward<scalar_t>(x, w);
+            });
+      });
   return result;
 }
 
@@ -708,47 +612,42 @@ std::tuple<Tensor, Tensor> prelu_backward(
   return std::tuple<Tensor, Tensor>{input_grad, weight_grad};
 }
 
-Tensor hardshrink(const Tensor& self, Scalar lambd_) {
-  auto out_tensor = at::empty_like(self);
-
-  auto iter =
-      TensorIteratorConfig().add_output(out_tensor).add_input(self).build();
-
+Tensor hardshrink(const Tensor& self, Scalar lambd) {
+  auto result = at::empty_like(self);
+  auto iter = TensorIterator::unary_op(result, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
       at::ScalarType::BFloat16,
+      at::ScalarType::Half,
       iter.dtype(),
       "hardshrink",
-      [&] {
-        auto lambd = lambd_.to<scalar_t>();
+      [&]() {
+        auto _lambd = lambd.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
-          return (x >= -lambd && x <= lambd) ? scalar_t(0) : x;
+          return (x >= -_lambd && x <= _lambd) ? scalar_t(0) : x;
         });
       });
-  return out_tensor;
+  return result;
 }
 
 Tensor hardshrink_backward(
     const Tensor& grad,
     const Tensor& self,
-    Scalar lambd_) {
-  auto out_tensor = at::empty_like(grad);
-
-  TensorIterator iter = TensorIteratorConfig()
-                            .add_output(out_tensor)
-                            .add_input(grad)
-                            .add_input(self)
-                            .build();
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, self.scalar_type(), "hardshrink_backward", [&] {
-        auto lambd = lambd_.to<scalar_t>();
+    Scalar lambd) {
+  auto result = at::empty_like(grad);
+  auto iter = TensorIterator::binary_op(result, grad, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "hardshrink_backward",
+      [&]() {
+        auto _lambd = lambd.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
-              return (x >= -lambd && x <= lambd) ? scalar_t(0) : grad_output;
+              return (x >= -_lambd && x <= _lambd) ? scalar_t(0) : grad_output;
             });
       });
-  return out_tensor;
+  return result;
 }
 
 Tensor gelu(const Tensor& self) {
@@ -788,8 +687,12 @@ Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
     auto _grad = to_plain_if_needed(grad);
     auto dX = at::empty_like(_self);
     auto iter = TensorIterator::binary_op(dX, _grad, _self);
-    IPEX_DISPATCH_FLOATING_TYPES_AND(
-        at::ScalarType::BFloat16, iter.dtype(), "gelu_backward", [&]() {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "gelu_backward",
+        [&]() {
           dpcpp_kernel_with_scalars(
               iter, [=](scalar_t grad, scalar_t self) -> scalar_t {
                 return impl::gelu_erf_backward<scalar_t>(grad, self);
