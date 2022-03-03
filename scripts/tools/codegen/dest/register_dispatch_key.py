@@ -197,7 +197,7 @@ class RegisterDispatchKey:
     # all of the existing kernel signatures scattered across aten/src/ATen/native.
     class_method_name: Optional[str]
 
-    lazy_reorder_no_variable_list = dict({'resize_': ['self'], 'as_strided': ['self'], 'resize_as_': ['self', 'the_template']})
+    lazy_reorder_no_variable_list = dict({'resize_': ['self'], 'as_strided': ['self'], 'as_strided_': ['self'], 'resize_as_': ['self', 'the_template']})
 
     lazy_reorder_block_list = set([
         'convolution_overrideable',
