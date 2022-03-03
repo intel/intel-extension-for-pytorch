@@ -1,13 +1,20 @@
 #!/bin/bash
 
+MODE=""
 LIBTORCH_PATH=""
 IPEX_VERSION=""
 
-if [ $# == 2 ]; then
-    LIBTORCH_PATH=$1
-    IPEX_VERSION=$2
+if [ $# == 3 ]; then
+    MODE=$1
+    LIBTORCH_PATH=$2
+    IPEX_VERSION=$3
 else
-    echo "Usage: bash $0 <libtorch_path> <ipex_version>"
+    echo "Usage: bash $0 [install|uninstall] <libtorch_path> <ipex_version>"
+    exit
+fi
+
+if [[ ! ${MODE} == "install" ]] && [[ ! ${MODE} == "uninstall" ]]; then
+    echo "Unrecognized execution mode: ${MODE}"
     exit
 fi
 
@@ -16,24 +23,44 @@ if [ ! -f ${LIBTORCH_PATH}/build-version ]; then
     exit
 fi
 
-echo $IPEX_VERSION > ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
+if [[ ${MODE} == "install" ]]; then
+    while IFS= read -r lib
+    do
+        if [ -f ${LIBTORCH_PATH}/lib/${lib} ]; then
+            echo "Installation failed."
+            echo "${lib} already exists in ${LIBTORCH_PATH}."
+            exit
+        fi
+    done < <(ls -1 *.so)
+    cp *.so ${LIBTORCH_PATH}/lib
+    if [ $? -gt 0 ]; then
+        echo "Installation failed."
+        echo "Please check if ${LIBTORCH_PATH}/lib exists or if you have privileges to write in ${LIBTORCH_PATH}/lib."
+        exit
+    fi
 
-dnnl_graph=$(ls libdnnl_graph.so.*.*)
-symlink="libdnnl_graph.so.$(echo $dnnl_graph | cut -d '.' -f 3)"
+    mkdir -p ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
+    if [ $? -gt 0 ]; then
+        echo "Installation failed."
+        echo "Please check if ${LIBTORCH_PATH}/share/cmake exists or if you have privileges to write in ${LIBTORCH_PATH}/share/cmake."
+        exit
+    fi
+    cp intel_ext_pt_cpuConfig.cmake ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
 
-ln -s ${dnnl_graph} ${symlink}
-cp ${dnnl_graph} ${symlink} libintel-ext-pt-cpu.so ${LIBTORCH_PATH}/lib
-if [ $? -gt 0 ]; then
-    rm ${symlink}
-    echo "Installation failed. Please check if ${LIBTORCH_PATH}/lib exists or if you have privileges to write in ${LIBTORCH_PATH}/lib."
-    exit
+    echo $IPEX_VERSION > ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
+    echo "Installation successed!"
+elif [[ ${MODE} == "uninstall" ]]; then
+    while IFS= read -r lib
+    do
+        if [ -f ${LIBTORCH_PATH}/lib/${lib} ]; then
+            rm ${LIBTORCH_PATH}/lib/${lib}
+        fi
+    done < <(ls -1 *.so)
+    if [ -d ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu ]; then
+        rm -rf ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
+    fi
+    if [ -f ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu ]; then
+        rm ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
+    fi
+    echo "Uninstallation successed!"
 fi
-
-mkdir -p ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
-if [ $? -gt 0 ]; then
-    echo "Installation failed. Please check if ${LIBTORCH_PATH}/share/cmake exists or if you have privileges to write in ${LIBTORCH_PATH}/share/cmake."
-    exit
-fi
-cp intel_ext_pt_cpuConfig.cmake ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
-rm ${symlink}
-echo "Installation successed!"
