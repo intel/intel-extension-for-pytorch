@@ -57,3 +57,16 @@ class TestTorchMethod(TestCase):
             x_dpcpp = x_cpu.to(dpcpp_device)
             res_dpcpp = x_dpcpp[:, :, li, lj]
             self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
+
+    def test_index_of_bool_mask(self, dtype=torch.float):
+        a_cpu = torch.randn(4, 15000, dtype=dtype)
+        b_cpu = torch.randn(4, 15000, dtype=dtype)
+        mask_cpu = a_cpu < b_cpu
+
+        a_xpu = a_cpu.xpu()
+        mask_xpu = mask_cpu.xpu()
+
+        output_cpu = a_cpu[mask_cpu]
+        output_xpu = a_xpu[mask_xpu]
+
+        self.assertEqual(output_cpu, output_xpu)

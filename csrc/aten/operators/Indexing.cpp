@@ -150,7 +150,10 @@ void indexSelect(
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   Tensor self = self_.contiguous();
+
   const int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
+  TORCH_CHECK(num_dim <= MAX_TENSORINFO_DIMS, "dim exceed max allowed dim");
+
   int64_t N = self.numel();
 
   if (N > 0) {
@@ -176,17 +179,15 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     if (num_nonzeros > 0 && num_dim > 0) {
       int64_t* tensor_begin = tensor.data_ptr<int64_t>();
 
-      std::vector<int64_t> self_sizes = self.sizes().vec();
-      Tensor self_sizes_cpu = at::empty(
-          {num_dim},
-          at::TensorOptions().dtype(kLong).device(kCPU).memory_format(
-              LEGACY_CONTIGUOUS_MEMORY_FORMAT));
-      std::copy(
-          self_sizes.begin(),
-          self_sizes.end(),
-          self_sizes_cpu.template data_ptr<int64_t>());
-      Tensor self_sizes_xpu = self_sizes_cpu.to(kXPU);
-      int64_t* self_sizes_ptr = self_sizes_xpu.data_ptr<int64_t>();
+      // preload sizes tensor for index calculation
+      int64_t sizes[MAX_TENSORINFO_DIMS];
+      int64_t divisor[MAX_TENSORINFO_DIMS];
+      sizes[num_dim - 1] = self.size(num_dim - 1);
+      divisor[num_dim - 1] = 1;
+      for (auto dim = num_dim - 2; dim >= 0; dim--) {
+        sizes[dim] = self.size(dim);
+        divisor[dim] = sizes[dim + 1] * divisor[dim + 1];
+      }
 
       const int64_t N = num_nonzeros * num_dim;
       auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -196,29 +197,13 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
       // restore flatten idx to indices
       auto cgf = DPCPP_Q_CGF(__cgh) {
-        dpcpp_local_acc_t<int64_t> size_vec(num_dim, __cgh);
-        dpcpp_local_acc_t<int64_t> divisor(num_dim, __cgh);
-
         auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-          auto local_id = item_id.get_local_linear_id();
           auto global_id = item_id.get_global_linear_id();
-          // preload sizes into size_vec (SLM)
-          if (global_id < num_dim)
-            size_vec[global_id] = self_sizes_ptr[global_id];
-          group_barrier(item_id.get_group());
-          // preload divisor with serial operations
-          if (local_id == 0) {
-            divisor[num_dim - 1] = 1;
-            for (auto dim = num_dim - 2; dim >= 0; dim--) {
-              divisor[dim] = divisor[dim + 1] * size_vec[dim];
-            }
-          }
-          group_barrier(item_id.get_group());
 
           auto index = global_id / num_dim;
           auto dim = global_id % num_dim;
           tensor_begin[global_id] =
-              idx_flat_begin[index] / divisor[dim] % size_vec[dim];
+              idx_flat_begin[index] / divisor[dim] % sizes[dim];
         };
 
         __cgh.parallel_for(

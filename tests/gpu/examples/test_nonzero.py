@@ -76,3 +76,28 @@ class TestNNMethod(TestCase):
                          0], torch.nonzero(b_dpcpp, as_tuple=True)[0].cpu())
         self.assertEqual(torch.nonzero(b_cpu, as_tuple=True)[
                          1], torch.nonzero(b_dpcpp, as_tuple=True)[1].cpu())
+
+    def test_nonzero_with_large_dim(self, dtype=torch.float):
+        a_cpu = torch.randn(4, 15000)
+        b_cpu = torch.randn(4, 15000)
+        mask_cpu = a_cpu < b_cpu
+        mask_xpu = mask_cpu.xpu()
+
+        output_cpu = torch.nonzero(mask_cpu)
+        output_xpu = torch.nonzero(mask_xpu)
+
+        print("CPU: ", output_cpu)
+        print("XPU: ", output_xpu.cpu())
+        self.assertEqual(output_cpu, output_xpu)
+
+        a_cpu = torch.randn(15000, 4)
+        b_cpu = torch.randn(15000, 4)
+        mask_cpu = a_cpu < b_cpu
+        mask_xpu = mask_cpu.xpu()
+
+        output_cpu = torch.nonzero(mask_cpu)
+        output_xpu = torch.nonzero(mask_xpu)
+
+        print("CPU: ", output_cpu)
+        print("XPU: ", output_xpu.cpu())
+        self.assertEqual(output_cpu, output_xpu)
