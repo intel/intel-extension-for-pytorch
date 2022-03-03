@@ -75,80 +75,16 @@ Tensor& mul_(Tensor& self, Scalar other) {
 }
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
-  Tensor _self = self, _other = other;
-  const auto ndim = _self.ndimension();
-  auto cl_tag = at::MemoryFormat::ChannelsLast;
-  if (3 == ndim || 4 == ndim || 5 == ndim) {
-    cl_tag = get_cl_tag_by_ndim(ndim);
-  }
-
-  if (_self.defined() && _other.defined() && _self.dim() > 0 &&
-      _other.dim() > 0 && _self.dim() == _other.dim() &&
-      _self.scalar_type() == _other.scalar_type() &&
-      xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
-      ((_self.is_contiguous() && _other.is_contiguous()) ||
-       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      !is_wrapped_number(_self) && !is_wrapped_number(_other) &&
-      (((!DPCPPTensorContext::is_plain(_self) ||
-         !DPCPPTensorContext::is_plain(_other)) &&
-        _self.sizes() == _other.sizes()) ||
-       (_self.sizes() != _other.sizes() &&
-        is_expandable_to(_other.sizes(), _self.sizes())))) {
-    xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
-  } else {
-    result = to_plain_if_needed_(result);
-    _self = to_plain_if_needed(self);
-    _other = to_plain_if_needed(other);
-    auto iter = TensorIterator::binary_float_op(result, _self, _other);
-    impl::div_kernel_dpcpp(iter);
-    auto smf = self.suggest_memory_format();
-    if (is_channels_last(smf)) {
-      if (!result.is_contiguous(smf)) {
-        result.contiguous(smf);
-      }
-    }
-  }
+  auto iter = TensorIterator::binary_float_op(result, self, other);
+  impl::div_kernel_dpcpp(iter);
   return result;
 }
 
 Tensor div(const Tensor& self, const Tensor& other) {
-  Tensor result, _self = self, _other = other;
-  const auto ndim = _self.ndimension();
-  auto cl_tag = at::MemoryFormat::ChannelsLast;
-  if (3 == ndim || 4 == ndim || 5 == ndim) {
-    cl_tag = get_cl_tag_by_ndim(ndim);
-  }
-
-  if (_self.defined() && _other.defined() && _self.dim() > 0 &&
-      _other.dim() > 0 && _self.dim() == _other.dim() &&
-      _self.scalar_type() == _other.scalar_type() &&
-      xpu::oneDNN::is_supported_onednn_dtype(_self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(_other) &&
-      ((_self.is_contiguous() && _other.is_contiguous()) ||
-       (_self.is_contiguous(cl_tag) && _other.is_contiguous(cl_tag))) &&
-      !is_wrapped_number(_self) && !is_wrapped_number(_other) &&
-      (((!DPCPPTensorContext::is_plain(_self) ||
-         !DPCPPTensorContext::is_plain(_other)) &&
-        _self.sizes() == _other.sizes()) ||
-       (_self.sizes() != _other.sizes() &&
-        is_expandable_to(_other.sizes(), _self.sizes())))) {
-    xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
-    return result;
-  } else {
-    result = to_plain_if_needed_(result);
-    _self = to_plain_if_needed(self);
-    _other = to_plain_if_needed(other);
-    auto iter = TensorIterator::binary_float_op(result, _self, _other);
-    impl::div_kernel_dpcpp(iter);
-    auto smf = self.suggest_memory_format();
-    if (is_channels_last(smf)) {
-      if (!iter.output().is_contiguous(smf)) {
-        iter.output().contiguous(smf);
-      }
-    }
-    return iter.output();
-  }
+  Tensor result;
+  auto iter = TensorIterator::binary_float_op(result, self, other);
+  impl::div_kernel_dpcpp(iter);
+  return iter.output();
 }
 
 Tensor& div_(Tensor& self, const Tensor& other) {
@@ -182,5 +118,6 @@ Tensor floor_divide(const Tensor& self, const Tensor& other) {
 Tensor& floor_divide_(Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::floor_divide_out(self, self, other);
 }
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

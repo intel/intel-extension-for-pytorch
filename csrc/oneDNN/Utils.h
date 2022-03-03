@@ -1,8 +1,10 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <core/MemoryFormat.h>
 #include <oneapi/dnnl/dnnl.hpp>
 #include <tensor/Context.h>
+#include <utils/Macros.h>
 
 using namespace dnnl;
 
@@ -153,6 +155,80 @@ static inline bool eltwise_backward_valid(const at::Tensor& tensor) {
   if (!at::AtenIpexTypeXPU::DPCPPTensorContext::is_plain(tensor))
     return true;
   if (tensor.is_contiguous() || tensor.dim() == 1)
+    return true;
+  return false;
+}
+
+static bool is_wrapped_number(const Tensor& t) {
+  return t.unsafeGetTensorImpl()->is_wrapped_number();
+}
+
+static inline bool is_broadcast_from_other_to_self(
+    const at::Tensor& self,
+    const at::Tensor& other) {
+  return (self.sizes() != other.sizes()) &&
+      is_expandable_to(other.sizes(), self.sizes());
+}
+
+static inline bool binary_valid(
+    const at::Tensor& self,
+    const at::Tensor& other) {
+  // FIXME: update onednn
+  if (!is_broadcast_from_other_to_self(self, other))
+    return false;
+
+  /* If the following conditions are satisfied, then oneDNN path will be
+     selected:
+     * 1. self and other should be xpu tensor and be defined.
+     * 2. self or other should not be scalar (wrapped tensor).
+     * 3. dim of self and other should be equal and must be larger than 0.
+     * 4. the datatype should be supported by oneDNN primitive.
+     * 5. self and other should be in the same datatype.
+     * 6. self and other should be contiguous or channel-last contiguous.*/
+
+  using namespace at::AtenIpexTypeXPU;
+
+  // 1. self and other should be xpu tensor and be defined.
+  if ((!self.defined()) || (!other.defined()) || (!self.is_xpu()) ||
+      (!other.is_xpu()))
+    return false;
+
+  // 2. self or other should not be scalar (wrapped tensor).
+  if (is_wrapped_number(self) || is_wrapped_number(other))
+    return false;
+
+  // 3. dim of self and other should be equal and must be larger than 0.
+  if ((self.dim() <= 0) || (other.dim() <= 0) || (self.dim() != other.dim()))
+    return false;
+
+  // 4. the datatype should be supported by oneDNN primitive.
+  switch (self.scalar_type()) {
+    case at::ScalarType::Char:
+      break;
+    case at::ScalarType::Byte:
+      break;
+    case at::ScalarType::Half:
+      break;
+    case at::ScalarType::Float:
+      break;
+    case at::ScalarType::BFloat16:
+      break;
+    default:
+      return false;
+  };
+
+  // 5. self and other should be in the same datatype.
+  if (self.scalar_type() != other.scalar_type())
+    return false;
+
+  // 6. self and other should be contiguous or channel-last contiguous.
+  const auto ndim = self.ndimension();
+  auto cl_tag = at::MemoryFormat::ChannelsLast;
+  if (3 == ndim || 4 == ndim || 5 == ndim) {
+    cl_tag = get_cl_tag_by_ndim(ndim);
+  }
+  if ((self.is_contiguous() && other.is_contiguous()) ||
+      (self.is_contiguous(cl_tag) && other.is_contiguous(cl_tag)))
     return true;
   return false;
 }

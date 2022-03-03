@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import ipex
+import copy
 import pytest
 
 cpu_device = torch.device("cpu")
@@ -522,3 +523,43 @@ class TestTorchMethod(TestCase):
         a /= b
         a_ /= b_
         self.assertEqual(a, a_.cpu())
+
+    def test_add_block_format(self, dtype=torch.float):
+        x1 = torch.randn(1, 2, 3, 3)
+        x1_xpu = x1.to("xpu")
+        x2 = torch.randn(1, 2, 3, 3)
+        x2_xpu = x2.to("xpu")
+        to_block_cpu = torch.nn.Conv2d(2, 2, kernel_size=3, padding=1)
+        to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
+        with torch.xpu.onednn_layout():
+            y = to_block_cpu(x1)
+            y.add_(x2)
+            x1.add_(y)
+            print(x1)
+            y_xpu = to_block_dpcpp(x1_xpu)
+            y_xpu.add_(x2_xpu)
+            x1_xpu.add_(y_xpu)
+            print(x1_xpu.cpu())
+            self.assertEqual(x1, x1_xpu.cpu())
+            a = torch.tensor([True, False], device="xpu")
+            b = torch.tensor([False, True], device="xpu")
+            t = torch.tensor([True, True], device="xpu")
+            assert torch.equal(a + b, t)
+
+    def test_add_broadcast_block_format(self):
+        with torch.xpu.onednn_layout():
+            to_block_xpu = torch.nn.Conv2d(3, 3, kernel_size=3, padding=1).xpu()
+            _self = to_block_xpu(torch.rand(1, 3, 1, 1).xpu())
+            _other = to_block_xpu(torch.rand(1, 3, 5, 5).xpu())
+            print('block: [1, 3, 1, 1] + [1, 3, 5, 5]')
+            _self + _other
+            print('block: [1, 3, 5, 5] + [1, 3, 1, 1]')
+            _other + _self
+
+    def test_add_broadcast_plain_format(self):
+        _self = torch.rand(1, 3, 1, 1).xpu()
+        _other = torch.rand(1, 3, 5, 5).xpu()
+        print('plain: [1, 3, 1, 1] + [1, 3, 5, 5]')
+        _self + _other
+        print('plain: [1, 3, 5, 5] + [1, 3, 1, 1]')
+        _other + _self
