@@ -4,52 +4,99 @@
 
 #include "../cpu/isa/cpu_feature.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
 namespace torch_ipex {
 namespace cpu {
 
-static CPUCapability compute_cpu_capability() {
-  /*
-  IPEX also allign to pytorch config environment, and keep the same behavior.
-  */
-  auto envar = std::getenv("ATEN_CPU_CAPABILITY");
-  if (envar) {
-    if (strcmp(envar, "avx512") == 0) {
-      return CPUCapability::AVX512;
-    }
-    if (strcmp(envar, "avx2") == 0) {
-      return CPUCapability::AVX2;
-    }
+const char* CPUCapabilityToString(CPUCapability isa) {
+  switch (isa) {
+    case CPUCapability::DEFAULT:
+      return "DEFAULT";
+    case CPUCapability::AVX2:
+      return "AVX2";
+    case CPUCapability::AVX512:
+      return "AVX512";
+    case CPUCapability::NUM_OPTIONS:
+      return "OutOfBoundaryLevel";
 
-    if (strcmp(envar, "default") == 0) {
-      return CPUCapability::DEFAULT;
-    }
-    TORCH_WARN("ignoring invalid value for ATEN_CPU_CAPABILITY: ", envar);
+    default:
+      return "WrongLevel";
   }
+}
 
+CPUCapability _get_highest_cpu_support_isa_level() {
+  /*
+  reference to FindAVX.cmake
+  */
   if (CPUFeature::get_instance().os_avx512() &&
       CPUFeature::get_instance().cpuid_avx512_vl() &&
       CPUFeature::get_instance().cpuid_avx512_bw() &&
       CPUFeature::get_instance().cpuid_avx512_dq() &&
       CPUFeature::get_instance().cpuid_avx512_f() &&
       CPUFeature::get_instance().cpuid_fma()) {
-    // CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw
-    // -mfma;/arch:AVX512")
-    // CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw
-    // -mfma;/arch:AVX512")
     return CPUCapability::AVX512;
   }
   if (CPUFeature::get_instance().os_avx2() &&
       CPUFeature::get_instance().cpuid_avx2() &&
       CPUFeature::get_instance().cpuid_fma()) {
-    // CHECK_SSE(C "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
-    // CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
     return CPUCapability::AVX2;
   }
 
   return CPUCapability::DEFAULT;
+}
+
+CPUCapability _get_highest_binary_support_isa_level() {
+#ifdef HAVE_AVX512_CPU_DEFINITION
+  return CPUCapability::AVX512;
+#endif
+#ifdef HAVE_AVX2_CPU_DEFINITION
+  return CPUCapability::AVX2;
+#endif
+  return CPUCapability::DEFAULT;
+}
+
+static CPUCapability compute_cpu_capability() {
+  CPUCapability highest_cpu_supported_isa_level =
+      _get_highest_cpu_support_isa_level();
+
+  CPUCapability highest_binary_supported_isa_level =
+      _get_highest_binary_support_isa_level();
+
+  bool b_manual_setup = false;
+  CPUCapability manual_setup_isa_level;
+
+  /*
+  IPEX also align to pytorch config environment, and keep the same behavior.
+  */
+  auto envar = std::getenv("ATEN_CPU_CAPABILITY");
+  if (envar) {
+    if (strcmp(envar, "avx512") == 0) {
+      manual_setup_isa_level = CPUCapability::AVX512;
+      b_manual_setup = true;
+    } else if (strcmp(envar, "avx2") == 0) {
+      manual_setup_isa_level = CPUCapability::AVX2;
+      b_manual_setup = true;
+    } else if (strcmp(envar, "default") == 0) {
+      manual_setup_isa_level = CPUCapability::DEFAULT;
+      b_manual_setup = true;
+    } else {
+      TORCH_WARN("ignoring invalid value for ATEN_CPU_CAPABILITY: ", envar);
+    }
+  }
+
+  CPUCapability max_support_isa_level = std::min(
+      highest_cpu_supported_isa_level, highest_binary_supported_isa_level);
+
+  if (b_manual_setup) {
+    if (manual_setup_isa_level <= max_support_isa_level) {
+      return manual_setup_isa_level;
+    }
+  }
+
+  return max_support_isa_level;
 }
 
 CPUCapability get_cpu_capability() {

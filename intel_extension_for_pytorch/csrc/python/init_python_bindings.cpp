@@ -73,6 +73,16 @@ void InitIpexModuleBindings(py::module m) {
     return get_current_isa_level();
   });
 
+  m.def("_get_highest_cpu_support_isa_level", []() {
+    using namespace torch_ipex::cpu;
+    return get_highest_cpu_support_isa_level();
+  });
+
+  m.def("_get_highest_binary_support_isa_level", []() {
+    using namespace torch_ipex::cpu;
+    return get_highest_binary_support_isa_level();
+  });
+
   m.def("mkldnn_set_verbose", &torch_ipex::verbose::_mkldnn_set_verbose);
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {
