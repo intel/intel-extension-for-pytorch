@@ -91,6 +91,8 @@ if len(sys.argv) > 1:
             print('Usage: python setup.py [build_clib|bdist_cppsdk] <libtorch_path>')
             exit(1)
         pytorch_install_dir = sys.argv[2]
+        if pytorch_install_dir.startswith('.'):
+            pytorch_install_dir = os.path.join(os.getcwd(), pytorch_install_dir)
         sys.argv.pop()
 
         if not os.path.isfile(os.path.join(pytorch_install_dir, 'build-version')):
