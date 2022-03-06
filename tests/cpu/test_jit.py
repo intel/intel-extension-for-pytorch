@@ -154,6 +154,20 @@ class ConvRelu_Fixed(nn.Module):
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
 
+class ConvLeakyRelu_Fixed(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvLeakyRelu_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.leaky_relu = nn.LeakyReLU(0.1)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.leaky_relu(x)
+        return x
+
+
 class Conv_Relu_Add(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(Conv_Relu_Add, self).__init__()
@@ -717,7 +731,7 @@ class ModMultLinear(nn.Module):
 
 class LinearSwishNaive(nn.Module):
     def __init__(self, in_feature, out_feature):
-        super(LinearSwishNaive, self).__init__() 
+        super(LinearSwishNaive, self).__init__()
         self.linear = nn.Linear(in_feature, out_feature)
         self.sigmoid = nn.Sigmoid()
 
@@ -1824,11 +1838,24 @@ class Tester(TestCase):
             self._test_output(
                 ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
-                kind_in_graph="ipex_prepack::convolution_relu_run")
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_relu_prepack")
             self._test_output_bf16(
                 ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
                 kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_relu_prepack",
+                prec=0.02)
+            self._test_output(
+                ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_leaky_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_leaky_relu_prepack")
+            self._test_output_bf16(
+                ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_leaky_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_leaky_relu_prepack",
                 prec=0.02)
 
     def test_output_conv_sum(self):
@@ -2323,7 +2350,7 @@ class Tester(TestCase):
                 res_jit = tr_model(input)
                 self.assertEqual(res_ref, res_jit)
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-                
+
         _test_onednn_fp32(
             LinearSwish_v1(3, 32, bias=True),
             torch.rand(32, 3),
