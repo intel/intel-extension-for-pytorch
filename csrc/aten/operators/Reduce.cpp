@@ -1315,8 +1315,8 @@ std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
   TORCH_CHECK(
       !self.is_complex(), "max is not yet implemented for complex tensors.");
   TORCH_CHECK(self.numel() > 0, "operation does not have an identity.");
-  Tensor min_result = at::empty({1}, self.options());
-  Tensor max_result = at::empty({1}, self.options());
+  Tensor min_result;
+  Tensor max_result;
   at::AtenIpexTypeXPU::aminmax_out(min_result, max_result, self);
   return std::tuple<Tensor, Tensor>(min_result, max_result);
 }
