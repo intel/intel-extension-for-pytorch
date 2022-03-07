@@ -377,6 +377,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseLinearWithEltwise(graph);
   graph_rewrite::fuseLinearAddRelu(graph);
 
+  graph_rewrite::FuseLinearSwishCustomized(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
