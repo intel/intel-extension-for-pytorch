@@ -17,16 +17,15 @@ at::Tensor mean_dim_impl(
     c10::IntArrayRef dim,
     bool keepdim,
     c10::optional<c10::ScalarType> dtype) {
-  auto input_ = input.is_contiguous() ? input : input.contiguous();
   int64_t dim_prod = 1;
-  if (dim.size() == 0 || input_.ndimension() == 0) {
-    dim_prod = input_.numel();
+  if (dim.size() == 0 || input.ndimension() == 0) {
+    dim_prod = input.numel();
   } else {
     for (auto d : dim) {
-      dim_prod *= input_.size(d);
+      dim_prod *= input.size(d);
     }
   }
-  return at::sum(input_, dim, keepdim, dtype).div_(dim_prod);
+  return at::sum(input, dim, keepdim, dtype).div_(dim_prod);
 }
 
 IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
