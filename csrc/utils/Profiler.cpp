@@ -39,9 +39,7 @@ struct DPCPPEventStubImpl : public KernelEventBase {
 struct DPCPPProfilerStubsImpl : public XPUStubs {
   void record(int* device, KernelEventStub* event, int64_t* cpu_ns)
       const override {
-    auto& Q = xpu::dpcpp::dpcppGetCurrentQueue();
-    auto evt = xpu::dpcpp::queue_barrier(Q);
-    event->reset(new DPCPPEventStubImpl(evt));
+    // event has been marked by markKernel, so this record need do nothing
   }
 
   float timeDiff(const KernelEventStub& event, const KernelEventStub& event2)
