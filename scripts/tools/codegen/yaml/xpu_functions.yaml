@@ -630,6 +630,7 @@ supported:
   - view
   - view_as_real   # newly added
   - zero_
+  - channel_shuffle
 autograd:
   - cdist
   - lstm.input
