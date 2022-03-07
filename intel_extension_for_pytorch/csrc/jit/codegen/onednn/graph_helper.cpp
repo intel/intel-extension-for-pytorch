@@ -480,7 +480,7 @@ LlgaGraphHelper::LlgaGraphHelper(
   auto deviceType = inferDevice(graph);
   auto engineKind = getLlgaEngineKind(deviceType);
   dnnl::graph::graph g{engineKind};
-  aliasDb_ = torch::make_unique<torch::jit::AliasDb>(graph);
+  aliasDb_ = std::make_unique<torch::jit::AliasDb>(graph);
   GRAPH_DEBUG("Constructing LLGA graph");
   // TODO: select nodes in top-level block for now
   for (auto* node : graph->block()->nodes()) {

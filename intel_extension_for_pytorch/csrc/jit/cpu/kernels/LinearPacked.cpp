@@ -50,11 +50,25 @@ at::Tensor linear_relu_run(
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+    const c10::intrusive_ptr<LinearOpContext>& op_context,
+    const c10::string_view approximate) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::linear_gelu_run", std::vector<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_gelu());
+  // https://github.com/pytorch/pytorch/pull/61439
+  // at::gelu can support tanh approximate now and OneDNN also support it
+  // by changing algorithm If there is other type of approximate are added to
+  // pytorch while  OneDNN not support it, we might need a fallback path here.
+  dnnl::algorithm gelu_type;
+  if (approximate == "none") {
+    gelu_type = dnnl::algorithm::eltwise_gelu_erf;
+  } else if (approximate == "tanh") {
+    gelu_type = dnnl::algorithm::eltwise_gelu_tanh;
+  } else {
+    TORCH_CHECK(
+        false, "ipex::linear_gelu_run only support tanh approximate now");
+  }
+  return op_context->run(
+      input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
 }
 
 at::Tensor linear_sigmoid_run(

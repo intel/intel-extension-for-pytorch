@@ -79,10 +79,11 @@ struct attr_t : public dnnl::primitive_attr {
   static attr_t fuse_gelu(
       float scale = 1.0,
       float alpha = 0.f,
-      float beta = 0.f) {
+      float beta = 0.f,
+      algorithm gelu_type = algorithm::eltwise_gelu_erf) {
     attr_t attr;
     post_ops po;
-    po.append_eltwise(scale, algorithm::eltwise_gelu_erf, alpha, beta);
+    po.append_eltwise(scale, gelu_type, alpha, beta);
     attr.set_post_ops(po);
     return attr;
   }

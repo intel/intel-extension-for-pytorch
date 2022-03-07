@@ -366,10 +366,11 @@ class LinearGelu(nn.Module):
         super(LinearGelu, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.approximate = kwargs["approximate"]
+        self.linear = nn.Linear(in_channels, out_channels, kwargs["bias"])
 
     def forward(self, x):
-        return F.gelu(self.linear(x))
+        return F.gelu(self.linear(x), approximate=self.approximate)
 
 class LinearSigmoid(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -2316,26 +2317,18 @@ class Tester(TestCase):
             kind_in_graph="aten::linear")
 
     def test_output_linear_gelu(self):
-        self._test_output(
-            LinearGelu(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearGelu(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_gelu_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=5e-3)
-        self._test_output(
-            LinearGelu(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearGelu(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_gelu_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=5e-3)
+        options = itertools.product([True, False], ["none", "tanh"])
+        for bias, approximate in options:
+            self._test_output(
+                LinearGelu(3, 32, bias=bias, approximate=approximate),
+                torch.rand(32, 3),
+                kind_in_graph="aten::linear")
+            self._test_output_bf16(
+                LinearGelu(3, 32, bias=bias, approximate=approximate),
+                torch.rand(32, 3),
+                kind_in_graph="ipex_prepack::linear_gelu_run",
+                kind_not_in_graph="ipex_prepack::linear_prepack",
+                prec=1e-2)
 
     def test_output_linear_swish(self):
         def _test_onednn_fp32(model, input, kind_in_graph, prec=5e-3):

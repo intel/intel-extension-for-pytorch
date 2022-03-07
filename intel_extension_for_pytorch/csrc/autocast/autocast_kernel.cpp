@@ -439,8 +439,9 @@ at::Tensor dropout(const at::Tensor& input, double p, bool train) {
       int8::dropout, at::dropout, "dropout", input, p, train);
 }
 
-at::Tensor gelu(const at::Tensor& input) {
-  return FallThroughFuction<at::Tensor>(int8::gelu, at::gelu, "gelu", input);
+at::Tensor gelu(const at::Tensor& input, c10::string_view approximate) {
+  return FallThroughFuction<at::Tensor>(
+      int8::gelu, at::gelu, "gelu", input, approximate);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lstm_aten(

@@ -111,7 +111,7 @@ at::Tensor add_tensor(
 
 at::Tensor dropout(const at::Tensor& input, double p, bool train);
 
-at::Tensor gelu(const at::Tensor& input);
+at::Tensor gelu(const at::Tensor& input, c10::string_view approximate = "none");
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lstm(
     const at::Tensor& input,

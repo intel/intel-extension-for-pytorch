@@ -396,15 +396,16 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
     Operator(
         "ipex_prepack::linear_gelu_run(Tensor input, "
-        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack, "
+        "str approximate) "
         "-> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = linear_gelu_run(
-                (std::move(peek(stack, 0, 2))).toTensor(),
-                (std::move(peek(stack, 1, 2)))
-                    .toCustomClass<LinearOpContext>());
-            drop(stack, 2);
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toCustomClass<LinearOpContext>(),
+                (std::move(peek(stack, 2, 3))).toStringView());
+            drop(stack, 3);
             pack(stack, std::move(result));
             return 0;
           };

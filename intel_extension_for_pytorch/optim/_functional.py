@@ -24,7 +24,7 @@ def _adagrad_impl(
     params: List[Tensor],
     grads: List[Tensor],
     state_sums: List[Tensor],
-    state_steps: List[int],
+    state_steps: List[Tensor],
     attr: dict,
     lr: float,
     weight_decay: float,
@@ -37,7 +37,8 @@ def _adagrad_impl(
     See :class:`~torch.optim.Adagrad` for details.
     """
 
-    for (param, grad, state_sum, step) in zip(params, grads, state_sums, state_steps):
+    for (param, grad, state_sum, step_t) in zip(params, grads, state_sums, state_steps):
+        step = int(step_t.item())
         param2 = torch.Tensor()
         if param in attr:
             if 'trail' in attr[param]:
