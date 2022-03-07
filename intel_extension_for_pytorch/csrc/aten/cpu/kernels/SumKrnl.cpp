@@ -25,12 +25,12 @@ namespace {
 // Load vector from a smaller type (more elements) to a larger type (fewer
 // elements), reducing neighboring elements until it fits into the vector size.
 template <typename acc_t, typename scalar_t, typename F>
-at::native::Vectorized<acc_t> load_reduce_vec(
+at::vec::Vectorized<acc_t> load_reduce_vec(
     const scalar_t* data,
     F reduce,
     acc_t ident) {
-  using vec_t = at::native::Vectorized<scalar_t>;
-  using vacc_t = at::native::Vectorized<acc_t>;
+  using vec_t = at::vec::Vectorized<scalar_t>;
+  using vacc_t = at::vec::Vectorized<acc_t>;
   static_assert(vacc_t::size() <= vec_t::size(), "");
   const auto val = vec_t::loadu(data);
   alignas(64) std::array<scalar_t, vec_t::size()> values;
@@ -64,17 +64,17 @@ struct LoadPolicy {
 };
 
 template <typename scalar_t>
-struct LoadPolicy<at::native::Vectorized<scalar_t>> {
+struct LoadPolicy<at::vec::Vectorized<scalar_t>> {
   static constexpr int64_t memsize() {
-    return sizeof(scalar_t) * at::native::Vectorized<scalar_t>::size();
+    return sizeof(scalar_t) * at::vec::Vectorized<scalar_t>::size();
   }
 
-  static at::native::Vectorized<scalar_t> load(
+  static at::vec::Vectorized<scalar_t> load(
       const char* C10_RESTRICT data,
       int64_t stride,
       int64_t index) {
     auto* ptr = data + index * stride;
-    return at::native::Vectorized<scalar_t>::loadu(ptr);
+    return at::vec::Vectorized<scalar_t>::loadu(ptr);
   }
 };
 
@@ -126,10 +126,10 @@ struct InnerSumCastLoadPolicy<scalar_t, scalar_t> : LoadPolicy<scalar_t> {};
 
 template <>
 struct InnerSumCastLoadPolicy<
-    at::native::Vectorized<c10::BFloat16>,
-    at::native::Vectorized<float>> {
-  using vec_t = at::native::Vectorized<c10::BFloat16>;
-  using vacc_t = at::native::Vectorized<float>;
+    at::vec::Vectorized<c10::BFloat16>,
+    at::vec::Vectorized<float>> {
+  using vec_t = at::vec::Vectorized<c10::BFloat16>;
+  using vacc_t = at::vec::Vectorized<float>;
 
   static constexpr int64_t memsize() {
     return LoadPolicy<vec_t>::memsize();
@@ -176,10 +176,10 @@ struct OuterSumCastLoadPolicy {
 
 template <>
 struct OuterSumCastLoadPolicy<
-    at::native::Vectorized<c10::BFloat16>,
-    at::native::Vectorized<float>> {
-  using vec_t = at::native::Vectorized<c10::BFloat16>;
-  using vacc_t = at::native::Vectorized<float>;
+    at::vec::Vectorized<c10::BFloat16>,
+    at::vec::Vectorized<float>> {
+  using vec_t = at::vec::Vectorized<c10::BFloat16>;
+  using vacc_t = at::vec::Vectorized<float>;
 
   static constexpr int64_t memsize() {
     return sizeof(c10::BFloat16) * vacc_t::size();
@@ -219,8 +219,8 @@ struct NanSumLoadPolicy {
 };
 
 template <typename scalar_t>
-struct NanSumLoadPolicy<at::native::Vectorized<scalar_t>> {
-  using vec_t = at::native::Vectorized<scalar_t>;
+struct NanSumLoadPolicy<at::vec::Vectorized<scalar_t>> {
+  using vec_t = at::vec::Vectorized<scalar_t>;
 
   static constexpr int64_t memsize() {
     return LoadPolicy<vec_t>::memsize();
@@ -277,10 +277,10 @@ struct InnerNanSumCastLoadPolicy<scalar_t, scalar_t>
 
 template <>
 struct InnerNanSumCastLoadPolicy<
-    at::native::Vectorized<c10::BFloat16>,
-    at::native::Vectorized<float>> {
-  using vec_t = at::native::Vectorized<c10::BFloat16>;
-  using vacc_t = at::native::Vectorized<float>;
+    at::vec::Vectorized<c10::BFloat16>,
+    at::vec::Vectorized<float>> {
+  using vec_t = at::vec::Vectorized<c10::BFloat16>;
+  using vacc_t = at::vec::Vectorized<float>;
 
   static constexpr int64_t memsize() {
     return LoadPolicy<vec_t>::memsize();
@@ -354,8 +354,8 @@ static void store(
     char* C10_RESTRICT data,
     int64_t stride,
     int64_t index,
-    const at::native::Vectorized<scalar_t>& values) {
-  using vec_t = at::native::Vectorized<scalar_t>;
+    const at::vec::Vectorized<scalar_t>& values) {
+  using vec_t = at::vec::Vectorized<scalar_t>;
   alignas(64) std::array<scalar_t, vec_t::size()> array_values;
   values.store(array_values.data());
   store<StorePolicy>(data, stride, index, array_values);
@@ -496,7 +496,7 @@ void vectorized_inner_sum(
     int64_t out_stride,
     int64_t size0,
     int64_t size1) {
-  using vacc_t = at::native::Vectorized<acc_t>;
+  using vacc_t = at::vec::Vectorized<acc_t>;
   constexpr int64_t vec_stride = VecLoadPolicy::memsize();
   constexpr int64_t scalar_stride = ScalarLoadPolicy::memsize();
   constexpr int64_t vec_numel = vec_stride / scalar_stride;
@@ -548,7 +548,7 @@ void vectorized_outer_sum(
     int64_t out_stride,
     int64_t size0,
     int64_t size1) {
-  using vacc_t = at::native::Vectorized<acc_t>;
+  using vacc_t = at::vec::Vectorized<acc_t>;
   constexpr int64_t scalar_stride = ScalarLoadPolicy::memsize();
   constexpr int64_t vec_stride = VecLoadPolicy::memsize();
   constexpr int64_t nrows = 4;
@@ -657,15 +657,14 @@ void cascade_sum(at::TensorIterator& iter) {
     const int64_t out_stride = out_strides[1];
     TORCH_INTERNAL_ASSERT(out_strides[0] == 0);
 
-    using vec_t = at::native::Vectorized<scalar_t>;
+    using vec_t = at::vec::Vectorized<scalar_t>;
     using acc_t = at::acc_type<scalar_t, true>;
-    using vacc_t = at::native::Vectorized<acc_t>;
+    using vacc_t = at::vec::Vectorized<acc_t>;
     using ScalarLoadPolicy = std::conditional_t<
         ignore_nan,
         NanSumCastLoadPolicy<scalar_t, acc_t>,
         CastLoadPolicy<scalar_t, acc_t>>;
     using StorePolicy = CastStoreAccumulate<scalar_t, acc_t>;
-
     if (in_strides[0] == sizeof(scalar_t) && size0 >= vec_t::size()) {
       // Contiguous inner reduction
       using VecLoadPolicy = std::conditional_t<
@@ -699,8 +698,8 @@ void sum_kernel_impl(at::TensorIterator& iter) {
           at::native::binary_kernel_reduce_vec(
               iter,
               [=](scalar_t a, scalar_t b) -> scalar_t { return a + b; },
-              [=](at::native::Vectorized<scalar_t> a,
-                  at::native::Vectorized<scalar_t> b) { return a + b; });
+              [=](at::vec::Vectorized<scalar_t> a,
+                  at::vec::Vectorized<scalar_t> b) { return a + b; });
         });
     return;
   }

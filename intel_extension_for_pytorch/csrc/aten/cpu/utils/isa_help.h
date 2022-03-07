@@ -9,7 +9,6 @@ namespace torch_ipex {
 namespace cpu {
 
 std::string get_current_isa_level();
-
 std::string get_highest_cpu_support_isa_level();
 std::string get_highest_binary_support_isa_level();
 
