@@ -21,6 +21,7 @@ class Conv2dRelu(torch.nn.Module):
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="test_SGDMasterWeight does not support onednn block format")
     def test_SGDMasterWeight(self, dtype=torch.float):
         model_real = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
         model_ref = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
@@ -80,6 +81,7 @@ class TestNNMethod(TestCase):
             self.assertEqual(p_real_list[i], p_ref_list[i], atol=1e-3, rtol=1.3e-04)
 
     # test official torch AdamW
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="test_AdamMasterWeight does not support onednn block format")
     def test_AdamMasterWeight(self, dtype=torch.float):
         model_real = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
         model_ref = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
