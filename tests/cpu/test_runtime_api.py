@@ -32,7 +32,7 @@ class SimpleNet_v2(torch.nn.Module):
 
 class TestCoreBinding(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_decorator_function_result(self):
+    def test_decorator_imperative_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -45,7 +45,7 @@ class TestCoreBinding(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_with_function_result(self):
+    def test_with_context_imperative_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -56,7 +56,7 @@ class TestCoreBinding(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_nested_with_function_result(self):
+    def test_nested_with_context_imperative_model(self):
         model = torch.nn.Softmax(dim=-1)
         model.eval()
         x = torch.rand(100, 8276)
@@ -72,7 +72,7 @@ class TestCoreBinding(TestCase):
 
 class TestRuntimeAPI(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_module_result(self):
+    def test_task_async_api_imperative_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -89,7 +89,7 @@ class TestRuntimeAPI(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_sync_task_result(self):
+    def test_task_sync_api_imperative_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -105,7 +105,7 @@ class TestRuntimeAPI(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_function_result(self):
+    def test_task_async_api_native_function(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -123,6 +123,29 @@ class TestRuntimeAPI(TestCase):
         y_runtime_future = task(model, x)
         y_runtime = y_runtime_future.get()
         self.assertEqual(y, y_runtime)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_task_copy(self):
+        model = SimpleNet()
+        model.eval()
+        x = torch.rand(64, 64, 3, 3)
+        # Calculate the reference result
+        y = model(x)
+
+        # Create task
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        task = ipex.cpu.runtime.Task(model, cpu_pool)
+
+        # Copy task
+        task2 = task
+
+        # Task submit and wait
+        y_runtime_future = task(x)
+        y_runtime = y_runtime_future.get()
+        y_runtime_future2 = task2(x)
+        y_runtime2 = y_runtime_future2.get()
+        self.assertEqual(y, y_runtime)
+        self.assertEqual(y, y_runtime2)
 
 class TestMultiStreamModule(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
@@ -143,7 +166,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_single_stream(self):
+    def test_single_stream_module(self):
         model = SimpleNet()
         model.eval()
         batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
@@ -163,7 +186,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, y_runtime2[0])
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_core_number_not_divisible_stream_number(self):
+    def test_core_number_not_divisible_by_stream_number(self):
         model = SimpleNet()
         model.eval()
         num_streams = 2
@@ -205,7 +228,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_batchsize_not_divisible_stream_number(self):
+    def test_batchsize_not_divisible_by_stream_number(self):
         model = SimpleNet()
         model.eval()
         num_streams = 3

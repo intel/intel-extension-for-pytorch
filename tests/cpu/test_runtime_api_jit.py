@@ -32,7 +32,7 @@ class SimpleNet_v2(torch.nn.Module):
 
 class TestJitRuntimeAPI(JitTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_trace_module(self):
+    def test_task_async_api_fp32_jit_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -51,7 +51,7 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_sync_trace_module(self):
+    def test_task_sync_api_fp32_jit_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -69,7 +69,7 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_bf16_task_core_bind(self):
+    def test_task_async_api_bf16_jit_model(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -89,7 +89,7 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_task_multi_submission(self):
+    def test_task_async_api_bf16_jit_model_multi_submission(self):
         model = SimpleNet()
         model.eval()
         x = torch.rand(64, 64, 3, 3)
@@ -115,9 +115,35 @@ class TestJitRuntimeAPI(JitTestCase):
         self.assertEqual(y, y_runtime[1])
         self.assertEqual(y, y_runtime[2])
 
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_task_copy_bf16_jit_mode(self):
+        model = SimpleNet()
+        model.eval()
+        x = torch.rand(64, 64, 3, 3)
+
+        # Calculate the reference result
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+            trace_mode = torch.jit.trace(model, x)
+        y = trace_mode(x)
+
+        # Create task
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        task = ipex.cpu.runtime.Task(trace_mode, cpu_pool)
+
+        # Copy Task
+        task2 = task
+
+        # Task submit and wait
+        y_runtime_future = task(x)
+        y_runtime = y_runtime_future.get()
+        y_runtime_future2 = task2(x)
+        y_runtime2 = y_runtime_future2.get()
+        self.assertEqual(y, y_runtime)
+        self.assertEqual(y, y_runtime2)
+
 class TestJITMultiStreamModule(JitTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_multi_stream_bf16_module(self):
+    def test_multi_stream_module_bf16_jit_model(self):
         model = SimpleNet()
         model.eval()
         batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
@@ -137,7 +163,7 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_multi_stream_concat_output(self):
+    def test_multi_stream_module_bf16_jit_model_concat_output(self):
         model = SimpleNet()
         model.eval()
         batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
@@ -160,7 +186,7 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y_runtime, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_single_stream(self):
+    def test_single_stream_module_bf16_jit_model(self):
         model = SimpleNet()
         model.eval()
         batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
@@ -184,7 +210,7 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y, y_runtime2[0])
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_bf16_core_number_not_divisible_stream_number(self):
+    def test_core_number_not_divisible_stream_number_bf16_jit_model(self):
         model = SimpleNet()
         model.eval()
         num_streams = 2
@@ -211,7 +237,7 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_bf16_batchsize_less_than_stream_number(self):
+    def test_batchsize_less_than_stream_number_bf16_jit_model(self):
         model = SimpleNet()
         model.eval()
         num_streams = 3
@@ -238,7 +264,7 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_bf16_batchsize_not_divisible_stream_number(self):
+    def test_batchsize_not_divisible_stream_number_bf16_jit_model(self):
         model = SimpleNet()
         model.eval()
         num_streams = 3
@@ -270,7 +296,7 @@ class TestJITMultiStreamModule(JitTestCase):
 
 class TestLLGARuntimeAPI(JitLlgaTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_int8_simpleNet_task_core_bind(self):
+    def test_task_async_api_int8_jit_model(self):
         with torch.no_grad():
             model = SimpleNet_v2()
             model.eval()
@@ -290,7 +316,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_int8_multi_stream(self):
+    def test_multi_stream_module_int8_jit_model(self):
         with torch.no_grad():
             model = SimpleNet_v2()
             model.eval()
@@ -312,7 +338,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_int8_core_number_not_divisible_stream_number(self):
+    def test_core_number_not_divisible_stream_number_int8_jit_model(self):
         with torch.no_grad():
             model = SimpleNet_v2()
             model.eval()
@@ -337,7 +363,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
-    def test_int8_batchsize_less_than_stream_number(self):
+    def test_batchsize_less_than_stream_number_int8_jit_model(self):
         with torch.no_grad():
             model = SimpleNet_v2()
             model.eval()

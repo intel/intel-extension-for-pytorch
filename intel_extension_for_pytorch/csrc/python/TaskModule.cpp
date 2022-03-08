@@ -86,8 +86,7 @@ std::unique_ptr<FutureTensor> TaskModule::run_async(
 
       typedef std::function<c10::IValue(std::vector<at::IValue>)>
           SubmitFunctionType;
-      using return_type = typename std::result_of<SubmitFunctionType(
-          std::vector<at::IValue>)>::type;
+      typedef decltype(SubmitFunctionType()(stack)) return_type;
       auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(
           std::forward<SubmitFunctionType>(
               [&](std::vector<at::IValue> stack) -> c10::IValue {
@@ -120,7 +119,7 @@ std::unique_ptr<FutureTensor> TaskModule::run_async(
     this->kwargs = kwargs;
 
     typedef std::function<py::object()> SubmitFunctionType;
-    using return_type = typename std::result_of<SubmitFunctionType()>::type;
+    typedef decltype(SubmitFunctionType()()) return_type;
     auto task = std::make_shared<std::packaged_task<return_type()>>(
         [&, this]() -> py::object {
           {

@@ -21,14 +21,13 @@ template <class F, class... Args>
 class Task {
  public:
   explicit Task(F&& f, std::shared_ptr<TaskExecutor> task_executor);
-  explicit Task(
-      F&& f,
-      Args&&... args,
-      std::shared_ptr<TaskExecutor> task_executor);
-  Task(const Task& task);
+  Task(const Task& task) = delete;
+  Task(Task&& task) = delete;
+  Task& operator=(const Task& task) = delete;
+  Task& operator=(Task&& task) = delete;
   ~Task();
   auto operator()(Args&&... args)
-      -> std::future<typename std::result_of<F(Args...)>::type>;
+      -> std::future<decltype(F()(std::forward<Args>(args)...))>;
 
  private:
   F f;
@@ -42,29 +41,16 @@ Task<F, Args...>::Task(F&& f, std::shared_ptr<TaskExecutor> task_executor) {
 }
 
 template <class F, class... Args>
-Task<F, Args...>::Task(
-    F&& f,
-    Args&&... args,
-    std::shared_ptr<TaskExecutor> task_executor) {
-  this->f = f;
-  this->task_executor = task_executor;
-}
-
-template <class F, class... Args>
-Task<F, Args...>::Task(const Task& task) {
-  this->f = task.f;
-  this->task_executor = task.task_executor;
-}
-
-template <class F, class... Args>
 Task<F, Args...>::~Task() {}
 
 template <class F, class... Args>
 auto Task<F, Args...>::operator()(Args&&... args)
-    -> std::future<typename std::result_of<F(Args...)>::type> {
-  using return_type = typename std::result_of<F(Args...)>::type;
+    -> std::future<decltype(F()(std::forward<Args>(args)...))> {
+  typedef decltype(F()(std::forward<Args>(args)...)) return_type;
   auto task = std::make_shared<std::packaged_task<return_type()>>(
-      std::bind(std::forward<F>(this->f), std::forward<Args>(args)...));
+      [&, this]() -> return_type {
+        return this->f(std::forward<Args>(args)...);
+      });
   std::future<return_type> res = task->get_future();
   auto grad_mode = at::GradMode::is_enabled();
   {
