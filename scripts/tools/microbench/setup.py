@@ -23,6 +23,7 @@ def get_defines(torch_version):
     table = {
         '1_7_0': ('TORCH_V_1_7', None),
         '1_11_0': ('TORCH_V_1_11', None),
+        '1_10_0': ('TORCH_V_1_11', None),
     }
     return [table[torch_version]]
 
