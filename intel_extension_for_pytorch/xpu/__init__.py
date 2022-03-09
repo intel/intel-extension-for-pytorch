@@ -2,7 +2,7 @@ import contextlib
 import sys
 from typing import Optional, Tuple, Union
 import torch
-import ipex
+import intel_extension_for_pytorch
 from torch import device as _device
 
 from .streams import Stream, Event
@@ -12,12 +12,12 @@ from .intrinsic import *
 from .settings import *
 from .itt import emit_itt
 
-from ipex._utils import _get_device_index  # , _dummy_type
-import ipex.optim as optim
-import ipex.autograd as autograd
-from ipex.autograd import inference_mode
+from intel_extension_for_pytorch._utils import _get_device_index  # , _dummy_type
+import intel_extension_for_pytorch.optim as optim
+import intel_extension_for_pytorch.autograd as autograd
+from intel_extension_for_pytorch.autograd import inference_mode
 
-default_generators: Tuple[torch._C.Generator] = ipex._C.default_generators
+default_generators: Tuple[torch._C.Generator] = intel_extension_for_pytorch._C.default_generators
 _device_t = Union[_device, str, int]
 
 
@@ -37,7 +37,7 @@ def is_available() -> bool:
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
     if is_available():
-        return ipex._C._getDeviceCount()
+        return intel_extension_for_pytorch._C._getDeviceCount()
     else:
         return 0
 
@@ -57,14 +57,14 @@ class device(object):
     def __enter__(self):
         if self.idx == -1:
             return
-        self.prev_idx = ipex._C._getDevice()
+        self.prev_idx = intel_extension_for_pytorch._C._getDevice()
         if self.prev_idx != self.idx:
-            ipex._C._setDevice(self.idx)
+            intel_extension_for_pytorch._C._setDevice(self.idx)
         _lazy_init()
 
     def __exit__(self, *args):
         if self.prev_idx != self.idx:
-            ipex._C._setDevice(self.prev_idx)
+            intel_extension_for_pytorch._C._setDevice(self.prev_idx)
         return False
 
 
@@ -95,7 +95,7 @@ def set_device(device: _device_t) -> None:
     """
     device = _get_device_index(device)
     if device >= 0:
-        ipex._C._setDevice(device)
+        intel_extension_for_pytorch._C._setDevice(device)
 
 
 def get_device_name(device: Optional[_device_t] = None) -> str:
@@ -132,13 +132,13 @@ def get_device_properties(device: _device_t):
     device = _get_device_index(device, optional=True)
     if device < 0 or device >= device_count():
         raise AssertionError("Invalid device id")
-    return ipex._C._get_device_properties(device)
+    return intel_extension_for_pytorch._C._get_device_properties(device)
 
 
 def current_device() -> int:
     r"""Returns the index of a currently selected device."""
     _lazy_init()
-    return ipex._C._getDevice()
+    return intel_extension_for_pytorch._C._getDevice()
 
 
 def synchronize(device: _device_t = None) -> None:
@@ -151,7 +151,7 @@ def synchronize(device: _device_t = None) -> None:
     """
     _lazy_init()
     idx = _get_device_index(device, optional=True)
-    return ipex._C._synchronize(idx)
+    return intel_extension_for_pytorch._C._synchronize(idx)
 
 
 def current_stream(device: Optional[_device_t] = None) -> Stream:
@@ -163,7 +163,7 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
             by :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
             (default).
     """
-    return Stream(_cdata=ipex._C._getCurrentStream(
+    return Stream(_cdata=intel_extension_for_pytorch._C._getCurrentStream(
         _get_device_index(device, optional=True)))
 
 
@@ -190,51 +190,51 @@ def stream(stream):
         with device(stream.device):
             dst_prev_stream = current_stream()
 
-    ipex._C._setCurrentStream(stream._cdata)
+    intel_extension_for_pytorch._C._setCurrentStream(stream._cdata)
     try:
         yield
     finally:
         if src_prev_stream.device != stream.device:
-            ipex._C._setCurrentStream(dst_prev_stream._cdata)
-        ipex._C._setCurrentStream(src_prev_stream._cdata)
+            intel_extension_for_pytorch._C._setCurrentStream(dst_prev_stream._cdata)
+        intel_extension_for_pytorch._C._setCurrentStream(src_prev_stream._cdata)
 
 
 from torch.storage import _StorageBase
 
 
-class ShortStorage(ipex._C.ShortStorageBase, _StorageBase):
+class ShortStorage(intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
     pass
 
 
-class CharStorage(ipex._C.CharStorageBase, _StorageBase):
+class CharStorage(intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
     pass
 
 
-class IntStorage(ipex._C.IntStorageBase, _StorageBase):
+class IntStorage(intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
     pass
 
 
-class LongStorage(ipex._C.LongStorageBase, _StorageBase):
+class LongStorage(intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
     pass
 
 
-class BoolStorage(ipex._C.BoolStorageBase, _StorageBase):
+class BoolStorage(intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
     pass
 
 
-class HalfStorage(ipex._C.HalfStorageBase, _StorageBase):
+class HalfStorage(intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
     pass
 
 
-class DoubleStorage(ipex._C.DoubleStorageBase, _StorageBase):
+class DoubleStorage(intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
     pass
 
 
-class FloatStorage(ipex._C.FloatStorageBase, _StorageBase):
+class FloatStorage(intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
     pass
 
 
-class BFloat16Storage(ipex._C.BFloat16StorageBase, _StorageBase):
+class BFloat16Storage(intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
     pass
 
 
@@ -247,11 +247,11 @@ torch._storage_classes.add(HalfStorage)
 torch._storage_classes.add(DoubleStorage)
 torch._storage_classes.add(FloatStorage)
 torch._storage_classes.add(BFloat16Storage)
-ipex._C._initExtension()
+intel_extension_for_pytorch._C._initExtension()
 
 
 def _xpu_tag(obj):
-    if type(obj).__module__ == 'ipex.xpu':
+    if type(obj).__module__ == 'intel_extension_for_pytorch.xpu':
         return 'xpu:' + str(obj.get_device())
 
 
@@ -334,6 +334,6 @@ serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 torch._register_device_module('xpu', current_module)
 
 # post initial
-ipex._C._postInitExtension()
+intel_extension_for_pytorch._C._postInitExtension()
 
 del torch

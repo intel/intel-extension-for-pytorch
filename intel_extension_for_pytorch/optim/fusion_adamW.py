@@ -1,9 +1,10 @@
 from typing import Callable, Iterable, Tuple
 
 import torch
-import ipex
+import intel_extension_for_pytorch
 from torch.optim import Optimizer
 import math
+
 
 class AdamWMasterWeight(Optimizer):
     r"""Implements AdamWMasterWeight algorithm, migrated with Torch official AdamW and Customer AdamW used in Bert.
@@ -28,7 +29,7 @@ class AdamWMasterWeight(Optimizer):
         amsgrad (boolean, optional): whether to use the AMSGrad variant of this
             algorithm from the paper `On the Convergence of Adam and Beyond`_
             (default: False)
-        transformer (boolean, optional) switch the official AdamW and customer 
+        transformer (boolean, optional) switch the official AdamW and customer
             AdamW (default: False)
         correct_bias (boolean, optional) control the behaviour of the bias calculation
             (default: True)
@@ -58,7 +59,7 @@ class AdamWMasterWeight(Optimizer):
         if not transformer and not correct_bias:
             raise ValueError("Invalid combination for attribute transformer and correct bias.")
 
-        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, 
+        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay,
                         amsgrad=amsgrad, transformer=transformer,
                         correct_bias=correct_bias)
         super(AdamWMasterWeight, self).__init__(params, defaults)
@@ -125,32 +126,32 @@ class AdamWMasterWeight(Optimizer):
 
                 # Fusion AdamW here using customer kernels depends on the attribute transformer
                 if not group['transformer']:
-                    ipex._C.fused_adamWMasterWeight(p.master_weight.data,
-                                                    p.data,
-                                                    p.grad.data,
-                                                    group['amsgrad'],
-                                                    state['exp_avg'],
-                                                    state['exp_avg_sq'],
-                                                    state['max_exp_avg_sq'],
-                                                    state['step'],
-                                                    group['lr'],
-                                                    group['eps'],
-                                                    beta1,
-                                                    beta2,
-                                                    group['weight_decay'])
+                    intel_extension_for_pytorch._C.fused_adamWMasterWeight(p.master_weight.data,
+                                                                           p.data,
+                                                                           p.grad.data,
+                                                                           group['amsgrad'],
+                                                                           state['exp_avg'],
+                                                                           state['exp_avg_sq'],
+                                                                           state['max_exp_avg_sq'],
+                                                                           state['step'],
+                                                                           group['lr'],
+                                                                           group['eps'],
+                                                                           beta1,
+                                                                           beta2,
+                                                                           group['weight_decay'])
                 else:
-                    ipex._C.transformer_adamWMasterWeight(p.master_weight.data,
-                                                          p.data,
-                                                          p.grad.data,
-                                                          state['exp_avg'],
-                                                          state['exp_avg_sq'],
-                                                          state['max_exp_avg_sq'],
-                                                          state['step'],
-                                                          group['lr'],
-                                                          group['eps'],
-                                                          beta1,
-                                                          beta2,
-                                                          group['weight_decay'],
-                                                          group['correct_bias'])
+                    intel_extension_for_pytorch._C.transformer_adamWMasterWeight(p.master_weight.data,
+                                                                                 p.data,
+                                                                                 p.grad.data,
+                                                                                 state['exp_avg'],
+                                                                                 state['exp_avg_sq'],
+                                                                                 state['max_exp_avg_sq'],
+                                                                                 state['step'],
+                                                                                 group['lr'],
+                                                                                 group['eps'],
+                                                                                 beta1,
+                                                                                 beta2,
+                                                                                 group['weight_decay'],
+                                                                                 group['correct_bias'])
 
         return loss

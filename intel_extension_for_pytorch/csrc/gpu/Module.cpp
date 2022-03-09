@@ -70,7 +70,8 @@ static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
 
 static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  auto module = THPObjectPtr(PyImport_ImportModule("ipex.xpu"));
+  auto module =
+      THPObjectPtr(PyImport_ImportModule("intel_extension_for_pytorch.xpu"));
   if (!module)
     throw python_error();
 
@@ -292,7 +293,7 @@ std::string get_dev_type(const DeviceProp& prop) {
 }
 
 static void register_xpu_device_properties(PyObject* module) {
-  // Add _DeviceProperties class to ipex._C
+  // Add _DeviceProperties class to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
   py::class_<DeviceProp>(m, "_DeviceProperties")
       .def_readonly("name", &DeviceProp::dev_name)
@@ -316,13 +317,13 @@ static void register_xpu_device_properties(PyObject* module) {
 }
 
 static void register_inference_mode(PyObject* module) {
-  // Add _DeviceProperties class to ipex._C
+  // Add _DeviceProperties class to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
   py::class_<c10::InferenceMode>(m, "_InferenceMode").def(py::init<bool>());
 }
 
 static void bindGetDeviceProperties(PyObject* module) {
-  // Add method to ipex._C
+  // Add method to intel_extension_for_pytorch._C
   auto m = py::handle(module).cast<py::module>();
   m.def(
       "_get_device_properties",

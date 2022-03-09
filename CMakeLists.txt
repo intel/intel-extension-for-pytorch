@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(ipex VERSION ${CMAKE_PROJECT_VERSION})
+project(intel_extension_for_pytorch VERSION ${CMAKE_PROJECT_VERSION})
 
 set(IPEX_ROOT_DIR ${PROJECT_SOURCE_DIR})
 list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
@@ -53,11 +53,11 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 add_subdirectory(${IPEX_ROOT_DIR}/csrc)
-add_subdirectory(${IPEX_ROOT_DIR}/ipex/csrc)
+add_subdirectory(${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
 
 function (print_configuration_summary)
-  # Fetch definitions of ipex_gpu_core as main target
-  get_target_property(IPEX_NATIVE_DEFINITIONS ipex_gpu_core COMPILE_DEFINITIONS)
+  # Fetch definitions of intel-ext-pt-gpu as main target
+  get_target_property(IPEX_NATIVE_DEFINITIONS intel-ext-pt-gpu COMPILE_DEFINITIONS)
 
     message(STATUS "")
     message(STATUS "******** Summary ********")

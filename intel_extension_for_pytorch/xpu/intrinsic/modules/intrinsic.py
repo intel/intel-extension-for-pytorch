@@ -1,5 +1,5 @@
 import torch
-import ipex
+import intel_extension_for_pytorch
 import math
 from torch.nn import Module, Parameter, init
 from torch.autograd import Function
@@ -29,7 +29,7 @@ class LinearReLU(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-        return ipex._C.linear_relu(input, self.weight, self.bias)
+        return intel_extension_for_pytorch._C.linear_relu(input, self.weight, self.bias)
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
@@ -59,7 +59,7 @@ class LinearSigmoid(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-        return ipex._C.linear_sigmoid(input, self.weight, self.bias)
+        return intel_extension_for_pytorch._C.linear_sigmoid(input, self.weight, self.bias)
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
@@ -85,5 +85,5 @@ class ReLUDummy(Module):
 class InteractionFuncion(Function):
     @staticmethod
     def forward(ctx, input_mlp, input_emb):
-        return ipex._C.interaction(input_mlp, input_emb)
+        return intel_extension_for_pytorch._C.interaction(input_mlp, input_emb)
 Interaction = InteractionFuncion.apply

@@ -1,6 +1,6 @@
 import torch
 from torch.autograd.grad_mode import _DecoratorContextManager
-import ipex
+import intel_extension_for_pytorch
 from typing import Any
 
 
@@ -18,7 +18,7 @@ class inference_mode(_DecoratorContextManager):
         self.mode = mode
 
     def __enter__(self):
-        self._inference_mode_raii_guard = ipex._C._InferenceMode(self.mode)
+        self._inference_mode_raii_guard = intel_extension_for_pytorch._C._InferenceMode(self.mode)
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         del self._inference_mode_raii_guard

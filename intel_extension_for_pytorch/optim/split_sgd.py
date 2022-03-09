@@ -1,5 +1,5 @@
 import torch
-import ipex
+import intel_extension_for_pytorch
 from torch.optim.optimizer import Optimizer, required
 
 
@@ -51,7 +51,7 @@ class SplitSGD(Optimizer):
                         b_d = param_state['bottom_half']
 
                 if p.dtype == torch.bfloat16:
-                    ipex._C.packed_add(p.data, b_d, d_p, -group['lr'])
+                    intel_extension_for_pytorch._C.packed_add(p.data, b_d, d_p, -group['lr'])
                     param_state['bottom_half'] = b_d
                 else:
                     p.data.add_(d_p, alpha=-group['lr'])

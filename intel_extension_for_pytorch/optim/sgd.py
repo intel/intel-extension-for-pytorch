@@ -1,5 +1,5 @@
 import torch
-import ipex
+import intel_extension_for_pytorch
 from torch.optim.optimizer import Optimizer, required
 
 
@@ -38,7 +38,7 @@ class SGDMasterWeight(Optimizer):
                 p_{t+1} & = p_{t} - \text{lr} * v_{t+1},
             \end{aligned}
 
-        where :math:`p`, :math:`g`, :math:`v` and :math:`\mu` denote the 
+        where :math:`p`, :math:`g`, :math:`v` and :math:`\mu` denote the
         parameters, gradient, velocity, and momentum respectively.
 
         This is in contrast to Sutskever et. al. and
@@ -137,9 +137,9 @@ class SGDMasterWeight(Optimizer):
                 # p.data.copy_(p.master_weight.data)
 
                 # fuse SGDMasterWeight update into one kernel
-                # TODO: ipex in Python code will be removed
-                ipex._C.fused_SGDMasterWeight(p.master_weight.data, p.data, p.grad, weight_decay,
-                                              momentum_buffer_not_existed, buf,
-                                              momentum, (1 - dampening), nesterov, group['lr'])
+                # TODO: intel_extension_for_pytorch in Python code will be removed
+                intel_extension_for_pytorch._C.fused_SGDMasterWeight(p.master_weight.data, p.data, p.grad, weight_decay,
+                                                                     momentum_buffer_not_existed, buf,
+                                                                     momentum, (1 - dampening), nesterov, group['lr'])
 
         return loss

@@ -34,7 +34,7 @@ else()
 endif()
 
 # Library dependencies.
-find_library(IPEX_GPU_CORE_LIBRARY ipex_gpu_core PATHS "${TORCH_IPEX_INSTALL_PREFIX}/lib")
+find_library(IPEX_GPU_CORE_LIBRARY intel-ext-pt-gpu PATHS "${TORCH_IPEX_INSTALL_PREFIX}/lib")
 set(TORCH_IPEX_LIBRARIES ${IPEX_GPU_CORE_LIBRARY})
 
 find_package_handle_standard_args(Ipex DEFAULT_MSG TORCH_IPEX_LIBRARIES TORCH_IPEX_INCLUDE_DIRS)

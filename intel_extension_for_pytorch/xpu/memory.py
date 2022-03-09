@@ -1,9 +1,9 @@
 import collections
 from typing import Any, Dict, Union
 
-import ipex
+import intel_extension_for_pytorch
 from torch.types import Device
-from ipex._utils import _get_device_index
+from intel_extension_for_pytorch._utils import _get_device_index
 
 
 def empty_cache() -> None:
@@ -17,7 +17,7 @@ def empty_cache() -> None:
         of GPU memory in certain cases. See :ref:`xpu-memory-management` for
         more details about GPU memory management.
     """
-    ipex._C._emptyCache()
+    intel_extension_for_pytorch._C._emptyCache()
 
 
 def memory_stats(device: Union[Device, int] = None) -> Dict[str, Any]:
@@ -100,7 +100,7 @@ def memory_stats(device: Union[Device, int] = None) -> Dict[str, Any]:
 def memory_stats_as_nested_dict(device: Union[Device, int] = None) -> Dict[str, Any]:
     r"""Returns the result of :func:`~torch.xpu.memory_stats` as a nested dictionary."""
     device = _get_device_index(device, optional=True)
-    return ipex._C._memoryStats(device)
+    return intel_extension_for_pytorch._C._memoryStats(device)
 
 
 def reset_accumulated_memory_stats(device: Union[Device, int] = None) -> None:
@@ -120,7 +120,7 @@ def reset_accumulated_memory_stats(device: Union[Device, int] = None) -> None:
         management.
     """
     device = _get_device_index(device, optional=True)
-    return ipex._C._resetAccumulatedMemoryStats(device)
+    return intel_extension_for_pytorch._C._resetAccumulatedMemoryStats(device)
 
 
 def reset_peak_memory_stats(device: Union[Device, int] = None) -> None:
@@ -139,7 +139,7 @@ def reset_peak_memory_stats(device: Union[Device, int] = None) -> None:
         management.
     """
     device = _get_device_index(device, optional=True)
-    return ipex._C._resetPeakMemoryStats(device)
+    return intel_extension_for_pytorch._C._resetPeakMemoryStats(device)
 
 
 def memory_allocated(device: Union[Device, int] = None) -> int:
@@ -230,7 +230,7 @@ def memory_snapshot():
         See :ref:`xpu-memory-management` for more details about GPU memory
         management.
     """
-    return ipex._C._memorySnapshot()
+    return intel_extension_for_pytorch._C._memorySnapshot()
 
 
 def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False) -> str:

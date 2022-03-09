@@ -1213,7 +1213,7 @@ bool THXPStorage_init(PyObject* module) {
   static std::string module_name;
   module_name.append(toString(scalarType));
   module_name.append("StorageBase");
-  static std::string class_name("ipex._C.");
+  static std::string class_name("intel_extension_for_pytorch._C.");
   class_name.append(module_name);
 
   THXPStorage_Type.tp_name = class_name.c_str();

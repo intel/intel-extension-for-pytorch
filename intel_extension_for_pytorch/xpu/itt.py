@@ -4,7 +4,7 @@ except ImportError:
     class _ITTStub(object):
         @staticmethod
         def _fail(*args, **kwargs):
-            raise RuntimeError("ipex is not build with ITT.")
+            raise RuntimeError("intel_extension_for_pytorch is not build with ITT.")
 
         rangePush = _fail
         rangePop = _fail

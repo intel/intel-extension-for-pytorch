@@ -1,5 +1,5 @@
 import torch
-import ipex
+import intel_extension_for_pytorch
 from torch.optim.optimizer import Optimizer, required
 
 
@@ -60,8 +60,8 @@ class FusionSGD(Optimizer):
                         # p.add_(buf, alpha=-group['lr'])
 
                         # update p, buf.
-                        ipex._C.fusion_amdd(p.data, d_p, param_state['momentum_buffer'], weight_decay, momentum,
-                                            1 - dampening, -group['lr'])
+                        intel_extension_for_pytorch._C.fusion_amdd(p.data, d_p, param_state['momentum_buffer'], weight_decay, momentum,
+                                                                   1 - dampening, -group['lr'])
                         # print('p.data = ', p.data.cpu())
                         # print('buf = ', param_state['momentum_buffer'].cpu())
 

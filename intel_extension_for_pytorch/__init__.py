@@ -11,8 +11,8 @@ from .autograd import inference_mode
 
 
 def version():
-    print("ipex gpu version:          {}".format(__version__))
-    print("ipex gpu git sha:          {}".format(__ipex_git_sha__))
+    print("intel_extension_for_pytorch gpu version:          {}".format(__version__))
+    print("intel_extension_for_pytorch gpu git sha:          {}".format(__ipex_git_sha__))
     print("private gpu torch version: {}".format(__torch_version__))
     print("private gpu torch sha:     {}".format(__torch_git_sha__))
     print("submodule ittapi sha:      {}".format(__ittapi_git_sha__))
@@ -63,4 +63,4 @@ def library_paths():
 # Path to folder containing CMake definitions for torch ipex package
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), 'share', 'cmake')
 
-import ipex.xpu
+import intel_extension_for_pytorch.xpu

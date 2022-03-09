@@ -3,7 +3,7 @@ from .modules import LinearSigmoid
 from .modules import ReLUDummy
 from .modules import Interaction
 
-import ipex
+import intel_extension_for_pytorch
 
 __all__ = [
     'LinearReLU',
@@ -14,4 +14,4 @@ __all__ = [
 
 
 def MulAdd(input, other, accumu, alpha=1.0):
-    return ipex._C.mul_add(input, other, accumu, alpha)
+    return intel_extension_for_pytorch._C.mul_add(input, other, accumu, alpha)
