@@ -1,5 +1,5 @@
 import torch
-import ipex
+import intel_extension_for_pytorch
 import microbench
 import torchvision.models as models
 

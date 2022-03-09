@@ -327,5 +327,5 @@ if __name__ == '__main__':
     parser.add_argument('--dtype', help='specific floating type', default='default')
     args = parser.parse_args()
     if args.backend.strip().lower() == 'xpu':
-        import ipex
+        import intel_extension_for_pytorch
     infos = run_op(args.log, bench_type=args.dtype, exclude=args.exclude, backend=args.backend)

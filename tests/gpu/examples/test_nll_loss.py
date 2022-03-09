@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
-import ipex
+import intel_extension_for_pytorch
 
 import numpy
 import pytest

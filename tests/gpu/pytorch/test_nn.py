@@ -70,7 +70,7 @@ if TEST_NUMPY:
     import numpy as np
 
 try:
-    import ipex
+    import intel_extension_for_pytorch
     from common.common_nn import TEST_DPCPP
 except ImportError:
     print("Import IPEX failed")

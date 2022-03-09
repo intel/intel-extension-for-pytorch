@@ -4,7 +4,7 @@ import torch
 from torch.testing._internal.common_utils import (TestCase,
                                                   repeat_test_for_types)
 
-import ipex
+import intel_extension_for_pytorch
 
 
 def wrapped_partial(func, *args, **kwargs):

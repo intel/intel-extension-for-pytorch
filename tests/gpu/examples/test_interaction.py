@@ -1,6 +1,6 @@
 import torch
 from torch._C import parse_ir
-import ipex
+import intel_extension_for_pytorch
 import torch.nn.functional as F
 import time
 from torch.testing._internal.common_utils import TestCase

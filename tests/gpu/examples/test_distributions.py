@@ -47,7 +47,7 @@ from torch.testing._internal.common_utils import (TEST_WITH_UBSAN, TestCase,
                                                   load_tests, run_tests,
                                                   set_rng_seed)
 
-import ipex
+import intel_extension_for_pytorch
 
 import numpy as np
 import pytest

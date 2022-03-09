@@ -1,6 +1,6 @@
 import torch
 
-import ipex
+import intel_extension_for_pytorch
 
 a = torch.ones([10], dtype=torch.float64)
 a = a.to("xpu")

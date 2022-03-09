@@ -7,7 +7,7 @@ from torch.testing._internal.common_utils import TestCase
     This issue was fixed in commit: 193ef42, PR: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu/pull/668/commits
 """
 
-import ipex
+import intel_extension_for_pytorch
 import os
 import pytest
 

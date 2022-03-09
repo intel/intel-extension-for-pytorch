@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--spec", default=None, required=True, help="GenSKU file name")
     args = parser.parse_args()
     if args.backend.strip().lower() == 'xpu':
-        import ipex
+        import intel_extension_for_pytorch
     infos = run_op(args.log, bench_type=args.dtype, exclude=args.exclude, backend=args.backend)
     infos = efficiency_workload(infos, args.spec)
     filename = args.log[:args.log.rfind('.')] + '_' + args.dtype + '_report.csv'

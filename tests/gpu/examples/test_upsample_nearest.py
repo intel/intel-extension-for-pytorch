@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
-import ipex
+import intel_extension_for_pytorch
 
 cpu_device = torch.device("cpu")
 sycl_device = torch.device("xpu")

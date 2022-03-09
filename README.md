@@ -124,11 +124,11 @@ python3 setup.py install --user
 
 ## Programming Model
 
-*  ```import ipex``` is a MUST before running any cases with Intel® Extension for PyTorch* GPU.
+*  ```import intel_extension_for_pytorch``` is a MUST before running any cases with Intel® Extension for PyTorch* GPU.
 *  Must convert tensors and models to xpu device before running. Example:
 
 ```bash
-import ipex
+import intel_extension_for_pytorch
 
 input = input.to("xpu")
 model = model.to("xpu")

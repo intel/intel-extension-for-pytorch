@@ -1,5 +1,5 @@
 import torch
-import ipex
+import intel_extension_for_pytorch
 from torch.nn.modules.utils import _pair
 import pytest
 
