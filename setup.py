@@ -382,8 +382,7 @@ setup(
               'intel_extension_for_pytorch.xpu.intrinsic',
               'intel_extension_for_pytorch.xpu.intrinsic.modules',
               'intel_extension_for_pytorch.optim'],
-    install_requires=['torch',
-                      'typing_extensions'],
+    install_requires=['typing_extensions'],
     package_data={
         'intel_extension_for_pytorch': [
             'README.md',
