@@ -27,9 +27,11 @@ Tensor q_cat(
     c10::optional<int64_t> zero_point) {
   double scale_out =
       scale.has_value() ? scale.value() : tensors.get(0).q_scale();
-  int64_t zero_point_out = zero_point.has_value()
-      ? zero_point.value()
-      : tensors.get(0).q_zero_point();
+
+  // This is a workaroud for oneDNN symmetric INT8, will remove it after oneDNN
+  // Asymmetric INT8 is ready.
+  int64_t zero_point_out = 0;
+
   std::vector<Tensor> tensors_;
   for (int i = 0; i < tensors.size(); i++) {
     auto src = tensors.get(i);
