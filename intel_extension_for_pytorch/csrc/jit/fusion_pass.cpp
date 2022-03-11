@@ -359,8 +359,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 
   // convolution folding
-  FoldFrozenConvAddOrSub(graph);
-  FoldFrozenConvMulOrDiv(graph);
+  FrozenConvFolding(graph);
 
   // convolution fusion
   graph_rewrite::insertPrePackedConvOp(graph);
