@@ -941,6 +941,7 @@ class Tester(TestCase):
         a = torch.randn(bs, seq_len, dim)
         b = torch.randn(bs, seq_len, dim)
         model = AddLayerNorm(dim)
+        torch._C._jit_set_texpr_fuser_enabled(False)
         jit_model = torch.jit.trace(model,(a, b))
         trace_graph = jit_model.graph_for(a, b)
         jit_res = jit_model(a, b)
@@ -968,6 +969,7 @@ class Tester(TestCase):
         ori_res = model(a, b, c)
         self.assertEqual(jit_res, ori_res)
         node = "ipex::add_layernorm"
+        torch._C._jit_set_texpr_fuser_enabled(True)
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
     def test_concat_bn_relu(self):

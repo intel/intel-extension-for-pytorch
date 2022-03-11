@@ -21,6 +21,7 @@ class ConvBatchNorm(torch.nn.Module):
 class TestOptimizeCases(TestCase):
     def test_optimize_parameters_behavior(self):
         model = ConvBatchNorm().eval()
+        torch._C._jit_set_texpr_fuser_enabled(False)
         for level in ["O0", "O1"]:
             # disbale conv_bn folding
             opt_M = ipex.optimize(model, level=level, dtype=torch.float, conv_bn_folding=False)
@@ -30,6 +31,7 @@ class TestOptimizeCases(TestCase):
                 trace_graph = traced_model.graph_for(x)
             self.assertTrue(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()))
             # TODO check weight_prepack.
+        torch._C._jit_set_texpr_fuser_enabled(True)
 
     def test_optimize_bf16_model(self):
         model = ConvBatchNorm()
