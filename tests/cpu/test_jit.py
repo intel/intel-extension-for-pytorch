@@ -79,6 +79,13 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
     IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
     skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
 
+try:
+    import torchvision
+    HAS_TORCHVISION = True
+except ImportError:
+    HAS_TORCHVISION = False
+skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+
 device = 'cpu:0'
 SIZE = 100
 
@@ -2568,6 +2575,55 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_relu_run",
                 kind_not_in_graph="prim::BailOut")
 
+    @skipIfNoTorchVision
+    def test_conv_torchvision_bn_folding(self):
+        from torchvision.ops import misc as misc_nn_ops
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                norm_layer = misc_nn_ops.FrozenBatchNorm2d
+                self.inplanes = 64
+                self.dilation = 1
+                self.groups = 1
+                self.base_width = 64
+                self.conv1 = torch.nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+                self.bn1 = norm_layer(self.inplanes)
+                self.relu = torch.nn.ReLU(inplace=True)
+                self.maxpool = torch.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.bn1(x)
+                x = self.relu(x)
+                x = self.maxpool(x)
+                return x
+
+        model = M().eval()
+        self._test_output(
+            model,
+            torch.randn(1, 3, 1200, 1200),
+            kind_in_graph="ipex_prepack::convolution_relu_run",
+            kind_not_in_graph="aten::add")
+
+        self._test_output(
+            model,
+            torch.randn(1, 3, 1200, 1200),
+            kind_in_graph="ipex_prepack::convolution_relu_run",
+            kind_not_in_graph="aten::mul")
+
+        self._test_output_bf16(
+            model,
+            torch.randn(1, 3, 1200, 1200),
+            kind_in_graph="ipex_prepack::convolution_relu_run",
+            kind_not_in_graph="aten::add",
+            prec=0.1)
+
+        self._test_output_bf16(
+            model,
+            torch.randn(1, 3, 1200, 1200),
+            kind_in_graph="ipex_prepack::convolution_relu_run",
+            kind_not_in_graph="aten::mul",
+            prec=0.1)
 
 if __name__ == '__main__':
     torch.manual_seed(2020)
