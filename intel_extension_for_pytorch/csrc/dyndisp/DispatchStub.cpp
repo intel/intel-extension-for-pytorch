@@ -33,20 +33,12 @@ CPUCapability _get_highest_cpu_support_isa_level() {
   /*
   reference to FindAVX.cmake
   */
-  if (CPUFeature::get_instance().os_avx512() &&
-      CPUFeature::get_instance().cpuid_avx512_vl() &&
-      CPUFeature::get_instance().cpuid_avx512_bw() &&
-      CPUFeature::get_instance().cpuid_avx512_dq() &&
-      CPUFeature::get_instance().cpuid_avx512_f() &&
-      CPUFeature::get_instance().cpuid_fma()) {
-    if (CPUFeature::get_instance().cpuid_avx512_bf16()) {
-      return CPUCapability::AVX512_BF16;
-    }
+  if (CPUFeature::get_instance().isa_level_avx512_bf16()) {
+    return CPUCapability::AVX512_BF16;
+  } else if (CPUFeature::get_instance().isa_level_avx512_core()) {
     return CPUCapability::AVX512;
   }
-  if (CPUFeature::get_instance().os_avx2() &&
-      CPUFeature::get_instance().cpuid_avx2() &&
-      CPUFeature::get_instance().cpuid_fma()) {
+  if (CPUFeature::get_instance().cpuid_avx2()) {
     return CPUCapability::AVX2;
   }
 
