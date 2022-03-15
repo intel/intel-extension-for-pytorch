@@ -1,19 +1,16 @@
 # for install
-astunparse
-expecttest
 flake8
 future
-numpy
-psutil
 pyyaml
-requests
 setuptools
 six
 types-dataclasses
 typing_extensions
 # for test
+expecttest
 hypothesis
 matplotlib
+numpy
 pytest
 scipy
 
