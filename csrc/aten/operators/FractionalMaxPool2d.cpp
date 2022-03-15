@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <core/Memory.h>
+#include <core/MemoryFormat.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
@@ -42,96 +43,119 @@ void fractional_max_pool2d_out_frame(
     int outputSizeH,
     int outputSizeW,
     int poolSizeH,
-    int poolSizeW) {
+    int poolSizeW,
+    const bool is_channels_last) {
   using accscalar_t = acc_type<scalar_t>;
   auto& queue = dpcppGetCurrentQueue();
-  int outputPlaneSize = outputSizeH * outputSizeW;
-  int work_group_size = outputPlaneSize > 128 ? 128 : outputPlaneSize;
-  int work_group_num = (outputPlaneSize + 127) / 128;
-
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int outputSize = numBatch * numPlane * outputSizeH * outputSizeW;
+  int work_group_size = outputSize > max_wg_size ? max_wg_size : outputSize;
+  auto eu_num = dpcppGetCurrentDeviceProperties()->max_compute_units;
+  // One full device launch could launch en_num * SMID32 * HD threads as below
+  const auto target_global_size = eu_num * 32 /* SIMD32 */ * 8 /* HD threads */;
+  // Each work group size is work_group_size, one full device launch is
+  // target_global_size, so we can calculate max work group num as below
+  const int max_work_group_num = target_global_size / work_group_size;
+  int work_group_num = outputSize / work_group_size < max_work_group_num
+      ? outputSize / work_group_size
+      : max_work_group_num;
+  int draft_work_group_num =
+      (outputSize + work_group_size - 1) / work_group_size;
+  // work item in each work group calculates loops' elements
+  int loops = draft_work_group_num / work_group_num + 1;
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto input_data = input;
     auto output_data = output;
     auto indices_data = indices;
     auto samples_data = samples;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto input_ptr = input_data;
       auto output_ptr = output_data;
       auto indices_ptr = indices_data;
       auto samples_ptr = samples_data;
 
-      int ourOutputPoint = item.get_global_id()[0];
-      int plane = item.get_group()[1];
-      int batch = item.get_group()[2];
+      int linearIndex = item.get_global_id()[0];
+      for (int l = 0; l < loops; ++l) {
+        int outputIndex = linearIndex + l * (work_group_size * work_group_num);
+        int batch = outputIndex / (numPlane * outputSizeH * outputSizeW);
+        int plane = is_channels_last
+            ? outputIndex % numPlane
+            : (outputIndex / outputSizeH / outputSizeW) % numPlane;
+        int outputH = is_channels_last
+            ? outputIndex / numPlane / outputSizeW % outputSizeH
+            : outputIndex / outputSizeW % outputSizeH;
+        int outputW = is_channels_last ? outputIndex / numPlane % outputSizeW
+                                       : outputIndex % outputSizeW;
 
-      if (ourOutputPoint < outputSizeH * outputSizeW) {
-        int outputW = ourOutputPoint % outputSizeW;
-        int outputH = ourOutputPoint / outputSizeW;
+        if (batch < numBatch && plane < numPlane && outputH < outputSizeH &&
+            outputW < outputSizeW) {
+          int poolW = get_interval<scalar_t, accscalar_t>(
+              static_cast<accscalar_t>(samples_ptr
+                                           [batch * numPlane * 2 +
+                                            plane * 2] /*[batch][plane][0] */),
+              outputW,
+              inputSizeW,
+              outputSizeW,
+              poolSizeW);
+          int poolH = get_interval<scalar_t, accscalar_t>(
+              static_cast<accscalar_t>(samples_ptr
+                                           [batch * numPlane * 2 + plane * 2 +
+                                            1] /*[batch][plane][1] */),
+              outputH,
+              inputSizeH,
+              outputSizeH,
+              poolSizeH);
 
-        int poolW = get_interval<scalar_t, accscalar_t>(
-            static_cast<accscalar_t>(
-                samples_ptr
-                    [batch * numPlane * 2 + plane * 2] /*[batch][plane][0] */),
-            outputW,
-            inputSizeW,
-            outputSizeW,
-            poolSizeW);
-        int poolH = get_interval<scalar_t, accscalar_t>(
-            static_cast<accscalar_t>(samples_ptr
-                                         [batch * numPlane * 2 + plane * 2 +
-                                          1] /*[batch][plane][1] */),
-            outputH,
-            inputSizeH,
-            outputSizeH,
-            poolSizeH);
+          scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
+          int maxIndex = -1;
 
-        scalar_t maxVal = std::numeric_limits<scalar_t>::lowest();
-        int maxIndex = -1;
-
-        for (int h = poolH; h < poolH + poolSizeH; ++h) {
-          if (poolSizeW < 2 || poolSizeW > 7) {
-            for (int w = poolW; w < poolW + poolSizeW; ++w) {
-              scalar_t val = input_ptr
-                  [batch * numPlane * inputSizeH * inputSizeW +
-                   plane * inputSizeH * inputSizeW + h * inputSizeW +
-                   w] /* [batch][plane][h][w]*/;
-              if (val > maxVal) {
-                maxIndex = h * inputSizeW + w;
-                maxVal = val;
+          for (int h = poolH; h < poolH + poolSizeH; ++h) {
+            if (poolSizeW < 2 || poolSizeW > 7) {
+              for (int w = poolW; w < poolW + poolSizeW; ++w) {
+                int64_t load_offset = is_channels_last
+                    ? batch * inputSizeH * inputSizeW * numPlane + plane +
+                        h * inputSizeW * numPlane + w * numPlane
+                    : batch * numPlane * inputSizeH * inputSizeW +
+                        plane * inputSizeH * inputSizeW + h * inputSizeW + w;
+                scalar_t val = input_ptr[load_offset];
+                if (val > maxVal) {
+                  maxIndex = h * inputSizeW + w;
+                  maxVal = val;
+                }
               }
-            }
-          } else {
-            for (int i = 0; i < poolSizeW; ++i) {
-              int w = i + poolW;
-              scalar_t val = input_ptr
-                  [batch * numPlane * inputSizeH * inputSizeW +
-                   plane * inputSizeH * inputSizeW + h * inputSizeW +
-                   w] /*[batch][plane][h][w] */;
-              if (val > maxVal) {
-                maxIndex = h * inputSizeW + w;
-                maxVal = val;
+            } else {
+              for (int i = 0; i < poolSizeW; ++i) {
+                int w = i + poolW;
+                int64_t load_offset = is_channels_last
+                    ? batch * inputSizeH * inputSizeW * numPlane + plane +
+                        h * inputSizeW * numPlane + w * numPlane
+                    : batch * numPlane * inputSizeH * inputSizeW +
+                        plane * inputSizeH * inputSizeW + h * inputSizeW + w;
+                scalar_t val = input_ptr[load_offset];
+                if (val > maxVal) {
+                  maxIndex = h * inputSizeW + w;
+                  maxVal = val;
+                }
               }
             }
           }
-        }
 
-        indices_ptr
-            [batch * numPlane * outputSizeH * outputSizeW +
-             plane * outputSizeH * outputSizeW + outputH * outputSizeW +
-             outputW] /*[batch][plane][outputH][outputW] */
-            = maxIndex;
-        output_ptr
-            [batch * numPlane * outputSizeH * outputSizeW +
-             plane * outputSizeH * outputSizeW + outputH * outputSizeW +
-             outputW] /*[batch][plane][outputH][outputW]*/
-            = maxVal;
+          int64_t store_offset = is_channels_last
+              ? batch * outputSizeH * outputSizeW * numPlane + plane +
+                  outputH * outputSizeW * numPlane + outputW * numPlane
+              : batch * numPlane * outputSizeH * outputSizeW +
+                  plane * outputSizeH * outputSizeW + outputH * outputSizeW +
+                  outputW;
+          indices_ptr[store_offset] = maxIndex;
+          output_ptr[store_offset] = maxVal;
+        }
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(
-                work_group_size * work_group_num, numPlane, numBatch),
-            DPCPP::range<3>(work_group_size, 1, 1)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(work_group_size * work_group_num),
+            DPCPP::range<1>(work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -147,56 +171,104 @@ void fractional_max_pool2d_backward_out_frame(
     int gradInputSizeH,
     int gradInputSizeW,
     int gradOutputSizeH,
-    int gradOutputSizeW) {
+    int gradOutputSizeW,
+    const bool is_channels_last) {
   auto& queue = dpcppGetCurrentQueue();
-  int gradOutputPlaneSize = gradOutputSizeH * gradOutputSizeW;
-  int work_group_size = gradOutputPlaneSize > 128 ? 128 : gradOutputPlaneSize;
-  int work_group_num = (gradOutputPlaneSize + 127) / 128;
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int gradOutputPlaneSize =
+      numBatch * numPlane * gradOutputSizeH * gradOutputSizeW;
+  int work_group_size =
+      gradOutputPlaneSize > max_wg_size ? max_wg_size : gradOutputPlaneSize;
+  auto eu_num = dpcppGetCurrentDeviceProperties()->max_compute_units;
+  // One full device launch could launch en_num * SMID32 * HD threads as below
+  const auto target_global_size = eu_num * 32 /* SIMD32 */ * 8 /* HD threads */;
+  // Each work group size is work_group_size, one full device launch is
+  // target_global_size, so we can calculate max work group num as below
+  const int max_work_group_num = target_global_size / work_group_size;
+  int work_group_num =
+      gradOutputPlaneSize / work_group_size < max_work_group_num
+      ? gradOutputPlaneSize / work_group_size
+      : max_work_group_num;
+  int draft_work_group_num =
+      (gradOutputPlaneSize + work_group_size - 1) / work_group_size;
+  // work item in each work group calculates loops' elements
+  int draft_loops = draft_work_group_num / work_group_num + 1;
+  constexpr int min_loops_per_wi = 16;
+  constexpr int max_loops_per_wi = 256;
+  int loops = draft_loops;
+  // if (min_loops_per_wi <= draft_loops && draft_loops <= max_loops_per_wi)
+  // It means that draft_loops hit the best interval, so we don't adjust loops
+  // and work_group_num above
+
+  // if draft_loops < min_loops_per_wi, we increase the loops, and re-calculate
+  // work_group_num. This would cause work_group_num become smaller than before.
+  // However, we should make sure that work_group_num >= 1
+  if (draft_loops < min_loops_per_wi) {
+    loops = min_loops_per_wi;
+    // adjust work_group_num
+    int adjust_work_group_num = draft_work_group_num / (loops - 1);
+    work_group_num = adjust_work_group_num > 1 ? adjust_work_group_num : 1;
+  }
+
+  // if max_loops_per_wi < draft_loops, we decrease the loops, and re-calculate
+  // work_group_num. This would cause work_group_num become bigger than before
+  if (max_loops_per_wi < draft_loops) {
+    loops = max_loops_per_wi;
+    // adjust work_group_num
+    work_group_num = draft_work_group_num / (loops - 1);
+  }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto gradInput_data = gradInput;
     auto gradOutput_data = gradOutput;
     auto indices_data = indices;
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto gradInput_ptr = gradInput_data;
       auto gradOutput_ptr = gradOutput_data;
       auto indices_ptr = indices_data;
 
-      int ourOutputPoint = item.get_global_id()[0];
-      int plane = item.get_group()[1];
-      int batch = item.get_group()[2];
-
-      if (ourOutputPoint < gradOutputPlaneSize) {
-        int outputW = ourOutputPoint % gradOutputSizeW;
-        int outputH = ourOutputPoint / gradOutputSizeW;
-
-        int index = indices_ptr
-            [batch * numPlane * gradOutputSizeH * gradOutputSizeW +
-             plane * gradOutputSizeH * gradOutputSizeW +
-             outputH * gradOutputSizeW +
-             outputW] /* [batch][plane][outputH][outputW]*/;
-        int inputW = index % gradInputSizeW;
-        int inputH = index / gradInputSizeW;
-
-        atomicAdd(
-            (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr
-                [batch * numPlane * gradInputSizeH * gradInputSizeW +
-                 plane * gradInputSizeH * gradInputSizeW +
-                 inputH * gradInputSizeW +
-                 inputW] /*[batch][plane][inputH][inputW] */,
-            gradOutput_ptr
-                [batch * numPlane * gradOutputSizeH * gradOutputSizeW +
-                 plane * gradOutputSizeH * gradOutputSizeW +
-                 outputH * gradOutputSizeW +
-                 outputW] /*[batch][plane][outputH][outputW]*/
-        );
+      int linearIndex = item.get_global_id()[0];
+      for (int l = 0; l < loops; ++l) {
+        int outputIndex = linearIndex + l * (work_group_size * work_group_num);
+        int batch =
+            outputIndex / (numPlane * gradOutputSizeH * gradOutputSizeW);
+        int plane = is_channels_last
+            ? outputIndex % numPlane
+            : (outputIndex / gradOutputSizeH / gradOutputSizeW) % numPlane;
+        int outputH = is_channels_last
+            ? outputIndex / numPlane / gradOutputSizeW % gradOutputSizeH
+            : outputIndex / gradOutputSizeW % gradOutputSizeH;
+        int outputW = is_channels_last
+            ? outputIndex / numPlane % gradOutputSizeW
+            : outputIndex % gradOutputSizeW;
+        if (batch < numBatch && plane < numPlane && outputH < gradOutputSizeH &&
+            outputW < gradOutputSizeW) {
+          int64_t gO_offset = is_channels_last
+              ? batch * gradOutputSizeH * gradOutputSizeW * numPlane + plane +
+                  outputH * gradOutputSizeW * numPlane + outputW * numPlane
+              : batch * numPlane * gradOutputSizeH * gradOutputSizeW +
+                  plane * gradOutputSizeH * gradOutputSizeW +
+                  outputH * gradOutputSizeW + outputW;
+          int index = indices_ptr[gO_offset];
+          int inputW = index % gradInputSizeW;
+          int inputH = index / gradInputSizeW;
+          int64_t gI_offset = is_channels_last
+              ? batch * gradInputSizeH * gradInputSizeW * numPlane + plane +
+                  inputH * gradInputSizeW * numPlane + inputW * numPlane
+              : batch * numPlane * gradInputSizeH * gradInputSizeW +
+                  plane * gradInputSizeH * gradInputSizeW +
+                  inputH * gradInputSizeW + inputW;
+          atomicAdd(
+              (dpcpp_global_ptr_pt<scalar_t>)&gradInput_ptr[gI_offset],
+              gradOutput_ptr[gO_offset]);
+        }
       }
     };
     cgh.parallel_for(
-        DPCPP::nd_range<3>(
-            DPCPP::range<3>(
-                work_group_size * work_group_num, numPlane, numBatch),
-            DPCPP::range<3>(work_group_size, 1, 1)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(work_group_size * work_group_num),
+            DPCPP::range<1>(work_group_size)),
         kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -254,18 +326,21 @@ void fractional_max_pool2d_out_template(
       " too large relative to input width ",
       inputW);
 
+  auto smf = (3 == ndims) ? at::MemoryFormat::Contiguous
+                          : input.suggest_memory_format();
+
   if (ndims == 3) {
     /* resize output */
     output.resize_({numPlanes, outputH, outputW});
     /* indices will contain the locations for each output point */
     indices.resize_({numPlanes, outputH, outputW});
   } else {
-    output.resize_({numBatch, numPlanes, outputH, outputW});
-    indices.resize_({numBatch, numPlanes, outputH, outputW});
+    output.resize_({numBatch, numPlanes, outputH, outputW}, smf);
+    indices.resize_({numBatch, numPlanes, outputH, outputW}, smf);
   }
 
   auto output_ = output;
-  auto input_ = input.contiguous();
+  auto input_ = input.contiguous(smf);
   auto indices_ = indices;
 
   if (ndims == 3) {
@@ -273,7 +348,6 @@ void fractional_max_pool2d_out_template(
     indices_ = indices_.reshape({1, numPlanes, outputH, outputW});
     input_ = input_.reshape({1, input.size(0), input.size(1), input.size(2)});
   }
-
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "fractional_max_pool2d_out_frame", [&] {
         fractional_max_pool2d_out_frame<scalar_t>(
@@ -288,7 +362,8 @@ void fractional_max_pool2d_out_template(
             outputH,
             outputW,
             poolSizeH,
-            poolSizeW);
+            poolSizeW,
+            is_smf_channels_last(input));
       });
 }
 
@@ -322,12 +397,15 @@ void fractional_max_pool2d_backward_out_template(
       outputW == gradOutput.size(dimw),
       "fractional_max_pool2d(): gradOutput width unexpected");
 
+  auto smf = (3 == ndims) ? at::MemoryFormat::Contiguous
+                          : input.suggest_memory_format();
+
   /* resize */
-  gradInput.resize_as_(input);
+  gradInput.resize_as_(input, smf);
   gradInput.zero_();
 
   auto gradInput_ = gradInput;
-  auto gradOutput_ = gradOutput.contiguous();
+  auto gradOutput_ = gradOutput.contiguous(smf);
   auto indices_ = indices;
 
   if (ndims == 3) {
@@ -346,7 +424,8 @@ void fractional_max_pool2d_backward_out_template(
       inputH,
       inputW,
       outputH,
-      outputW);
+      outputW,
+      is_smf_channels_last(input));
 }
 
 } // namespace impl
