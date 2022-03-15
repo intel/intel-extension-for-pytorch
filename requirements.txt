@@ -1,5 +1,6 @@
 # for install
 astunparse
+expecttest
 flake8
 future
 numpy
