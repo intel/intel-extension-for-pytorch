@@ -621,6 +621,15 @@ class MatmulDiv(nn.Module):
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
+class BmmAdd(nn.Module):
+    def __init__(self):
+        super(BmmAdd, self).__init__()
+
+    def forward(self, input, batch1, batch2):
+        bmm_res = torch.bmm(batch1, batch2)
+        res = torch.add(bmm_res, input)
+        return res
+
 class MHAScoresCalculation(nn.Module):
     def __init__(self, dim_per_head, softmax_dim=-1):
         super(MHAScoresCalculation, self).__init__()
@@ -2475,6 +2484,17 @@ class Tester(TestCase):
             kind_in_graph="ipex::matmul_div",
             kind_not_in_graph=None,
             prec=5e-3)
+
+    def test_bmm_add(self):
+        M = torch.randn(10, 3, 5)
+        batch1 = torch.randn(10, 3, 4)
+        batch2 = torch.randn(10, 4, 5)
+        mod = BmmAdd()
+        traced_mod = torch.jit.trace(mod, (M, batch1, batch2))
+        fused_mod = traced_mod.graph_for(M, batch1, batch2)
+        out = traced_mod(M, batch1, batch2)
+        expected = torch.baddbmm(M, batch1, batch2)
+        self.assertTrue(torch.allclose(out, expected))
 
     def test_ipex_softmax(self):
         self._test_output(

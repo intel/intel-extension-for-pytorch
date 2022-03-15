@@ -355,6 +355,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // Multi-Head-Attention
   graph_rewrite::FuseMHAScoreCalc(graph);
 
+  // Fuse bmm + add for bmm_add
+  graph_rewrite::fuseBmmAdd(graph);
+
   // Replace _convolution with conv2d or conv3d
   graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 

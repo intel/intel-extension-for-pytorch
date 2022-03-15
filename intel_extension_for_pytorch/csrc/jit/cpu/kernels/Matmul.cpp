@@ -121,5 +121,28 @@ at::Tensor dil_matmul_div(
   }
 }
 
+at::Tensor dil_bmm_add(
+    const at::Tensor& input,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const c10::Scalar& alpha) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("dil_bmm_add", std::vector<c10::IValue>({}));
+#endif
+  auto batch1_dim = batch1.dim();
+  auto batch2_dim = batch2.dim();
+  if (batch1_dim == batch2_dim && batch1_dim >= 3) {
+    auto _input = input.is_contiguous() ? input : input.contiguous();
+    ideep::tensor onednn_input = itensor_view_from_dense(_input);
+
+    auto op_attr = ideep::attr_t::fuse_binary(
+        dnnl::algorithm::binary_add, onednn_input.get_desc());
+    return bmm_impl(
+        batch1, batch2, at::Tensor(), op_attr, {onednn_input}, 1.0f);
+  } else {
+    return at::baddbmm(input, batch1, batch2);
+  }
+}
+
 } // namespace cpu
 } // namespace torch_ipex
