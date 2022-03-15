@@ -471,7 +471,7 @@ static inline __attribute__((always_inline)) void mul_and_sum_s8x128_to_s32x16(
   auto b_3_i = _mm512_cvtepi8_epi16(b_3);
   a_0_i = _mm512_madd_epi16(a_0_i, b_0_i);
   a_2_i = _mm512_madd_epi16(a_2_i, b_2_i);
-#ifdef AVX512_VNNI
+#ifdef CPU_CAPABILITY_AVX512_VNNI
   a_0_i = _mm512_dpwssd_epi32(a_0_i, a_1_i, b_1_i);
   a_2_i = _mm512_dpwssd_epi32(a_2_i, a_3_i, b_3_i);
 #else
@@ -524,7 +524,7 @@ static inline __attribute__((always_inline)) void mul_and_sum_s16x128_to_s32x16(
     const __m512i* b16x4) {
   auto a_0_i = _mm512_madd_epi16(a16x4[0], b16x4[0]);
   auto a_2_i = _mm512_madd_epi16(a16x4[2], b16x4[2]);
-#ifdef AVX512_VNNI
+#ifdef CPU_CAPABILITY_AVX512_VNNI
   a_0_i = _mm512_dpwssd_epi32(a_0_i, a16x4[1], b16x4[1]);
   a_2_i = _mm512_dpwssd_epi32(a_2_i, a16x4[3], b16x4[3]);
 #else
@@ -580,7 +580,7 @@ mul_and_sum_s8x128x2_to_s32x16x2(
   a0_2_i = _mm512_madd_epi16(a0_2_i, b0_2_i);
   a1_0_i = _mm512_madd_epi16(a1_0_i, b1_0_i);
   a1_2_i = _mm512_madd_epi16(a1_2_i, b1_2_i);
-#ifdef AVX512_VNNI
+#ifdef CPU_CAPABILITY_AVX512_VNNI
   a0_0_i = _mm512_dpwssd_epi32(a0_0_i, a0_1_i, b0_1_i);
   a1_0_i = _mm512_dpwssd_epi32(a1_0_i, a1_1_i, b1_1_i);
   a0_2_i = _mm512_dpwssd_epi32(a0_2_i, a0_3_i, b0_3_i);
@@ -611,7 +611,7 @@ mul_and_sum_s16x128x2_to_s32x16x2(
   auto a1_0_i = _mm512_madd_epi16(a1_16x4[0], b1_16x4[0]);
   auto a0_2_i = _mm512_madd_epi16(a0_16x4[2], b0_16x4[2]);
   auto a1_2_i = _mm512_madd_epi16(a1_16x4[2], b1_16x4[2]);
-#ifdef AVX512_VNNI
+#ifdef CPU_CAPABILITY_AVX512_VNNI
   a0_0_i = _mm512_dpwssd_epi32(a0_0_i, a0_16x4[1], b0_16x4[1]);
   a1_0_i = _mm512_dpwssd_epi32(a1_0_i, a1_16x4[1], b1_16x4[1]);
   a0_2_i = _mm512_dpwssd_epi32(a0_2_i, a0_16x4[3], b0_16x4[3]);
