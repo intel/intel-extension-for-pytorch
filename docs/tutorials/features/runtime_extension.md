@@ -195,7 +195,7 @@ The runtime extension also provides purely C++ API with async Task.
 #include "Task.h"
 
 // Encapulate your application into a task function
-at::Tensor taskfunction(at::Tensor input) {
+at::Tensor taskfunction(const at::Tensor& input) {
     at::Tensor output;
     output = at::softmax(input, -1);
     return input;
@@ -205,13 +205,13 @@ at::Tensor taskfunction(at::Tensor input) {
 std::vector<int32_t> cpu_core_list({0, 1, 2, 3});
 std::shared_ptr<TaskExecutor> task_executor = std::make_shared<TaskExecutor>(cpu_core_list);
 // Create Task
-Task<at::Tensor (*)(at::Tensor), at::Tensor> task(taskfunction, task_executor);
+Task<at::Tensor (*)(const at::Tensor&), const at::Tensor&> task(taskfunction, task_executor);
 
 // Create input
 at::Tensor input_tensor = at::rand({100, 8276});
 
 // Submit task into TaskExecutor
-auto res_future = task(std::move(input_tensor));
+auto res_future = task(input_tensor);
 
 // Block until finish executation and get the result
 auto res = res_future.get();

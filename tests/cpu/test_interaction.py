@@ -54,7 +54,9 @@ class TestInteractionCases(TestCase):
 
             A = interact_fusion(x1, ly1)
             B = interact_features(x2, ly2)
-            self.assertEqual(A, B)
+            # For FP32 data type, fused interaction will use MKLDNN gemm while
+            # non-fused interaction will use GEMM. So there might be a small difference here
+            torch.testing.assert_allclose(A, B, rtol=1e-4, atol=1e-4)
 
             A.sum().backward()
             B.sum().backward()

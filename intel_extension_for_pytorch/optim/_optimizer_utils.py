@@ -115,9 +115,10 @@ def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
                             # weight attr need "op" info to pack state while bias attr not
                             state = optimizer.state[new_param]
                             for state_key, state_value in state.items():
-                                if isinstance(state_value, torch.Tensor):
-                                    assert state_value.size() == p.size(), \
-                                        "Only support the optimizer state's size has the same shape with model's parameter."
+                                if isinstance(state_value, torch.Tensor) and state_value.size() == p.size():
+                                    # We have an assumtion here that any tensor's in parameter state, if they
+                                    # have same shapes with the parameter, they should share same layout with 
+                                    # the parameter. Thus we need pack the state as we did to parameters.
                                     if attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
                                         memory_format = torch.channels_last \
                                             if attr['op'] is torch.nn.Conv2d else torch.channels_last_3d
@@ -147,7 +148,10 @@ def patch_state_dict(optimizer):
             if k1 in opt.params_attr:
                 params_attr = opt.params_attr[k1]
                 for state_key, state_value in v2.items():
-                    if isinstance(state_value, torch.Tensor):
+                    if isinstance(state_value, torch.Tensor) and state_value.shape == k1.shape:
+                        # We have an assumtion here that any tensor's in parameter state, if they
+                        # have same shapes with the parameter, they should share same layout with 
+                        # the parameter. Thus we need unpack the state as we did to parameters.
                         if 'op' in params_attr:
                             # Secondly, unpack releated states
                             unpack_dtype = torch.bfloat16 if 'bf16_param' in params_attr else k1.dtype

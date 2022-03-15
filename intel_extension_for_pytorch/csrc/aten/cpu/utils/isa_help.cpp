@@ -14,5 +14,17 @@ std::string get_current_isa_level() {
 #endif
 }
 
+std::string get_highest_cpu_support_isa_level() {
+  CPUCapability level = _get_highest_cpu_support_isa_level();
+
+  return CPUCapabilityToString(level);
+}
+
+std::string get_highest_binary_support_isa_level() {
+  CPUCapability level = _get_highest_binary_support_isa_level();
+
+  return CPUCapabilityToString(level);
+}
+
 } // namespace cpu
 } // namespace torch_ipex

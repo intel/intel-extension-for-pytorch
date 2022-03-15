@@ -210,7 +210,7 @@ class TestOp(JitLlgaTestCase):
         m = M()
         x = torch.randn(1, 3, 4, 4)
         graph, _ = self.checkTrace(m, [x])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)     
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
     @llga_fp32_bf16_test_env
     @unittest.skipIf(True, 'Disable mul due to bad performance')
@@ -472,7 +472,72 @@ class TestFusionPattern(JitLlgaTestCase):
             x = torch.rand(1, 32, 28, 28)
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
-            self.assertFused(graph, ['aten::batch_dorm', 'aten::' + eltwise])
+            self.assertFused(graph, ['aten::batch_norm', 'aten::' + eltwise])
+
+    @unittest.skip("Semi-Compiler unit-test")
+    @llga_fp32_bf16_test_env
+    def test_mha_pattern(self):
+        def forward_test(x, y, z, a):
+            tmp = torch.matmul(x, y)/8. + a
+            tmp = torch.softmax(tmp, -1)
+            tmp = tmp.matmul(z)
+            tmp = torch.permute(tmp, (0, 2, 1, 3))
+            return tmp.contiguous()
+
+        x = torch.randn(128, 16, 384, 64)
+        y = torch.randn(128, 16, 64, 384)
+        z = torch.randn(128, 16, 384, 64)
+        a = torch.rand(128, 1, 1, 384)
+
+        graph, _ = self.checkTrace(forward_test, [x, y, z, a])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::matmul', 'aten::div', 'aten:add', 'aten:softmax',
+                                 'aten::permute', 'aten::contiguous'])
+
+    @llga_fp32_bf16_test_env
+    def test_do_not_map_permute(self):
+        def forward_test(x, y, z, a):
+            tmp = torch.matmul(x, y)/8. + a
+            tmp = torch.softmax(tmp, -1)
+            tmp = tmp.matmul(z)
+            temp = tmp.view(tmp.numel())
+            tmp = torch.permute(tmp, (0, 2, 1, 3))
+            temp.add_(-1)
+            return tmp.contiguous()
+
+        x = torch.randn(128, 16, 384, 64)
+        y = torch.randn(128, 16, 64, 384)
+        z = torch.randn(128, 16, 384, 64)
+        a = torch.rand(128, 1, 1, 384)
+
+        graph, _ = self.checkTrace(forward_test, [x, y, z, a])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
+
+    @llga_fp32_bf16_test_env
+    def test_no_contiguous_no_op(self):
+        def forward(x):
+            return x.contiguous()
+        x = torch.rand(32, 28)
+        graph, traced = self.checkTrace(forward, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
+    @llga_fp32_bf16_test_env
+    def test_contiguous_mapping_padded(self):
+        def forward(x):
+            tmp = torch.as_strided(x, (15, 15), (16, 1))
+            return tmp.contiguous()
+        x = torch.rand(16, 16)
+        graph, traced = self.checkTrace(forward, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @llga_fp32_bf16_test_env
+    def test_contiguous_mapping_zero_stride(self):
+        def forward(x):
+            tmp = torch.as_strided(x, (32, 28), (0, 1))
+            return tmp.contiguous()
+        x = torch.rand(28, 32)
+        graph, traced = self.checkTrace(forward, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_linear_eltwise(self):

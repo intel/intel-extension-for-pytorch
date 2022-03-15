@@ -1,5 +1,5 @@
 #include "Softmax.h"
-#include "AddSoftmax.h"
+#include "csrc/aten/cpu/AddSoftmax.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 
 #include <ATen/Context.h>

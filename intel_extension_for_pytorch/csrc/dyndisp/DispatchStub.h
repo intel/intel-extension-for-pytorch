@@ -48,7 +48,17 @@ using namespace c10;
 namespace torch_ipex {
 namespace cpu {
 
-enum class CPUCapability { DEFAULT = 0, AVX2 = 1, AVX512 = 2, NUM_OPTIONS };
+enum class CPUCapability {
+  DEFAULT = 0,
+  AVX2 = 1,
+  AVX512 = 2,
+  AVX512_BF16 = 3,
+  NUM_OPTIONS
+};
+
+const char* CPUCapabilityToString(CPUCapability isa);
+CPUCapability _get_highest_cpu_support_isa_level();
+CPUCapability _get_highest_binary_support_isa_level();
 
 CPUCapability get_cpu_capability();
 
@@ -65,6 +75,10 @@ struct TORCH_API DispatchStubImpl {
   void* get_call_ptr(
       DeviceType device_type,
       void* DEFAULT
+#ifdef HAVE_AVX512_BF16_CPU_DEFINITION
+      ,
+      void* AVX512_BF16
+#endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
       ,
       void* AVX512
@@ -82,6 +96,10 @@ struct TORCH_API DispatchStubImpl {
    */
   void* choose_cpu_impl(
       void* DEFAULT
+#ifdef HAVE_AVX512_BF16_CPU_DEFINITION
+      ,
+      void* AVX512_BF16
+#endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
       ,
       void* AVX512
@@ -118,6 +136,10 @@ struct DispatchStub<rT (*)(Args...), T> {
     return reinterpret_cast<FnPtr>(impl.get_call_ptr(
         device_type,
         reinterpret_cast<void*>(DEFAULT)
+#ifdef HAVE_AVX512_BF16_CPU_DEFINITION
+            ,
+        reinterpret_cast<void*>(AVX512_BF16)
+#endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
             ,
         reinterpret_cast<void*>(AVX512)
@@ -145,6 +167,9 @@ struct DispatchStub<rT (*)(Args...), T> {
   }
 
   static FnPtr DEFAULT;
+#ifdef HAVE_AVX512_BF16_CPU_DEFINITION
+  static FnPtr AVX512_BF16;
+#endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
   static FnPtr AVX512;
 #endif

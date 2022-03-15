@@ -259,7 +259,6 @@ at::Tensor max_pool2d_with_indices_backward_out_cpu(
       input,
       gradOutput,
       indices,
-      nbatch,
       kH,
       kW,
       dH,

@@ -304,7 +304,7 @@ def _should_prepack(module, auto_kernel_selection):
     return True
 
 def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selection):
-    def convert(m, auto_kernel_selection):
+    def convert(m, optimizer, params_attr, auto_kernel_selection):
         if _should_prepack(m, auto_kernel_selection) and (m.weight.dtype == torch.float32 or m.weight.dtype == torch.bfloat16):
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
@@ -373,15 +373,15 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
         else:
             return m
 
-    def convert_rec(m, auto_kernel_selection):
-        new_m = convert(m, auto_kernel_selection)
+    def convert_rec(m, optimizer, params_attr, auto_kernel_selection):
+        new_m = convert(m, optimizer, params_attr, auto_kernel_selection)
         for name, sub_m in m.named_children():
-            setattr(new_m, name, convert_rec(sub_m, auto_kernel_selection))
-        return new_m
+            setattr(new_m, name, convert_rec(sub_m, optimizer, params_attr, auto_kernel_selection)[0])
+        return new_m, optimizer, params_attr
 
-    opt_model, opt_optmizer, params_attr = convert_rec(module, auto_kernel_selection), optimizer, params_attr
-    if optimizer is not None:
-        setattr(optimizer, 'params_attr', params_attr)
-        optim._optimizer_utils.patch_load_state_dict(optimizer)
-        optim._optimizer_utils.patch_state_dict(optimizer)
+    opt_model, opt_optmizer, params_attr = convert_rec(module, optimizer, params_attr, auto_kernel_selection)
+    if opt_optmizer is not None:
+        setattr(opt_optmizer, 'params_attr', params_attr)
+        optim._optimizer_utils.patch_load_state_dict(opt_optmizer)
+        optim._optimizer_utils.patch_state_dict(opt_optmizer)
     return opt_model, opt_optmizer, params_attr

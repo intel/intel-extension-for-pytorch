@@ -544,13 +544,23 @@ class CPUOPsTester(TestCase):
             self.assertEqual(y1, y2)
 
     def test_sum(self):
-        x = torch.randn(32, 2, 128, 56, 56, requires_grad=True)
-        for dtype in [torch.float32, torch.double, torch.bfloat16]:
-            for dim in [(1), (2, 1), (1, 3, 4)]:
-                y1 = torch.sum(x, dim=dim, keepdim=False, dtype=dtype)
-                x2 = x.clone().detach().to(memory_format=torch.channels_last_3d).requires_grad_()
-                y2 = torch.sum(x2, dim=dim, keepdim=False, dtype=dtype)
-                self.assertEqual(y1, y2)
+        dtypes = [torch.float32, torch.double, torch.bfloat16]
+
+        x1 = torch.randn((1, 128, 56, 56)).to(memory_format=torch.channels_last)
+        x1 = x1.reshape([1, 2, 64, 56, 56])
+        x2 = x1.contiguous()
+        for dtype in dtypes:
+            y1 = torch.sum(x1, dim=(1), keepdim=False, dtype=dtype)
+            y2 = torch.sum(x2, dim=(1), keepdim=False, dtype=dtype)
+            self.assertEqual(y1, y2, prec=1e-4)
+
+        x3 = torch.randn((1, 64, 100, 13, 24)).to(memory_format=torch.channels_last_3d)
+        x4 = x3.contiguous()
+        for dtype in dtypes:
+            y1 = torch.sum(x1, dim=(3, 4), keepdim=False, dtype=dtype)
+            y2 = torch.sum(x2, dim=(3, 4), keepdim=False, dtype=dtype)
+            self.assertEqual(y1, y2, prec=1e-4)
+
         a = torch.randn([3, 2, 3])
         mask = a.ge(0.5)
         s = mask.sum()

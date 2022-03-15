@@ -1,10 +1,12 @@
 #include "graph_rewrite.h"
 
-#include <torch/csrc/jit/frontend/code_template.h>
+#include <ATen/code_template.h>
 
 namespace torch {
 namespace jit {
 namespace graph_rewrite {
+
+using namespace at::jit;
 
 void insertPrePackedConvTranspose2dOp(Block* b) {
   for (Node* n : b->nodes()) {

@@ -91,6 +91,8 @@ if len(sys.argv) > 1:
             print('Usage: python setup.py [build_clib|bdist_cppsdk] <libtorch_path>')
             exit(1)
         pytorch_install_dir = sys.argv[2]
+        if pytorch_install_dir.startswith('.'):
+            pytorch_install_dir = os.path.join(os.getcwd(), pytorch_install_dir)
         sys.argv.pop()
 
         if not os.path.isfile(os.path.join(pytorch_install_dir, 'build-version')):
@@ -325,17 +327,9 @@ def get_build_type():
 
 
 def get_avx_version():
-    avx_version = ''
-    if _check_env_flag('AVX2'):
-        avx_version = 'AVX2'
-    elif _check_env_flag('AVX512'):
-        avx_version = 'AVX512'
-
-    if avx_version == '':
-        avx_version = 'AVX512'
-
-    if _check_env_flag('DYN_DISP'):
-        avx_version = 'AVX2'
+    # disable isa level check for dyndisp turn on.
+    # need restruct all isa check code later.
+    avx_version = 'AVX2'
 
     # print("The extension will be built with {}.".format(avx_version))
     return avx_version
@@ -514,15 +508,6 @@ if mode == 'cppsdk':
         def run(self):
             self.run_command('build_clib')
 
-            dnnl_graph_files = glob.glob(
-                os.path.join('build', 'Release', 'packages', package_name, 'lib', 'libdnnl_graph.so.*.*'),
-                recursive=True)
-            if len(dnnl_graph_files) != 1:
-                print('Multiple/None libdnnl_graph.so found:')
-                for f in dnnl_graph_files:
-                    print(f)
-                exit(1)
-
             tmp_dir = 'tmp'
             if os.path.exists(tmp_dir):
                 shutil.rmtree(tmp_dir)
@@ -530,7 +515,6 @@ if mode == 'cppsdk':
             shutil.copyfile(os.path.join('tools', 'install_c++_sdk.sh.in'), os.path.join(tmp_dir, 'install_c++_sdk.sh'))
             shutil.copyfile(os.path.join('cmake', 'Modules', 'FindIPEX.cmake.in'), os.path.join(tmp_dir, 'intel_ext_pt_cpuConfig.cmake'))
             shutil.copyfile(os.path.join('build', 'Release', 'packages', package_name, 'lib', 'libintel-ext-pt-cpu.so'), os.path.join(tmp_dir, 'libintel-ext-pt-cpu.so'))
-            shutil.copyfile(dnnl_graph_files[0], os.path.join(tmp_dir, os.path.basename(dnnl_graph_files[0])))
 
             if int(USE_CXX11_ABI) == 0:
                 run_file_name = 'libintel-ext-pt-shared-with-deps-{}.run'.format(TORCH_IPEX_VERSION)

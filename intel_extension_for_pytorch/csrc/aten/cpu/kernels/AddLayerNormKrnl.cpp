@@ -3,7 +3,7 @@
 //  and
 //  https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/layer_norm.cpp
 
-#include <csrc/jit/cpu/kernels/AddLayerNorm.h>
+#include <csrc/aten/cpu/AddLayerNorm.h>
 #include "csrc/utils/ipex_op_profile.h"
 
 #if defined(CPU_CAPABILITY_AVX512)

@@ -1,4 +1,4 @@
-#include <csrc/jit/cpu/kernels/MaskedDivSoftmax.h>
+#include <csrc/aten/cpu/DivSoftmax.h>
 
 #if defined(CPU_CAPABILITY_AVX512)
 #include "csrc/cpu/vec512/add_softmax.h"

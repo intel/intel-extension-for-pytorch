@@ -44,6 +44,10 @@ class TORCH_API TaskModule {
   explicit TaskModule(
       const py::object& module,
       const torch_ipex::runtime::CPUPool& cpu_pool);
+  TaskModule(const TaskModule& task_module) = delete;
+  TaskModule(TaskModule&& task_module) = delete;
+  TaskModule& operator=(const TaskModule& task_module) = delete;
+  TaskModule& operator=(TaskModule&& task_module) = delete;
   ~TaskModule();
   py::object run_sync(py::args&& args, py::kwargs&& kwargs); /*sync execution*/
   std::unique_ptr<FutureTensor> run_async(

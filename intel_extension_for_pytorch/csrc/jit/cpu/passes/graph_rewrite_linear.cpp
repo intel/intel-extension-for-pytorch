@@ -1,11 +1,13 @@
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
-#include <torch/csrc/jit/frontend/code_template.h>
+#include <ATen/code_template.h>
 
 namespace torch {
 namespace jit {
 namespace graph_rewrite {
+
+using namespace at::jit;
 
 void insertPrePackedLinearOp(Block* b) {
   for (Node* n : b->nodes()) {
@@ -119,16 +121,16 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
         return (%res))";
 
   std::string linear_gelu = R"(
-    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+    graph(%input, %weight, %bias, %approximate, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
         %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
         %x = ipex_prepack::linear_run(%input, %packed_weight)
-        %res= aten::gelu(%x)
+        %res= aten::gelu(%x, %approximate)
         return (%res))";
 
   std::string linear_gelu_fused = R"(
-    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+    graph(%input, %weight, %bias, %approximate, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
         %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
-        %res = ipex_prepack::linear_gelu_run(%input, %packed_weight)
+        %res = ipex_prepack::linear_gelu_run(%input, %packed_weight, %approximate)
         return (%res))";
 
   auto linear_sigmoid_rstring = CodeTemplate(R"(

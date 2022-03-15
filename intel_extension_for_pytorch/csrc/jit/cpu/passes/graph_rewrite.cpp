@@ -513,6 +513,24 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
   rewriter_concatbnrelu.runOnGraph(graph, fusion_filter);
 }
 
+void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph) {
+  std::string linear_swish = R"(
+      graph(%x, %weight, %bias):
+        %_linear_res = aten::linear(%x, %weight, %bias)
+        %_sigmod_res = aten::sigmoid(%_linear_res)
+        %_mul_res2 = aten::mul(%_linear_res, %_sigmod_res)
+        return (%_mul_res2) )";
+
+  std::string linear_swish_fusion = R"(
+      graph(%x, %weight, %bias):
+        %_res = ipex::linear_swish_customized(%x, %weight, %bias)
+        return (%_res) )";
+
+  SubgraphRewriter ls_fusion;
+  ls_fusion.RegisterRewritePattern(linear_swish, linear_swish_fusion);
+  ls_fusion.runOnGraph(graph);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

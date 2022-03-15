@@ -1,7 +1,7 @@
 #include "Mha.h"
-#include "AddSoftmax.h"
-#include "MaskedDivSoftmax.h"
 #include "Softmax.h"
+#include "csrc/aten/cpu/AddSoftmax.h"
+#include "csrc/aten/cpu/DivSoftmax.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>

@@ -435,10 +435,10 @@ at::Tensor dropout(const at::Tensor& input, double p, bool train) {
   return at::dropout(input, p, train);
 }
 
-at::Tensor gelu(const at::Tensor& input) {
+at::Tensor gelu(const at::Tensor& input, c10::string_view approximate) {
   auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   if (check_int8_calibration()) {
-    auto output = at::gelu(input);
+    auto output = at::gelu(input, approximate);
     calibrate({input}, {}, {output}, "gelu", op_id, OP_TYPE_DEFAULT);
     return output;
   }

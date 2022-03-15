@@ -1,4 +1,4 @@
-#include "MaskedDivSoftmax.h"
+#include "DivSoftmax.h"
 
 namespace torch_ipex {
 namespace cpu {
