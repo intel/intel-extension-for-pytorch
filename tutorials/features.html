@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Features &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
+  <title>Features &mdash; intel_extension_for_pytorch 1.11.0+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -32,7 +32,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.100+cpu
+                1.11.0+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -160,7 +160,7 @@
 <p>Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance boost. A few  ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via ATen registration mechanism. Moreover, some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.nn.FrozenBatchNorm2d">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.</span></span><span class="sig-name descname"><span class="pre">FrozenBatchNorm2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_features</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.FrozenBatchNorm2d" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.nn.</span></span><span class="sig-name descname"><span class="pre">FrozenBatchNorm2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_features</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.FrozenBatchNorm2d" title="Permalink to this definition"></a></dt>
 <dd><p>BatchNorm2d where the batch statistics and the affine parameters are fixed</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -229,6 +229,7 @@ and feature 2 is “Like play football” which is represented by [-0.1, 0.3, 0.
 <h2>INT8 Quantization (Experimental)<a class="headerlink" href="#int8-quantization-experimental" title="Permalink to this headline"></a></h2>
 <p>Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. The quantized model is then optimized with the <a class="reference external" href="https://spec.oneapi.io/onednn-graph/latest/introduction.html">oneDNN graph</a> fusion pass to deliver good performance.</p>
 <p>Check more detailed information for <a class="reference external" href="features/int8.html">INT8</a>.</p>
+<p>oneDNN provides an evaluation feature called <a class="reference external" href="https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler">oneDNN Graph Compiler</a>. Please refer to <a class="reference external" href="https://github.com/oneapi-src/oneDNN/blob/dev-graph-preview4/doc/build/build_options.md#build-graph-compiler">oneDNN build instruction</a> to try this feature.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>

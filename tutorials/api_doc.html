@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Documentation &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
+  <title>API Documentation &mdash; intel_extension_for_pytorch 1.11.0+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.100+cpu
+                1.11.0+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -179,7 +179,12 @@ parameters of convolution and linear will be casted to bfloat16 dtype.</p>
 </dl>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function before invoking DDP in distributed
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function AFTER loading weights to model via
+<code class="docutils literal notranslate"><span class="pre">model.load_state_dict(torch.load(PATH))</span></code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function BEFORE invoking DDP in distributed
 training scenario.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function deepcopys the original model. If DDP is invoked
 before <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function, DDP is applied on the origin model, rather
@@ -190,6 +195,7 @@ unpredictable accuracy loss.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
@@ -226,7 +232,7 @@ Default value is <code class="docutils literal notranslate"><span class="pre">Tr
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.verbose">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">verbose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.verbose" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">verbose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.verbose" title="Permalink to this definition"></a></dt>
 <dd><p>On-demand oneDNN verbosing functionality</p>
 <p>To make it easier to debug performance issues, oneDNN can dump verbose
 messages containing information like kernel size, input data size and
@@ -386,7 +392,7 @@ loaded or saved.</p></li>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.quantization.calibrate">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">calibrate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_recipe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.calibrate" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">calibrate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_recipe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.calibrate" title="Permalink to this definition"></a></dt>
 <dd><p>Enable quantization  calibration scope which will collect the scales and zero
 points of ops to be quantized, such as convolution, linear.</p>
 <dl class="field-list simple">
@@ -442,7 +448,12 @@ for JIT trace of the given model.</p></li>
 <dd class="field-odd"><p><strong>None</strong> (<em>None</em>) – None</p>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Whether the runtime exetension is enabled or not.</p>
+<dd class="field-even"><p><dl class="simple">
+<dt>Whether the runtime exetension is enabled or not. If the</dt><dd><p>Intel OpenMP Library is preloaded, this API will return True.
+Otherwise, it will return False.</p>
+</dd>
+</dl>
+</p>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>bool</p>
@@ -452,7 +463,7 @@ for JIT trace of the given model.</p></li>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.cpu.runtime.CPUPool">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">CPUPool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">core_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.CPUPool" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">CPUPool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">core_ids</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_id</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.CPUPool" title="Permalink to this definition"></a></dt>
 <dd><p>An abstraction of a pool of CPU cores used for intra-op parallelism.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -474,7 +485,7 @@ ipex.cpu.runtime.CPUPool object.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.cpu.runtime.pin">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">pin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.pin" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">pin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.pin" title="Permalink to this definition"></a></dt>
 <dd><p>Apply the given CPU pool to the master thread that runs the scoped code
 region or the function/method def.</p>
 <dl class="field-list simple">
@@ -495,7 +506,7 @@ as a <cite>with</cite> context or a function decorator.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.cpu.runtime.MultiStreamModule">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_output</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">bool</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModule" title="Permalink to this definition"></a></dt>
 <dd><p>MultiStreamModule supports inference with multi-stream throughput mode.</p>
 <p>If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
 the cores will be allocated equally to each stream.</p>
@@ -510,6 +521,10 @@ first N streams.</p>
 <li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
 ipex.cpu.runtime.CPUPool object, contains
 all CPU cores used to run multi-stream inference.</p></li>
+<li><p><strong>concat_output</strong> (<em>bool</em>) – A flag indicates whether the output of each
+stream will be concatenated or not. The default value is True. Note:
+if the output of each stream can’t be concatenated, set this flag to
+false to get the raw output (a list of each stream’s output).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -524,7 +539,7 @@ ipex.cpu.runtime.MultiStreamModule object.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.cpu.runtime.Task">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.Task" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">ipex.cpu.runtime.cpupool.CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.Task" title="Permalink to this definition"></a></dt>
 <dd><p>An abstraction of computation based on PyTorch module and is scheduled
 asynchronously.</p>
 <dl class="field-list simple">

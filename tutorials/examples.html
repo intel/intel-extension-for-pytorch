@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Examples &mdash; intel_extension_for_pytorch 1.10.100+cpu documentation</title>
+  <title>Examples &mdash; intel_extension_for_pytorch 1.11.0+cpu documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -31,7 +31,7 @@
             <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
           </a>
               <div class="version">
-                1.10.100+cpu
+                1.11.0+cpu
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -647,15 +647,15 @@
 </pre></div>
 </div>
 <p><strong>CMakeLists.txt</strong></p>
-<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span><span class="w"> </span><span class="s">3.0</span><span class="w"> </span><span class="s">FATAL_ERROR</span><span class="p">)</span>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span> <span class="s">3.0</span> <span class="s">FATAL_ERROR</span><span class="p">)</span>
 <span class="nb">project</span><span class="p">(</span><span class="s">example-app</span><span class="p">)</span>
 
-<span class="nb">find_package</span><span class="p">(</span><span class="s">intel_ext_pt_cpu</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="nb">find_package</span><span class="p">(</span><span class="s">intel_ext_pt_cpu</span> <span class="s">REQUIRED</span><span class="p">)</span>
 
-<span class="nb">add_executable</span><span class="p">(</span><span class="s">example-app</span><span class="w"> </span><span class="s">example-app.cpp</span><span class="p">)</span>
-<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">example-app</span><span class="w"> </span><span class="s2">&quot;${TORCH_LIBRARIES}&quot;</span><span class="p">)</span>
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">example-app</span> <span class="s">example-app.cpp</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">example-app</span> <span class="s2">&quot;${TORCH_LIBRARIES}&quot;</span><span class="p">)</span>
 
-<span class="nb">set_property</span><span class="p">(</span><span class="s">TARGET</span><span class="w"> </span><span class="s">example-app</span><span class="w"> </span><span class="s">PROPERTY</span><span class="w"> </span><span class="s">CXX_STANDARD</span><span class="w"> </span><span class="s">14</span><span class="p">)</span>
+<span class="nb">set_property</span><span class="p">(</span><span class="s">TARGET</span> <span class="s">example-app</span> <span class="s">PROPERTY</span> <span class="s">CXX_STANDARD</span> <span class="s">14</span><span class="p">)</span>
 </pre></div>
 </div>
 <p><strong>Command for compilation</strong></p>

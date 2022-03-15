@@ -12,7 +12,7 @@ The configurations are mainly around the following perspectives. Italic values a
 
 ## Usage of launch script
 
-The *launch* script is provided as a module of torch_ipex. You can take advantage of it with the following command:
+The *launch* script is provided as a module of *intel_extension_for_pytorch*. You can take advantage of it with the following command:
 ```
 python -m intel_extension_for_pytorch.cpu.launch [knobs] <your_pytorch_script> [args]
 ```
@@ -24,10 +24,11 @@ Available knobs are listed below:
 | ```-m```, ```--module``` | - | False | Changes each process to interpret the launch script  as a python module, executing with the same behavior as 'python -m'. |
 | ```--no_python``` | - | False | Do not prepend the --program script with \python\ - just exec  it directly. Useful when the script is not a Python script. |
 | ```--ninstances``` | int | -1 | For multi-instance, you should give the cores number you used for per instance. |
+| ```--instance_idx``` | int | -1 | Specify instance_idx to run single instance among multiple instances. Useful when running each instance independently. |
 | ```--ncore_per_instance``` | int | -1 | Cores per instance |
 | ```--latency_mode``` | - | False | By default 4 core per instance and use all physical cores |
-| ```--throughput_mode``` | - | False | By default one instance per socket and use all physical cores |
-| ```--socket_id``` | int | -1 | Socket id for multi-instance, by default all sockets will be used |
+| ```--throughput_mode``` | - | False | By default one instance per numa node and use all physical cores |
+| ```--node_id``` | int | -1 | Node id for multi-instance, by default all numa nodes will be used |
 | ```--use_logical_core``` | - | False | Whether only use physical cores |
 | ```--disable_numactl``` | - | False | Disable numactl |
 | ```--core_list``` | str | None | Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used. |
@@ -38,7 +39,7 @@ Available knobs are listed below:
 | ```--enable_jemalloc``` | - | False | Enable jemalloc allocator |
 | ```--use_default_allocator``` | - |  False | Use default memory allocator |
 
-**Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--socket_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--socket_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
+**Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
 
 The *launch* script respects existing environment variables when it get launched, expect for *LD_PRELOAD*. If you have your favorite values for certain environment variables, you can set them before running the *launch* script. A typical usage scenario is as the following. Intel OpenMP library uses an environment variable *KMP_AFFINITY* to control its behavior. Different settings result in different performance numbers. By default, if you enable Intel OpenMP library, the *launch* script will set *KMP_AFFINITY* to "granularity=fine,compact,1,0". If you want to try with other values, you can use *export* command on Linux to set *KMP_AFFINITY* before you run the *launch* script. In this case, the script will not set the default value but take the existing value of *KMP_AFFINITY*, and print a message to stdout.
 
@@ -57,12 +58,13 @@ Example script [resnet50.py](../examples/resnet50.py) will be used in this guide
 - Single instance for inference
   - [I. Use all physical cores](#i-use-all-physical-cores)
   - [II. Use all cores including logical cores](#ii-use-all-cores-including-logical-cores)
-  - [III. Use physical cores on 1 socket](#iii-use-physical-cores-on-1-socket)
+  - [III. Use physical cores on 1 node](#iii-use-physical-cores-on-1-node)
   - [IV. Use your designated number of cores](#iv-use-your-designated-number-of-cores)
 - Multiple instances for inference
-  - [V. Throughput mode (i.e. number of socket instances, each instance runs on 1 socket)](#v-throughput-mode)
+  - [V. Throughput mode (i.e. number of numa node instances, each instance runs on 1 numa node)](#v-throughput-mode)
   - [VI. Latency mode (Use 4 cores for each instance)](#vi-latency-mode)
   - [VII. Your designated number of instances](#vii-your-designated-number-of-instances)
+  - [VIII. Your designated number of instances and instance index](#viii-your-designated-number-of-instances-and-instance-index)
 - Usage of Jemalloc/TCMalloc/Default memory allocator
   - [Jemalloc](#jemalloc)
   - [TCMalloc](#tcmalloc)
@@ -104,7 +106,7 @@ $ cat logs/run_20210712212258_instances.log
 2021-07-12 21:22:58,764 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 21:22:58,764 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 21:22:58,764 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 21:22:58,764 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
+2021-07-12 21:22:58,764 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] on different NUMA nodes
 2021-07-12 21:22:58,764 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712212258_instance_0_cores_0-43.log
 ```
 
@@ -137,17 +139,17 @@ $ cat logs/run_20210712223308_instances.log
 2021-07-12 22:33:08,118 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-12 22:33:08,118 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-12 22:33:08,118 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-12 22:33:08,118 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80', '81', '82', '83', '84', '85', '86', '87'] in different NUMA node
+2021-07-12 22:33:08,118 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '66', '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '80', '81', '82', '83', '84', '85', '86', '87'] on different NUMA nodes
 2021-07-12 22:33:08,118 - __main__ - INFO - numactl -C 0-87 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712223308_instance_0_cores_0-87.log
 ```
 
-#### III. Use physical cores on 1 socket
+#### III. Use physical cores on 1 node
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 1 --log_path ./logs resnet50.py
+python -m intel_extension_for_pytorch.cpu.launch --node_id 1 --log_path ./logs resnet50.py
 ```
 
-CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same socket.
+CPU usage is shown as below. 1 main worker thread was launched, then it launched threads on all other cores on the same numa node.
 
 ![Single instance all physical cores](../../../images/launch_script/1ins_soc.gif)
 
@@ -214,7 +216,7 @@ $ cat logs/run_20210712220928_instances.log
 python -m intel_extension_for_pytorch.cpu.launch --throughput_mode --log_path ./logs resnet50.py
 ```
 
-CPU usage is shown as below. 2 main worker threads were launched on 2 socket respectively, then they launched threads on other physical cores.
+CPU usage is shown as below. 2 main worker threads were launched on 2 numa nodes respectively, then they launched threads on other physical cores.
 
 ![Multiple instance throughput mode](../../../images/launch_script/nins_thr.gif)
 
@@ -286,7 +288,7 @@ $ cat logs/run_20210712221415_instances.log
 2021-07-12 22:14:15,146 - __main__ - INFO - numactl -C 8-11 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221415_instance_2_cores_8-11.log
 2021-07-12 22:14:15,149 - __main__ - INFO - numactl -C 12-15 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221415_instance_3_cores_12-15.log
 2021-07-12 22:14:15,151 - __main__ - INFO - numactl -C 16-19 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221415_instance_4_cores_16-19.log
-2021-07-12 22:14:15,154 - __main__ - WARNING - Numa Aware: cores:['20', '21', '22', '23'] in different NUMA node
+2021-07-12 22:14:15,154 - __main__ - WARNING - Numa Aware: cores:['20', '21', '22', '23'] on different NUMA nodes
 2021-07-12 22:14:15,154 - __main__ - INFO - numactl -C 20-23 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221415_instance_5_cores_20-23.log
 2021-07-12 22:14:15,157 - __main__ - INFO - numactl -C 24-27 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221415_instance_6_cores_24-27.log
 2021-07-12 22:14:15,159 - __main__ - INFO - numactl -C 28-31 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221415_instance_7_cores_28-31.log
@@ -332,6 +334,39 @@ $ cat logs/run_20210712221305_instances.log
 2021-07-12 22:13:05,476 - __main__ - INFO - numactl -C 22-32 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_2_cores_22-32.log
 2021-07-12 22:13:05,479 - __main__ - INFO - numactl -C 33-43 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_3_cores_33-43.log
 ```
+#### VIII. Your designated number of instances and instance index 
+
+Launcher by default runs all `ninstances` for multi-instance inference/training as shown above. You can specify `instance_idx` to independely run that instance only among `ninstances`
+
+```
+python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 0 --log_path ./logs resnet50.py
+```
+
+you can confirm usage in log file:
+
+```
+2022-01-06 13:01:51,175 - __main__ - INFO - OMP_NUM_THREADS=14
+2022-01-06 13:01:51,176 - __main__ - INFO - Using Intel OpenMP
+2022-01-06 13:01:51,177 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
+2022-01-06 13:01:51,177 - __main__ - INFO - KMP_BLOCKTIME=1
+2022-01-06 13:01:51,177 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
+2022-01-06 13:01:51,177 - __main__ - INFO - numactl -C 0-10 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20220106130151_instance_0_cores_0-13.log
+```
+
+```
+python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 1 --log_path ./logs resnet50.py
+```
+
+you can confirm usage in log file:
+
+```
+2022-01-06 13:01:51,175 - __main__ - INFO - OMP_NUM_THREADS=14
+2022-01-06 13:01:51,176 - __main__ - INFO - Using Intel OpenMP
+2022-01-06 13:01:51,177 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
+2022-01-06 13:01:51,177 - __main__ - INFO - KMP_BLOCKTIME=1
+2022-01-06 13:01:51,177 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
+2022-01-06 13:01:51,177 - __main__ - INFO - numactl -C 11-21 -m 0 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20220106130151_instance_0_cores_0-13.log
+```
 
 ### Usage of Jemalloc/TCMalloc/Default memory allocator
 
@@ -355,7 +390,7 @@ you can confirm usage in log file:
 2021-07-13 15:30:48,235 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-13 15:30:48,235 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-13 15:30:48,235 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so:<VIRTUAL_ENV>/lib/libjemalloc.so
-2021-07-13 15:30:48,236 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
+2021-07-13 15:30:48,236 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] on different NUMA nodes
 2021-07-13 15:30:48,236 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210713153048_instance_0_cores_0-43.log
 ```
 
@@ -374,7 +409,7 @@ you can confirm usage in log file:
 2021-07-13 15:33:33,654 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-13 15:33:33,654 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-13 15:33:33,654 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so:<VIRTUAL_ENV>/lib/libtcmalloc.so
-2021-07-13 15:33:33,654 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
+2021-07-13 15:33:33,654 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] on different NUMA nodes
 2021-07-13 15:33:33,655 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210713153333_instance_0_cores_0-43.log
 ```
 
@@ -392,7 +427,7 @@ you can confirm usage in log file:
 2021-07-13 15:36:59,784 - __main__ - INFO - KMP_AFFINITY=granularity=fine,compact,1,0
 2021-07-13 15:36:59,784 - __main__ - INFO - KMP_BLOCKTIME=1
 2021-07-13 15:36:59,784 - __main__ - INFO - LD_PRELOAD=<VIRTUAL_ENV>/lib/libiomp5.so
-2021-07-13 15:36:59,784 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
+2021-07-13 15:36:59,784 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] on different NUMA nodes
 2021-07-13 15:36:59,784 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210713153659_instance_0_cores_0-43.log
 ```
 
@@ -415,6 +450,6 @@ you can confirm usage in log file:
 ```
 2021-07-13 15:25:00,760 - __main__ - WARNING - Both TCMalloc and JeMalloc are not found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or /home/<user>/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance
 2021-07-13 15:25:00,761 - __main__ - INFO - OMP_NUM_THREADS=44
-2021-07-13 15:25:00,761 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] in different NUMA node
+2021-07-13 15:25:00,761 - __main__ - WARNING - Numa Aware: cores:['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43'] on different NUMA nodes
 2021-07-13 15:25:00,761 - __main__ - INFO - numactl -C 0-43 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210713152500_instance_0_cores_0-43.log
 ```
