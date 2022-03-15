@@ -1,6 +1,17 @@
 Known Issues
 ============
 
+- BFloat16 is currently only supported natively on platforms with the following instruction set. The support will be expanded gradually to more platforms in furture releases.
+
+  | Instruction Set | Description |
+  | --- | --- |
+  | AVX512\_CORE | Intel AVX-512 with AVX512BW, AVX512VL, and AVX512DQ extensions |
+  | AVX512\_CORE\_VNNI | Intel AVX-512 with Intel DL Boost |
+  | AVX512\_CORE\_BF16 | Intel AVX-512 with Intel DL Boost and bfloat16 support |
+  | AVX512\_CORE\_AMX | Intel AVX-512 with Intel DL Boost and bfloat16 support and Intel Advanced Matrix Extensions (Intel AMX) with 8-bit integer and bfloat16 support |
+
+- INT8 performance of EfficientNet and DenseNet with IntelÂ® Extension for PyTorch\* is slower than that of FP32
+
 - `omp_set_num_threads` function failed to change OpenMP threads number of oneDNN operators if it was set before.
 
   `omp_set_num_threads` function is provided in Intel® Extension for PyTorch\* to change number of threads used with openmp. However, it failed to change number of OpenMP threads if it was set before.

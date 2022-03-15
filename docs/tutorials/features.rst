@@ -117,6 +117,8 @@ Intel® Extension for PyTorch* has built-in quantization recipes to deliver good
 
 Check more detailed information for `INT8 <features/int8.html>`_.
 
+oneDNN provides an evaluation feature called `oneDNN Graph Compiler <https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler>`_. Please refer to `oneDNN build instruction <https://github.com/oneapi-src/oneDNN/blob/dev-graph-preview4/doc/build/build_options.md#build-graph-compiler>`_ to try this feature.
+
 .. toctree::
    :hidden:
    :maxdepth: 1
