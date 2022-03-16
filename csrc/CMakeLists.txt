@@ -251,9 +251,9 @@ install(FILES ${IPEX_GPU_ATEN_GENERATED}/ipex.h DESTINATION include)
 
 # CMake config file for the external project.
 configure_file(
-        ${IPEX_ROOT_DIR}/cmake/IpexConfig.cmake.in
-        ${PROJECT_BINARY_DIR}/IpexConfig.cmake
+        ${IPEX_ROOT_DIR}/cmake/IntelExtensionPytorchConfig.cmake.in
+        ${PROJECT_BINARY_DIR}/IntelExtensionPytorchConfig.cmake
         @ONLY)
 install(FILES
-        ${PROJECT_BINARY_DIR}/IpexConfig.cmake
-        DESTINATION share/cmake/Ipex)
+        ${PROJECT_BINARY_DIR}/IntelExtensionPytorchConfig.cmake
+        DESTINATION share/cmake/IntelExtensionPytorch)

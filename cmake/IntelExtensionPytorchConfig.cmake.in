@@ -1,18 +1,18 @@
-# FindTorchIPEX
+# FindIntelExtensionPytorch
 # -------
 #
 # Finds the Torch IPEX library
 #
 # This will define the following variables:
 #
-#   TORCH_IPEX_FOUND        -- True if the system has the Torch IPEX library
+#   IntelExtensionPytorch_FOUND        -- True if the system has the Torch IPEX library
 #   TORCH_IPEX_INCLUDE_DIRS -- The include directories for torch
 #   TORCH_IPEX_LIBRARIES    -- Libraries to link against
 #   TORCH_IPEX_CXX_FLAGS    -- Additional (required) compiler flags
 #
 # and the following imported targets:
 #
-#   ipex
+#   intel-ext-pt-gpu
 
 include(FindPackageHandleStandardArgs)
 
@@ -37,19 +37,19 @@ endif()
 find_library(IPEX_GPU_CORE_LIBRARY intel-ext-pt-gpu PATHS "${TORCH_IPEX_INSTALL_PREFIX}/lib")
 set(TORCH_IPEX_LIBRARIES ${IPEX_GPU_CORE_LIBRARY})
 
-find_package_handle_standard_args(Ipex DEFAULT_MSG TORCH_IPEX_LIBRARIES TORCH_IPEX_INCLUDE_DIRS)
+find_package_handle_standard_args(IntelExtensionPytorch DEFAULT_MSG TORCH_IPEX_LIBRARIES TORCH_IPEX_INCLUDE_DIRS)
 
 # When we build libipex_gpu_core with the old GCC ABI, dependent libraries must too.
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   set(TORCH_IPEX_CXX_FLAGS "-D_GLIBCXX_USE_CXX11_ABI=@GLIBCXX_USE_CXX11_ABI@")
 endif()
 
-add_library(ipex SHARED IMPORTED)
-set_target_properties(ipex PROPERTIES
+add_library(intel-ext-pt-gpu SHARED IMPORTED)
+set_target_properties(intel-ext-pt-gpu PROPERTIES
     IMPORTED_LOCATION "${TORCH_IPEX_LIBRARIES}"
     INTERFACE_INCLUDE_DIRECTORIES "${TORCH_IPEX_INCLUDE_DIRS}"
     CXX_STANDARD 17
 )
 if(TORCH_IPEX_CXX_FLAGS)
-  set_property(TARGET ipex PROPERTY INTERFACE_COMPILE_OPTIONS "${TORCH_IPEX_CXX_FLAGS}")
+  set_property(TARGET intel-ext-pt-gpu PROPERTY INTERFACE_COMPILE_OPTIONS "${TORCH_IPEX_CXX_FLAGS}")
 endif()
