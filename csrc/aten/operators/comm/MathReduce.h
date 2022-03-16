@@ -77,14 +77,15 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   const auto max_wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  const auto wgroup_size = std::min(max_wgroup_size, N);
-  const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+  auto wgroup_size = std::min(max_wgroup_size, N);
+  auto ngroups = (N + wgroup_size - 1) / wgroup_size;
 
   tgt1.copy_(src);
   K* tgt1_ptr = tgt1.data_ptr<K>();
   Index* tgt2_ptr = tgt2.data_ptr<Index>();
 
-  const auto num_per_batch = src.numel() / N;
+  const auto num_of_elems = src.numel();
+  const auto num_of_reduce_line = src.numel() / N;
   const auto num_dim = (src.dim() == 0) ? 1 : src.dim();
 
   auto size_rdim = src.size(rdim);
@@ -101,38 +102,69 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_0);
 
-  for (auto ng = ngroups; ng >= 1; ng = (ng + wgroup_size - 1) / wgroup_size) {
-    for (auto i = 0; i < num_per_batch; i++) {
-      auto cgf = DPCPP_Q_CGF(__cgh) {
-        dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
-        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-          auto local_id = item_id.get_local_linear_id();
-          auto global_id = item_id.get_global_linear_id();
-          auto group_id = item_id.get_group_linear_id();
-          auto group_size = item_id.get_local_range().size();
+  if (size_rdim <= max_wgroup_size) {
+    wgroup_size = std::min(max_wgroup_size, num_of_reduce_line);
+    ngroups = (num_of_reduce_line + wgroup_size - 1) / wgroup_size;
+    auto cgf = DPCPP_Q_CGF(__cgh) {
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+        auto local_id = item_id.get_local_linear_id();
+        auto global_id = item_id.get_global_linear_id();
 
-          auto index = i * size_rdim + global_id;
-          // init local shared memory of input
-          if (global_id < N) {
-            local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+        auto head_index = global_id * size_rdim;
+        if (head_index < num_of_elems) {
+          for (auto i = 1; i < size_rdim; i++) {
+            auto index = head_index + i;
+            auto head_elem = max_t(tgt1_ptr[head_index], tgt2_ptr[head_index]);
+            auto cur_elem = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+            auto result_elem = binary_op(head_elem, cur_elem);
+            tgt1_ptr[head_index] = result_elem.first;
+            tgt2_ptr[head_index] = result_elem.second;
           }
-
-          simple_reduce(item_id, local_max_buf, binary_op);
-
-          auto target_idx = i * size_rdim + group_id;
-          if (local_id == 0) {
-            tgt1_ptr[target_idx] = local_max_buf[local_id].first;
-            tgt2_ptr[target_idx] = local_max_buf[local_id].second;
-          }
-        };
-
-        __cgh.parallel_for(
-            DPCPP::nd_range<1>(ng * wgroup_size, wgroup_size), kfn);
+        }
       };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-    }
-    if (ng == 1)
-      break;
+
+      __cgh.parallel_for(
+          DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    return;
+  }
+
+  auto remained = size_rdim;
+  for (auto ng = ngroups; remained > 1;
+       ng = (ng + wgroup_size - 1) / wgroup_size) {
+    auto total_ngroups = ng * num_of_reduce_line;
+    auto cgf = DPCPP_Q_CGF(__cgh) {
+      dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+        auto local_id = item_id.get_local_linear_id();
+        auto global_id = item_id.get_global_linear_id();
+        auto group_id = item_id.get_group_linear_id();
+        auto group_size = item_id.get_local_range().size();
+        auto sub_group_id = group_id % ng;
+        auto i = group_id / ng;
+        auto sub_global_id = global_id % (ng * group_size);
+
+        auto index = i * size_rdim + sub_global_id;
+        // init local shared memory of input
+        if (sub_global_id < N) {
+          local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+        }
+
+        simple_reduce(item_id, local_max_buf, binary_op);
+
+        auto target_idx = i * size_rdim + sub_group_id;
+        if (local_id == 0) {
+          tgt1_ptr[target_idx] = local_max_buf[local_id].first;
+          tgt2_ptr[target_idx] = local_max_buf[local_id].second;
+        }
+      };
+
+      __cgh.parallel_for(
+          DPCPP::nd_range<1>(total_ngroups * wgroup_size, wgroup_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    remained = ng;
   }
 }
 
@@ -148,14 +180,15 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   const auto max_wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  const auto wgroup_size = std::min(max_wgroup_size, N);
-  const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
+  auto wgroup_size = std::min(max_wgroup_size, N);
+  auto ngroups = (N + wgroup_size - 1) / wgroup_size;
 
   tgt1.copy_(src);
   K* tgt1_ptr = tgt1.data_ptr<K>();
   Index* tgt2_ptr = tgt2.data_ptr<Index>();
 
-  const auto num_per_batch = src.numel() / N;
+  const auto num_of_elems = src.numel();
+  const auto num_of_reduce_line = src.numel() / N;
   const auto num_dim = (src.dim() == 0) ? 1 : src.dim();
 
   auto stride_rdim = src.stride(rdim);
@@ -173,40 +206,72 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_0);
 
-  for (auto ng = ngroups; ng >= 1; ng = (ng + wgroup_size - 1) / wgroup_size) {
-    for (auto i = 0; i < num_per_batch; i++) {
-      auto cgf = DPCPP_Q_CGF(__cgh) {
-        dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
-        auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-          auto local_id = item_id.get_local_linear_id();
-          auto global_id = item_id.get_global_linear_id();
-          auto group_id = item_id.get_group_linear_id();
-          auto group_size = item_id.get_local_range().size();
+  if (size_rdim <= max_wgroup_size) {
+    wgroup_size = std::min(max_wgroup_size, num_of_reduce_line);
+    ngroups = (num_of_reduce_line + wgroup_size - 1) / wgroup_size;
+    auto cgf = DPCPP_Q_CGF(__cgh) {
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+        auto local_id = item_id.get_local_linear_id();
+        auto global_id = item_id.get_global_linear_id();
 
-          auto index = i / stride_rdim * stride_rdim * size_rdim +
-              i % stride_rdim + global_id * stride_rdim;
-          // init local shared memory of input
-          if (global_id < N) {
-            local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+        auto head_index = global_id / stride_rdim * stride_rdim * size_rdim +
+            global_id % stride_rdim;
+        if (head_index < num_of_elems) {
+          for (auto i = 1; i < size_rdim; i++) {
+            auto index = head_index + i * stride_rdim;
+            auto head_elem = max_t(tgt1_ptr[head_index], tgt2_ptr[head_index]);
+            auto cur_elem = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+            auto result_elem = binary_op(head_elem, cur_elem);
+            tgt1_ptr[head_index] = result_elem.first;
+            tgt2_ptr[head_index] = result_elem.second;
           }
-
-          simple_reduce(item_id, local_max_buf, binary_op);
-
-          auto target_idx = i / stride_rdim * stride_rdim * size_rdim +
-              i % stride_rdim + group_id * stride_rdim;
-          if (local_id == 0) {
-            tgt1_ptr[target_idx] = local_max_buf[local_id].first;
-            tgt2_ptr[target_idx] = local_max_buf[local_id].second;
-          }
-        };
-
-        __cgh.parallel_for(
-            DPCPP::nd_range<1>(ng * wgroup_size, wgroup_size), kfn);
+        }
       };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-    }
-    if (ng == 1)
-      break;
+
+      __cgh.parallel_for(
+          DPCPP::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    return;
+  }
+
+  auto remained = size_rdim;
+  for (auto ng = ngroups; remained > 1;
+       ng = (ng + wgroup_size - 1) / wgroup_size) {
+    auto total_ngroups = ng * num_of_reduce_line;
+    auto cgf = DPCPP_Q_CGF(__cgh) {
+      dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+        auto local_id = item_id.get_local_linear_id();
+        auto global_id = item_id.get_global_linear_id();
+        auto group_id = item_id.get_group_linear_id();
+        auto group_size = item_id.get_local_range().size();
+        auto sub_group_id = group_id % ng;
+        auto i = group_id / ng;
+        auto sub_global_id = global_id % (ng * group_size);
+
+        auto index = i / stride_rdim * stride_rdim * size_rdim +
+            i % stride_rdim + sub_global_id * stride_rdim;
+        // init local shared memory of input
+        if (sub_global_id < N) {
+          local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
+        }
+
+        simple_reduce(item_id, local_max_buf, binary_op);
+
+        auto target_idx = i / stride_rdim * stride_rdim * size_rdim +
+            i % stride_rdim + sub_group_id * stride_rdim;
+        if (local_id == 0) {
+          tgt1_ptr[target_idx] = local_max_buf[local_id].first;
+          tgt2_ptr[target_idx] = local_max_buf[local_id].second;
+        }
+      };
+
+      __cgh.parallel_for(
+          DPCPP::nd_range<1>(total_ngroups * wgroup_size, wgroup_size), kfn);
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+    remained = ng;
   }
 }
 
