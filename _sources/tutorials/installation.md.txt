@@ -49,6 +49,8 @@ Prebuilt wheel files availability matrix for Python versions
 | 1.9.0 | ✔️ | ✔️ | ✔️ | ✔️ |  |
 | 1.8.0 |  | ✔️ |  |  |  |
 
+**Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check the mapping table above.
+
 Starting from 1.11.0, you can use normal pip command to install the package.
 
 ```
@@ -63,7 +65,7 @@ python -m pip install intel_extension_for_pytorch -f https://software.intel.com/
 
 **Note:** For version prior to 1.10.0, please use package name `torch_ipex`, rather than `intel_extension_for_pytorch`.
 
-**Note:** To install a package with a specific version, please use the standard way of pip.
+**Note:** To install a package with a specific version, please run with the following command.
 
 ```
 python -m pip install <package_name>==<version_name> -f https://software.intel.com/ipex-whl-stable

@@ -44,40 +44,45 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Releases</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#id1">1.10.100</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#id2">1.10.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id1">1.11.0</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#known-issues">Known Issues</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#what-s-changed">What’s Changed</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id3">1.9.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id2">1.10.100</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id3">1.10.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id4">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#known-issues">Known Issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id5">What’s Changed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id6">1.9.0</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#what-s-new">What’s New</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id4">1.8.0</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id5">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id7">1.8.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id8">What’s New</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id6">1.2.0</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id7">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id9">1.2.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id10">What’s New</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#performance-improvement">Performance Improvement</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#others">Others</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id8">Known issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id11">Known issues</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id9">1.1.0</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id10">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id12">1.1.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id13">What’s New</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#performance">Performance</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#known-issue">Known issue</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#id11">1.0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id14">1.0.2</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alpha">1.0.1-Alpha</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#id12">1.0.0-Alpha</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id13">What’s New</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id15">1.0.0-Alpha</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id16">What’s New</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#performance-result">Performance Result</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id14">Known issue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id17">Known issue</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#note">NOTE</a></li>
 </ul>
 </li>
@@ -120,7 +125,87 @@
   <section id="releases">
 <h1>Releases<a class="headerlink" href="#releases" title="Permalink to this headline"></a></h1>
 <section id="id1">
-<h2>1.10.100<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h2>
+<h2>1.11.0<a class="headerlink" href="#id1" title="Permalink to this headline"></a></h2>
+<p>We are excited to announce Intel® Extension for PyTorch* 1.11.0-cpu release by tightly following PyTorch 1.11 release. Along with extension 1.11, we focused on continually improving OOB user experience and performance. Highlights include:</p>
+<ul class="simple">
+<li><p>Support a single binary with runtime dynamic dispatch based on AVX2/AVX512 hardware ISA detection</p></li>
+<li><p>Support install binary from <code class="docutils literal notranslate"><span class="pre">pip</span></code> with package name only (without the need of specifying the URL)</p></li>
+<li><p>Provide the C++ SDK installation to facilitate ease of C++ app development and deployment</p></li>
+<li><p>Add more optimizations, including graph fusions for speeding up Transformer-based models and CNN, etc</p></li>
+<li><p>Reduce the binary size for both the PIP wheel and C++ SDK (2X to 5X reduction from the previous version)</p></li>
+</ul>
+<section id="highlights">
+<h3>Highlights<a class="headerlink" href="#highlights" title="Permalink to this headline"></a></h3>
+<ul>
+<li><p>Combine the AVX2 and AVX512 binary as a single binary and automatically dispatch to different implementations based on hardware ISA detection at runtime. The typical case is to serve the data center that mixtures AVX2-only and AVX512 platforms. It does not need to deploy the different ISA binary now compared to the previous version</p>
+<p><em><strong>NOTE</strong></em>:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Please refer to <a class="reference external" href="https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support">oneDNN document</a> for more details.</p>
+<blockquote>
+<div><p>When one input is of type u8, and the other one is of type s8, oneDNN assumes that it is the user’s responsibility to choose the quantization parameters so that no overflow/saturation occurs. For instance, a user can use u7 [0, 127] instead of u8 for the unsigned input, or s7 [-64, 63] instead of the s8 one. It is worth mentioning that this is required only when the Intel AVX2 or Intel AVX512 Instruction Set is used.</p>
+</div></blockquote>
+</li>
+<li><p>The extension wheel packages have been uploaded to <a class="reference external" href="https://pypi.org/project/intel-extension-for-pytorch/">pypi.org</a>. The user could directly install the extension by <code class="docutils literal notranslate"><span class="pre">pip/pip3</span></code> without explicitly specifying the binary location URL.</p></li>
+</ul>
+<table align="center">
+<tbody>
+<tr>
+<td>v1.10.100-cpu</td>
+<td>v1.11.0-cpu</td>
+</tr>
+<tr>
+<td><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">intel_extension_for_pytorch</span><span class="o">==</span><span class="mf">1.10.100</span> <span class="o">-</span><span class="n">f</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">software</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ipex</span><span class="o">-</span><span class="n">whl</span><span class="o">-</span><span class="n">stable</span>
+</pre></div>
+</div>
+</td>
+<td><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">intel_extension_for_pytorch</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table><ul class="simple">
+<li><p>Compared to the previous version, this release provides a dedicated installation file for the C++ SDK. The installation file automatically detects the PyTorch C++ SDK location and installs the extension C++ SDK files to the PyTorch C++ SDK. The user does not need to manually add the extension C++ SDK source files and CMake to the PyTorch SDK. In addition to that, the installation file reduces the C++ SDK binary size from ~220MB to ~13.5MB.</p></li>
+</ul>
+<table align="center">
+<tbody>
+<tr>
+<td>v1.10.100-cpu</td>
+<td>v1.11.0-cpu</td>
+</tr>
+<tr>
+<td><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">intel</span><span class="o">-</span><span class="n">ext</span><span class="o">-</span><span class="n">pt</span><span class="o">-</span><span class="n">cpu</span><span class="o">-</span><span class="n">libtorch</span><span class="o">-</span><span class="n">shared</span><span class="o">-</span><span class="k">with</span><span class="o">-</span><span class="n">deps</span><span class="o">-</span><span class="mf">1.10.0</span><span class="o">+</span><span class="n">cpu</span><span class="o">.</span><span class="n">zip</span> <span class="p">(</span><span class="mi">220</span><span class="n">M</span><span class="p">)</span>
+<span class="n">intel</span><span class="o">-</span><span class="n">ext</span><span class="o">-</span><span class="n">pt</span><span class="o">-</span><span class="n">cpu</span><span class="o">-</span><span class="n">libtorch</span><span class="o">-</span><span class="n">cxx11</span><span class="o">-</span><span class="n">abi</span><span class="o">-</span><span class="n">shared</span><span class="o">-</span><span class="k">with</span><span class="o">-</span><span class="n">deps</span><span class="o">-</span><span class="mf">1.10.0</span><span class="o">+</span><span class="n">cpu</span><span class="o">.</span><span class="n">zip</span> <span class="p">(</span><span class="mi">224</span><span class="n">M</span><span class="p">)</span>
+</pre></div>
+</div>
+</td>
+<td><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">libintel</span><span class="o">-</span><span class="n">ext</span><span class="o">-</span><span class="n">pt</span><span class="o">-</span><span class="mf">1.11.0</span><span class="o">+</span><span class="n">cpu</span><span class="o">.</span><span class="n">run</span> <span class="p">(</span><span class="mf">13.7</span><span class="n">M</span><span class="p">)</span>
+<span class="n">libintel</span><span class="o">-</span><span class="n">ext</span><span class="o">-</span><span class="n">pt</span><span class="o">-</span><span class="n">cxx11</span><span class="o">-</span><span class="n">abi</span><span class="o">-</span><span class="mf">1.11.0</span><span class="o">+</span><span class="n">cpu</span><span class="o">.</span><span class="n">run</span> <span class="p">(</span><span class="mf">13.5</span><span class="n">M</span><span class="p">)</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table><ul class="simple">
+<li><p>Add more optimizations, including more custom operators and fusions.</p>
+<ul>
+<li><p>Fuse the QKV linear operators as a single Linear to accelerate the Transformer*(BERT-*) encoder part  - <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/0f27c269cae0f902973412dc39c9a7aae940e07b">#278</a>.</p></li>
+<li><p>Remove Multi-Head-Attention fusion limitations to support the 64bytes unaligned tensor shape. <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/dbb10fedb00c6ead0f5b48252146ae9d005a0fad">#531</a></p></li>
+<li><p>Fold the binary operator to Convolution and Linear operator to reduce computation. <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/564588561fa5d45b8b63e490336d151ff1fc9cbc">#432</a> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/b4e7dacf08acd849cecf8d143a11dc4581a3857f">#438</a> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/74aa21262938b923d3ed1e6929e7d2b629b3ff27">#602</a></p></li>
+<li><p>Replace the outplace operators with their corresponding in-place version to reduce memory footprint. The extension currently supports the operators including <code class="docutils literal notranslate"><span class="pre">sliu</span></code>, <code class="docutils literal notranslate"><span class="pre">sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">tanh</span></code>, <code class="docutils literal notranslate"><span class="pre">hardsigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">hardswish</span></code>, <code class="docutils literal notranslate"><span class="pre">relu6</span></code>, <code class="docutils literal notranslate"><span class="pre">relu</span></code>, <code class="docutils literal notranslate"><span class="pre">selu</span></code>, <code class="docutils literal notranslate"><span class="pre">softmax</span></code>. <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/38647677e8186a235769ea519f4db65925eca33c">#524</a></p></li>
+<li><p>Fuse the Concat + BN + ReLU as a single operator. <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/275ff503aea780a6b741f04db5323d9529ee1081">#452</a></p></li>
+<li><p>Optimize Conv3D for both imperative and JIT by enabling NHWC and pre-packing the weight. <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/ae33faf62bb63b204b0ee63acb8e29e24f6076f3">#425</a></p></li>
+</ul>
+</li>
+<li><p>Reduce the binary size. C++ SDK is reduced from ~220MB to ~13.5MB while the wheel packaged is reduced from ~100MB to ~40MB.</p></li>
+<li><p>Update oneDNN and oneDNN graph to <a class="reference external" href="https://github.com/oneapi-src/oneDNN/releases/tag/v2.5.2">2.5.2</a> and <a class="reference external" href="https://github.com/oneapi-src/oneDNN/releases/tag/graph-v0.4.2">0.4.2</a> respectively.</p></li>
+</ul>
+</section>
+<section id="what-s-changed">
+<h3>What’s Changed<a class="headerlink" href="#what-s-changed" title="Permalink to this headline"></a></h3>
+<p><strong>Full Changelog</strong>: https://github.com/intel/intel-extension-for-pytorch/compare/v1.10.100…v1.11.0</p>
+</section>
+</section>
+<section id="id2">
+<h2>1.10.100<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h2>
 <p>This release is meant to fix the following issues:</p>
 <ul class="simple">
 <li><p>Resolve the issue that the PyTorch Tensor Expression(TE) did not work after importing the extension.</p></li>
@@ -133,12 +218,12 @@
 </li>
 </ul>
 </section>
-<section id="id2">
-<h2>1.10.0<a class="headerlink" href="#id2" title="Permalink to this headline"></a></h2>
+<section id="id3">
+<h2>1.10.0<a class="headerlink" href="#id3" title="Permalink to this headline"></a></h2>
 <p>The Intel® Extension for PyTorch* 1.10 is on top of PyTorch 1.10. In this release, we polished the front end APIs. The APIs are more simplible, stable and straightforward now. According to PyTorch community recommendation, we changed the underhood device from <code class="docutils literal notranslate"><span class="pre">XPU</span></code> to <code class="docutils literal notranslate"><span class="pre">CPU</span></code>. With this change, the model and tensor does not need to be converted to the extension device to get performance improvement. It simplifies the model changes.</p>
 <p>Besides that, we continuously optimize the Transformer* and CNN models by fusing more operators and applying NHWC. We measured the 1.10 performance on Torchvison and HugginFace. As expected, 1.10 can speed up the two model zones.</p>
-<section id="highlights">
-<h3>Highlights<a class="headerlink" href="#highlights" title="Permalink to this headline"></a></h3>
+<section id="id4">
+<h3>Highlights<a class="headerlink" href="#id4" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Change the package name to <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> while the original package name is <code class="docutils literal notranslate"><span class="pre">intel_pytorch_extension</span></code>. This change targets to avoid any potential legal issues.</p></li>
 </ul>
@@ -254,7 +339,7 @@
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">MyModel</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
-        
+
     <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">x</span>
@@ -374,13 +459,13 @@
 </li>
 </ul>
 </section>
-<section id="what-s-changed">
-<h3>What’s Changed<a class="headerlink" href="#what-s-changed" title="Permalink to this headline"></a></h3>
+<section id="id5">
+<h3>What’s Changed<a class="headerlink" href="#id5" title="Permalink to this headline"></a></h3>
 <p><strong>Full Changelog</strong>: https://github.com/intel/intel-extension-for-pytorch/compare/v1.9.0…v1.10.0+cpu-rc3</p>
 </section>
 </section>
-<section id="id3">
-<h2>1.9.0<a class="headerlink" href="#id3" title="Permalink to this headline"></a></h2>
+<section id="id6">
+<h2>1.9.0<a class="headerlink" href="#id6" title="Permalink to this headline"></a></h2>
 <section id="what-s-new">
 <h3>What’s New<a class="headerlink" href="#what-s-new" title="Permalink to this headline"></a></h3>
 <ul>
@@ -392,10 +477,10 @@
 </ul>
 </section>
 </section>
-<section id="id4">
-<h2>1.8.0<a class="headerlink" href="#id4" title="Permalink to this headline"></a></h2>
-<section id="id5">
-<h3>What’s New<a class="headerlink" href="#id5" title="Permalink to this headline"></a></h3>
+<section id="id7">
+<h2>1.8.0<a class="headerlink" href="#id7" title="Permalink to this headline"></a></h2>
+<section id="id8">
+<h3>What’s New<a class="headerlink" href="#id8" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Rebased the Intel Extension for Pytorch from Pytorch -1.7.0 to the official Pytorch-1.8.0 release. The new XPU device type has been added into Pytorch-1.8.0(49786), don’t need to patch PyTorch to enable Intel Extension for Pytorch anymore</p></li>
 <li><p>Upgraded the oneDNN from v1.5-rc to v1.8.1</p></li>
@@ -403,10 +488,10 @@
 </ul>
 </section>
 </section>
-<section id="id6">
-<h2>1.2.0<a class="headerlink" href="#id6" title="Permalink to this headline"></a></h2>
-<section id="id7">
-<h3>What’s New<a class="headerlink" href="#id7" title="Permalink to this headline"></a></h3>
+<section id="id9">
+<h2>1.2.0<a class="headerlink" href="#id9" title="Permalink to this headline"></a></h2>
+<section id="id10">
+<h3>What’s New<a class="headerlink" href="#id10" title="Permalink to this headline"></a></h3>
 <ul>
 <li><p>We rebased the Intel Extension for pytorch from Pytorch -1.5rc3 to the official Pytorch-1.7.0 release. It will have performance improvement with the new Pytorch-1.7 support.</p></li>
 <li><p>Device name was changed from DPCPP to XPU.</p>
@@ -443,17 +528,17 @@
 </li>
 </ul>
 </section>
-<section id="id8">
-<h3>Known issues<a class="headerlink" href="#id8" title="Permalink to this headline"></a></h3>
+<section id="id11">
+<h3>Known issues<a class="headerlink" href="#id11" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Multi-node training still encounter hang issues after several iterations. The fix will be included in the next official release.</p></li>
 </ul>
 </section>
 </section>
-<section id="id9">
-<h2>1.1.0<a class="headerlink" href="#id9" title="Permalink to this headline"></a></h2>
-<section id="id10">
-<h3>What’s New<a class="headerlink" href="#id10" title="Permalink to this headline"></a></h3>
+<section id="id12">
+<h2>1.1.0<a class="headerlink" href="#id12" title="Permalink to this headline"></a></h2>
+<section id="id13">
+<h3>What’s New<a class="headerlink" href="#id13" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p>Added optimization for training with FP32 data type &amp; BF16 data type. All the optimized FP32/BF16 backward operators include:</p>
 <ul>
@@ -527,8 +612,8 @@
 </ul>
 </section>
 </section>
-<section id="id11">
-<h2>1.0.2<a class="headerlink" href="#id11" title="Permalink to this headline"></a></h2>
+<section id="id14">
+<h2>1.0.2<a class="headerlink" href="#id14" title="Permalink to this headline"></a></h2>
 <ul class="simple">
 <li><p>Rebase torch CCL patch to PyTorch 1.5.0-rc3</p></li>
 </ul>
@@ -541,10 +626,10 @@
 <li><p>Fix the issue that cannot normally invoke <code class="docutils literal notranslate"><span class="pre">enable_auto_optimization</span></code></p></li>
 </ul>
 </section>
-<section id="id12">
-<h2>1.0.0-Alpha<a class="headerlink" href="#id12" title="Permalink to this headline"></a></h2>
-<section id="id13">
-<h3>What’s New<a class="headerlink" href="#id13" title="Permalink to this headline"></a></h3>
+<section id="id15">
+<h2>1.0.0-Alpha<a class="headerlink" href="#id15" title="Permalink to this headline"></a></h2>
+<section id="id16">
+<h3>What’s New<a class="headerlink" href="#id16" title="Permalink to this headline"></a></h3>
 <ul>
 <li><p>Auto Operator Optimization</p>
 <p>Intel Extension for PyTorch will automatically optimize the operators of PyTorch when importing its python package. It will significantly improve the computation performance if the input tensor and the model is converted to the extension device.</p>
@@ -591,8 +676,8 @@ Currently, the extension has supported bfloat16. It streamlines the work to enab
 </tbody>
 </table><p>We also measured the performance of ResNeXt101, Transformer-FB, DLRM, and YOLOv3 with the extension. We observed that the performance could be significantly improved by the extension as expected.</p>
 </section>
-<section id="id14">
-<h3>Known issue<a class="headerlink" href="#id14" title="Permalink to this headline"></a></h3>
+<section id="id17">
+<h3>Known issue<a class="headerlink" href="#id17" title="Permalink to this headline"></a></h3>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/10">#10</a> All data types have not been registered for DPCPP</p></li>
 <li><p><a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/37">#37</a> MaxPool can’t get nan result when input’s value is nan</p></li>
