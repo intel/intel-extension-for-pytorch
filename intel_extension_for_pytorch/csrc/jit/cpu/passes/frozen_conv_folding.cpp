@@ -9,6 +9,7 @@
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
+#include <torch/csrc/jit/passes/fold_conv_bn.h>
 #include <torch/csrc/jit/tensorexpr/types.h>
 
 #include "csrc/aten/cpu/WeightPack.h"
@@ -18,17 +19,96 @@
 namespace torch {
 namespace jit {
 
-namespace {
+namespace graph_rewrite {
 
 using Tensor = at::Tensor;
 
 bool supportedConvNode(Node* n) {
-  if (n->kind() == aten::conv2d || n->kind() == aten::conv3d ||
-      n->kind() == Symbol::fromQualString("torch_ipex::convolution_forward")) {
+  if (n->kind() == aten::conv2d || n->kind() == aten::conv3d) {
     return true;
   } else {
     return false;
   }
+}
+
+bool FoldFrozenConvBatchnorm(Block* b) {
+  bool graph_modified = false;
+  for (Node* n : b->nodes()) {
+    for (Block* block : n->blocks()) {
+      graph_modified |= FoldFrozenConvBatchnorm(block);
+    }
+
+    if (n->kind() == aten::batch_norm &&
+        supportedConvNode(n->inputs().at(0)->node())) {
+      auto conv = n->inputs().at(0)->node();
+      auto bn = n;
+      if (nonConstantParameters(conv) || nonConstantParameters(bn)) {
+        continue;
+      }
+      if (conv->output()->uses().size() > 1) {
+        continue;
+      }
+
+      auto bn_rm_ivalue = bn->namedInput("running_mean");
+      auto bn_rv_ivalue = bn->namedInput("running_var");
+      // check running_mean and running_var has value, if they are
+      // None(track_running_stats=False), skiping the folding path.
+      if (bn_rm_ivalue->type() == NoneType::get() &&
+          bn_rv_ivalue->type() == NoneType::get()) {
+        continue;
+      }
+
+      auto bn_rm = constant_as<Tensor>(bn->namedInput("running_mean")).value();
+      auto bn_rv = constant_as<Tensor>(bn->namedInput("running_var")).value();
+      auto bn_eps = constant_as<double>(bn->namedInput("eps")).value();
+      auto conv_w = constant_as<Tensor>(conv->namedInput("weight")).value();
+
+      // implementation taken from torch/nn/utils/fusion.py
+      Tensor conv_b;
+      if (conv->namedInput("bias")->type() == NoneType::get()) {
+        conv_b = at::zeros_like(bn_rm);
+      } else {
+        conv_b = constant_as<Tensor>(conv->namedInput("bias")).value();
+      }
+      Tensor bn_w;
+      if (bn->namedInput("weight")->type() == NoneType::get()) {
+        bn_w = at::ones_like(bn_rm);
+      } else {
+        bn_w = constant_as<Tensor>(bn->namedInput("weight")).value();
+      }
+      Tensor bn_b;
+      if (n->namedInput("bias")->type() == NoneType::get()) {
+        bn_b = at::zeros_like(bn_rm);
+      } else {
+        bn_b = constant_as<Tensor>(bn->namedInput("bias")).value();
+      }
+
+      ConvBNParameters params;
+      params.conv_w = conv_w;
+      params.conv_b = conv_b;
+      params.bn_rm = bn_rm;
+      params.bn_rv = bn_rv;
+      params.bn_eps = bn_eps;
+      params.bn_w = bn_w;
+      params.bn_b = bn_b;
+      std::tuple<Tensor, Tensor> out = computeUpdatedConvWeightAndBias(params);
+      WithInsertPoint guard(conv);
+      auto fused_conv_w = b->owningGraph()->insertConstant(std::get<0>(out));
+      auto fused_conv_b = b->owningGraph()->insertConstant(std::get<1>(out));
+      auto conv_w_value = conv->namedInput("weight");
+      auto conv_b_value = conv->namedInput("bias");
+
+      fused_conv_w->setDebugName(conv_w_value->debugName() + "_fused_bn");
+      fused_conv_b->setDebugName(conv_b_value->debugName() + "_fused_bn");
+
+      conv->replaceInputWith(conv_w_value, fused_conv_w);
+      conv->replaceInputWith(conv_b_value, fused_conv_b);
+
+      bn->output()->replaceAllUsesWith(conv->output());
+      graph_modified = true;
+    }
+  }
+  return graph_modified;
 }
 
 // In order to fuse add/sub/mul/div with conv, the dimensions of its
@@ -82,31 +162,8 @@ bool checkConvAndBroadcastingOpPreConditions(Node* conv, Node* op) {
 
   if (op->inputs().at(1)->type()->cast<TensorType>()) {
     auto op_tensor = constant_as<Tensor>(op->inputs().at(1)).value();
-    if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
-      if (!opDoesNotBroadCastWithConv(op_tensor, weight_tensor)) {
-        return false;
-      }
-    } else {
-      if (op_tensor.ndimension() > conv->inputs()
-                                       .at(0)
-                                       ->type()
-                                       ->cast<TensorType>()
-                                       ->sizes()
-                                       .size()
-                                       .value()) {
-        return false;
-      }
-      for (int64_t i = op_tensor.ndimension() - 1; i >= 0; i--) {
-        if (i == 1 &&
-            op_tensor.size(i) ==
-                constant_as<int64_t>(conv->namedInput("output_channel"))
-                    .value()) {
-          continue;
-        }
-        if (op_tensor.size(i) != 1) {
-          return false;
-        }
-      }
+    if (!opDoesNotBroadCastWithConv(op_tensor, weight_tensor)) {
+      return false;
     }
     if (!op_tensor.is_floating_point() &&
         c10::promoteTypes(
@@ -138,17 +195,10 @@ bool FoldFrozenConvAddOrSub(Block* b) {
           constant_as<Tensor>(conv->namedInput("weight")).value();
 
       Tensor add_or_sub_tensor;
-      if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
-        add_or_sub_tensor = resizeConstantScalarOrTensorToShape(
-            add_or_sub->inputs().at(1),
-            {weight_tensor.size(0)},
-            weight_tensor.options());
-      } else {
-        add_or_sub_tensor = resizeConstantScalarOrTensorToShape(
-            add_or_sub->inputs().at(1),
-            {constant_as<int64_t>(conv->namedInput("output_channel")).value()},
-            weight_tensor.options());
-      }
+      add_or_sub_tensor = resizeConstantScalarOrTensorToShape(
+          add_or_sub->inputs().at(1),
+          {weight_tensor.size(0)},
+          weight_tensor.options());
       Tensor bias;
       if (conv->namedInput("bias")->type() == NoneType::get()) {
         bias = at::zeros_like(add_or_sub_tensor, weight_tensor.dtype());
@@ -198,27 +248,7 @@ bool FoldFrozenConvMulOrDiv(Block* b) {
       }
 
       Tensor weight_tensor;
-      if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
-        weight_tensor = constant_as<Tensor>(conv->namedInput("weight")).value();
-      } else {
-        weight_tensor = torch_ipex::cpu::convolution_weight_unpack(
-            constant_as<Tensor>(conv->namedInput("weight")).value(),
-            toIValue(conv->namedInput("padding"))->toIntVector(),
-            toIValue(conv->namedInput("stride"))->toIntVector(),
-            toIValue(conv->namedInput("dilation"))->toIntVector(),
-            toIValue(conv->namedInput("kernel_size"))->toIntVector(),
-            constant_as<int64_t>(conv->namedInput("groups")).value(),
-            constant_as<int64_t>(conv->namedInput("output_channel")).value(),
-            conv->inputs()
-                .at(0)
-                ->type()
-                ->cast<TensorType>()
-                ->sizes()
-                .concrete_sizes()
-                .value()[1],
-            constant_as<bool>(conv->namedInput("weight_channels_last")).value(),
-            c10::nullopt);
-      }
+      weight_tensor = constant_as<Tensor>(conv->namedInput("weight")).value();
 
       int64_t out_channels = weight_tensor.size(0);
 
@@ -247,17 +277,7 @@ bool FoldFrozenConvMulOrDiv(Block* b) {
       TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
 
       Tensor fuse_weight;
-      if (conv->kind() == aten::conv2d || conv->kind() == aten::conv3d) {
-        fuse_weight = (*stack_out)[0].toTensor().to(weight_tensor.dtype());
-      } else {
-        fuse_weight = torch_ipex::cpu::convolution_weight_pack(
-            (*stack_out)[0].toTensor().to(weight_tensor.dtype()),
-            toIValue(conv->namedInput("padding"))->toIntVector(),
-            toIValue(conv->namedInput("stride"))->toIntVector(),
-            toIValue(conv->namedInput("dilation"))->toIntVector(),
-            constant_as<int64_t>(conv->namedInput("groups")).value(),
-            c10::nullopt);
-      }
+      fuse_weight = (*stack_out)[0].toTensor().to(weight_tensor.dtype());
 
       auto fused_conv_weight = b->owningGraph()->insertConstant(fuse_weight);
       auto conv_weight_value = conv->namedInput("weight");
@@ -298,7 +318,11 @@ bool FoldFrozenConvMulOrDiv(Block* b) {
   return graph_modified;
 }
 
-} // namespace
+bool FoldFrozenConvBatchnorm(std::shared_ptr<Graph>& graph) {
+  bool graph_modified = FoldFrozenConvBatchnorm(graph->block());
+  EliminateDeadCode(graph);
+  return graph_modified;
+}
 
 bool FoldFrozenConvAddOrSub(std::shared_ptr<Graph>& graph) {
   bool graph_modified = FoldFrozenConvAddOrSub(graph->block());
@@ -317,10 +341,12 @@ void FrozenConvFolding(std::shared_ptr<Graph>& graph) {
   bool changed;
   do {
     changed = false;
+    changed |= FoldFrozenConvBatchnorm(graph);
     changed |= FoldFrozenConvAddOrSub(graph);
     changed |= FoldFrozenConvMulOrDiv(graph);
   } while (changed);
 }
 
+} // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

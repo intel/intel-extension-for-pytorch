@@ -16,6 +16,7 @@
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/batch_mm.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
+#include <torch/csrc/jit/passes/frozen_conv_folding.h>
 #include <torch/csrc/jit/passes/graph_rewrite_helper.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/remove_dropout.h>
@@ -361,18 +362,24 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // Replace _convolution with conv2d or conv3d
   graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 
+  // Replace torch_ipex::convolution_forward with conv2d or conv3d when conv
+  // weights are constant. Conv weights will be unpacked in this step.
+  graph_rewrite::replaceFrozenIPEXConvWithAtenConv(graph);
+
   // convolution folding
-  FrozenConvFolding(graph);
+  graph_rewrite::FrozenConvFolding(graph);
+
+  // Insert ipex_prepack::convolution_prepack.
+  // Conv weights will be re-prepacked in this step.
+  graph_rewrite::insertPrePackedConvOp(graph);
 
   // convolution fusion
-  graph_rewrite::insertPrePackedConvOp(graph);
   graph_rewrite::fuseConvWithEltwise(graph);
   graph_rewrite::fuseConvAddRelu(graph);
   graph_rewrite::fuseBottleneck(graph);
 
   // linear folding
-  FoldFrozenLinearAddOrSub(graph);
-  FoldFrozenLinearMulOrDiv(graph);
+  graph_rewrite::FrozenLinearFolding(graph);
 
   // linear fusion
   graph_rewrite::insertPrePackedLinearOp(graph);

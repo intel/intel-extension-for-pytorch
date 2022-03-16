@@ -1436,6 +1436,40 @@ class Tester(TestCase):
                 prec=0.02,
                 levels=['O1'])
 
+    def test_output_frozen_conv_bn(self):
+        batch_size = 8
+        out_channels = 16
+        in_channels = 3
+        kernel_size = 3
+        image_size = 16
+        options = itertools.product([torch.float32, torch.bfloat16], [True, False])
+        for dtype, use_channels_last in options:
+            input_size = [batch_size, in_channels, image_size, image_size]
+            model = ConvBatchNorm_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
+            x = torch.randn(input_size, dtype=dtype)
+            if use_channels_last:
+                x = x.to(memory_format=torch.channels_last)
+                model = model.to(memory_format=torch.channels_last)
+            
+            model = ipex.optimize(model, dtype=dtype, conv_bn_folding=False)
+
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype), torch.no_grad():
+                result = model(x)
+                trace_model = torch.jit.trace(model, x).eval()
+                freeze_model = torch.jit.freeze(trace_model)
+
+                tresult = trace_model(x)
+                fused_tresult = freeze_model(x)
+
+                trace_graph = trace_model.graph_for(x)
+                freeze_graph = freeze_model.graph_for(x)
+
+                self.assertEqual(result, tresult)
+                self.assertEqual(result, fused_tresult)
+                self.assertEqual(fused_tresult.dtype, dtype)
+                self.assertTrue(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()))
+                self.assertTrue(all(n.kind() != "ipex::batch_norm" for n in freeze_graph.nodes()))
+
     def test_output_bn_conv(self):
         batch_size = 8
         out_channels = 16
