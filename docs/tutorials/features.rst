@@ -44,6 +44,8 @@ Low precision data type BFloat16 has been natively supported on the 3rd Generati
 
 Check more detailed information for `Auto Mixed Precision (AMP) <features/amp.html>`_.
 
+Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with `AVX512 BFloat16 instruction <https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html>`_, there will be further performance boost.
+
 .. toctree::
    :hidden:
    :maxdepth: 1

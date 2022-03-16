@@ -1,13 +1,95 @@
 Releases
 =============
 
+## 1.11.0
+
+We are excited to announce Intel® Extension for PyTorch\* 1.11.0-cpu release by tightly following PyTorch 1.11 release. Along with extension 1.11, we focused on continually improving OOB user experience and performance. Highlights include:
+
+* Support a single binary with runtime dynamic dispatch based on AVX2/AVX512 hardware ISA detection
+* Support install binary from `pip` with package name only (without the need of specifying the URL)
+* Provide the C++ SDK installation to facilitate ease of C++ app development and deployment
+* Add more optimizations, including graph fusions for speeding up Transformer-based models and CNN, etc
+* Reduce the binary size for both the PIP wheel and C++ SDK (2X to 5X reduction from the previous version)
+
+### Highlights
+- Combine the AVX2 and AVX512 binary as a single binary and automatically dispatch to different implementations based on hardware ISA detection at runtime. The typical case is to serve the data center that mixtures AVX2-only and AVX512 platforms. It does not need to deploy the different ISA binary now compared to the previous version
+
+    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Please refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details. 
+
+    > When one input is of type u8, and the other one is of type s8, oneDNN assumes that it is the user’s responsibility to choose the quantization parameters so that no overflow/saturation occurs. For instance, a user can use u7 [0, 127] instead of u8 for the unsigned input, or s7 [-64, 63] instead of the s8 one. It is worth mentioning that this is required only when the Intel AVX2 or Intel AVX512 Instruction Set is used.
+
+- The extension wheel packages have been uploaded to [pypi.org](https://pypi.org/project/intel-extension-for-pytorch/). The user could directly install the extension by `pip/pip3` without explicitly specifying the binary location URL.
+
+<table align="center">
+<tbody>
+<tr>
+<td>v1.10.100-cpu</td>
+<td>v1.11.0-cpu</td>
+</tr>
+<tr>
+<td>
+
+```python
+python -m pip install intel_extension_for_pytorch==1.10.100 -f https://software.intel.com/ipex-whl-stable
+```
+</td>
+<td>
+
+```python
+pip install intel_extension_for_pytorch
+```
+</td>
+</tr>
+</tbody>
+</table>
+
+- Compared to the previous version, this release provides a dedicated installation file for the C++ SDK. The installation file automatically detects the PyTorch C++ SDK location and installs the extension C++ SDK files to the PyTorch C++ SDK. The user does not need to manually add the extension C++ SDK source files and CMake to the PyTorch SDK. In addition to that, the installation file reduces the C++ SDK binary size from ~220MB to ~13.5MB. 
+
+<table align="center">
+<tbody>
+<tr>
+<td>v1.10.100-cpu</td>
+<td>v1.11.0-cpu</td>
+</tr>
+<tr>
+<td>
+
+```python
+intel-ext-pt-cpu-libtorch-shared-with-deps-1.10.0+cpu.zip (220M)
+intel-ext-pt-cpu-libtorch-cxx11-abi-shared-with-deps-1.10.0+cpu.zip (224M)
+```
+</td>
+<td>
+
+```python
+libintel-ext-pt-1.11.0+cpu.run (13.7M)
+libintel-ext-pt-cxx11-abi-1.11.0+cpu.run (13.5M)
+```
+</td>
+</tr>
+</tbody>
+</table>
+
+- Add more optimizations, including more custom operators and fusions.
+    - Fuse the QKV linear operators as a single Linear to accelerate the Transformer\*(BERT-\*) encoder part  - [#278](https://github.com/intel/intel-extension-for-pytorch/commit/0f27c269cae0f902973412dc39c9a7aae940e07b).
+    - Remove Multi-Head-Attention fusion limitations to support the 64bytes unaligned tensor shape. [#531](https://github.com/intel/intel-extension-for-pytorch/commit/dbb10fedb00c6ead0f5b48252146ae9d005a0fad)
+    - Fold the binary operator to Convolution and Linear operator to reduce computation. [#432](https://github.com/intel/intel-extension-for-pytorch/commit/564588561fa5d45b8b63e490336d151ff1fc9cbc) [#438](https://github.com/intel/intel-extension-for-pytorch/commit/b4e7dacf08acd849cecf8d143a11dc4581a3857f) [#602](https://github.com/intel/intel-extension-for-pytorch/commit/74aa21262938b923d3ed1e6929e7d2b629b3ff27)
+    - Replace the outplace operators with their corresponding in-place version to reduce memory footprint. The extension currently supports the operators including `sliu`, `sigmoid`, `tanh`, `hardsigmoid`, `hardswish`, `relu6`, `relu`, `selu`, `softmax`. [#524](https://github.com/intel/intel-extension-for-pytorch/commit/38647677e8186a235769ea519f4db65925eca33c)
+    - Fuse the Concat + BN + ReLU as a single operator. [#452](https://github.com/intel/intel-extension-for-pytorch/commit/275ff503aea780a6b741f04db5323d9529ee1081)
+    - Optimize Conv3D for both imperative and JIT by enabling NHWC and pre-packing the weight. [#425](https://github.com/intel/intel-extension-for-pytorch/commit/ae33faf62bb63b204b0ee63acb8e29e24f6076f3)
+- Reduce the binary size. C++ SDK is reduced from ~220MB to ~13.5MB while the wheel packaged is reduced from ~100MB to ~40MB.
+- Update oneDNN and oneDNN graph to [2.5.2](https://github.com/oneapi-src/oneDNN/releases/tag/v2.5.2) and [0.4.2](https://github.com/oneapi-src/oneDNN/releases/tag/graph-v0.4.2) respectively.
+
+### What's Changed
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v1.10.100...v1.11.0
+
 ## 1.10.100
 
 This release is meant to fix the following issues:
 - Resolve the issue that the PyTorch Tensor Expression(TE) did not work after importing the extension.
-- Wraps the BactchNorm(BN) as another operator to break the TE's BN-related fusions. Because the BatchNorm performance of PyTorch Tensor Expression can not achieve the same performance as PyTorch ATen BN. 
+- Wraps the BactchNorm(BN) as another operator to break the TE's BN-related fusions. Because the BatchNorm performance of PyTorch Tensor Expression can not achieve the same performance as PyTorch ATen BN.
 - Update the [documentation](https://intel.github.io/intel-extension-for-pytorch/)
-    - Fix the INT8 quantization example issue #205 
+    - Fix the INT8 quantization example issue #205
     - Polish the installation guide
 
 ## 1.10.0
@@ -149,7 +231,7 @@ class MyModel(nn.Module):
     def __init__(self):
         super(MyModel, self).__init__()
         self.conv = nn.Conv2d(10, 10, 3)
-        
+
     def forward(self, x):
         x = self.conv(x)
         return x
