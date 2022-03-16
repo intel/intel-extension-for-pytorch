@@ -134,6 +134,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   for (auto ng = ngroups; remained > 1;
        ng = (ng + wgroup_size - 1) / wgroup_size) {
     auto total_ngroups = ng * num_of_reduce_line;
+    wgroup_size = std::min(max_wgroup_size, remained);
     auto cgf = DPCPP_Q_CGF(__cgh) {
       dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
@@ -147,7 +148,7 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
 
         auto index = i * size_rdim + sub_global_id;
         // init local shared memory of input
-        if (sub_global_id < N) {
+        if (sub_global_id < remained) {
           local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
         }
 
@@ -239,6 +240,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   for (auto ng = ngroups; remained > 1;
        ng = (ng + wgroup_size - 1) / wgroup_size) {
     auto total_ngroups = ng * num_of_reduce_line;
+    wgroup_size = std::min(max_wgroup_size, remained);
     auto cgf = DPCPP_Q_CGF(__cgh) {
       dpcpp_local_acc_t<max_t> local_max_buf(wgroup_size, __cgh);
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
@@ -253,7 +255,7 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
         auto index = i / stride_rdim * stride_rdim * size_rdim +
             i % stride_rdim + sub_global_id * stride_rdim;
         // init local shared memory of input
-        if (sub_global_id < N) {
+        if (sub_global_id < remained) {
           local_max_buf[local_id] = max_t(tgt1_ptr[index], tgt2_ptr[index]);
         }
 
