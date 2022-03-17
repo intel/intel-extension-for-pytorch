@@ -166,7 +166,7 @@ static bool is_wrapped_number(const Tensor& t) {
 static inline bool is_broadcast_from_other_to_self(
     const at::Tensor& self,
     const at::Tensor& other) {
-  return (self.sizes() != other.sizes()) &&
+  return (self.sizes() == other.sizes()) ||
       is_expandable_to(other.sizes(), self.sizes());
 }
 
