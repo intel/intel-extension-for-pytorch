@@ -13,12 +13,16 @@ class FrozenBatchNorm2d(nn.Module):
         - Output: :math:`(N, C, H, W)` (same shape as input)
     """
 
-    def __init__(self, num_features):
+    def __init__(self,
+        num_features: int,
+        eps: float = 1e-5,
+    ):
         super(FrozenBatchNorm2d, self).__init__()
+        self.eps = eps
         self.register_buffer("weight", torch.ones(num_features))
         self.register_buffer("bias", torch.zeros(num_features))
         self.register_buffer("running_mean", torch.zeros(num_features))
         self.register_buffer("running_var", torch.ones(num_features))
 
     def forward(self, input):
-        return torch.ops.torch_ipex.frozen_batch_norm(input, self.weight, self.bias, self.running_mean, self.running_var)
+        return torch.ops.torch_ipex.frozen_batch_norm(input, self.weight, self.bias, self.running_mean, self.running_var, self.eps)

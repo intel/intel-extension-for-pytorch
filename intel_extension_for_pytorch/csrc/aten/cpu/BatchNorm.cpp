@@ -289,15 +289,36 @@ at::Tensor frozen_batch_norm(
     const at::Tensor& weight,
     const at::Tensor& bias,
     const at::Tensor& running_mean,
-    const at::Tensor& running_var) {
+    const at::Tensor& running_var,
+    double eps) {
   IPEX_RECORD_FUNCTION(
       "torch_ipex::frozen_batch_norm", std::vector<c10::IValue>({}));
 
   return IPEXBatchNormOp::apply(
-      input, weight, bias, running_mean, running_var, false, 0, 0);
+      input, weight, bias, running_mean, running_var, false, 0, eps);
 }
 
 } // namespace cpu
+} // namespace torch_ipex
+
+namespace torch_ipex {
+namespace autocast {
+
+at::Tensor frozen_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    double eps) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::frozen_batch_norm", "")
+                       .typed<decltype(frozen_batch_norm)>();
+  return op.call(input, weight, bias, running_mean, running_var, eps);
+}
+
+} // namespace autocast
 } // namespace torch_ipex
 
 namespace {
@@ -305,11 +326,15 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "frozen_batch_norm(Tensor input, Tensor weight, Tensor bias, Tensor "
-      "running_mean, Tensor running_var) -> Tensor");
+      "running_mean, Tensor running_var, float eps) -> Tensor");
   m.impl(
       "frozen_batch_norm",
-      c10::DispatchKey::Autograd,
+      c10::DispatchKey::AutogradCPU,
       torch_ipex::cpu::frozen_batch_norm);
+  m.impl(
+      "frozen_batch_norm",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::frozen_batch_norm);
   m.def(
       "batch_norm_forward(Tensor input, Tensor weight, Tensor bias, Tensor? "
       "running_mean, Tensor? running_var, bool train, float momentum, float "
@@ -329,26 +354,3 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
 }
 
 } // namespace
-
-namespace torch_ipex {
-namespace autocast {
-
-at::Tensor frozen_batch_norm(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    const at::Tensor& running_mean,
-    const at::Tensor& running_var) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::frozen_batch_norm", "")
-                       .typed<decltype(frozen_batch_norm)>();
-  return op.call(input, weight, bias, running_mean, running_var);
-}
-
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
-  m.impl("frozen_batch_norm", torch_ipex::autocast::frozen_batch_norm);
-}
-
-} // namespace autocast
-} // namespace torch_ipex
