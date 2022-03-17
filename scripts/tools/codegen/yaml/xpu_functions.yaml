@@ -489,6 +489,7 @@ supported:
   - rsqrt.out
 #  - rsub.Scalar  # different signature
 #  - rsub.Tensor  # different signature
+  - scatter.src
   - scatter_.src
 #  - scatter_.value
 #  - scatter_add_

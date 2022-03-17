@@ -467,6 +467,38 @@ Tensor& scatter_(
   return self;
 }
 
+Tensor scatter(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src) {
+  Tensor out = at::empty_like(self);
+  out.copy_(self);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      out.scalar_type(),
+      "Scatter",
+      [&]() { impl::Scatter<scalar_t>(out, dim, index, src); });
+  return out;
+}
+
+Tensor scatter(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Scalar& value) {
+  Tensor out = at::empty_like(self);
+  out.copy_(self);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      out.scalar_type(),
+      "ScatterFill",
+      [&]() { impl::ScatterFill<scalar_t>(out, dim, index, value); });
+  return out;
+}
+
 Tensor& scatter_out(
     const Tensor& self,
     int64_t dim,
