@@ -68,7 +68,7 @@ This page shows performance boost with Intel® Extension for PyTorch\* on severa
     <td style="text-align: center; vertical-align: middle" scope="col">Input shape<br />[3, 224, 224]</td>
   </tr>
   <tr>
-    <td style="text-align: center; vertical-align: middle" scope="col">Fast R-CNN ResNet50 FPN</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Faster R-CNN ResNet50 FPN</td>
     <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
     <td style="text-align: center; vertical-align: middle" scope="col">80</td>
     <td style="text-align: center; vertical-align: middle" scope="col">1.71x</td>

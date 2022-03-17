@@ -8,17 +8,17 @@ More detailed tutorials are available at [**Intel® Extension for PyTorch\* onli
 
 ## Installation
 
-Wheel files are avaiable for the following Python versions.
-
-| Extension Version | Python 3.6 | Python 3.7 | Python 3.8 | Python 3.9 |
-| :--: | :--: | :--: | :--: | :--: |
-| 1.10.100 | ✔️ | ✔️ | ✔️ | ✔️ |
+You can use either of the following 2 commands to install Intel® Extension for PyTorch\*.
 
 ```python
-python -m pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
-python -m pip install intel_extension_for_pytorch==1.10.100 -f https://software.intel.com/ipex-whl-stable
-python -m pip install psutil
+python -m pip install intel_extension_for_pytorch
 ```
+
+```python
+python -m pip install intel_extension_for_pytorch -f https://software.intel.com/ipex-whl-stable
+```
+
+**Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
 
 More installation methods can be found at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/tutorials/installation.html)
 

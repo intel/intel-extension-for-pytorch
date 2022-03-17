@@ -1,20 +1,15 @@
 Known Issues
 ============
 
-- `omp_set_num_threads` function failed to change OpenMP threads number of oneDNN operators if it was set before.
+- BF16 AMP(auto-mixed-precision) runs abnormally with the extension on the AVX2-only machine if the topology contains `Conv`, `Matmul`, `Linear`, and `BatchNormalization`
 
-  `omp_set_num_threads` function is provided in Intel® Extension for PyTorch\* to change number of threads used with openmp. However, it failed to change number of OpenMP threads if it was set before.
+- Runtime extension does not support the scenario that the BS is not divisible by the stream number
 
-  pseudo code:
+- Incorrect Conv and Linear result if the number of OMP threads is changed at runtime
 
-  ```
-  omp_set_num_threads(6)
-  model_execution()
-  omp_set_num_threads(4)
-  same_model_execution_again()
-  ```
+  The oneDNN memory layout depends on the number of OMP threads, which requires the caller to detect the changes for the # of OMP threads while this release has not implemented it yet.
 
-  **Reason:** oneDNN primitive descriptor stores the omp number of threads. Current oneDNN integration caches the primitive descriptor in IPEX. So if we use runtime extension with oneDNN based pytorch/ipex operation, the runtime extension fails to change the used omp number of threads.
+- INT8 performance of EfficientNet and DenseNet with Intel® Extension for PyTorch\* is slower than that of FP32
 
 - Low performance with INT8 support for dynamic shapes
 

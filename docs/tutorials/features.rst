@@ -44,6 +44,8 @@ Low precision data type BFloat16 has been natively supported on the 3rd Generati
 
 Check more detailed information for `Auto Mixed Precision (AMP) <features/amp.html>`_.
 
+Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with `AVX512 BFloat16 instruction <https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html>`_, there will be further performance boost.
+
 .. toctree::
    :hidden:
    :maxdepth: 1
@@ -116,6 +118,8 @@ INT8 Quantization (Experimental)
 Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. The quantized model is then optimized with the `oneDNN graph <https://spec.oneapi.io/onednn-graph/latest/introduction.html>`_ fusion pass to deliver good performance.
 
 Check more detailed information for `INT8 <features/int8.html>`_.
+
+oneDNN provides an evaluation feature called `oneDNN Graph Compiler <https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler>`_. Please refer to `oneDNN build instruction <https://github.com/oneapi-src/oneDNN/blob/dev-graph-preview4/doc/build/build_options.md#build-graph-compiler>`_ to try this feature. You can find oneDNN in `third_party/llga`.
 
 .. toctree::
    :hidden:
