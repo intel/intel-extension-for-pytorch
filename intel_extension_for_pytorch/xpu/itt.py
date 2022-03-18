@@ -50,10 +50,12 @@ class emit_itt(object):
         if self.entered:
             raise RuntimeError("ITT annotation context manager is not reentrant")
         self.entered = True
-        torch.autograd._enable_profiler(
+        torch.autograd._enable_profiler_legacy(
             torch.autograd.ProfilerConfig(
                 torch.autograd.ProfilerState.ITT,
                 self.record_shapes,
+                False,
+                False,
                 False,
                 False)
         )
@@ -62,5 +64,5 @@ class emit_itt(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self.enabled:
             return
-        torch.autograd._disable_profiler()
+        torch.autograd._disable_profiler_legacy()
         return False
