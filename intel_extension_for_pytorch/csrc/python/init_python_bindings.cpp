@@ -47,11 +47,11 @@ namespace {
 
 py::object GetBinaryInfo() {
   auto py_dict = py::dict();
-  py_dict["__version__"] = std::string(__version__);
-  py_dict["__gitrev__"] = std::string(__gitrev__);
-  py_dict["__avx_version__"] = std::string(__avx_version__);
-  py_dict["__torch_gitrev__"] = std::string(__torch_gitrev__);
-  py_dict["__mode__"] = std::string(__mode__);
+  py_dict["__version__"] = __version__();
+  py_dict["__gitrev__"] = __gitrev__();
+  py_dict["__avx_version__"] = __avx_version__();
+  py_dict["__torch_gitrev__"] = __torch_gitrev__();
+  py_dict["__mode__"] = __mode__();
   return std::move(py_dict);
 }
 

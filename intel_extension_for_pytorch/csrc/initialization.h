@@ -13,14 +13,19 @@ class InitIPEX final {
   InitIPEX& operator=(InitIPEX&&) noexcept;
 
   InitIPEX&& init(void (*func)()) && {
+    check_pytorch_version();
     func();
     return std::move(*this);
   }
 
   InitIPEX& init(void (*func)()) & {
+    check_pytorch_version();
     func();
     return *this;
   }
+
+ private:
+  void check_pytorch_version();
 };
 
 } // namespace torch_ipex
