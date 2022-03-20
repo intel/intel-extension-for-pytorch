@@ -53,17 +53,18 @@ Tensor elu(
 }
 
 Tensor& elu_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
-    Scalar alpha,
-    Scalar scale,
-    Scalar input_scale,
-    const Tensor& output) {
+    const Scalar& alpha,
+    const Scalar& scale,
+    const Scalar& input_scale,
+    bool is_result,
+    const Tensor& self_or_result,
+    Tensor& grad_input) {
   auto iter = TensorIteratorConfig()
                   .set_check_mem_overlap(true)
                   .add_output(grad_input)
                   .add_input(grad_output)
-                  .add_input(output)
+                  .add_input(self_or_result)
                   .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -73,10 +74,15 @@ Tensor& elu_backward_out(
         auto negiptocoef = input_scale.to<scalar_t>();
 
         dpcpp_kernel_for_tensor_iter(
-            iter, [=](scalar_t grad_output, scalar_t output) -> scalar_t {
-              if (output <= 0)
-                return grad_output * negiptocoef * (output + negcoef);
-              else
+            iter,
+            [=](scalar_t grad_output, scalar_t self_or_result) -> scalar_t {
+              if (self_or_result <= 0) {
+                if (is_result)
+                  return grad_output * negiptocoef * (self_or_result + negcoef);
+                else
+                  return grad_output * negiptocoef * negcoef *
+                      Numerics<scalar_t>::exp(self_or_result * negiptocoef);
+              } else
                 return grad_output * poscoef;
             });
       });
@@ -85,13 +91,20 @@ Tensor& elu_backward_out(
 
 Tensor elu_backward(
     const Tensor& grad_output,
-    Scalar alpha,
-    Scalar scale,
-    Scalar input_scale,
-    const Tensor& output) {
+    const Scalar& alpha,
+    const Scalar& scale,
+    const Scalar& input_scale,
+    bool is_result,
+    const Tensor& self_or_result) {
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::AtenIpexTypeXPU::elu_backward_out(
-      grad_input, grad_output, alpha, scale, input_scale, output);
+      grad_output,
+      alpha,
+      scale,
+      input_scale,
+      is_result,
+      self_or_result,
+      grad_input);
 }
 
 Tensor& elu_(

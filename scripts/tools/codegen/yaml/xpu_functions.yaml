@@ -178,8 +178,8 @@ supported:
   - elu
   - elu.out
   - elu_
-#  - elu_backward  # different schema
-#  - elu_backward.grad_input  # different schema
+  - elu_backward
+  - elu_backward.grad_input
   - embedding_dense_backward
   - empty.memory_format
   - empty_strided

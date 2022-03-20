@@ -16,7 +16,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_elu(self, dtype=torch.float):
         def test_Xelu(Xelu):
             x_cpu = torch.randn([3, 4], device=cpu_device, dtype=dtype, requires_grad=True)
