@@ -10077,7 +10077,6 @@ class TestNNDeviceType(NNTestCase):
 
     @dtypesIfDPCPP(torch.float, torch.bfloat16) # dnnl unsupport double, we cancel the double case
     @dtypes(torch.float)
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_variable_sequence(self, device, dtype):
         def pad(var, length):
             if var.size(0) == length:

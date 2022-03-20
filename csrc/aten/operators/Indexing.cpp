@@ -221,7 +221,9 @@ void indexAdd(
     Tensor& dst,
     int64_t dim,
     const Tensor& indices,
-    const Tensor& src) {
+    const Tensor& src,
+    const Scalar& alpha) {
+  scalar_t alpha_val = alpha.to<scalar_t>();
   dim = maybe_wrap_dim(dim, dst.dim());
 
   auto numIndices = indices.numel();
@@ -358,7 +360,7 @@ void indexAdd(
                   __inner_idx, dst_info);
               src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
                   __inner_idx, src_info);
-              g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
+              g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_] * alpha_val;
             }
           }
         });
@@ -1057,13 +1059,14 @@ Tensor& index_add_(
     Tensor& self,
     int64_t dim,
     const Tensor& index,
-    const Tensor& source) {
+    const Tensor& source,
+    const Scalar& alpha) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "indexAdd",
-      [&]() { impl::indexAdd<scalar_t>(self, dim, index, source); });
+      [&]() { impl::indexAdd<scalar_t>(self, dim, index, source, alpha); });
   return self;
 }
 

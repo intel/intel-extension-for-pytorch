@@ -33,7 +33,6 @@ class TestTorchMethod(TestCase):
         print("y_xpu = ", y_xpu.cpu())
         self.assertEqual(y, y_xpu.cpu())
 
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_index_add(self, dtype=torch.float):
         x = torch.randn((8192, 8192), device=cpu_device)
         t = torch.randn((4096, 8192), dtype=torch.float)
