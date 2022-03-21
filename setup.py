@@ -391,7 +391,7 @@ setup(
             'include/*.h',
             'include/core/*.h',
             'include/utils/*.h',
-            'share/cmake/Ipex/*']
+            'share/cmake/IntelExtensionPytorch/*']
     },
     long_description=long_description,
     long_description_content_type='test/markdown',
