@@ -115,7 +115,7 @@ class JitLlgaTestCase(JitTestCase):
 
             return graph
 
-    def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine, int8_bf16=False):
+    def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine, int8_bf16=False, inplace=False):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             conf = ipex.quantization.QuantConf(qscheme=qscheme)
@@ -141,9 +141,9 @@ class JitLlgaTestCase(JitTestCase):
                 # jit trace to insert quant/dequant
                 if int8_bf16:
                     with torch.cpu.amp.autocast():
-                        traced_model = ipex.quantization.convert(model, conf, x)
+                        traced_model = ipex.quantization.convert(model, conf, x, inplace=inplace)
                 else:
-                    traced_model = ipex.quantization.convert(model, conf, x)
+                    traced_model = ipex.quantization.convert(model, conf, x, inplace=inplace)
 
             # warm up run
             y0 = traced_model(*x)
