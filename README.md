@@ -357,3 +357,22 @@ export LIBRARY_PATH=${MKL_DPCPP_ROOT}/lib:${MKL_DPCPP_ROOT}/lib64:${MKL_DPCPP_RO
 
 Please note that the solutions to above issues are workaround. When MKLD-11291 is solved, mkl library for CPU and oneMKL library for GPU can work together in same system, we will no longer meet such issues. For now, we recommend to build PyTorch with mkl from conda channel and build Intel® Extension for PyTorch* with oneMKL library from oneAPI Base toolkit, which is the typical usage scenario validated regularly.
 
+### 3. symbol undefined caused by _GLIBCXX_USE_CXX11_ABI:
+#### Error info: <br>
+```bash
+File "/root/.local/lib/python3.9/site-packages/ipex/__init__.py", line 4, in <module>
+    from . import _C
+ImportError: /root/.local/lib/python3.9/site-packages/ipex/lib/libipex_gpu_core.so: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
+```
+
+This issue appears when Intel® Extension for PyTorch* is compiled with _GLIBCXX_USE_CXX11_ABI=1 and PyTorch is compiled with _GLIBCXX_USE_CXX11_ABI=0, which causes inconsistent.
+<BR>
+
+#### Background：
+1. DPC++ has no plan to support _GLIBCXX_USE_CXX11_ABI=0 (CMPLRLLVM-34202), Intel® Extension for PyTorch* is always compiled with _GLIBCXX_USE_CXX11_ABI=1. <br>
+2. PyTorch detects the setting of _GLIBCXX_USE_CXX11_ABI by checking user config and compiler capability. If compiler in use does not support _GLIBCXX_USE_CXX11_ABI=1, PyTorch is compiled with _GLIBCXX_USE_CXX11_ABI=0. PyTorch publishes official binary package with _GLIBCXX_USE_CXX11_ABI=0. <br>
+
+#### Solution：
+User shall update PyTorch CMAKE file to set _GLIBCXX_USE_CXX11_ABI=1 and compile PyTorch with particular compiler which supports _GLIBCXX_USE_CXX11_ABI=1. We recommend to use gcc version 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04) on ubuntu 20.04 which is validated by us. <br>
+
+This issue won't exist with future version of PyTorch as community agrees to provide _GLIBCXX_USE_CXX11_ABI=1 binary for versions after PyTorch 1.10. 
