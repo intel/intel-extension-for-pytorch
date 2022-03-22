@@ -62,6 +62,16 @@ SET(AVX512_BF16_CODE "
   }
 ")
 
+SET(AMX_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+
+  int main() {
+    _tile_dpbusd (1, 2, 3);
+    return 0;
+  }
+")
+
 MACRO(CHECK_SSE lang type flags)
   SET(__FLAG_I 1)
   SET(CMAKE_REQUIRED_FLAGS_SAVE ${CMAKE_REQUIRED_FLAGS})
@@ -105,3 +115,10 @@ CHECK_SSE(CXX "AVX512_VNNI" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx5
 # https://gcc.gnu.org/onlinedocs/gcc-10.3.0/gcc/x86-Options.html#x86-Options
 CHECK_SSE(C "AVX512_BF16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma;/arch:AVX512")
 CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma;/arch:AVX512")
+
+# gcc start to support amx from version 11.2
+# https://gcc.gnu.org/onlinedocs/gcc-11.2.0/gcc/x86-Options.html#x86-Options
+CHECK_SSE(C "AMX" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+ -mamx-tile -mamx-int8 -mamx-bf16;/arch:AVX512")
+CHECK_SSE(CXX "AMX" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+ -mamx-tile -mamx-int8 -mamx-bf16;/arch:AVX512")

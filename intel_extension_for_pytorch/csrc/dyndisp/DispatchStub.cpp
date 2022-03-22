@@ -23,6 +23,8 @@ const char* CPUCapabilityToString(CPUCapability isa) {
       return "AVX512_VNNI";
     case CPUCapability::AVX512_BF16:
       return "AVX512_BF16";
+    case CPUCapability::AMX:
+      return "AMX";
     case CPUCapability::NUM_OPTIONS:
       return "OutOfBoundaryLevel";
 
@@ -35,7 +37,9 @@ CPUCapability _get_highest_cpu_support_isa_level() {
   /*
   reference to FindAVX.cmake
   */
-  if (CPUFeature::get_instance().isa_level_avx512_bf16()) {
+  if (CPUFeature::get_instance().isa_level_amx()) {
+    return CPUCapability::AMX;
+  } else if (CPUFeature::get_instance().isa_level_avx512_bf16()) {
     return CPUCapability::AVX512_BF16;
   } else if (CPUFeature::get_instance().isa_level_avx512_vnni()) {
     return CPUCapability::AVX512_VNNI;
@@ -50,6 +54,9 @@ CPUCapability _get_highest_cpu_support_isa_level() {
 }
 
 CPUCapability _get_highest_binary_support_isa_level() {
+#ifdef HAVE_AMX_CPU_DEFINITION
+  return CPUCapability::AMX;
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
   return CPUCapability::AVX512_BF16;
 #endif
@@ -80,7 +87,9 @@ static CPUCapability compute_cpu_capability() {
   */
   auto envar = std::getenv("ATEN_CPU_CAPABILITY");
   if (envar) {
-    if (strcmp(envar, "avx512_bf16") == 0) {
+    if (strcmp(envar, "amx") == 0) {
+      manual_setup_isa_level = CPUCapability::AMX;
+    } else if (strcmp(envar, "avx512_bf16") == 0) {
       manual_setup_isa_level = CPUCapability::AVX512_BF16;
     } else if (strcmp(envar, "avx512_vnni") == 0) {
       manual_setup_isa_level = CPUCapability::AVX512_VNNI;
@@ -118,6 +127,10 @@ CPUCapability get_cpu_capability() {
 void* DispatchStubImpl::get_call_ptr(
     DeviceType device_type,
     void* DEFAULT
+#ifdef HAVE_AMX_CPU_DEFINITION
+    ,
+    void* AMX
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
     ,
     void* AVX512_BF16
@@ -143,6 +156,10 @@ void* DispatchStubImpl::get_call_ptr(
       if (!fptr) {
         fptr = choose_cpu_impl(
             DEFAULT
+#ifdef HAVE_AMX_CPU_DEFINITION
+            ,
+            AMX
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
             ,
             AVX512_BF16
@@ -182,6 +199,10 @@ void* DispatchStubImpl::get_call_ptr(
 
 void* DispatchStubImpl::choose_cpu_impl(
     void* DEFAULT
+#ifdef HAVE_AMX_CPU_DEFINITION
+    ,
+    void* AMX
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
     ,
     void* AVX512_BF16
@@ -201,6 +222,20 @@ void* DispatchStubImpl::choose_cpu_impl(
 ) {
   auto capability = static_cast<int>(get_cpu_capability());
   (void)capability;
+#ifdef HAVE_AMX_CPU_DEFINITION
+  if (capability >= static_cast<int>(CPUCapability::AMX)) {
+    // Quantization kernels have also been disabled on Windows
+    // for AVX512 because some of their tests are flaky on Windows.
+    // Ideally, we should have AVX512 kernels for all kernels.
+    if (C10_UNLIKELY(!AMX)) {
+      // dispatch to AVX2, since the AVX512 kernel is missing
+      TORCH_INTERNAL_ASSERT(AVX2, "DispatchStub: missing AVX2 kernel");
+      return AVX2;
+    } else {
+      return AMX;
+    }
+  }
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
   if (capability >= static_cast<int>(CPUCapability::AVX512_BF16)) {
     // Quantization kernels have also been disabled on Windows

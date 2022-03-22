@@ -3,7 +3,7 @@ import os
 
 import intel_extension_for_pytorch._C as core
 
-supported_isa_set = ["default", "avx2", "avx512", "avx512_vnni", "avx512_bf16"]
+supported_isa_set = ["default", "avx2", "avx512", "avx512_vnni", "avx512_bf16", "amx"]
 
 def get_isa_val(isa_name):
     if isa_name == "default":
@@ -16,6 +16,8 @@ def get_isa_val(isa_name):
         return 3
     elif isa_name == "avx512_bf16":
         return 4
+    elif isa_name == "amx":
+        return 5
     else:
         return 100
 

@@ -54,6 +54,7 @@ enum class CPUCapability {
   AVX512 = 2,
   AVX512_VNNI = 3,
   AVX512_BF16 = 4,
+  AMX = 5,
   NUM_OPTIONS
 };
 
@@ -76,6 +77,10 @@ struct TORCH_API DispatchStubImpl {
   void* get_call_ptr(
       DeviceType device_type,
       void* DEFAULT
+#ifdef HAVE_AMX_CPU_DEFINITION
+      ,
+      void* AMX
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
       ,
       void* AVX512_BF16
@@ -101,6 +106,10 @@ struct TORCH_API DispatchStubImpl {
    */
   void* choose_cpu_impl(
       void* DEFAULT
+#ifdef HAVE_AMX_CPU_DEFINITION
+      ,
+      void* AMX
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
       ,
       void* AVX512_BF16
@@ -145,6 +154,10 @@ struct DispatchStub<rT (*)(Args...), T> {
     return reinterpret_cast<FnPtr>(impl.get_call_ptr(
         device_type,
         reinterpret_cast<void*>(DEFAULT)
+#ifdef HAVE_AMX_CPU_DEFINITION
+            ,
+        reinterpret_cast<void*>(AMX)
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
             ,
         reinterpret_cast<void*>(AVX512_BF16)
@@ -180,6 +193,9 @@ struct DispatchStub<rT (*)(Args...), T> {
   }
 
   static FnPtr DEFAULT;
+#ifdef HAVE_AMX_CPU_DEFINITION
+  static FnPtr AMX;
+#endif
 #ifdef HAVE_AVX512_BF16_CPU_DEFINITION
   static FnPtr AVX512_BF16;
 #endif
