@@ -69,6 +69,37 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
+    def test_conv_share_dequant_weight(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+
+            def forward(self, x):
+                # type: (List[Tensor]) -> Tensor
+                all_logits = []
+                for feature in x:
+                    logits = self.conv(feature)
+                    all_logits.append(logits)
+                return torch.cat(all_logits, dim=1)
+        
+        for memory_format in [torch.contiguous_format, torch.channels_last]:
+            m = M()
+            patterns = [
+                ["aten::dequantize", "aten::_convolution"],
+                ["aten::dequantize", "aten::_convolution"],
+                ["aten::dequantize", "aten::_convolution"],
+            ]            
+            a = torch.randn(1, 32, 28, 28).to(memory_format=memory_format)
+            b = torch.randn(1, 32, 28, 28).to(memory_format=memory_format)
+            c = torch.randn(1, 32, 28, 28).to(memory_format=memory_format)
+            x = [a, b, c]
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="conv_share_dequant_weight", qscheme=qscheme)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+                self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)
+
     def test_linear_int8_in_f32_out(self):
         for bias in [True, False]:
             x = torch.rand(32, 28)
