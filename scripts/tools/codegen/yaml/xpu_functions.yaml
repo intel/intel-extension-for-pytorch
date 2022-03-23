@@ -32,7 +32,7 @@ supported:
   - _log_softmax
   - _log_softmax_backward_data
 #  - _lu_solve_helper  # different schema
-#  - _lu_with_info  # different schema
+  - _lu_with_info
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
   - _pdist_backward
@@ -633,6 +633,8 @@ supported:
   - view_as_real   # newly added
   - zero_
   - channel_shuffle
+  - linalg_slogdet
+  - linalg_slogdet.out
 autograd:
   - cdist
   - lstm.input

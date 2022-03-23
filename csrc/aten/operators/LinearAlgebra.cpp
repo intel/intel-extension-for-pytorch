@@ -348,5 +348,95 @@ Tensor& addr_(
   return at::AtenIpexTypeXPU::addr_out(self, self, vec1, vec2, beta, alpha);
 }
 
+static inline void squareCheckInputs(const Tensor& self) {
+  TORCH_CHECK(
+      self.dim() >= 2, "Tensor of matrices must have at least 2 dimensions. ");
+  TORCH_CHECK(
+      self.size(-1) == self.size(-2),
+      "A must be batches of square matrices, "
+      "but they are ",
+      self.size(-1),
+      " by ",
+      self.size(-2),
+      " matrices");
+}
+
+using namespace native;
+
+// Helper function for det methods.
+// For pivoted LU factorization A = P * L * U. Since we always have det(L) = 1,
+// det(P) = \pm 1, this method returns a 3-tuple:
+//   (det(P), diag(U), info),
+// where info helps us identify singular matrices.
+static inline std::
+    tuple<c10::ExclusivelyOwned<Tensor>, c10::ExclusivelyOwned<Tensor>>
+    _lu_det_P_diag_U(const Tensor& self) {
+  Tensor pivs, lu, infos;
+  std::tie(lu, pivs, infos) =
+      at::_lu_with_info(self, /*pivot=*/true, /*check_errors=*/false);
+  TORCH_CHECK(
+      infos.ge(0).all().item<uint8_t>(), "Invalid argument passed to lu");
+  auto n = self.size(-1);
+  auto num_exchanges = (at::arange(1, n + 1, pivs.options()) != pivs)
+                           .sum(-1, /*keepdim=*/false, /*dtype=*/at::kLong)
+                           .fmod_(2);
+  auto u_diagonal = lu.diagonal(/*offset=*/0, /*dim1=*/-2, /*dim2=*/-1);
+  num_exchanges.mul_(-2).add_(1);
+  return std::make_tuple(
+      c10::ExclusivelyOwned<Tensor>(std::move(num_exchanges)),
+      c10::ExclusivelyOwned<Tensor>(std::move(u_diagonal)));
+}
+
+std::tuple<Tensor, Tensor> linalg_slogdet(const Tensor& self) {
+  squareCheckInputs(self);
+  ScalarType t = self.scalar_type();
+  TORCH_CHECK(
+      t == ScalarType::Double || t == ScalarType::Float ||
+          t == ScalarType::ComplexFloat || t == ScalarType::ComplexDouble,
+      "linalg_slogdet: expected a tensor of float, double, cfloat or cdouble types but got ",
+      t);
+
+  c10::ExclusivelyOwned<Tensor> det_P, diag_U;
+  std::tie(det_P, diag_U) = _lu_det_P_diag_U(self);
+  auto det_sign = diag_U->sgn().prod(-1).mul_(*det_P);
+  // abslogdet_val is -inf if U is singular, in which case
+  // diag_U.abs_().log_().sum(-1) will return -inf. U is singular when U(i, i) =
+  // 0 for some i in [1, self.size(-1)]. Since abslogdet_val cannot take nan, no
+  // special case handling is required. in-place abs is not supported for
+  // complex tensors
+  auto abslogdet_val = isComplexType(t) ? diag_U->abs().log_().sum(-1)
+                                        : diag_U->abs_().log_().sum(-1);
+  return std::make_tuple(det_sign, abslogdet_val);
+}
+
+// TODO: implement _out variant avoiding copy and using already allocated
+// storage directly
+std::tuple<Tensor&, Tensor&> linalg_slogdet_out(
+    const Tensor& input,
+    Tensor& sign,
+    Tensor& logabsdet) {
+  checkSameDevice("linalg_slogdet", sign, input, "sign");
+  checkSameDevice("linalg_slogdet", logabsdet, input, "logabsdet");
+  checkLinalgCompatibleDtype("linalg_slogdet", sign, input, "sign");
+  ScalarType real_dtype = toValueType(input.scalar_type());
+  // logabsdet is always real-valued here
+  checkLinalgCompatibleDtype(
+      "linalg_slogdet", logabsdet.scalar_type(), real_dtype, "logabsdet");
+
+  Tensor sign_tmp, logabsdet_tmp;
+  std::tie(sign_tmp, logabsdet_tmp) = at::linalg_slogdet(input);
+
+  at::native::resize_output(sign, sign_tmp.sizes());
+  sign.copy_(sign_tmp);
+  at::native::resize_output(logabsdet, logabsdet_tmp.sizes());
+  logabsdet.copy_(logabsdet_tmp);
+
+  return std::tuple<Tensor&, Tensor&>(sign, logabsdet);
+}
+
+std::tuple<Tensor, Tensor> slogdet(const Tensor& self) {
+  return at::linalg_slogdet(self);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
