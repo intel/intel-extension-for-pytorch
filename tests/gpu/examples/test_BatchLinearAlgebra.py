@@ -241,41 +241,43 @@ class TestTorchMethod(TestCase):
             Ai_xpu = A_xpu.inverse()
             _validate(A_xpu.cpu(), Ai_xpu.cpu())
 
-    # @pytest.mark.skipif("not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(reason="not block the pre-ci")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
     def test_qr(self, dtype=torch.float):
         def _validate(A, Q, R):
-            self.assertEqual(A, torch.matmul(Q, R))
-            self.assertEqual(torch.matmul(Q, Q.inverse()), torch.eye(Q.size(-1)).expand_as(Q))
+            if Q.size(0) != 0:
+                self.assertEqual(Q @ R, A)
+                q_size = list(Q.size())
+                q_size[-2] = q_size[-1]
+                diag_tensor = torch.eye(q_size[-1]).expand(q_size)
+                valid_tensor = (Q.transpose(-2, -1) @ Q).round()
+                self.assertEqual(valid_tensor, diag_tensor)
 
-        for size in [(3, 3), (2, 3, 3), (128, 64, 64)]:
-            A = torch.randn(size, dtype=dtype)
+        for size in [(3, 3), (2, 5, 3), (2, 3, 5), (128, 64, 64)]:
+            for mode in ["reduced", "r", "complete"]:
+                A = torch.randn(size, dtype=dtype)
 
-            # CPU
-            A_cpu = A.to('cpu')
-            q_cpu, r_cpu = torch.qr(A_cpu)
-            print("ON CPU:")
-            print("A = ", A_cpu)
-            print("Q = ", q_cpu)
-            print("R = ", r_cpu)
-            _validate(A_cpu, q_cpu, r_cpu)
-            q_cpu, r_cpu = A_cpu.qr()
-            _validate(A_cpu, q_cpu, r_cpu)
+                print("mode is ", mode)
+                # CPU
+                A_cpu = A.to('cpu')
+                q_cpu, r_cpu = torch.linalg.qr(A_cpu, mode=mode)
+                print("ON CPU:")
+                print("A = ", A_cpu)
+                print("Q = ", q_cpu)
+                print("R = ", r_cpu)
+                _validate(A_cpu, q_cpu, r_cpu)
 
-            # XPU
-            A_xpu = A.to('xpu')
-            q_xpu, r_xpu = torch.qr(A_xpu)
-            print("ON XPU:")
-            print("A = ", A_xpu.cpu())
-            print("Q = ", q_xpu.cpu())
-            print("R = ", r_xpu.cpu())
-            _validate(A_xpu.cpu(), q_xpu.cpu(), r_xpu.cpu())
-            q_xpu, r_xpu = A_xpu.qr()
-            _validate(A_xpu.cpu(), q_xpu.cpu(), r_xpu.cpu())
+                # XPU
+                A_xpu = A.to('xpu')
+                q_xpu, r_xpu = torch.linalg.qr(A_xpu, mode=mode)
+                print("ON XPU:")
+                print("A = ", A_xpu.cpu())
+                print("Q = ", q_xpu.cpu())
+                print("R = ", r_xpu.cpu())
+                _validate(A_xpu, q_xpu, r_xpu)
 
-            self.assertEqual(q_cpu, q_xpu)
+                self.assertEqual(r_cpu, r_xpu, rtol=1.3e-6, atol=5e-5)
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="onemkl not compiled for IPEX")
     def test_ormqr(self, dtype=torch.float):
         A = torch.randn(8, 5)
         c = torch.randn(8, 8)

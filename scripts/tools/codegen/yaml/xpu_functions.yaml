@@ -28,6 +28,7 @@ supported:
   - _masked_scale
   - _index_put_impl_ 
   - _inverse_helper
+  - _linalg_qr_helper
   - _local_scalar_dense
   - _log_softmax
   - _log_softmax_backward_data
@@ -37,7 +38,6 @@ supported:
   - _make_per_tensor_quantized_tensor
   - _pdist_backward
   - _pdist_forward
-#  - _qr_helper  # different schema
   - _reshape_alias  # newly added
   - _s_where
   - _softmax
@@ -438,8 +438,6 @@ supported:
   - prod.dim_int
   - prod.int_out
   - put_
-#  - qr         # should not register
-#  - qr.Q  # dispatch is False
   - quantize_per_channel
   - quantize_per_tensor
   - random_

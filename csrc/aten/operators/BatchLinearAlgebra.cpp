@@ -13,6 +13,29 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+static inline std::tuple<bool, bool> _parse_qr_mode(c10::string_view mode) {
+  bool compute_q;
+  bool reduced;
+  if (mode == "reduced") {
+    compute_q = true;
+    reduced = true;
+  } else if (mode == "complete") {
+    compute_q = true;
+    reduced = false;
+  } else if (mode == "r") {
+    compute_q = false;
+    reduced = true; // this is actually irrelevant in this mode
+  } else {
+    TORCH_CHECK(
+        false,
+        "qr received unrecognized mode '",
+        mode,
+        "' but expected one of 'reduced' (default), 'r', or 'complete'");
+  }
+  return std::make_tuple(compute_q, reduced);
+}
+
 namespace impl {
 
 #ifdef USE_ONEMKL
@@ -39,16 +62,22 @@ void error_handle(
 #endif
 
 template <typename scalar_t, typename IndexType, bool upper>
-void apply_triu_tril(Tensor& result, const Tensor& self_, const int64_t k) {
-  auto self = self_.contiguous();
+void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto N = self.numel();
   int64_t group_size = dpcppMaxWorkGroupSize(dev_id);
   auto num_groups = CeilDiv(N, group_size);
   auto total_items = num_groups * group_size;
-  IndexType stride0 = (IndexType)self.size(-2);
-  IndexType stride1 = (IndexType)self.size(-1);
+  IndexType self_size_0 = (IndexType)self.size(-2);
+  IndexType self_size_1 = (IndexType)self.size(-1);
+  IndexType self_stride = (IndexType)(self.dim() > 2 ? self.stride(-3) : 1);
+  IndexType self_stride_0 = (IndexType)self.stride(-2);
+  IndexType self_stride_1 = (IndexType)self.stride(-1);
+  IndexType result_stride =
+      (IndexType)(result.dim() > 2 ? result.stride(-3) : 1);
+  IndexType result_stride_0 = (IndexType)result.stride(-2);
+  IndexType result_stride_1 = (IndexType)result.stride(-1);
 
   scalar_t* result_ptr = (scalar_t*)(result.data_ptr());
   scalar_t* self_ptr = (scalar_t*)(self.data_ptr());
@@ -57,13 +86,19 @@ void apply_triu_tril(Tensor& result, const Tensor& self_, const int64_t k) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       for (size_t linearIndex = item.get_global_id(0); linearIndex < (size_t)N;
            linearIndex += item.get_global_range()[0]) {
-        IndexType row, col;
+        IndexType batch_id = linearIndex / (self_size_0 * self_size_1);
+        IndexType row =
+            (linearIndex % (self_size_0 * self_size_1)) / self_size_1;
+        IndexType col =
+            (linearIndex % (self_size_0 * self_size_1)) % self_size_1;
 
-        row = (linearIndex % (stride0 * stride1)) / stride1;
-        col = (linearIndex % (stride0 * stride1)) % stride1;
+        IndexType src_index =
+            batch_id * self_stride + row * self_stride_0 + col * self_stride_1;
+        IndexType tgt_index = batch_id * result_stride + row * result_stride_0 +
+            col * result_stride_1;
 
         bool mask = upper ? (col - row >= k) : (col - row <= k);
-        result_ptr[linearIndex] = mask ? self_ptr[linearIndex] : scalar_t(0);
+        result_ptr[tgt_index] = mask ? self_ptr[src_index] : scalar_t(0);
       }
     };
 
@@ -779,6 +814,106 @@ static void apply_cholesky_dpcpp(
 #endif
 }
 
+void apply_linalg_qr_out_dpcpp(
+    const Tensor& input,
+    const Tensor& Q,
+    const Tensor& R,
+    bool compute_q,
+    bool reduced_mode) {
+  TORCH_INTERNAL_ASSERT(input.dim() >= 2);
+
+  TORCH_INTERNAL_ASSERT(input.scalar_type() == Q.scalar_type());
+  TORCH_INTERNAL_ASSERT(input.device() == Q.device());
+
+  TORCH_INTERNAL_ASSERT(input.scalar_type() == R.scalar_type());
+  TORCH_INTERNAL_ASSERT(input.device() == R.device());
+
+  auto m = input.size(-2);
+  auto n = input.size(-1);
+  auto mn = std::min(m, n);
+
+  // Q must have the expected shape: reduced_mode ? (..., m, min(m, n)) : (...,
+  // m, m)
+  if (compute_q) {
+    auto expected_Q_shape = input.sizes().vec();
+    expected_Q_shape.back() = reduced_mode ? mn : m;
+    TORCH_INTERNAL_ASSERT(Q.sizes().equals(expected_Q_shape));
+
+    // Q tensor must be in batched column major order (Fortran contiguous)
+    TORCH_INTERNAL_ASSERT(Q.transpose(-2, -1).is_contiguous());
+  }
+
+  // R must have the expected shape: (reduced_mode || !compute_q) ? (...,
+  // min(m,n), n) : (..., m, n)
+  auto expected_R_shape = input.sizes().vec();
+  expected_R_shape.end()[-2] = (reduced_mode || !compute_q) ? mn : m;
+  TORCH_INTERNAL_ASSERT(R.sizes().equals(expected_R_shape));
+
+  // R tensor must be in batched column major order (Fortran contiguous)
+  TORCH_INTERNAL_ASSERT(R.transpose(-2, -1).is_contiguous());
+
+  auto tau_shape = input.sizes().vec();
+  tau_shape.pop_back();
+  tau_shape.back() = mn;
+  Tensor tau = at::empty(tau_shape, input.options());
+
+  // geqrf requires m x n workspace input that is modified in-place
+  // if m > n and reduced==true we use Q tensor for storing the result of geqrf
+  // operation otherwise R tensor is used
+  Tensor QR;
+  if (m <= n) {
+    QR = R;
+  } else { // m > n
+    if (compute_q) {
+      QR = reduced_mode ? Q : R;
+    } else {
+      // if m > n and compute_q==false we need to allocate an additional
+      // temporary tensor
+      QR = at::empty(input.transpose(-2, -1).sizes(), input.options());
+      QR.transpose_(-2, -1);
+    }
+  }
+
+  // apply_geqrf_dpcpp_ performs calculations in-place and 'QR' must be a copy
+  // of input
+  QR.copy_(input);
+  std::vector<int64_t> infos(native::batchCount(input), 0);
+  IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+    impl::apply_geqrf_dpcpp_<scalar_t>(QR, tau, m, n, infos);
+  });
+
+  // this is for mode='r'
+  if (!compute_q) {
+    // if m > n we used a temporary tensor to store the result of geqrf
+    if (m > n) {
+      R.copy_(QR.slice(-2, 0, mn));
+    }
+    R.triu_();
+    return;
+  }
+
+  // if Q tensor was used for geqrf copy the result for R from QR
+  if (m > n && reduced_mode) {
+    R.copy_(Q.slice(-2, 0, n));
+  } else {
+    Q.slice(-1, 0, n).copy_(R.slice(-1, 0, m));
+  }
+  R.triu_();
+
+  // Next perform orgqr for Q using the result from geqrf
+  if (reduced_mode) {
+    IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+      impl::apply_orgqr_dpcpp_<scalar_t>(
+          const_cast<Tensor&>(Q), tau, m, mn, mn, infos);
+    });
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+      impl::apply_orgqr_dpcpp_<scalar_t>(
+          const_cast<Tensor&>(Q), tau, m, m, mn, infos);
+    });
+  }
+}
+
 } // namespace impl
 
 Tensor& triu_out(const Tensor& self, int64_t diagonal, Tensor& out) {
@@ -998,93 +1133,37 @@ Tensor& inverse_out(Tensor& out, const Tensor& self) {
   return out;
 }
 
-std::tuple<Tensor, Tensor> _qr_helper(const Tensor& self, bool some) {
-  std::vector<int64_t> infos(native::batchCount(self), 0);
-  int64_t m = self.size(-2), n = self.size(-1);
+std::tuple<Tensor, Tensor> _linalg_qr_helper(
+    const Tensor& input,
+    c10::string_view mode) {
+  bool compute_q, reduced_mode;
+  std::tie(compute_q, reduced_mode) = _parse_qr_mode(mode);
+  auto m = input.size(-2);
+  auto n = input.size(-1);
+  auto mn = std::min(m, n);
 
-  // Prepare inputs for geqrf
-  auto self_sizes = self.sizes().vec();
-  self_sizes.pop_back();
-  self_sizes[self.dim() - 2] = std::min(m, n);
-  auto tau_working_copy = at::empty(self_sizes, self.options());
-  Tensor q_working_copy;
-
-  std::vector<int64_t> q_sizes, q_strides;
-  int64_t n_columns_q;
-  Tensor R;
-  std::tie(q_sizes, q_strides, n_columns_q) =
-      native::_compute_geometry_for_Q(self, some);
-
-  if (self.numel() == 0) {
-    q_sizes[self.dim() - 1] = n_columns_q;
-    q_working_copy = at::eye(
-        q_sizes[self.dim() - 2], q_sizes[self.dim() - 1], self.options());
-    q_working_copy = q_working_copy.expand_as(q_working_copy);
-
-    q_sizes[self.dim() - 1] = n;
-    q_sizes[self.dim() - 2] = n_columns_q;
-    R = at::empty(q_sizes, self.options());
-    return std::make_tuple(q_working_copy, R);
-  }
-
-  q_working_copy = at::empty_strided(q_sizes, q_strides, self.options());
-  q_working_copy.narrow(-1, 0, n).copy_(self);
-
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "qr_dpcpp", [&] {
-    impl::apply_geqrf_dpcpp_<scalar_t>(
-        q_working_copy, tau_working_copy, m, n, infos);
-  });
-  if (self.dim() > 2) {
-    native::batchCheckErrors(infos, "qr_dpcpp");
+  // Allocate Q, R tensors with correct shape and memory layout
+  Tensor Q;
+  if (compute_q) {
+    auto Qt_shape = input.sizes().vec();
+    Qt_shape.end()[-2] = reduced_mode ? mn : m;
+    Qt_shape.end()[-1] = m;
+    Q = at::empty(Qt_shape, input.options());
+    Q.transpose_(-2, -1); // make 'Q' with Fortran contiguous memory layout
   } else {
-    native::singleCheckErrors(infos[0], "qr_dpcpp");
+    Q = at::empty({0}, input.options());
   }
-  R = q_working_copy.slice(-2, 0, n_columns_q)
-          .slice(-1, 0, n)
-          .contiguous()
-          .triu();
 
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "qr_dpcpp", [&] {
-    impl::apply_orgqr_dpcpp_<scalar_t>(
-        q_working_copy,
-        tau_working_copy,
-        m,
-        n_columns_q,
-        std::min(m, n),
-        infos);
-  });
-  if (self.dim() > 2) {
-    native::batchCheckErrors(infos, "qr_dpcpp");
-  } else {
-    native::singleCheckErrors(infos[0], "qr_dpcpp");
-  }
-  return std::make_tuple(q_working_copy.narrow(-1, 0, n_columns_q), R);
-}
+  auto Rt_shape = input.sizes().vec();
+  Rt_shape.end()[-2] = n;
+  Rt_shape.end()[-1] = (reduced_mode || !compute_q) ? mn : m;
+  Tensor R = at::empty(Rt_shape, input.options());
+  R.transpose_(-2, -1); // make 'R' with Fortran contiguous memory layout
 
-std::tuple<Tensor, Tensor> qr(const Tensor& self, bool some) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "self should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  return at::AtenIpexTypeXPU::_qr_helper(self, some);
-}
+  // Now fill Q, R tensors with the result
+  impl::apply_linalg_qr_out_dpcpp(input, Q, R, compute_q, reduced_mode);
 
-std::tuple<Tensor&, Tensor&> qr_out(
-    Tensor& Q,
-    Tensor& R,
-    const Tensor& self,
-    bool some) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "self should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  Tensor Q_tmp, R_tmp;
-  std::tie(Q_tmp, R_tmp) = at::AtenIpexTypeXPU::_qr_helper(self, some);
-  Q.resize_as_(Q_tmp).copy_(Q_tmp);
-  R.resize_as_(R_tmp).copy_(R_tmp);
-  return std::tuple<Tensor&, Tensor&>(Q, R);
+  return std::make_tuple(Q, R);
 }
 
 std::tuple<Tensor, Tensor> geqrf(const Tensor& self) {
@@ -1436,9 +1515,9 @@ Tensor cholesky(const Tensor& self, bool upper) {
   native::squareCheckInputs(self);
   auto raw_cholesky_output = at::AtenIpexTypeXPU::_cholesky_helper(self, upper);
   if (upper) {
-    return raw_cholesky_output.contiguous().triu_();
+    return raw_cholesky_output.triu_();
   } else {
-    return raw_cholesky_output.contiguous().tril_();
+    return raw_cholesky_output.tril_();
   }
 }
 
