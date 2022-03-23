@@ -18,8 +18,6 @@ beta2 = 0.999
 adam_epsilon = 1e-6
 weight_decay = 0.01
 
-checking_perf = 0
-
 class CPUReferenceAdamMasterWeight(Optimizer):
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  weight_decay=1e-2, amsgrad=False, transformer=False, correct_bias=True):
@@ -236,12 +234,7 @@ class TestNNMethod(TestCase):
 
             # update
             optimizer_cpu.step()
-            if i == num_iter - 1 and checking_perf == 1:
-                with torch.autograd.profiler.profile(use_xpu=True, record_shapes=True) as prof:
-                    optimizer_xpu.step()
-                print(prof.key_averages().table(sort_by="self_xpu_time_total"))
-            else:
-                optimizer_xpu.step()
+            optimizer_xpu.step()
             torch.xpu.synchronize()
 
             # checking updated weight
@@ -392,12 +385,7 @@ class TestNNMethod(TestCase):
 
             # update
             optimizer_cpu.step()
-            if i == num_iter - 1 and checking_perf == 1:
-                with torch.autograd.profiler.profile(use_xpu=True, record_shapes=True) as prof:
-                    optimizer_xpu.step()
-                print(prof.key_averages().table(sort_by="self_xpu_time_total"))
-            else:
-                optimizer_xpu.step()
+            optimizer_xpu.step()
             torch.xpu.synchronize()
 
             # checking updated weight
@@ -544,12 +532,7 @@ class TestNNMethod(TestCase):
 
             # update
             optimizer_cpu.step()
-            if i == num_iter - 1 and checking_perf == 1:
-                with torch.autograd.profiler.profile(use_xpu=True, record_shapes=True) as prof:
-                    optimizer_xpu.step()
-                print(prof.key_averages().table(sort_by="self_xpu_time_total"))
-            else:
-                optimizer_xpu.step()
+            optimizer_xpu.step()
             torch.xpu.synchronize()
 
             # checking updated weight
@@ -698,12 +681,7 @@ class TestNNMethod(TestCase):
 
             # update
             optimizer_cpu.step()
-            if i == num_iter - 1 and checking_perf == 1:
-                with torch.autograd.profiler.profile(use_xpu=True, record_shapes=True) as prof:
-                    optimizer_xpu.step()
-                print(prof.key_averages().table(sort_by="self_xpu_time_total"))
-            else:
-                optimizer_xpu.step()
+            optimizer_xpu.step()
             torch.xpu.synchronize()
 
             # checking updated weight
