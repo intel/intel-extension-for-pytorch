@@ -138,7 +138,10 @@ std::tuple<at::Tensor, at::Tensor> max_pool2d_with_indices_out_cpu(
         input.options().memory_format(memory_format).dtype(at::kLong));
   }
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to max_pool2d_kernel_impl(
+      output, indices, input, kW, kH, dW, dH, padW, padH, dilationW, dilationH);
+  */
   max_pool2d_kernel_stub(
       kCPU,
       output,
@@ -152,10 +155,6 @@ std::tuple<at::Tensor, at::Tensor> max_pool2d_with_indices_out_cpu(
       padH,
       dilationW,
       dilationH);
-#else
-  max_pool2d_kernel_impl(
-      output, indices, input, kW, kH, dW, dH, padW, padH, dilationW, dilationH);
-#endif
 
   return std::make_tuple(output, indices);
 }
@@ -280,11 +279,8 @@ at::Tensor max_pool2d_with_indices_backward_out_cpu(
       at::empty(input.sizes(), input.options().memory_format(memory_format))
           .zero_();
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to max_pool2d_backward_kernel_impl(gradInput, gradOutput, indices);
   max_pool2d_backward_kernel_stub(kCPU, gradInput, gradOutput, indices);
-#else
-  max_pool2d_backward_kernel_impl(gradInput, gradOutput, indices);
-#endif
 
   return gradInput;
 }

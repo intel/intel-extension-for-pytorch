@@ -44,9 +44,7 @@ at::Tensor ROIAlign_forward(
     int64_t sampling_ratio,
     bool aligned);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename T>
 struct PreCalc {
@@ -190,9 +188,7 @@ at::Tensor roi_align_backward_kernel_impl(
     bool aligned,
     bool is_channels_last);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using roi_align_forward_kernel_fn = at::Tensor (*)(
     const at::Tensor&,

@@ -20,9 +20,8 @@
 
 namespace torch_ipex {
 namespace cpu {
-#if defined(DYN_DISP_BUILD)
+
 namespace {
-#endif
 
 template <typename T>
 static inline void cat(
@@ -793,7 +792,6 @@ at::Tensor dil_qinteraction_kernel_impl(
   return output;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -803,8 +801,6 @@ REGISTER_DISPATCH(
     interaction_backward_kernel_stub,
     &interaction_backward_kernel_impl);
 REGISTER_DISPATCH(dil_qinteraction_kernel_stub, &dil_qinteraction_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -21,13 +21,12 @@ at::Tensor AddLayerNorm(
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
     float eps) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to add_layer_norm_kernel_impl(
+      a, b, alpha, normalized_shape, weight_opt, bias_opt, eps);
+  */
   return add_layer_norm_kernel_stub(
       kCPU, a, b, alpha, normalized_shape, weight_opt, bias_opt, eps);
-#else
-  return add_layer_norm_kernel_impl(
-      a, b, alpha, normalized_shape, weight_opt, bias_opt, eps);
-#endif
 }
 
 at::Tensor dil_add_layernorm(

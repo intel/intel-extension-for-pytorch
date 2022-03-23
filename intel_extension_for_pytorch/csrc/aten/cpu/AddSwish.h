@@ -13,19 +13,14 @@ at::Tensor AddSwish(
     const at::Tensor& weight,
     const at::Tensor& bias);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor add_swish_kernel_impl(
     at::Tensor& x,
     at::Tensor& a,
     const at::Tensor& b,
     const at::Tensor& c);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using add_swish_kernel_fn = at::Tensor (*)(
     at::Tensor&,

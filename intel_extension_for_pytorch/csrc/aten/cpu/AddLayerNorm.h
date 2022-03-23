@@ -81,9 +81,7 @@ at::Tensor dil_add_layernorm(
     float eps,
     bool cuda_enable);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor add_layer_norm_kernel_impl(
     const at::Tensor& a,
@@ -93,10 +91,7 @@ at::Tensor add_layer_norm_kernel_impl(
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
     float eps);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using add_layer_norm_kernel_fn = at::Tensor (*)(
     const at::Tensor&,

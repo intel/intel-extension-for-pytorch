@@ -11,18 +11,14 @@ at::Tensor nms_kernel(
     const at::Tensor& scores,
     double iou_threshold);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor nms_kernel_impl(
     const at::Tensor& dets,
     const at::Tensor& scores,
     double iou_threshold);
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using nms_kernel_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&, double);

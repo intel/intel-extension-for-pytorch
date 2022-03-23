@@ -14,9 +14,7 @@ std::vector<at::Tensor> interaction_backward(
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor interaction_forward_kernel_impl(
     const std::vector<at::Tensor>& input);
@@ -31,9 +29,7 @@ at::Tensor dil_qinteraction_kernel_impl(
     int64_t o_zp,
     at::ScalarType o_dtype);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using interaction_forward_kernel_fn =
     at::Tensor (*)(const std::vector<at::Tensor>&);

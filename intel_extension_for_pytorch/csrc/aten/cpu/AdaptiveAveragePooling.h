@@ -74,9 +74,7 @@ at::Tensor adaptive_avg_pool2d_backward_cpu(
     const at::Tensor& grad_output,
     const at::Tensor& input);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void adaptive_avg_pool2d_kernel_impl(
     at::Tensor& output,
@@ -86,10 +84,7 @@ void adaptive_avg_pool2d_kernel_impl(
 void adaptive_avg_pool2d_backward_kernel_impl(
     at::Tensor& grad_input,
     const at::Tensor& grad_output);
-
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using adaptive_avg_pool2d_kernel_fn =
     void (*)(at::Tensor&, const at::Tensor&, at::IntArrayRef);

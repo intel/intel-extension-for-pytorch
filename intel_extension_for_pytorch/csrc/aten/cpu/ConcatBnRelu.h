@@ -27,9 +27,7 @@ at::Tensor ConcatBnRelu(
     bool bn_cudnn_enabled,
     int dim);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor concat_bn_relu_kernel_impl(
     const c10::List<at::Tensor>& a,
@@ -44,10 +42,7 @@ at::Tensor concat_bn_relu_kernel_impl(
     double bn_eps,
     bool bn_cudnn_enabled,
     int dim);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using concat_bn_relu_kernel_fn = at::Tensor (*)(
     const c10::List<at::Tensor>&,

@@ -5,9 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor cumsum_kernel_impl(
     at::Tensor& result,
@@ -15,9 +13,7 @@ at::Tensor cumsum_kernel_impl(
     int64_t dim,
     c10::optional<at::ScalarType> dtype);
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using cumsum_kernel_fn = at::Tensor (*)(
     at::Tensor&,

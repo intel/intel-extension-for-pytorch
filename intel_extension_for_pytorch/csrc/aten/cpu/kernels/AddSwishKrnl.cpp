@@ -7,9 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor add_swish_kernel_impl(
     at::Tensor& x,
@@ -30,12 +28,9 @@ at::Tensor add_swish_kernel_impl(
   return at::mul(lin_res, sigmoid_res);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(add_swish_kernel_stub, &add_swish_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -77,9 +77,7 @@ void sort_based_batched_csr2csc_opt(
     std::vector<int64_t> pooling_modes,
     int64_t max_embeddings);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void sort_based_batched_csr2csc_opt_kernel_impl(
     BatchedHyperCompressedSparseColumn& batched_csc,
@@ -89,9 +87,7 @@ void sort_based_batched_csr2csc_opt_kernel_impl(
     std::vector<int64_t> pooling_modes,
     int64_t max_embeddings);
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using sort_based_batched_csr2csc_opt_kernel_fn = void (*)(
     BatchedHyperCompressedSparseColumn&,

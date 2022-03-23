@@ -48,7 +48,18 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
       "; param2_ sizes: ",
       param2_.sizes());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to adagrad_fused_step_kernel_impl(
+      param_,
+      grad_,
+      state_sum_,
+      param2_,
+      step,
+      learning_rate,
+      weight_decay,
+      lr_decay,
+      eps);
+  */
   return adagrad_fused_step_kernel_stub(
       kCPU,
       param_,
@@ -60,18 +71,6 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
       weight_decay,
       lr_decay,
       eps);
-#else
-  return adagrad_fused_step_kernel_impl(
-      param_,
-      grad_,
-      state_sum_,
-      param2_,
-      step,
-      learning_rate,
-      weight_decay,
-      lr_decay,
-      eps);
-#endif
 }
 
 } // namespace cpu

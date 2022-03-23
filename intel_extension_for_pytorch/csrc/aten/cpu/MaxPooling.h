@@ -90,9 +90,7 @@ at::Tensor max_pool2d_with_indices_backward_out_cpu(
     bool ceil_mode,
     const at::Tensor& indices);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void max_pool2d_kernel_impl(
     const at::Tensor& output,
@@ -112,9 +110,7 @@ void max_pool2d_backward_kernel_impl(
     const at::Tensor& grad_output,
     const at::Tensor& indices);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using max_pool2d_kernel_fn = void (*)(
     const at::Tensor&,

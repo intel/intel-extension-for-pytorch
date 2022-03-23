@@ -20,9 +20,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 static inline void make_offset2bag(
     const at::Tensor& offsets,
@@ -429,7 +427,6 @@ at::Tensor embedding_bag_int8_kernel_impl(
   return output;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(embedding_bag_kernel_stub, &embedding_bag_kernel_impl);
@@ -439,8 +436,6 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     embedding_bag_int8_kernel_stub,
     &embedding_bag_int8_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

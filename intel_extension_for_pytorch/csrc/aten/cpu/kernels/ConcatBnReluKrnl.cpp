@@ -10,9 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor concat_bn_relu_kernel_impl(
     const c10::List<at::Tensor>& a,
@@ -81,12 +79,9 @@ at::Tensor concat_bn_relu_kernel_impl(
   return at::relu(bn_res);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(concat_bn_relu_kernel_stub, &concat_bn_relu_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

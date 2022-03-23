@@ -13,9 +13,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 using namespace at::vec;
 
@@ -260,12 +258,9 @@ at::Tensor cumsum_kernel_impl(
   return NewCumSumOp::_forward(result, self, dim, dtype);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(cumsum_kernel_stub, &cumsum_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

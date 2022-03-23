@@ -39,11 +39,8 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
   {
     at::NoNamesGuard guard;
 
-#if defined(DYN_DISP_BUILD)
+    // pointer to copy_kernel_impl(self, src, non_blocking);
     copy_kernel_stub(kCPU, self, src, non_blocking);
-#else
-    copy_kernel_impl(self, src, non_blocking);
-#endif
   }
   at::namedinference::propagate_names_if_nonempty(self, maybe_outnames);
   return self;

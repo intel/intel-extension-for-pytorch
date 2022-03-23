@@ -62,7 +62,18 @@ c10::optional<at::Tensor> sgd_fused_step(
       "; param2_ sizes: ",
       param2_.sizes());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to sgd_fused_step_kernel_impl(
+      param_,
+      grad_,
+      momentum_buf_,
+      param2_,
+      momentum,
+      learning_rate,
+      weight_decay,
+      dampening,
+      nesterov);
+  */
   return sgd_fused_step_kernel_stub(
       kCPU,
       param_,
@@ -74,18 +85,6 @@ c10::optional<at::Tensor> sgd_fused_step(
       weight_decay,
       dampening,
       nesterov);
-#else
-  return sgd_fused_step_kernel_impl(
-      param_,
-      grad_,
-      momentum_buf_,
-      param2_,
-      momentum,
-      learning_rate,
-      weight_decay,
-      dampening,
-      nesterov);
-#endif
 }
 
 } // namespace cpu

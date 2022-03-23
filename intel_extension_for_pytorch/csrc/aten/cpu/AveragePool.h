@@ -134,9 +134,7 @@ at::Tensor avg_pool3d_backward_out_cpu(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void avg_pool2d_kernel_impl(
     const at::Tensor& output,
@@ -191,10 +189,7 @@ void avg_pool3d_backward_kernel_impl(
     int padD,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override);
-
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using avg_pool2d_kernel_fn = void (*)(
     const at::Tensor&,

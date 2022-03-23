@@ -16,9 +16,7 @@ using namespace torch_ipex::kernel;
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 /*
   rnnt_update_batch: used in the batched_decoder of RNN-T.
@@ -226,14 +224,11 @@ bool rnnt_update_batch_kernel_impl(
 #endif
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
     rnnt_update_batch_kernel_stub,
     &rnnt_update_batch_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

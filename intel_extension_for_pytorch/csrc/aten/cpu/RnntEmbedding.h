@@ -6,9 +6,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void rnnt_embedding_kernel_impl(
     const at::Tensor& embedding_table,
@@ -18,9 +16,7 @@ void rnnt_embedding_kernel_impl(
     int64_t batch_size,
     int64_t embedding_dim);
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using rnnt_embedding_kernel_fn = void (*)(
     const at::Tensor&,

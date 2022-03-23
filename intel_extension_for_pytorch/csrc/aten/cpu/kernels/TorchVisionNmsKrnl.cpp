@@ -10,9 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename scalar_t>
 at::Tensor nms_kernel_body(
@@ -97,12 +95,9 @@ at::Tensor nms_kernel_impl(
   return result;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(nms_kernel_stub, &nms_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

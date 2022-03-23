@@ -252,9 +252,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu(
     double eps,
     std::array<bool, 3> grad_input_mask);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void batch_norm_cpu_kernel_impl(
     at::Tensor& output,
@@ -286,10 +284,7 @@ void batch_norm_cpu_backward_kernel_impl(
     const at::Tensor& save_invstd,
     bool train,
     double eps);
-
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using batch_norm_cpu_kernel_fn = void (*)(
     at::Tensor&,

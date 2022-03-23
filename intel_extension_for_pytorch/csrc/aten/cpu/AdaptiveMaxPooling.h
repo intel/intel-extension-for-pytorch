@@ -56,9 +56,7 @@ at::Tensor adaptive_max_pool2d_backward_out_cpu(
     const at::Tensor& input,
     const at::Tensor& indices);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void adaptive_max_pool2d_kernel_impl(
     const at::Tensor& output,
@@ -70,10 +68,7 @@ void adaptive_max_pool2d_backward_kernel_impl(
     const at::Tensor& grad_input,
     const at::Tensor& grad_output,
     const at::Tensor& indices);
-
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using adaptive_max_pool2d_kernel_fn = void (*)(
     const at::Tensor&,

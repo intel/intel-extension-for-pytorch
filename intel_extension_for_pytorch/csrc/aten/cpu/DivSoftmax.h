@@ -15,9 +15,7 @@ at::Tensor DivMaskedfillSoftmax(
     const float& fill,
     const float& dim_per_head);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor div_maskedfill_softmax_kernel_impl(
     at::Tensor& a,
@@ -26,9 +24,7 @@ at::Tensor div_maskedfill_softmax_kernel_impl(
     const float& fill,
     const float& dim_per_head);
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using div_maskedfill_softmax_kernel_fn = at::Tensor (*)(
     at::Tensor&,

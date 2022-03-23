@@ -13,13 +13,12 @@ void sort_based_batched_csr2csc_opt(
     const Tensor& indices,
     std::vector<int64_t> pooling_modes,
     int64_t max_embeddings) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to sort_based_batched_csr2csc_opt_kernel_impl(
+      batched_csc, B, offsets, indices, pooling_modes, max_embeddings);
+  */
   sort_based_batched_csr2csc_opt_kernel_stub(
       kCPU, batched_csc, B, offsets, indices, pooling_modes, max_embeddings);
-#else
-  sort_based_batched_csr2csc_opt_kernel_impl(
-      batched_csc, B, offsets, indices, pooling_modes, max_embeddings);
-#endif
 }
 
 } // namespace cpu

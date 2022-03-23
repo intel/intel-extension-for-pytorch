@@ -57,7 +57,20 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
       "; param2_ sizes: ",
       param2_.sizes());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to lamb_fused_step_kernel_impl(
+      param_,
+      exp_avg_,
+      exp_avg_sq_,
+      grad_,
+      param2_,
+      step,
+      beta1,
+      beta2,
+      learning_rate,
+      weight_decay,
+      eps);
+  */
   return lamb_fused_step_kernel_stub(
       kCPU,
       param_,
@@ -71,21 +84,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
       learning_rate,
       weight_decay,
       eps);
-
-#else
-  return lamb_fused_step_kernel_impl(
-      param_,
-      exp_avg_,
-      exp_avg_sq_,
-      grad_,
-      param2_,
-      step,
-      beta1,
-      beta2,
-      learning_rate,
-      weight_decay,
-      eps);
-#endif
 }
 
 } // namespace cpu

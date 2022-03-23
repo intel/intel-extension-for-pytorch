@@ -10,9 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void bf16_to_fp32(void* dst, const void* src, int len) {
   BF16_2_FP32((float*)dst, (at::BFloat16*)src, len);
@@ -119,7 +117,6 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16_kernel_impl(
   return std::tie(top_half, bottom_half);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -128,8 +125,6 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     split_float_bfloat16_kernel_stub,
     &split_float_bfloat16_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

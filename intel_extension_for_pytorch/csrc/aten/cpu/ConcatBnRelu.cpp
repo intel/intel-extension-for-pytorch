@@ -33,7 +33,21 @@ at::Tensor ConcatBnRelu(
     int dim) {
   IPEX_RECORD_FUNCTION("ipex::concat_bn_relu", std::vector<c10::IValue>({}));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to concat_bn_relu_kernel_impl(
+      a,
+      bn_scale,
+      bn_beta,
+      bn_weight,
+      bn_bias,
+      bn_mean,
+      bn_var,
+      bn_training,
+      bn_momentum,
+      bn_eps,
+      bn_cudnn_enabled,
+      dim);
+  */
   return concat_bn_relu_kernel_stub(
       kCPU,
       a,
@@ -48,21 +62,6 @@ at::Tensor ConcatBnRelu(
       bn_eps,
       bn_cudnn_enabled,
       dim);
-#else
-  return concat_bn_relu_kernel_impl(
-      a,
-      bn_scale,
-      bn_beta,
-      bn_weight,
-      bn_bias,
-      bn_mean,
-      bn_var,
-      bn_training,
-      bn_momentum,
-      bn_eps,
-      bn_cudnn_enabled,
-      dim);
-#endif
 }
 
 } // namespace cpu

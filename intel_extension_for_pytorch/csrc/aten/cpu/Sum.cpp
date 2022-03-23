@@ -73,11 +73,8 @@ at::Tensor sum_out_cpu(
   if (iter.numel() == 0) {
     output.zero_();
   } else {
-#if defined(DYN_DISP_BUILD)
+    // pointer to sum_kernel_impl(iter);
     sum_kernel_stub(kCPU, iter);
-#else
-    sum_kernel_impl(iter);
-#endif
   }
 
   return output;

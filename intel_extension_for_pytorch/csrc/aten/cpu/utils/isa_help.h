@@ -12,15 +12,11 @@ std::string get_current_isa_level();
 std::string get_highest_cpu_support_isa_level();
 std::string get_highest_binary_support_isa_level();
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 std::string get_current_isa_level_kernel_impl();
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using get_current_isa_level_kernel_fn = std::string (*)();
 DECLARE_DISPATCH(

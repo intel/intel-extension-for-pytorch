@@ -13,9 +13,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename T>
 inline void rnnt_embedding_kernel_body(
@@ -66,12 +64,9 @@ void rnnt_embedding_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(rnnt_embedding_kernel_stub, &rnnt_embedding_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

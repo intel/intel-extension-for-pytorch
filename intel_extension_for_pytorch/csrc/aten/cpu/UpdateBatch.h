@@ -11,9 +11,7 @@ enum BatchStatus : bool {
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 bool rnnt_update_batch_kernel_impl(
     const at::Tensor& k,
@@ -38,10 +36,7 @@ bool rnnt_update_batch_kernel_impl(
     int64_t batch_size,
     int64_t _SOS,
     int64_t max_len);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using rnnt_update_batch_kernel_fn = bool (*)(
     const at::Tensor&,

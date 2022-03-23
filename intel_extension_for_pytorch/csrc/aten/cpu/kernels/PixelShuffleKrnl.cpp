@@ -17,9 +17,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename scalar_t>
 void cpu_pixel_shuffle(
@@ -317,7 +315,6 @@ void pixel_unshuffle_backward_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(pixel_shuffle_kernel_stub, &pixel_shuffle_kernel_impl);
@@ -331,8 +328,6 @@ REGISTER_DISPATCH(pixel_unshuffle_kernel_stub, &pixel_unshuffle_kernel_impl);
 REGISTER_DISPATCH(
     pixel_unshuffle_backward_kernel_stub,
     &pixel_unshuffle_backward_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

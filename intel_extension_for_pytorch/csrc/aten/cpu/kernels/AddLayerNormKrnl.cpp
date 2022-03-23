@@ -14,9 +14,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor add_layer_norm_kernel_impl(
     const at::Tensor& a,
@@ -70,12 +68,9 @@ at::Tensor add_layer_norm_kernel_impl(
 #endif
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(add_layer_norm_kernel_stub, &add_layer_norm_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

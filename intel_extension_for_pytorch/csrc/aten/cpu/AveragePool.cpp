@@ -99,7 +99,19 @@ at::Tensor avg_pool2d_out_cpu(
         input.options().memory_format(memory_format));
   }
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to avg_pool2d_kernel_impl(
+      output,
+      input,
+      kW,
+      kH,
+      dW,
+      dH,
+      padW,
+      padH,
+      count_include_pad,
+      divisor_override);
+  */
   avg_pool2d_kernel_stub(
       kCPU,
       output,
@@ -112,19 +124,6 @@ at::Tensor avg_pool2d_out_cpu(
       padH,
       count_include_pad,
       divisor_override);
-#else
-  avg_pool2d_kernel_impl(
-      output,
-      input,
-      kW,
-      kH,
-      dW,
-      dH,
-      padW,
-      padH,
-      count_include_pad,
-      divisor_override);
-#endif
 
   return output;
 }
@@ -219,7 +218,19 @@ at::Tensor avg_pool2d_backward_out_cpu(
       " for `gradOutput` but got dtype ",
       gradOutput.dtype());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to avg_pool2d_backward_kernel_impl(
+      gradInput,
+      gradOutput,
+      kW,
+      kH,
+      dW,
+      dH,
+      padW,
+      padH,
+      count_include_pad,
+      divisor_override);
+  */
   avg_pool2d_backward_kernel_stub(
       kCPU,
       gradInput,
@@ -232,19 +243,6 @@ at::Tensor avg_pool2d_backward_out_cpu(
       padH,
       count_include_pad,
       divisor_override);
-#else
-  avg_pool2d_backward_kernel_impl(
-      gradInput,
-      gradOutput,
-      kW,
-      kH,
-      dW,
-      dH,
-      padW,
-      padH,
-      count_include_pad,
-      divisor_override);
-#endif
 
   return gradInput;
 }
@@ -364,7 +362,22 @@ at::Tensor avg_pool3d_out_cpu(
         input.options().memory_format(memory_format));
   }
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to avg_pool3d_kernel_impl(
+      output,
+      input,
+      kW,
+      kH,
+      kT,
+      dW,
+      dH,
+      dT,
+      padW,
+      padH,
+      padT,
+      count_include_pad,
+      divisor_override);
+  */
   avg_pool3d_kernel_stub(
       kCPU,
       output,
@@ -380,22 +393,6 @@ at::Tensor avg_pool3d_out_cpu(
       padT,
       count_include_pad,
       divisor_override);
-#else
-  avg_pool3d_kernel_impl(
-      output,
-      input,
-      kW,
-      kH,
-      kT,
-      dW,
-      dH,
-      dT,
-      padW,
-      padH,
-      padT,
-      count_include_pad,
-      divisor_override);
-#endif
 
   return output;
 }
@@ -519,7 +516,22 @@ at::Tensor avg_pool3d_backward_out_cpu(
       " for `gradOutput` but got dtype ",
       gradOutput.dtype());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to avg_pool3d_backward_kernel_impl(
+      gradInput,
+      gradOutput,
+      kW,
+      kH,
+      kT,
+      dW,
+      dH,
+      dT,
+      padW,
+      padH,
+      padT,
+      count_include_pad,
+      divisor_override);
+  */
   avg_pool3d_backward_kernel_stub(
       kCPU,
       gradInput,
@@ -535,22 +547,6 @@ at::Tensor avg_pool3d_backward_out_cpu(
       padT,
       count_include_pad,
       divisor_override);
-#else
-  avg_pool3d_backward_kernel_impl(
-      gradInput,
-      gradOutput,
-      kW,
-      kH,
-      kT,
-      dW,
-      dH,
-      dT,
-      padW,
-      padH,
-      padT,
-      count_include_pad,
-      divisor_override);
-#endif
 
   return gradInput;
 }

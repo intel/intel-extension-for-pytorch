@@ -27,18 +27,13 @@ void cpu_channel_shuffle_cl(
 
 at::Tensor channel_shuffle(const at::Tensor& self, int64_t groups);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void channel_shuffle_kernel_impl(
     at::Tensor& output,
     const at::Tensor& input,
     int64_t groups);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using channel_shuffle_kernel_fn =
     void (*)(at::Tensor&, const at::Tensor&, int64_t);

@@ -14,13 +14,12 @@ std::vector<Tensor> merged_embeddingbag_forward_cpu(
     const Tensor& offsets,
     const std::vector<Tensor>& weights,
     const std::vector<int64_t> pooling_modes) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to merged_embeddingbag_forward_cpu_kernel_impl(
+      indices, offsets, weights, pooling_modes);
+  */
   return merged_embeddingbag_forward_cpu_kernel_stub(
       kCPU, indices, offsets, weights, pooling_modes);
-#else
-  return merged_embeddingbag_forward_cpu_kernel_impl(
-      indices, offsets, weights, pooling_modes);
-#endif
 }
 
 } // namespace cpu

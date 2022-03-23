@@ -9,9 +9,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 using namespace at;
 
@@ -161,14 +159,11 @@ std::vector<Tensor> merged_embeddingbag_forward_cpu_kernel_impl(
   return outputs;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
     merged_embeddingbag_forward_cpu_kernel_stub,
     &merged_embeddingbag_forward_cpu_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

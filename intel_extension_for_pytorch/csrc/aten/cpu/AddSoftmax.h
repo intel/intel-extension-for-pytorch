@@ -13,18 +13,13 @@ at::Tensor DivAddSoftmax(
     const at::Tensor& b,
     const float& dim_per_head);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor div_add_softmax_kernel_impl(
     at::Tensor& a,
     const at::Tensor& b,
     const float& dim_per_head);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using div_add_softmax_kernel_fn =
     at::Tensor (*)(at::Tensor&, const at::Tensor&, const float&);

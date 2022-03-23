@@ -8,9 +8,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void packed_add_kernel_impl(
     at::Tensor& top_half_,
@@ -164,12 +162,9 @@ void packed_add_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(packed_add_kernel_stub, &packed_add_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

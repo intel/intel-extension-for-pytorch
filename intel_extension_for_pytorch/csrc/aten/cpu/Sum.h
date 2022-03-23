@@ -6,14 +6,11 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
+
 void sum_kernel_impl(at::TensorIterator& iter);
 
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using sum_kernel_fn = void (*)(at::TensorIterator&);
 DECLARE_DISPATCH(sum_kernel_fn, sum_kernel_stub);

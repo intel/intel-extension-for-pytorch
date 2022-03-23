@@ -103,7 +103,19 @@ batch_norm_cpu_transform_input_template(
     at::Tensor output =
         at::empty_like(input, suggest_memory_format_contig(input));
 
-#if defined(DYN_DISP_BUILD)
+    /*
+    pointer to batch_norm_cpu_kernel_impl(
+        output,
+        input,
+        weight,
+        bias,
+        save_mean,
+        save_invstd,
+        running_mean,
+        running_var,
+        train,
+        eps);
+    */
     batch_norm_cpu_kernel_stub(
         kCPU,
         output,
@@ -116,19 +128,6 @@ batch_norm_cpu_transform_input_template(
         running_var,
         train,
         eps);
-#else
-    batch_norm_cpu_kernel_impl(
-        output,
-        input,
-        weight,
-        bias,
-        save_mean,
-        save_invstd,
-        running_mean,
-        running_var,
-        train,
-        eps);
-#endif
 
     return std::make_tuple(output, save_mean, save_invstd);
   }
@@ -231,11 +230,9 @@ std::tuple<at::Tensor, at::Tensor> batch_norm_cpu_update_stats_template(
     auto _mean_a = _mean.accessor<param_t, 1>();
     auto _var_sum_a = _var_sum.accessor<param_t, 1>();
 
-#if defined(DYN_DISP_BUILD)
+    // pointer to batch_norm_cpu_collect_stats_kernel_impl(_mean, _var_sum,
+    // input);
     batch_norm_cpu_collect_stats_kernel_stub(kCPU, _mean, _var_sum, input);
-#else
-    batch_norm_cpu_collect_stats_kernel_impl(_mean, _var_sum, input);
-#endif
 
     at::parallel_for(0, n_input, 1, [&](int64_t b_begin, int64_t b_end) {
       for (int64_t f = b_begin; f < b_end; ++f) {
@@ -333,7 +330,21 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu_template(
       grad_input = at::empty_like(input, suggest_memory_format_contig(input));
     }
 
-#if defined(DYN_DISP_BUILD)
+    /*
+    pointer to batch_norm_cpu_backward_kernel_impl(
+        grad_input,
+        grad_weight,
+        grad_bias,
+        grad_out_,
+        input,
+        weight,
+        running_mean,
+        running_var,
+        save_mean,
+        save_invstd,
+        train,
+        eps);
+    */
     batch_norm_cpu_backward_kernel_stub(
         kCPU,
         grad_input,
@@ -348,21 +359,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu_template(
         save_invstd,
         train,
         eps);
-#else
-    batch_norm_cpu_backward_kernel_impl(
-        grad_input,
-        grad_weight,
-        grad_bias,
-        grad_out_,
-        input,
-        weight,
-        running_mean,
-        running_var,
-        save_mean,
-        save_invstd,
-        train,
-        eps);
-#endif
 
     return std::make_tuple(grad_input, grad_weight, grad_bias);
   }
