@@ -28,13 +28,17 @@ def get_defines(torch_version):
     return [table[torch_version]]
 
 
+num_workers = int(os.environ['MAX_JOBS'])
+cpp_parts = ['csrc/generated_' + str(t) + '.cpp' for t in range(num_workers)]
+
 setup(
     name='microbench',
     ext_modules=[
         CppExtension(
             'microbench',
-            ['csrc/microbench.cpp'],
-            define_macros=get_defines(torch_version)
+            ['csrc/microbench.cpp'] + cpp_parts,
+            define_macros=get_defines(torch_version),
+            extra_compile_args=['-Wno-unused-function']
         )
     ],
     cmdclass={'build_ext': BuildExtension}

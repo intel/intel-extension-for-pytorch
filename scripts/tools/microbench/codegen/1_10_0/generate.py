@@ -46,11 +46,12 @@ def get_bench_verbose(name, wrapper_name, arg_names, arg_types):
     return data + " std::cout<<\"{mb_" + wrapper_name + '}\"<<std::endl;\n'
 
 
-def gen_code(aten_path, out_file):
-    full_aten_decls = load_aten_declarations(aten_path)
-    output = "#pragma once\n#include <torch/extension.h>\n#include <iostream>\nusing namespace at;\n\nnamespace microbench {\n\n"
+def gen_code_part(decls, out_file):
+    out_file_ = os.path.basename(out_file)
+    out_file_prefix = out_file_[:out_file_.rfind('.')]
+    output = "#include <torch/extension.h>\n#include <iostream>\n#include \"argprint.h\"\nusing namespace at;\n\nnamespace microbench {\n\n"
     wrapper_metas = []
-    for declaration in full_aten_decls:
+    for declaration in decls:
         name = declaration['name']
         operator_name = declaration['operator_name']
         if declaration.get('overload_name'):
@@ -72,7 +73,8 @@ def gen_code(aten_path, out_file):
             op_output = "{0} {1}({2})\n".format(return_type, wrapper_name,
                                                 "c10::DispatchKeySet ks, " + ", ".join(declaration_formals)) + "{\n"
         else:
-            op_output = "{0} {1}({2})\n".format(return_type, wrapper_name, "c10::DispatchKeySet ks") + "{\n"
+            op_output = "{0} {1}({2})\n".format(
+                return_type, wrapper_name, "c10::DispatchKeySet ks") + "{\n"
         op_output += get_bench_verbose(name,
                                        wrapper_name, arg_names, arg_types)
         op_type_signature = "{0}({1})".format(
@@ -101,9 +103,7 @@ def gen_code(aten_path, out_file):
         output += "  m.impl(\"{0}\", c10::DispatchKey::{1}, TORCH_FN({2}));\n".format(
             aten_name, MICROBENCH_DISPATCH_KEY, microbench_impl)
     output += "}\n\n"
-    output += "#define MICRO_BENCH_REGISTER \\\n"
-    output += "py::class_<at::Scalar>(m, \"Scalar\").def(py::init<>()); \\\n"
-    output += "m.def(\"bench_scalar_slow\", [](py::handle t) { return scalar_slow(t.ptr());}); \\\n"
+    output += "void init_" + out_file_prefix + "(pybind11::module& m) \n{\n"
     for item in wrapper_metas:
         name, operator_name, overload_name, wrapper_name, arg_types, arg_names, op_type_signature = item
         args = []
@@ -112,9 +112,35 @@ def gen_code(aten_path, out_file):
         args = ", ".join(args)
         func_for_call = "mb_" + wrapper_name
         aten_operator_name = 'aten::' + operator_name
-        output += "m.def(\"" + func_for_call + "\", [](" + args + \
+        output += "  m.def(\"" + func_for_call + "\", [](" + args + \
             "){{ auto op = c10::Dispatcher::singleton().findSchemaOrThrow(\"{0}\", \"{1}\").typed<{2}>(); return op.call(".format(
-                aten_operator_name, overload_name, op_type_signature) + ", ".join(arg_names) + "); }); \\\n"
+                aten_operator_name, overload_name, op_type_signature) + ", ".join(arg_names) + "); }); \n"
+    output += "}\n"
+    with open(out_file, 'w') as f:
+        f.write(output)
+
+
+def gen_code(aten_path, out_file):
+    num_workers = int(os.environ['MAX_JOBS'])
+    # gen parts
+    out_file_ = out_file[:out_file.rfind('.')]
+    full_aten_decls = load_aten_declarations(aten_path)
+    chunk_size = len(full_aten_decls) // num_workers
+    for k in range(num_workers):
+        gen_code_part(full_aten_decls[:chunk_size],
+                      out_file_ + '_' + str(k) + '.cpp')
+        full_aten_decls = full_aten_decls[chunk_size:]
+    # gen head
+    output = "#pragma once\n\n#include <torch/extension.h>\n\n"
+    part_name = os.path.basename(out_file_)
+    for k in range(num_workers):
+        output += "void init_" + part_name + '_' + \
+            str(k) + "(pybind11::module& m); \n"
+    output += "\n#define MICRO_BENCH_REGISTER \\\n"
+    output += "  py::class_<at::Scalar>(m, \"Scalar\").def(py::init<>()); \\\n"
+    output += "  m.def(\"bench_scalar_slow\", [](py::handle t) { return scalar_slow(t.ptr());}); \\\n"
+    for k in range(num_workers):
+        output += "  init_" + part_name + '_' + str(k) + "(m); \\\n"
     with open(out_file, 'w') as f:
         f.write(output)
 

@@ -6,7 +6,7 @@
 using namespace at;
 
 template <typename T>
-void print_(T item) {
+static void print_(T item) {
   std::cout << "unknown";
 }
 
@@ -83,7 +83,7 @@ void print_<c10::optional<std::array<bool, 3>>>(
 }
 
 template <typename T>
-void argprint(T item, std::string argname, std::string argtype) {
+static void argprint(T item, std::string argname, std::string argtype) {
   std::cout << argname << "(" << argtype << "):";
   print_(item);
   std::cout << "; ";

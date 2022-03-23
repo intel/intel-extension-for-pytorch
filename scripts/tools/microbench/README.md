@@ -5,7 +5,7 @@
 ```bash
 pip install -r requirements.txt
 rm -rf ./build
-python setup.py install
+MAX_JOBS=32 python setup.py install
 ```
 
 #### Guide for Verbose Generation

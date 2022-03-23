@@ -132,13 +132,15 @@ def get_true_inputs(params: list, specific_floating_type=None, backend='xpu') ->
         elif 'std::array<bool,3>' in type:
             inputs.append(eval(raw_value))
         elif 'Tensor' in type:
-            value = raw_value.strip().replace('[', '^ITNFLAG').replace(']', '^ITNFLAG').split('^ITNFLAG')
+            value = raw_value.strip().replace(
+                '[', '^ITNFLAG').replace(']', '^ITNFLAG').split('^ITNFLAG')
             dtype = value[0]
             shape = eval('[' + value[1] + ']')
             memory_format = value[2]
             if specific_floating_type is not None and dtype in ['float', 'c10::BFloat16', 'c10::Half']:
                 dtype = specific_floating_type
-            inputs.append(create_randn_tensor(shape, backend, dtype, memory_format))
+            inputs.append(create_randn_tensor(
+                shape, backend, dtype, memory_format))
         elif 'IntArrayRef' in type:
             inputs.append(eval(raw_value))
         elif 'int64_t' in type or 'double' in type or 'float' in type:
@@ -236,12 +238,25 @@ def get_prof(inputs, func, backend):
     else:
         kwargs = {}
     time_info = None
-    with torch.autograd.profiler.profile(True, **kwargs) as prof:
-        output = func(*inputs)
+    if backend == 'xpu':
+        with torch.autograd.profiler_legacy.profile(True, **kwargs) as prof:
+            output = func(*inputs)
+    else:
+        with torch.autograd.profiler.profile(True, **kwargs) as prof:
+            output = func(*inputs)
     time_info = str(prof.key_averages().table(sort_by="self_cpu_time_total"))
     if backend != 'cpu':
         eval("torch.{0}.synchronize()".format(backend))
     return output, time_info, prof
+
+
+flush_tensor = None
+def flush_cache(backend, shape=(1024, 1024, 1024)):
+    global flush_tensor
+    if (flush_tensor is None) or (backend not in str(flush_tensor.device)):
+        print('create flush tensor')
+        flush_tensor = torch.randn(shape).to(backend)
+    flush_tensor += 1
 
 
 def run_op(filename, bench_type=None, backend='XPU', sample=8, time_base='us', exclude=[]):
@@ -280,17 +295,22 @@ def run_op(filename, bench_type=None, backend='XPU', sample=8, time_base='us', e
             print("----args={}".format(params))
 
             # get true inputs
-            inputs = get_true_inputs(params, specific_floating_type=bench_type, backend=backend_lower)
+            inputs = get_true_inputs(
+                params, specific_floating_type=bench_type, backend=backend_lower)
             if '_embedding_bag' in op_class_name:
-                inputs[1] = torch.arange(inputs[1].shape[0]).long().to(backend_lower)
-                inputs[2] = torch.arange(inputs[2].shape[0]).long().to(backend_lower)
+                inputs[1] = torch.arange(
+                    inputs[1].shape[0]).long().to(backend_lower)
+                inputs[2] = torch.arange(
+                    inputs[2].shape[0]).long().to(backend_lower)
 
             # dry run
             time_avg_ = []
             func = eval(func_name)
             for i in range(sample):
+                flush_cache(backend_lower)
                 output, time_info, prof = get_prof(inputs, func, backend_lower)
-                time_avg_.append(get_time_avg(time_info, 'aten::' + op_class_name, time_base, backend_lower))
+                time_avg_.append(get_time_avg(
+                    time_info, 'aten::' + op_class_name, time_base, backend_lower))
             time_avg_ = sorted(time_avg_)
             time_avg = time_avg_[len(time_avg_) // 2]
 
@@ -324,8 +344,10 @@ if __name__ == '__main__':
     parser.add_argument('--log', help='path to log file')
     parser.add_argument('--exclude', help='e.g. onednn+trivial', default='')
     parser.add_argument('--backend', help='backend to run', default='cpu')
-    parser.add_argument('--dtype', help='specific floating type', default='default')
+    parser.add_argument(
+        '--dtype', help='specific floating type', default='default')
     args = parser.parse_args()
     if args.backend.strip().lower() == 'xpu':
         import intel_extension_for_pytorch
-    infos = run_op(args.log, bench_type=args.dtype, exclude=args.exclude, backend=args.backend)
+    infos = run_op(args.log, bench_type=args.dtype,
+                   exclude=args.exclude, backend=args.backend)
