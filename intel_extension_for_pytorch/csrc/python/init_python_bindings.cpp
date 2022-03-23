@@ -40,7 +40,6 @@
 #include "intel_extension_for_pytorch/csrc/aten/cpu/EmbeddingBag.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/CPUPool.h"
 #include "intel_extension_for_pytorch/csrc/cpu/runtime/TaskExecutor.h"
-#include "intel_extension_for_pytorch/csrc/cpu/utils/CPUISA.h"
 
 namespace torch_ipex {
 namespace {
@@ -49,7 +48,6 @@ py::object GetBinaryInfo() {
   auto py_dict = py::dict();
   py_dict["__version__"] = __version__();
   py_dict["__gitrev__"] = __gitrev__();
-  py_dict["__avx_version__"] = __avx_version__();
   py_dict["__torch_gitrev__"] = __torch_gitrev__();
   py_dict["__mode__"] = __mode__();
   return std::move(py_dict);
@@ -57,16 +55,6 @@ py::object GetBinaryInfo() {
 
 void InitIpexModuleBindings(py::module m) {
   m.def("_get_binary_info", []() { return GetBinaryInfo(); });
-
-  // Check CPU ISA
-  m.def("_does_support_avx2", []() {
-    using namespace torch_ipex::cpu::utils;
-    return CPUISA::info().does_support_avx2();
-  });
-  m.def("_does_support_avx512", []() {
-    using namespace torch_ipex::cpu::utils;
-    return CPUISA::info().does_support_avx512();
-  });
 
   m.def("_get_current_isa_level", []() {
     using namespace torch_ipex::cpu;
