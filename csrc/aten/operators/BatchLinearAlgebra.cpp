@@ -971,7 +971,8 @@ std::tuple<Tensor, Tensor, Tensor> _lu_with_info(
   }
   std::copy(
       infos.begin(), infos.end(), infos_tensor.template data_ptr<int64_t>());
-  return std::make_tuple(self_working_copy, pivots_tensor, infos_tensor);
+  return std::make_tuple(
+      self_working_copy, pivots_tensor.to(kInt), infos_tensor);
 }
 
 Tensor _lu_solve_helper(
@@ -982,6 +983,8 @@ Tensor _lu_solve_helper(
   auto LU_data_working_copy = native::cloneBatchedColumnMajor(LU_data);
   auto LU_pivots_working_copy =
       LU_pivots.is_contiguous() ? LU_pivots : LU_pivots.contiguous();
+  // FIXME: oneMKL only support int64_t datatype of pivots
+  LU_pivots_working_copy = LU_pivots.to(kLong);
   std::vector<int64_t> infos(native::batchCount(self), 0);
 
   if (self.numel() == 0 || LU_data.numel() == 0) {

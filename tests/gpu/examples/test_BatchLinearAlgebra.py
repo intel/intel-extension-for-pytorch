@@ -133,8 +133,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(A_det.to(cpu_device), A_dpcpp_det.to(cpu_device))
         self.assertEqual(A_det_log.to(cpu_device), A_dpcpp_det_log.to(cpu_device))
 
-    # @pytest.mark.skipif("not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(reason="not block the pre-ci")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_lu(self, dtype=torch.float):
         def _validate(A, LU, pivot):
             P, L, U = torch.lu_unpack(LU, pivot)
@@ -158,8 +157,7 @@ class TestTorchMethod(TestCase):
             LU_xpu, pivot_xpu = A_xpu.lu()
             _validate(A_xpu.cpu(), LU_xpu.cpu(), pivot_xpu.cpu())
 
-    # @pytest.mark.skipif("not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(reason="not block the pre-ci")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_lu_solve(self, dtype=torch.float):
         def _validate(A, x, b):
             b_ = torch.matmul(A, x)
@@ -188,7 +186,7 @@ class TestTorchMethod(TestCase):
             x_xpu = b_xpu.lu_solve(*A_xpu.lu())
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_solve(self, dtype=torch.float):
         def _validate(A, x, b):
             d_ = torch.dist(b, torch.matmul(A, x))
