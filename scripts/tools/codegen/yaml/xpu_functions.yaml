@@ -44,7 +44,7 @@ supported:
   - _softmax_backward_data
   - _solve_helper
 #  - _std  # different schema
-#  - _svd_helper  # different schema
+  - _svd_helper  # different schema
   - _symeig_helper
 #  - _triangular_solve_helper  # different schema
   - _unique

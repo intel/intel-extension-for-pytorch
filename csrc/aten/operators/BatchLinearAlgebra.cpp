@@ -489,6 +489,39 @@ static void apply_ormqr_dpcpp_(
 #endif
 }
 
+// Copy from PyTorch fmk. The utils is not compatible with kXPU backend in 1.10
+static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
+    const Tensor& input,
+    bool some,
+    bool compute_uv) {
+  auto sizes = input.sizes().vec();
+  int64_t m = input.size(-2), n = input.size(-1);
+
+  sizes[input.dim() - 1] = (compute_uv && some) ? std::min(m, n) : m;
+  auto strides = at::detail::defaultStrides(sizes);
+  // U should be a column-major or a batch of column-major matrices
+  // ... x m x ucol will have strides: ...., ucol, 1
+  // We require: ...., 1, m
+  strides[input.dim() - 1] = m;
+  strides[input.dim() - 2] = 1;
+
+  Tensor U_empty;
+  U_empty = at::empty_strided(sizes, strides, input.options());
+
+  sizes[input.dim() - 2] = n;
+  sizes[input.dim() - 1] = n;
+  // VT should be a row-major or a batch of row-major matrices
+  Tensor VT_empty;
+  VT_empty = at::empty(sizes, input.options());
+
+  sizes.pop_back();
+  sizes[input.dim() - 2] = std::min(m, n);
+  Tensor S_empty;
+  ScalarType dtype = toValueType(typeMetaToScalarType(input.dtype()));
+  S_empty = at::empty(sizes, input.options().dtype(dtype));
+  return std::tuple<Tensor, Tensor, Tensor>(U_empty, S_empty, VT_empty);
+}
+
 template <typename scalar_t>
 static void apply_svd(
     Tensor& self,
@@ -1177,7 +1210,7 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
 
   Tensor U_working_copy, S_working_copy, VT_working_copy;
   std::tie(U_working_copy, S_working_copy, VT_working_copy) =
-      native::_create_U_S_VT(self, some, compute_uv);
+      impl::_create_U_S_VT(self, some, compute_uv);
 
   if (self.numel() > 0) {
     auto self_working_copy = native::cloneBatchedColumnMajor(self);

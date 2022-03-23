@@ -8,8 +8,7 @@ import pytest
 
 
 class TestNNMethod(TestCase):
-    # @pytest.mark.skipif("not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(reason="not block the pre-ci")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_pinverse(self):
         a = torch.randn(5, 3)
         b = torch.pinverse(a)
