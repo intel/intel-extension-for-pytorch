@@ -12,5 +12,5 @@ class TestTorchMethod(TestCase):
         print("Testing itt func.!\n")
         output = torch.rand(4, 3, 640, 1024)
         output = output.to('xpu')
-        with torch.xpu.emit_itt():
+        with torch.xpu.emit_itt(enabled=torch.xpu.has_itt()):
             torch.max(output, dim=1)

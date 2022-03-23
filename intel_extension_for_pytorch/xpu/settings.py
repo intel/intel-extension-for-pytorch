@@ -4,6 +4,9 @@ from enum import Enum
 def has_onemkl():
     return _C._is_onemkl_enabled()
 
+def has_itt():
+    return _C._itt_is_enabled()
+
 def has_channels_last_1d():
     return _C._is_channels_last_1d_enabled()
 
