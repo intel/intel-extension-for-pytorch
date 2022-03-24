@@ -273,7 +273,7 @@ Tensor packed_add(
     values = values.contiguous();
     int64_t stride = xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
 
-    Tensor uniqueOffsets = at::empty({nnz}, indices.options());
+    Tensor uniqueOffsets = at::arange(0, {nnz}, indices.options());
     Tensor new_indices, origIndices;
     std::tie(new_indices, origIndices) =
         at::AtenIpexTypeXPU::sort(indices1D, 0, false);
