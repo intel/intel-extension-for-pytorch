@@ -11,20 +11,12 @@ else(MSVC)
   endif()
 endif(MSVC)
 
-#[[
-if(NOT MSVC AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
-  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/../aten/src/ATen/MapAllocator.cpp PROPERTIES COMPILE_FLAGS "-fno-openmp")
-endif()
-]]
-
 file(GLOB_RECURSE cpu_kernel_cpp_in "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc/aten/cpu/kernels/*.cpp")
-
 list(APPEND DPCPP_ISA_SRCS_ORIGIN ${cpu_kernel_cpp_in})
 
 # foreach(file_path ${cpu_kernel_cpp_in})
 #   message(${file_path})
 # endforeach()
-
 
 # Some versions of GCC pessimistically split unaligned load and store
 # instructions when using the default tuning. This is a bad choice on
@@ -53,6 +45,10 @@ if(CXX_AMX_FOUND)
     -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma \
     -mamx-tile -mamx-int8 -mamx-bf16")
   endif(MSVC)
+else(CXX_AMX_FOUND)
+  if(CMAKE_COMPILER_IS_GNUCXX)
+    message(WARNING "Please upgrade gcc version to 11.2+ to support CPU ISA AMX.")
+  endif(CMAKE_COMPILER_IS_GNUCXX)
 endif(CXX_AMX_FOUND)
 
 if(CXX_AVX512_BF16_FOUND)
@@ -65,6 +61,10 @@ if(CXX_AVX512_BF16_FOUND)
     -DCPU_CAPABILITY_AVX512_VNNI -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni \
     -mavx512bf16 -mfma")
   endif(MSVC)
+else(CXX_AVX512_BF16_FOUND)
+  if(CMAKE_COMPILER_IS_GNUCXX)
+    message(WARNING "Please upgrade gcc version to 10.3+ to support CPU ISA AVX512_BF16.")
+  endif(CMAKE_COMPILER_IS_GNUCXX)  
 endif(CXX_AVX512_BF16_FOUND)
 
 if(CXX_AVX512_VNNI_FOUND)
@@ -76,6 +76,10 @@ if(CXX_AVX512_VNNI_FOUND)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ -DCPU_CAPABILITY_AVX512 \
      -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mfma")
   endif(MSVC)
+else(CXX_AVX512_VNNI_FOUND)
+  if(CMAKE_COMPILER_IS_GNUCXX)
+    message(WARNING "Please upgrade gcc version to 9.2+ to support CPU ISA AVX512_VNNI.")
+  endif(CMAKE_COMPILER_IS_GNUCXX)   
 endif(CXX_AVX512_VNNI_FOUND)
 
 if(CXX_AVX512_FOUND)
@@ -86,6 +90,10 @@ if(CXX_AVX512_FOUND)
   else(MSVC)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ -mavx512f -mavx512bw -mavx512vl -mavx512dq -mfma")
   endif(MSVC)
+else(CXX_AVX512_FOUND)
+  if(CMAKE_COMPILER_IS_GNUCXX)
+    message(WARNING "Please upgrade gcc version to 9.2+ to support CPU ISA AVX512.")
+  endif(CMAKE_COMPILER_IS_GNUCXX)   
 endif(CXX_AVX512_FOUND)
 
 if(CXX_AVX2_FOUND)
@@ -148,8 +156,3 @@ foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
 endforeach()
 
 list(APPEND DPCPP_ISA_SRCS ${cpu_kernel_cpp})
-
-# foreach(file_path ${cpu_kernel_cpp})
-#   message(${file_path})
-# endforeach()
-
