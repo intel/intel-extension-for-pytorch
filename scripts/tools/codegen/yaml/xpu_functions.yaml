@@ -24,6 +24,12 @@ supported:
   - _empty_affine_quantized
   - _empty_per_channel_affine_quantized
 #  - _fft_with_size.norm_modes  # different schema
+  - _fft_c2r
+  - _fft_r2c
+  - _fft_c2c
+  - _fft_c2r.out
+  - _fft_r2c.out
+  - _fft_c2c.out
   - _fused_dropout
   - _masked_scale
   - _index_put_impl_ 
