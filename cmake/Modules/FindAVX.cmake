@@ -46,6 +46,18 @@ SET(AVX512_VNNI_CODE "
     __m512i src3 = _mm512_set1_epi8(a3);
     // detect avx512_vnni
     _mm512_dpbusds_epi32(src3, src1, src2);
+
+    // detect avx512
+    __m512i a = _mm512_set_epi8(0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0);
+    __m512i b = a;
+    __mmask64 equality_mask = _mm512_cmp_epi8_mask(a, b, _MM_CMPINT_EQ);
     return 0;
   }
 ")
