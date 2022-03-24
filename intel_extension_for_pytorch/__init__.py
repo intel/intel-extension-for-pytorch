@@ -5,6 +5,8 @@ except ImportError:
     pass  # skip if torchvision is not available
 
 from .version import __version__
+from .utils import _cpu_isa
+_cpu_isa.check_minimal_isa_support()
 
 torch_version = ''
 ipex_version = ''
