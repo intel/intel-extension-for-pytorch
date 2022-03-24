@@ -25,6 +25,10 @@ def _lazy_init():
     pass
 
 
+def _lazy_call(callable, **kwargs):
+    callable()
+
+
 def is_available() -> bool:
     r"""Returns a bool indicating if XPU is currently available."""
     if not hasattr(intel_extension_for_pytorch._C, '_getDeviceCount'):
