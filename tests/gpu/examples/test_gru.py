@@ -47,3 +47,5 @@ class TestNNMethod(TestCase):
         self.assertEqual(h0, h0.cpu())
         self.assertEqual(input.grad, input_xpu.grad.cpu())
         self.assertEqual(h0.grad, h0_xpu.grad.cpu())
+        for i in range(len(param_grad)):
+            self.assertEqual(param_grad[i], param_grad_xpu[i].cpu())

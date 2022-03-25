@@ -18,7 +18,7 @@ using namespace at::AtenIpexTypeXPU;
 namespace xpu {
 namespace oneDNN {
 
-static inline void gru_forward(
+static inline Tensor gru_forward(
     const Tensor& src_layer,
     const Tensor& src_iter,
     const Tensor& weight_layer,
@@ -26,7 +26,6 @@ static inline void gru_forward(
     const Tensor& bias,
     Tensor& dst_layer,
     Tensor& dst_iter,
-    Tensor& workspace,
     bool reverse,
     int64_t hidden_size,
     bool has_bias,
@@ -65,9 +64,6 @@ static inline void gru_forward(
   memory::dims dst_layer_dims = {seq_length, mini_batch, hidden_size}; // tnc
   memory::dims dst_iter_dims = {
       1, 1, mini_batch, hidden_size}; // ldnc   dst_iter, dst_layer hidden state
-
-  dst_layer = at::empty(dst_layer_dims, src_layer.options());
-  dst_iter = at::empty(dst_iter_dims, src_iter.options());
 
   auto src_layer_md = memory::desc({src_layer_dims}, data_t, format_any);
   auto weights_layer_md =
@@ -194,11 +190,12 @@ static inline void gru_forward(
     xpu::oneDNN::reorder(dst_iter, dst_iter_);
   }
 
+  Tensor workspace;
   auto gru_forward_p = lbr_gru_forward(gru_forward_pd);
   if (train) {
     auto workspace_md = gru_forward_pd.workspace_desc();
-    auto w_size = workspace_md.get_size() / src_layer.dtype().itemsize();
-    workspace = at::empty(w_size, src_layer.options());
+    auto w_size = workspace_md.get_size();
+    workspace = at::empty(w_size, src_layer.options().dtype(at::kByte));
     auto workspace_memory =
         dpcpp_onednn_memory(workspace_md, engine, workspace.data_ptr());
 
@@ -233,9 +230,10 @@ static inline void gru_forward(
   if (dst_iter_memory != dst_iter_usr_memory) {
     xpu::oneDNN::reorder(dst_iter_, dst_iter);
   }
+  return workspace;
 }
 
-static inline void gru_backward(
+static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
     const Tensor& src_layer,
     const Tensor& src_iter,
     const Tensor& weight_layer,
@@ -246,11 +244,6 @@ static inline void gru_backward(
     const Tensor& workspace,
     const Tensor& diff_dst_layer,
     const Tensor& diff_dst_iter,
-    Tensor& diff_src_layer,
-    Tensor& diff_src_iter,
-    Tensor& diff_weight_layer,
-    Tensor& diff_weight_iter,
-    Tensor& diff_bias,
     bool reverse,
     int64_t hidden_size,
     bool has_bias,
@@ -288,11 +281,14 @@ static inline void gru_backward(
   memory::dims dst_iter_dims = {
       1, 1, mini_batch, hidden_size}; // ldnc   dst_iter, dst_layer hidden state
 
-  diff_src_layer = at::empty(src_layer_dims, src_layer.options());
-  diff_src_iter = at::empty(src_iter_dims, src_iter.options());
-  diff_weight_layer = at::empty(weights_layer_dims, weight_layer.options());
-  diff_weight_iter = at::empty(weights_iter_dims, weight_iter.options());
-  diff_bias = at::empty(bias_dims, bias.options());
+  auto diff_src_layer = at::empty(src_layer_dims, src_layer.options());
+  auto diff_src_iter = at::empty(src_iter_dims, src_iter.options());
+  // onednn rnn primitive used accumulate grad, so we must zero grad buffer.
+  auto diff_weight_layer =
+      at::empty(weights_layer_dims, weight_layer.options()).zero_();
+  auto diff_weight_iter =
+      at::empty(weights_iter_dims, weight_iter.options()).zero_();
+  auto diff_bias = at::empty(bias_dims, bias.options()).zero_();
 
   auto src_layer_md = memory::desc({src_layer_dims}, data_t, format_any);
   auto weights_layer_md =
@@ -551,8 +547,9 @@ static inline void gru_backward(
         expected_diff_weights_layer_md,
         diff_weight_layer.options(),
         c10::nullopt);
-    diff_weights_layer_memory = memory(
+    diff_weights_layer_memory = dpcpp_onednn_memory(
         expected_diff_weights_layer_md, engine, diff_weight_layer_.data_ptr());
+    xpu::oneDNN::reorder(diff_weight_layer, diff_weight_layer_);
   }
 
   auto expected_diff_weights_iter_md = gru_backward_pd.diff_weights_iter_desc();
@@ -563,8 +560,9 @@ static inline void gru_backward(
         expected_diff_weights_iter_md,
         diff_weight_iter.options(),
         c10::nullopt);
-    diff_weights_iter_memory = memory(
+    diff_weights_iter_memory = dpcpp_onednn_memory(
         expected_diff_weights_iter_md, engine, diff_weight_iter_.data_ptr());
+    xpu::oneDNN::reorder(diff_weight_iter, diff_weight_iter_);
   }
 
   auto expected_diff_bias_md = gru_backward_pd.diff_bias_desc();
@@ -572,8 +570,9 @@ static inline void gru_backward(
   if (diff_bias_usr_memory.get_desc() != expected_diff_bias_md) {
     diff_bias_ = empty_opaque_tensor(
         expected_diff_bias_md, diff_bias.options(), c10::nullopt);
-    diff_bias_memory =
-        memory(expected_diff_bias_md, engine, diff_bias_.data_ptr());
+    diff_bias_memory = dpcpp_onednn_memory(
+        expected_diff_bias_md, engine, diff_bias_.data_ptr());
+    xpu::oneDNN::reorder(diff_bias, diff_bias_);
   }
 
   auto workspace_memory = dpcpp_onednn_memory(
@@ -615,6 +614,13 @@ static inline void gru_backward(
   if (diff_bias_usr_memory != diff_bias_memory) {
     xpu::oneDNN::reorder(diff_bias_, diff_bias);
   }
+
+  return {
+      diff_src_layer,
+      diff_src_iter,
+      diff_weight_layer,
+      diff_weight_iter,
+      diff_bias};
 }
 } // namespace oneDNN
 } // namespace xpu

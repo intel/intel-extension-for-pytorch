@@ -32,6 +32,10 @@ std::tuple<Tensor, Tensor, Tensor> gru_forward_layer(
     bool train,
     bool bidirectional) {
   int32_t num_bias_gate = 4;
+  std::vector<int64_t> output_size = {
+      input.size(0), input.size(1), hidden_size};
+  auto y = at::empty(output_size, input.options());
+  auto hy_ = at::empty(hx.sizes(), hx.options());
 
   std::vector<at::Tensor> gates_i = weight1.chunk(3, /*gates*/ 0);
   auto weight_ih = at::cat({gates_i[1], gates_i[0], gates_i[2]}, /*gates*/ 0)
@@ -43,7 +47,7 @@ std::tuple<Tensor, Tensor, Tensor> gru_forward_layer(
                        .t()
                        .contiguous();
 
-  Tensor bias, y, hy, workspace_t;
+  Tensor bias;
   if (has_biases) {
     std::vector<at::Tensor> b1 = weight3.chunk(3, /*output_channels*/ 0);
     std::vector<at::Tensor> b2 = weight4.chunk(3, /*output_channels*/ 0);
@@ -56,22 +60,21 @@ std::tuple<Tensor, Tensor, Tensor> gru_forward_layer(
   if (weight1.scalar_type() != ScalarType::Half)
     bias = bias.to(at::kFloat);
 
-  xpu::oneDNN::gru_forward(
+  auto workspace = xpu::oneDNN::gru_forward(
       input,
       hx,
       weight_ih,
       weight_hh,
       bias,
       y,
-      hy,
-      workspace_t,
+      hy_,
       reverse,
       hidden_size,
       has_biases,
       train,
       bidirectional);
-  auto hy_ = hy.reshape(hx.sizes());
-  return std::make_tuple(std::move(y), std::move(hy_), std::move(workspace_t));
+
+  return std::make_tuple(std::move(y), std::move(hy_), std::move(workspace));
 }
 
 std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward_layer(
@@ -114,27 +117,23 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward_layer(
     bias = at::zeros({num_bias_gate * hidden_size}, weight1.options());
   }
 
-  xpu::oneDNN::gru_backward(
-      input,
-      hx,
-      weight_ih,
-      weight_hh,
-      bias,
-      output,
-      hy,
-      workspace,
-      grad_y,
-      grad_hy,
-      grad_input,
-      grad_hx,
-      grad_weight_ih,
-      grad_weight_hh,
-      grad_bias,
-      reverse,
-      hidden_size,
-      has_biases,
-      train,
-      bidirectional);
+  std::tie(grad_input, grad_hx, grad_weight_ih, grad_weight_hh, grad_bias) =
+      xpu::oneDNN::gru_backward(
+          input,
+          hx,
+          weight_ih,
+          weight_hh,
+          bias,
+          output,
+          hy,
+          workspace,
+          grad_y,
+          grad_hy,
+          reverse,
+          hidden_size,
+          has_biases,
+          train,
+          bidirectional);
 
   std::vector<at::Tensor> grad_w_1 = grad_weight_ih.permute({0, 1, 3, 4, 2})
                                          .reshape(weight1.sizes())
@@ -153,6 +152,12 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward_layer(
   auto grad_b2 =
       at::cat({grad_b[1], grad_b[0], grad_b[3]}, /*output_channels*/ 0);
   auto grad_hx_ = grad_hx.reshape(hx.sizes());
+  grad_input.resize_as_(input);
+  grad_w_ih.resize_as_(weight1);
+  grad_w_hh.resize_as_(weight2);
+  grad_b1.resize_as_(weight3);
+  grad_b2.resize_as_(weight4);
+  grad_hx.resize_as_(hx);
   return std::make_tuple(
       std::move(grad_input),
       std::move(grad_w_ih),
@@ -223,8 +228,9 @@ class GRUFunction : public Function<GRUFunction> {
     auto hy = saved[7];
     auto workspace = saved[8];
 
-    Tensor grad_output = grad_outputs[0];
-    Tensor grad_hy = grad_outputs[1];
+    Tensor grad_output = grad_outputs[0].contiguous();
+    Tensor grad_hy = grad_outputs[1].contiguous();
+
     auto reverse = ctx->saved_data["reverse"].toBool();
     auto hidden_size = ctx->saved_data["hidden_size"].toInt();
     auto has_biases = ctx->saved_data["has_biases"].toBool();
