@@ -1267,7 +1267,9 @@ void batch_norm_cpu_kernel_impl(
                 eps);
           }
         });
-  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  } else if (
+      input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     AT_DISPATCH_FLOATING_TYPES_AND(
         at::ScalarType::BFloat16,
         input.scalar_type(),
@@ -1338,7 +1340,9 @@ void batch_norm_cpu_collect_stats_kernel_impl(
             }
           }
         });
-  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  } else if (
+      input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     AT_DISPATCH_FLOATING_TYPES_AND(
         at::ScalarType::BFloat16,
         input.scalar_type(),
@@ -1445,7 +1449,9 @@ void batch_norm_cpu_backward_kernel_impl(
             }
           }
         });
-  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+  } else if (
+      input.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     AT_DISPATCH_FLOATING_TYPES_AND(
         at::ScalarType::BFloat16,
         input.scalar_type(),

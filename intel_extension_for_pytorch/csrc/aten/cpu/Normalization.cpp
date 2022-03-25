@@ -68,7 +68,8 @@ struct Var {
 };
 
 static inline bool is_contiguous(const at::Tensor& t) {
-  return t.is_contiguous() || t.is_contiguous(at::MemoryFormat::ChannelsLast);
+  return t.is_contiguous() || t.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      t.is_contiguous(at::MemoryFormat::ChannelsLast3d);
 }
 
 // For some ambiguous cases, it is possible a channels last contiguous
@@ -78,7 +79,9 @@ static inline bool is_contiguous(const at::Tensor& t) {
 static inline at::MemoryFormat suggest_memory_format_contig(
     const at::Tensor& t) {
   return t.is_contiguous() ? at::MemoryFormat::Contiguous
-                           : at::MemoryFormat::ChannelsLast;
+                           : (t.is_contiguous(at::MemoryFormat::ChannelsLast3d)
+                                  ? at::MemoryFormat::ChannelsLast3d
+                                  : at::MemoryFormat::ChannelsLast);
 }
 
 template <typename scalar_t, typename param_t>
