@@ -74,7 +74,7 @@ Better to explain the concepts here with a diagram, the **dotted lines** indicat
 
 Before moving on, I feel it is necessary to explain how PyTorch organizes tensors in memory - the **layout**. Here we only focus on **dense** tensors, skip 'coo' layout of **sparse** tensor.
 
-The question itself can be reinterpreted as for a tensor of size <N, C, H, W>, how does PyTorch accesses the element with index <n, w, h, w> from memory, the answer is **stride**:
+The question itself can be reinterpreted as for a tensor of size <N, C, H, W>, how does PyTorch accesses the element with index <n, c, h, w> from memory, the answer is **stride**:
 ```
 tensor: <N, C, H, W>
 index: <n, c, h, w>
