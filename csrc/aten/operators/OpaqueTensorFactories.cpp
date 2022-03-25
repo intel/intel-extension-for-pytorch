@@ -11,13 +11,15 @@ Tensor empty_opaque_tensor(
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
   auto* allocator = xpu::dpcpp::getDeviceAllocator();
-  int64_t nelements = DPCPPTensorContext(nullptr, meta).padded_size();
   auto dtype = options.dtype();
-  int64_t size_bytes = nelements * dtype.itemsize();
+
+  // Here the opaque tensor is allocated on full size of block layout from the
+  // memory descriptor.
+  int64_t size_bytes = meta.get_size();
   auto storage_impl = c10::make_intrusive<StorageImpl>(
       StorageImpl::use_byte_size_t(),
       size_bytes,
-      allocator->allocate(nelements * dtype.itemsize()),
+      allocator->allocate(size_bytes),
       allocator,
       /*resizeable=*/true);
 
@@ -46,13 +48,15 @@ Tensor empty_opaque_qtensor(
     c10::optional<MemoryFormat> optional_memory_format,
     QuantizerPtr quantizer) {
   auto* allocator = xpu::dpcpp::getDeviceAllocator();
-  int64_t nelements = DPCPPTensorContext(nullptr, meta).padded_size();
   auto dtype = scalarTypeToTypeMeta(quantizer->scalar_type());
-  int64_t size_bytes = nelements * dtype.itemsize();
+
+  // Here the opaque tensor is allocated on full size of block layout from the
+  // memory descriptor.
+  int64_t size_bytes = meta.get_size();
   auto storage_impl = c10::make_intrusive<StorageImpl>(
       StorageImpl::use_byte_size_t(),
       size_bytes,
-      allocator->allocate(nelements * dtype.itemsize()),
+      allocator->allocate(size_bytes),
       allocator,
       /*resizeable=*/true);
 
