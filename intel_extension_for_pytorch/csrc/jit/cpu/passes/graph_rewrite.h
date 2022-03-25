@@ -27,6 +27,8 @@ void FuseShuffle(std::shared_ptr<Graph>& graph);
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph);
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
+void fuseBmmAdd(std::shared_ptr<Graph>& graph);
+
 void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph);
 void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph);
 void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph);
@@ -35,6 +37,7 @@ void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph>& graph);
 void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph>& graph);
 void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
 
+void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph);
 void insertPrePackedConvOp(std::shared_ptr<Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph);

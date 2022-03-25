@@ -277,6 +277,39 @@ bool CPUFeature::os_amx() {
   return false;
 }
 
+bool CPUFeature::isa_level_avx2() {
+  static bool b_is_support = os_avx2() && cpuid_avx2() && cpuid_fma();
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_avx2_vnni() {
+  static bool b_is_support = isa_level_avx2() && cpuid_avx_vnni();
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_avx512_core() {
+  static bool b_is_support = isa_level_avx2() && os_avx512() &&
+      cpuid_avx512_vl() && cpuid_avx512_bw() && cpuid_avx512_dq() &&
+      cpuid_avx512_f();
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_avx512_vnni() {
+  static bool b_is_support = isa_level_avx512_core() && cpuid_avx512_vnni();
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_avx512_bf16() {
+  static bool b_is_support = isa_level_avx512_vnni() && cpuid_avx512_bf16();
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_amx() {
+  static bool b_is_support = isa_level_avx512_bf16() && os_amx() &&
+      cpuid_amx_bf16() && cpuid_amx_int8() && cpuid_amx_tile();
+  return b_is_support;
+}
+
 __forceinline void print_bool_status(const char* p_name, bool b_status) {
   printf("%s:\t\t\t%s\n", p_name, (b_status ? "true" : "false"));
 }

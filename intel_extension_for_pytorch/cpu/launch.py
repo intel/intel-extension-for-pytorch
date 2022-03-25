@@ -214,8 +214,6 @@ class CPUinfo():
         We strongly advice to not use cores on different nodes.
         '''
         cores_numa_map = self.logical_core_node_map
-        if len(core_list) <= 1:
-            return True
         numa_ids = []
         for core in core_list:
             numa_id = cores_numa_map[core]
@@ -223,6 +221,9 @@ class CPUinfo():
                 numa_ids.append(numa_id)
         if len(numa_ids) > 1:
             logger.warning("Numa Aware: cores:{} on different NUMA nodes:{}".format(str(core_list), str(numa_ids)))
+        if len(numa_ids) == 0:
+            logger.error("invalid number of NUMA nodes; please make sure numa_ids >= 1")
+            exit(-1)
         return numa_ids
 
 class Launcher():

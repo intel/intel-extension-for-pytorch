@@ -56,11 +56,8 @@ at::Tensor upsample_nearest1d_out_cpu(
 
   at::Tensor output = at::empty(full_output_size, input.options());
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to upsample_nearest1d_kernel_impl(output, input, scales);
   upsample_nearest1d_kernel_stub(kCPU, output, input, scales);
-#else
-  upsample_nearest1d_kernel_impl(output, input, scales);
-#endif
 
   return output;
 }
@@ -86,12 +83,10 @@ at::Tensor upsample_nearest1d_backward_out_cpu(
 
   at::Tensor grad_input = at::zeros(input_size, grad_output.options());
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to upsample_nearest1d_backward_kernel_impl(grad_input, grad_output,
+  // scales);
   upsample_nearest1d_backward_kernel_stub(
       kCPU, grad_input, grad_output, scales);
-#else
-  upsample_nearest1d_backward_kernel_impl(grad_input, grad_output, scales);
-#endif
 
   return grad_input;
 }
@@ -122,11 +117,9 @@ at::Tensor upsample_nearest2d_out_cpu(
       full_output_size,
       input.options().memory_format(input.suggest_memory_format()));
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to upsample_nearest2d_kernel_impl(output, input, scales_h,
+  // scales_w);
   upsample_nearest2d_kernel_stub(kCPU, output, input, scales_h, scales_w);
-#else
-  upsample_nearest2d_kernel_impl(output, input, scales_h, scales_w);
-#endif
 
   return output;
 }
@@ -174,13 +167,12 @@ at::Tensor upsample_nearest2d_backward_out_cpu(
                                   grad_output.suggest_memory_format()))
                               .zero_();
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_nearest2d_backward_kernel_impl(
+      grad_input, grad_output, scales_h, scales_w);
+  */
   upsample_nearest2d_backward_kernel_stub(
       kCPU, grad_input, grad_output, scales_h, scales_w);
-#else
-  upsample_nearest2d_backward_kernel_impl(
-      grad_input, grad_output, scales_h, scales_w);
-#endif
 
   return grad_input;
 }
@@ -212,12 +204,12 @@ at::Tensor upsample_nearest3d_out_cpu(
       full_output_size,
       input.options().memory_format(input.suggest_memory_format()));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_nearest3d_kernel_impl(output, input, scales_d, scales_h,
+  scales_w);
+  */
   upsample_nearest3d_kernel_stub(
       kCPU, output, input, scales_d, scales_h, scales_w);
-#else
-  upsample_nearest3d_kernel_impl(output, input, scales_d, scales_h, scales_w);
-#endif
 
   return output;
 }
@@ -260,13 +252,12 @@ at::Tensor upsample_nearest3d_backward_out_cpu(
 
   at::Tensor grad_input = at::zeros(input_size, grad_output.options());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_nearest3d_backward_kernel_impl(
+      grad_input, grad_output, scales_d, scales_h, scales_w);
+  */
   upsample_nearest3d_backward_kernel_stub(
       kCPU, grad_input, grad_output, scales_d, scales_h, scales_w);
-#else
-  upsample_nearest3d_backward_kernel_impl(
-      grad_input, grad_output, scales_d, scales_h, scales_w);
-#endif
 
   return grad_input;
 }
@@ -293,11 +284,11 @@ at::Tensor upsample_linear1d_out_cpu(
 
   at::Tensor output = at::empty(full_output_size, input.options());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_linear1d_kernel_impl(output, input, align_corners,
+  scales);
+  */
   upsample_linear1d_kernel_stub(kCPU, output, input, align_corners, scales);
-#else
-  upsample_linear1d_kernel_impl(output, input, align_corners, scales);
-#endif
 
   return output;
 }
@@ -329,13 +320,12 @@ at::Tensor upsample_linear1d_backward_out_cpu(
 
   at::Tensor grad_input = at::zeros(input_size, grad_output.options());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_linear1d_backward_kernel_impl(
+      grad_input, grad_output, align_corners, scales);
+  */
   upsample_linear1d_backward_kernel_stub(
       kCPU, grad_input, grad_output, align_corners, scales);
-#else
-  upsample_linear1d_backward_kernel_impl(
-      grad_input, grad_output, align_corners, scales);
-#endif
 
   return grad_input;
 }
@@ -367,13 +357,12 @@ at::Tensor upsample_bilinear2d_out_cpu(
       full_output_size,
       input.options().memory_format(input.suggest_memory_format()));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_bilinear2d_kernel_impl(
+      output, input, align_corners, scales_h, scales_w);
+  */
   upsample_bilinear2d_kernel_stub(
       kCPU, output, input, align_corners, scales_h, scales_w);
-#else
-  upsample_bilinear2d_kernel_impl(
-      output, input, align_corners, scales_h, scales_w);
-#endif
 
   return output;
 }
@@ -422,13 +411,12 @@ at::Tensor upsample_bilinear2d_backward_out_cpu(
                                   grad_output.suggest_memory_format()))
                               .zero_();
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_bilinear2d_backward_kernel_impl(
+      grad_input, grad_output, align_corners, scales_h, scales_w);
+  */
   upsample_bilinear2d_backward_kernel_stub(
       kCPU, grad_input, grad_output, align_corners, scales_h, scales_w);
-#else
-  upsample_bilinear2d_backward_kernel_impl(
-      grad_input, grad_output, align_corners, scales_h, scales_w);
-#endif
 
   return grad_input;
 }
@@ -461,13 +449,12 @@ at::Tensor upsample_trilinear3d_out_cpu(
       full_output_size,
       input.options().memory_format(input.suggest_memory_format()));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_trilinear3d_kernel_impl(
+      output, input, align_corners, scales_d, scales_h, scales_w);
+  */
   upsample_trilinear3d_kernel_stub(
       kCPU, output, input, align_corners, scales_d, scales_h, scales_w);
-#else
-  upsample_trilinear3d_kernel_impl(
-      output, input, align_corners, scales_d, scales_h, scales_w);
-#endif
 
   return output;
 }
@@ -511,7 +498,10 @@ at::Tensor upsample_trilinear3d_backward_out_cpu(
 
   at::Tensor grad_input = at::zeros(input_size, grad_output.options());
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to upsample_trilinear3d_backward_kernel_impl(
+      grad_input, grad_output, align_corners, scales_d, scales_h, scales_w);
+  */
   upsample_trilinear3d_backward_kernel_stub(
       kCPU,
       grad_input,
@@ -520,10 +510,6 @@ at::Tensor upsample_trilinear3d_backward_out_cpu(
       scales_d,
       scales_h,
       scales_w);
-#else
-  upsample_trilinear3d_backward_kernel_impl(
-      grad_input, grad_output, align_corners, scales_d, scales_h, scales_w);
-#endif
 
   return grad_input;
 }

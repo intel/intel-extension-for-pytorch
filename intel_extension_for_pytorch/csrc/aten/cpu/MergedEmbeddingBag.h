@@ -7,9 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 struct SGDArgs {
   SGDArgs(
@@ -58,9 +56,7 @@ void merged_embeddingbag_backward_sgd_cpu_kernel_impl(
     double weight_decay,
     double lr);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using merged_embeddingbag_forward_cpu_kernel_fn = std::vector<Tensor> (*)(
     const Tensor&,

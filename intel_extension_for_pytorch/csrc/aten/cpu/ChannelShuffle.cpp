@@ -66,11 +66,8 @@ at::Tensor channel_shuffle(const at::Tensor& self, int64_t groups) {
     output.resize_(self.sizes(), memory_format);
     auto input = self.contiguous(memory_format);
 
-#if defined(DYN_DISP_BUILD)
+    // pointer to channel_shuffle_kernel_impl(output, input, groups);
     channel_shuffle_kernel_stub(kCPU, output, input, groups);
-#else
-    channel_shuffle_kernel_impl(output, input, groups);
-#endif
 
     return at::namedinference::propagate_names_if_nonempty(
         output, self.names());

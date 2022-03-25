@@ -24,6 +24,17 @@ if [ ! -f ${LIBTORCH_PATH}/build-version ]; then
 fi
 
 if [[ ${MODE} == "install" ]]; then
+    TORCH_VERSION=$(cat ${LIBTORCH_PATH}/build-version)
+    [[ ${TORCH_VERSION} =~ ([0-9]+\.[0-9]+).* ]]
+    TORCH_VER=${BASH_REMATCH[1]}
+    [[ ${IPEX_VERSION} =~ ([0-9]+\.[0-9]+).* ]]
+    IPEX_VER=${BASH_REMATCH[1]}
+    if [[ ${IPEX_VER} != ${TORCH_VER} ]]; then
+        echo "Installation failed."
+        echo "ERROR! Intel® Extension for PyTorch* needs to work with libtorch ${IPEX_VER}.*, but libtorch ${TORCH_VERSION} is found. Please switch to the matching version and run again."
+        exit
+    fi
+
     while IFS= read -r lib
     do
         if [ -f ${LIBTORCH_PATH}/lib/${lib} ]; then

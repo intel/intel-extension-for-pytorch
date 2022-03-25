@@ -13,11 +13,8 @@ void packed_add(
     at::Tensor& bot_half_,
     const at::Tensor& grad_,
     double alpha) {
-#if defined(DYN_DISP_BUILD)
+  // pointer to packed_add_kernel_impl(top_half_, bot_half_, grad_, alpha);
   packed_add_kernel_stub(kCPU, top_half_, bot_half_, grad_, alpha);
-#else
-  packed_add_kernel_impl(top_half_, bot_half_, grad_, alpha);
-#endif
 }
 
 } // namespace cpu

@@ -5,9 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step_kernel_impl(
     const at::Tensor& param_,
@@ -50,9 +48,7 @@ void packed_add_kernel_impl(
     const at::Tensor& grad,
     double alpha);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using adagrad_fused_step_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
     const at::Tensor&,

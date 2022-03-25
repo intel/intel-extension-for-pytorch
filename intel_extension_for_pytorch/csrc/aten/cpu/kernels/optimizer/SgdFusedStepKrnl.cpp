@@ -7,9 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 using namespace at::vec;
 
@@ -424,12 +422,9 @@ c10::optional<at::Tensor> sgd_fused_step_kernel_impl(
     return momentum_buf;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(sgd_fused_step_kernel_stub, &sgd_fused_step_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

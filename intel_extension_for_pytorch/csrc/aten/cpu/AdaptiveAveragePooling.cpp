@@ -63,11 +63,8 @@ void adaptive_avg_pool2d_out_cpu_template(
     return;
   }
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to adaptive_avg_pool2d_kernel_impl(output, input, output_size);
   adaptive_avg_pool2d_kernel_stub(kCPU, output, input, output_size);
-#else
-  adaptive_avg_pool2d_kernel_impl(output, input, output_size);
-#endif
 }
 
 at::Tensor& adaptive_avg_pool2d_backward_out_cpu_template(
@@ -108,11 +105,9 @@ at::Tensor& adaptive_avg_pool2d_backward_out_cpu_template(
   grad_input.resize_(input.sizes(), input.suggest_memory_format());
   grad_input.zero_();
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to adaptive_avg_pool2d_backward_kernel_impl(grad_input,
+  // grad_output);
   adaptive_avg_pool2d_backward_kernel_stub(kCPU, grad_input, grad_output);
-#else
-  adaptive_avg_pool2d_backward_kernel_impl(grad_input, grad_output);
-#endif
 
   return grad_input;
 }

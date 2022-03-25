@@ -15,9 +15,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename scalar_t, typename accscalar_t>
 void cpu_max_pool(
@@ -624,15 +622,12 @@ void max_pool2d_backward_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(max_pool2d_kernel_stub, &max_pool2d_kernel_impl);
 REGISTER_DISPATCH(
     max_pool2d_backward_kernel_stub,
     &max_pool2d_backward_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

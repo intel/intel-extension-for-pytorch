@@ -23,21 +23,15 @@ DEFINE_DISPATCH(interaction_backward_kernel_stub);
 DEFINE_DISPATCH(dil_qinteraction_kernel_stub);
 
 at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
-#if defined(DYN_DISP_BUILD)
+  // pointer to interaction_forward_kernel_impl(input);
   return interaction_forward_kernel_stub(kCPU, input);
-#else
-  return interaction_forward_kernel_impl(input);
-#endif
 }
 
 std::vector<at::Tensor> _interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
-#if defined(DYN_DISP_BUILD)
+  // pointer to interaction_backward_kernel_impl(grad_out, input);
   return interaction_backward_kernel_stub(kCPU, grad_out, input);
-#else
-  return interaction_backward_kernel_impl(grad_out, input);
-#endif
 }
 
 at::Tensor dil_qinteraction(
@@ -45,11 +39,8 @@ at::Tensor dil_qinteraction(
     double o_scale,
     int64_t o_zp,
     at::ScalarType o_dtype) {
-#if defined(DYN_DISP_BUILD)
+  // pointer to dil_qinteraction_kernel_impl(input, o_scale, o_zp, o_dtype);
   return dil_qinteraction_kernel_stub(kCPU, input, o_scale, o_zp, o_dtype);
-#else
-  return dil_qinteraction_kernel_impl(input, o_scale, o_zp, o_dtype);
-#endif
 }
 
 } // namespace cpu

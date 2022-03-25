@@ -47,7 +47,31 @@ static bool rnnt_update_batch(
 #endif
   IPEX_RECORD_FUNCTION("IPEX::rnnt_update_batch", std::vector<c10::IValue>({}));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to torch_ipex::cpu::rnnt_update_batch_kernel_impl(
+      k,
+      out_lens,
+      label_col,
+      symbols_added,
+      time_idxs,
+      blankness_out,
+      blankvec_out,
+      not_blank_out,
+      label_to_put_out,
+      label_tensor_out,
+      label_for_next_loop_out,
+      hidden_0,
+      hidden_1,
+      hidden_prime_0,
+      hidden_prime_1,
+      x,
+      f,
+      max_symbols,
+      blank_id,
+      batch_size,
+      _SOS,
+      max_len);
+  */
   return torch_ipex::cpu::rnnt_update_batch_kernel_stub(
       kCPU,
       k,
@@ -72,31 +96,6 @@ static bool rnnt_update_batch(
       batch_size,
       _SOS,
       max_len);
-#else
-  return torch_ipex::cpu::rnnt_update_batch_kernel_impl(
-      k,
-      out_lens,
-      label_col,
-      symbols_added,
-      time_idxs,
-      blankness_out,
-      blankvec_out,
-      not_blank_out,
-      label_to_put_out,
-      label_tensor_out,
-      label_for_next_loop_out,
-      hidden_0,
-      hidden_1,
-      hidden_prime_0,
-      hidden_prime_1,
-      x,
-      f,
-      max_symbols,
-      blank_id,
-      batch_size,
-      _SOS,
-      max_len);
-#endif
 }
 
 } // namespace kernel

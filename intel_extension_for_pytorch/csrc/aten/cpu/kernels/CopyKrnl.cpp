@@ -26,9 +26,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 // transpose operation of a 8*8 block
 template <typename T>
@@ -718,12 +716,9 @@ at::Tensor& copy_kernel_impl(
   return self;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(copy_kernel_stub, &copy_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

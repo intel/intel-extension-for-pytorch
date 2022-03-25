@@ -5,9 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor nms_cpu_kernel_impl(
     const at::Tensor& dets,
@@ -44,9 +42,7 @@ box_head_nms_cpu_kernel_impl(
     const int detections_per_img,
     const int num_classes);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using nms_cpu_kernel_fn = at::Tensor (*)(
     const at::Tensor&,

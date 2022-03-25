@@ -18,9 +18,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 // Load vector from a smaller type (more elements) to a larger type (fewer
 // elements), reducing neighboring elements until it fits into the vector size.
@@ -712,12 +710,9 @@ void sum_kernel_impl(at::TensorIterator& iter) {
       [&] { cascade_sum</*ignore_nan=*/false, scalar_t>(iter); });
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(sum_kernel_stub, &sum_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

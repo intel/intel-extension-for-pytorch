@@ -18,11 +18,8 @@ at::Tensor AddSwish(
     at::Tensor& mm_output,
     const at::Tensor& weight,
     const at::Tensor& bias) {
-#if defined(DYN_DISP_BUILD)
+  // pointer to add_swish_kernel_impl(x, mm_output, weight, bias);
   return add_swish_kernel_stub(kCPU, x, mm_output, weight, bias);
-#else
-  return add_swish_kernel_impl(x, mm_output, weight, bias);
-#endif
 }
 
 } // namespace cpu

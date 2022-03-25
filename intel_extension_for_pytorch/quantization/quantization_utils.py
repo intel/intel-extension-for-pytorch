@@ -182,7 +182,7 @@ class _quantization_int8(object):
                 return func(*args, **kwargs)
         return decorate_autocast
 
-def convert(model, conf, inputs):
+def convert(model, conf, inputs, inplace=False):
     r"""
     Convert an FP32 torch.nn.Module model to a quantized JIT ScriptModule
     according to the given quantization recipes in the quantization
@@ -196,6 +196,7 @@ def convert(model, conf, inputs):
         conf (quantization.QuantConf): Quantization's setting.
         inputs (tuple or torch.Tensor): A tuple of example inputs that are used
             for JIT trace of the given model.
+        inplace (bool): Whether or not to do inplace model convert.
 
     Returns:
         torch.jit.ScriptModule
@@ -204,11 +205,15 @@ def convert(model, conf, inputs):
 
     assert isinstance(model, torch.nn.Module), "Only support nn.Module convert for quantization path"
 
+    if inplace:
+        model_ = model
+    else:
+        model_ = copy.deepcopy(model)
+ 
     # pre-conver model's parameters dtype if it has conv, linear
     # and Embedding for bfloat16 path.
-    model_ = model
     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
-        model_ = nn.utils._model_convert.convert_module_data_type(copy.deepcopy(model), torch.bfloat16)
+        model_ = nn.utils._model_convert.convert_module_data_type(model_, torch.bfloat16)
 
     with torch.no_grad(), _quantization_int8():
         trace_model = torch.jit.trace(model_, inputs, check_trace=False)

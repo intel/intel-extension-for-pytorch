@@ -34,13 +34,12 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
     IPEX_RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::_forward", std::vector<c10::IValue>({}));
 
-#if defined(DYN_DISP_BUILD)
+    /*
+    pointer to embedding_bag_kernel_impl(
+        weight, indices, offsets, include_last_offset);
+    */
     auto ret = embedding_bag_kernel_stub(
         kCPU, weight, indices, offsets, include_last_offset);
-#else
-    auto ret = embedding_bag_kernel_impl(
-        weight, indices, offsets, include_last_offset);
-#endif
 
     return ret;
   }
@@ -79,7 +78,10 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
 
     at::Tensor grad = sparse ? grad_outputs[0] : grad_outputs[0].contiguous();
 
-#if defined(DYN_DISP_BUILD)
+    /*
+    pointer to embedding_bag_backward_kernel_stub(
+            kCPU, grad, indices, offsets, num_weights, sparse);
+    */
     return {
         embedding_bag_backward_kernel_stub(
             kCPU, grad, indices, offsets, num_weights, sparse),
@@ -87,15 +89,6 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
         at::Tensor(),
         at::Tensor(),
         at::Tensor()};
-#else
-    return {
-        embedding_bag_backward_kernel_impl(
-            grad, indices, offsets, num_weights, sparse),
-        at::Tensor(),
-        at::Tensor(),
-        at::Tensor(),
-        at::Tensor()};
-#endif
   }
 };
 
@@ -121,13 +114,12 @@ at::Tensor dil_qembeddingbag(
     double o_scale,
     int64_t o_zp,
     at::ScalarType o_dtype) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to torch_ipex::cpu::embedding_bag_int8_kernel_impl(
+      weight, indices, offsets, include_last_offset);
+  */
   return torch_ipex::cpu::embedding_bag_int8_kernel_stub(
       kCPU, weight, indices, offsets, include_last_offset);
-#else
-  return torch_ipex::cpu::embedding_bag_int8_kernel_impl(
-      weight, indices, offsets, include_last_offset);
-#endif
 }
 
 } // namespace cpu

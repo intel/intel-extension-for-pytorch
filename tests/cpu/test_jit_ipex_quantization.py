@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing import FileCheck
-
+import copy
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 
 import intel_extension_for_pytorch as ipex
@@ -102,5 +102,32 @@ class TestIpexOps(JitLlgaTestCase):
             graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, config_name="interaction", qscheme=qscheme)
             self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
 
+class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
+    def test_inplace_convert(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = nn.Linear(128,1)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x
+
+        m = M()
+        x = torch.rand(1,128)
+        for int8_bf16 in [False, True]:
+            m_ = copy.deepcopy(m)
+            for inplace in [False, True]:
+                orgin_model_weight_dtype = m_.linear.weight.dtype
+                orgin_model_bias_dtype = m_.linear.bias.dtype
+                _, _, ori_model = self.prepareModel(m_, x, folding=False, remove_dropout=False, config_name="inplace_convert", qscheme=torch.per_tensor_affine, int8_bf16=int8_bf16, inplace=inplace)
+                if inplace and int8_bf16:
+                    if m_.linear.weight.dtype == orgin_model_weight_dtype or m_.linear.bias.dtype == orgin_model_bias_dtype:
+                        print("model should have changed")
+                        assert(0)
+                else:
+                    if m_.linear.weight.dtype != orgin_model_weight_dtype or m_.linear.bias.dtype != orgin_model_bias_dtype:
+                        print("model should not change")
+                        assert(0)
 if __name__ == '__main__':
     run_tests()

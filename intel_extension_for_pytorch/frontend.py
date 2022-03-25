@@ -172,7 +172,12 @@ def optimize(
 
     .. warning::
 
-        Please invoke ``optimize`` function before invoking DDP in distributed
+        Please invoke ``optimize`` function AFTER loading weights to model via
+        ``model.load_state_dict(torch.load(PATH))``.
+
+    .. warning::
+
+        Please invoke ``optimize`` function BEFORE invoking DDP in distributed
         training scenario.
 
         The ``optimize`` function deepcopys the original model. If DDP is invoked
@@ -185,6 +190,7 @@ def optimize(
 
         >>> # bfloat16 inference case.
         >>> model = ...
+        >>> model.load_state_dict(torch.load(PATH))
         >>> model.eval()
         >>> optimized_model = ipex.optimize(model, dtype=torch.bfloat16)
         >>> # running evaluation step.

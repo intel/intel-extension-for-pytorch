@@ -46,18 +46,13 @@ at::Tensor& quantized_copy_from_float_cpu_(
 
 at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor& copy_kernel_impl(
     at::Tensor& self,
     const at::Tensor& src,
     bool non_blocking);
-
-#if defined(DYN_DISP_BUILD)
 }
-#endif
 
 using copy_kernel_fn = at::Tensor& (*)(at::Tensor&, const at::Tensor&, bool);
 DECLARE_DISPATCH(copy_kernel_fn, copy_kernel_stub);

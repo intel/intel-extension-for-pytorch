@@ -63,7 +63,8 @@ at::Tensor frozen_batch_norm(
     const at::Tensor& weight,
     const at::Tensor& bias,
     const at::Tensor& running_mean,
-    const at::Tensor& running_var);
+    const at::Tensor& running_var,
+    double eps);
 
 } // namespace cpu
 } // namespace torch_ipex

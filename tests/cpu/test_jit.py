@@ -621,6 +621,15 @@ class MatmulDiv(nn.Module):
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
+class BmmAdd(nn.Module):
+    def __init__(self):
+        super(BmmAdd, self).__init__()
+
+    def forward(self, input, batch1, batch2):
+        bmm_res = torch.bmm(batch1, batch2)
+        res = torch.add(bmm_res, input)
+        return res
+
 class MHAScoresCalculation(nn.Module):
     def __init__(self, dim_per_head, softmax_dim=-1):
         super(MHAScoresCalculation, self).__init__()
@@ -1426,6 +1435,40 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex::batch_norm",
                 prec=0.02,
                 levels=['O1'])
+
+    def test_output_frozen_conv_bn(self):
+        batch_size = 8
+        out_channels = 16
+        in_channels = 3
+        kernel_size = 3
+        image_size = 16
+        options = itertools.product([torch.float32, torch.bfloat16], [True, False])
+        for dtype, use_channels_last in options:
+            input_size = [batch_size, in_channels, image_size, image_size]
+            model = ConvBatchNorm_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
+            x = torch.randn(input_size, dtype=dtype)
+            if use_channels_last:
+                x = x.to(memory_format=torch.channels_last)
+                model = model.to(memory_format=torch.channels_last)
+            
+            model = ipex.optimize(model, dtype=dtype, conv_bn_folding=False)
+
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype), torch.no_grad():
+                result = model(x)
+                trace_model = torch.jit.trace(model, x).eval()
+                freeze_model = torch.jit.freeze(trace_model)
+
+                tresult = trace_model(x)
+                fused_tresult = freeze_model(x)
+
+                trace_graph = trace_model.graph_for(x)
+                freeze_graph = freeze_model.graph_for(x)
+
+                self.assertEqual(result, tresult)
+                self.assertEqual(result, fused_tresult)
+                self.assertEqual(fused_tresult.dtype, dtype)
+                self.assertTrue(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()))
+                self.assertTrue(all(n.kind() != "ipex::batch_norm" for n in freeze_graph.nodes()))
 
     def test_output_bn_conv(self):
         batch_size = 8
@@ -2475,6 +2518,17 @@ class Tester(TestCase):
             kind_in_graph="ipex::matmul_div",
             kind_not_in_graph=None,
             prec=5e-3)
+
+    def test_bmm_add(self):
+        M = torch.randn(10, 3, 5)
+        batch1 = torch.randn(10, 3, 4)
+        batch2 = torch.randn(10, 4, 5)
+        mod = BmmAdd()
+        traced_mod = torch.jit.trace(mod, (M, batch1, batch2))
+        fused_mod = traced_mod.graph_for(M, batch1, batch2)
+        out = traced_mod(M, batch1, batch2)
+        expected = torch.baddbmm(M, batch1, batch2)
+        self.assertTrue(torch.allclose(out, expected))
 
     def test_ipex_softmax(self):
         self._test_output(

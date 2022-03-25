@@ -80,11 +80,9 @@ std::tuple<at::Tensor, at::Tensor> adaptive_max_pool2d_out_cpu(
             .dtype(at::kLong));
   }
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to adaptive_max_pool2d_kernel_impl(output, indices, input,
+  // output_size);
   adaptive_max_pool2d_kernel_stub(kCPU, output, indices, input, output_size);
-#else
-  adaptive_max_pool2d_kernel_impl(output, indices, input, output_size);
-#endif
 
   return std::make_tuple(output, indices);
 }
@@ -133,12 +131,10 @@ at::Tensor adaptive_max_pool2d_backward_out_cpu(
           input.options().memory_format(input.suggest_memory_format()))
           .zero_();
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to adaptive_max_pool2d_backward_kernel_impl(grad_input,
+  // grad_output, indices);
   adaptive_max_pool2d_backward_kernel_stub(
       kCPU, grad_input, grad_output, indices);
-#else
-  adaptive_max_pool2d_backward_kernel_impl(grad_input, grad_output, indices);
-#endif
 
   return grad_input;
 }

@@ -5,9 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void bf16_to_fp32(void* dst, const void* src, int len);
 void fp32_to_bf16(void* dst, const void* src, int len);
@@ -18,9 +16,7 @@ at::Tensor cat_bfloat16_float_kernel_impl(
 std::tuple<at::Tensor, at::Tensor> split_float_bfloat16_kernel_impl(
     const at::Tensor tensor);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using cat_bfloat16_float_kernel_fn =
     at::Tensor (*)(const at::Tensor, const at::Tensor);

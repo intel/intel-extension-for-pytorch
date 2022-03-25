@@ -46,7 +46,10 @@ static void rnnt_embedding(
 #endif
   IPEX_RECORD_FUNCTION("IPEX::rnnt_embedding", std::vector<c10::IValue>({}));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to torch_ipex::cpu::rnnt_embedding_kernel_impl(
+      embedding_table, idx, embedding_out, _SOS, batch_size, embedding_dim);
+  */
   torch_ipex::cpu::rnnt_embedding_kernel_stub(
       kCPU,
       embedding_table,
@@ -55,10 +58,6 @@ static void rnnt_embedding(
       _SOS,
       batch_size,
       embedding_dim);
-#else
-  torch_ipex::cpu::rnnt_embedding_kernel_impl(
-      embedding_table, idx, embedding_out, _SOS, batch_size, embedding_dim);
-#endif
 }
 
 } // namespace kernel

@@ -127,9 +127,7 @@ at::Tensor upsample_trilinear3d_backward_out_cpu(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w);
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void upsample_nearest1d_kernel_impl(
     const at::Tensor& output,
@@ -215,10 +213,7 @@ void upsample_trilinear3d_backward_kernel_impl(
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w);
-
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using upsample_nearest1d_kernel_fn =
     void (*)(const at::Tensor&, const at::Tensor&, c10::optional<double>);

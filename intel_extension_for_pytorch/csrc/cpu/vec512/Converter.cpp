@@ -27,11 +27,8 @@ at::Tensor cat_bfloat16_float(
           bottom_half_.scalar_type() == at::kBFloat16,
       "pack_bfloat16_float: expect both args to be at::BFloat16");
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to cat_bfloat16_float_kernel_impl(top_half_, bottom_half_);
   return cat_bfloat16_float_kernel_stub(kCPU, top_half_, bottom_half_);
-#else
-  return cat_bfloat16_float_kernel_impl(top_half_, bottom_half_);
-#endif
 }
 
 std::tuple<at::Tensor, at::Tensor> split_float_bfloat16(
@@ -40,11 +37,8 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16(
       tensor_.scalar_type() == at::kFloat,
       "pack_bfloat16_float: expect both tensor to be at::kFloat");
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to split_float_bfloat16_kernel_impl(tensor_);
   return split_float_bfloat16_kernel_stub(kCPU, tensor_);
-#else
-  return split_float_bfloat16_kernel_impl(tensor_);
-#endif
 }
 
 } // namespace converter

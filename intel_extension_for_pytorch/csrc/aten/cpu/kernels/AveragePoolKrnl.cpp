@@ -16,9 +16,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename scalar_t, typename accscalar_t, bool is_3d>
 void cpu_avg_pool(
@@ -942,7 +940,6 @@ void avg_pool3d_backward_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(avg_pool2d_kernel_stub, &avg_pool2d_kernel_impl);
@@ -954,8 +951,6 @@ REGISTER_DISPATCH(avg_pool3d_kernel_stub, &avg_pool3d_kernel_impl);
 REGISTER_DISPATCH(
     avg_pool3d_backward_kernel_stub,
     &avg_pool3d_backward_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

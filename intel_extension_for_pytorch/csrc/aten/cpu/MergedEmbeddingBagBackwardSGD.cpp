@@ -18,7 +18,19 @@ void merged_embeddingbag_backward_sgd_cpu(
     const std::vector<Tensor>& bf16_trail,
     double weight_decay,
     double lr) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to merged_embeddingbag_backward_sgd_cpu_kernel_impl(
+      grads_y_,
+      indices,
+      offsets,
+      weights,
+      indices_with_row_offset,
+      row_offsets,
+      pooling_modes,
+      bf16_trail,
+      weight_decay,
+      lr);
+  */
   return merged_embeddingbag_backward_sgd_cpu_kernel_stub(
       kCPU,
       grads_y_,
@@ -31,19 +43,6 @@ void merged_embeddingbag_backward_sgd_cpu(
       bf16_trail,
       weight_decay,
       lr);
-#else
-  return merged_embeddingbag_backward_sgd_cpu_kernel_impl(
-      grads_y_,
-      indices,
-      offsets,
-      weights,
-      indices_with_row_offset,
-      row_offsets,
-      pooling_modes,
-      bf16_trail,
-      weight_decay,
-      lr);
-#endif
 }
 
 } // namespace cpu

@@ -13,6 +13,15 @@ set(CMAKE_CXX_STANDARD 14)
 set(TEST_NAME ipex_cpp_test)
 set(THIRD_PARTY_ROOT "${PROJECT_DIR}/third_party")
 
+set(_CXX11_ABI_FLAG 0)
+if(DEFINED GLIBCXX_USE_CXX11_ABI)
+  if(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
+    set(CXX_STANDARD_REQUIRED ON)
+    set(_CXX11_ABI_FLAG 1)
+  endif()
+endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=${_CXX11_ABI_FLAG}")
+
 # Set the include dir
 include_directories(${PYTORCH_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)

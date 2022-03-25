@@ -1,3 +1,4 @@
+#include "csrc/aten/cpu/WeightPack.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -8,6 +9,68 @@ namespace jit {
 namespace graph_rewrite {
 
 using namespace at::jit;
+
+void replaceFrozenIPEXConvWithAtenConv(Block* b) {
+  for (Node* n : b->nodes()) {
+    for (Block* block : n->blocks()) {
+      replaceFrozenIPEXConvWithAtenConv(block);
+    }
+    if (n->kind() ==
+        Symbol::fromQualString("torch_ipex::convolution_forward")) {
+      if (!(constant_as<at::Tensor>(n->namedInput("weight")).has_value())) {
+        continue;
+      }
+
+      auto input_size_option = n->inputs()
+                                   .at(0)
+                                   ->type()
+                                   ->cast<TensorType>()
+                                   ->sizes()
+                                   .concrete_sizes();
+
+      at::Tensor weight_tensor = torch_ipex::cpu::convolution_weight_unpack(
+          constant_as<at::Tensor>(n->namedInput("weight")).value(),
+          toIValue(n->namedInput("padding"))->toIntVector(),
+          toIValue(n->namedInput("stride"))->toIntVector(),
+          toIValue(n->namedInput("dilation"))->toIntVector(),
+          toIValue(n->namedInput("kernel_size"))->toIntVector(),
+          constant_as<int64_t>(n->namedInput("groups")).value(),
+          constant_as<int64_t>(n->namedInput("output_channel")).value(),
+          n->inputs()
+              .at(0)
+              ->type()
+              ->cast<TensorType>()
+              ->sizes()
+              .concrete_sizes()
+              .value()[1],
+          constant_as<bool>(n->namedInput("weight_channels_last")).value(),
+          c10::nullopt);
+
+      WithInsertPoint guard(n);
+      auto graph = n->owningGraph();
+
+      auto aten_conv = graph->insertNode(graph->create(
+          input_size_option.value().size() == 4 ? aten::conv2d : aten::conv3d,
+          1));
+      aten_conv->addInput(n->inputs().at(0));
+      IValue weight_value(weight_tensor);
+      auto weight = graph->insertConstant(weight_value);
+      aten_conv->addInput(weight);
+      aten_conv->addInput(n->inputs().at(2));
+      aten_conv->addInput(n->inputs().at(3));
+      aten_conv->addInput(n->inputs().at(4));
+      aten_conv->addInput(n->inputs().at(5));
+      aten_conv->addInput(n->inputs().at(7));
+      aten_conv->output()->setType(n->output()->type()->cast<TensorType>());
+      n->output()->replaceAllUsesWith(aten_conv->output());
+    }
+  }
+  EliminateDeadCode(b);
+}
+
+void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph) {
+  replaceFrozenIPEXConvWithAtenConv(graph->block());
+}
 
 void insertPrePackedConvOp(Block* b) {
   for (Node* n : b->nodes()) {
@@ -53,9 +116,14 @@ void insertPrePackedConvOp(Block* b) {
         if (weight_size.size() == 5) {
           k_size.push_back(weight_size[4]);
         }
-        // w_is_channels_last is invaild, there will has a check the memory
-        // format at convolution kernel side.
         bool w_is_channels_last = false;
+        if (constant_as<at::Tensor>(n->namedInput("weight")).has_value()) {
+          at::Tensor weight_tensor =
+              constant_as<at::Tensor>(n->namedInput("weight")).value();
+          w_is_channels_last =
+              weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+              weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d);
+        }
         int64_t o_channel = weight_size[0];
         IValue kernel_size_value(k_size), weight_is_prepacked_value(false),
             weight_is_channels_last_value(w_is_channels_last),
@@ -375,11 +443,11 @@ void fuseBottleneck(std::shared_ptr<Graph>& graph) {
         match.values_map.at(vmap.at("packed_weight3"))->node();
 
     auto weight1_is_channels_last =
-        constant_as<bool>(packed_weight1->inputs().at(9)).value();
+        constant_as<bool>(packed_weight1->inputs().at(8)).value();
     auto weight2_is_channels_last =
-        constant_as<bool>(packed_weight2->inputs().at(9)).value();
+        constant_as<bool>(packed_weight2->inputs().at(8)).value();
     auto weight3_is_channels_last =
-        constant_as<bool>(packed_weight3->inputs().at(9)).value();
+        constant_as<bool>(packed_weight3->inputs().at(8)).value();
     if (!weight1_is_channels_last || !weight2_is_channels_last ||
         !weight3_is_channels_last) {
       return false;
@@ -412,13 +480,13 @@ void fuseBottleneck(std::shared_ptr<Graph>& graph) {
         match.values_map.at(vmap.at("packed_weight4"))->node();
 
     auto weight1_is_channels_last =
-        constant_as<bool>(packed_weight1->inputs().at(9)).value();
+        constant_as<bool>(packed_weight1->inputs().at(8)).value();
     auto weight2_is_channels_last =
-        constant_as<bool>(packed_weight2->inputs().at(9)).value();
+        constant_as<bool>(packed_weight2->inputs().at(8)).value();
     auto weight3_is_channels_last =
-        constant_as<bool>(packed_weight3->inputs().at(9)).value();
+        constant_as<bool>(packed_weight3->inputs().at(8)).value();
     auto weight4_is_channels_last =
-        constant_as<bool>(packed_weight4->inputs().at(9)).value();
+        constant_as<bool>(packed_weight4->inputs().at(8)).value();
     if (!weight1_is_channels_last || !weight2_is_channels_last ||
         !weight3_is_channels_last || !weight4_is_channels_last) {
       return false;

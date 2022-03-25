@@ -17,7 +17,7 @@
 namespace torch {
 namespace jit {
 
-namespace {
+namespace graph_rewrite {
 
 using Tensor = at::Tensor;
 
@@ -75,10 +75,11 @@ bool checkLinearAndBroadcastingOpPreConditions(Node* linear, Node* op) {
   return true;
 }
 
-void FoldFrozenLinearAddOrSub(Block* b) {
+bool FoldFrozenLinearAddOrSub(Block* b) {
+  bool graph_modified = false;
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      FoldFrozenLinearAddOrSub(block);
+      graph_modified |= FoldFrozenLinearAddOrSub(block);
     }
 
     if (supportedAddOrSub(n) &&
@@ -131,15 +132,18 @@ void FoldFrozenLinearAddOrSub(Block* b) {
           add_or_sub->kind().toUnqualString());
       linear->replaceInputWith(linear_b_value, fused_linear_b);
       add_or_sub->output()->replaceAllUsesWith(linear->output());
+      graph_modified = true;
       // DCE run after cleans up nodes
     }
   }
+  return graph_modified;
 }
 
-void FoldFrozenLinearMulOrDiv(Block* b) {
+bool FoldFrozenLinearMulOrDiv(Block* b) {
+  bool graph_modified = false;
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      FoldFrozenLinearMulOrDiv(block);
+      graph_modified |= FoldFrozenLinearMulOrDiv(block);
     }
 
     if (supportedMulOrDiv(n) &&
@@ -230,22 +234,35 @@ void FoldFrozenLinearMulOrDiv(Block* b) {
             mul_or_div->kind().toUnqualString());
         linear->replaceInputWith(linear_b_value, fused_linear_bias);
       }
+      graph_modified = true;
       // DCE run after cleans up nodes
     }
   }
+  return graph_modified;
 }
 
-} // namespace
-
-void FoldFrozenLinearAddOrSub(std::shared_ptr<Graph>& graph) {
-  FoldFrozenLinearAddOrSub(graph->block());
+bool FoldFrozenLinearAddOrSub(std::shared_ptr<Graph>& graph) {
+  bool graph_modified = FoldFrozenLinearAddOrSub(graph->block());
   EliminateDeadCode(graph);
+  return graph_modified;
 }
 
-void FoldFrozenLinearMulOrDiv(std::shared_ptr<Graph>& graph) {
-  FoldFrozenLinearMulOrDiv(graph->block());
+bool FoldFrozenLinearMulOrDiv(std::shared_ptr<Graph>& graph) {
+  bool graph_modified = FoldFrozenLinearMulOrDiv(graph->block());
   EliminateDeadCode(graph);
+  return graph_modified;
 }
 
+void FrozenLinearFolding(std::shared_ptr<Graph>& graph) {
+  // run a couple times to capture Conv -> Mul -> Add etc
+  bool changed;
+  do {
+    changed = false;
+    changed |= FoldFrozenLinearAddOrSub(graph);
+    changed |= FoldFrozenLinearMulOrDiv(graph);
+  } while (changed);
+}
+
+} // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

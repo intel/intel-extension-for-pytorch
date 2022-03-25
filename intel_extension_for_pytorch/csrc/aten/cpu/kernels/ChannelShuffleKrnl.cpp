@@ -23,9 +23,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 template <typename scalar_t>
 void cpu_channel_shuffle(
@@ -295,12 +293,9 @@ void channel_shuffle_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(channel_shuffle_kernel_stub, &channel_shuffle_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

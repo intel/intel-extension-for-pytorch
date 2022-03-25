@@ -21,7 +21,8 @@ class OpSplitter {
         {aten::to, {Symbol::aten("dequantize")}},
         {Symbol::aten("dequantize"),
          {Symbol::aten("quantize_per_tensor"),
-          Symbol::aten("quantize_per_channel")}},
+          Symbol::aten("quantize_per_channel"),
+          prim::Constant}},
     };
 
     auto it = NodeKindToInputKind.find(node->kind());

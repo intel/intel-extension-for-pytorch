@@ -7,9 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor div_maskedfill_softmax_kernel_impl(
     at::Tensor& a,
@@ -34,14 +32,11 @@ at::Tensor div_maskedfill_softmax_kernel_impl(
   return at::softmax(a_fill, -1);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
     div_maskedfill_softmax_kernel_stub,
     &div_maskedfill_softmax_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

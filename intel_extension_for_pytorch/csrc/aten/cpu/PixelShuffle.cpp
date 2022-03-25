@@ -37,11 +37,8 @@ at::Tensor pixel_shuffle_cpu(const at::Tensor& self, int64_t upscale_factor) {
   output.resize_(output_sizes, memory_format);
   auto input = self.contiguous(memory_format);
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to pixel_shuffle_kernel_impl(output, input, upscale_factor);
   pixel_shuffle_kernel_stub(kCPU, output, input, upscale_factor);
-#else
-  pixel_shuffle_kernel_impl(output, input, upscale_factor);
-#endif
 
   return output;
 }
@@ -55,12 +52,10 @@ at::Tensor pixel_shuffle_backward_cpu(
   grad_input.resize_(input_sizes, memory_format);
   auto grad_output_ = grad_output.contiguous(memory_format);
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to pixel_shuffle_backward_kernel_impl(grad_input, grad_output_,
+  // upscale_factor);
   pixel_shuffle_backward_kernel_stub(
       kCPU, grad_input, grad_output_, upscale_factor);
-#else
-  pixel_shuffle_backward_kernel_impl(grad_input, grad_output_, upscale_factor);
-#endif
 
   return grad_input;
 }
@@ -82,11 +77,8 @@ at::Tensor pixel_unshuffle_cpu(
   output.resize_(output_sizes, memory_format);
   auto input = self.contiguous(memory_format);
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to pixel_unshuffle_kernel_impl(output, input, downscale_factor);
   pixel_unshuffle_kernel_stub(kCPU, output, input, downscale_factor);
-#else
-  pixel_unshuffle_kernel_impl(output, input, downscale_factor);
-#endif
 
   return output;
 }
@@ -100,13 +92,12 @@ at::Tensor pixel_unshuffle_backward_cpu(
   grad_input.resize_(input_sizes, memory_format);
   auto grad_output_ = grad_output.contiguous(memory_format);
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to pixel_unshuffle_backward_kernel_impl(
+      grad_input, grad_output_, downscale_factor);
+  */
   pixel_unshuffle_backward_kernel_stub(
       kCPU, grad_input, grad_output_, downscale_factor);
-#else
-  pixel_unshuffle_backward_kernel_impl(
-      grad_input, grad_output_, downscale_factor);
-#endif
 
   return grad_input;
 }

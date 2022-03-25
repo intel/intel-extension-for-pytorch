@@ -21,9 +21,7 @@ struct AccType<at::BFloat16> {
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 // This helper computes the interpolation weights (w1, w2...) for every sampling
 // point of a given box. There are pool_height * pool_width * roi_bin_grid_h *
@@ -798,7 +796,6 @@ at::Tensor roi_align_backward_kernel_impl(
   return grad_input;
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -807,8 +804,6 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     roi_align_backward_kernel_stub,
     &roi_align_backward_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

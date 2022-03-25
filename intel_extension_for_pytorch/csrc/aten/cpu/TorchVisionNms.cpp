@@ -41,11 +41,8 @@ at::Tensor nms_kernel(
       " and ",
       scores.size(0));
 
-#if defined(DYN_DISP_BUILD)
+  // pointer to nms_kernel_impl(dets, scores, iou_threshold);
   return nms_kernel_stub(kCPU, dets, scores, iou_threshold);
-#else
-  return nms_kernel_impl(dets, scores, iou_threshold);
-#endif
 }
 
 IPEX_TORCH_LIBRARY_IMPL(torchvision, CPU, m) {

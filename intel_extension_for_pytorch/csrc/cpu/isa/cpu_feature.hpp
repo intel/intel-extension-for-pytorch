@@ -127,6 +127,26 @@ class CPUFeature {
  public:
   MICRO_CLASS_CHECK_FUNC(prefetchw);
   MICRO_CLASS_CHECK_FUNC(prefetchwt1);
+
+ public:
+  /*
+  isa level referance to oneDNN.
+  ------------------------------------------------------------------------------------
+  The ISAs are partially ordered:
+  SSE41 < AVX < AVX2,
+  AVX2 < AVX512_CORE < AVX512_CORE_VNNI < AVX512_CORE_BF16 < AVX512_CORE_AMX,
+  AVX2 < AVX2_VNNI.
+  Link:
+  https://oneapi-src.github.io/oneDNN/dev_guide_cpu_dispatcher_control.html
+  */
+  bool isa_level_avx2();
+  bool isa_level_avx2_vnni();
+
+  bool isa_level_avx512_core();
+  bool isa_level_avx512_vnni();
+  bool isa_level_avx512_bf16();
+
+  bool isa_level_amx();
 };
 } // namespace cpu
 } // namespace torch_ipex

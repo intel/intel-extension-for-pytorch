@@ -19,9 +19,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 using scale_t = std::vector<c10::optional<double>>;
 
@@ -1970,7 +1968,6 @@ void upsample_trilinear3d_backward_kernel_impl(
   }
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
@@ -2024,8 +2021,6 @@ REGISTER_DISPATCH(
 REGISTER_DISPATCH(
     upsample_trilinear3d_backward_kernel_stub,
     &upsample_trilinear3d_backward_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -6,9 +6,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 using namespace at::vec;
 
@@ -622,12 +620,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step_kernel_impl(
   return std::make_tuple(param_, exp_avg_, exp_avg_sq_);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(lamb_fused_step_kernel_stub, &lamb_fused_step_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

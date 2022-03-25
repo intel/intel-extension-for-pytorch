@@ -89,9 +89,7 @@ class PixelUnshuffleOp : public torch::autograd::Function<PixelUnshuffleOp> {
       torch::autograd::tensor_list grad_outputs);
 };
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void pixel_shuffle_kernel_impl(
     at::Tensor& output,
@@ -112,10 +110,7 @@ void pixel_unshuffle_backward_kernel_impl(
     at::Tensor& grad_input,
     const at::Tensor& grad_output,
     int64_t downscale_factor);
-
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using pixel_shuffle_kernel_fn =
     void (*)(at::Tensor&, const at::Tensor&, int64_t);

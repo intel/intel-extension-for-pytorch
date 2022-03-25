@@ -192,7 +192,7 @@ class TestOp(JitLlgaTestCase):
 
         x = torch.rand(32, 32)
         graph, _ = self.checkTrace(add_scalar, [x])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_add_with_duplicated_input(self):

@@ -5,9 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 void sort_based_batched_csr2csc_opt_kernel_impl(
     BatchedHyperCompressedSparseColumn& batched_csc,
@@ -125,14 +123,11 @@ void sort_based_batched_csr2csc_opt_kernel_impl(
   allocator->raw_deallocate(tmpBuf1);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
     sort_based_batched_csr2csc_opt_kernel_stub,
     &sort_based_batched_csr2csc_opt_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -6,9 +6,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 using namespace at::vec;
 
@@ -335,14 +333,11 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_impl(
   return std::make_tuple(param_, state_sum_);
 }
 
-#if defined(DYN_DISP_BUILD)
 } // anonymous namespace
 
 REGISTER_DISPATCH(
     adagrad_fused_step_kernel_stub,
     &adagrad_fused_step_kernel_impl);
-
-#endif
 
 } // namespace cpu
 } // namespace torch_ipex

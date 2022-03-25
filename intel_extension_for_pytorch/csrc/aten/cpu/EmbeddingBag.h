@@ -26,9 +26,7 @@ at::Tensor embedding_bag(
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(DYN_DISP_BUILD)
 namespace {
-#endif
 
 at::Tensor embedding_bag_kernel_impl(
     const at::Tensor& weight,
@@ -49,9 +47,7 @@ at::Tensor embedding_bag_int8_kernel_impl(
     const at::Tensor& offsets,
     bool include_last_offset);
 
-#if defined(DYN_DISP_BUILD)
-}
-#endif
+} // namespace
 
 using embedding_bag_kernel_fn = at::Tensor (*)(
     const at::Tensor&,

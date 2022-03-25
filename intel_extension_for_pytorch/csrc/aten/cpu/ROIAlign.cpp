@@ -25,7 +25,16 @@ at::Tensor IPEXROIAlignOp::_forward(
   IPEX_RECORD_FUNCTION(
       "IPEXROIAlignOp::_forward", std::vector<c10::IValue>({}));
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to roi_align_forward_kernel_impl(
+      input,
+      rois,
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      sampling_ratio,
+      aligned);
+  */
   return roi_align_forward_kernel_stub(
       kCPU,
       input,
@@ -35,16 +44,6 @@ at::Tensor IPEXROIAlignOp::_forward(
       pooled_width,
       sampling_ratio,
       aligned);
-#else
-  return roi_align_forward_kernel_impl(
-      input,
-      rois,
-      spatial_scale,
-      pooled_height,
-      pooled_width,
-      sampling_ratio,
-      aligned);
-#endif
 }
 
 at::Tensor IPEXROIAlignOp::forward(
@@ -68,7 +67,16 @@ at::Tensor IPEXROIAlignOp::forward(
       input.is_contiguous(at::MemoryFormat::ChannelsLast);
   ctx->save_for_backward({rois});
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to roi_align_forward_kernel_impl(
+      input,
+      rois,
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      sampling_ratio,
+      aligned);
+  */
   return roi_align_forward_kernel_stub(
       kCPU,
       input,
@@ -78,16 +86,6 @@ at::Tensor IPEXROIAlignOp::forward(
       pooled_width,
       sampling_ratio,
       aligned);
-#else
-  return roi_align_forward_kernel_impl(
-      input,
-      rois,
-      spatial_scale,
-      pooled_height,
-      pooled_width,
-      sampling_ratio,
-      aligned);
-#endif
 }
 
 torch::autograd::variable_list IPEXROIAlignOp::backward(
@@ -106,7 +104,21 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
   auto saved = ctx->get_saved_variables();
   at::Tensor rois = saved[0];
 
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to roi_align_backward_kernel_impl(
+      grad_outputs[0],
+      rois,
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      input_shape[0],
+      input_shape[1],
+      input_shape[2],
+      input_shape[3],
+      sampling_ratio,
+      aligned,
+      is_channels_last);
+  */
   at::Tensor grad_input = roi_align_backward_kernel_stub(
       kCPU,
       grad_outputs[0],
@@ -121,21 +133,6 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
       sampling_ratio,
       aligned,
       is_channels_last);
-#else
-  at::Tensor grad_input = roi_align_backward_kernel_impl(
-      grad_outputs[0],
-      rois,
-      spatial_scale,
-      pooled_height,
-      pooled_width,
-      input_shape[0],
-      input_shape[1],
-      input_shape[2],
-      input_shape[3],
-      sampling_ratio,
-      aligned,
-      is_channels_last);
-#endif
 
   return {
       grad_input,
@@ -183,7 +180,16 @@ at::Tensor roi_align_forward_kernel_instance(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to roi_align_forward_kernel_impl(
+      input,
+      rois,
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      sampling_ratio,
+      aligned);
+  */
   return roi_align_forward_kernel_stub(
       kCPU,
       input,
@@ -193,16 +199,6 @@ at::Tensor roi_align_forward_kernel_instance(
       pooled_width,
       sampling_ratio,
       aligned);
-#else
-  return roi_align_forward_kernel_impl(
-      input,
-      rois,
-      spatial_scale,
-      pooled_height,
-      pooled_width,
-      sampling_ratio,
-      aligned);
-#endif
 }
 
 at::Tensor roi_align_backward_kernel_instance(
@@ -218,7 +214,21 @@ at::Tensor roi_align_backward_kernel_instance(
     int64_t sampling_ratio,
     bool aligned,
     bool is_channels_last) {
-#if defined(DYN_DISP_BUILD)
+  /*
+  pointer to roi_align_backward_kernel_impl(
+      grad,
+      rois,
+      spatial_scale,
+      pooled_height,
+      pooled_width,
+      batch_size,
+      channels,
+      height,
+      width,
+      sampling_ratio,
+      aligned,
+      is_channels_last);
+  */
   return roi_align_backward_kernel_stub(
       kCPU,
       grad,
@@ -233,21 +243,6 @@ at::Tensor roi_align_backward_kernel_instance(
       sampling_ratio,
       aligned,
       is_channels_last);
-#else
-  return roi_align_backward_kernel_impl(
-      grad,
-      rois,
-      spatial_scale,
-      pooled_height,
-      pooled_width,
-      batch_size,
-      channels,
-      height,
-      width,
-      sampling_ratio,
-      aligned,
-      is_channels_last);
-#endif
 }
 
 } // namespace cpu

@@ -28,21 +28,45 @@ inline void packed_bf16_add_ker(
 #if defined(CPU_CAPABILITY_AVX512)
   auto vAlpha = _mm512_set1_ps(alpha);
   int i = 0;
-  for (; i < len - 15; i += 16) {
-    auto x1 = _mm256_loadu_si256((__m256i*)(a1 + i));
-    auto x2 = _mm256_loadu_si256((__m256i*)(a2 + i));
-    auto y1 = _mm256_loadu_si256((__m256i*)(b + i));
+  for (; i < len - 31; i += 32) {
+    auto x10 = _mm256_loadu_si256((__m256i*)(a1 + i));
+    auto x11 = _mm256_loadu_si256((__m256i*)(a1 + i + 16));
+    auto x20 = _mm256_loadu_si256((__m256i*)(a2 + i));
+    auto x21 = _mm256_loadu_si256((__m256i*)(a2 + i + 16));
+    auto y10 = _mm256_loadu_si256((__m256i*)(b + i));
+    auto y11 = _mm256_loadu_si256((__m256i*)(b + i + 16));
 
-    auto z1 = pack_bf16_to_fp32(x1, x2);
-    auto z2 = cvt_bf16_to_fp32(y1);
-    z1 = _mm512_fmadd_ps(vAlpha, z2, z1);
+    auto z10 = pack_bf16_to_fp32(x10, x20);
+    auto z20 = cvt_bf16_to_fp32(y10);
+    z10 = _mm512_fmadd_ps(vAlpha, z20, z10);
+    auto z11 = pack_bf16_to_fp32(x11, x21);
+    auto z21 = cvt_bf16_to_fp32(y11);
+    z11 = _mm512_fmadd_ps(vAlpha, z21, z11);
     // Update result back to split input tensors.
-    _mm256_storeu_si256((__m256i*)(a1 + i), trunc_fp32_to_bf16(z1));
+    _mm256_storeu_si256((__m256i*)(a1 + i), trunc_fp32_to_bf16(z10));
     _mm256_storeu_si256(
-        (__m256i*)(a2 + i), _mm512_cvtepi32_epi16(_mm512_castps_si512(z1)));
+        (__m256i*)(a2 + i), _mm512_cvtepi32_epi16(_mm512_castps_si512(z10)));
+    _mm256_storeu_si256((__m256i*)(a1 + i + 16), trunc_fp32_to_bf16(z11));
+    _mm256_storeu_si256(
+        (__m256i*)(a2 + i + 16),
+        _mm512_cvtepi32_epi16(_mm512_castps_si512(z11)));
   }
 
   if (i < len) {
+    for (; i < len - 15; i += 16) {
+      auto x1 = _mm256_loadu_si256((__m256i*)(a1 + i));
+      auto x2 = _mm256_loadu_si256((__m256i*)(a2 + i));
+      auto y1 = _mm256_loadu_si256((__m256i*)(b + i));
+
+      auto z1 = pack_bf16_to_fp32(x1, x2);
+      auto z2 = cvt_bf16_to_fp32(y1);
+      z1 = _mm512_fmadd_ps(vAlpha, z2, z1);
+      // Update result back to split input tensors.
+      _mm256_storeu_si256((__m256i*)(a1 + i), trunc_fp32_to_bf16(z1));
+      _mm256_storeu_si256(
+          (__m256i*)(a2 + i), _mm512_cvtepi32_epi16(_mm512_castps_si512(z1)));
+    }
+
     __mmask16 mask = (1 << (len - i)) - 1;
     auto x1 = _mm256_maskz_loadu_epi16(mask, a1 + i);
     auto x2 = _mm256_maskz_loadu_epi16(mask, a2 + i);
@@ -181,26 +205,40 @@ inline void add_ker(double* inout, double* in, int len) {
   }
 }
 
-static inline void move_ker(at::BFloat16* out, float* in, int64_t len) {
+static inline __attribute__((always_inline)) void move_ker(
+    at::BFloat16* out,
+    const float* in,
+    int64_t len) {
+#if defined(CPU_CAPABILITY_AVX512)
+  cvt_fp32_to_bf16(out, in, len);
+#else
+  ref::mov_ker(out, in, len);
+#endif
+}
+
+static inline __attribute__((always_inline)) void move_ker_load_aligned(
+    at::BFloat16* out,
+    float* in,
+    int64_t len) {
   int64_t i = 0;
 #if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
-    auto in0 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i));
-    auto in1 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i + 16));
+    auto in0 = cvt_fp32_to_bf16(_mm512_load_ps(in + i));
+    auto in1 = cvt_fp32_to_bf16(_mm512_load_ps(in + i + 16));
     _mm256_storeu_si256((__m256i*)(out + i), in0);
     _mm256_storeu_si256((__m256i*)(out + i + 16), in1);
   }
 
   if (i < len - 15) {
-    auto in0 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i));
+    auto in0 = cvt_fp32_to_bf16(_mm512_load_ps(in + i));
     _mm256_storeu_si256((__m256i*)(out + i), in0);
     i += 16;
   }
 
   if (i < len) {
     auto mask = ((1 << (len - i)) - 1);
-    auto in0 = cvt_fp32_to_bf16(_mm512_maskz_loadu_ps(mask, in + i));
+    auto in0 = cvt_fp32_to_bf16(_mm512_maskz_load_ps(mask, in + i));
     _mm256_mask_storeu_epi16((__m256i*)(out + i), mask, in0);
   }
 #else
@@ -208,7 +246,10 @@ static inline void move_ker(at::BFloat16* out, float* in, int64_t len) {
 #endif
 }
 
-static inline void move_ker(float* out, const float* in, int64_t len) {
+static inline __attribute__((always_inline)) void move_ker(
+    float* out,
+    const float* in,
+    int64_t len) {
   int64_t i = 0;
 #if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
@@ -227,7 +268,54 @@ static inline void move_ker(float* out, const float* in, int64_t len) {
 #endif
 }
 
-static inline void move_ker(
+static inline __attribute__((always_inline)) void move_ker_128(
+    float* out,
+    const float* in) {
+#if defined(CPU_CAPABILITY_AVX512)
+  auto in0 = _mm512_loadu_ps(in + 0);
+  auto in1 = _mm512_loadu_ps(in + 16);
+  auto in2 = _mm512_loadu_ps(in + 32);
+  auto in3 = _mm512_loadu_ps(in + 48);
+  auto in4 = _mm512_loadu_ps(in + 64);
+  auto in5 = _mm512_loadu_ps(in + 80);
+  auto in6 = _mm512_loadu_ps(in + 96);
+  auto in7 = _mm512_loadu_ps(in + 112);
+  _mm512_storeu_ps(out + 0, in0);
+  _mm512_storeu_ps(out + 16, in1);
+  _mm512_storeu_ps(out + 32, in2);
+  _mm512_storeu_ps(out + 48, in3);
+  _mm512_storeu_ps(out + 64, in0);
+  _mm512_storeu_ps(out + 80, in1);
+  _mm512_storeu_ps(out + 96, in2);
+  _mm512_storeu_ps(out + 112, in3);
+#else
+  ref::mov_ker(out, in, 128);
+#endif
+}
+
+static inline __attribute__((always_inline)) void move_ker_load_aligned(
+    float* out,
+    const float* in,
+    int64_t len) {
+  int64_t i = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+#pragma unroll(4)
+  for (i = 0; i < len - 15; i += 16) {
+    auto in0 = _mm512_load_ps(in + i);
+    _mm512_storeu_ps(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_load_ps(mask, in + i);
+    _mm512_mask_storeu_ps(out + i, mask, in0);
+  }
+#else
+  ref::mov_ker(out, in, len);
+#endif
+}
+
+static inline __attribute__((always_inline)) void move_ker(
     at::BFloat16* out,
     const at::BFloat16* in,
     int64_t len) {
@@ -246,6 +334,45 @@ static inline void move_ker(
   }
 #else
   ref::mov_ker(out, in, len);
+#endif
+}
+
+static inline __attribute__((always_inline)) void move_ker_load_aligned(
+    at::BFloat16* out,
+    const at::BFloat16* in,
+    int64_t len) {
+  int64_t i = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+#pragma unroll(4)
+  for (i = 0; i < len - 31; i += 32) {
+    auto in0 = _mm512_load_si512(in + i);
+    _mm512_storeu_si512(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = (1 << (len - i)) - 1;
+    auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
+    _mm512_mask_storeu_epi16(out + i, mask, in0);
+  }
+#else
+  ref::mov_ker(out, in, len);
+#endif
+}
+
+static inline __attribute__((always_inline)) void move_ker_128(
+    at::BFloat16* out,
+    const at::BFloat16* in) {
+#if defined(CPU_CAPABILITY_AVX512)
+  auto in0 = _mm512_loadu_si512(in + 0);
+  auto in1 = _mm512_loadu_si512(in + 32);
+  auto in2 = _mm512_loadu_si512(in + 64);
+  auto in3 = _mm512_loadu_si512(in + 96);
+  _mm512_storeu_si512(out + 0, in0);
+  _mm512_storeu_si512(out + 32, in1);
+  _mm512_storeu_si512(out + 64, in2);
+  _mm512_storeu_si512(out + 96, in3);
+#else
+  ref::mov_ker(out, in, 128);
 #endif
 }
 
@@ -294,14 +421,25 @@ static inline void move_ker(double* out, double* in, int len) {
   }
 }
 
-static inline void zero_ker(double* out, int len) {
+static inline void move_ker_128(double* out, double* in) {
+#pragma omp simd
+  for (int i = 0; i < 128; i++) {
+    *(out + i) = *(in + i);
+  }
+}
+
+static inline __attribute__((always_inline)) void zero_ker(
+    double* out,
+    int len) {
 #pragma omp simd
   for (int i = 0; i < len; i++) {
     *(out + i) = 0;
   }
 }
 
-static inline void zero_ker(float* out, int64_t len) {
+static inline __attribute__((always_inline)) void zero_ker(
+    float* out,
+    int64_t len) {
   int64_t i = 0;
 #if defined(CPU_CAPABILITY_AVX512)
   __m512 zero_512 = _mm512_setzero_ps();
@@ -319,7 +457,9 @@ static inline void zero_ker(float* out, int64_t len) {
 #endif
 }
 
-static inline void zero_ker(at::BFloat16* out, int64_t len) {
+static inline __attribute__((always_inline)) void zero_ker(
+    at::BFloat16* out,
+    int64_t len) {
   int64_t i = 0;
 #if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
