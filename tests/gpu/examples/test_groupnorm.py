@@ -18,7 +18,6 @@ class TestNet(nn.Module):
         return x
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_group_norm_forward(self, dtype=torch.float):
         # x = torch.randn(32,64, 540, 960, requires_grad=True, device=torch.device('cpu'))
         x = torch.randn(16, 16, 64, 64, requires_grad=True, device=torch.device('cpu'))
@@ -38,7 +37,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y_pred_dpcpp.is_contiguous(), True)
         self.assertEqual(y_pred, y_pred_dpcpp)
 
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_group_norm_backward(self, dtype=torch.float):
         x = torch.randn(16, 16, 64, 64, requires_grad=True, device=torch.device('cpu'))
         x_dpcpp = x.to("xpu")
