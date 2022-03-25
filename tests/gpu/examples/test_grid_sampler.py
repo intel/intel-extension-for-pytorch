@@ -11,7 +11,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_gridSampler(self, dtype=torch.float):
         inp = torch.ones(1, 1, 4, 4)
         out_h = 20
@@ -30,7 +29,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(outp.to(cpu_device), outp_xpu.to(cpu_device))
 
     @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
-    @pytest.mark.skip(reason="not block the pre-ci")
     def test_gridSampler_3d(self, dtype=torch.float):
         N = random.randint(2, 5)
         C = random.randint(2, 4)
