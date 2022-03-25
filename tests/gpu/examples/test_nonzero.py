@@ -101,3 +101,14 @@ class TestNNMethod(TestCase):
         print("CPU: ", output_cpu)
         print("XPU: ", output_xpu.cpu())
         self.assertEqual(output_cpu, output_xpu)
+
+    def test_nonzero_fill(self, dtype=torch.float):
+        a_cpu = torch.randn([100, 2])
+        a_xpu = a_cpu.to("xpu")
+
+        a_cpu[a_cpu < 0] = 0
+        a_xpu[a_xpu < 0] = 0
+
+        print("CPU: ", a_cpu)
+        print("XPU: ", a_xpu.cpu())
+        self.assertEqual(a_cpu, a_xpu)
