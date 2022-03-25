@@ -22,45 +22,94 @@
 #include <utility>
 #include "comm/Numerics.h"
 
-using namespace xpu::dpcpp;
-using xpu::dpcpp::Array;
-
 namespace at {
 namespace AtenIpexTypeXPU {
+
+using namespace xpu::dpcpp;
+using namespace at::native::Memory::detail;
+using at::detail::Array;
 
 static inline int64_t div_up(int64_t a, int64_t b) {
   return (a + b - 1) / b;
 }
 
-struct ReduceConfig {
-  static constexpr int LANE = 0;
-  static constexpr int SUB_GROUP = 1;
-  static constexpr int WORK_GROUP = 2;
+// returns floor(log2(n))
+static inline int last_pow2(int n) {
+  n |= (n >> 1);
+  n |= (n >> 2);
+  n |= (n >> 4);
+  n |= (n >> 8);
+  n |= (n >> 16);
+  return std::max(1, n - (n >> 1));
+}
 
-  ReduceConfig(
-      int element_size_bytes,
-      int num_outputs,
-      int num_inputs,
-      int num_total,
-      int work_group_size)
+// Warning: 64-bit integer loop inside device
+static void reduce_fraction(size_t& numerator, size_t& denominator) {
+  // get GCD of num and denom using Euclid's algorithm.
+  // Can replace this with std::gcd if we ever support c++17.
+  size_t a = denominator;
+  size_t b = numerator;
+  while (b != 0) {
+    a %= b;
+    // swap(a, b)
+    size_t tmp = a;
+    a = b;
+    b = tmp;
+  }
+
+  // a is now the GCD
+  numerator /= a;
+  denominator /= a;
+}
+
+struct ReduceConfig {
+  static constexpr int GROUP_X = 0;
+  static constexpr int GROUP_Y = 1;
+  static constexpr int GROUP = 2;
+
+  static constexpr int input_vec_size = 4;
+
+  ReduceConfig(int element_size_bytes, int num_outputs, int num_inputs)
       : element_size_bytes(element_size_bytes),
         num_inputs(num_inputs),
-        num_outputs(num_outputs),
-        num_total(num_total),
-        work_group_size(work_group_size) {}
-
-  ReduceConfig(const ReduceConfig& rhs) = default;
+        num_outputs(num_outputs) {}
 
   int element_size_bytes;
   int num_inputs;
   int num_outputs;
-  int num_total;
-  int work_group_size;
   int step_input = 1;
   int step_output = 1;
-  int wg_per_output = 1;
+  int groups_per_output = 1;
   int input_mult[3] = {0, 0, 0};
   int output_mult[2] = {0, 0};
+
+  // Change terms in accordance with SYCL
+  // Common pattern: width is equal to sub-group size
+  int group_width;
+  int group_height;
+  int num_items; /* workgroup size */
+
+  bool vectorize_input = false;
+  int output_vec_size = 1;
+
+  template <typename T>
+  void set_group_dimension(int64_t dim0, int64_t dim1) {
+    auto max_wg_sz = dpcppGetCurrentQueue()
+                         .get_device()
+                         .template get_info<dpcpp_dev_max_work_group_size>();
+    const int max_num_items = max_wg_sz / output_vec_size;
+    int dim0_pow2 = dim0 < max_num_items ? static_cast<int>(last_pow2(dim0))
+                                         : max_num_items;
+    int dim1_pow2 = dim1 < max_num_items ? static_cast<int>(last_pow2(dim1))
+                                         : max_num_items;
+    group_width = std::min(dim0_pow2, int(32)); /* suggested sub-group */
+    group_height = std::min(dim1_pow2, int(max_num_items / group_width));
+    group_width = std::min(dim0_pow2, int(max_num_items / group_height));
+    num_items = group_width * group_height;
+
+    if (num_items < 32)
+      group_width = 32;
+  }
 
   int split_input(int parallelism) {
     int step = step_input;
@@ -74,87 +123,90 @@ struct ReduceConfig {
     return step;
   }
 
-  DPCPP::range<2> get_local_size() const {
-    int sg_size =
-        DPCPP_SUB_GROUP_SIZE; // to be replaced with real sub_group_size;
-    // return DPCPP::range<2>(sg_size, work_group_size / sg_size);
-    return DPCPP::range<2>(work_group_size / sg_size, sg_size);
+  // Becareful of the geometry order
+  DPCPP::range<2> group_sz() const {
+    return {(size_t)group_height, (size_t)group_width};
+  }
+  DPCPP::range<2> global_sz() const {
+    return {
+        (size_t)(groups_per_output * group_height),
+        (size_t)(
+            group_width * div_up(num_outputs / output_vec_size, step_output))};
+  }
+  DPCPP::range<2> n_groups() const {
+    return {
+        (size_t)(groups_per_output),
+        (size_t)(div_up(num_outputs / output_vec_size, step_output))};
   }
 
-  DPCPP::range<2> get_global_size() const {
-    // return DPCPP::range<2>(
-    //    div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE,
-    //    wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE);
-    return DPCPP::range<2>(
-        wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE,
-        div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE);
+  bool should_group_x_reduce() const {
+    return input_mult[GROUP_X] != 0;
   }
 
-  bool should_sg_reduce() const {
-    return input_mult[LANE] != 0;
-  }
-
-  bool should_wg_reduce() const {
-    return input_mult[SUB_GROUP] != 0;
+  bool should_group_y_reduce() const {
+    return input_mult[GROUP_Y] != 0;
   }
 
   bool should_global_reduce() const {
-    return input_mult[WORK_GROUP] != 0;
+    return input_mult[GROUP] != 0;
   }
 
-  bool should_store(int output_idx, const DPCPP::nd_item<2>& item_id) const {
+  bool should_store(DPCPP::nd_item<2> pos, int output_idx) const {
     return output_idx < num_outputs &&
-        (!should_sg_reduce() || item_id.get_local_id(1) == 0) &&
-        (!should_wg_reduce() || item_id.get_local_id(0) == 0);
+        (!should_group_x_reduce() || pos.get_local_id(1) == 0) &&
+        (!should_group_y_reduce() || pos.get_local_id(0) == 0);
   }
 
-  int input_idx(const DPCPP::nd_item<2>& item_id) const {
-    int lane = item_id.get_local_id(1);
-    int sg = item_id.get_local_id(0);
-    int wg2 = item_id.get_group(0);
+  bool should_reduce_tail(DPCPP::nd_item<2> pos) const {
+    return (!should_group_y_reduce() || pos.get_local_id(0) == 0) &&
+        (!should_global_reduce() || pos.get_group(0) == 0);
+  }
+
+  int input_idx(DPCPP::nd_item<2> pos) const {
+    int lane = pos.get_local_id(1);
+    int thread = pos.get_local_id(0);
+    int group_y = pos.get_group(0);
     return (
-        lane * input_mult[LANE] + sg * input_mult[SUB_GROUP] +
-        wg2 * input_mult[WORK_GROUP]);
+        lane * input_mult[GROUP_X] + thread * input_mult[GROUP_Y] +
+        group_y * input_mult[GROUP]);
   }
 
-  int output_idx(const DPCPP::nd_item<2>& item_id) const {
-    int lane = item_id.get_local_id(1);
-    int sg = item_id.get_local_id(0);
-    int wg1 = item_id.get_group(1);
-    return (
-        lane * output_mult[LANE] + sg * output_mult[SUB_GROUP] +
-        wg1 * step_output);
+  template <int output_vec_size>
+  int output_idx(DPCPP::nd_item<2> pos) const {
+    int lane = pos.get_local_id(1);
+    int thread = pos.get_local_id(0);
+    int group_x = pos.get_group(1);
+    return (lane * output_mult[GROUP_X] + thread * output_mult[GROUP_Y] +
+            group_x * step_output) *
+        output_vec_size;
   }
 
-  int shared_memory_offset(int offset, const DPCPP::nd_item<2>& item_id) const {
-    int lane = item_id.get_local_id(1);
-    int sg = item_id.get_local_id(0);
-    return lane + (sg + offset) * item_id.get_local_range(1);
+  int slm_offset(DPCPP::nd_item<2> pos, int offset) const {
+    return pos.get_local_id(1) +
+        (pos.get_local_id(0) + offset) * pos.get_local_range(1);
   }
 
-  int staging_memory_offset(int wg2, const DPCPP::nd_item<2>& item_id) const {
-    int offset = wg2 + item_id.get_group(1) * item_id.get_group_range(0);
-    if (!should_sg_reduce()) {
-      offset = item_id.get_local_id(1) + offset * item_id.get_local_range(1);
+  int staging_memory_offset(DPCPP::nd_item<2> pos, int wg_y) const {
+    int offset = wg_y + pos.get_group(1) * pos.get_group_range(0);
+    if (!should_group_x_reduce()) {
+      offset = pos.get_local_id(1) + offset * pos.get_local_range(1);
     }
     return offset;
   }
 
-  int shared_memory_size() const {
-    if (!should_wg_reduce()) {
-      return 0;
-    }
-    return element_size_bytes * work_group_size;
+  int slm_sz() const {
+    // if (!should_group_y_reduce() && (!should_group_x_reduce() || group_width
+    // <= 32)) { return 0; }
+    return element_size_bytes * num_items * output_vec_size;
   }
 
   int64_t global_memory_size() const {
     if (!should_global_reduce()) {
       return 0;
     }
-
-    auto size = (int64_t)element_size_bytes * num_outputs * wg_per_output;
-    if (!should_sg_reduce()) {
-      size *= get_local_size()[1];
+    auto size = (int64_t)element_size_bytes * num_outputs * groups_per_output;
+    if (!should_group_x_reduce()) {
+      size *= group_sz()[1] * output_vec_size;
     }
     return size;
   }
@@ -163,17 +215,38 @@ struct ReduceConfig {
     if (!should_global_reduce()) {
       return 0;
     }
-    return sizeof(int) * get_global_size()[1] / DPCPP_SUB_GROUP_SIZE;
+    return sizeof(int) * n_groups()[1];
   }
 
-  int values_per_thread() const {
+  int values_per_item() const {
     return div_up(num_inputs, step_input);
   }
 };
 
+std::ostream& operator<<(std::ostream& out, const ReduceConfig& config);
+
+template <int output_vec_size, typename R>
+class reduce_kernel {
+ public:
+  reduce_kernel(
+      R reduction,
+      dpcpp_local_acc_t<char> shared,
+      dpcpp_local_acc_t<bool> finished)
+      : reduction(reduction), shared(shared), finished(finished) {}
+
+  void operator()(DPCPP::nd_item<2> pos) const {
+    reduction.template run<output_vec_size>(pos, shared, finished);
+  }
+
+ private:
+  R reduction;
+  dpcpp_local_acc_t<char> shared; /* group tree reduce */
+  dpcpp_local_acc_t<bool> finished; /* last WG flag to broadcast inner WG */
+};
+
 template <typename index_t>
 static OffsetCalculator<2, index_t> make_output_calculator(
-    const TensorIterator& iter) {
+    const at::TensorIterator& iter) {
   int num_reduce_dims = iter.num_reduce_dims();
   int num_output_dims = iter.ndim() - num_reduce_dims;
   int input_index = iter.ntensors() - 1;
@@ -188,7 +261,7 @@ static OffsetCalculator<2, index_t> make_output_calculator(
 
 template <typename index_t>
 static OffsetCalculator<1, index_t> make_input_calculator(
-    const TensorIterator& iter) {
+    const at::TensorIterator& iter) {
   int num_reduce_dims = iter.num_reduce_dims();
   int input_index = iter.ntensors() - 1;
   std::array<const int64_t*, 1> strides = {
@@ -198,64 +271,25 @@ static OffsetCalculator<1, index_t> make_input_calculator(
       num_reduce_dims, iter.shape().data(), strides.data());
 }
 
-template <int vt, typename index_t, typename func_t>
-void strided_iterate(func_t f, index_t begin, index_t end, index_t stride) {
-  if (begin + (vt - 1) * stride < end) {
-    //#pragma unroll
-    for (index_t i = 0; i < vt; i++) {
-      f(i, begin + i * stride);
-    }
-  } else { //#pragma unroll
-    for (index_t i = 0; i < vt; i++) {
-      index_t idx = begin + i * stride;
-      if (idx < end) {
-        f(i, idx);
-      }
-    }
-  }
-}
-
-template <int vt, typename index_t, typename type_t, typename foo_t>
-Array<type_t, vt> load_memory(
-    const type_t* in,
-    index_t begin,
-    index_t end,
-    index_t stride,
-    foo_t foo) {
-  Array<type_t, vt> res;
-  strided_iterate<vt>(
-      [&](index_t i, index_t idx) { res[i] = in[foo(idx)]; },
-      begin,
-      end,
-      stride);
-  return res;
-}
-
-template <int vt, typename index_t, typename type_t>
-Array<type_t, vt> load_memory(
-    const type_t* in,
-    index_t begin,
-    index_t end,
-    index_t stride) {
-  return load_memory<vt, index_t, type_t>(
-      in, begin, end, stride, [](index_t idx) { return idx; });
-}
-
 template <typename out_scalar_t, typename func_t>
 struct func_wrapper_t {
-  using arg_t = typename binary_function_traits<func_t>::arg2_t;
-  func_t reduce;
+  using arg_t = typename binary_function_traits<func_t>::arg1_t;
+  using scalar_t = typename binary_function_traits<func_t>::arg2_t;
+
   func_t combine;
   static inline out_scalar_t project(arg_t arg) {
     return (out_scalar_t)arg;
   }
-  static inline arg_t sg_shfl_down(arg_t arg, int offset) {
-    // TODO: replace following function with sub_group api when it's available
-    // return WARP_SHFL_DOWN(arg, offset);
-    return arg;
+
+  static inline arg_t translate_idx(arg_t acc, int64_t /*idx*/) {
+    return acc;
   }
 
-  func_wrapper_t(const func_t& op) : reduce(op), combine(op) {}
+  func_wrapper_t(const func_t& op) : combine(op) {}
+
+  arg_t reduce(arg_t acc, scalar_t val, int64_t idx) const {
+    return combine(acc, val);
+  }
 };
 
 template <typename scalar_t, typename func_t>
@@ -270,16 +304,21 @@ template <
     typename out_scalar_t = scalar_t,
     int vt0 = 4>
 struct ReduceOp {
-  using traits = binary_function_traits<decltype(&ops_t::reduce)>;
-  using arg_t = typename std::remove_const<
-      typename std::remove_reference<typename traits::arg1_t>::type>::type;
-  using out_t = out_scalar_t;
+  using traits = function_traits<decltype(&ops_t::reduce)>;
+  using arg_t =
+      typename std::decay<typename traits::template arg<0>::type>::type;
 
   using InputCalculator = OffsetCalculator<1, index_t>;
   using OutputCalculator = OffsetCalculator<2, index_t>;
 
   static constexpr bool can_accumulate_in_output =
-      std::is_convertible<arg_t, out_scalar_t>::value;
+      std::is_convertible<arg_t, out_scalar_t>::value &&
+      std::is_convertible<out_scalar_t, arg_t>::value;
+
+  static constexpr float acc_buffer_multiplier =
+      (float)sizeof(arg_t) / sizeof(out_scalar_t);
+
+  static constexpr int input_vec_size = ReduceConfig::input_vec_size;
 
   ops_t ops;
   arg_t ident;
@@ -287,11 +326,17 @@ struct ReduceOp {
   InputCalculator input_calc;
   OutputCalculator output_calc;
   const void* src;
-  void* dst0;
-  void* dst1;
-  void* buffer;
+  const char* dst[2]; // it accepts at most two destinations
+  // acc_buf used for accumulation among sub Tensor Iterator when accumulation
+  // on output is not permissible
+  void* acc_buf;
+  // workgroup buf used for accumulation between workgrouops during global
+  // reduction
+  void* group_buf;
   int* semaphores;
+  int64_t base_idx;
   bool accumulate;
+  bool final_output;
   int noutputs;
 
   ReduceOp(
@@ -300,313 +345,662 @@ struct ReduceOp {
       InputCalculator input_calc,
       OutputCalculator output_calc,
       const void* src,
-      void* dst0,
-      void* dst1,
-      void* buffer,
+      char* dst0,
+      c10::optional<char*> dst1,
+      void* acc_buf,
+      void* group_buf,
       int* semaphores,
       arg_t ident,
-      int noutputs)
+      int noutputs,
+      int64_t base_idx)
       : ops(ops),
         ident(ident),
         config(config),
         input_calc(input_calc),
         output_calc(output_calc),
         src(src),
-        dst0(dst0),
-        dst1(dst1),
-        buffer(buffer),
+        acc_buf(acc_buf),
+        group_buf(group_buf),
         semaphores(semaphores),
-        noutputs(noutputs) {}
+        base_idx(base_idx),
+        noutputs(noutputs) {
+    dst[0] = dst0;
+    if (dst1.has_value()) {
+      dst[1] = dst1.value();
+    }
+  }
 
-  Array<scalar_t, vt0> load_inputs(const scalar_t* data, index_t offset) const {
-    index_t end = config.num_inputs;
-    index_t stride = input_calc.strides_[0][0] / sizeof(scalar_t);
-    if (input_calc.dims == 1) {
-      return load_memory<vt0, index_t, scalar_t>(
-          data, offset, end, config.step_input, [&](index_t idx) {
-            return idx * stride;
-          });
+  template <int output_vec_size>
+  void run(
+      DPCPP::nd_item<2> pos,
+      dpcpp_local_ptr<char> shared,
+      dpcpp_local_ptr<bool> finished) const {
+    index_t output_idx = config.output_idx<output_vec_size>(pos);
+    index_t input_idx = config.input_idx(pos);
+    auto base_offsets1 = output_calc.get(output_idx)[1];
+
+    using arg_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    arg_vec_t value;
+    for (int i = 0; i < output_vec_size; i++) {
+      value[i] = ident;
+    }
+
+    if (output_idx < config.num_outputs && input_idx < config.num_inputs) {
+      const scalar_t* input_slice =
+          (const scalar_t*)((const char*)src + base_offsets1);
+      value = item_reduce<output_vec_size>(pos, input_slice);
+    }
+
+    if (config.should_group_y_reduce()) {
+      value = group_y_reduce<output_vec_size>(pos, value, shared);
+    }
+    if (config.should_group_x_reduce()) {
+      value = group_x_reduce<output_vec_size>(pos, value, shared);
+    }
+
+    using out_ptr_vec_t = at::detail::Array<out_scalar_t*, output_vec_size>;
+    using offset_vec_t = at::detail::Array<index_t, output_vec_size>;
+    offset_vec_t base_offsets;
+    out_ptr_vec_t out;
+
+#pragma unroll
+    for (int i = 0; i < output_vec_size; i++) {
+      base_offsets[i] = output_calc.get(output_idx + i)[0];
+      out[i] = (out_scalar_t*)((char*)dst[0] + base_offsets[i]);
+    }
+
+    arg_vec_t* acc = nullptr;
+    if (acc_buf != nullptr) {
+      size_t numerator = sizeof(arg_t);
+      size_t denominator = sizeof(out_scalar_t);
+      reduce_fraction(numerator, denominator);
+      acc =
+          (arg_vec_t*)((char*)acc_buf + (base_offsets[0] * numerator / denominator));
+    }
+
+    if (config.should_global_reduce()) {
+      value = global_reduce<output_vec_size>(pos, value, acc, shared, finished);
+    } else if (config.should_store(pos, output_idx)) {
+      if (accumulate) {
+#pragma unroll
+        for (int i = 0; i < output_vec_size; i++) {
+          value[i] = ops.translate_idx(value[i], base_idx);
+        }
+      }
+
+      if (acc == nullptr) {
+        if (accumulate) {
+          value =
+              accumulate_in_output<output_vec_size, can_accumulate_in_output>(
+                  out, value);
+        }
+        if (final_output) {
+          set_results_to_output<output_vec_size>(value, base_offsets);
+        } else {
+#pragma unroll
+          for (int i = 0; i < output_vec_size; i++) {
+            *(out[i]) = get_accumulated_output<can_accumulate_in_output>(
+                out[i], value[i]);
+          }
+        }
+      } else {
+        if (accumulate) {
+#pragma unroll
+          for (int i = 0; i < output_vec_size; i++) {
+            value[i] = ops.combine((*acc)[i], value[i]);
+          }
+        }
+        if (final_output) {
+          set_results_to_output<output_vec_size>(value, base_offsets);
+        } else {
+          *acc = value;
+        }
+      }
+    }
+  }
+
+  template <int output_vec_size>
+  SYCL_EXTERNAL at::detail::Array<arg_t, output_vec_size> item_reduce(
+      DPCPP::nd_item<2> pos,
+      const scalar_t* data) const {
+    if (config.vectorize_input) {
+      // assert(output_vec_size == 1);
+      // reduce at the header of input_slice where memory is not aligned,
+      // so that group_reduce will have an aligned memory to work on.
+      return {input_vectorized_item_reduce_impl(pos, data)};
     } else {
-      return load_memory<vt0, index_t, scalar_t>(
-          data, offset, end, config.step_input, [&](index_t idx) {
-            return input_calc.get(idx)[0] / sizeof(scalar_t);
-          });
+      index_t element_stride = input_calc.strides_[0][0] / sizeof(scalar_t);
+      bool is_contiguous = (input_calc.dims == 1 && element_stride == 1);
+      if (is_contiguous) {
+        return item_reduce_impl<output_vec_size>(
+            pos, data, [](index_t idx) { return idx; });
+      } else if (input_calc.dims == 1) {
+        return item_reduce_impl<output_vec_size>(
+            pos, data, [&](index_t idx) { return idx * element_stride; });
+      } else {
+        return item_reduce_impl<output_vec_size>(pos, data, [&](index_t idx) {
+          return input_calc.get(idx)[0] / sizeof(scalar_t);
+        });
+      }
     }
   }
 
-  arg_t thread_reduce_once(const scalar_t* data, index_t offset) const {
-    auto values = load_inputs(data, offset);
-
+  SYCL_EXTERNAL arg_t input_vectorized_item_reduce_impl(
+      DPCPP::nd_item<2> pos,
+      const scalar_t* data) const {
+    index_t end = config.num_inputs;
+    // Handle the head of input slice where data is not aligned
     arg_t value = ident;
-    strided_iterate<vt0, index_t>(
-        [&](index_t i, index_t idx) { value = ops.reduce(value, values[i]); },
-        offset,
-        config.num_inputs,
-        config.step_input);
-
-    return value;
-  }
-
-  arg_t thread_reduce(const scalar_t* data, const DPCPP::nd_item<2>& item_id)
-      const {
-    arg_t value = ident;
-    index_t idx = config.input_idx(item_id);
-    while (idx < static_cast<index_t>(config.num_inputs)) {
-      arg_t next = thread_reduce_once(data, idx);
-      value = ops.combine(value, next);
-      idx += config.step_input * vt0;
+    // sycl provided the composition so we don't need to rewrite it.
+    constexpr int align_bytes =
+        alignof(at::native::Memory::aligned_vector<scalar_t, input_vec_size>);
+    constexpr int align_elements = align_bytes / sizeof(scalar_t);
+    int shift = ((uint64_t)data) % align_bytes / sizeof(scalar_t);
+    if (shift > 0) {
+      auto idx = pos.get_local_id(1);
+      if (idx >= shift && idx < align_elements &&
+          config.should_reduce_tail(pos)) {
+        value = ops.reduce(
+            value,
+            data[pos.get_local_id(1) - shift],
+            pos.get_local_id(1) - shift);
+      }
+      // align data to vector start
+      data += align_elements - shift;
+      if (end > align_elements - shift)
+        end -= align_elements - shift; /* warning: end flip */
+      else
+        end = 0;
+      shift = align_elements - shift;
     }
-    return value;
-  }
 
-  arg_t sub_group_reduce(arg_t value) const {
-    for (int64_t offset = 1; offset < DPCPP_SUB_GROUP_SIZE; offset <<= 1) {
-      arg_t other = ops.sg_shfl_down(value, offset);
-      value = ops.combine(value, other);
+    // Do the vectorized reduction
+    using load_t = typename at::native::Memory::
+        aligned_vector<scalar_t, input_vec_size>::type;
+
+    index_t idx = config.input_idx(pos);
+    const index_t stride = config.step_input;
+
+    // multiple registers
+    arg_t value_list[input_vec_size];
+    value_list[0] = value;
+
+#pragma unroll
+    for (int i = 1; i < input_vec_size; ++i) {
+      value_list[i] = ident;
     }
-    return value;
+
+    load_t values;
+
+    while (idx * input_vec_size + input_vec_size - 1 < end) {
+      values = reinterpret_cast<const load_t*>(data)[idx];
+#pragma unroll
+      for (index_t i = 0; i < input_vec_size; ++i) {
+        auto val = bitwise_cast<scalar_t>(values[i]);
+        value_list[i] =
+            ops.reduce(value_list[i], val, shift + idx * input_vec_size + i);
+      }
+      idx += stride;
+    }
+
+    // tail
+    index_t tail_start = end - end % input_vec_size;
+    if (config.should_reduce_tail(pos)) {
+      int idx = tail_start + pos.get_local_id(1);
+      if (idx < end) {
+        value_list[0] = ops.reduce(value_list[0], data[idx], idx + shift);
+      }
+    }
+
+    // registers accumulation
+#pragma unroll
+    for (int i = 1; i < input_vec_size; ++i) {
+      value_list[0] = ops.combine(value_list[0], value_list[i]);
+    }
+    return value_list[0];
   }
 
-  arg_t work_group_reduce(
-      arg_t value,
-      const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      const DPCPP::nd_item<2>& item_id) const {
-    local_ptr[config.shared_memory_offset(0, item_id)] = value;
-    int num_sg = (item_id.get_local_range(1) * item_id.get_local_range(0)) /
-        DPCPP_SUB_GROUP_SIZE;
-    for (int64_t offset = num_sg / 2; offset > 0; offset >>= 1) {
-      DPCPP::group_barrier(item_id.get_group());
-      if (static_cast<int64_t>(item_id.get_local_id(0)) < offset &&
-          ((static_cast<int64_t>(item_id.get_local_id(0)) + offset) < num_sg)) {
-        arg_t other = local_ptr[config.shared_memory_offset(offset, item_id)];
-        value = ops.combine(value, other);
-        local_ptr[config.shared_memory_offset(0, item_id)] = value;
+  template <int output_vec_size, typename offset_calc_t>
+  at::detail::Array<arg_t, output_vec_size> item_reduce_impl(
+      DPCPP::nd_item<2> pos,
+      const scalar_t* data_,
+      offset_calc_t calc) const {
+    index_t idx = config.input_idx(pos);
+    const index_t end = config.num_inputs;
+    const index_t stride = config.step_input;
+
+    using arg_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    using load_t = typename at::native::Memory::
+        aligned_vector<scalar_t, output_vec_size>::type;
+    const load_t* data = reinterpret_cast<const load_t*>(data_);
+
+    arg_vec_t value_list[vt0];
+
+#pragma unroll(vt0)
+    for (int i = 0; i < vt0; i++) {
+#pragma unroll(output_vec_size)
+      for (int j = 0; j < output_vec_size; ++j) {
+        value_list[i][j] = ident;
+      }
+    }
+
+    load_t values[vt0];
+
+    while (idx + (vt0 - 1) * stride < end) {
+#pragma unroll(vt0)
+      for (index_t i = 0; i < vt0; ++i) {
+        values[i] = data[calc(idx + i * stride) / output_vec_size];
+      }
+#pragma unroll(vt0)
+      for (index_t i = 0; i < vt0; ++i) {
+#pragma unroll(output_vec_size)
+        for (index_t j = 0; j < output_vec_size; ++j) {
+          auto val = bitwise_cast<scalar_t>(values[i][j]);
+          value_list[i][j] =
+              ops.reduce(value_list[i][j], val, idx + i * stride);
+        }
+      }
+      idx += stride * vt0;
+    }
+
+    // tail
+    int idx_ = idx;
+#pragma unroll(vt0)
+    for (index_t i = 0; i < vt0; ++i) {
+      if (idx >= end) {
+        break;
+      }
+      values[i] = data[calc(idx) / output_vec_size];
+      idx += stride;
+    }
+    idx = idx_;
+#pragma unroll(vt0)
+    for (index_t i = 0; i < vt0; ++i) {
+      if (idx >= end) {
+        break;
+      }
+#pragma unroll(output_vec_size)
+      for (index_t j = 0; j < output_vec_size; ++j) {
+        auto val = bitwise_cast<scalar_t>(values[i][j]);
+        value_list[i][j] = ops.reduce(value_list[i][j], val, idx);
+      }
+      idx += stride;
+    }
+
+    // combine accumulators
+#pragma unroll(vt0)
+    for (int i = 1; i < vt0; ++i) {
+#pragma unroll(output_vec_size)
+      for (index_t j = 0; j < output_vec_size; ++j) {
+        value_list[0][j] = ops.combine(value_list[0][j], value_list[i][j]);
+      }
+    }
+    return value_list[0];
+  }
+
+  template <int output_vec_size>
+  at::detail::Array<arg_t, output_vec_size> group_x_reduce(
+      DPCPP::nd_item<2> pos,
+      at::detail::Array<arg_t, output_vec_size> value,
+      dpcpp_local_ptr<void> shared_memory) const {
+    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    auto l_x = pos.get_local_id(1), l_y = pos.get_local_id(0);
+    auto gp_x = pos.get_local_range(1);
+
+    int dim_x = gp_x;
+    dpcpp_local_ptr<args_vec_t> shared(shared_memory);
+    auto sg = pos.get_sub_group();
+    uint32_t sbgrpSize = sg.get_local_range()[0];
+    if (dim_x > sbgrpSize) {
+      int address_base = l_x + l_y * gp_x;
+      shared[address_base] = value;
+      for (int offset = dim_x / 2; offset >= sbgrpSize; offset >>= 1) {
+        DPCPP::group_barrier(pos.get_group());
+        if (l_x < offset && l_x + offset < gp_x /* redundant??? */) {
+          args_vec_t other = shared[address_base + offset];
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.combine(value[i], other[i]);
+          }
+          shared[address_base] = value;
+        }
+      }
+      dim_x = sbgrpSize;
+    }
+
+    DPCPP::group_barrier(pos.get_group());
+
+    // sub-group reduction
+    for (int offset = 1; offset < dim_x; offset <<= 1) {
+#pragma unroll(output_vec_size)
+      for (int i = 0; i < output_vec_size; ++i) {
+        arg_t other = sg.shuffle_down(value[i], offset);
+        value[i] = ops.combine(value[i], other);
       }
     }
     return value;
   }
 
-  bool mark_block_finished(
-      const dpcpp_local_ptr_pt<int>& last_wg_done_ptr,
-      int* smem,
-      const DPCPP::nd_item<2>& item_id) const {
-    // sync workloads above in WG
-    DPCPP::group_barrier(item_id.get_group());
+  template <int output_vec_size>
+  at::detail::Array<arg_t, output_vec_size> group_y_reduce(
+      DPCPP::nd_item<2> pos,
+      at::detail::Array<arg_t, output_vec_size> value,
+      dpcpp_local_ptr<void> shared_memory) const {
+    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    dpcpp_local_ptr<args_vec_t> shared{shared_memory};
+    shared[config.slm_offset(pos, 0)] = value;
 
-    // WGs sync. read-modify-write sync, using acquire_release ordering
-    dpcpp_atomic_ref_t<int> at_var(*(smem + item_id.get_group(1)));
-    if (item_id.get_local_linear_id() == 0) {
-      int prev_blocks_finished = at_var.fetch_add(
+    auto l_y = pos.get_local_id(0);
+    auto dim_y = pos.get_local_range(0);
+    for (int offset = dim_y / 2; offset > 0; offset >>= 1) {
+      DPCPP::group_barrier(pos.get_group());
+      if (l_y < offset && l_y + offset < dim_y /* redundant ??? */) {
+        args_vec_t other = shared[config.slm_offset(pos, offset)];
+#pragma unroll(output_vec_size)
+        for (int i = 0; i < output_vec_size; ++i) {
+          value[i] = ops.combine(value[i], other[i]);
+        }
+        shared[config.slm_offset(pos, 0)] = value;
+      }
+    }
+    return value;
+  }
+
+  // In/out from slm pointers
+  void mark_group_finished(
+      DPCPP::nd_item<2> pos,
+      dpcpp_local_ptr<bool> finished) const {
+    DPCPP::group_barrier(pos.get_group());
+
+    if (pos.get_local_linear_id() == 0) {
+      dpcpp_atomic_ref_t<int> count(semaphores[pos.get_group(1)]);
+      int prev_groups_finished = count.fetch_add(
           1, dpcpp_mem_odr_acq_rel
           /* , default memory scope is device */);
-
-      last_wg_done_ptr[0] =
-          (prev_blocks_finished ==
-           static_cast<int>(item_id.get_group_range(0) - 1));
+      finished[0] = (prev_groups_finished == (pos.get_group_range(0) - 1));
     }
+    DPCPP::group_barrier(pos.get_group());
+  }
 
-    // ensure all WIs update the status `is_last_block_done`
-    DPCPP::group_barrier(item_id.get_group());
-    bool is_last_block_done = last_wg_done_ptr[0];
-    return is_last_block_done;
+  template <int output_vec_size, bool can_acc>
+  at::detail::Array<arg_t, output_vec_size> accumulate_in_output(
+      at::detail::Array<out_scalar_t*, output_vec_size> out,
+      at::detail::Array<arg_t, output_vec_size> value,
+      typename std::enable_if<can_acc>::type* = nullptr) const {
+    at::detail::Array<arg_t, output_vec_size> ret;
+#pragma unroll(output_vec_size)
+    for (int i = 0; i < output_vec_size; ++i) {
+      ret[i] = ops.combine(*(out[i]), value[i]);
+    }
+    return ret;
   }
 
   template <bool can_acc>
-  arg_t accumulate_in_output(
-      const out_scalar_t* out,
+  out_scalar_t get_accumulated_output(
+      out_scalar_t* out,
       arg_t value,
       typename std::enable_if<can_acc>::type* = nullptr) const {
-    return ops.combine(*out, value);
+    assert(!final_output);
+    return (out_scalar_t)value;
   }
 
   // This function should never be called --
-  // it's the version of `accumulate_in_output`
+  // It's the version of `accumulate_in_output`
   // when accumulation in the output is not possible.
-  template <bool can_acc>
-  arg_t accumulate_in_output(
-      out_scalar_t* out,
-      arg_t,
+  template <int output_vec_size, bool can_acc>
+  at::detail::Array<arg_t, output_vec_size> accumulate_in_output(
+      at::detail::Array<out_scalar_t*, output_vec_size>,
+      at::detail::Array<arg_t, output_vec_size>,
       typename std::enable_if<!can_acc>::type* = nullptr) const {
-    // TODO: Replace following assert with dpcpp counterparts.
-    // assert(false);
+    assert(false);
     return arg_t{};
   }
 
-  template <class T>
-  void set_results(const T x, out_scalar_t* out0, out_scalar_t* out1) const {
-    *out0 = x;
+  // This function should never be called --
+  // it's the version of `get_accumulated_output`
+  // when accumulation in the output is not possible.
+  template <bool can_acc>
+  out_scalar_t get_accumulated_output(
+      out_scalar_t* out,
+      arg_t value,
+      typename std::enable_if<!can_acc>::type* = nullptr) const {
+    assert(false);
+    return *out;
   }
 
   template <class T>
-  void set_results(
-      const std::pair<T, T> x,
-      out_scalar_t* out0,
-      out_scalar_t* out1) const {
+  void set_results(const T x, const index_t base_offset) const {
+    assert(noutputs == 1);
+    auto res = (out_scalar_t*)((char*)dst[0] + base_offset);
+    *res = x;
+  }
+
+  // Currently implemented for max of two outputs
+  template <class T1, class T2>
+  void set_results(const std::pair<T1, T2> x, const index_t base_offset) const {
     if (noutputs >= 1) {
-      *out0 = x.first;
+      auto res0 = (T1*)((char*)dst[0] + base_offset);
+      *res0 = x.first;
     }
     if (noutputs >= 2) {
-      *out1 = x.second;
+      // base offset is computed assuming element size being sizeof(T1), so we
+      // need to make a correction to obtain the correct base offset
+      auto res1 = (T2*)((char*)dst[1] + base_offset / sizeof(T1) * sizeof(T2));
+      *res1 = x.second;
     }
   }
 
+  template <int output_vec_size>
   void set_results_to_output(
-      arg_t value,
-      out_scalar_t* out0,
-      out_scalar_t* out1) const {
-    set_results(ops.project(value), out0, out1);
+      at::detail::Array<arg_t, output_vec_size> value,
+      at::detail::Array<index_t, output_vec_size> base_offset) const {
+    assert(final_output);
+#pragma unroll(output_vec_size)
+    for (int i = 0; i < output_vec_size; ++i) {
+      set_results(ops.project(value[i]), base_offset[i]);
+    }
   }
 
-  arg_t global_reduce(
-      arg_t value,
-      out_scalar_t* out0,
-      out_scalar_t* out1,
-      const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      char* global_reduce_buf,
-      int* smem,
-      const DPCPP::nd_item<2>& item_id) const {
-    arg_t* reduce_buffer = (arg_t*)global_reduce_buf;
-    bool should_store =
-        config.should_store(config.output_idx(item_id), item_id);
+  template <int output_vec_size>
+  at::detail::Array<arg_t, output_vec_size> global_reduce(
+      DPCPP::nd_item<2> pos,
+      at::detail::Array<arg_t, output_vec_size> value,
+      at::detail::Array<arg_t, output_vec_size>* acc,
+      dpcpp_local_ptr<char> shared_memory,
+      dpcpp_local_ptr<bool> is_last_group_done) const {
+    using arg_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    using out_ptr_vec_t = at::detail::Array<out_scalar_t*, output_vec_size>;
+    using offset_vec_t = at::detail::Array<index_t, output_vec_size>;
+
+    arg_vec_t* reduce_buffer = (arg_vec_t*)group_buf;
+    index_t output_idx = config.output_idx<output_vec_size>(pos);
+    offset_vec_t base_offsets;
+    out_ptr_vec_t out;
+
+#pragma unroll(output_vec_size)
+    for (int i = 0; i < output_vec_size; ++i) {
+      base_offsets[i] = output_calc.get(output_idx + i)[0];
+      out[i] = (out_scalar_t*)((char*)dst[0] + base_offsets[i]);
+    }
+
+    bool should_store = config.should_store(pos, output_idx);
     if (should_store) {
-      index_t offset =
-          config.staging_memory_offset(item_id.get_group(0), item_id);
+      index_t offset = config.staging_memory_offset(pos, pos.get_group(0));
       reduce_buffer[offset] = value;
     }
 
-    DPCPP::group_barrier(item_id.get_group());
-    bool is_last_block_done =
-        mark_block_finished((dpcpp_local_ptr_pt<int>)local_ptr, smem, item_id);
+    DPCPP::group_barrier(pos.get_group());
+    mark_group_finished(pos, is_last_group_done);
 
-    if (is_last_block_done) {
+    if (is_last_group_done[0]) {
       value = ident;
-      if (config.should_sg_reduce()) {
-        index_t input_offset = item_id.get_local_id(1) +
-            item_id.get_local_id(0) * item_id.get_local_range(1);
-        index_t step = item_id.get_local_range(1) * item_id.get_local_range(0);
-        for (; input_offset < static_cast<index_t>(config.wg_per_output);
-             input_offset += step) {
-          index_t idx = config.staging_memory_offset(input_offset, item_id);
-          arg_t next = reduce_buffer[idx];
-          value = ops.combine(value, next);
+      if (config.should_group_x_reduce()) {
+        index_t input_offset =
+            pos.get_local_id(1) + pos.get_local_id(0) * pos.get_local_range(1);
+        index_t step = pos.get_local_range(0) * pos.get_local_range(1);
+        for (; input_offset < config.groups_per_output; input_offset += step) {
+          index_t idx = config.staging_memory_offset(pos, input_offset);
+          arg_vec_t next = reduce_buffer[idx];
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.combine(value[i], next[i]);
+          }
         }
       } else {
-        index_t input_offset = item_id.get_local_id(0);
-        index_t step = item_id.get_local_range(0);
-        for (; input_offset < static_cast<index_t>(config.wg_per_output);
-             input_offset += step) {
-          index_t idx = config.staging_memory_offset(input_offset, item_id);
-          arg_t next = reduce_buffer[idx];
-          value = ops.combine(value, next);
+        index_t input_offset = pos.get_local_id(0);
+        index_t step = pos.get_local_range(0);
+        for (; input_offset < config.groups_per_output; input_offset += step) {
+          index_t idx = config.staging_memory_offset(pos, input_offset);
+          arg_vec_t next = reduce_buffer[idx];
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.combine(value[i], next[i]);
+          }
         }
       }
-      value = work_group_reduce(value, local_ptr, item_id);
-      if (config.should_sg_reduce()) {
-        value = sub_group_reduce(value);
+      value = group_y_reduce(pos, value, shared_memory);
+      if (config.should_group_x_reduce()) {
+        value = group_x_reduce<output_vec_size>(pos, value, shared_memory);
       }
       if (should_store) {
         if (accumulate) {
-          value = accumulate_in_output<can_accumulate_in_output>(out0, value);
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.translate_idx(value[i], base_idx);
+          }
         }
-        set_results_to_output(value, out0, out1);
+
+        if (acc == nullptr) {
+          if (accumulate) {
+            value =
+                accumulate_in_output<output_vec_size, can_accumulate_in_output>(
+                    out, value);
+          }
+          if (final_output) {
+            set_results_to_output<output_vec_size>(value, base_offsets);
+          } else {
+#pragma unroll(output_vec_size)
+            for (int i = 0; i < output_vec_size; ++i) {
+              *(out[i]) = get_accumulated_output<can_accumulate_in_output>(
+                  out[i], value[i]);
+            }
+          }
+        } else {
+          if (accumulate) {
+#pragma unroll(output_vec_size)
+            for (int i = 0; i < output_vec_size; ++i) {
+              value[i] = ops.combine((*acc)[i], value[i]);
+            }
+          }
+          if (final_output) {
+            set_results_to_output<output_vec_size>(value, base_offsets);
+          } else {
+            *acc = value;
+          }
+        }
       }
     }
-
     return value;
-  }
-
-  void run(
-      const char* input,
-      char* output0,
-      char* output1,
-      const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      char* global_reduce_buf,
-      int* smem,
-      const DPCPP::nd_item<2>& item_id) const {
-    index_t output_idx = config.output_idx(item_id);
-    index_t input_idx = config.input_idx(item_id);
-    auto base_offsets = output_calc.get(output_idx);
-    arg_t value = ident;
-    if (output_idx < static_cast<index_t>(config.num_outputs) &&
-        input_idx < static_cast<index_t>(config.num_inputs)) {
-      auto input_slice = (char*)input + base_offsets[1];
-      value = thread_reduce((scalar_t*)input_slice, item_id);
-    }
-    bool should_wg_reduce = config.should_wg_reduce();
-    if (should_wg_reduce) {
-      value = work_group_reduce(value, local_ptr, item_id);
-    }
-    if (config.should_sg_reduce() &&
-        (!should_wg_reduce || item_id.get_local_id(0) == 0)) {
-      value = sub_group_reduce(value);
-    }
-
-    auto out0 = (out_scalar_t*)(output0 + base_offsets[0]);
-    auto out1 = (out_scalar_t*)(output1 + base_offsets[0]);
-    if (config.should_global_reduce()) {
-      value = global_reduce(
-          value,
-          (out_scalar_t*)out0,
-          (out_scalar_t*)out1,
-          local_ptr,
-          global_reduce_buf,
-          smem,
-          item_id);
-    } else if (config.should_store(output_idx, item_id)) {
-      if (accumulate) {
-        value = accumulate_in_output<can_accumulate_in_output>(
-            (out_scalar_t*)out0, value);
-      }
-      set_results_to_output(value, (out_scalar_t*)out0, (out_scalar_t*)out1);
-    }
   }
 };
 
-template <typename DataType, typename R>
+template <typename R>
 static void launch_reduce_kernel(
     const ReduceConfig& config,
-    const R reduction) {
-  using acc_t = typename R::arg_t;
-  using output_t = typename R::out_t;
+    const R& reduction) {
   auto& queue = dpcppGetCurrentQueue();
 
-  dpcppMemsetAsync(reduction.dst0, 0, sizeof(output_t) * config.num_outputs);
-  if (reduction.noutputs > 1) {
-    dpcppMemsetAsync(reduction.dst1, 0, sizeof(output_t) * config.num_outputs);
-  }
-
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_ptr = static_cast<const char*>(reduction.src);
-    auto out0_ptr = static_cast<char*>(reduction.dst0);
-    auto out1_ptr =
-        reduction.noutputs <= 1 ? NULL : static_cast<char*>(reduction.dst1);
-    auto local_acc = dpcpp_local_acc_t<acc_t>(config.work_group_size, cgh);
-
-    auto global_reduce_ptr = config.should_global_reduce()
-        ? static_cast<char*>(reduction.buffer)
-        : NULL;
-    auto sema_ptr = config.should_global_reduce()
-        ? static_cast<int*>(reduction.semaphores)
-        : NULL;
-
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      auto local_ptr = (dpcpp_local_ptr_pt<acc_t>)local_acc.get_pointer().get();
-      reduction.run(
-          in_ptr,
-          out0_ptr,
-          out1_ptr,
-          local_ptr,
-          global_reduce_ptr,
-          sema_ptr,
-          item_id);
-    };
-
-    cgh.parallel_for(
-        DPCPP::nd_range<2>(config.get_global_size(), config.get_local_size()),
-        kfn);
+    DPCPP::range<1> slm_sz{static_cast<uint32_t>(config.slm_sz())};
+    dpcpp_local_acc_t<char> shared(slm_sz, cgh);
+    dpcpp_local_acc_t<bool> finished({1}, cgh);
+    switch (config.output_vec_size) {
+      case 4: {
+        reduce_kernel<4, R> ker(reduction, shared, finished);
+        cgh.parallel_for(
+            DPCPP::nd_range<2>(config.global_sz(), config.group_sz()), ker);
+        break;
+      }
+      case 2: {
+        reduce_kernel<2, R> ker(reduction, shared, finished);
+        cgh.parallel_for(
+            DPCPP::nd_range<2>(config.global_sz(), config.group_sz()), ker);
+        break;
+      }
+      default: {
+        reduce_kernel<1, R> ker(reduction, shared, finished);
+        cgh.parallel_for(
+            DPCPP::nd_range<2>(config.global_sz(), config.group_sz()), ker);
+        break;
+      }
+    }
   };
 
   DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+class AccumulationBuffer {
+ public:
+  AccumulationBuffer() = default;
+  AccumulationBuffer(
+      size_t acc_t_size,
+      size_t out_t_size,
+      char* out_ptr,
+      int64_t size) {
+    out_ptr_ = out_ptr;
+    if (out_t_size >= acc_t_size) {
+      // reusing output buffer for accumulation.
+      acc_ptr_ = out_ptr;
+      numerator_ = 1;
+      denominator_ = 1;
+    } else {
+      buffer_ = getDeviceAllocator()->allocate(size);
+      acc_ptr_ = (char*)buffer_.get();
+      numerator_ = acc_t_size;
+      denominator_ = out_t_size;
+      reduce_fraction(numerator_, denominator_);
+    }
+  }
+
+  char* get_acc_slice(char* out_ptr) {
+    return acc_ptr_ == nullptr
+        ? nullptr
+        : acc_ptr_ + ((out_ptr - out_ptr_) * numerator_ / denominator_);
+  }
+
+ private:
+  char* acc_ptr_ = nullptr;
+  char* out_ptr_ = nullptr;
+  size_t numerator_;
+  size_t denominator_;
+  at::DataPtr buffer_;
+};
+
+template <typename scalar_t>
+int get_output_vec_size(at::TensorIterator& iter) {
+  int vec_size = 4;
+  auto update_vec_size = [&vec_size](uint64_t n) {
+    while (n % vec_size != 0) {
+      vec_size /= 2;
+    }
+  };
+
+  uint64_t base_address =
+      reinterpret_cast<uint64_t>(iter.data_ptr(iter.noutputs())) /
+      sizeof(scalar_t);
+  update_vec_size(base_address);
+
+  const int output_index = iter.num_reduce_dims();
+  update_vec_size(iter.shape()[output_index]);
+
+  int j = 0;
+  for (auto i : iter.strides(iter.noutputs())) {
+    if (j != output_index) {
+      update_vec_size(i / sizeof(scalar_t));
+    }
+    j++;
+  }
+  return vec_size;
 }
 
 template <
@@ -616,42 +1010,66 @@ template <
     typename ops_t,
     typename ident_t = double>
 inline void dpcpp_reduce_kernel(
-    TensorIterator& iter,
+    at::TensorIterator& iter,
     const ops_t& ops,
-    ident_t ident = 0) {
-  TORCH_INTERNAL_ASSERT(
+    ident_t ident = 0,
+    AccumulationBuffer* acc_buf_ptr = nullptr,
+    int64_t base_idx = 0) {
+  AT_ASSERT(
       iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 &&
       iter.noutputs() >= 1);
 
-  using traits = binary_function_traits<decltype(&ops_t::reduce)>;
-  using arg_t = typename traits::arg1_t;
+  using traits = function_traits<decltype(&ops_t::reduce)>;
+  using arg_t = typename traits::template arg<0>::type;
   static constexpr bool can_accumulate_in_output =
       std::is_convertible<arg_t, out_scalar_t>::value;
 
   bool can_use_32bit_indexing = iter.can_use_32bit_indexing();
-  if (can_accumulate_in_output && !can_use_32bit_indexing) {
+  std::unique_ptr<AccumulationBuffer> owned_buf_ptr;
+
+  // The acc_buf_ptr is a shared pointer. It is create at the first entrance and
+  // resued by all recursive function calls.
+  if (acc_buf_ptr == nullptr) {
+    // acc_buf_ptr holds buffer used for accuulation amoung multiple sub_iter
+    // when accumulation in output is not possible.
+    if (!can_accumulate_in_output && !can_use_32bit_indexing) {
+      int64_t output_memory_size = iter.element_size(0);
+      for (int dim = 0; dim < iter.ndim(); dim++) {
+        output_memory_size = std::max(
+            output_memory_size, iter.shape()[dim] * iter.strides(0)[dim]);
+      }
+      output_memory_size /= iter.element_size(0); // iter.strides is in bytes
+      owned_buf_ptr.reset(new AccumulationBuffer(
+          sizeof(arg_t),
+          sizeof(out_scalar_t),
+          (char*)iter.data_ptr(0),
+          output_memory_size * sizeof(arg_t)));
+    } else {
+      owned_buf_ptr.reset(new AccumulationBuffer());
+    }
+    acc_buf_ptr = owned_buf_ptr.get();
+  }
+
+  if (!can_use_32bit_indexing) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_reduce_kernel<scalar_t, out_scalar_t, vt0>(sub_iter, ops, ident);
+      int64_t sub_iter_base_idx = sub_iter.view_offsets()[0];
+
+      dpcpp_reduce_kernel<scalar_t, out_scalar_t, vt0>(
+          sub_iter, ops, ident, acc_buf_ptr, sub_iter_base_idx);
     }
     return;
   }
 
-  char* out_data = (char*)iter.data_ptr(0);
   const char* in_data = (char*)iter.data_ptr(iter.ntensors() - 1);
-  char* out_data_extra;
+  char* out_data = (char*)iter.data_ptr(0);
   const auto noutputs = iter.noutputs();
+  c10::optional<char*> out_data_extra;
   if (noutputs > 1) {
     out_data_extra = (char*)iter.data_ptr(1);
   } else {
-    out_data_extra = nullptr;
+    out_data_extra = c10::nullopt;
   }
-
-  auto& queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t wg_size = dpcppMaxWorkGroupSize(dev_id);
-  // firstly hardcoded; to be replaced with get_sub_group_max_size
-  int sg_size = DPCPP_SUB_GROUP_SIZE;
-  int sgs_per_wg = wg_size / sg_size;
+  char* acc_data = acc_buf_ptr->get_acc_slice(out_data);
 
   // Start by assuming that each thread handles a single output and all
   // the inputs for that output.
@@ -659,33 +1077,138 @@ inline void dpcpp_reduce_kernel(
   int64_t inputs_per_output = iter.numel() / num_outputs;
   int input_index = iter.ntensors() - 1;
 
-  auto config = ReduceConfig(
-      sizeof(arg_t), num_outputs, inputs_per_output, iter.numel(), wg_size);
+  auto config = ReduceConfig(sizeof(arg_t), num_outputs, inputs_per_output);
 
-  // TODO: Currently subgroup and its corresponding logic doesn't work well.
-  // We will re-enable it when subgroup api is available
-  if (iter.ndim() == 0 ||
-      iter.strides(/*arg=*/input_index)[0] == sizeof(scalar_t)) {
-    config.input_mult[0] = config.split_input(sg_size);
-  } else {
-    // Otherwise split the output across langs in a subgroup
-    config.output_mult[0] = config.split_output(sg_size);
-  }
+  int64_t dim0;
+  int64_t dim1;
+  int64_t fastest_moving_stride;
+  bool reduction_on_fastest_striding_dimension;
 
-  if (config.values_per_thread() >= sgs_per_wg * 16 ||
-      config.values_per_thread() >= 256) {
-    config.input_mult[1] = config.split_input(sgs_per_wg);
-  } else {
-    // Otherwise, each warp handles a separate output.
-    config.output_mult[1] = config.split_output(sgs_per_wg);
-  }
-
-  if (config.values_per_thread() >= 256 && num_outputs <= 4096) {
-    config.wg_per_output = div_up(config.values_per_thread(), 16);
-    if (config.wg_per_output > 65535) {
-      config.wg_per_output = 65535;
+  if (iter.ndim() > 0) {
+    // Adjust group size to map group width to fastest changing dimension of the
+    // input tensor. This grants the best possible memory accessing pattern,
+    // given that for non-contiguous tensor with space in between, we cannot
+    // have perfect memory coalescing.
+    reduction_on_fastest_striding_dimension =
+        (iter.num_reduce_dims() == iter.ndim()) ||
+        (iter.strides(/*arg=*/input_index)[0] <
+         iter.strides(/*arg=*/input_index)[iter.num_reduce_dims()]);
+    // Notice that dim0 & dim1 does NOT guarantee any launch configuration here!
+    // dim0 & dim1 are more like the upper bound of the group dimension. The
+    // actual launch config and reduction scheme is determined by setting values
+    // to 'config.input_mult' and 'config.output_mult'.
+    // We try to max out dim1 so that we have enough threads per CTA to deliver
+    // performance for larger problem size.
+    if (reduction_on_fastest_striding_dimension) {
+      // Map group.x to the fastest reducing dimension. It implies:
+      //   1. group_x_reduce is required.
+      //   2. group.y now max out to num_outputs.
+      dim0 = inputs_per_output;
+      dim1 = num_outputs;
+      fastest_moving_stride = iter.strides(/*arg=*/input_index)[0];
+    } else {
+      // Map group.x to the fastest non reducing dimension. It implies:
+      //   1. group_x_reduce is turned off.
+      //   2. group.y now max out to inputs_per_output.
+      dim0 = num_outputs;
+      dim1 = inputs_per_output;
+      fastest_moving_stride =
+          iter.strides(/*arg=*/input_index)[iter.num_reduce_dims()];
     }
-    config.input_mult[2] = config.split_input(config.wg_per_output);
+  } else {
+    reduction_on_fastest_striding_dimension = true;
+    fastest_moving_stride = sizeof(scalar_t);
+    dim0 = 1;
+    dim1 = 1;
+  }
+
+  // We do vectorization to gain better memory access, there are two cases which
+  // we call "vectorize along input" and "vectorize along output". Note that the
+  // "input/output" here does not mean we are vectorizing load/store
+  // instructions. We always only vectorize load instructions.
+  //
+  // Case 1: "vectorize along input"
+  // This case happens when we are reducing along fastest moving dimension. In
+  // such case, WIs with the same dim0 works on the same reduction
+  // cooperatively and will produce results for the same output. In such case,
+  // values in each loaded vector always correspond to the same output.
+  //
+  // Case 2: "vectorize along output"
+  // This case happens when the fastest moving dimension is not the dimension of
+  // reduction. In such case, WIs with different dim1 are independent
+  // and will produce results for different outputs. In such case, values in
+  // each loaded vector always correspond to different outputs.
+  if (fastest_moving_stride == sizeof(scalar_t)) {
+    if (reduction_on_fastest_striding_dimension && dim0 > 128 &&
+        iter.num_reduce_dims() == 1 && vt0 > ReduceConfig::input_vec_size) {
+      // Case 1: "vectorize along input"
+      // Note that if vt0 < ReduceConfig::vec_size, then this means the register
+      // pressure could be high, in such case, we should avoid vectorization.
+      config.vectorize_input = true;
+    } else if (!reduction_on_fastest_striding_dimension) {
+      // Case 2: "vectorize along output"
+      config.output_vec_size = get_output_vec_size<scalar_t>(iter);
+      dim0 /= config.output_vec_size;
+    }
+  }
+
+  // Adjust group_width and group_height
+  config.set_group_dimension<scalar_t>(dim0, dim1);
+
+  int group_width = config.group_width;
+  int group_height = config.group_height;
+
+  if (iter.ndim() == 0 || reduction_on_fastest_striding_dimension) {
+    // Split the input across lanes if the input is contiguous in the reduced
+    // dimension. This will require reduction between WIs using SG
+    // shuffle instructions and shared memory (if group_width > SGSize).
+    config.input_mult[0] = config.split_input(group_width);
+  } else {
+    // Otherwise split the output across lanes in a SG.
+    config.output_mult[0] = config.split_output(group_width);
+  }
+
+  if (config.values_per_item() >= group_height * 16 ||
+      config.values_per_item() >= 256) {
+    // Divide the input across SGs in a work group, if that leaves at least
+    // 16 elements to be summed by each WI. This will require inter-SG
+    // reduction using shared memory.
+    config.input_mult[1] = config.split_input(group_height);
+  } else {
+    // Otherwise, each SG handles a separate output.
+    config.output_mult[1] = config.split_output(group_height);
+  }
+
+  // We are finding a general rountine to work out target max WI number on dev
+  // And now we use catch-all configuration
+  constexpr int min_values_per_item = 16;
+  constexpr int max_values_per_item = 256;
+  // Query max compute units for EU num temporarily
+  auto eu_num = dpcppGetCurrentDeviceProperties()->max_compute_units;
+  const auto target_global_size = eu_num * 32 /* SIMD32 */ * 8 /* HD threads */;
+  int g_x = config.n_groups()[1];
+  if (config.input_mult[1] != 0 &&
+      config.values_per_item() >= max_values_per_item &&
+      g_x <= target_global_size) {
+    // Divide the input across work-groups if the amount of work per-item
+    // is large enough and the size of the output is small enough. This will
+    // require a reduction using global memory.
+    // If we decide to split input across groups, as long as we can get enough
+    // number of groups ('target_group_size') to balance SS, we should still
+    // make the number of values per item large for best performance.
+    auto groups_per_output1 = div_up(target_global_size, g_x);
+    auto groups_per_output2 =
+        div_up(config.values_per_item(), min_values_per_item);
+    auto groups_per_output3 =
+        div_up(config.values_per_item(), max_values_per_item);
+    // We want the minimum of groups_per_output1 and groups_per_output2, so that
+    // each WI can have a large number of values to deal with. But we don't
+    // want values_per_item to be larger than max_values_per_item
+    config.groups_per_output = std::max(
+        std::min(groups_per_output1, groups_per_output2), groups_per_output3);
+    if (config.groups_per_output > 1) {
+      config.input_mult[2] = config.split_input(config.groups_per_output);
+    }
   }
 
   at::DataPtr buffer;
@@ -697,232 +1220,28 @@ inline void dpcpp_reduce_kernel(
     dpcppMemset(semaphores.get(), 0, config.semaphore_size());
   }
 
-  if (can_use_32bit_indexing) {
-    auto output_calc = make_output_calculator<uint32_t>(iter);
-    auto input_calc = make_input_calculator<uint32_t>(iter);
-    auto reduce = ReduceOp<scalar_t, ops_t, uint32_t, out_scalar_t, vt0>(
-        ops,
-        config,
-        input_calc,
-        output_calc,
-        in_data,
-        out_data,
-        out_data_extra,
-        buffer.get(),
-        (int*)semaphores.get(),
-        ident,
-        noutputs);
-    reduce.accumulate = iter.should_accumulate();
-    launch_reduce_kernel<scalar_t>(config, reduce);
-  } else {
-    auto output_calc = make_output_calculator<uint64_t>(iter);
-    auto input_calc = make_input_calculator<uint64_t>(iter);
-    auto reduce = ReduceOp<scalar_t, ops_t, uint64_t, out_scalar_t, vt0>(
-        ops,
-        config,
-        input_calc,
-        output_calc,
-        in_data,
-        out_data,
-        out_data_extra,
-        buffer.get(),
-        (int*)semaphores.get(),
-        ident,
-        noutputs);
-    TORCH_INTERNAL_ASSERT(!iter.should_accumulate());
-    reduce.accumulate = false;
-    launch_reduce_kernel<scalar_t>(config, reduce);
-  }
-}
-
-// Expecting SIMD-32 kernel, 4 threads;
-// Baseline kernel working set equal local size
-constexpr int REDUCE_GROUP_SIZE = 32 * 4;
-constexpr int REDUCE_WORKING_SET = REDUCE_GROUP_SIZE * 16;
-
-template <
-    typename scalar_t,
-    typename out_t,
-    typename ident_t,
-    typename reduce_t,
-    typename combine_t,
-    typename project_t>
-void dpcpp_simple_reduce_thread(
-    DPCPP::nd_item<1> it,
-    dpcpp_local_acc_t<scalar_t> local_data,
-    out_t* out,
-    scalar_t* ping,
-    scalar_t* in,
-    size_t nelem,
-    ident_t ident,
-    reduce_t reduce,
-    combine_t combine,
-    project_t project) {
-  size_t group_size = REDUCE_GROUP_SIZE;
-  size_t working_set = REDUCE_WORKING_SET;
-  int lid = it.get_local_id(0);
-  int group_id = it.get_group(0);
-  int gid_start = group_id * (group_size * 2);
-  int gid = gid_start + lid;
-
-  scalar_t accumu = scalar_t(ident);
-  while (gid < nelem) {
-    scalar_t reg1 = in[gid];
-    scalar_t reg2 =
-        (gid + group_size) < nelem ? in[gid + group_size] : scalar_t(0);
-    accumu = reduce(accumu, reg1);
-    accumu = reduce(accumu, reg2);
-    gid += group_size * 2 * it.get_group_range(0);
-  }
-  local_data[lid] = accumu;
-  DPCPP::group_barrier(it.get_group());
-
-  size_t local_size = group_size < nelem ? group_size : nelem;
-  while (local_size >= 2) {
-    auto offset = size_t((local_size + 1) / 2);
-    if (lid < offset) {
-      scalar_t data =
-          (lid + offset < local_size) ? local_data[lid + offset] : scalar_t(0);
-      local_data[lid] = combine(local_data[lid], data);
-    }
-    local_size = offset;
-    DPCPP::group_barrier(it.get_group());
-  }
-  if (lid == 0) {
-    int num_group = (nelem + working_set - 1) / working_set;
-    if (num_group == 1) {
-      out[group_id] = out_t(project(local_data[lid]));
-    } else {
-      ping[group_id] = local_data[lid];
-    }
-  }
-}
-
-template <
-    typename scalar_t,
-    typename out_t,
-    typename ident_t,
-    typename reduce_t,
-    typename combine_t,
-    typename project_t>
-void dpcpp_simple_reduce_group(
-    out_t* out,
-    scalar_t* pong,
-    scalar_t* in,
-    size_t nelem,
-    ident_t ident,
-    reduce_t reduce,
-    combine_t combine,
-    project_t project) {
-  auto& queue = dpcppGetCurrentQueue();
-  size_t working_set = REDUCE_WORKING_SET;
-  size_t group_size = REDUCE_GROUP_SIZE;
-  int num_group = (nelem + working_set - 1) / working_set;
-  size_t global_size = group_size * num_group;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    dpcpp_local_acc_t<scalar_t> local_data(group_size, cgh);
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-      dpcpp_simple_reduce_thread<scalar_t, out_t, ident_t>(
-          item_id,
-          local_data,
-          out,
-          pong,
-          in,
-          nelem,
-          ident,
-          reduce,
-          combine,
-          project);
-    };
-    DPCPP::range<1> global_range{global_size};
-    DPCPP::range<1> local_range{group_size};
-    cgh.parallel_for(DPCPP::nd_range<1>{global_range, local_range}, kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
-template <typename scalar_t, typename out_t, typename ident_t, typename ops_t>
-void dpcpp_simple_reduce(
-    scalar_t* pong,
-    scalar_t* ping,
-    scalar_t* in,
-    out_t* out,
-    size_t nelem,
-    const ops_t& ops,
-    bool with_reduce,
-    ident_t ident) {
-  auto reduce = [ops](scalar_t a, scalar_t b) -> scalar_t {
-    return ops.reduce(a, b);
-  };
-  auto combine = [ops](scalar_t a, scalar_t b) -> scalar_t {
-    return ops.combine(a, b);
-  };
-  auto project = [ops](scalar_t a) -> scalar_t { return ops.project(a); };
-
-  if (with_reduce) {
-    dpcpp_simple_reduce_group<scalar_t, out_t, ident_t>(
-        out, ping, in, nelem, ident, reduce, combine, project);
-  } else {
-    dpcpp_simple_reduce_group<scalar_t, out_t, ident_t>(
-        out, ping, in, nelem, ident, combine, combine, project);
-  }
-
-  size_t working_set = REDUCE_WORKING_SET;
-  int num_group = (nelem + working_set - 1) / working_set;
-  if (num_group == 1)
-    return;
-
-  if (num_group > working_set) {
-    dpcpp_simple_reduce<scalar_t, out_t, ident_t, ops_t>(
-        ping, pong, ping, out, num_group, ops, false, ident);
-  } else {
-    dpcpp_simple_reduce_group<scalar_t, out_t, ident_t>(
-        out, ping, ping, num_group, ident, combine, combine, project);
-  }
-}
-
-template <
-    typename scalar_t,
-    typename out_scalar_t,
-    int vt0 = 4,
-    typename ops_t,
-    typename ident_t = double>
-inline void dpcpp_simple_reduce_kernel(
-    TensorIterator& iter,
-    const ops_t& ops,
-    ident_t ident = 0) {
-  TORCH_INTERNAL_ASSERT(
-      iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 &&
-      iter.noutputs() >= 1);
-
-  auto output_ptr = (out_scalar_t*)iter.data_ptr(0);
-  auto input = iter.tensor(iter.ntensors() - 1);
-  auto input_ptr = input.data_ptr<scalar_t>();
-  // TODO: consider reduce case with two output tensors
-  // scalar_t* output_extra = nullptr;
-  /*if (iter.noutputs() > 1) {
-    output_extra = (out_scalar_t*)iter.data_ptr(1);
-  }*/
-
-  auto working_set = REDUCE_WORKING_SET;
-  int64_t ping_elems = (input.numel() + working_set - 1) / working_set;
-  int64_t pong_elems = (ping_elems + working_set - 1) / working_set;
-  auto ping = at::empty({ping_elems}, input.options());
-  auto pong = at::empty({pong_elems}, input.options());
-  scalar_t* ping_ptr = ping.data_ptr<scalar_t>();
-  scalar_t* pong_ptr = pong.data_ptr<scalar_t>();
-  dpcpp_simple_reduce<scalar_t, out_scalar_t, ident_t, ops_t>(
-      pong_ptr,
-      ping_ptr,
-      input_ptr,
-      output_ptr,
-      input.numel(),
+  AT_ASSERT(can_use_32bit_indexing);
+  auto output_calc = make_output_calculator<uint32_t>(iter);
+  auto input_calc = make_input_calculator<uint32_t>(iter);
+  auto reduce = ReduceOp<scalar_t, ops_t, uint32_t, out_scalar_t, vt0>(
       ops,
-      true,
-      ident);
+      config,
+      input_calc,
+      output_calc,
+      in_data,
+      out_data,
+      out_data_extra,
+      acc_data,
+      buffer.get(),
+      (int*)semaphores.get(),
+      ident,
+      noutputs,
+      base_idx);
+  reduce.accumulate = iter.should_accumulate();
+  reduce.final_output = iter.is_final_output();
+
+  launch_reduce_kernel(config, reduce);
 }
-// dpcpp simple reduce part end
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

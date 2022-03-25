@@ -31,3 +31,28 @@ class TestTorchMethod(TestCase):
             res_dpcpp = torch._aminmax(user_xpu)
             self.assertEqual(res_cpu[0], res_dpcpp[0].cpu())
             self.assertEqual(res_cpu[1], res_dpcpp[1].cpu())
+
+    def test_min_max_focus_case(self, dtype=torch.float):
+        a = torch.randn(4, 15000)
+        res_min_cpu = torch.min(a, -1)
+        res_max_cpu = torch.max(a, -1)
+        a = a.to("xpu")
+
+        res_min = torch.min(a, -1)
+        res_max = torch.max(a, -1)
+        self.assertEqual(res_min_cpu[0], res_min[0].cpu())
+        self.assertEqual(res_min_cpu[1], res_min[1].cpu())
+        self.assertEqual(res_max_cpu[0], res_max[0].cpu())
+        self.assertEqual(res_max_cpu[1], res_max[1].cpu())
+
+        a = torch.randn(2000000, 2)
+        res_min_cpu = torch.min(a, 0)
+        res_max_cpu = torch.max(a, 0)
+        a = a.to("xpu")
+
+        res_min = torch.min(a, 0)
+        res_max = torch.max(a, 0)
+        self.assertEqual(res_min_cpu[0], res_min[0].cpu())
+        self.assertEqual(res_min_cpu[1], res_min[1].cpu())
+        self.assertEqual(res_max_cpu[0], res_max[0].cpu())
+        self.assertEqual(res_max_cpu[1], res_max[1].cpu())

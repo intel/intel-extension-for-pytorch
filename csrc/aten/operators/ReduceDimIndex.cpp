@@ -1,6 +1,8 @@
 #include <ATen/ATen.h>
+#include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/ReduceOpsUtils.h>
 
+#include "Reduce.h"
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
@@ -8,40 +10,95 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <typename scalar_t>
+struct LessOrNan {
+  C10_DEVICE bool operator()(
+      scalar_t a,
+      scalar_t b,
+      int64_t idx_a,
+      int64_t idx_b) const {
+    // If (a == b), then choose the one with lower idx, else min(a, b)
+    if (Numerics<scalar_t>::isnan(a)) {
+      if (Numerics<scalar_t>::isnan(b)) {
+        return idx_a < idx_b;
+      }
+      return true;
+    }
+    return (a == b) ? idx_a < idx_b : (a < b);
+  }
+};
+
+template <typename scalar_t>
+struct GreaterOrNan {
+  C10_DEVICE bool operator()(
+      scalar_t a,
+      scalar_t b,
+      int64_t idx_a,
+      int64_t idx_b) const {
+    // If (a == b), then choose the one with lower idx, else max(a, b)
+    if (Numerics<scalar_t>::isnan(a)) {
+      if (Numerics<scalar_t>::isnan(b)) {
+        return idx_a < idx_b;
+      }
+      return true;
+    }
+    return (a == b) ? idx_a < idx_b : (a > b);
+  }
+};
+
+template <typename comp_t>
+struct MinMaxReductionOps {
+  using scalar_t = typename binary_function_traits<comp_t>::arg1_t;
+  using index_t = int64_t;
+  using arg_t = std::pair<scalar_t, index_t>;
+
+  static C10_DEVICE arg_t project(arg_t arg) {
+    return arg;
+  }
+
+  static C10_DEVICE arg_t reduce(arg_t arg, scalar_t val, int64_t idx) {
+    return comp_t{}(arg.first, val, arg.second, idx) ? arg : arg_t(val, idx);
+  }
+
+  static C10_DEVICE arg_t combine(arg_t a, arg_t b) {
+    return comp_t{}(a.first, b.first, a.second, b.second) ? a : b;
+  }
+
+  static C10_DEVICE arg_t translate_idx(arg_t a, int64_t base_idx) {
+    return {a.first, a.second + base_idx};
+  }
+
+#if defined(__CUDACC__) || defined(__HIPCC__)
+  static C10_DEVICE arg_t warp_shfl_down(arg_t arg, int offset) {
+    return arg_t(
+        WARP_SHFL_DOWN(arg.first, offset), WARP_SHFL_DOWN(arg.second, offset));
+  }
+#endif
+};
+
+template <typename scalar_t>
+struct MinOps : public MinMaxReductionOps<LessOrNan<scalar_t>> {};
+
+template <typename scalar_t>
+struct MaxOps : public MinMaxReductionOps<GreaterOrNan<scalar_t>> {};
+
 std::tuple<Tensor&, Tensor&> _min_out(
     Tensor& min,
     Tensor& min_indices,
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  dim = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
+  at::TensorIterator iter = make_reduction(
+      "min", min, min_indices, self, dim, keepdim, self.scalar_type(), kLong);
+  AT_DISPATCH_ALL_TYPES_AND3(
+      kBFloat16, kHalf, kBool, iter.dtype(2), "min_xpu", [&]() {
+        dpcpp_reduce_kernel<scalar_t, scalar_t>(
+            iter,
+            MinOps<scalar_t>{},
+            std::pair<scalar_t, int64_t>(Numerics<scalar_t>::upper_bound(), 0));
+      });
 
-  if (_dimreduce_return_trivial_no_ident(min, self, dim, keepdim, "min")) {
-    AT_ASSERT(min.dim() == 0);
-    min_indices.resize_({}).fill_(0);
-    return std::forward_as_tuple(min, min_indices);
-  } else {
-    IPEX_DISPATCH_ALL_TYPES_AND3(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        at::ScalarType::Bool,
-        min.scalar_type(),
-        "_min_out",
-        [&] {
-          std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
-              Numerics<scalar_t>::upper_bound(), 0);
-
-          reduceDimIndex<scalar_t, int64_t>(
-              min,
-              min_indices,
-              self,
-              dim,
-              keepdim,
-              init,
-              MinValuePair<scalar_t, int64_t>());
-        });
-    return std::tuple<Tensor&, Tensor&>(min, min_indices);
-  }
+  return {min, min_indices};
 }
 
 std::tuple<Tensor, Tensor> _min(const Tensor& self, int64_t dim, bool keepdim) {
@@ -69,34 +126,17 @@ std::tuple<Tensor&, Tensor&> _max_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  dim = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
+  at::TensorIterator iter = make_reduction(
+      "max", max, max_indices, self, dim, keepdim, self.scalar_type(), kLong);
+  AT_DISPATCH_ALL_TYPES_AND3(
+      kBFloat16, kHalf, kBool, iter.dtype(2), "max_xpu", [&]() {
+        dpcpp_reduce_kernel<scalar_t, scalar_t>(
+            iter,
+            MaxOps<scalar_t>{},
+            std::pair<scalar_t, int64_t>(Numerics<scalar_t>::lower_bound(), 0));
+      });
 
-  if (_dimreduce_return_trivial_no_ident(max, self, dim, keepdim, "max")) {
-    AT_ASSERT(max.dim() == 0);
-    max_indices.resize_({}).fill_(0);
-    return std::forward_as_tuple(max, max_indices);
-  } else {
-    IPEX_DISPATCH_ALL_TYPES_AND3(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        at::ScalarType::Bool,
-        max.scalar_type(),
-        "_max_out",
-        [&] {
-          std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
-              Numerics<scalar_t>::lower_bound(), 0);
-
-          reduceDimIndex<scalar_t, int64_t>(
-              max,
-              max_indices,
-              self,
-              dim,
-              keepdim,
-              init,
-              MaxValuePair<scalar_t, int64_t>());
-        });
-    return std::tuple<Tensor&, Tensor&>(max, max_indices);
-  }
+  return {max, max_indices};
 }
 
 std::tuple<Tensor, Tensor> _max(const Tensor& self, int64_t dim, bool keepdim) {

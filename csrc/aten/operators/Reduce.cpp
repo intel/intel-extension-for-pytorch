@@ -218,7 +218,8 @@ struct WelfordOps {
 
  public:
   using acc_t = WelfordData<acc_scalar_t, index_t, combine_t>;
-  inline DPCPP_DEVICE acc_t reduce(acc_t acc, scalar_t data) const {
+  inline DPCPP_DEVICE acc_t
+  reduce(acc_t acc, scalar_t data, int64_t idx) const {
     acc_scalar_t delta = data - acc.mean;
     acc_scalar_t new_mean = acc.mean + delta / (acc.nf + 1);
     acc_scalar_t new_delta = data - new_mean;
@@ -259,7 +260,9 @@ struct WelfordOps {
     // FIXME:
     return arg;
   }
-
+  static inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) {
+    return acc;
+  }
   WelfordOps(bool unbiased, bool take_sqrt)
       : unbiased(unbiased), take_sqrt(take_sqrt) {}
 };
@@ -316,12 +319,12 @@ template <typename acc_t, typename factor_t>
 struct ReduceMeanOps {
   factor_t factor;
 
-  inline acc_t reduce(acc_t a, acc_t b) const {
+  inline acc_t reduce(acc_t a, acc_t b, int64_t idx) const {
     return a + b;
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
-    return reduce(a, b);
+    return a + b;
   }
 
   inline acc_t project(acc_t a) const {
@@ -333,6 +336,10 @@ struct ReduceMeanOps {
     return arg;
   }
 
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
+  }
+
   ReduceMeanOps(factor_t factor) : factor(factor) {}
 };
 
@@ -340,7 +347,7 @@ template <typename acc_t>
 struct NormOps {
   acc_t norm;
 
-  inline acc_t reduce(acc_t acc, acc_t data) const {
+  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
     return acc + Numerics<acc_t>::pow(Numerics<acc_t>::fabs(data), norm);
   }
 
@@ -357,12 +364,16 @@ struct NormOps {
     return arg;
   }
 
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
+  }
+
   NormOps(acc_t norm) : norm(norm) {}
 };
 
 template <typename acc_t>
 struct NormZeroOps {
-  inline acc_t reduce(acc_t acc, acc_t data) const {
+  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
     return acc + (data == acc_t(0) ? acc_t(0) : acc_t(1));
   }
 
@@ -378,11 +389,14 @@ struct NormZeroOps {
     // FIXME:
     return arg;
   }
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
+  }
 };
 
 template <typename acc_t>
 struct NormOneOps {
-  inline acc_t reduce(acc_t acc, acc_t data) const {
+  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
     return acc + Numerics<acc_t>::fabs(data);
   }
 
@@ -398,11 +412,14 @@ struct NormOneOps {
     // FIXME:
     return arg;
   }
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
+  }
 };
 
 template <typename acc_t>
 struct AbsMinOps {
-  inline acc_t reduce(acc_t acc, acc_t data) const {
+  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
     return Numerics<acc_t>::min(acc, Numerics<acc_t>::fabs(data));
   }
 
@@ -418,11 +435,14 @@ struct AbsMinOps {
     // FIXME:
     return arg;
   }
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
+  }
 };
 
 template <typename acc_t>
 struct AbsMaxOps {
-  inline acc_t reduce(acc_t acc, acc_t data) const {
+  inline acc_t reduce(acc_t acc, acc_t data, int64_t idx) const {
     return Numerics<acc_t>::max(acc, Numerics<acc_t>::fabs(data));
   }
 
@@ -438,12 +458,15 @@ struct AbsMaxOps {
     // FIXME:
     return arg;
   }
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
+  }
 };
 
 template <typename scalar_t, typename acc_scalar_t, typename index_t>
 struct MinMaxOps {
   using acc_t = std::pair<acc_scalar_t, acc_scalar_t>;
-  inline acc_t reduce(acc_t acc, scalar_t data) const {
+  inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
     return combine(acc, {data, data});
   }
 
@@ -466,6 +489,9 @@ struct MinMaxOps {
   inline acc_t sg_shfl_down(acc_t arg, int offset) const {
     // FIXME:
     return arg;
+  }
+  inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) const {
+    return acc;
   }
 };
 
@@ -566,28 +592,6 @@ static void norm_kernel_impl(
   }
 
   auto input = iter.tensor(iter.ntensors() - 1);
-  // Currently, the dpcpp_simple_reduce_kernel only supports contiguous input
-  // with dim=1 or normalization dim=1
-  if (input.is_contiguous() && (input.dim() == 1 || dim.size() == 0)) {
-    if (p == static_cast<float>(0)) {
-      dpcpp_simple_reduce_kernel<scalar_t, out_t>(
-          iter, NormZeroOps<acc_t>(), 0);
-    } else if (p == static_cast<float>(1)) {
-      dpcpp_simple_reduce_kernel<scalar_t, out_t>(iter, NormOneOps<acc_t>(), 0);
-    } else if (Numerics<float>::isinf(p)) {
-      if (p < std::numeric_limits<float>::lowest()) {
-        dpcpp_simple_reduce_kernel<scalar_t, out_t>(
-            iter, AbsMinOps<acc_t>(), std::numeric_limits<acc_t>::max());
-      } else {
-        dpcpp_simple_reduce_kernel<scalar_t, out_t>(
-            iter, AbsMaxOps<acc_t>(), std::numeric_limits<acc_t>::min());
-      }
-    } else {
-      dpcpp_simple_reduce_kernel<scalar_t, out_t>(
-          iter, NormOps<acc_t>{acc_t(p)}, 0);
-    }
-    return;
-  }
   if (p == static_cast<float>(0)) {
     dpcpp_reduce_kernel<scalar_t, out_t>(iter, NormZeroOps<acc_t>(), 0);
   } else if (p == static_cast<float>(1)) {
