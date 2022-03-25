@@ -202,10 +202,12 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
         auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
           auto global_id = item_id.get_global_linear_id();
 
-          auto index = global_id / num_dim;
-          auto dim = global_id % num_dim;
-          tensor_begin[global_id] =
-              idx_flat_begin[index] / divisor[dim] % sizes[dim];
+          if (global_id < N) {
+            auto index = global_id / num_dim;
+            auto dim = global_id % num_dim;
+            tensor_begin[global_id] =
+                idx_flat_begin[index] / divisor[dim] % sizes[dim];
+          }
         };
 
         __cgh.parallel_for(
