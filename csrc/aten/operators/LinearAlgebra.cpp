@@ -438,5 +438,10 @@ std::tuple<Tensor, Tensor> slogdet(const Tensor& self) {
   return at::linalg_slogdet(self);
 }
 
+std::tuple<Tensor, Tensor, Tensor> _det_lu_based_helper(const Tensor& self) {
+  // fallback to at::native::_det_lu_based_helper
+  return at::native::_det_lu_based_helper(self);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

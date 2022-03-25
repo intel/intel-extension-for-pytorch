@@ -93,8 +93,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(check_res.to(cpu_device), check_res_dpcpp.to(cpu_device))
         self.assertEqual(res_tensor.to(cpu_device), res_tensor_dpcpp.to(cpu_device))
 
-    # @pytest.mark.skipif("not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(reason="not block the pre-ci")
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_logdet(self, dtype=torch.float):
         ts = int(time.time())
         torch.manual_seed(ts)

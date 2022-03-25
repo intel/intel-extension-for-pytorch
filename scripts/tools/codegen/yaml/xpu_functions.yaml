@@ -640,6 +640,7 @@ supported:
   - channel_shuffle
   - linalg_slogdet
   - linalg_slogdet.out
+  - _det_lu_based_helper
 autograd:
   - cdist
   - lstm.input
