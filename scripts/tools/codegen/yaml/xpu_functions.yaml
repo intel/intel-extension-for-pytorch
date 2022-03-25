@@ -180,6 +180,7 @@ supported:
   - div.Tensor
   - div.out
   - div_.Tensor
+  - div.out_mode
   - dot
   - elu
   - elu.out
