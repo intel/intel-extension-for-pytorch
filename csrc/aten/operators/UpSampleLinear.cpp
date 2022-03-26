@@ -1,5 +1,5 @@
 #include <ATen/native/UpSample.h>
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <tensor/Context.h>
 
 #include "UpSample.h"

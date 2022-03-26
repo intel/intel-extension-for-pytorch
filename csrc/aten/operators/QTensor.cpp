@@ -8,7 +8,7 @@
 #include <core/Allocator.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/ListUtils.h>
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 

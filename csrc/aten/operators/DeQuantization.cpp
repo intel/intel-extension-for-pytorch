@@ -6,7 +6,7 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>

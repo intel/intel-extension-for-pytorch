@@ -3,7 +3,7 @@
 #include <ATen/Config.h>
 #include <ATen/record_function.h>
 
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <oneDNN/Reorder.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/Utils.h>

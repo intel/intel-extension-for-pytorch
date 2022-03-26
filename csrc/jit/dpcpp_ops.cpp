@@ -2,7 +2,7 @@
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/record_function.h>
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <oneDNN/oneDNN.h>

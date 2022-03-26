@@ -6,7 +6,7 @@
 #include <core/Allocator.h>
 #include <core/Device.h>
 #include <core/Generator.h>
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <runtime/Memory.h>
 #include <utils/Settings.h>
 #include "Event.h"

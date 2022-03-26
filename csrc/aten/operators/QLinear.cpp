@@ -3,7 +3,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/core/op_registration/op_registration.h>
 
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <oneDNN/oneDNN.h>
 #include <quantized/QUtil.h>
 #include <runtime/Utils.h>

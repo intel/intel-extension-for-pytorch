@@ -13,7 +13,7 @@
 
 #include <core/Memory.h>
 #include <core/MemoryFormat.h>
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <oneDNN/oneDNN.h>
 #include <tensor/Context.h>
 

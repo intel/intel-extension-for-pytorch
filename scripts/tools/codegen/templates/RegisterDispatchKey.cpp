@@ -30,7 +30,7 @@
 #include <c10/util/Optional.h>
 #include <torch/library.h>
 
-#include <intrinsic/ipex_intrinsic.h>
+#include <intrinsic/intrinsic.h>
 #include <utils/SimpleTrace.h>
 
 #include <cstddef>
