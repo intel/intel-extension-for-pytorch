@@ -262,6 +262,17 @@ MAKE_REGISTER_FUNC(
     Tensor(const Tensor&, c10::optional<double>, c10::optional<double>, bool),
     fp32)
 
+MAKE_REGISTER_FUNC(
+    ADD_NS(group_norm),
+    "group_norm",
+    Tensor(
+        const Tensor&,
+        int64_t,
+        const c10::optional<Tensor>&,
+        const c10::optional<Tensor>&,
+        double,
+        bool),
+    user_defined_dtype)
 
 IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
   // for int8 path
