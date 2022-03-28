@@ -636,6 +636,7 @@ supported:
   - var_mean.correction
   - view
   - view_as_real   # newly added
+  - view_as_complex
   - zero_
   - channel_shuffle
   - linalg_slogdet

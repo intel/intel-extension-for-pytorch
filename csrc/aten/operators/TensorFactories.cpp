@@ -677,6 +677,10 @@ Tensor view_as_real(const at::Tensor& self) {
   return at::native::view_as_real(self);
 }
 
+Tensor view_as_complex(const Tensor& self) {
+  return at::native::view_as_complex(self);
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
