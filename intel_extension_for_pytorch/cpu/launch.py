@@ -594,7 +594,7 @@ class DistributedTrainingLauncher(Launcher):
 
         os.environ["LAUNCH_CMD"] = "#"
         cmd = ['mpiexec.hydra']
-        mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node, mpi_pin_domain, opm_num_threads)
+        mpi_config = "-l -np {} -ppn {} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node)
         mpi_config += args.more_mpi_params
         if args.nnodes > 1:
             mpi_config += " -hostfile {}".format(args.hostfile)
@@ -607,8 +607,13 @@ class DistributedTrainingLauncher(Launcher):
             cmd.append("-m")
         cmd.append(args.program)
         cmd.extend(args.program_args)
-        logger.info(cmd)
-        process = subprocess.Popen(cmd, env=os.environ)
+        log_name = args.log_file_prefix + ".log"
+        log_name = os.path.join(args.log_path, log_name)
+        cmd_s = " ".join(cmd)
+        if args.log_path:
+            cmd_s = "{} 2>&1 | tee {}".format(cmd_s, log_name)
+        logger.info(cmd_s)
+        process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
         process.wait()
         os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
         os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
