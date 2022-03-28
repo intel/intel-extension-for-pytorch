@@ -27,6 +27,7 @@
 #include "intel_extension_for_pytorch/csrc/quantization/Observer.hpp"
 #include "intel_extension_for_pytorch/csrc/quantization/auto_opt_config.hpp"
 #include "intel_extension_for_pytorch/csrc/utils/env_settings.h"
+#include "intel_extension_for_pytorch/csrc/utils/fpmath_mode.h"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
 #include "intel_extension_for_pytorch/csrc/utils/verbose.hpp"
 
@@ -104,6 +105,12 @@ void InitIpexModuleBindings(py::module m) {
       "autocast_decrement_nesting",
       &torch_ipex::autocast::autocast_decrement_nesting);
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
+
+  m.def("set_fp32_low_precision_mode", [](IPEXLowPrecisionMode mode) {
+    torch_ipex::setFP32LowPrecisionModeCpu(mode);
+  });
+
+  m.def("get_fp32_low_precision_mode", &torch_ipex::getFP32LowPrecisionModeCpu);
 
   // llga path
   m.def(
@@ -313,6 +320,11 @@ void InitIpexModuleBindings(py::module m) {
             // the GIL or not further down in the stack
             return self.run_async(std::move(args), std::move(kwargs));
           });
+
+  py::enum_<IPEXLowPrecisionMode>(m, "IPEXLowPrecisionMode")
+      .value("BF32", IPEXLowPrecisionMode::BF32)
+      .value("FP32", IPEXLowPrecisionMode::FP32)
+      .export_values();
 
   m.def("is_runtime_ext_enabled", &torch_ipex::runtime::is_runtime_ext_enabled);
   m.def("init_runtime_ext", &torch_ipex::runtime::init_runtime_ext);

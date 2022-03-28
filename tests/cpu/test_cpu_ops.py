@@ -651,6 +651,22 @@ class CPUOPsTester(TestCase):
         mask = a.ge(0.5)
         s = mask.sum()
         self.assertTrue(s.dtype != torch.bool)
+    
+    def test_matmul(self):
+        dtypes = [torch.float32, torch.bfloat16]
+        for dtype in dtypes:
+            a = torch.randn(2, 3, dtype=dtype)
+            b = torch.randn(3, 4, dtype=dtype)
+            c = torch.zeros(2, 4, dtype=dtype)
+            torch.mm(a, b, out=c)
+            d = torch.mm(a, b)
+            self.assertTrue(torch.equal(c, d))
+            e = torch.randn(10, 3, 4, dtype=dtype)
+            f = torch.randn(10, 4, 5, dtype=dtype)
+            g = torch.zeros(10, 3, 5, dtype=dtype)
+            torch.bmm(e, f, out=g)
+            h = torch.bmm(e, f)
+            self.assertTrue(torch.equal(g, h))
 
 if __name__ == '__main__':
     test = unittest.main()

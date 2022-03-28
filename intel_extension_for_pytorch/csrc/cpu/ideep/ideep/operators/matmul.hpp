@@ -308,6 +308,8 @@ struct matmul_forward : public dnnl::matmul,
           utils::op_scale_mask(scale_size), std::vector<float>(1, dst_coeff));
     }
 
+    op_attr.set_fpmath_mode();
+
     // Use user mode scratchpad
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 

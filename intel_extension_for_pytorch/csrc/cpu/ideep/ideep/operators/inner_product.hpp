@@ -256,6 +256,7 @@ struct inner_product_forward
       }
     }
 
+    op_attr.set_fpmath_mode();
     tensor::desc dst_desc = dst.get_desc().to_type(dst_data_type);
 
     // Use user mode scratchpad

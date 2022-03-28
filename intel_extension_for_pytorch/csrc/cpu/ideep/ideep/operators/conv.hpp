@@ -660,7 +660,7 @@ struct convolution_forward
     }
 
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-
+    op_attr.set_fpmath_mode();
     auto dst_desc = attr.has_op_kind(kind::sum)
         ? dst.get_desc()
         : tensor::desc(dst_dims, dst_data_type);
