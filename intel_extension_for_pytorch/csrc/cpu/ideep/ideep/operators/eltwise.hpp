@@ -22,17 +22,24 @@ struct eltwise_forward : public dnnl::eltwise_forward {
     }
     auto src_desc = src_in.get_desc();
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
-        {aprop_kind, aalgorithm, src_desc, alpha, beta}, aengine);
+        {aprop_kind, aalgorithm, src_desc, alpha, beta}, op_attr, aengine);
 
     dst.reinit_if_possible(pd.dst_desc());
     if (src_in.has_scale()) {
       dst.set_scale(src_in.get_scale());
     }
+    tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(
         stream::default_stream(),
-        {{DNNL_ARG_SRC, src_in}, {DNNL_ARG_DST, dst}});
+        {{DNNL_ARG_SRC, src_in},
+         {DNNL_ARG_DST, dst},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
 
     // xpz: ???
     if (dst.has_scale() && aalgorithm == algorithm::eltwise_relu &&
@@ -58,8 +65,14 @@ struct eltwise_backward : public dnnl::eltwise_backward {
 
     auto forward_hints = eltwise_forward::primitive_desc(
         {prop_kind::forward, aalgorithm, src_desc, alpha, beta}, aengine);
+
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aalgorithm, forward_hints.dst_desc(), src_desc, alpha, beta},
+        op_attr,
         aengine,
         forward_hints);
 
@@ -77,11 +90,13 @@ struct eltwise_backward : public dnnl::eltwise_backward {
     auto src_dst_arg = use_dst ? DNNL_ARG_DST : DNNL_ARG_SRC;
     auto expected_src_dst_desc = use_dst ? pd.dst_desc() : pd.src_desc();
     auto expected_src_dst = src.reorder_if_differ_in(expected_src_dst_desc);
+    tensor scratchpad(pd.scratchpad_desc());
     super(pd).execute(
         stream::default_stream(),
         {{DNNL_ARG_DIFF_DST, expected_diff_dst},
          {src_dst_arg, expected_src_dst},
-         {DNNL_ARG_DIFF_SRC, diff_src}});
+         {DNNL_ARG_DIFF_SRC, diff_src},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 };
 } // namespace ideep

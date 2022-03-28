@@ -17,8 +17,15 @@ struct layer_normalization_forward : public dnnl::layer_normalization_forward {
       const engine& aengine = engine::cpu_engine()) {
     auto flags = batch_normalization_flag::use_scale_shift;
     auto src_desc = src.get_desc();
+
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
-        {prop_kind::forward_training, src_desc, epsilon, flags}, aengine);
+        {prop_kind::forward_training, src_desc, epsilon, flags},
+        op_attr,
+        aengine);
 
     tensor scale_shift{pd.weights_desc()};
     auto* scale_shift_buf = static_cast<char*>(scale_shift.get_data_handle());
@@ -31,6 +38,7 @@ struct layer_normalization_forward : public dnnl::layer_normalization_forward {
     mean.reinit_if_possible(pd.mean_desc());
     variance.reinit_if_possible(pd.variance_desc());
     dst.reinit_if_possible(pd.dst_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(
         stream::default_stream(),
@@ -38,7 +46,8 @@ struct layer_normalization_forward : public dnnl::layer_normalization_forward {
          {DNNL_ARG_SCALE_SHIFT, scale_shift},
          {DNNL_ARG_MEAN, mean},
          {DNNL_ARG_VARIANCE, variance},
-         {DNNL_ARG_DST, dst}});
+         {DNNL_ARG_DST, dst},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 };
 

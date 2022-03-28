@@ -139,8 +139,12 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
       std::move(rhs_shape), mkldnn_dtype, std::move(rhs_stride));
   ideep::tensor::desc res_desc(
       std::move(res_shape), mkldnn_dtype, std::move(res_stride));
+
+  auto op_attr = dnnl::primitive_attr();
+  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
   auto pd = ideep::matmul_forward::primitive_desc(
-      {lhs_desc, rhs_desc, res_desc}, ideep::engine::cpu_engine());
+      {lhs_desc, rhs_desc, res_desc}, op_attr, ideep::engine::cpu_engine());
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     T cat_buf[vector_nums * vector_size] __attribute__((aligned(64)));
@@ -152,13 +156,17 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
     ideep::tensor lhs({lhs_desc, cat_buf});
     ideep::tensor rhs({lhs_desc, cat_buf});
     ideep::tensor res({res_desc, mm_buf});
+    ideep::tensor scratchpad(pd.scratchpad_desc());
     auto p = dnnl::matmul(pd);
     for (int64_t i = start; i < end; i++) {
       move_ker(&out_data[i * out_data_line_len], input_ptr[0], vector_size);
       cat<T>(cat_buf, input_ptr, feature_sizes, input_nums);
       p.execute(
           ideep::stream::default_stream(),
-          {{DNNL_ARG_SRC, lhs}, {DNNL_ARG_WEIGHTS, rhs}, {DNNL_ARG_DST, res}});
+          {{DNNL_ARG_SRC, lhs},
+           {DNNL_ARG_WEIGHTS, rhs},
+           {DNNL_ARG_DST, res},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
       T* flat_buf = (T*)(&out_data[i * out_data_line_len] + vector_size);
       flat_triangle<T>(mm_buf, flat_buf, vector_nums);
       for (uint32_t n = 0; n < input_nums; n++) {
@@ -211,8 +219,12 @@ inline std::vector<at::Tensor> _interaction_backward(
       std::move(rhs_shape), mkldnn_dtype, std::move(rhs_stride));
   ideep::tensor::desc res_desc(
       std::move(res_shape), mkldnn_dtype, std::move(res_stride));
+
+  auto op_attr = dnnl::primitive_attr();
+  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
   auto pd = ideep::matmul_forward::primitive_desc(
-      {lhs_desc, rhs_desc, res_desc}, ideep::engine::cpu_engine());
+      {lhs_desc, rhs_desc, res_desc}, op_attr, ideep::engine::cpu_engine());
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     auto mm_elems = vector_nums * vector_nums;
@@ -231,6 +243,7 @@ inline std::vector<at::Tensor> _interaction_backward(
     ideep::tensor lhs({lhs_desc, sum_buf});
     ideep::tensor rhs({lhs_desc, cat_buf});
     ideep::tensor res({res_desc, grad_cat_buf});
+    ideep::tensor scratchpad(pd.scratchpad_desc());
     auto p = dnnl::matmul(pd);
     for (int64_t i = start; i < end; i++) {
       // Special BMM characteristics in Interaction layer
@@ -259,7 +272,10 @@ inline std::vector<at::Tensor> _interaction_backward(
       cat<T>(cat_buf, input_ptr, feature_sizes, input_nums);
       p.execute(
           ideep::stream::default_stream(),
-          {{DNNL_ARG_SRC, lhs}, {DNNL_ARG_WEIGHTS, rhs}, {DNNL_ARG_DST, res}});
+          {{DNNL_ARG_SRC, lhs},
+           {DNNL_ARG_WEIGHTS, rhs},
+           {DNNL_ARG_DST, res},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
       cat_backward<T, T>(
           grad_cat_buf,
           output_ptr,

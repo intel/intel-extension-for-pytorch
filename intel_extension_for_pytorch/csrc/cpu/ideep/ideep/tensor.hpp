@@ -867,14 +867,31 @@ class tensor : public memory {
   }
 
   inline void reorder_from(const tensor& src) {
-    dnnl::reorder(src, *this)
-        .execute(stream::default_stream(), const_cast<tensor&>(src), *this);
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    auto pd = dnnl::reorder::primitive_desc(src, *this, op_attr);
+
+    tensor scratchpad(pd.scratchpad_desc());
+    dnnl::reorder(pd).execute(
+        stream::default_stream(),
+        {{DNNL_ARG_FROM, const_cast<tensor&>(src)},
+         {DNNL_ARG_TO, *this},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 
   inline void reorder_to(tensor& dst, const attr_t& aattr = attr_t()) const {
-    auto pd = dnnl::reorder::primitive_desc(*this, dst, aattr);
+    // Use user mode scratchpad
+    attr_t op_attr = aattr;
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    auto pd = dnnl::reorder::primitive_desc(*this, dst, op_attr);
+
+    tensor scratchpad(pd.scratchpad_desc());
     dnnl::reorder(pd).execute(
-        stream::default_stream(), const_cast<tensor&>(*this), dst);
+        stream::default_stream(),
+        {{DNNL_ARG_FROM, const_cast<tensor&>(*this)},
+         {DNNL_ARG_TO, dst},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 
   /// Convert the tensor to public format, and f32 data type by default
@@ -971,8 +988,18 @@ class tensor : public memory {
       const dims& offsets,
       const attr_t& attr = attr_t()) {
     auto view = get_desc().submemory_desc(adims, offsets);
-    dnnl::reorder({src.get_engine(), src.get_desc(), get_engine(), view, attr})
-        .execute(stream::default_stream(), const_cast<tensor&>(src), *this);
+    // Use user mode scratchpad
+    attr_t op_attr = attr;
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
+    auto pd = dnnl::reorder::primitive_desc(
+        src.get_engine(), src.get_desc(), get_engine(), view, op_attr);
+    tensor scratchpad(pd.scratchpad_desc());
+    dnnl::reorder(pd).execute(
+        stream::default_stream(),
+        {{DNNL_ARG_FROM, const_cast<tensor&>(src)},
+         {DNNL_ARG_TO, *this},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 
   // reorder part of this tensor to dst
@@ -982,8 +1009,18 @@ class tensor : public memory {
       const dims& offsets,
       const attr_t& attr = attr_t()) const {
     auto view = get_desc().submemory_desc(adims, offsets);
-    dnnl::reorder({get_engine(), view, dst.get_engine(), dst.get_desc(), attr})
-        .execute(stream::default_stream(), const_cast<tensor&>(*this), dst);
+    // Use user mode scratchpad
+    attr_t op_attr = attr;
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
+    auto pd = dnnl::reorder::primitive_desc(
+        get_engine(), view, dst.get_engine(), dst.get_desc(), op_attr);
+    tensor scratchpad(pd.scratchpad_desc());
+    dnnl::reorder(pd).execute(
+        stream::default_stream(),
+        {{DNNL_ARG_FROM, const_cast<tensor&>(*this)},
+         {DNNL_ARG_TO, dst},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 
   // simple api for extract_submemory

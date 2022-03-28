@@ -16,13 +16,15 @@ struct concat : public dnnl::concat {
       return static_cast<memory::desc>(t.get_desc());
     });
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     // create a pd to query the optimimal format for src and dst
-    auto pd = primitive_desc(axis, input_descs, aengine);
+    auto pd = primitive_desc(axis, input_descs, aengine, op_attr);
     auto expected_desc = tensor::desc(pd.dst_desc());
 
     output.reinit_if_possible(expected_desc);
-
-    exec_args args{{DNNL_ARG_DST, output}};
 
     // DNNL currently supports two types of implementations in the concat:
     //   (Very fast) Works only when all memories are in the same format
@@ -45,8 +47,11 @@ struct concat : public dnnl::concat {
         return static_cast<memory::desc>(t.get_desc());
       });
       // recreate the pd on new inputs with same formats
-      pd = primitive_desc(axis, input_descs, aengine);
+      pd = primitive_desc(axis, input_descs, aengine, op_attr);
     }
+
+    tensor scratchpad(pd.scratchpad_desc());
+    exec_args args{{DNNL_ARG_DST, output}, {DNNL_ARG_SCRATCHPAD, scratchpad}};
 
     for (int i = 0; i < opt_inputs.size(); ++i) {
       args.insert({DNNL_ARG_MULTIPLE_SRC + i, opt_inputs[i]});

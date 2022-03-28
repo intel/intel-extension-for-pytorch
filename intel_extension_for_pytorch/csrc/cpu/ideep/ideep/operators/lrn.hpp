@@ -19,14 +19,22 @@ struct lrn_forward : public dnnl::lrn_forward {
     // workaround: use src.get_desc() once issue intel/mkl-dnn#588 is resolved
     auto src_desc = src._get_unblocked_desc_if_4c_blocked();
     // auto src_desc = src.get_desc();
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
     auto pd = primitive_desc(
         {aprop_kind, aalgorithm, src_desc, local_size, alpha, beta, k},
+        op_attr,
         aengine);
 
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
     dst.reinit_if_possible(pd.dst_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
-    exec_args args{{DNNL_ARG_SRC, expected_src}, {DNNL_ARG_DST, dst}};
+    exec_args args{
+        {DNNL_ARG_SRC, expected_src},
+        {DNNL_ARG_DST, dst},
+        {DNNL_ARG_SCRATCHPAD, scratchpad}};
 
     bool with_workspace = aprop_kind == prop_kind::forward_training;
     if (with_workspace) {
@@ -65,18 +73,25 @@ struct lrn_backward : public dnnl::lrn_backward {
          k},
         aengine);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aalgorithm, src_desc, diff_dst.get_desc(), local_size, alpha, beta, k},
+        op_attr,
         aengine,
         forward_hints);
 
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
     diff_src.reinit_if_possible(pd.diff_src_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
     exec_args args{
         {DNNL_ARG_SRC, src},
         {DNNL_ARG_DIFF_DST, expected_diff_dst},
-        {DNNL_ARG_DIFF_SRC, diff_src}};
+        {DNNL_ARG_DIFF_SRC, diff_src},
+        {DNNL_ARG_SCRATCHPAD, scratchpad}};
 
     if (dst.has_workspace()) {
       args.insert({DNNL_ARG_WORKSPACE, dst.get_workspace()});

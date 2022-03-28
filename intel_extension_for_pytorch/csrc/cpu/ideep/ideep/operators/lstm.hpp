@@ -35,6 +35,10 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
     auto dst_iter_desc = dst_iter.get_desc();
     auto dst_iter_c_desc = dst_iter_c.get_desc();
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aprop,
          direction,
@@ -47,12 +51,14 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
          dst_layer_desc,
          dst_iter_desc,
          dst_iter_c_desc},
+        op_attr,
         aengine);
 
     auto expected_weights_layer =
         weights_layer.reorder_if_differ_in(pd.weights_layer_desc());
     auto expected_weights_iter =
         weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(
         stream::default_stream(),
@@ -64,7 +70,8 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
          {DNNL_ARG_BIAS, bias},
          {DNNL_ARG_DST_LAYER, dst_layer},
          {DNNL_ARG_DST_ITER, dst_iter},
-         {DNNL_ARG_DST_ITER_C, dst_iter_c}});
+         {DNNL_ARG_DST_ITER_C, dst_iter_c},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 
   static std::tuple<tensor::desc, tensor::desc> expected_weights_desc(
@@ -143,6 +150,10 @@ struct lstm_forward_training : public dnnl::lstm_forward {
     auto weights_layer_desc = weights_layer.get_desc().to_format_any();
     auto weights_iter_desc = weights_iter.get_desc().to_format_any();
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {prop_kind::forward_training,
          direction,
@@ -155,6 +166,7 @@ struct lstm_forward_training : public dnnl::lstm_forward {
          dst_layer_desc,
          dst_iter_desc,
          dst_iter_c_desc},
+        op_attr,
         aengine);
     return pd;
   }
@@ -182,6 +194,7 @@ struct lstm_forward_training : public dnnl::lstm_forward {
     dst_layer.reinit_if_possible(pd.dst_layer_desc());
     dst_iter.reinit_if_possible(pd.dst_iter_desc());
     dst_iter_c.reinit_if_possible(pd.dst_iter_c_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(
         stream::default_stream(),
@@ -194,7 +207,8 @@ struct lstm_forward_training : public dnnl::lstm_forward {
          {DNNL_ARG_DST_LAYER, dst_layer},
          {DNNL_ARG_DST_ITER, dst_iter},
          {DNNL_ARG_DST_ITER_C, dst_iter_c},
-         {DNNL_ARG_WORKSPACE, workspace}});
+         {DNNL_ARG_WORKSPACE, workspace},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 
   static std::tuple<tensor::desc, tensor::desc> expected_weights_desc(
@@ -296,6 +310,10 @@ struct lstm_backward : public dnnl::lstm_backward {
     auto diff_dst_iter_desc = dst_iter_desc.to_type(data_type::f32);
     auto diff_dst_iter_c_desc = dst_iter_c_desc.to_type(data_type::f32);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aprop,
          direction,
@@ -317,6 +335,7 @@ struct lstm_backward : public dnnl::lstm_backward {
          diff_dst_layer_desc,
          diff_dst_iter_desc,
          diff_dst_iter_c_desc},
+        op_attr,
         aengine,
         forward_hints);
 
@@ -337,6 +356,7 @@ struct lstm_backward : public dnnl::lstm_backward {
     expected_diff_weights_iter.zero_init(pd.diff_weights_iter_desc());
     tensor expected_diff_bias;
     expected_diff_bias.zero_init(pd.diff_bias_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(
         stream::default_stream(),
@@ -358,7 +378,8 @@ struct lstm_backward : public dnnl::lstm_backward {
          {DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer},
          {DNNL_ARG_DIFF_DST_ITER, diff_dst_iter},
          {DNNL_ARG_DIFF_DST_ITER_C, diff_dst_iter_c},
-         {DNNL_ARG_WORKSPACE, workspace}});
+         {DNNL_ARG_WORKSPACE, workspace},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
 
     diff_weights_layer.feed_from(expected_diff_weights_layer);
     diff_weights_iter.feed_from(expected_diff_weights_iter);

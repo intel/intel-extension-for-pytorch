@@ -16,8 +16,13 @@ struct binary : public dnnl::binary {
     auto src1_desc = src1.get_desc();
     auto dst_desc = src0_desc.to_format_any();
 
-    auto pd =
-        primitive_desc({aalgorithm, src0_desc, src1_desc, dst_desc}, aengine);
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
+    auto pd = primitive_desc(
+        {aalgorithm, src0_desc, src1_desc, dst_desc}, op_attr, aengine);
+
+    tensor scratchpad(pd.scratchpad_desc());
 
     auto expected_src0 = src0.reorder_if_differ_in(pd.src0_desc());
     auto expected_src1 = src1.reorder_if_differ_in(pd.src1_desc());
@@ -27,7 +32,8 @@ struct binary : public dnnl::binary {
         stream::default_stream(),
         {{DNNL_ARG_SRC_0, expected_src0},
          {DNNL_ARG_SRC_1, expected_src1},
-         {DNNL_ARG_DST, dst}});
+         {DNNL_ARG_DST, dst},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 };
 

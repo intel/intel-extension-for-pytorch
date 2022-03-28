@@ -854,6 +854,9 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
             padding_l,
             padding_r);
 
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aalgorithm,
          diff_src_desc,
@@ -863,6 +866,7 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
          dilates_,
          padding_l,
          padding_r},
+        op_attr,
         aengine,
         forward_hints);
 
@@ -879,11 +883,14 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
       expected_diff_src.init(expected_diff_src_desc);
     }
 
+    tensor scratchpad(pd.scratchpad_desc());
+
     super(pd).execute(
         stream::default_stream(),
         {{DNNL_ARG_DIFF_DST, expected_diff_dst},
          {DNNL_ARG_WEIGHTS, expected_weights},
-         {DNNL_ARG_DIFF_SRC, expected_diff_src}});
+         {DNNL_ARG_DIFF_SRC, expected_diff_src},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
 
     // diff_src has been init in FW side, but has diff desc with
     // expected_diff_src.
@@ -1015,6 +1022,9 @@ struct convolution_backward_weights
             prop_kind::forward,
             aengine);
 
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = with_diff_bias ? primitive_desc(
                                    {aalgorithm,
                                     src_desc,
@@ -1025,6 +1035,7 @@ struct convolution_backward_weights
                                     dilates_,
                                     padding_l,
                                     padding_r},
+                                   op_attr,
                                    aengine,
                                    forward_hints)
                              : primitive_desc(
@@ -1036,6 +1047,7 @@ struct convolution_backward_weights
                                     dilates_,
                                     padding_l,
                                     padding_r},
+                                   op_attr,
                                    aengine,
                                    forward_hints);
 
@@ -1054,6 +1066,8 @@ struct convolution_backward_weights
       expected_diff_weights.init(expected_diff_weights_desc);
     }
 
+    tensor scratchpad(pd.scratchpad_desc());
+
     if (with_diff_bias) {
       diff_bias.reinit_if_possible(pd.diff_bias_desc());
       super(pd).execute(
@@ -1061,13 +1075,15 @@ struct convolution_backward_weights
           {{DNNL_ARG_DIFF_DST, expected_diff_dst},
            {DNNL_ARG_SRC, expected_src},
            {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights},
-           {DNNL_ARG_DIFF_BIAS, diff_bias}});
+           {DNNL_ARG_DIFF_BIAS, diff_bias},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     } else {
       super(pd).execute(
           stream::default_stream(),
           {{DNNL_ARG_DIFF_DST, expected_diff_dst},
            {DNNL_ARG_SRC, expected_src},
-           {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights}});
+           {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     }
     // diff_weights has been init in FW side, but has diff desc with
     // expected_diff_weights.

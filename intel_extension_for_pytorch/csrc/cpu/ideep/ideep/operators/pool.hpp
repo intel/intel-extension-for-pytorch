@@ -26,6 +26,10 @@ struct pooling_forward : public dnnl::pooling_forward {
 
     tensor::desc dst_desc(output_sizes, src.get_data_type(), tag::any);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aprop_kind,
          aalgorithm,
@@ -35,6 +39,7 @@ struct pooling_forward : public dnnl::pooling_forward {
          kernel,
          padding_l,
          padding_r},
+        op_attr,
         aengine);
 
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
@@ -43,7 +48,12 @@ struct pooling_forward : public dnnl::pooling_forward {
       dst.set_scale(src.get_scale());
     }
 
-    exec_args args{{DNNL_ARG_SRC, expected_src}, {DNNL_ARG_DST, dst}};
+    tensor scratchpad(pd.scratchpad_desc());
+
+    exec_args args{
+        {DNNL_ARG_SRC, expected_src},
+        {DNNL_ARG_DST, dst},
+        {DNNL_ARG_SCRATCHPAD, scratchpad}};
     if (with_workspace) {
       dst.init_workspace(pd.workspace_desc());
       args.insert({DNNL_ARG_WORKSPACE, dst.get_workspace()});
@@ -81,16 +91,25 @@ struct pooling_backward : public dnnl::pooling_backward {
          padding_r},
         aengine);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aalgorithm, src_desc, dst_desc, strides, kernel, padding_l, padding_r},
+        op_attr,
         aengine,
         forward_hints);
 
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
     diff_src.reinit_if_possible(pd.diff_src_desc());
 
+    tensor scratchpad(pd.scratchpad_desc());
+
     exec_args args{
-        {DNNL_ARG_DIFF_DST, expected_diff_dst}, {DNNL_ARG_DIFF_SRC, diff_src}};
+        {DNNL_ARG_DIFF_DST, expected_diff_dst},
+        {DNNL_ARG_DIFF_SRC, diff_src},
+        {DNNL_ARG_SCRATCHPAD, scratchpad}};
     if (dst.has_workspace()) {
       auto expected_workspace =
           dst.get_workspace().reorder_if_differ_in(pd.workspace_desc());

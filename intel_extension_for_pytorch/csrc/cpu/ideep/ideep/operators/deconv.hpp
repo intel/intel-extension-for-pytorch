@@ -239,11 +239,15 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
       algorithm aalgorithm,
       prop_kind aprop_kind,
       const engine& aengine) {
+    attr_t op_attr = attr;
     // make weights and dilates compatible with DNNL
     auto weights_ = weights.make_grouped_weights(groups, true);
     auto dilates_ = utils::get_compatible_dilates(dilates);
 
     tensor::desc dst_desc(dst_dims, src.get_data_type());
+
+    // Use user mode scratchpad
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
     auto pd = get_primitive_desc<with_bias>(
         src.get_desc(),
@@ -254,11 +258,12 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
         dilates_,
         padding_l,
         padding_r,
-        attr,
+        op_attr,
         aalgorithm,
         aprop_kind,
         aengine);
 
+    tensor scratchpad(pd.scratchpad_desc());
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
     auto expected_weights = weights_.reorder_if_differ_in(pd.weights_desc());
     dst.reinit_if_possible(pd.dst_desc());
@@ -270,13 +275,15 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
           {{DNNL_ARG_SRC, expected_src},
            {DNNL_ARG_WEIGHTS, expected_weights},
            {DNNL_ARG_BIAS, expected_bias},
-           {DNNL_ARG_DST, dst}});
+           {DNNL_ARG_DST, dst},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     } else {
       super(pd).execute(
           stream::default_stream(),
           {{DNNL_ARG_SRC, expected_src},
            {DNNL_ARG_WEIGHTS, expected_weights},
-           {DNNL_ARG_DST, dst}});
+           {DNNL_ARG_DST, dst},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     }
   }
 };
@@ -320,6 +327,10 @@ struct convolution_transpose_backward_data
             padding_l,
             padding_r);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
         {aalgorithm,
          diff_src_desc,
@@ -329,18 +340,21 @@ struct convolution_transpose_backward_data
          dilates_,
          padding_l,
          padding_r},
+        op_attr,
         aengine,
         forward_hints);
 
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
     auto expected_weights = weights_.reorder_if_differ_in(pd.weights_desc());
     diff_src.reinit_if_possible(pd.diff_src_desc());
+    tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(
         stream::default_stream(),
         {{DNNL_ARG_DIFF_DST, expected_diff_dst},
          {DNNL_ARG_WEIGHTS, expected_weights},
-         {DNNL_ARG_DIFF_SRC, diff_src}});
+         {DNNL_ARG_DIFF_SRC, diff_src},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 };
 
@@ -459,6 +473,10 @@ struct convolution_transpose_backward_weights
             prop_kind::forward,
             aengine);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = with_diff_bias ? primitive_desc(
                                    {aalgorithm,
                                     src_desc,
@@ -469,6 +487,7 @@ struct convolution_transpose_backward_weights
                                     dilates_,
                                     padding_l,
                                     padding_r},
+                                   op_attr,
                                    aengine,
                                    forward_hints)
                              : primitive_desc(
@@ -480,6 +499,7 @@ struct convolution_transpose_backward_weights
                                     dilates_,
                                     padding_l,
                                     padding_r},
+                                   op_attr,
                                    aengine,
                                    forward_hints);
 
@@ -491,6 +511,7 @@ struct convolution_transpose_backward_weights
 
     tensor expected_diff_weights;
     expected_diff_weights.init(expected_diff_weights_desc);
+    tensor scratchpad(pd.scratchpad_desc());
 
     if (with_diff_bias) {
       diff_bias.reinit_if_possible(pd.diff_bias_desc());
@@ -499,13 +520,15 @@ struct convolution_transpose_backward_weights
           {{DNNL_ARG_DIFF_DST, expected_diff_dst},
            {DNNL_ARG_SRC, expected_src},
            {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights},
-           {DNNL_ARG_DIFF_BIAS, diff_bias}});
+           {DNNL_ARG_DIFF_BIAS, diff_bias},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     } else {
       super(pd).execute(
           stream::default_stream(),
           {{DNNL_ARG_DIFF_DST, expected_diff_dst},
            {DNNL_ARG_SRC, expected_src},
-           {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights}});
+           {DNNL_ARG_DIFF_WEIGHTS, expected_diff_weights},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     }
 
     diff_weights.feed_from(expected_diff_weights);
