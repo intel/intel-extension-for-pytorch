@@ -208,13 +208,14 @@ IPEX_VERBOSE=1 IPEX_ONEDNN_LAYOUT=1 python ResNet50.py
 ## Feature Introduction
 
 ### AOT compilation:
-AOT compilation is supported on ATS-P and PVC with below config:
+AOT compilation is supported on ATS-P or PVC separately with below config:
 | Supported HW | Setting |
 | ------ | ------ |
 | ATS-P B0 |  USE_AOT_DEVLIST='xe_hp_sdv'  |
 | PVC XT A0 | USE_AOT_DEVLIST='12.4.0'  | 
 | PVC XT B3 | USE_AOT_DEVLIST='12.4.1' |
-
+<br>
+Multi-target AOT compilation to support both ATS-P and PVC is not allowed currently.
 
 ### oneDNN specific layouts:
 All models listed in above "Verified Models" can run with IPEX_ONEDNN_LAYOUT=1 on ATS-P L0 backend. However, not all supported models can gain performance improvement through this feature.
