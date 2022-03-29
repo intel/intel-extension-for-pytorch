@@ -536,7 +536,8 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     auto tensor1 = listConstruct->input(0)->type()->cast<TensorType>();
     auto check_type_channelsize = [](c10::TensorType tensor) {
       return (
-          tensor.scalarType().value() == at::kFloat &&
+          (tensor.scalarType().value() == at::kFloat ||
+           tensor.scalarType().value() == at::kBFloat16) &&
           tensor.sizes()[1].value() % 16 == 0 && is_channelslast(tensor));
     };
     // Check if the dimension of the first tensor is either 4 or 5.
@@ -561,6 +562,15 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
           return false;
         }
       }
+    }
+    // Check if the BN weights is fp32 datatype.
+    auto bn_node = node->input(0)->node();
+    if (bn_node->namedInput("weight")
+            ->type()
+            ->cast<TensorType>()
+            ->scalarType()
+            .value() != at::kFloat) {
+      return false;
     }
     return true;
   };
