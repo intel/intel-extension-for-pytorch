@@ -5,6 +5,7 @@
 #include <torch/csrc/autograd/custom_function.h>
 
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/jit/cpu/kernels/OpContext.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -22,6 +23,14 @@ at::Tensor linear_kernel(
     const at::Tensor& bias,
     const ideep::attr_t& attr);
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward_kernel(
+    const at::Tensor& input,
+    const at::Tensor& grad_output,
+    const at::Tensor& weight,
+    std::array<bool, 3> output_mask,
+    ideep::tensor packed_weight,
+    const c10::optional<at::Tensor>& bias);
+
 // IPEX customized linear OP with n-D packed weight
 // Additional out_features, in_features is used to query expected weigth desc
 // Since n-D packed weight have loss these info
@@ -32,19 +41,17 @@ class IPEXLinearOp : public torch::autograd::Function<IPEXLinearOp> {
   static at::Tensor _forward(
       const at::Tensor& input,
       const at::Tensor& weight,
-      const int64_t out_features,
-      const int64_t in_features,
       const c10::optional<at::Tensor>& bias,
-      const int64_t eltwise = 0);
+      const int64_t eltwise,
+      const c10::intrusive_ptr<LinearOpContext>& op_context);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
-      const int64_t out_features,
-      const int64_t in_features,
       const c10::optional<at::Tensor>& bias,
-      const int64_t eltwise = 0);
+      const int64_t eltwise,
+      const c10::intrusive_ptr<LinearOpContext>& op_context);
 
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
@@ -54,17 +61,15 @@ class IPEXLinearOp : public torch::autograd::Function<IPEXLinearOp> {
 at::Tensor ipex_linear(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const int64_t out_features,
-    const int64_t in_features,
-    const c10::optional<at::Tensor>& bias);
+    const c10::optional<at::Tensor>& bias,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
 
 at::Tensor ipex_linear_eltwise(
     const at::Tensor& input,
     const at::Tensor& weight,
-    const int64_t out_features,
-    const int64_t in_features,
     const c10::optional<at::Tensor>& bias,
-    const int64_t eltwise);
+    const int64_t eltwise,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
 
 } // namespace cpu
 } // namespace torch_ipex

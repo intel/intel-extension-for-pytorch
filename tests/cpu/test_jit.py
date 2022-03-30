@@ -830,7 +830,7 @@ class Tester(TestCase):
                 self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
 
-    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
+    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False]):
         modelName = model.__class__.__name__
         options = itertools.product(levels, use_channels_last)
         for level, use_channels_last in options:
@@ -893,11 +893,15 @@ class Tester(TestCase):
             trace_graph = trace_model.graph_for(x)
             freeze_graph = freeze_model.graph_for(x)
 
-        node = "ipex_prepack::convolution_prepack"
-#prepack op need in freeze model
-        self.assertTrue(all(n.kind() != node for n in freeze_graph.nodes()))
-#prepack op need note in none freeze model
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+        jit_node = "ipex_prepack::convolution_run"
+        pack_node = "ipex_prepack::convolution_prepack"
+        imperative_node = "torch_ipex::convolution_forward"
+# for freeze model, there will be only convolution_run in the graph
+        self.assertTrue(any(n.kind() == jit_node for n in freeze_graph.nodes()))
+        self.assertTrue(all(n.kind() != pack_node for n in freeze_graph.nodes()))
+# for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
+        self.assertTrue(any(n.kind() == imperative_node for n in trace_graph.nodes()))
+        
 
     def test_concat_linear(self):
         def check_op_count(graph_str, op_names=[]):
@@ -929,7 +933,7 @@ class Tester(TestCase):
         ori_res = model(test_val1)
         model_jit = torch.jit.trace(model,(test_val1))
         graph_ori = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
+        linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
         self.assertEqual(linear_count_ori, 4)
         model_jit = torch.jit.freeze(model_jit)
         jit_res = model_jit(test_val1)
@@ -944,7 +948,7 @@ class Tester(TestCase):
             ori_res = model(test_val1)
             model_jit = torch.jit.trace(model,(test_val1))
             graph_ori = str(model_jit.graph_for(test_val1))
-            linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
+            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
             self.assertEqual(linear_count_ori, 4)
             model_jit = torch.jit.freeze(model_jit)
             model_jit(test_val1)
