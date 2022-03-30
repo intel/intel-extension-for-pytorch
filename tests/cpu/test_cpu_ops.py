@@ -439,6 +439,76 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
+    def test_groupnorm_nhwc(self):
+        def helper(self, size, groups, memory_format, dtype, prec=1e-5):
+            channels = size[1]
+            input = torch.randn(size, dtype=dtype, requires_grad=True)
+            input = input.contiguous(memory_format=memory_format)
+            input.retain_grad()
+            grad = torch.randn(size, dtype=dtype)
+            grad = grad.contiguous(memory_format=memory_format)
+            gn = nn.GroupNorm(groups, channels).to(dtype)
+            gn.weight.data.uniform_()
+            gn.bias.data.uniform_()
+
+            ref_input = input.detach().clone().contiguous().requires_grad_(True)
+            ref_grad = grad.detach().clone().contiguous()
+            ref_gn = nn.GroupNorm(groups, channels).to(dtype)
+            ref_gn.load_state_dict(gn.state_dict())
+
+            out = gn(input)
+            out.backward(grad)
+            ref_out = ref_gn(ref_input)
+            ref_out.backward(ref_grad)
+
+            self.assertTrue(out.is_contiguous(memory_format=memory_format))
+            self.assertTrue(ref_out.is_contiguous())
+            self.assertTrue(out.dtype == dtype)
+            self.assertTrue(input.grad.dtype == dtype)
+            self.assertEqual(out, ref_out, prec = prec)
+            self.assertEqual(input.grad, ref_input.grad, prec = prec)
+            if (dtype == torch.float32):
+                self.assertEqual(gn.weight.grad, ref_gn.weight.grad, prec=1e-04)
+                self.assertEqual(gn.bias.grad, ref_gn.bias.grad, prec=1e-04)
+        helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.float32)
+        helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.float32)
+        helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.float32)
+        helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.bfloat16, prec=0.04)
+        helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.bfloat16, prec=0.04)
+        helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.bfloat16, prec=0.04)
+
+    def test_groupnorm_nwc(self):
+        size = (4, 20, 20)
+        channels = size[1]
+        groups = 4
+        x = torch.randn(size, requires_grad=True)
+        grad = torch.randn(size)
+        m = nn.GroupNorm(groups, channels)
+
+        # test nwc
+        x1 = x.clone().detach().requires_grad_().transpose(1, 2)
+        grad1 = grad.detach().clone()
+        y1 = m(x1)
+        y1.backward(grad1)
+
+        x2 = x1.clone().detach().contiguous()
+        grad2 = grad.detach().clone()
+        y2 = m(x2)
+        y2.backward(grad2)
+        self.assertEqual(y1, y2)
+        self.assertEqual(x1.grad, x2.grad)
+
+        # test bfloat16
+        x3 = x.clone().detach().requires_grad_().transpose(1, 2).bfloat16()
+        grad3 = grad.detach().clone()
+        m_bf16 = m.to(torch.bfloat16)
+        y3 = m_bf16(x3)
+        self.assertTrue(y3.dtype == torch.bfloat16)
+        self.assertEqual(y3, y2, prec=0.02)
+        self.assertEqual(x3.grad, x2.grad, prec=0.02)
+        self.assertEqual(m.weight.grad, m_bf16.weight.grad)
+        self.assertEqual(m.bias.grad, m_bf16.bias.grad)
+
     def test_avg_pool2d(self):
         m = nn.AvgPool2d((3, 2), stride=(2, 1))
         x = torch.randn(20, 16, 50, 32)
@@ -581,6 +651,22 @@ class CPUOPsTester(TestCase):
         mask = a.ge(0.5)
         s = mask.sum()
         self.assertTrue(s.dtype != torch.bool)
+    
+    def test_matmul(self):
+        dtypes = [torch.float32, torch.bfloat16]
+        for dtype in dtypes:
+            a = torch.randn(2, 3, dtype=dtype)
+            b = torch.randn(3, 4, dtype=dtype)
+            c = torch.zeros(2, 4, dtype=dtype)
+            torch.mm(a, b, out=c)
+            d = torch.mm(a, b)
+            self.assertTrue(torch.equal(c, d))
+            e = torch.randn(10, 3, 4, dtype=dtype)
+            f = torch.randn(10, 4, 5, dtype=dtype)
+            g = torch.zeros(10, 3, 5, dtype=dtype)
+            torch.bmm(e, f, out=g)
+            h = torch.bmm(e, f)
+            self.assertTrue(torch.equal(g, h))
 
 if __name__ == '__main__':
     test = unittest.main()

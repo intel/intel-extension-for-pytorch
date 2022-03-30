@@ -3,6 +3,7 @@
 #include <c10/core/Allocator.h>
 
 namespace torch_ipex {
+
 namespace cpu {
 
 /**
@@ -182,10 +183,6 @@ at::Tensor empty_aten_tensor_from_desc(
     at_sizes[i] = padded_dims[i] / blk_size_per_dim[i];
   }
   return at::empty(at_sizes, options);
-}
-
-int mkldnn_set_verbose(int level) {
-  return ideep::utils::set_verbose(level);
 }
 
 } // namespace cpu

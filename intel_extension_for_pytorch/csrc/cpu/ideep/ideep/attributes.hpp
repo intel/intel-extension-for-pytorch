@@ -11,7 +11,12 @@ using post_ops = dnnl::post_ops;
 /// Attribute class for extra information into computations
 struct attr_t : public dnnl::primitive_attr {
   attr_t() {}
-
+  void set_fpmath_mode() {
+    error::wrap_c_api(
+        dnnl_primitive_attr_set_fpmath_mode(
+            get(), ideep::utils::get_fpmath_mode()),
+        "could not set fpmath mode primitive attribute");
+  }
   attr_t(int mask, const scale_t& scales) {
     set_output_scales(mask, scales);
   }

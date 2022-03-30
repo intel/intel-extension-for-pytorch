@@ -83,7 +83,9 @@ def optimize(
     optimize_lstm=None,
     split_master_weight_for_bf16=None,
     fuse_update_step=None,
-    auto_kernel_selection=None):
+    auto_kernel_selection=None,
+    sample_input=None
+):
     r"""
     Apply optimizations at Python frontend to the given model (nn.Module), as
     well as the given optimizer (optional). If the optimizer is given,
@@ -153,6 +155,11 @@ def optimize(
             which have better performance. It doesn't support all optimizers.
             The default value is ``None``. Explicitly setting this knob
             overwrites the configuration set by ``level`` knob.
+        sample_input (tuple or torch.Tensor): Whether to feed sample input data to ipex.optimize. The shape of
+            input data will impact the block format of packed weight. If not feed a sample
+            input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
+            If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
+            best block format.            
         auto_kernel_selection (bool) [experimental]: Different backends may have
             different performances with different dtypes/shapes. Default value
             is False. Intel® Extension for PyTorch* will try to optimize the
@@ -235,6 +242,10 @@ def optimize(
         opt_properties.fuse_update_step = fuse_update_step
     if auto_kernel_selection is not None:
         opt_properties.auto_kernel_selection = auto_kernel_selection
+    if sample_input is not None:
+        if isinstance(sample_input, torch.Tensor):
+            sample_input = (sample_input,)
+        utils._weight_prepack.record_input_shape_for_prepack(model, sample_input)
 
     if inplace:
         optimized_model = model
@@ -246,7 +257,7 @@ def optimize(
         if opt_properties.conv_bn_folding:
             try:
                 optimized_model = optimization.fuse(optimized_model, inplace=inplace)
-            except:
+            except:  # noqa E722
                 warnings.warn("Conv BatchNorm folding failed during the optimize process.")
         if opt_properties.replace_dropout_with_identity:
             utils._model_convert.replace_dropout_with_identity(optimized_model)
@@ -277,7 +288,7 @@ def optimize(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
     if opt_properties.weights_prepack:
         optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
-          optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
+            optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
     # TODO: model list, optimizer list.
     if optimizer is None:
         return optimized_model

@@ -9,12 +9,12 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
 
     table0 = nn.EmbeddingBag(100, 16, mode='mean').double()
     table1 = nn.EmbeddingBag(50, 32, mode='sum')
-    table2 = nn.EmbeddingBag(18000000, 128, mode='sum', include_last_offset=True, _weight=torch.empty(18000000, 128, dtype=torch.bfloat16))
+    table2 = nn.EmbeddingBag(18000000, 8, mode='sum', include_last_offset=True, _weight=torch.empty(18000000, 8, dtype=torch.bfloat16))
     merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table2])
     merged2 = MergedEmbeddingBagWithSGD([
         (100, 16, 'mean', table0.weight.dtype, table0.weight.detach()),
         (50, 32, 'sum', table1.weight.dtype, table1.weight.detach()),
-        (18000000, 128, 'sum', table2.weight.dtype, table2.weight.detach()),
+        (18000000, 8, 'sum', table2.weight.dtype, table2.weight.detach()),
     ])
 
     input = [

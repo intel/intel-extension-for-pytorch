@@ -17,7 +17,6 @@ c10::intrusive_ptr<ConvolutionOpContext> IpexConvolutionOpContext::
         int64_t groups,
         int64_t output_channel,
         bool weight_is_channels_last,
-        bool weight_is_packed,
         std::vector<int64_t>&& input_size,
         const ideep::attr_t& attr) {
   auto op_context = torch_ipex::cpu::detail::convolution::create(
@@ -30,7 +29,6 @@ c10::intrusive_ptr<ConvolutionOpContext> IpexConvolutionOpContext::
       groups,
       output_channel,
       weight_is_channels_last,
-      weight_is_packed,
       input_size,
       attr);
   return c10::make_intrusive<IpexConvolutionOpContext>(
@@ -40,12 +38,27 @@ c10::intrusive_ptr<ConvolutionOpContext> IpexConvolutionOpContext::
       std::move(padding),
       std::move(dilation),
       std::move(kernel_size),
-      std::move(input_size),
       groups,
       output_channel,
       weight_is_channels_last,
-      weight_is_packed,
+      std::move(input_size),
       std::move(op_context));
+}
+
+std::vector<int64_t> ConvolutionOpContext::get_stride() {
+  return stride_;
+}
+
+std::vector<int64_t> ConvolutionOpContext::get_padding() {
+  return padding_;
+}
+
+std::vector<int64_t> ConvolutionOpContext::get_dilation() {
+  return dilation_;
+}
+
+int64_t ConvolutionOpContext::get_groups() {
+  return groups_;
 }
 
 at::Tensor IpexConvolutionOpContext::run(
@@ -62,8 +75,42 @@ at::Tensor& IpexConvolutionOpContext::run(
       op_context_, input, accumu, attr);
 }
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexConvolutionOpContext::
+    run_backward(
+        const at::Tensor& input,
+        const at::Tensor& grad_output,
+        std::array<bool, 3> output_mask) {
+  return torch_ipex::cpu::detail::convolution::run_backward(
+      op_context_, input, grad_output, output_mask);
+}
+
+at::Tensor IpexConvolutionOpContext::get_at_packed_weight() {
+  return torch_ipex::cpu::detail::convolution::get_at_packed_weight(
+      op_context_);
+}
+
+at::Tensor IpexConvolutionOpContext::pack(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::convolution::pack(op_context_, tensor);
+}
+
+at::Tensor IpexConvolutionOpContext::to_public(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::convolution::unpack(op_context_, tensor);
+}
+
 detail::ContextConvolution& IpexConvolutionOpContext::get_conetxt() {
   return op_context_;
+}
+
+int64_t LinearOpContext::get_out_features() {
+  return out_features_;
+}
+
+int64_t LinearOpContext::get_in_features() {
+  return in_features_;
+}
+
+c10::optional<int64_t> LinearOpContext::get_batchsize() {
+  return batch_size_;
 }
 
 c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
@@ -71,17 +118,15 @@ c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
     c10::optional<at::Tensor>&& bias,
     int64_t out_features,
     int64_t in_features,
-    int64_t batch_size,
-    bool weight_is_packed) {
+    c10::optional<int64_t> batch_size) {
   auto op_context = torch_ipex::cpu::detail::linear::create(
-      weight, bias, out_features, in_features, batch_size, weight_is_packed);
+      weight, bias, out_features, in_features, batch_size);
   return c10::make_intrusive<IpexLinearOpContext>(
       std::move(weight),
       std::move(bias),
       out_features,
       in_features,
       batch_size,
-      weight_is_packed,
       std::move(op_context));
 }
 
@@ -98,6 +143,43 @@ at::Tensor& IpexLinearOpContext::run(
   return torch_ipex::cpu::detail::linear::run(op_context_, input, accumu, attr);
 }
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexLinearOpContext::
+    run_backward(
+        const at::Tensor& input,
+        const at::Tensor& grad_output,
+        std::array<bool, 3> output_mask) {
+  return torch_ipex::cpu::detail::linear::run_backward(
+      op_context_, input, grad_output, output_mask);
+}
+
+at::Tensor IpexLinearOpContext::get_at_packed_weight() {
+  return torch_ipex::cpu::detail::linear::get_at_packed_weight(op_context_);
+}
+
+void IpexLinearOpContext::set_bias(at::Tensor& bias) {
+  return torch_ipex::cpu::detail::linear::set_bias(op_context_, bias);
+}
+
+void IpexLinearOpContext::set_weight(at::Tensor& weight) {
+  return torch_ipex::cpu::detail::linear::set_weight(op_context_, weight);
+}
+
+at::Tensor IpexLinearOpContext::pack(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::linear::pack(op_context_, tensor);
+}
+
+at::Tensor IpexLinearOpContext::to_public(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::linear::unpack(op_context_, tensor);
+}
+
+void IpexLinearOpContext::may_repack(int64_t batch_size) {
+  if (!batch_size_.has_value() || batch_size_.has_value() != batch_size) {
+    batch_size_ = c10::make_optional(batch_size);
+    torch_ipex::cpu::detail::linear::repack_for(op_context_, batch_size);
+  }
+  return;
+}
+
 c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
     create_context(
         at::Tensor&& weight,
@@ -110,7 +192,6 @@ c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
         int64_t groups,
         int64_t output_channel,
         bool weight_is_channels_last,
-        bool weight_is_packed,
         std::vector<int64_t>&& input_size) {
   auto op_context = torch_ipex::cpu::detail::conv_transpose2d::create(
       weight,
@@ -123,7 +204,6 @@ c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
       groups,
       output_channel,
       weight_is_channels_last,
-      weight_is_packed,
       input_size);
   return c10::make_intrusive<IpexConvTransposeOpContext>(
       std::move(weight),
@@ -137,7 +217,6 @@ c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
       groups,
       output_channel,
       weight_is_channels_last,
-      weight_is_packed,
       std::move(op_context));
 }
 
@@ -146,6 +225,37 @@ at::Tensor IpexConvTransposeOpContext::run(
     const ideep::attr_t& attr) {
   return torch_ipex::cpu::detail::conv_transpose2d::run(
       op_context_, input, attr);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexConvTransposeOpContext::
+    run_backward(
+        const at::Tensor& input,
+        const at::Tensor& grad_output,
+        std::array<bool, 3> output_mask) {
+  return torch_ipex::cpu::detail::conv_transpose2d::run_backward(
+      op_context_, input, grad_output, output_mask);
+}
+
+at::Tensor IpexConvTransposeOpContext::get_at_packed_weight() {
+  return torch_ipex::cpu::detail::conv_transpose2d::get_at_packed_weight(
+      op_context_);
+}
+
+at::Tensor IpexConvTransposeOpContext::pack(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::conv_transpose2d::pack(op_context_, tensor);
+}
+
+at::Tensor IpexConvTransposeOpContext::to_public(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::conv_transpose2d::unpack(op_context_, tensor);
+}
+
+void IpexConvTransposeOpContext::may_repack(std::vector<int64_t> input_size) {
+  if (input_size_.empty() || input_size_ != input_size) {
+    input_size_ = input_size;
+    torch_ipex::cpu::detail::conv_transpose2d::repack_for(
+        op_context_, input_size);
+  }
+  return;
 }
 
 } // namespace cpu

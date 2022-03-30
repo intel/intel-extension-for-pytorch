@@ -4,6 +4,7 @@
 #include <torch/csrc/autograd/custom_function.h>
 
 #include "csrc/cpu/ideep/ideep.hpp"
+#include "csrc/jit/cpu/kernels/OpContext.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -29,6 +30,20 @@ at::Tensor convolution_kernel(
     int64_t groups,
     const ideep::attr_t& attr);
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
+    const at::Tensor& input,
+    const at::Tensor& grad_output,
+    const at::Tensor& at_weight,
+    const ideep::tensor& mkldnn_weight,
+    const ideep::tensor& mkldnn_bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    at::IntArrayRef kernel_size,
+    int64_t groups,
+    const bool weight_channels_last,
+    std::array<bool, 3> output_mask);
+
 std::vector<int64_t> calc_conv_output_size(
     at::IntArrayRef input_size,
     at::IntArrayRef kernel_size,
@@ -45,28 +60,14 @@ class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      at::IntArrayRef stride,
-      at::IntArrayRef padding,
-      at::IntArrayRef dilation,
-      at::IntArrayRef kernel_size,
-      int64_t groups,
-      int64_t output_channel,
-      bool weight_channels_last,
-      bool weight_prepacked);
+      const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      at::IntArrayRef stride,
-      at::IntArrayRef padding,
-      at::IntArrayRef dilation,
-      at::IntArrayRef kernel_size,
-      int64_t groups,
-      int64_t output_channel,
-      bool weight_channels_last,
-      bool weight_prepacked);
+      const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,

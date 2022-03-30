@@ -18,6 +18,23 @@ class ConvBatchNorm(torch.nn.Module):
     def forward(self, x):
         return self.bn(self.conv(x))
 
+class TwoLayerMLP(torch.nn.Module):
+    def __init__(self):
+        super(TwoLayerMLP, self).__init__()
+        self.l1 = torch.nn.Linear(2, 2)
+        self.l2 = torch.nn.Linear(3, 3)
+
+    def forward(self, x1, x2):
+        return self.l1(x1).sum() + self.l2(x2).sum()
+
+class OneLayerMLP(torch.nn.Module):
+    def __init__(self):
+        super(OneLayerMLP, self).__init__()
+        self.l1 = torch.nn.Linear(2, 2)
+
+    def forward(self, x1):
+        return self.l1(x1)
+
 class TestOptimizeCases(TestCase):
     def test_optimize_parameters_behavior(self):
         model = ConvBatchNorm().eval()
@@ -195,6 +212,25 @@ class TestOptimizeCases(TestCase):
             else:
               self.assertTrue(isinstance(opt_M.linear, _IPEXLinear))
               self.assertTrue(isinstance(opt_M.conv, _IPEXConv2d))
+
+    def test_record_shape(self):
+        options = itertools.product([OneLayerMLP, TwoLayerMLP], [True, False])
+        for module, inference_only in options:
+            M = module()
+            input = torch.rand(2, 2)
+            if isinstance(M, TwoLayerMLP):
+                input = (input, torch.rand(3, 3))
+            if inference_only:
+                M.eval()
+                opt_M = ipex.optimize(M, sample_input=input, auto_kernel_selection=True)
+            else:
+                optimizer = torch.optim.SGD(M.parameters(), lr=0.01)
+                opt_M, _ = ipex.optimize(M, optimizer=optimizer, sample_input=input, auto_kernel_selection=True)
+            self.assertEqual(M.l1.input_shape, (2, 2))
+            self.assertEqual(opt_M.l1.batch_size_collapsed, 2)
+            if isinstance(M, TwoLayerMLP):
+                self.assertEqual(M.l2.input_shape, (3, 3))
+                self.assertEqual(opt_M.l2.batch_size_collapsed, 3)
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -21,7 +21,6 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     int64_t groups,
     int64_t output_channel,
     bool weight_is_channels_last,
-    bool weight_is_packed,
     std::vector<int64_t>&& input_size);
 
 at::Tensor convolution_run(
@@ -93,8 +92,7 @@ ContextConvolution create(
     const int64_t groups,
     const int64_t output_channel,
     const bool weight_is_channels_last,
-    const bool weight_is_packed,
-    const at::IntArrayRef input_size,
+    const std::vector<int64_t>& input_size,
     const ideep::attr_t& attr);
 
 at::Tensor run(
@@ -107,6 +105,24 @@ at::Tensor& run(
     const at::Tensor& input,
     at::Tensor& accumu,
     const ideep::attr_t& attr);
+
+// Runing backward for conv by given grad_output, input and grad_masks.
+// Will using the mkldnn_weight/bias stored in the context
+std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
+    ContextConvolution& context,
+    const at::Tensor& input,
+    const at::Tensor& grad_output,
+    std::array<bool, 3> output_mask);
+
+// Return the n-D ATen weight which sharing same memory with the mkldnn packed
+// weight This n-D ATen weight will be used for autograd and optimizer update
+at::Tensor get_at_packed_weight(ContextConvolution& context);
+
+// Pack given tensor to same format with mkldnn packed weight
+at::Tensor pack(ContextConvolution& context, const at::Tensor& tensor);
+
+// Unpack given tensor to same format with original weight format
+at::Tensor unpack(ContextConvolution& context, const at::Tensor& tensor);
 
 } // namespace convolution
 } // namespace detail

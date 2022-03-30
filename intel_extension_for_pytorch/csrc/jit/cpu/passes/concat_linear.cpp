@@ -9,12 +9,15 @@
 #include <vector>
 
 #include "csrc/aten/cpu/WeightPack.h"
+#include "csrc/jit/cpu/kernels/LinearPacked.h"
+#include "csrc/jit/cpu/kernels/OpContext.h"
 
 namespace torch {
 namespace jit {
 namespace {
 
 using Tensor = at::Tensor;
+using namespace torch_ipex::cpu;
 
 class ConcatLinearLayers {
  public:
@@ -102,12 +105,12 @@ class ConcatLinearLayers {
         // always unpack to contiguous tensor with no transposed, and the origin
         // weight dtype is same as packed weight.
         weight_list = c10::fmap(compatible_layers, [](Node* n) {
-          return torch_ipex::cpu::linear_weight_unpack(
-              constant_as<Tensor>(n->namedInput("weight")).value(),
-              constant_as<int64_t>(n->inputs().at(2)).value(),
-              constant_as<int64_t>(n->inputs().at(3)).value(),
-              false,
-              c10::nullopt);
+          auto linear_op_ctx = toIValue(n->inputs().at(3))
+                                   .value()
+                                   .toCustomClass<LinearOpContext>();
+          auto weight_tensor = linear_op_ctx->to_public(
+              constant_as<Tensor>(n->namedInput("weight")).value());
+          return weight_tensor.contiguous();
         });
       }
 
@@ -126,17 +129,31 @@ class ConcatLinearLayers {
             tensor_input, cat_weight_value, cat_bias_value};
         linear_node = graph_->create(aten::linear, linear_in);
       } else {
-        auto packed_cat_weight =
-            torch_ipex::cpu::linear_weight_pack(cat_weight, c10::nullopt);
+        auto linear_op_ctx = toIValue(base_node->inputs().at(3))
+                                 .value()
+                                 .toCustomClass<LinearOpContext>();
+        auto batch_size = linear_op_ctx->get_batchsize();
+        auto cat_out_feature = cat_weight.size(0);
+        auto cat_in_feature = cat_weight.size(1);
+        c10::intrusive_ptr<LinearOpContext> cat_linear_ctx =
+            torch_ipex::cpu::detail::linear::createLinearPrePackOpContext(
+                std::move(cat_weight),
+                std::move(cat_bias),
+                cat_out_feature,
+                cat_in_feature,
+                batch_size);
+        Node* n = graph_->create(prim::Constant);
+        n->ival_(attr::value, IValue(cat_linear_ctx));
+        n->output()->setType(getCustomClass(
+            "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
+        Value* cat_linear_ctx_value = graph_->insertNode(n)->output();
+        auto packed_cat_weight = linear_op_ctx->get_at_packed_weight();
         Value* cat_weight_value = graph_->insertConstant(packed_cat_weight);
-        Value* out_features_value = graph_->insertConstant(cat_weight.size(0));
-        Value* in_features_value = graph_->insertConstant(cat_weight.size(1));
         std::vector<Value*> linear_in = {
             tensor_input,
             cat_weight_value,
-            out_features_value,
-            in_features_value,
-            cat_bias_value};
+            cat_bias_value,
+            cat_linear_ctx_value};
         linear_node = graph_->create(
             Symbol::fromQualString("torch_ipex::ipex_linear"), linear_in);
       }
@@ -176,8 +193,11 @@ class ConcatLinearLayers {
             constant_as<Tensor>(orig_node->namedInput("weight")).value();
         slice_end = slice_start + weight_tensor.size(0);
       } else {
-        slice_end = slice_start +
-            constant_as<int64_t>(orig_node->inputs().at(2)).value();
+        auto linear_op_ctx = toIValue(orig_node->inputs().at(3))
+                                 .value()
+                                 .toCustomClass<LinearOpContext>();
+        int64_t out_features = linear_op_ctx->get_out_features();
+        slice_end = slice_start + out_features;
       }
 
       Value* slice_end_val = graph_->insertConstant(slice_end);
@@ -258,8 +278,14 @@ class ConcatLinearLayers {
         } else {
           // for torch_ipex::ipex_linear, we only need to check the in_features
           // are same size between two nodes and bias size.
-          if (constant_as<int64_t>(base_node->inputs().at(3)).value() !=
-                  constant_as<int64_t>(node->inputs().at(3)).value() ||
+          auto base_linear_op_ctx = toIValue(base_node->inputs().at(3))
+                                        .value()
+                                        .toCustomClass<LinearOpContext>();
+          auto linear_op_ctx = toIValue(node->inputs().at(3))
+                                   .value()
+                                   .toCustomClass<LinearOpContext>();
+          if (base_linear_op_ctx->get_in_features() !=
+                  linear_op_ctx->get_in_features() ||
               !isNonZeroDimEqual(base_bias, bias)) {
             continue;
           }

@@ -9,39 +9,53 @@ namespace cpu {
 namespace detail {
 
 struct ContextConvTranspose final {
+  ideep::tensor::desc original_desc_;
   ideep::tensor weight_packed_;
+  // at_weight will share same memory with weight_packed_
+  // at_weight is used for autograd and optimizer update
+  at::Tensor at_weight_;
   c10::optional<at::Tensor> bias_;
-  std::array<int64_t, 4> weight_size_;
-  std::array<int64_t, 2> padding_;
-  std::array<int64_t, 2> output_padding_;
-  std::array<int64_t, 2> stride_;
-  std::array<int64_t, 2> dilation_;
-  std::array<int64_t, 4> input_size_;
+  // paddings_, strided_, dilation_, output_padding_ here are expanded and
+  // might different with those stored on ConvTransposeOpContext.
+  // For example, aten deconv2d can accept padding = 2, but onednn deconv2d need
+  // expand padding to {2, 2}
+  std::vector<int64_t> padding_;
+  std::vector<int64_t> output_padding_;
+  std::vector<int64_t> stride_;
+  std::vector<int64_t> dilation_;
+  std::vector<int64_t> input_size_;
+  std::vector<int64_t> kernel_size_;
   int64_t groups_;
-  std::array<int64_t, 4> origin_weight_dims_;
+  // The originin weight != weight_packed_.get_dims() since there is a tranpose
+  // for weight, We directly store origin_weight_dims_ here to avoid compute it.
+  std::vector<int64_t> origin_weight_dims_;
   bool weight_is_channels_last_;
 
   ContextConvTranspose() = delete;
 
   ContextConvTranspose(
+      ideep::tensor::desc&& original_desc,
       ideep::tensor&& weight_packed,
+      at::Tensor&& at_weight,
       c10::optional<at::Tensor>&& bias,
-      std::array<int64_t, 4> weight_size,
-      std::array<int64_t, 2> padding,
-      std::array<int64_t, 2> output_padding,
-      std::array<int64_t, 2> stride,
-      std::array<int64_t, 2> dilation,
+      std::vector<int64_t> padding,
+      std::vector<int64_t> output_padding,
+      std::vector<int64_t> stride,
+      std::vector<int64_t> dilation,
+      std::vector<int64_t> kernel_size,
       int64_t groups,
-      std::array<int64_t, 4> input_size,
-      std::array<int64_t, 4> origin_weight_dims,
+      std::vector<int64_t> input_size,
+      std::vector<int64_t> origin_weight_dims,
       bool weight_is_channels_last)
-      : weight_packed_(std::move(weight_packed)),
+      : original_desc_(std::move(original_desc)),
+        weight_packed_(std::move(weight_packed)),
+        at_weight_(std::move(at_weight)),
         bias_(std::move(bias)),
-        weight_size_(weight_size),
         padding_(padding),
         output_padding_(output_padding),
         stride_(stride),
         dilation_(dilation),
+        kernel_size_(kernel_size),
         input_size_(input_size),
         groups_(groups),
         origin_weight_dims_(origin_weight_dims),

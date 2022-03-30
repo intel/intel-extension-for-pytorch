@@ -9,6 +9,16 @@
 #include <limits>
 #include "utils.h"
 
+// use float as accumulation type for BFloat16
+template <typename scalar_t>
+struct AccType {
+  using type = scalar_t;
+};
+template <>
+struct AccType<BFloat16> {
+  using type = float;
+};
+
 namespace torch_ipex {
 namespace cpu {
 namespace kernel {
@@ -17,33 +27,75 @@ namespace vec512 {
 
 using Tensor = at::Tensor;
 
-template <typename T>
-void _concat_bn_relu_kernel_channels_last(
+template <typename T, typename ACC_T>
+static void _concat_bn_relu_kernel_channels_last(
     const std::vector<const T*>& in_ptr,
     const std::vector<int64_t>& in_ch,
     T* out_ptr,
-    const T* scale_ptr,
-    const T* beta_ptr,
+    const ACC_T* scale_ptr,
+    const ACC_T* beta_ptr,
     int64_t total_size_except_channels,
     int64_t ci,
     int64_t co) {
   int64_t i = 0, j = 0, k = 0;
   auto zero = _mm512_set1_ps(0.0);
-#pragma omp parallel for collapse(2)
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+#pragma omp parallel for simd schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+#pragma omp parallel for schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
   for (i = 0; i < total_size_except_channels; ++i) {
     for (j = 0; j < in_ptr.size(); ++j) {
+      auto concat_in_ptr = in_ptr[j] + i * in_ch[j + 1] - (i + 1) * in_ch[j];
       for (k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
-        _mm512_store_ps(
-            out_ptr + i * co + k,
-            _mm512_max_ps(
-                zero,
-                _mm512_add_ps(
-                    _mm512_load_ps(beta_ptr + k),
-                    _mm512_mul_ps(
-                        _mm512_load_ps(scale_ptr + k),
-                        _mm512_load_ps(
-                            in_ptr[j] + i * (in_ch[j + 1] - in_ch[j]) + k -
-                            in_ch[j])))));
+        auto in = _mm512_loadu_ps(concat_in_ptr + k);
+        auto beta = _mm512_loadu_ps(beta_ptr + k);
+        auto scale = _mm512_loadu_ps(scale_ptr + k);
+        auto bn_out = _mm512_add_ps(beta, _mm512_mul_ps(scale, in));
+        auto out = _mm512_max_ps(zero, bn_out);
+        _mm512_storeu_ps(out_ptr + i * co + k, out);
+      }
+    }
+  }
+}
+
+template <>
+void _concat_bn_relu_kernel_channels_last<at::BFloat16, float>(
+    const std::vector<const at::BFloat16*>& in_ptr,
+    const std::vector<int64_t>& in_ch,
+    at::BFloat16* out_ptr,
+    const float* scale_ptr,
+    const float* beta_ptr,
+    int64_t total_size_except_channels,
+    int64_t ci,
+    int64_t co) {
+  int64_t i = 0, j = 0, k = 0;
+  auto zero = _mm512_set1_ps(0.0);
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+#pragma omp parallel for simd schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+#pragma omp parallel for schedule( \
+    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (i = 0; i < total_size_except_channels; ++i) {
+    for (j = 0; j < in_ptr.size(); ++j) {
+      auto concat_in_ptr = in_ptr[j] + i * in_ch[j + 1] - (i + 1) * in_ch[j];
+      for (k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
+        auto in =
+            cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(concat_in_ptr + k)));
+        auto beta = _mm512_loadu_ps(beta_ptr + k);
+        auto scale = _mm512_loadu_ps(scale_ptr + k);
+        auto bn_out = _mm512_add_ps(beta, _mm512_mul_ps(scale, in));
+        auto out = _mm512_max_ps(zero, bn_out);
+        _mm256_storeu_si256(
+            (__m256i*)(out_ptr + i * co + k), cvt_fp32_to_bf16(out));
       }
     }
   }
@@ -57,6 +109,7 @@ void ConcatBnReluKernelImpl_ChannelsLast(
     const Tensor& scale,
     const Tensor& beta,
     Tensor& output) {
+  using ACC_T = typename AccType<T>::type;
   int64_t list_length = a.size();
   int64_t total_size_except_channels = 1;
   std::vector<const T*> input_ptr(list_length);
@@ -74,11 +127,11 @@ void ConcatBnReluKernelImpl_ChannelsLast(
       total_size_except_channels *= a[0].size(i);
   }
 
-  const T* scale_data = scale.data_ptr<T>();
-  const T* beta_data = beta.data_ptr<T>();
+  const ACC_T* scale_data = scale.data_ptr<ACC_T>();
+  const ACC_T* beta_data = beta.data_ptr<ACC_T>();
   T* output_data = output.data_ptr<T>();
 
-  _concat_bn_relu_kernel_channels_last<T>(
+  _concat_bn_relu_kernel_channels_last<T, ACC_T>(
       input_ptr,
       input_channels,
       output_data,

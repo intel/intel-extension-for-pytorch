@@ -308,6 +308,11 @@ struct matmul_forward : public dnnl::matmul,
           utils::op_scale_mask(scale_size), std::vector<float>(1, dst_coeff));
     }
 
+    op_attr.set_fpmath_mode();
+
+    // Use user mode scratchpad
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     dst_data_type = dst_type == data_type::undef ? dst_data_type : dst_type;
     tensor::desc dst_desc(dst_dims, dst_data_type, tag::any);
     auto key = utils::create_key(
@@ -356,6 +361,8 @@ struct matmul_forward : public dnnl::matmul,
       auto expected_bias = bias.reorder_if_differ_in(pd.bias_desc(), bias_attr);
       primitive_args.insert({DNNL_ARG_BIAS, expected_bias});
     }
+    tensor scratchpad(pd.scratchpad_desc());
+    primitive_args.insert({DNNL_ARG_SCRATCHPAD, scratchpad});
     super(pd).execute(stream::default_stream(), primitive_args);
   }
 };

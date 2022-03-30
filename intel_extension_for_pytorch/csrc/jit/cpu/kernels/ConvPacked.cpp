@@ -23,7 +23,6 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     int64_t groups,
     int64_t output_channel,
     bool weight_is_channels_last,
-    bool weight_is_packed,
     std::vector<int64_t>&& input_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvolutionPrePackOpContext",
@@ -38,7 +37,6 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
       groups,
       output_channel,
       weight_is_channels_last,
-      weight_is_packed,
       std::move(input_size),
       ideep::attr_t());
 }
@@ -297,7 +295,7 @@ at::Tensor convolution_bottleneck_run(
 
 ContextConvolution create(
     const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias_opt,
+    const c10::optional<at::Tensor>& bias,
     const at::IntArrayRef stride,
     const at::IntArrayRef padding,
     const at::IntArrayRef dilation,
@@ -305,9 +303,11 @@ ContextConvolution create(
     const int64_t groups,
     const int64_t output_channel,
     const bool weight_is_channels_last,
-    const bool weight_is_packed,
-    const at::IntArrayRef input_size,
+    const std::vector<int64_t>& input_size_,
     const ideep::attr_t& attr) {
+  auto input_size = input_size_.empty()
+      ? gen_dummy_input_size_for(weight.sizes(), groups)
+      : input_size_;
   auto dim = input_size.size() - 2;
   const auto padding_expanded = expand_param_if_needed(padding, "padding", dim);
   const auto stride_expanded = expand_param_if_needed(stride, "stride", dim);
@@ -315,11 +315,9 @@ ContextConvolution create(
       expand_param_if_needed(dilation, "dilation", dim);
 
   bool weight_is_channels_last_ = weight_is_channels_last;
-  if (!weight_is_packed) {
-    weight_is_channels_last_ =
-        weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-        weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
-  }
+  weight_is_channels_last_ =
+      weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
 
   auto memory_format = at::MemoryFormat::Contiguous;
   auto format_tag = input_size.size() == 4 ? ideep::format_tag::nchw
@@ -334,9 +332,7 @@ ContextConvolution create(
     }
   }
   auto weight_ = weight;
-  if (!weight_is_packed) {
-    weight_ = weight.contiguous(memory_format);
-  }
+  weight_ = weight.contiguous(memory_format);
 
   // get original weight dims.
   std::vector<int64_t> origin_weight_dims;
@@ -345,18 +341,31 @@ ContextConvolution create(
   for (auto& s : kernel_size) {
     origin_weight_dims.push_back(s);
   }
-  ideep::tensor packed_weight = get_conv_packed_weight(
-      weight_,
-      stride_expanded,
-      padding_expanded,
-      dilation_expanded,
-      origin_weight_dims,
+
+  auto w = itensor_view_from_dense(weight_);
+  ideep::tensor::desc ori_desc(w.get_desc());
+  ideep::data_type dtype = w.get_data_type();
+  auto expected_desc = get_conv_expected_weights_desc(
+      w.get_dims(),
+      dtype,
+      {stride_expanded.begin(), stride_expanded.end()},
+      {padding_expanded.begin(), padding_expanded.end()},
+      {padding_expanded.begin(), padding_expanded.end()},
+      {dilation_expanded.begin(), dilation_expanded.end()},
       groups,
       weight_is_channels_last_,
-      weight_is_packed,
-      weight_is_channels_last_,
-      input_size,
-      ideep::attr_t());
+      ideep::algorithm::convolution_direct,
+      ideep::data_type::f32,
+      input_size);
+  auto at_weight = empty_aten_tensor_from_desc(expected_desc, weight.options());
+  ideep::tensor packed_weight;
+  if (ideep::data_type::f32 == dtype) {
+    packed_weight.init(expected_desc, at_weight.template data_ptr<float>());
+  } else {
+    packed_weight.init(
+        expected_desc, at_weight.template data_ptr<c10::BFloat16>());
+  }
+  packed_weight.feed_from(w);
 
   ideep::convolution_forward_params conv_params;
   std::vector<int64_t> output_sizes = calc_conv_output_size(
@@ -374,12 +383,9 @@ ContextConvolution create(
   ideep::tensor dst = ideep::tensor(
       {output_sizes.begin(), output_sizes.end()}, data_type, format_tag);
 
-  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
-      at::borrow_from_optional_tensor(bias_opt);
-  const at::Tensor& bias = *bias_maybe_owned;
   ideep::tensor mkldnn_bias;
-  if (bias.defined()) {
-    mkldnn_bias = itensor_view_from_dense(bias);
+  if (bias.has_value() && bias.value().defined()) {
+    mkldnn_bias = itensor_view_from_dense(bias.value());
     ideep::convolution_forward::prepare(
         conv_params,
         src,
@@ -418,11 +424,15 @@ ContextConvolution create(
         ideep::prop_kind::forward_inference);
   }
   return ContextConvolution{
+      std::move(ori_desc),
       std::move(packed_weight),
       std::move(mkldnn_bias),
+      std::move(at_weight),
+      bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
       padding_expanded,
       stride_expanded,
       dilation_expanded,
+      kernel_size.vec(),
       groups,
       weight_is_channels_last_,
       conv_params,
@@ -539,6 +549,78 @@ at::Tensor& run(
         attr);
   }
   return accumu;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
+    ContextConvolution& context,
+    const at::Tensor& input,
+    const at::Tensor& grad_output,
+    std::array<bool, 3> output_mask) {
+  return convolution_backward_kernel(
+      input,
+      grad_output,
+      context.at_weight_,
+      context.weight_packed_,
+      context.bias_,
+      context.stride_,
+      context.padding_,
+      context.dilation_,
+      context.kernel_size_,
+      context.groups_,
+      context.weight_is_channels_last_,
+      output_mask);
+}
+
+at::Tensor get_at_packed_weight(ContextConvolution& context) {
+  return context.at_weight_;
+}
+
+at::Tensor pack(ContextConvolution& context, const at::Tensor& tensor) {
+  auto ideep_tensor = itensor_view_from_dense(tensor);
+  auto dtype = ideep_tensor.get_data_type();
+  auto expected_desc = context.weight_packed_.get_desc().to_type(dtype);
+  auto packed_at_tensor =
+      empty_aten_tensor_from_desc(expected_desc, tensor.options());
+  ideep::tensor packed_tensor;
+  if (ideep::data_type::f32 == dtype) {
+    packed_tensor.init(
+        expected_desc, packed_at_tensor.template data_ptr<float>());
+  } else {
+    packed_tensor.init(
+        expected_desc, packed_at_tensor.template data_ptr<c10::BFloat16>());
+  }
+  packed_tensor.feed_from(ideep_tensor);
+  return packed_at_tensor;
+}
+
+at::Tensor unpack(ContextConvolution& context, const at::Tensor& tensor) {
+  auto dtype = get_mkldnn_dtype(tensor.scalar_type());
+  auto expected_desc = context.weight_packed_.get_desc().to_type(dtype);
+  ideep::tensor blocked_tensor;
+  if (ideep::data_type::f32 == dtype) {
+    blocked_tensor.init(expected_desc, tensor.template data_ptr<float>());
+  } else {
+    blocked_tensor.init(
+        expected_desc, tensor.template data_ptr<c10::BFloat16>());
+  }
+
+  at::Tensor result = at::empty(expected_desc.get_dims(), tensor.options());
+  if (context.weight_is_channels_last_) {
+    if (context.original_desc_.get_ndims() == 4) {
+      result = result.to(at::MemoryFormat::ChannelsLast);
+    } else {
+      result = result.to(at::MemoryFormat::ChannelsLast3d);
+    }
+  }
+  ideep::tensor pub_tensor;
+  auto pub_tensor_desc = context.original_desc_.to_type(dtype);
+  if (ideep::data_type::f32 == dtype) {
+    pub_tensor.init(pub_tensor_desc, result.template data_ptr<float>());
+  } else {
+    pub_tensor.init(pub_tensor_desc, result.template data_ptr<c10::BFloat16>());
+  }
+  pub_tensor.feed_from(blocked_tensor);
+  return result;
 }
 
 } // namespace convolution

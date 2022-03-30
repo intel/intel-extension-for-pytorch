@@ -13,6 +13,7 @@
 #include <torch/csrc/jit/tensorexpr/types.h>
 
 #include "csrc/aten/cpu/WeightPack.h"
+#include "csrc/jit/cpu/kernels/OpContext.h"
 #include "folding_common_utils.h"
 #include "frozen_conv_folding.h"
 
@@ -22,6 +23,7 @@ namespace jit {
 namespace graph_rewrite {
 
 using Tensor = at::Tensor;
+using namespace torch_ipex::cpu;
 
 bool supportedConvNode(Node* n) {
   if (n->kind() == aten::conv2d || n->kind() == aten::conv3d) {

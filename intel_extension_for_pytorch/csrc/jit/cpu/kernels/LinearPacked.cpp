@@ -15,8 +15,7 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     c10::optional<at::Tensor>&& bias,
     int64_t out_features,
     int64_t in_features,
-    int64_t batch_size,
-    bool weight_is_packed) {
+    c10::optional<int64_t> batch_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createLinearPrePackOpContext",
       std::vector<c10::IValue>({}));
@@ -26,8 +25,7 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
       std::move(bias),
       out_features,
       in_features,
-      batch_size,
-      weight_is_packed);
+      batch_size);
 }
 
 at::Tensor linear_run(
@@ -106,26 +104,32 @@ ContextLinear create(
     const c10::optional<at::Tensor>& bias,
     const int64_t out_features,
     const int64_t in_features,
-    const int64_t batch_size,
-    const bool weight_is_packed) {
-  auto weight_dtype = get_mkldnn_dtype(weight.scalar_type());
-  ideep::tensor parcked_weight;
+    const c10::optional<int64_t> batch_size) {
+  ideep::tensor packed_weight;
+  auto w = itensor_view_from_dense(weight);
+  ideep::dims input_size;
+  auto dtype = w.get_data_type();
+  ideep::tensor::desc ori_desc(w.get_desc());
+  if (batch_size.has_value()) {
+    input_size = {batch_size.value(), in_features};
+  }
   auto packed_desc = ideep::inner_product_forward::expected_weights_desc(
       {out_features, in_features},
-      {batch_size, in_features},
-      /* weight dtype */ weight_dtype,
-      /* src dtype */ weight_dtype);
-  parcked_weight.init(packed_desc);
-  if (!weight_is_packed) {
-    auto weight_ = weight.contiguous();
-    ideep::tensor w = itensor_view_from_dense(weight_);
-    parcked_weight.feed_from(w);
+      input_size,
+      /* weight dtype */ dtype,
+      /* src dtype */ dtype);
+  auto at_weight = empty_aten_tensor_from_desc(packed_desc, weight.options());
+  if (ideep::data_type::f32 == dtype) {
+    packed_weight.init(packed_desc, at_weight.template data_ptr<float>());
   } else {
-    auto w = get_linear_packed_weight(weight, out_features, in_features);
-    parcked_weight.feed_from(w);
+    packed_weight.init(
+        packed_desc, at_weight.template data_ptr<c10::BFloat16>());
   }
+  packed_weight.feed_from(w);
   return ContextLinear{
-      std::move(parcked_weight),
+      std::move(ori_desc),
+      std::move(packed_weight),
+      std::move(at_weight),
       bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
   };
 }
@@ -152,6 +156,94 @@ at::Tensor& run(
   const at::Tensor& bias = *bias_maybe_owned;
   linear_kernel_output(input_, context.weight_packed_, bias, accumu, attr);
   return accumu;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
+    ContextLinear& context,
+    const at::Tensor& input,
+    const at::Tensor& grad_output,
+    std::array<bool, 3> output_mask) {
+  return linear_backward_kernel(
+      input,
+      grad_output,
+      context.at_weight_,
+      output_mask,
+      context.weight_packed_,
+      context.bias_);
+}
+
+at::Tensor get_at_packed_weight(ContextLinear& context) {
+  return context.at_weight_;
+}
+
+void set_bias(ContextLinear& context, at::Tensor& bias) {
+  context.bias_ = c10::make_optional<at::Tensor>(std::move(bias));
+}
+
+void set_weight(ContextLinear& context, at::Tensor& weight) {
+  context.at_weight_.copy_(weight);
+}
+
+at::Tensor pack(ContextLinear& context, const at::Tensor& tensor) {
+  auto ideep_tensor = itensor_view_from_dense(tensor);
+  auto dtype = ideep_tensor.get_data_type();
+  auto expected_desc = context.weight_packed_.get_desc().to_type(dtype);
+  auto packed_at_tensor =
+      empty_aten_tensor_from_desc(expected_desc, tensor.options());
+  ideep::tensor packed_tensor;
+  if (ideep::data_type::f32 == dtype) {
+    packed_tensor.init(
+        expected_desc, packed_at_tensor.template data_ptr<float>());
+  } else {
+    packed_tensor.init(
+        expected_desc, packed_at_tensor.template data_ptr<c10::BFloat16>());
+  }
+  packed_tensor.feed_from(ideep_tensor);
+  return packed_at_tensor;
+}
+
+at::Tensor unpack(ContextLinear& context, const at::Tensor& tensor) {
+  auto dtype = get_mkldnn_dtype(tensor.scalar_type());
+  auto expected_desc = context.weight_packed_.get_desc().to_type(dtype);
+  ideep::tensor blocked_tensor;
+  if (ideep::data_type::f32 == dtype) {
+    blocked_tensor.init(expected_desc, tensor.template data_ptr<float>());
+  } else {
+    blocked_tensor.init(
+        expected_desc, tensor.template data_ptr<c10::BFloat16>());
+  }
+
+  at::Tensor result = at::empty(expected_desc.get_dims(), tensor.options());
+  ideep::tensor pub_tensor;
+  auto pub_tensor_desc = context.original_desc_.to_type(dtype);
+  if (ideep::data_type::f32 == dtype) {
+    pub_tensor.init(pub_tensor_desc, result.template data_ptr<float>());
+  } else {
+    pub_tensor.init(pub_tensor_desc, result.template data_ptr<c10::BFloat16>());
+  }
+  pub_tensor.feed_from(blocked_tensor);
+  return result;
+}
+
+void repack_for(ContextLinear& context, int64_t batch_size) {
+  auto dtype = context.original_desc_.get_data_type();
+  ideep::tensor packed_weight;
+  auto packed_desc = ideep::inner_product_forward::expected_weights_desc(
+      context.weight_packed_.get_dims(),
+      {batch_size, context.weight_packed_.get_dim(1)},
+      /* weight dtype */ dtype,
+      /* src dtype */ dtype);
+  auto new_at_weight =
+      empty_aten_tensor_from_desc(packed_desc, context.at_weight_.options());
+  if (ideep::data_type::f32 == dtype) {
+    packed_weight.init(packed_desc, new_at_weight.template data_ptr<float>());
+  } else {
+    packed_weight.init(
+        packed_desc, new_at_weight.template data_ptr<c10::BFloat16>());
+  }
+  packed_weight.feed_from(context.weight_packed_);
+  context.at_weight_ = new_at_weight;
+  context.weight_packed_ = packed_weight;
 }
 
 } // namespace linear

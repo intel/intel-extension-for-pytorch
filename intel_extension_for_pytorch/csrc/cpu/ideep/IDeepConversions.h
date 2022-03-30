@@ -38,7 +38,5 @@ at::Tensor empty_aten_tensor_from_desc(
     const ideep::tensor::desc& desc,
     const at::TensorOptions& options);
 
-int mkldnn_set_verbose(int level);
-
 } // namespace cpu
 } // namespace torch_ipex

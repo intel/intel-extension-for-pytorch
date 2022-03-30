@@ -28,6 +28,8 @@
 #endif
 
 namespace ideep {
+
+extern dnnl_fpmath_mode_t fpmath_mode;
 namespace utils {
 
 static void bernoulli_generate(const long n, const double p, int* r) {
@@ -315,6 +317,13 @@ inline void array_set(T* arr, const U& val, size_t size) {
 inline int set_verbose(int level) {
   dnnl::status ret = dnnl::set_verbose(level);
   return ret == dnnl::status::success;
+}
+
+inline void set_fpmath_mode(dnnl_fpmath_mode_t m) {
+  ideep::fpmath_mode = m;
+}
+inline dnnl_fpmath_mode_t get_fpmath_mode() {
+  return ideep::fpmath_mode;
 }
 } // namespace utils
 } // namespace ideep

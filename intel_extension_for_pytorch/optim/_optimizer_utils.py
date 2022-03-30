@@ -4,6 +4,7 @@ import types
 import warnings
 from ._functional import sgd_step, adagrad_step, lamb_step
 from ._lamb import Lamb
+from ..nn import utils
 
 IPEX_FUSED_OPTIMIZER_LIST = [
     torch.optim.SGD,
@@ -119,22 +120,15 @@ def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
                                     # We have an assumtion here that any tensor's in parameter state, if they
                                     # have same shapes with the parameter, they should share same layout with 
                                     # the parameter. Thus we need pack the state as we did to parameters.
-                                    if attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
-                                        memory_format = torch.channels_last \
-                                            if attr['op'] is torch.nn.Conv2d else torch.channels_last_3d
-                                        value_temp = state_value.to(memory_format=memory_format) \
-                                            if attr['weight_channels_last'] else state_value
-                                        state[state_key] = torch.ops.torch_ipex.convolution_weight_pack(
-                                            value_temp,
-                                            attr['padding'],
-                                            attr['stride'],
-                                            attr['dilation'],
-                                            attr['groups'],
-                                            pack_dtype)
-                                    elif attr['op'] is torch.nn.Linear:
-                                        state[state_key] = torch.ops.torch_ipex.linear_weight_pack(
-                                            state_value,
-                                            pack_dtype)
+                                    if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE:
+                                        if attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
+                                            memory_format = torch.channels_last \
+                                                if attr['op'] is torch.nn.Conv2d else torch.channels_last_3d
+                                            value_temp = state_value.to(memory_format=memory_format) \
+                                                if attr['weight_channels_last'] else state_value
+                                            state[state_key] = attr['ctx'].pack(value_temp)
+                                        else:
+                                            state[state_key] = attr['ctx'].pack(state_value)                                   
 
 def patch_state_dict(optimizer):
     r"""
@@ -154,40 +148,8 @@ def patch_state_dict(optimizer):
                         # the parameter. Thus we need unpack the state as we did to parameters.
                         if 'op' in params_attr:
                             # Secondly, unpack releated states
-                            unpack_dtype = torch.bfloat16 if 'bf16_param' in params_attr else k1.dtype
-                            if params_attr['op'] is torch.nn.Conv2d or params_attr['op'] is torch.nn.Conv3d:
-                                state_value = torch.ops.torch_ipex.convolution_weight_unpack(
-                                    state_value,
-                                    params_attr['padding'],
-                                    params_attr['stride'],
-                                    params_attr['dilation'],
-                                    params_attr['kernel_size'],
-                                    params_attr['groups'],
-                                    params_attr['out_channels'],
-                                    params_attr['in_channels'],
-                                    params_attr['weight_channels_last'],
-                                    unpack_dtype)
-                            elif params_attr['op'] is torch.nn.Linear:
-                                state_value = torch.ops.torch_ipex.linear_weight_unpack(
-                                    state_value,
-                                    params_attr['out_features'],
-                                    params_attr['in_features'],
-                                    params_attr['weight_transposed'],
-                                    unpack_dtype)
-                                pass
-                            elif params_attr['op'] is torch.nn.ConvTranspose2d:
-                                state_value = torch.ops.torch_ipex.conv_transpose2d_weight_unpack(
-                                    state_value,
-                                    params_attr['stride'],
-                                    params_attr['padding'],
-                                    params_attr['output_padding'],
-                                    params_attr['groups'],
-                                    params_attr['dilation'],
-                                    params_attr['kernel_size'],
-                                    params_attr['out_channels'],
-                                    params_attr['in_channels'],
-                                    params_attr['weight_channels_last'],
-                                    unpack_dtype)
+                            if params_attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE:
+                                state_value = params_attr['ctx'].to_public(state_value)
                             else:
                                 assert False, "unsupported op to unpack"
                         v2[state_key] = state_value

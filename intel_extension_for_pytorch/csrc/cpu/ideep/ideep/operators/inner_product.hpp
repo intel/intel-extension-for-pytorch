@@ -256,7 +256,12 @@ struct inner_product_forward
       }
     }
 
+    op_attr.set_fpmath_mode();
     tensor::desc dst_desc = dst.get_desc().to_type(dst_data_type);
+
+    // Use user mode scratchpad
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = get_primitive_desc(
         src_desc,
         weights_desc,
@@ -279,19 +284,23 @@ struct inner_product_forward
       dst.set_scale(dst_scales_in);
     }
 
+    tensor scratchpad(pd.scratchpad_desc());
+
     if (with_bias) {
       super(pd).execute(
           stream::default_stream(),
           {{DNNL_ARG_SRC, src},
            {DNNL_ARG_WEIGHTS, weights},
            {DNNL_ARG_BIAS, bias},
-           {DNNL_ARG_DST, dst}});
+           {DNNL_ARG_DST, dst},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     } else {
       super(pd).execute(
           stream::default_stream(),
           {{DNNL_ARG_SRC, src},
            {DNNL_ARG_WEIGHTS, weights},
-           {DNNL_ARG_DST, dst}});
+           {DNNL_ARG_DST, dst},
+           {DNNL_ARG_SCRATCHPAD, scratchpad}});
     }
 
     if (attr.non_negitive_output() && dst.get_data_type() == data_type::s8) {
@@ -325,8 +334,15 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     auto forward_hints = inner_product_forward::get_primitive_desc(
         diff_src_desc, weights_desc, diff_dst_desc);
 
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = primitive_desc(
-        {diff_src_desc, weights_desc, diff_dst_desc}, aengine, forward_hints);
+        {diff_src_desc, weights_desc, diff_dst_desc},
+        op_attr,
+        aengine,
+        forward_hints);
 
     // diff_src's origin content are not used, so it can be re-init directly
     // It's caller's duty to make sure diff_src's buffer size is same with it
@@ -338,11 +354,13 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
       diff_src.init(pd.diff_src_desc(), diff_src.get_data_handle());
     }
 
+    tensor scratchpad(pd.scratchpad_desc());
     super(pd).execute(
         stream::default_stream(),
         {{DNNL_ARG_DIFF_DST, diff_dst},
          {DNNL_ARG_WEIGHTS, weights_},
-         {DNNL_ARG_DIFF_SRC, diff_src}});
+         {DNNL_ARG_DIFF_SRC, diff_src},
+         {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
 };
 
@@ -401,13 +419,20 @@ struct inner_product_backward_weights
     }
     auto forward_hints = inner_product_forward::get_primitive_desc(
         src_desc, weights_desc, diff_dst_desc, diff_bias_desc, with_diff_bias);
+
+    // Use user mode scratchpad
+    auto op_attr = dnnl::primitive_attr();
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+
     auto pd = with_diff_bias
         ? primitive_desc(
               {src_desc, diff_weights_desc, diff_bias_desc, diff_dst_desc},
+              op_attr,
               aengine,
               forward_hints)
         : primitive_desc(
               {src_desc, diff_weights_desc, diff_dst_desc},
+              op_attr,
               aengine,
               forward_hints);
 
@@ -415,10 +440,13 @@ struct inner_product_backward_weights
       diff_weights.init(pd.diff_weights_desc());
     }
 
+    tensor scratchpad(pd.scratchpad_desc());
+
     exec_args args{
         {DNNL_ARG_DIFF_DST, diff_dst},
         {DNNL_ARG_SRC, src},
-        {DNNL_ARG_DIFF_WEIGHTS, diff_weights}};
+        {DNNL_ARG_DIFF_WEIGHTS, diff_weights},
+        {DNNL_ARG_SCRATCHPAD, scratchpad}};
 
     if (with_diff_bias) {
       if (diff_bias.is_empty()) {

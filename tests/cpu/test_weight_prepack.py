@@ -31,9 +31,10 @@ class TestPrepackCases(TestCase):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         options = itertools.product([True, False], [1, 2], [1, 4],
-                [torch.contiguous_format, channels_last], [torch.float, torch.bfloat16])
+                [torch.contiguous_format, channels_last], [torch.float, torch.bfloat16],
+                [True, False])
 
-        for bias, dilation, groups, memory_format, dtype in options:
+        for bias, dilation, groups, memory_format, dtype, feed_sample_input in options:
             N = torch.randint(3, 10, (1,)).item()
             M = torch.randint(1, 3, (1,)).item() * groups
             C = torch.randint(1, 3, (1,)).item() * groups
@@ -58,9 +59,12 @@ class TestPrepackCases(TestCase):
             origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
             origin_model2 = copy.deepcopy(model).train()
             origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
-            ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
-            # inplace case
-            ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
+            if feed_sample_input:
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1', sample_input=x)
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True, sample_input=x)
+            else:
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
             self.assertTrue(ipex_model1.weight.dtype == dtype)
             self.assertTrue(ipex_model2.weight.dtype == dtype)
 
@@ -124,9 +128,10 @@ class TestPrepackCases(TestCase):
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         options = itertools.product([torch.float, torch.bfloat16],
                                     [1, 256], [1, 324],
-                                    [torch.contiguous_format, channels_last])
+                                    [torch.contiguous_format, channels_last],
+                                    [True, False])
 
-        for dtype, in_channels, out_channels, memory_format in options:
+        for dtype, in_channels, out_channels, memory_format, feed_sample_input in options:
             model = conv_module[dim](in_channels, out_channels, kernel_size=1, stride=1, padding=1, bias=False)
             model = model.to(memory_format=memory_format).to(dtype=dtype).float().train()
             input_shape = [32, in_channels, 1, 1]
@@ -141,8 +146,12 @@ class TestPrepackCases(TestCase):
             origin_optimizer1 = SGD(origin_model1.parameters(), lr=0.01, momentum=0.9)
             origin_model2 = copy.deepcopy(model).train()
             origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
-            ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
-            ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
+            if feed_sample_input:
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1', sample_input=x)
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True, sample_input=x)
+            else:
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
 
             # train one step for origin.
             y1 = origin_model1(x1)
@@ -196,11 +205,11 @@ class TestPrepackCases(TestCase):
     def _test_conv_serialization_base(self, dim):
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         optimizer_options = [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
-        options = itertools.product([torch.float, torch.bfloat16], optimizer_options)
+        options = itertools.product([torch.float, torch.bfloat16], optimizer_options, [True, False])
         input_shape = [8, 3, 56, 56]
         if dim == 3:
             input_shape.append(56)
-        for dtype, optimizer in options:
+        for dtype, optimizer, feed_sample_input in options:
             model = conv_module[dim](3, 64, kernel_size=7, stride=2, padding=3, bias=False)
             x = torch.randn(input_shape).to(dtype=dtype).float().to(memory_format=channels_last)
             model = model.to(dtype=dtype).float().to(memory_format=channels_last).train()
@@ -209,7 +218,10 @@ class TestPrepackCases(TestCase):
             origin_model = copy.deepcopy(model).train()
             lr = 1e-2
             origin_optimizer = optimizer(origin_model.parameters(), lr=lr)
-            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+            if feed_sample_input:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+            else:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # train one step for origin.
             y1 = origin_model(origin_x)
             loss1 = y1.sum()
@@ -257,7 +269,10 @@ class TestPrepackCases(TestCase):
             ipex_checkpoint = torch.load('ipex_checkpoint.pth')
             origin_ipex_model.load_state_dict(ipex_checkpoint['model_state_dict'])
             origin_ipex_optimizer.load_state_dict(ipex_checkpoint['optimizer_state_dict'])
-            ipex_model, ipex_optimizer = ipex.optimize(origin_ipex_model, dtype=dtype, optimizer=origin_ipex_optimizer, level='O1')
+            if feed_sample_input:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+            else:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # train second step for origin.
             y1 = origin_model(origin_x)
             loss = y1.sum()
@@ -288,11 +303,15 @@ class TestPrepackCases(TestCase):
 
     def _test_imagenet_model(self, model):
         model = model.to(memory_format=torch.channels_last)
-        for dtype in [torch.float32, torch.bfloat16]:
+        for dtype, feed_sample_input in itertools.product([torch.float32, torch.bfloat16], [True, False]):
             model = model.to(dtype).float()
             # inference case, will do conv+bn folding 'O1'. do nothing for 'O0'.
-            ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1')
             x = torch.randn(1, 3, 224, 224).to(dtype=dtype).float().to(memory_format=torch.channels_last)
+            # inference case, will do conv+bn folding 'O1'. do nothing for 'O0'.
+            if feed_sample_input:
+                ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1', sample_input=x)
+            else:
+                ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1')
             y1 = model(x)
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 y2 = ipex_model2(x)
@@ -302,7 +321,10 @@ class TestPrepackCases(TestCase):
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = ASGD(origin_model.parameters(), lr=0.01)
             # do weight prepack for 'O1'
-            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+            if feed_sample_input:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+            else:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # run two iterations, and then compare the results.
 
             xx = [torch.randn(1, 3, 224, 224).to(dtype=dtype).float().to(memory_format=torch.channels_last),
@@ -321,7 +343,7 @@ class TestPrepackCases(TestCase):
                     ipex_optimizer.zero_grad()
                     loss2.backward()
                     ipex_optimizer.step()
-            self.assertEqual(y1, y2.float(), rtol=5e-2, atol=1e-2)
+            self.assertEqual(y1, y2.float(), rtol=6e-2, atol=1e-2)
 
 
     @skipIfNoTorchVision
@@ -347,15 +369,18 @@ class TestPrepackCases(TestCase):
         in_features = torch.randint(3, 10, (1,)).item()
 
         input_shapes = [(8, in_features), (2, 4, in_features), (2, 2, 2, in_features)]
-        options = itertools.product([True, False], input_shapes)
-        for bias, x_shape in options:
+        options = itertools.product([True, False], input_shapes, [True, False])
+        for bias, x_shape, feed_sample_input  in options:
             for dtype in [torch.float32, torch.bfloat16]:
                 x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
                 model = L(in_features, out_features, bias).to(dtype=dtype).float().eval()
                 x1 = x.clone().requires_grad_(False)
                 x2 = x.clone().requires_grad_(False)
                 origin_model = copy.deepcopy(model).eval()
-                ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
+                if feed_sample_input:
+                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
+                else:
+                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
                 self.assertEqual(ipex_model.linear.weight.dtype, dtype)
                 y1 = origin_model(x1)
@@ -364,7 +389,7 @@ class TestPrepackCases(TestCase):
                     y2 = ipex_model(x2)
                 self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-3)
 
-    @unittest.skipIf(True, "ipex linear bf16 backward data has NAN issue")
+    # @unittest.skipIf(True, "ipex linear bf16 backward data has NAN issue")
     def test_linear_training(self):
         linear_module = torch.nn.Linear
         out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]
@@ -372,8 +397,8 @@ class TestPrepackCases(TestCase):
         input_shapes = []
         for s in in_feature:
             input_shapes += [(128, s), (2, 64, s), (2, 2, 32, s)]
-        options = itertools.product(out_feature, [True, False], input_shapes, [torch.bfloat16])
-        for out_features, bias, x_shape, dtype in options:
+        options = itertools.product(out_feature, [True, False], input_shapes, [torch.bfloat16], [True, False])
+        for out_features, bias, x_shape, dtype, feed_sample_input in options:
             in_features = x_shape[-1]
             model = torch.nn.Linear(in_features, out_features, bias=bias).to(dtype=dtype).float().train()
             x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
@@ -381,7 +406,10 @@ class TestPrepackCases(TestCase):
             x2 = x.clone().requires_grad_()
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
-            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+            if feed_sample_input:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+            else:
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             self.assertTrue(ipex_model.weight.dtype == dtype)
 
             for i in range(1):
@@ -523,13 +551,16 @@ class TestPrepackCases(TestCase):
                     model = Deconv3d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation).to(memory_format=torch.channels_last)
                     x = torch.rand((2, ic, input_depth, input_height, input_width)).to(memory_format=torch.channels_last)
 
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype, feed_sample_input in itertools.product([torch.float32, torch.bfloat16], [True, False]):
                     x = x.to(dtype=dtype).float()
                     model = model.to(dtype=dtype).float()
                     if inference:
                         model.eval()
                         origin_model = copy.deepcopy(model).eval()
-                        ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
+                        if feed_sample_input:
+                            ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
+                        else:
+                            ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
                         if padding - output_padding + stride <= 0:
                             # unsupported in mkldnn, should not replace the original ConvTranspose module
@@ -547,7 +578,10 @@ class TestPrepackCases(TestCase):
                         model.train()
                         origin_model = copy.deepcopy(model).train()
                         origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
-                        ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
+                        if feed_sample_input:
+                            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                        else:
+                            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                         
                         if padding - output_padding + stride <= 0:
                             # unsupported in mkldnn, should not replace the original ConvTranspose module
