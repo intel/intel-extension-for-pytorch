@@ -166,15 +166,17 @@ static bool is_wrapped_number(const Tensor& t) {
 static inline bool is_broadcast_from_other_to_self(
     const at::Tensor& self,
     const at::Tensor& other) {
-  return (self.sizes() == other.sizes()) ||
-      is_expandable_to(other.sizes(), self.sizes());
+  return (
+      self.sizes() != other.sizes() &&
+      is_expandable_to(other.sizes(), self.sizes()));
 }
 
 static inline bool binary_valid(
     const at::Tensor& self,
     const at::Tensor& other) {
   // FIXME: update onednn
-  if (!is_broadcast_from_other_to_self(self, other))
+  if (self.sizes() != other.sizes() &&
+      !is_broadcast_from_other_to_self(self, other))
     return false;
 
   /* If the following conditions are satisfied, then oneDNN path will be
