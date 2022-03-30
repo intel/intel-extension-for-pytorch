@@ -51,6 +51,10 @@ except ImportError as e:
     print('You need to install pytorch first.')
     sys.exit(1)
 
+if not torch._C._GLIBCXX_USE_CXX11_ABI:
+    print("Intel extension for pytorch only supports _GLIBCXX_USE_CXX11_ABI = 1, please install pytorch with cxx11abi enabled.")
+    sys.exit(1)
+
 os.environ.setdefault('IPEX_BACKEND', 'gpu')
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ipex_pydir = os.path.join(base_dir, 'intel_extension_for_pytorch')
