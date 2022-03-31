@@ -234,7 +234,7 @@ def get_io_info(true_inputs, true_outputs):
 def get_prof(inputs, func, backend):
     time_info = None
     if backend == 'xpu':
-        with torch.autograd.profiler_legacy.profile(True, use_xpu = True) as prof:
+        with torch.autograd.profiler_legacy.profile(True, use_xpu=True) as prof:
             output = func(*inputs)
     else:
         with torch.profiler.profile(
