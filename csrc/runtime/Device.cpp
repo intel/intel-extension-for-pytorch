@@ -27,13 +27,6 @@ struct DPCPPDevicePool {
   std::mutex devices_mutex;
 } gDevPool;
 
-static void clearDPCPPContextAndDevices() {
-#if defined(USE_MULTI_CONTEXT)
-  gDevPool.contexts.clear();
-#endif
-  gDevPool.devices.clear();
-}
-
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
   auto plaform_list = DPCPP::platform::get_platforms();
@@ -99,13 +92,6 @@ static void initGlobalDevicePoolState() {
         DPCPP::context({*gDevPool.devices[i]}, dpcppAsyncHandler));
   }
 #endif
-
-  // Note: DPCPPRuntime's destruction happens before the destroy of the
-  // global vars except the global vars with dpcpp type. This will make
-  // our global device pool destruction crash. So we use atexit to
-  // manually free all dpcpp devices. atexit callback happens before
-  // DPCPPRuntime destruction.
-  atexit(clearDPCPPContextAndDevices);
 }
 
 static void initDevicePoolCallOnce() {
