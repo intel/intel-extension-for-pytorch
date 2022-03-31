@@ -20,9 +20,9 @@ static std::vector<DeviceProp> device_properties;
 static thread_local DeviceId cur_dev_index = 0;
 
 struct DPCPPDevicePool {
-  std::vector<DPCPP::device> devices;
+  std::vector<std::unique_ptr<DPCPP::device>> devices;
 #if defined(USE_MULTI_CONTEXT)
-  std::vector<DPCPP::context> contexts;
+  std::vector<std::unique_ptr<DPCPP::context>> contexts;
 #endif
   std::mutex devices_mutex;
 } gDevPool;
@@ -59,12 +59,13 @@ static void initGlobalDevicePoolState() {
     constexpr DPCPP::info::partition_affinity_domain next_partitionable =
         DPCPP::info::partition_affinity_domain::next_partitionable;
     for (const auto& root_device : root_devices) {
-      std::vector<DPCPP::device> sub_devices;
       try {
-        sub_devices = root_device.create_sub_devices<partition_by_affinity>(
-            next_partitionable);
-        gDevPool.devices.insert(
-            gDevPool.devices.end(), sub_devices.begin(), sub_devices.end());
+        auto sub_devices =
+            root_device.create_sub_devices<partition_by_affinity>(
+                next_partitionable);
+        for (auto& s_dev : sub_devices) {
+          gDevPool.devices.push_back(std::make_unique<DPCPP::device>(s_dev));
+        }
       } catch (sycl::exception& e) {
         // FIXME: should only check feature_not_supported here.
         // But for now we got invalid here if partition is not supported.
@@ -76,11 +77,14 @@ static void initGlobalDevicePoolState() {
         TORCH_WARN(
             "Tile partition is UNSUPPORTED : ",
             root_device.get_info<dpcpp_dev_name>());
-        gDevPool.devices.push_back(root_device);
+        gDevPool.devices.push_back(
+            std::make_unique<DPCPP::device>(root_device));
       }
     }
   } else {
-    gDevPool.devices = std::move(root_devices);
+    for (const auto& root_device : root_devices) {
+      gDevPool.devices.push_back(std::make_unique<DPCPP::device>(root_device));
+    }
   }
 
   auto device_count = gDevPool.devices.size();
@@ -91,8 +95,8 @@ static void initGlobalDevicePoolState() {
 #if defined(USE_MULTI_CONTEXT)
   gDevPool.contexts.resize(device_count);
   for (int i = 0; i < device_count; i++) {
-    gDevPool.contexts[i] =
-        DPCPP::context({gDevPool.devices[i]}, dpcppAsyncHandler);
+    gDevPool.contexts[i] = std::make_unique<DPCPP::context>(
+        DPCPP::context({*gDevPool.devices[i]}, dpcppAsyncHandler));
   }
 #endif
 
@@ -140,17 +144,35 @@ DPCPP::device dpcppGetRawDevice(DeviceId device_id) {
   if (device_id >= (DeviceId)gDevPool.devices.size()) {
     TORCH_CHECK(0, "dpcppSetDevice: device_id is out of range");
   }
-  return gDevPool.devices[device_id];
+  return *gDevPool.devices[device_id];
 }
 
 DeviceId dpcppGetDeviceIndex(DPCPP::device device) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
-  auto it = std::find(gDevPool.devices.begin(), gDevPool.devices.end(), device);
+  auto comp_op = [&](std::unique_ptr<DPCPP::device>& dev) -> bool {
+    return device == *dev;
+  };
+  auto it =
+      std::find_if(gDevPool.devices.begin(), gDevPool.devices.end(), comp_op);
   if (it != gDevPool.devices.end()) {
     return std::distance(gDevPool.devices.begin(), it);
   }
   return -1;
+}
+
+DPCPP::context dpcppGetDeviceContext(DeviceId device) {
+  initDevicePoolCallOnce();
+  DeviceId device_id = device;
+  if (device_id == -1) {
+    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
+  }
+#if defined(USE_MULTI_CONTEXT)
+  return *gDevPool.contexts[device_id];
+#else
+  auto dev = dpcppGetRawDevice(device_id);
+  return dev.get_platform().ext_oneapi_get_default_context();
+#endif
 }
 
 int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr) {
@@ -159,7 +181,7 @@ int dpcppGetDeviceIdFromPtr(DeviceId* device_id, void* ptr) {
   return DPCPP_SUCCESS;
 }
 
-static void initContextVectors() {
+static void initDevPropVectors() {
   auto num_gpus = 0;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_gpus));
   device_prop_flags.resize(num_gpus);
@@ -249,7 +271,7 @@ DeviceProp* dpcppGetCurrentDeviceProperties() {
 }
 
 DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
-  std::call_once(init_prop_flag, initContextVectors);
+  std::call_once(init_prop_flag, initDevPropVectors);
   DeviceId device_id = device;
   if (device_id == -1) {
     AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
@@ -259,20 +281,6 @@ DeviceProp* dpcppGetDeviceProperties(DeviceId device) {
   AT_ASSERT(device_id >= 0 && device_id < num_gpus);
   std::call_once(device_prop_flags[device_id], initDeviceProperty, device_id);
   return &device_properties[device_id];
-}
-
-DPCPP::context dpcppGetDeviceContext(DeviceId device) {
-  std::call_once(init_prop_flag, initContextVectors);
-  DeviceId device_id = device;
-  if (device_id == -1) {
-    AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
-  }
-#if defined(USE_MULTI_CONTEXT)
-  return gDevPool.contexts[device_id];
-#else
-  auto dev = dpcppGetRawDevice(device_id);
-  return dev.get_platform().ext_oneapi_get_default_context();
-#endif
 }
 
 } // namespace dpcpp

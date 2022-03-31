@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <utility>
 
 #include <runtime/Device.h>
@@ -21,20 +22,19 @@ enum class QueueType : uint8_t {
 class Queue {
  public:
   Queue(DeviceId di, DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
-      : queue_([&]() -> DPCPP::queue {
-          return Settings::I().is_event_profiling_enabled()
-              ? DPCPP::queue(
-                    dpcppGetDeviceContext(di),
-                    dpcppGetRawDevice(di),
-                    asyncHandler,
-                    {DPCPP::property::queue::in_order(),
-                     DPCPP::property::queue::enable_profiling()})
-              : DPCPP::queue(
-                    dpcppGetDeviceContext(di),
-                    dpcppGetRawDevice(di),
-                    asyncHandler,
-                    {DPCPP::property::queue::in_order()});
-        }()),
+      : queue_(std::make_unique<DPCPP::queue>(
+            Settings::I().is_event_profiling_enabled()
+                ? DPCPP::queue(
+                      dpcppGetDeviceContext(di),
+                      dpcppGetRawDevice(di),
+                      asyncHandler,
+                      {DPCPP::property::queue::in_order(),
+                       DPCPP::property::queue::enable_profiling()})
+                : DPCPP::queue(
+                      dpcppGetDeviceContext(di),
+                      dpcppGetRawDevice(di),
+                      asyncHandler,
+                      {DPCPP::property::queue::in_order()}))),
         device_id_(di) {}
 
   DeviceId getDeviceId() const {
@@ -42,7 +42,7 @@ class Queue {
   }
 
   DPCPP::queue& getDpcppQueue() {
-    return queue_;
+    return *queue_;
   }
 
   ~Queue() = default;
@@ -50,7 +50,7 @@ class Queue {
   IPEX_DISABLE_COPY_AND_ASSIGN(Queue);
 
  private:
-  DPCPP::queue queue_;
+  std::unique_ptr<DPCPP::queue> queue_;
   DeviceId device_id_;
 };
 
