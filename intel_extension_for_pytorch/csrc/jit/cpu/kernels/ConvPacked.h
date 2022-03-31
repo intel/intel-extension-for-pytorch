@@ -57,6 +57,11 @@ at::Tensor convolution_swish_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+at::Tensor convolution_gelu_run(
+    const at::Tensor& input,
+    c10::string_view approximate,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+
 at::Tensor convolution_add_run(
     const at::Tensor& input,
     at::Tensor& accumu,

@@ -576,6 +576,15 @@ class ConvElu(nn.Module):
         c = torch.add(b, b)
         return c
 
+class ConvGelu(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvGelu, self).__init__()
+        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.approximate = kwargs["approximate"]
+
+    def forward(self, x):
+        return F.gelu(self.conv(x), approximate=self.approximate)
+
 class ConvTranspose2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
         super(ConvTranspose2d, self).__init__()
@@ -1331,6 +1340,12 @@ class Tester(TestCase):
 #torch.randn(batch_size, in_channels, image_size, image_size),
 #kind_in_graph = "ipex::conv2d_elu",
 #prec = 0.02)
+            for approximate in ["none", "tanh"]:
+                self._test_output(
+                    ConvGelu(dim, in_channels, out_channels, kernel_size, image_size, approximate=approximate),
+                    x,
+                    kind_in_graph="ipex_prepack::convolution_gelu_run",
+                    kind_not_in_graph="ipex_prepack::convolution_gelu_prepack")
 
     def test_output_conv_bn(self):
         batch_size = 8

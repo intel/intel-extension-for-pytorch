@@ -237,6 +237,37 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::convolution_gelu_prepack(" CONV_PREPACK_ARGS
+        ", str approximate) "
+        "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto approximate = (std::move(peek(stack, 10, 11))).toStringView();
+            dnnl::algorithm gelu_type;
+            if (approximate == "none") {
+              gelu_type = dnnl::algorithm::eltwise_gelu_erf;
+            } else {
+              gelu_type = dnnl::algorithm::eltwise_gelu_tanh;
+            }
+            auto result = IpexConvolutionOpContext::create_context(
+                std::move((std::move(peek(stack, 0, 11))).toTensor()),
+                std::move(toOptionalTensor(std::move(peek(stack, 1, 11)))),
+                std::move((std::move(peek(stack, 2, 11))).toIntVector()),
+                std::move((std::move(peek(stack, 3, 11))).toIntVector()),
+                std::move((std::move(peek(stack, 4, 11))).toIntVector()),
+                std::move((std::move(peek(stack, 5, 11))).toIntVector()),
+                (std::move(peek(stack, 6, 11))).toInt(),
+                (std::move(peek(stack, 7, 11))).toInt(),
+                (std::move(peek(stack, 8, 11))).toBool(),
+                std::move((std::move(peek(stack, 9, 11))).toIntVector()),
+                ideep::attr_t::fuse_gelu(1.f, 0.f, 0.f, gelu_type));
+            drop(stack, 11);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex_prepack::convolution_hardtanh_run(Tensor input, Scalar "
         "lower_bound, Scalar upper_bound, "
         "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
@@ -352,6 +383,23 @@ RegisterOperators op({
                 (std::move(peek(stack, 1, 2)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 2);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::convolution_gelu_run(Tensor input, str approximate, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = convolution_gelu_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toStringView(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvolutionOpContext>());
+            drop(stack, 3);
             pack(stack, std::move(result));
             return 0;
           };

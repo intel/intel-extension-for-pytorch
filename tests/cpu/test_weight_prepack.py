@@ -27,6 +27,71 @@ def module_found(model, type):
     return False
 
 class TestPrepackCases(TestCase):
+    def _is_channels_last_nwc(self, input):
+        n = 0
+        c = 1
+        w = 2
+        dims = input.size()
+        strides = input.stride()
+        return strides[n] == dims[w] * dims[c] and strides[w] == dims[c] and strides[c] == 1
+
+    def _test_convolution_inference_base(self, dim):
+        class ConvNd(torch.nn.Module):
+            def __init__(self, dim, in_channels, out_channels, kernel_size, stride, padding, dilation, bias, groups):
+                super(ConvNd, self).__init__()
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=bias, groups=groups)
+
+            def forward(self, x):
+                return self.conv(x)
+        input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
+        if dim == 2:
+            channels_last = torch.channels_last
+        elif dim == 3:
+            channels_last = torch.channels_last_3d
+        if dim == 1:
+            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format])
+        else:
+            options = itertools.product([True, False], [1, 2], [1, 4], [torch.contiguous_format, channels_last])
+
+        for bias, dilation, groups, memory_format in options:
+            N = torch.randint(3, 10, (1,)).item()
+            M = torch.randint(1, 3, (1,)).item() * groups
+            C = torch.randint(1, 3, (1,)).item() * groups
+            x_shape = (N, C) + input_shapes[dim]
+            x = torch.randn(x_shape, dtype=torch.float32)
+            model = ConvNd(
+                dim=dim,
+                in_channels=C,
+                out_channels=M,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                dilation=dilation,
+                bias=bias,
+                groups=groups).float().eval()
+            model = model.to(memory_format=memory_format)
+            x = x.to(memory_format=memory_format)
+            ipex_model = ipex.optimize(model, dtype=torch.float32, level='O1')
+            y_ipex = ipex_model(x)
+            y = model(x)
+            self.assertEqual(y, y_ipex)
+            if dim == 1:
+                self.assertTrue(self._is_channels_last_nwc(y_ipex))
+                x_nwc = torch.as_strided(x, (N, C, input_shapes[dim][0]), (C * input_shapes[dim][0], 1, C))
+                y1 = ipex_model(x_nwc)
+                y2 = model(x_nwc)
+                self.assertEqual(y1, y2)
+                self.assertTrue(self._is_channels_last_nwc(y1))
+
+    def test_conv1d_inference(self):
+        self._test_convolution_inference_base(dim=1)
+
+    def test_conv2d_inference(self):
+        self._test_convolution_inference_base(dim=2)
+
+    def test_conv3d_inference(self):
+        self._test_convolution_inference_base(dim=3)
+
     def _test_convolution_training_base(self, dim):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d

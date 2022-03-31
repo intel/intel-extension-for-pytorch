@@ -77,6 +77,10 @@ class _IPEXConvNd(nn.Module):
     def forward(self, x):
         return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx)
 
+class _IPEXConv1d(_IPEXConvNd):
+    def __init__(self, dense_module):
+        super(_IPEXConv1d, self).__init__(dense_module)
+
 class _IPEXConv2d(_IPEXConvNd):
     def __init__(self, dense_module):
         super(_IPEXConv2d, self).__init__(dense_module)
@@ -241,16 +245,30 @@ IPEX_WEIGHT_PREPACK_MODULE = {
     torch.nn.Conv2d: _IPEXConv2d,
     torch.nn.ConvTranspose2d: _IPEXConvTranspose2d,
     torch.nn.Conv3d: _IPEXConv3d,
+    torch.nn.Conv1d: _IPEXConv1d,
 }
 
 def _should_prepack(module, auto_kernel_selection):
     if type(module) not in IPEX_WEIGHT_PREPACK_MODULE:
         return False
-    elif isinstance(module, torch.nn.Linear) and not auto_kernel_selection and module.weight.dtype is torch.float:
+    # If hook is on `weight` or `bias`, will not prepack.
+    if module._forward_pre_hooks is not None:
+        for _, hook in module._forward_pre_hooks.items():
+            if hook.name == 'weight' or hook.name == 'bias':
+                return False
+    if module._forward_hooks is not None:
+        for _, hook in module._forward_hooks.items():
+            if hook.name == 'weight' or hook.name == 'bias':
+                return False
+    if module._backward_hooks is not None:
+        for _, hook in module._backward_hooks.items():
+            if hook.name == 'weight' or hook.name == 'bias':
+                return False
+    if isinstance(module, torch.nn.Linear) and not auto_kernel_selection and module.weight.dtype is torch.float:
         # For now we simply distinguish "mkl" and "mkldnn" backend by "weight prepack"
         # Does not prepack Linear for FP32 to choose "mkl" backend
         return False
-    elif isinstance(module, torch.nn.ConvTranspose2d):
+    if isinstance(module, torch.nn.ConvTranspose2d):
         if module.padding[0] - module.output_padding[0] + module.stride[0] <= 0:
             return False
         if module.padding[1] - module.output_padding[1] + module.stride[1] <= 0:
@@ -323,5 +341,6 @@ def record_input_shape_for_prepack(module, sample_input):
         for child in module.children():
             register_hook_function_rec(child)
 
+    hook_function.name = "input_shape"
     register_hook_function_rec(module)
     module(*sample_input)

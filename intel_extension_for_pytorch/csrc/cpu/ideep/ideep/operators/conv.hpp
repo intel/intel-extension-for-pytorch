@@ -225,8 +225,8 @@ struct convolution_forward
       const dims& src_dims = dims(),
       const attr_t& attr = attr_t(),
       const engine& aengine = engine::cpu_engine()) {
-    auto src_size =
-        weights_dims.size(); // weights_dims is 4 for conv2d and 5 for conv3d
+    auto src_size = weights_dims.size(); // weights_dims is 3 for conv1d, 4 for
+                                         // conv2d and 5 for conv3d
     auto grouped = groups > 1;
     auto weights_dims_g =
         grouped ? utils::group_dims(weights_dims, groups) : weights_dims;
@@ -244,8 +244,11 @@ struct convolution_forward
     auto oc = groups * dims_in[0 + grouped];
     if (5 == src_size) {
       kernel_size.push_back(dims_in[ndims - 3]);
+      kernel_size.push_back(dims_in[ndims - 2]);
     }
-    kernel_size.push_back(dims_in[ndims - 2]);
+    if (4 == src_size) {
+      kernel_size.push_back(dims_in[ndims - 2]);
+    }
     kernel_size.push_back(dims_in[ndims - 1]);
     if (src_dims.empty()) {
       // Construct a dummy case, those shapes are from resnet50 model,
@@ -255,11 +258,10 @@ struct convolution_forward
       x_dims.push_back(ic);
       y_dims.push_back(32);
       y_dims.push_back(oc);
+      x_dims.push_back(14 * kernel_size[0]);
       if (4 == src_size) {
-        x_dims.push_back(14 * kernel_size[0]);
         x_dims.push_back(14 * kernel_size[1]);
-      } else {
-        x_dims.push_back(14 * kernel_size[0]);
+      } else if (5 == src_size) {
         x_dims.push_back(14 * kernel_size[1]);
         x_dims.push_back(14 * kernel_size[2]);
       }
@@ -286,8 +288,17 @@ struct convolution_forward
     auto src_query = src_desc;
     auto dst_query = dst_desc;
     if (channels_last) {
-      src_query = src_desc.to_format(5 == src_size ? tag::ndhwc : tag::nhwc);
-      dst_query = dst_desc.to_format(5 == src_size ? tag::ndhwc : tag::nhwc);
+      if (4 == src_size) {
+        src_query = src_desc.to_format(tag::nhwc);
+        dst_query = dst_desc.to_format(tag::nhwc);
+      } else if (5 == src_size) {
+        src_query = src_desc.to_format(tag::ndhwc);
+        dst_query = dst_desc.to_format(tag::ndhwc);
+      }
+    }
+    if (3 == src_size) {
+      src_query = src_desc.to_format(tag::nwc);
+      dst_query = dst_desc.to_format(tag::nwc);
     }
 
     // FIXME: workaroud winograd format issue in inference
@@ -345,6 +356,7 @@ struct convolution_forward
     auto weights_desc_query = weights_desc;
     auto bias_desc_query = with_bias ? bias_desc : tensor::desc();
     auto dst_desc_query = dst_desc;
+    auto src_is_channels_last = src_desc.is_channels_last();
     if (!keep_format) {
       src_desc_query = src_desc.to_format_any();
       weights_desc_query = weights_desc.to_format_any();
@@ -355,9 +367,15 @@ struct convolution_forward
     // For nhwc / ndhwc path, weight uses format_tag::any,
     // while activation uses format_tag::nhwc / format_tag::ndhwc.
     bool channels_last =
-        src_desc.is_channels_last() || weights_desc.is_channels_last();
+        src_is_channels_last || weights_desc.is_channels_last();
     if (channels_last) {
-      auto memory_format = src_desc.get_ndims() == 4 ? tag::nhwc : tag::ndhwc;
+      const auto dim = src_desc.get_ndims();
+      auto memory_format = tag::nhwc;
+      if (dim == 3) {
+        memory_format = tag::nwc;
+      } else if (dim == 5) {
+        memory_format = tag::ndhwc;
+      }
       src_desc_query = src_desc.to_format(memory_format);
       weights_desc_query = weights_desc.to_format_any();
       bias_desc_query = with_bias ? bias_desc.to_format_any() : tensor::desc();

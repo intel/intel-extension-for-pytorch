@@ -35,8 +35,11 @@ inline std::vector<int64_t> gen_dummy_input_size_for(
   std::vector<int64_t> kernel_size;
   if (5 == input_dim) {
     kernel_size.push_back(weight_sizes[input_dim - 3]);
+    kernel_size.push_back(weight_sizes[input_dim - 2]);
   }
-  kernel_size.push_back(weight_sizes[input_dim - 2]);
+  if (4 == input_dim) {
+    kernel_size.push_back(weight_sizes[input_dim - 2]);
+  }
   kernel_size.push_back(weight_sizes[input_dim - 1]);
   std::vector<int64_t> input_sizes;
   auto grouped = groups > 1;
@@ -46,11 +49,10 @@ inline std::vector<int64_t> gen_dummy_input_size_for(
   auto ic = groups * weights_dims_g[1 + grouped];
   input_sizes.push_back(32);
   input_sizes.push_back(ic);
+  input_sizes.push_back(14 * kernel_size[0]);
   if (4 == input_dim) {
-    input_sizes.push_back(14 * kernel_size[0]);
     input_sizes.push_back(14 * kernel_size[1]);
-  } else {
-    input_sizes.push_back(14 * kernel_size[0]);
+  } else if (5 == input_dim) {
     input_sizes.push_back(14 * kernel_size[1]);
     input_sizes.push_back(14 * kernel_size[2]);
   }

@@ -77,7 +77,8 @@ void insertPrePackedConvOp(Block* b) {
     for (Block* block : n->blocks()) {
       insertPrePackedConvOp(block);
     }
-    if (n->kind() == aten::conv2d || n->kind() == aten::conv3d) {
+    if (n->kind() == aten::conv1d || n->kind() == aten::conv2d ||
+        n->kind() == aten::conv3d) {
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
       auto prepack_node = graph->create(
@@ -90,12 +91,14 @@ void insertPrePackedConvOp(Block* b) {
                                    .concrete_sizes();
       // if can't get input shape info, will not do weight prepack.
       if (!(input_size_option.has_value() &&
-            (input_size_option.value().size() == 4 ||
+            (input_size_option.value().size() == 3 ||
+             input_size_option.value().size() == 4 ||
              input_size_option.value().size() == 5))) {
         continue;
       }
       IValue input_size_value(input_size_option.value());
-      if (n->kind() == aten::conv2d || n->kind() == aten::conv3d) {
+      if (n->kind() == aten::conv1d || n->kind() == aten::conv2d ||
+          n->kind() == aten::conv3d) {
         auto weight_size_option = n->inputs()
                                       .at(1)
                                       ->type()
@@ -104,14 +107,21 @@ void insertPrePackedConvOp(Block* b) {
                                       .concrete_sizes();
         // weight has not shape info, will not do weight prapacked.
         if (!(weight_size_option.has_value() &&
-              (weight_size_option.value().size() == 4 ||
+              (weight_size_option.value().size() == 3 ||
+               weight_size_option.value().size() == 4 ||
                weight_size_option.value().size() == 5))) {
           continue;
         }
         auto weight_size = weight_size_option.value();
-        std::vector<int64_t> k_size = {weight_size[2], weight_size[3]};
+        // 1d case.
+        std::vector<int64_t> k_size = {weight_size[2]};
+        // 2d case.
+        if (weight_size.size() == 4) {
+          k_size.push_back(weight_size[3]);
+        }
         // 3d case.
         if (weight_size.size() == 5) {
+          k_size.push_back(weight_size[3]);
           k_size.push_back(weight_size[4]);
         }
         bool w_is_channels_last = false;
@@ -171,7 +181,8 @@ void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
-      rewriter_elu, rewriter_swish, rewriter_silu, rewriter_leaky_relu;
+      rewriter_elu, rewriter_swish, rewriter_silu, rewriter_leaky_relu,
+      rewriter_gelu;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> hardtanh_operators = {"hardtanh", "hardtanh_"};
@@ -267,6 +278,19 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::convolution_leaky_relu_run(%input, %alpha, %packed_weight)
         return (%res))";
 
+  auto conv_gelu_rstring = R"(
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+        %x = ipex_prepack::convolution_run(%input, %packed_weight)
+        %res = aten::gelu(%x, %approximate)
+        return (%res))";
+
+  std::string conv_gelu_fused = R"(
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_gelu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %approximate)
+        %res = ipex_prepack::convolution_gelu_run(%input, %approximate, %packed_weight)
+        return (%res))";
+
   for (const auto& relu : relu_operators) {
     TemplateEnv env;
     env.s("relu", relu);
@@ -325,6 +349,17 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         conv_leaky_relu_rstring.format(env), conv_leaky_relu_fused);
   }
 
+  auto filter_conv_gelu =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        const auto& match_vmap = match.values_map;
+        auto approximate_value =
+            getIValue("approximate", match_vmap, vmap).value();
+        return approximate_value == "none" || approximate_value == "tanh";
+      };
+
+  rewriter_gelu.RegisterRewritePattern(conv_gelu_rstring, conv_gelu_fused);
+
   rewriter_relu.runOnGraph(graph);
   rewriter_sigmoid.runOnGraph(graph);
   rewriter_hardtanh.runOnGraph(graph);
@@ -332,6 +367,7 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
   rewriter_swish.runOnGraph(graph);
   rewriter_silu.runOnGraph(graph);
   rewriter_leaky_relu.runOnGraph(graph);
+  rewriter_gelu.runOnGraph(graph, filter_conv_gelu);
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {

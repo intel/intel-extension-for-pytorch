@@ -3,6 +3,7 @@
 #include "csrc/aten/cpu/Conv.h"
 #include "csrc/aten/cpu/ParamUtils.h"
 #include "csrc/aten/cpu/WeightPack.h"
+#include "csrc/aten/cpu/utils/utils.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/cpu/ideep/ideep/utils.hpp"
@@ -110,6 +111,29 @@ at::Tensor convolution_swish_run(
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_swish_run", std::vector<c10::IValue>({}));
   return op_context->run(input, ideep::attr_t::fuse_swish());
+}
+
+at::Tensor convolution_gelu_run(
+    const at::Tensor& input,
+    const c10::string_view approximate,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::convolution_gelu_run", std::vector<c10::IValue>({}));
+  // https://github.com/pytorch/pytorch/pull/61439
+  // at::gelu can support tanh approximate now and OneDNN also support it
+  // by changing algorithm If there is other type of approximate are added to
+  // pytorch while  OneDNN not support it, we might need a fallback path here.
+  dnnl::algorithm gelu_type;
+  if (approximate == "none") {
+    gelu_type = dnnl::algorithm::eltwise_gelu_erf;
+  } else if (approximate == "tanh") {
+    gelu_type = dnnl::algorithm::eltwise_gelu_tanh;
+  } else {
+    TORCH_CHECK(
+        false, "ipex::linear_gelu_run only support tanh approximate now");
+  }
+  return op_context->run(
+      input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
 }
 
 at::Tensor convolution_add_run(
@@ -320,13 +344,17 @@ ContextConvolution create(
       weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
 
   auto memory_format = at::MemoryFormat::Contiguous;
-  auto format_tag = input_size.size() == 4 ? ideep::format_tag::nchw
-                                           : ideep::format_tag::ncdhw;
+  auto format_tag = ideep::format_tag::nchw;
+  if (input_size.size() == 5) {
+    format_tag = ideep::format_tag::ncdhw;
+  } else if (input_size.size() == 3) {
+    format_tag = ideep::format_tag::nwc;
+  }
   if (weight_is_channels_last_) {
     if (input_size.size() == 4) {
       memory_format = at::MemoryFormat::ChannelsLast;
       format_tag = ideep::format_tag::nhwc;
-    } else {
+    } else if (input_size.size() == 5) {
       memory_format = at::MemoryFormat::ChannelsLast3d;
       format_tag = ideep::format_tag::ndhwc;
     }
@@ -451,17 +479,27 @@ at::Tensor run(
   if (use_channels_last) {
     if (input.dim() == 4) {
       memory_format = at::MemoryFormat::ChannelsLast;
-    } else {
+    } else if (input.dim() == 5) {
       memory_format = at::MemoryFormat::ChannelsLast3d;
     }
   }
-  auto input_ = input.contiguous(memory_format);
+  auto input_ = input;
+  if (!is_channels_last_1d(input)) {
+    input_ = input.contiguous(memory_format);
+  }
   if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
       attr == context.conv_params_.op_attr &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {
+    auto output_sizes = context.conv_params_.pd.dst_desc().dims();
     auto output = at::empty(
-        context.conv_params_.pd.dst_desc().dims(),
+        output_sizes,
         input_.options().memory_format(input_.suggest_memory_format()));
+    if (input.dim() == 3) {
+      std::vector<int64_t> output_strides = {
+          (output_sizes[1] * output_sizes[2]), 1, output_sizes[1]};
+      output =
+          at::empty_strided(output_sizes, output_strides, input_.options());
+    }
     const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
     ideep::tensor mkldnn_output = itensor_view_from_dense(output);
     if (context.bias_.is_empty()) {
@@ -507,11 +545,14 @@ at::Tensor& run(
   if (use_channels_last) {
     if (input.dim() == 4) {
       memory_format = at::MemoryFormat::ChannelsLast;
-    } else {
+    } else if (input.dim() == 5) {
       memory_format = at::MemoryFormat::ChannelsLast3d;
     }
   }
-  auto input_ = input.contiguous(memory_format);
+  auto input_ = input;
+  if (!is_channels_last_1d(input)) {
+    input_ = input.contiguous(memory_format);
+  }
   // always align accumu format with inputs' format.
   accumu = accumu.contiguous(memory_format);
   if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
@@ -608,7 +649,7 @@ at::Tensor unpack(ContextConvolution& context, const at::Tensor& tensor) {
   if (context.weight_is_channels_last_) {
     if (context.original_desc_.get_ndims() == 4) {
       result = result.to(at::MemoryFormat::ChannelsLast);
-    } else {
+    } else if (context.original_desc_.get_ndims() == 5) {
       result = result.to(at::MemoryFormat::ChannelsLast3d);
     }
   }
