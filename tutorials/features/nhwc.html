@@ -190,7 +190,7 @@
 <section id="pytorch-strided-layout">
 <h2>PyTorch Strided Layout<a class="headerlink" href="#pytorch-strided-layout" title="Permalink to this headline"></a></h2>
 <p>Before moving on, I feel it is necessary to explain how PyTorch organizes tensors in memory - the <strong>layout</strong>. Here we only focus on <strong>dense</strong> tensors, skip ‘coo’ layout of <strong>sparse</strong> tensor.</p>
-<p>The question itself can be reinterpreted as for a tensor of size &lt;N, C, H, W&gt;, how does PyTorch accesses the element with index &lt;n, w, h, w&gt; from memory, the answer is <strong>stride</strong>:</p>
+<p>The question itself can be reinterpreted as for a tensor of size &lt;N, C, H, W&gt;, how does PyTorch accesses the element with index &lt;n, c, h, w&gt; from memory, the answer is <strong>stride</strong>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tensor</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="o">&gt;</span>
 <span class="n">index</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">n</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="o">&gt;</span>
 <span class="n">strides</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">CHW</span><span class="p">,</span> <span class="n">HW</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="mi">1</span><span class="o">&gt;</span>
