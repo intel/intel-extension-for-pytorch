@@ -232,17 +232,17 @@ def get_io_info(true_inputs, true_outputs):
 
 
 def get_prof(inputs, func, backend):
-    if backend != 'cpu':
-        use_backend = 'use_' + backend
-        kwargs = {use_backend: True}
-    else:
-        kwargs = {}
     time_info = None
     if backend == 'xpu':
-        with torch.autograd.profiler_legacy.profile(True, **kwargs) as prof:
+        with torch.autograd.profiler_legacy.profile(True, use_xpu = True) as prof:
             output = func(*inputs)
     else:
-        with torch.autograd.profiler.profile(True, **kwargs) as prof:
+        with torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ]
+        ) as prof:
             output = func(*inputs)
     time_info = str(prof.key_averages().table(sort_by="self_cpu_time_total"))
     if backend != 'cpu':
