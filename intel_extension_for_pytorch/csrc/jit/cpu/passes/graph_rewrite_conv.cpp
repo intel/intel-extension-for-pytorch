@@ -108,13 +108,15 @@ void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
-      rewriter_elu, rewriter_swish, rewriter_silu;
+      rewriter_elu, rewriter_swish, rewriter_silu, rewriter_leaky_relu;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> hardtanh_operators = {"hardtanh", "hardtanh_"};
   std::array<std::string, 2> elu_operators = {"elu", "elu_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
   std::array<std::string, 2> silu_operators = {"silu", "silu_"};
+  std::array<std::string, 2> leaky_relu_operators = {
+      "leaky_relu", "leaky_relu_"};
 
   auto conv_relu_rstring = CodeTemplate(R"(
     graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %weight_is_prepacked:bool, %input_size:int[]):
@@ -189,6 +191,19 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::convolution_swish_run(%input, %packed_weight)
         return (%res))";
 
+  auto conv_leaky_relu_rstring = CodeTemplate(R"(
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %weight_is_prepacked:bool, %input_size:int[], %alpha):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %weight_is_prepacked,  %input_size)
+        %x = ipex_prepack::convolution_run(%input, %packed_weight)
+        %res = aten::${leaky_relu}(%x, %alpha)
+        return (%res))");
+
+  std::string conv_leaky_relu_fused = R"(
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %weight_is_prepacked:bool, %input_size:int[], %alpha):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_leaky_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %weight_is_prepacked, %input_size, %alpha)
+        %res = ipex_prepack::convolution_leaky_relu_run(%input, %alpha, %packed_weight)
+        return (%res))";
+
   for (const auto& relu : relu_operators) {
     TemplateEnv env;
     env.s("relu", relu);
@@ -240,12 +255,20 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         return no_input_scale;
       };
 
+  for (const auto& leaky_relu : leaky_relu_operators) {
+    TemplateEnv env;
+    env.s("leaky_relu", leaky_relu);
+    rewriter_leaky_relu.RegisterRewritePattern(
+        conv_leaky_relu_rstring.format(env), conv_leaky_relu_fused);
+  }
+
   rewriter_relu.runOnGraph(graph);
   rewriter_sigmoid.runOnGraph(graph);
   rewriter_hardtanh.runOnGraph(graph);
   rewriter_elu.runOnGraph(graph, filter_conv2d_elu);
   rewriter_swish.runOnGraph(graph);
   rewriter_silu.runOnGraph(graph);
+  rewriter_leaky_relu.runOnGraph(graph);
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {

@@ -32,6 +32,11 @@ at::Tensor convolution_relu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+at::Tensor convolution_leaky_relu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+
 at::Tensor convolution_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);

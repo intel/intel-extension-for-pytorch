@@ -183,25 +183,6 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex_prepack::convolution_hardtanh_run(Tensor input, Scalar "
-        "lower_bound, Scalar upper_bound, "
-        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
-        "W_prepack) -> Tensor",
-        [](const Node* node) -> Operation {
-          return [](Stack* stack) {
-            auto result = convolution_hardtanh_run(
-                (std::move(peek(stack, 0, 4))).toTensor(),
-                (std::move(peek(stack, 1, 4))).toScalar(),
-                (std::move(peek(stack, 2, 4))).toScalar(),
-                (std::move(peek(stack, 3, 4)))
-                    .toCustomClass<ConvolutionOpContext>());
-            drop(stack, 4);
-            pack(stack, std::move(result));
-            return 0;
-          };
-        },
-        aliasAnalysisFromSchema()),
-    Operator(
         "ipex_prepack::convolution_elu_prepack(" CONV_PREPACK_ARGS
         ", Scalar alpha, Scalar scale, Scalar input_scale) "
         "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext",
@@ -234,6 +215,52 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::convolution_leaky_relu_prepack(" CONV_PREPACK_ARGS
+        ", Scalar alpha) "
+        "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto alpha_value =
+                (std::move(peek(stack, 11, 12))).toScalar().to<float>();
+            auto result = IpexConvolutionOpContext::create_context(
+                std::move((std::move(peek(stack, 0, 12))).toTensor()),
+                std::move(toOptionalTensor(std::move(peek(stack, 1, 12)))),
+                std::move((std::move(peek(stack, 2, 12))).toIntVector()),
+                std::move((std::move(peek(stack, 3, 12))).toIntVector()),
+                std::move((std::move(peek(stack, 4, 12))).toIntVector()),
+                std::move((std::move(peek(stack, 5, 12))).toIntVector()),
+                (std::move(peek(stack, 6, 12))).toInt(),
+                (std::move(peek(stack, 7, 12))).toInt(),
+                (std::move(peek(stack, 8, 12))).toBool(),
+                (std::move(peek(stack, 9, 12))).toBool(),
+                std::move((std::move(peek(stack, 10, 12))).toIntVector()),
+                ideep::attr_t::fuse_relu(1.0, alpha_value));
+            drop(stack, 12);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::convolution_hardtanh_run(Tensor input, Scalar "
+        "lower_bound, Scalar upper_bound, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = convolution_hardtanh_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toScalar(),
+                (std::move(peek(stack, 2, 4))).toScalar(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<ConvolutionOpContext>());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex_prepack::convolution_elu_run(Tensor input, Scalar alpha, "
         "Scalar scale, Scalar input_scale, "
         "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
@@ -253,6 +280,24 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::convolution_leaky_relu_run(Tensor input, Scalar alpha, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = convolution_leaky_relu_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvolutionOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
     Operator(
         "ipex_prepack::convolution_bottleneck_run(Tensor(a!) input, "
         "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack1, "

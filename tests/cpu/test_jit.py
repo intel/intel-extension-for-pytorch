@@ -156,6 +156,19 @@ class ConvRelu_Fixed(nn.Module):
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
 
+class ConvLeakyRelu_Fixed(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvLeakyRelu_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.leaky_relu = nn.LeakyReLU(0.1)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.leaky_relu(x)
+        return x
+
 class Conv_Relu_Add(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(Conv_Relu_Add, self).__init__()
@@ -1787,12 +1800,27 @@ class Tester(TestCase):
             self._test_output(
                 ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
-                kind_in_graph="ipex_prepack::convolution_relu_run")
+                kind_in_graph="ipex_prepack::convolution_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_relu_prepack")
             self._test_output_bf16(
                 ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
                 kind_in_graph="ipex_prepack::convolution_relu_run",
-                prec=0.08)
+                kind_not_in_graph="ipex_prepack::convolution_relu_prepack",
+                prec=0.08,
+                levels=['O1'])
+            self._test_output(
+                ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_leaky_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_leaky_relu_prepack")
+            self._test_output_bf16(
+                ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_leaky_relu_run",
+                kind_not_in_graph="ipex_prepack::convolution_leaky_relu_prepack",
+                prec=0.02,
+                levels=['O1'])
 
     def test_output_conv_sum(self):
         batch_size = 8

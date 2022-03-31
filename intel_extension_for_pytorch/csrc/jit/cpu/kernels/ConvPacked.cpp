@@ -59,6 +59,16 @@ at::Tensor convolution_relu_run(
   return op_context->run(input, ideep::attr_t::fuse_relu());
 }
 
+at::Tensor convolution_leaky_relu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::convolution_leaky_relu_run", std::vector<c10::IValue>({}));
+  auto alpha_value = alpha.to<float>();
+  return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
+}
+
 at::Tensor convolution_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
