@@ -26,6 +26,81 @@
 namespace torch_ipex {
 namespace cpu {
 
+// slow path on horizontal reduce
+template <typename scalar_t, typename Op>
+inline scalar_t vec_reduce_all(
+    const Op& vec_fun,
+    at::vec::Vectorized<scalar_t> acc_vec,
+    int64_t size) {
+  using Vec = at::vec::Vectorized<scalar_t>;
+  scalar_t acc_arr[Vec::size()];
+  acc_vec.store(acc_arr);
+  for (const auto i : c10::irange(1, size)) {
+    std::array<scalar_t, Vec::size()> acc_arr_next = {0};
+    acc_arr_next[0] = acc_arr[i];
+    Vec acc_vec_next = Vec::loadu(acc_arr_next.data());
+    acc_vec = vec_fun(acc_vec, acc_vec_next);
+  }
+  acc_vec.store(acc_arr);
+  return acc_arr[0];
+}
+
+template <typename scalar_t, typename Op>
+inline scalar_t vec_reduce_all(
+    const Op& vec_fun,
+    at::vec::Vectorized<scalar_t> acc_vec) {
+  using Vec = at::vec::Vectorized<scalar_t>;
+  return torch_ipex::cpu::vec_reduce_all(vec_fun, acc_vec, Vec::size());
+}
+
+// SIMD version on horizontal reduce
+#if defined(CPU_CAPABILITY_AVX512) && !defined(_MSC_VER)
+template <typename scalar_t = float, typename Op>
+inline float vec_reduce_all(
+    const Op& vec_fun,
+    at::vec::Vectorized<float> acc_vec) {
+  using Vec = at::vec::Vectorized<float>;
+  Vec v = acc_vec;
+
+  // 256-bit shuffle
+  Vec v1 = _mm512_shuffle_f32x4(v, v, 0x4E);
+  v = vec_fun(v, v1);
+  // 128-bit shuffle
+  v1 = _mm512_shuffle_f32x4(v, v, 0xB1);
+  v = vec_fun(v, v1);
+  // 64-bit shuffle
+  v1 = _mm512_shuffle_ps(v, v, 0x4E);
+  v = vec_fun(v, v1);
+  // 32-bit shuffle
+  v1 = _mm512_shuffle_ps(v, v, 0xB1);
+  v = vec_fun(v, v1);
+
+  return _mm512_cvtss_f32(v);
+}
+#endif
+
+#if defined(CPU_CAPABILITY_AVX2) && !defined(_MSC_VER)
+template <typename scalar_t = float, typename Op>
+inline float vec_reduce_all(
+    const Op& vec_fun,
+    at::vec::Vectorized<float> acc_vec) {
+  using Vec = at::vec::Vectorized<float>;
+  Vec v = acc_vec;
+
+  // 128-bit shuffle
+  Vec v1 = _mm256_permute2f128_ps(v, v, 0x1);
+  v = vec_fun(v, v1);
+  // 64-bit shuffle
+  v1 = _mm256_shuffle_ps(v, v, 0x4E);
+  v = vec_fun(v, v1);
+  // 32-bit shuffle
+  v1 = _mm256_shuffle_ps(v, v, 0xB1);
+  v = vec_fun(v, v1);
+
+  return _mm256_cvtss_f32(v);
+}
+#endif
+
 namespace {
 
 template <typename T>
@@ -113,10 +188,10 @@ std::tuple<T, T> ColumnwiseMoments(
     }
   }
   // horizontal add fast path
-  T mean_val =
-      at::vec::vec_reduce_all([](Vec& x, Vec& y) { return x + y; }, acc0_vec);
-  T rstd_val =
-      at::vec::vec_reduce_all([](Vec& x, Vec& y) { return x + y; }, acc1_vec);
+  T mean_val = torch_ipex::cpu::vec_reduce_all(
+      [](Vec& x, Vec& y) { return x + y; }, acc0_vec);
+  T rstd_val = torch_ipex::cpu::vec_reduce_all(
+      [](Vec& x, Vec& y) { return x + y; }, acc1_vec);
   return std::tuple<T, T>(mean_val, rstd_val);
 }
 
@@ -157,9 +232,9 @@ std::tuple<float, float> ColumnwiseMoments(
     }
   }
   // horizontal add fast path
-  float mean_val = at::vec::vec_reduce_all(
+  float mean_val = torch_ipex::cpu::vec_reduce_all(
       [](fVec& x, fVec& y) { return x + y; }, acc0_fvec);
-  float rstd_val = at::vec::vec_reduce_all(
+  float rstd_val = torch_ipex::cpu::vec_reduce_all(
       [](fVec& x, fVec& y) { return x + y; }, acc1_fvec);
   return std::tuple<float, float>(mean_val, rstd_val);
 }
