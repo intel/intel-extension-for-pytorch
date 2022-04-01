@@ -5,10 +5,10 @@ set(CMAKE_INSTALL_MESSAGE NEVER)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
-SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
-SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
-SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+set(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
+set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
+set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
+set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch/csrc")
 
@@ -29,7 +29,12 @@ ENDIF()
 
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
 # use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
-SET(DNNL_GRAPH_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+
+set(DNNL_GRAPH_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+if(DEFINED ENV{BUILD_IPEX_WITH_GRAPH_COMPILER})
+  set(DNNL_GRAPH_BUILD_COMPILER_BACKEND ON CACHE BOOL "" FORCE)
+  set(DNNL_GRAPH_LLVM_CONFIG "llvm-config-13" CACHE STRING "" FORCE)
+endif()
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
 # add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
 
@@ -185,6 +190,14 @@ list(REMOVE_ITEM DPCPP_SRCS ${DPCPP_ISA_SRCS_ORIGIN})
 add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
+add_dependencies(${PLUGIN_NAME} dnnl_graph)
+# If Graph Compiler is built, then it should link to its LLVM dependencies,
+# and not the LLVM symbols exposed by PyTorch.
+if (DEFINED ENV{BUILD_IPEX_WITH_GRAPH_COMPILER})
+  get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
+  target_link_libraries(${PLUGIN_NAME} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
+endif()
+target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
@@ -199,9 +212,6 @@ elseif ("${ATEN_THREADING}" STREQUAL "TBB")
 else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
-
-add_dependencies(${PLUGIN_NAME} dnnl_graph)
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
 install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
