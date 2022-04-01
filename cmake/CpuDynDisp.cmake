@@ -31,7 +31,7 @@ ENDIF()
 # use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
 
 set(DNNL_GRAPH_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
-if(DEFINED ENV{BUILD_IPEX_WITH_GRAPH_COMPILER})
+if(DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   set(DNNL_GRAPH_BUILD_COMPILER_BACKEND ON CACHE BOOL "" FORCE)
   set(DNNL_GRAPH_LLVM_CONFIG "llvm-config-13" CACHE STRING "" FORCE)
 endif()
@@ -193,7 +193,7 @@ link_directories(${PYTORCH_INSTALL_DIR}/lib)
 add_dependencies(${PLUGIN_NAME} dnnl_graph)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
-if (DEFINED ENV{BUILD_IPEX_WITH_GRAPH_COMPILER})
+if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
   target_link_libraries(${PLUGIN_NAME} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
 endif()
