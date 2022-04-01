@@ -8,7 +8,7 @@ import intel_extension_for_pytorch
 import pytest
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
     def test_q_upsamle_nearest_channels_last(self, dtype=torch.float):
         x_cpu = torch.randn((2, 3, 5, 5), dtype=torch.float32, device=torch.device("cpu")).to(memory_format=torch.channels_last)
         x_gpu = x_cpu.to("xpu").to(memory_format=torch.channels_last)

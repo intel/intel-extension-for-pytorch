@@ -44,9 +44,9 @@ static void initGlobalDevicePoolState() {
   }
 
   // Mapping framework device to physical tile by default.
-  // If IPEX_DISABLE_TILE_PARTITION enabled, mapping framework device to
+  // If IPEX_TILE_AS_DEVICE disabled, mapping framework device to
   // physical device.
-  if (Settings::I().is_tile_partition_enabled()) {
+  if (Settings::I().is_tile_as_device_enabled()) {
     constexpr DPCPP::info::partition_property partition_by_affinity =
         DPCPP::info::partition_property::partition_by_affinity_domain;
     constexpr DPCPP::info::partition_affinity_domain next_partitionable =

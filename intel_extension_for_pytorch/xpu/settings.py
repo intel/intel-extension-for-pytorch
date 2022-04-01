@@ -95,135 +95,95 @@ class onemkl_verbose(object):
         set_onemkl_verbose(ONEMKL_VERB_LEVEL.OFF)
         return False
 
-# Force Sync Execution
-def using_force_sync_exec():
-    return _C._is_force_sync_exec()
 
-def enable_force_sync_exec():
-    _C._enable_force_sync_exec()
+# Sync Execution Mode
+def using_xpu_sync_mode():
+    return _C._is_xpu_sync_mode()
 
-def disable_force_sync_exec():
-    _C._disable_force_sync_exec()
+def enable_xpu_sync_mode():
+    _C._enable_xpu_sync_mode()
 
-class force_sync_exec():
+def disable_xpu_sync_mode():
+    _C._disable_xpu_sync_mode()
+
+class xpu_sync_mode():
     def __init__(self):
-        self.sync_exec = using_force_sync_exec()
+        self.sync_exec = using_xpu_sync_mode()
 
     def __enter__(self):
         if not self.sync_exec:
-            enable_force_sync_exec()
+            enable_xpu_sync_mode()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self.sync_exec:
-            disable_force_sync_exec()
+            disable_xpu_sync_mode()
         return False
 
-# Event Profiling
-def using_event_profiling():
-    return _C._is_event_profiling_enabled()
-
-def enable_event_profiling():
-    _C._enable_event_profiling()
-
-def disable_event_profiling():
-    _C._disable_event_profiling()
-
-class event_profiling():
-    def __init__(self):
-        self.profiling_enalbed = using_event_profiling()
-
-    def __enter__(self):
-        if not self.profiling_enalbed:
-            enable_event_profiling()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if not self.profiling_enalbed:
-            disable_event_profiling()
-        return False
 
 # oneDNN Layout
-def using_onednn_layout():
-    return _C._is_onednn_layout_enabled()
+def using_layout_opt():
+    return _C._is_layout_opt_enabled()
 
-def enable_onednn_layout():
-    _C._enable_onednn_layout()
+def enable_layout_opt():
+    _C._enable_layout_opt()
 
-def disable_onednn_layout():
-    _C._disable_onednn_layout()
+def disable_layout_opt():
+    _C._disable_layout_opt()
 
-class onednn_layout():
+class layout_opt():
     def __init__(self):
-        self.layout_enabled = using_onednn_layout()
+        self.layout_enabled = using_layout_opt()
 
     def __enter__(self):
         if not self.layout_enabled:
-            enable_onednn_layout()
+            enable_layout_opt()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self.layout_enabled:
-            disable_onednn_layout()
+            disable_layout_opt()
         return False
 
-# Tile Partition
-# NOTE: Tile partition can only be set within lazy init.
-def using_tile_partition():
-    return _C._is_tile_partition_enabled()
+# Tile Partition As Device
+def using_tile_as_device():
+    return _C._is_tile_as_device_enabled()
 
-def enable_tile_partition():
-    _C._enable_tile_partition()
 
-def disable_tile_partition():
-    _C._disable_tile_partition()
-
-# Warning Level
-# NOTE: Warning Level is not available yet.
-class WARN_LEVEL(EnumBase):
-    OFF = 0
-    ON = 1
-
-def get_warning_level():
-    return WARN_LEVEL.get_value(_C._get_warning_level)
-
-def set_warning_level(level):
-    WARN_LEVEL.set_value(_C._set_warning_level, level)
-
-# XPU Backend
-# NOTE: XPU Backend is not available yet.
-class XPU_BACKEND(EnumBase):
-    GPU = 0
-    CPU = 1
-    AUTO = 2
-
-def get_xpu_backend():
-    return XPU_BACKEND.get_value(_C._get_xpu_backend)
-
-def set_xpu_backend(backend):
-    XPU_BACKEND.set_value(_C._set_xpu_backend, backend)
-
-# TF32 Execution Mode
-# NOTE: TF32 mode is not available yet.
-def using_tf32_mode():
-    return _C._is_tf32_mode_enabled()
-
-def enable_tf32_mode():
-    _C._enable_tf32_mode()
-
-def disable_tf32_mode():
-    _C._disable_tf32_mode()
-
-class tf32_mode():
-    def __init__(self):
-        self.tf32_enabled = using_tf32_mode()
-
-    def __enter__(self):
-        if not self.tf32_enabled:
-            enable_tf32_mode()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if not self.tf32_enabled:
-            disable_tf32_mode()
-        return False
+# # XPU Backend
+# # NOTE: XPU Backend is not available yet.
+# class XPU_BACKEND(EnumBase):
+#     GPU = 0
+#     CPU = 1
+#     AUTO = 2
+# 
+# def get_xpu_backend():
+#     return XPU_BACKEND.get_value(_C._get_xpu_backend)
+# 
+# def set_xpu_backend(backend):
+#     XPU_BACKEND.set_value(_C._set_xpu_backend, backend)
+# 
+# # TF32 Execution Mode
+# # NOTE: TF32 mode is not available yet.
+# def using_tf32_mode():
+#     return _C._is_tf32_mode_enabled()
+# 
+# def enable_tf32_mode():
+#     _C._enable_tf32_mode()
+# 
+# def disable_tf32_mode():
+#     _C._disable_tf32_mode()
+# 
+# class tf32_mode():
+#     def __init__(self):
+#         self.tf32_enabled = using_tf32_mode()
+# 
+#     def __enter__(self):
+#         if not self.tf32_enabled:
+#             enable_tf32_mode()
+#         return self
+# 
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         if not self.tf32_enabled:
+#             disable_tf32_mode()
+#         return False

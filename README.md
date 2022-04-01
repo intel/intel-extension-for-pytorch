@@ -53,7 +53,7 @@ Code organization
     │   │   ├── gpu           // IPEX gpu Python API implementation
     │   │   └── itt           // ITT support
     │   ├── optim             // Customized optimizer implementation for Python
-    |   └── xpu               // XPU Python API implementation 
+    |   └── xpu               // XPU Python API implementation
     └── torch_patches         // Remaining patches for PyTorch proper
 ```
 
@@ -113,7 +113,7 @@ cd pytorch
 git am <PATH_To_frameworks.ai.pytorch.ipex-gpu>/torch_patches/*
 python3 setup.py install --user
 ```
-**Note:** We recommend using **GCC** compiler for building PyTorch. 
+**Note:** We recommend using **GCC** compiler for building PyTorch.
 
 ## Build and Install Intel® Extension for PyTorch* GPU
 
@@ -142,10 +142,10 @@ Please download pre-optimized models for Intel® Extension for PyTorch* GPU thro
 git clone https://github.com/intel-innersource/frameworks.ai.pytorch.gpu-models/
 ```
 | **Model** | **Inference** | **Training** |
-| ------ | ------ | ------ | 
+| ------ | ------ | ------ |
 | **ResNet50** | FP32/FP16/BF16/INT8 | FP32/BF16 |
-| **DLRM** | FP32/FP16 | FP32/BF16 | 
-| **BERT** | FP32/FP16 | FP32/BF16 | 
+| **DLRM** | FP32/FP16 | FP32/BF16 |
+| **BERT** | FP32/FP16 | FP32/BF16 |
 | **3D-Unet** | FP32/INT8 | N/A |
 | **SSD-ResNet34** | INT8 | BF16 |
 | **Transformer** | FP32 | FP32 |
@@ -158,22 +158,24 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 
 | **Build Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
-| USE_AOT_DEVLIST | "" | device list for AOT compilation. Now only ATS-P and PVC are supported. | 
 | USE_ONEMKL | ON | Use oneMKL BLAS library if set to ON. |
 | USE_CHANNELS_LAST_1D | ON | Support channels last 1D memory format if set to ON. |
 | USE_PERSIST_STREAM | ON | Use persistent oneDNN stream if set to ON.|
 | USE_PRIMITIVE_CACHE | OFF | Use Intel® Extension for PyTorch* GPU solution to cache oneDNN primtives if set to ON. <br> Otherwise use oneDNN cache solution.|
-| USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
 | USE_QUEUE_BARRIER | ON | Default is ON. Use queue submit barrier if set to ON. Otherwise use dummy kernel. |
+| USE_SCRATCHPAD_MODE | ON | Default is ON. Use oneDNN scratchpad user mode.|
 | USE_MULTI_CONTEXT | ON | Create DPC++ runtime context per device. |
 | USE_ITT | ON | Use Intel(R) VTune Profiler ITT functionality if set to ON. |
+| USE_AOT_DEVLIST | "" | device list for AOT compilation. Now only ATS-P and PVC are supported. |
 | BUILD_STATS | OFF | Count statistics for each component during build process if set to ON. |
-| BUILD_SEPARATE_OPS | OFF | Build each operator in separate library if set to ON. |
 | BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option if set to ON. |
 | BUILD_STRIPPED_BIN | OFF | Strip all symbols when building Intel® Extension for PyTorch* GPU libraries. |
+| BUILD_SEPARATE_OPS | OFF | Build each operator in separate library if set to ON. |
+| BUILD_SIMPLE_TRACE | OFF | Build simple trace for each registered operators
+| BUILD_OPT_LEVEL | OFF | Add build option -Ox, accept values: 0/1
+| BUILD_NO_CLANGFORMAT | OFF | Build without force clang-format if set to ON. |
 | BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path if set to ON. |
 | BUILD_DOUBLE_KERNEL | OFF | Build double data type kernels. This option is set to ON only if <br> BUILD_INTERNAL_DEBUG is set to ON. |
-| BUILD_NO_CLANGFORMAT | OFF | Build without force clang-format if set to ON. |
 
 ## Launch Option List
 The following lauch options are supported in Intel® Extension for PyTorch* GPU.
@@ -182,11 +184,9 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 | ------ | ------ |
 | IPEX_SHOW_OPTION | Show all available launch option values. |
 | IPEX_VERBOSE | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU customized kernel. |
-| IPEX_WARNING | WARNING level in integer. Provide warning messages for Intel® Extension for PyTorch* GPU runtime. |
-| IPEX_FORCE_SYNC | Enable synchronized execution mode. This mode will perform blocking <br> wait for the completion of submitted kernel. |
-| IPEX_DISABLE_PROFILING | Disable profiling solution in Intel® Extension for PyTorch* GPU. If set to 1, the queue profiling flag will be unset and kernel profiling information will be reset. |
-| IPEX_DISABLE_TILE_PARTITION | Device partition. If set to 1, tile partition will be disabled and map device to physical device. |
-| IPEX_ONEDNN_LAYOUT | Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use blocked layouts querying from oneDNN.  |
+| IPEX_XPU_SYNC_MODE | Enable synchronized execution mode. This mode will perform blocking <br> wait for the completion of submitted kernel. |
+| IPEX_TILE_AS_DEVICE | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
+| IPEX_LAYOUT_OPT | Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use blocked layouts querying from oneDNN.  |
 
 All these options are set to zero by default. User may enable one or more options like below examples.</br>
 
@@ -212,7 +212,7 @@ AOT compilation is supported on ATS-P or PVC separately with below config:
 | Supported HW | Setting |
 | ------ | ------ |
 | ATS-P B0 |  USE_AOT_DEVLIST='xe_hp_sdv'  |
-| PVC XT A0 | USE_AOT_DEVLIST='12.4.0'  | 
+| PVC XT A0 | USE_AOT_DEVLIST='12.4.0'  |
 | PVC XT B3 | USE_AOT_DEVLIST='12.4.1' |
 <br>
 Multi-target AOT compilation to support both ATS-P and PVC is not allowed currently.
@@ -226,15 +226,15 @@ All fusions patterns are only available in PyTorch JIT mode.
 | Supported Fusion | Supported Precision |
 | ------ | ------ |
 | Conv2D + ReLU |  FP32/FP16/BF16/INT8  |
-| Conv2D + Sum | FP32/FP16/BF16/INT8 | 
+| Conv2D + Sum | FP32/FP16/BF16/INT8 |
 | Conv2D + Sum + ReLU | FP32/FP16/BF16/INT8 |
-| Conv3D + ReLU | FP32/FP16/BF16 | 
+| Conv3D + ReLU | FP32/FP16/BF16 |
 | Conv3D + Sum | FP32/FP16/BF16 |
-| Conv3D + Sum + ReLU | FP32/FP16/BF16 | 
+| Conv3D + Sum + ReLU | FP32/FP16/BF16 |
 | Linear + ReLU | FP32/FP16/BF16  |
-| Linear + Sigmoid | FP32/FP16/BF16 | 
+| Linear + Sigmoid | FP32/FP16/BF16 |
 | Linear + Div(scalar) | FP32/FP16/BF16 |
-| Mul + Add | FP32/FP16/BF16 | 
+| Mul + Add | FP32/FP16/BF16 |
 | Add + ReLU | INT8 |
 
 ### Multi-tile training with Horovod:
@@ -253,7 +253,7 @@ Multi-tile ResNet50 training is verified with DistributedDataParallel (DDP) on 2
 ```bash
 git clone -b chengjun/ccl_torch1.7_gpu https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
 git submodule update --init --recursive
-COMPUTE_BACKEND=dpcpp_level_zero python setup.py install    
+COMPUTE_BACKEND=dpcpp_level_zero python setup.py install
 ```
 Example of running multi-tile ResNet50 training with DDP:
 ```bash
@@ -322,7 +322,7 @@ This release uses clang-format and flake8 to enhance the code in Intel® Extensi
 | PyTorch NN functions | 115 | 100.00%　|
 | PyTorch Tensor functions | 340 | 100.00%　|
 | PyTorch Methods | 231 | 100.00%　|
-| Total | 686 | 100.00% | 
+| Total | 686 | 100.00% |
 
 ## Caveat
 ### 1. Build order of PyTorch and extension:

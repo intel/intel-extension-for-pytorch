@@ -12,7 +12,7 @@ sycl_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_layout_opt(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_upsamle_linear_1d_channels_last(self, dtype=torch.float):
         input_cpu = torch.randn((2, 3, 5), dtype=torch.float32, device=cpu_device)
         input_dpcpp = input_cpu.to("xpu").to(memory_format=torch.channels_last_1d)
@@ -41,7 +41,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
         self.assertEqual(grad_dpcpp.is_contiguous(memory_format=torch.channels_last_1d), True)
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
     def test_upsamle_linear_2d_channels_last(self, dtype=torch.float):
         input_cpu = torch.randn((2, 3, 5, 5), dtype=torch.float32, device=cpu_device)
         input_dpcpp = input_cpu.to("xpu").to(memory_format=torch.channels_last)
@@ -70,7 +70,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
         self.assertEqual(grad_dpcpp.is_contiguous(memory_format=torch.channels_last), True)
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
     def test_upsamle_linear_3d_channels_last(self, dtype=torch.float):
         input_cpu = torch.randn((2, 3, 2, 5, 5), dtype=torch.float32, device=cpu_device)
         input_dpcpp = input_cpu.to("xpu").to(memory_format=torch.channels_last_3d)

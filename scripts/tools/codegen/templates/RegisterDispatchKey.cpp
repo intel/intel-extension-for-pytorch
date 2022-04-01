@@ -69,7 +69,7 @@ public:
     fflush(stdout);
   }
   ~IpexSimpleTrace() {
-    if (Settings::I().is_force_sync_exec()) {
+    if (Settings::I().is_xpu_sync_mode_enabled()) {
       wait_for_queue_finish();
     }
     print_indent();

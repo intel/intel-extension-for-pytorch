@@ -1,5 +1,5 @@
 set(SIMPLE_TRACE)
-if(BUILD_SIMPLE_TRACE_IPEX_ENTRY)
+if(BUILD_SIMPLE_TRACE)
         set(SIMPLE_TRACE "--simple_trace")
 endif()
 

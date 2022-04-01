@@ -4,7 +4,6 @@
 # Build options:
 #
 # USE_ONEMKL            - to use oneMKL in operators
-# USE_MICROBENCH        - to build with Microbench
 # USE_CHANNELS_LAST_1D  - to use channels last 1d feature
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
@@ -16,10 +15,12 @@
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
+# BUILD_SEPARATE_OPS    - to build each operator in separate library
+# BUILD_SIMPLE_TRACE    - to build simple trace for each registered operator
+# BUILD_OPT_LEVEL       - to add build option -Ox, accept values: 0/1
+# BUILD_NO_CLANGFORMAT  - to build without force clang-format
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
 # BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)
-# BUILD_NO_CLANGFORMAT  - to build without force clang-format
-# BUILD_SEPARATE_OPS    - to build each operator in separate library
 #
 ##############################################################
 

@@ -427,7 +427,7 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
     auto format_plain = get_dnnl_default_format(ndim, is_channels_last);
 
     memory::desc tensor_md;
-    if (!Settings::I().is_onednn_layout_enabled()) {
+    if (!Settings::I().is_layout_opt_enabled()) {
       tensor_md = memory::desc({input_tz}, data_t, format_plain);
     } else {
       auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(
@@ -457,7 +457,7 @@ void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
 
   // Tensor output;
   memory output_usr_memory;
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!Settings::I().is_layout_opt_enabled()) {
     output_usr_memory =
         dpcpp_onednn_memory(output_md, engine, output.data_ptr());
   } else {

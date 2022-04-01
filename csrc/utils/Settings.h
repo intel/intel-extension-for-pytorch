@@ -16,27 +16,18 @@ class IPEX_API Settings final {
   int get_verbose_level() const;
   void set_verbose_level(int level);
 
-  int get_warning_level() const;
-  void set_warning_level(int level);
-
   XPU_BACKEND get_xpu_backend() const;
   void set_xpu_backend(XPU_BACKEND backend);
 
-  bool is_force_sync_exec() const;
-  void enable_force_sync_exec();
-  void disable_force_sync_exec();
+  bool is_xpu_sync_mode_enabled() const;
+  void enable_xpu_sync_mode();
+  void disable_xpu_sync_mode();
 
-  bool is_event_profiling_enabled() const;
-  void enable_event_profiling();
-  void disable_event_profiling();
+  bool is_tile_as_device_enabled() const;
 
-  bool is_tile_partition_enabled() const;
-  void enable_tile_partition();
-  void disable_tile_partition();
-
-  bool is_onednn_layout_enabled() const;
-  void enable_onednn_layout();
-  void disable_onednn_layout();
+  bool is_layout_opt_enabled() const;
+  void enable_layout_opt();
+  void disable_layout_opt();
 
   bool is_tf32_mode_enabled() const;
   void enable_tf32_mode();
@@ -53,13 +44,11 @@ class IPEX_API Settings final {
 
  private:
   int verbose_level;
-  int warning_level;
   XPU_BACKEND xpu_backend;
 
-  bool force_sync_exec_enabled;
-  bool event_profiling_enabled;
-  bool tile_partition_enabled;
-  bool onednn_layout_enabled;
+  bool xpu_sync_mode_enabled;
+  bool tile_as_device_enabled;
+  bool layout_opt_enabled;
   bool tf32_mode_enabled;
 };
 

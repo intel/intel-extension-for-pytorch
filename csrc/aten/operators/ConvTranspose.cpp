@@ -107,7 +107,7 @@ Tensor dpcpp_convolution_transpose(
 
   memory weight_usr_memory;
   memory::desc input_usr_md, weight_usr_md, output_usr_md;
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!Settings::I().is_layout_opt_enabled()) {
     input_usr_md = memory::desc({input_tz}, src_data_t, format_data);
     weight_usr_md =
         memory::desc({trans_weight_tz}, wei_data_t, trans_format_weight);
@@ -191,11 +191,11 @@ Tensor dpcpp_convolution_transpose(
        {DNNL_ARG_BIAS, bias_memory},
        {DNNL_ARG_DST, output_memory}});
 
-  if (!Settings::I().is_onednn_layout_enabled() &&
+  if (!Settings::I().is_layout_opt_enabled() &&
       output_.data_ptr() != output.data_ptr()) {
     xpu::oneDNN::reorder(output_, output);
   } else if (
-      Settings::I().is_onednn_layout_enabled() &&
+      Settings::I().is_layout_opt_enabled() &&
       output_.data_ptr() != output.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(output_);
     DPCPPTensorContext::set_tensor_ctx(output, std::move(blk_ctx));
@@ -300,7 +300,7 @@ Tensor dpcpp_convolution_transpose_backward_input(
 
   memory weight_usr_memory;
   memory::desc grad_output_usr_md, weight_usr_md, grad_input_usr_md;
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!Settings::I().is_layout_opt_enabled()) {
     grad_output_usr_md = memory::desc({output_tz}, dst_data_t, format_data);
     weight_usr_md =
         memory::desc({trans_weight_tz}, wei_data_t, trans_format_weight);
@@ -378,11 +378,11 @@ Tensor dpcpp_convolution_transpose_backward_input(
        {DNNL_ARG_WEIGHTS, weight_memory},
        {DNNL_ARG_DIFF_SRC, grad_input_memory}});
 
-  if (!Settings::I().is_onednn_layout_enabled() &&
+  if (!Settings::I().is_layout_opt_enabled() &&
       grad_input_.data_ptr() != grad_input.data_ptr()) {
     xpu::oneDNN::reorder(grad_input_, grad_input);
   } else if (
-      Settings::I().is_onednn_layout_enabled() &&
+      Settings::I().is_layout_opt_enabled() &&
       grad_input_.data_ptr() != grad_input.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
@@ -490,7 +490,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_transpose_backward_weights(
   memory grad_weight_usr_memory, grad_bias_memory;
   memory::desc input_usr_md, grad_output_usr_md, grad_weight_usr_md,
       grad_bias_md;
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!Settings::I().is_layout_opt_enabled()) {
     input_usr_md = memory::desc({input_tz}, src_data_t, format_data);
     grad_output_usr_md = memory::desc({output_tz}, dst_data_t, format_data);
     grad_weight_usr_md =

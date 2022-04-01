@@ -8,7 +8,7 @@ import pytest
 
 class TestTorchMethod(TestCase):
 
-    @pytest.mark.skipif("not torch.xpu.using_onednn_layout()", reason="only for block format")
+    @pytest.mark.skipif("not torch.xpu.using_layout_opt()", reason="only for block format")
     def test_reshape_cat(self, dtype=torch.float):
         """
         Issue: When run SSD-ResNet50 with block format, it raised a shape mismatch error in cat op.

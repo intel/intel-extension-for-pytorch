@@ -531,7 +531,7 @@ class TestTorchMethod(TestCase):
         x2_xpu = x2.to("xpu")
         to_block_cpu = torch.nn.Conv2d(2, 2, kernel_size=3, padding=1)
         to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
-        with torch.xpu.onednn_layout():
+        with torch.xpu.layout_opt():
             y = to_block_cpu(x1)
             y.add_(x2)
             x1.add_(y)
@@ -547,7 +547,7 @@ class TestTorchMethod(TestCase):
             assert torch.equal(a + b, t)
 
     def test_add_broadcast_block_format(self):
-        with torch.xpu.onednn_layout():
+        with torch.xpu.layout_opt():
             to_block_xpu = torch.nn.Conv2d(3, 3, kernel_size=3, padding=1).xpu()
             _self = to_block_xpu(torch.rand(1, 3, 1, 1).xpu())
             _other = to_block_xpu(torch.rand(1, 3, 5, 5).xpu())

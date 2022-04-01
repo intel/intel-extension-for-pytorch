@@ -252,7 +252,7 @@ static inline void matmul(
             {mb, m, n}, b_dt, {b.stride(0), b.stride(1), b.stride(2)});
     }
 
-    if (dims == 2 && Settings::I().is_onednn_layout_enabled()) {
+    if (dims == 2 && Settings::I().is_layout_opt_enabled()) {
       // attr + blk
 #ifdef USE_PRIMITIVE_CACHE
       create_key(
@@ -275,7 +275,7 @@ static inline void matmul(
       matmul_desc = matmul::desc(m1_md, m2_md, b_md, dst_md);
     }
   } else {
-    if (dims == 2 && Settings::I().is_onednn_layout_enabled()) {
+    if (dims == 2 && Settings::I().is_layout_opt_enabled()) {
       // no attr + blk
 #ifdef USE_PRIMITIVE_CACHE
       create_key(
@@ -339,7 +339,7 @@ static inline void matmul(
 
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
-    onoff |= Settings::I().is_onednn_layout_enabled();
+    onoff |= Settings::I().is_layout_opt_enabled();
     onoff &= c10::InferenceMode::is_enabled();
     return onoff;
   }();
@@ -406,7 +406,7 @@ static inline void matmul(
         });
   }
 
-  if (Settings::I().is_onednn_layout_enabled() && dst_m != dst_usr_m &&
+  if (Settings::I().is_layout_opt_enabled() && dst_m != dst_usr_m &&
       dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));

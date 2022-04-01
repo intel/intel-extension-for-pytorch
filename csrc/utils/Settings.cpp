@@ -13,21 +13,17 @@ namespace dpcpp {
 /*
  * All available launch options for IPEX
  *
- * IPEX_SHOW_OPTION:
+ * IPEX_SHOW_OPTIONS:
  *    Default = 0, Set 1 to show all launch option values
  * IPEX_VERBOSE:
  *    Default = 0, Set verbose level with synchronization execution mode
- * IPEX_WARNING:
- *    Default = 0, Set warning level as int value for IPEX log lines
  * IPEX_XPU_BACKEND:
  *    Default = 0 (XB_GPU), Set XPU_BACKEND as global IPEX backend
- * IPEX_FORCE_SYNC:
+ * IPEX_XPU_SYNC_MODE:
  *    Default = 0, Set 1 to enforce synchronization execution mode
- * IPEX_DISABLE_PROFILING:
- *    Default = 0, Set 1 to disable IPEX event profiling
- * IPEX_DISABLE_TILE_PARTITION:
- *    Default = 0, Set 1 to disable tile partition and map per root device
- * IPEX_ONEDNN_LAYOUT:
+ * IPEX_TILE_AS_DEVICE:
+ *    Default = 1, Set 0 to disable tile partition and map per root device
+ * IPEX_LAYOUT_OPT:
  *    Default = 0, Set 1 to enable onednn specific layouts
  * IPEX_TF32_MODE:
  *    Default = 0, Set 1 to enable TF32 mode execution
@@ -42,28 +38,28 @@ Settings& Settings::I() {
 }
 
 Settings::Settings() {
-#define DPCPP_ENV_TYPE_DEF(type, var, show)     \
-  auto type = [&]() -> std::optional<int> {     \
-    auto env = std::getenv("IPEX_" #var);       \
-    std::optional<int> _##type;                 \
-    try {                                       \
-      _##type = std::stoi(env, 0, 10);          \
-    } catch (...) {                             \
-      _##type = std::nullopt;                   \
-    }                                           \
-    if (show) {                                 \
-      std::cerr << " ** IPEX_" << #var << ": "; \
-      if (_##type.has_value()) {                \
-        std::cerr << _##type.value();           \
-      } else {                                  \
-        std::cerr << "NIL";                     \
-      }                                         \
-      std::cerr << std::endl;                   \
-    }                                           \
-    return _##type;                             \
+#define DPCPP_ENV_TYPE_DEF(type, name, val, show) \
+  auto type = [&]() -> std::optional<int> {       \
+    auto env = std::getenv("IPEX_" #name);        \
+    std::optional<int> _##type;                   \
+    try {                                         \
+      _##type = std::stoi(env, 0, 10);            \
+    } catch (...) {                               \
+      _##type = std::nullopt;                     \
+    }                                             \
+    if (show) {                                   \
+      std::cerr << " ** IPEX_" << #name << ": ";  \
+      if (_##type.has_value()) {                  \
+        std::cerr << _##type.value();             \
+      } else {                                    \
+        std::cerr << val;                         \
+      }                                           \
+      std::cerr << std::endl;                     \
+    }                                             \
+    return _##type;                               \
   }()
 
-  DPCPP_ENV_TYPE_DEF(show_option, SHOW_OPTION, false);
+  DPCPP_ENV_TYPE_DEF(show_option, SHOW_OPTIONS, 0, false);
   bool show_opt =
       show_option.has_value() ? (show_option != 0 ? true : false) : false;
   if (show_opt) {
@@ -77,20 +73,14 @@ Settings::Settings() {
   }
 
   verbose_level = 0;
-  DPCPP_ENV_TYPE_DEF(env_verbose_level, VERBOSE, show_opt);
+  DPCPP_ENV_TYPE_DEF(env_verbose_level, VERBOSE, verbose_level, show_opt);
   if (env_verbose_level.has_value()) {
     verbose_level = env_verbose_level.value();
   }
 
-  warning_level = 0;
-  DPCPP_ENV_TYPE_DEF(env_warning_level, WARNING, show_opt);
-  if (env_warning_level.has_value()) {
-    warning_level = env_warning_level.value();
-  }
-
   /* Not ready so far.
   xpu_backend = XPU_BACKEND::XB_GPU;
-  DPCPP_ENV_TYPE_DEF(env_xpu_backend, XPU_BACKEND, show_opt);
+  DPCPP_ENV_TYPE_DEF(env_xpu_backend, XPU_BACKEND, xpu_backend, show_opt);
   if (env_xpu_backend.has_value()
       && ((env_xpu_backend.value() >= XPU_BACKEND::XB_GPU)
         && (env_xpu_backend.value() < XPU_BACKEND::XB_MAX))) {
@@ -98,36 +88,29 @@ Settings::Settings() {
   }
   */
 
-  force_sync_exec_enabled = false;
-  DPCPP_ENV_TYPE_DEF(env_force_sync, FORCE_SYNC, show_opt);
-  if (env_force_sync.has_value() && (env_force_sync.value() != 0)) {
-    force_sync_exec_enabled = true;
-  }
-
-  event_profiling_enabled = true;
-  DPCPP_ENV_TYPE_DEF(env_disable_profiling, DISABLE_PROFILING, show_opt);
-  if (env_disable_profiling.has_value() &&
-      (env_disable_profiling.value() != 0)) {
-    event_profiling_enabled = false;
-  }
-
-  tile_partition_enabled = true;
+  xpu_sync_mode_enabled = false;
   DPCPP_ENV_TYPE_DEF(
-      env_disable_tile_partition, DISABLE_TILE_PARTITION, show_opt);
-  if (env_disable_tile_partition.has_value() &&
-      (env_disable_tile_partition.value() != 0)) {
-    tile_partition_enabled = false;
+      env_xpu_sync_mode, XPU_SYNC_MODE, xpu_sync_mode_enabled, show_opt);
+  if (env_xpu_sync_mode.has_value() && (env_xpu_sync_mode.value() != 0)) {
+    xpu_sync_mode_enabled = true;
   }
 
-  onednn_layout_enabled = false;
-  DPCPP_ENV_TYPE_DEF(env_onednn_layout, ONEDNN_LAYOUT, show_opt);
-  if (env_onednn_layout.has_value() && (env_onednn_layout.value() != 0)) {
-    onednn_layout_enabled = true;
+  tile_as_device_enabled = true;
+  DPCPP_ENV_TYPE_DEF(
+      env_tile_as_device, TILE_AS_DEVICE, tile_as_device_enabled, show_opt);
+  if (env_tile_as_device.has_value() && (env_tile_as_device.value() == 0)) {
+    tile_as_device_enabled = false;
+  }
+
+  layout_opt_enabled = false;
+  DPCPP_ENV_TYPE_DEF(env_layout_opt, LAYOUT_OPT, layout_opt_enabled, show_opt);
+  if (env_layout_opt.has_value() && (env_layout_opt.value() != 0)) {
+    layout_opt_enabled = true;
   }
 
   /* Not ready so far.
   tf32_mode_enabled = false;
-  DPCPP_ENV_TYPE_DEF(env_tf32_mode, TF32_MODE, show_opt);
+  DPCPP_ENV_TYPE_DEF(env_tf32_mode, TF32_MODE, tf32_mode_enabled, show_opt);
   if (env_tf32_mode.has_value() && (env_tf32_mode.value() != 0)) {
     tf32_mode_enabled = true;
   }
@@ -149,16 +132,6 @@ void Settings::set_verbose_level(int level) {
   verbose_level = level;
 }
 
-int Settings::get_warning_level() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return warning_level;
-}
-
-void Settings::set_warning_level(int level) {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  warning_level = level;
-}
-
 XPU_BACKEND Settings::get_xpu_backend() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return xpu_backend;
@@ -169,64 +142,39 @@ void Settings::set_xpu_backend(XPU_BACKEND backend) {
   xpu_backend = backend;
 }
 
-bool Settings::is_force_sync_exec() const {
+bool Settings::is_xpu_sync_mode_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return force_sync_exec_enabled;
+  return xpu_sync_mode_enabled;
 }
 
-void Settings::enable_force_sync_exec() {
+void Settings::enable_xpu_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  force_sync_exec_enabled = true;
+  xpu_sync_mode_enabled = true;
 }
 
-void Settings::disable_force_sync_exec() {
+void Settings::disable_xpu_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  force_sync_exec_enabled = false;
+  xpu_sync_mode_enabled = false;
 }
 
-bool Settings::is_event_profiling_enabled() const {
+bool Settings::is_tile_as_device_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return event_profiling_enabled;
+  return tile_as_device_enabled;
 }
 
-void Settings::enable_event_profiling() {
+bool Settings::is_layout_opt_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  event_profiling_enabled = true;
+  return layout_opt_enabled;
 }
 
-void Settings::disable_event_profiling() {
+void Settings::enable_layout_opt() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  event_profiling_enabled = false;
+  layout_opt_enabled = true;
 }
 
-bool Settings::is_tile_partition_enabled() const {
+void Settings::disable_layout_opt() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return tile_partition_enabled;
-}
-
-void Settings::enable_tile_partition() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  tile_partition_enabled = true;
-}
-
-void Settings::disable_tile_partition() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  tile_partition_enabled = false;
-}
-
-bool Settings::is_onednn_layout_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return onednn_layout_enabled;
-}
-
-void Settings::enable_onednn_layout() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_layout_enabled = true;
-}
-
-void Settings::disable_onednn_layout() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_layout_enabled = false;
+  layout_opt_enabled = false;
 }
 
 bool Settings::is_tf32_mode_enabled() const {

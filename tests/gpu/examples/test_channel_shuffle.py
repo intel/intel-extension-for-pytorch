@@ -29,7 +29,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(dst_xpu.is_contiguous(), True)
         self.assertEqual(dst_cpu, dst_xpu.cpu())
 
-    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
     def test_channelshuffle_channels_last(self, dtype=torch.float):
         src_cpu = torch.randn(1, 4, 2, 2)
         src_xpu = src_cpu.to(memory_format=torch.channels_last).to("xpu")

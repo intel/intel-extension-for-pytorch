@@ -198,7 +198,7 @@ static at::Tensor convolution(
   auto ndim = src.ndimension();
   auto dst_tz =
       conv_dst_tz(ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
-  if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
+  if (!Settings::I().is_layout_opt_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
       dst_opt = attr.with_relu() ? device(kXPU).dtype(kQUInt8)
@@ -267,7 +267,7 @@ static at::Tensor convolution(
                               : memory::desc();
 
   // block combination
-  if (Settings::I().is_onednn_layout_enabled()) {
+  if (Settings::I().is_layout_opt_enabled()) {
     src_md = memory::desc(src_tz, src_data_t, fmt_any);
     dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
@@ -365,7 +365,7 @@ static at::Tensor convolution(
       ? memory::desc(wgh_tz, wei_usr_data_t, fmt_wgh)
       : wgh_ctx.meta();
 
-  if (!Settings::I().is_onednn_layout_enabled()) {
+  if (!Settings::I().is_layout_opt_enabled()) {
     src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
     dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   } else {
@@ -413,7 +413,7 @@ static at::Tensor convolution(
 
   auto weight_cache_optimization = [&]() {
     bool onoff = false;
-    onoff |= Settings::I().is_onednn_layout_enabled();
+    onoff |= Settings::I().is_layout_opt_enabled();
     onoff |= onednn_conv_use_channels_last(src, wgh);
     onoff &= !at::GradMode::is_enabled();
     return onoff;
@@ -463,7 +463,7 @@ static at::Tensor convolution(
   auto expected_dst_md = conv_forward_pd.dst_desc();
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
-    if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
+    if (Settings::I().is_layout_opt_enabled() && dst.is_quantized()) {
       auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
           (get_onednn_dtype(dst) == memory::data_type::u8 &&
            dst.q_zero_point() == 128)
@@ -545,7 +545,7 @@ static at::Tensor convolution(
        {DNNL_ARG_DST, dst_m}});
 #endif
 
-  if (Settings::I().is_onednn_layout_enabled() &&
+  if (Settings::I().is_layout_opt_enabled() &&
       dst_.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));

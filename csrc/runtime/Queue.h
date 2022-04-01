@@ -22,19 +22,12 @@ enum class QueueType : uint8_t {
 class Queue {
  public:
   Queue(DeviceId di, DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
-      : queue_(std::make_unique<DPCPP::queue>(
-            Settings::I().is_event_profiling_enabled()
-                ? DPCPP::queue(
-                      dpcppGetDeviceContext(di),
-                      dpcppGetRawDevice(di),
-                      asyncHandler,
-                      {DPCPP::property::queue::in_order(),
-                       DPCPP::property::queue::enable_profiling()})
-                : DPCPP::queue(
-                      dpcppGetDeviceContext(di),
-                      dpcppGetRawDevice(di),
-                      asyncHandler,
-                      {DPCPP::property::queue::in_order()}))),
+      : queue_(std::make_unique<DPCPP::queue>(DPCPP::queue(
+            dpcppGetDeviceContext(di),
+            dpcppGetRawDevice(di),
+            asyncHandler,
+            {DPCPP::property::queue::in_order(),
+             DPCPP::property::queue::enable_profiling()}))),
         device_id_(di) {}
 
   DeviceId getDeviceId() const {

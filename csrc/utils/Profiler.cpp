@@ -160,9 +160,7 @@ static RegisterDPCPPMethods reg;
 
 bool is_profiler_enabled() {
 #if defined(USE_PROFILER)
-  return (
-      xpu::dpcpp::Settings::I().is_event_profiling_enabled() &&
-      profilerEnabled());
+  return profilerEnabled();
 #else
   return false;
 #endif
