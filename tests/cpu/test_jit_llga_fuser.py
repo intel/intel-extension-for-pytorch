@@ -414,6 +414,38 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::' + eltwise])
 
     @llga_fp32_bf16_test_env
+    def test_ensure_tensor_is_rewrapped(self):
+        class M(nn.Module):
+            def __init__(self, eltwise_fn, data_type):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
+                self.eltwise = eltwise_fn
+                self.adaptive_avg_pool_2d = nn.AdaptiveAvgPool2d((5, 7))
+
+            def forward(self, x, y):
+                x = self.conv1(x)
+                x = self.eltwise(x)
+                x = self.conv2(x)
+                x = self.eltwise(x)
+                x = torch.add(x, y)
+                x = self.adaptive_avg_pool_2d(x)
+                return x
+
+        eltwise_fn_name = 'relu'
+        eltwise_fn = get_eltwise_fn(eltwise_fn_name)
+        for data_type in [torch.bfloat16, torch.float]:
+            m = M(eltwise_fn, data_type)
+            m = m.to(memory_format=torch.channels_last)
+            x = torch.rand(1, 32, 28, 28, dtype=data_type).to(memory_format=torch.channels_last)
+            y = torch.rand(1, 32, 28, 28, dtype=data_type).to(memory_format=torch.channels_last)
+            # Simply test if the output is accurate
+            # The output of the second partition is input to adaptive_avg_pool2d, which is
+            # unsupported by LLGA. In resnext101 32x16d, we encountered an accuracy issue.
+            graph, _ = self.checkTrace(m, [x, y])
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+
+    @llga_fp32_bf16_test_env
     def test_conv2d_bn(self):
         class M(nn.Module):
             def __init__(self):
@@ -478,7 +510,7 @@ class TestFusionPattern(JitLlgaTestCase):
     @llga_fp32_bf16_test_env
     def test_mha_pattern(self):
         def forward_test(x, y, z, a):
-            tmp = torch.matmul(x, y)/8. + a
+            tmp = torch.matmul(x, y) / 8. + a
             tmp = torch.softmax(tmp, -1)
             tmp = tmp.matmul(z)
             tmp = torch.permute(tmp, (0, 2, 1, 3))
@@ -497,7 +529,7 @@ class TestFusionPattern(JitLlgaTestCase):
     @llga_fp32_bf16_test_env
     def test_do_not_map_permute(self):
         def forward_test(x, y, z, a):
-            tmp = torch.matmul(x, y)/8. + a
+            tmp = torch.matmul(x, y) / 8. + a
             tmp = torch.softmax(tmp, -1)
             tmp = tmp.matmul(z)
             temp = tmp.view(tmp.numel())

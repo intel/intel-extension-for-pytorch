@@ -306,6 +306,40 @@ class TestFusionPattern(JitLlgaTestCase):
                         self.assertFused(graph, ['aten::_convolution', 'aten::' + eltwise, 'aten::quantize_per_channel', 'aten::dequantize'])
                         self.checkPatterns(graph, patterns)
 
+    def test_ensure_tensor_is_rewrapped(self):
+        class M(nn.Module):
+            def __init__(self, eltwise_fn):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.eltwise = eltwise_fn
+                self.adaptive_avg_pool_2d = nn.AdaptiveAvgPool2d((5, 7))
+
+            def forward(self, x, y):
+                x = self.conv1(x)
+                x = self.eltwise(x)
+                x = self.conv2(x)
+                x = self.eltwise(x)
+                x = torch.add(x, y)
+                x = self.adaptive_avg_pool_2d(x)
+                return x
+
+                eltwise_fn_name = 'relu'
+                eltwise_fn = get_eltwise_fn(eltwise_fn_name)
+
+                m = M(eltwise_fn)
+                x = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
+                y = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
+                for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                # Simply test if the output is accurate
+                # The output of the second partition is input to adaptive_avg_pool2d, which is
+                # unsupported by LLGA. In resnext101 32x16d, we encountered an accuracy issue
+                    graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1,
+                                                    config_name="ensure_tensor_is_rewrapped_eltwise",
+                                                    qscheme=qscheme)
+                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+
+
     def test_conv2d_bn(self):
         class M(nn.Module):
             def __init__(self, bias):

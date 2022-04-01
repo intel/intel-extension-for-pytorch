@@ -186,16 +186,56 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
     auto iter = inplacePairs_.find(outputId);
     if (iter != inplacePairs_.end()) {
       // output reuses one of input tensors
+#ifdef GRAPH_DEBUG_ENABLED
+      GRAPH_DEBUG("Inplace computation");
+#endif
       auto inputOffset = iter->second;
       auto inputTensor = inputs[inputOffset];
+      auto dataType = spec.dtype();
+      if (C10_UNLIKELY(!useOpaqueLayout(i) && inputTensor.is_mkldnn())) {
+        // If the input tensor was between two partitions, it would've been
+        // wrapped with LlgaTensorImpl. But if it's being reused as the output
+        // tensor, which is not between two partitions, then we'd have to
+        // re-wrap it with a sub-class of TensorImpl, as it'd be fed into a
+        // PyTorch op.
+#ifdef GRAPH_DEBUG_ENABLED
+        GRAPH_DEBUG("Rewrap tensor");
+#endif
+        auto llgaImpl =
+            static_cast<at::LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
+        switch (dataType) {
+          case data_type::f32:
+          case data_type::bf16:
+            inputTensor = at::LlgaTensorImpl::llga_to_aten_tensor(llgaImpl);
+            break;
+          case data_type::s8:
+          case data_type::u8:
+            inputTensor = at::LlgaTensorImpl::llga_to_aten_tensor(
+                llgaImpl, spec.get_quantizer());
+            break;
+          case data_type::s32:
+          default:
+            TORCH_CHECK(
+                false, "Invalid data type ", static_cast<size_t>(dataType));
+        }
+      }
       outputs.push_back(inputTensor);
       runOutputs.push_back(
           {spec.logical_tensor(), Engine::getEngine(), inputTensor.data_ptr()});
-    } else if (spec.is_opaque()) {
+    } else if (useOpaqueLayout(i)) {
+      // Wrap tensors between partitions with LlgaTensorImpl wrapper, so that we
+      // can bypass guard-check, as strides would be different than those
+      // expected.
+#ifdef GRAPH_DEBUG_ENABLED
+      GRAPH_DEBUG("Between partitions");
+#endif
       auto tensor = at::empty_llga(spec, opt);
       outputs.push_back(tensor);
       runOutputs.push_back(at::llga_from_aten_tensor(tensor));
     } else {
+#ifdef GRAPH_DEBUG_ENABLED
+      GRAPH_DEBUG("Neither opaque nor inplace");
+#endif
       if (spec.is_quantized()) {
         at::QuantizerPtr quantizer = spec.get_quantizer();
         auto qtensor = at::new_qtensor(spec.sizes(), opt, quantizer);
@@ -278,9 +318,13 @@ void LlgaKernel::run(Stack& stack) {
   std::call_once(
       spec_initialized_flag_,
       [&](const TensorArgs& inputs) {
+#ifdef GRAPH_DEBUG_ENABLED
         GRAPH_DEBUG("Initializing input logical tensors");
+#endif
         inputSpecs_ = initializeInputSpecs(inputs);
+#ifdef GRAPH_DEBUG_ENABLED
         GRAPH_DEBUG("Initializing output logical tensors");
+#endif
         outputSpecs_ = initializeOutputSpecs();
       },
       inputs);
@@ -291,25 +335,35 @@ void LlgaKernel::run(Stack& stack) {
 
   int n_thread = omp_get_max_threads();
   if (n_thread > 0 && n_thread <= MAX_COMPILATION_CACHE_SIZE) {
+#ifdef GRAPH_DEBUG_ENABLED
     GRAPH_DEBUG("Cached compilation");
+#endif
     compilation = compileAndCache(partition_, n_thread);
   } else {
+#ifdef GRAPH_DEBUG_ENABLED
     GRAPH_DEBUG("Runtime compilation");
+#endif
     compilation = compile(partition_);
   }
-
+#ifdef GRAPH_DEBUG_ENABLED
   GRAPH_DEBUG("Preparing runtime tensors");
+#endif
   std::tie(runInputs, runOutputs) = prepareRunArgs(inputs, outputs);
-
+#ifdef GRAPH_DEBUG_ENABLED
   GRAPH_DEBUG("Executing partition");
+#endif
   compilation.execute(Stream::getStream(), runInputs, runOutputs);
+#ifdef GRAPH_DEBUG_ENABLED
   GRAPH_DEBUG("Partition executed");
-
+#endif
   // Update the stack.
   drop(stack, nGraphInputs_);
-  for (auto& o : outputs)
+  for (auto& o : outputs) {
     push_one(stack, std::move(o));
+  }
+#ifdef GRAPH_DEBUG_ENABLED
   GRAPH_DEBUG("Stack updated");
+#endif
 }
 
 } // namespace onednn
