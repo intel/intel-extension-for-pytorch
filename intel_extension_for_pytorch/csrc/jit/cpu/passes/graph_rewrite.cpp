@@ -38,34 +38,44 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
         %r = ipex::shuffle_2d(%input, %view_shape, %trans_dim0, %trans_dim1)
         return (%r) )";
 
+  // this filter passes only for the following conditions:
+  // (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
+  // (2) the tranpose is for groups => [n, c // groups, grpups, h, w]
+  // (3) the output view shape should be the same as the input tensor shape
   auto filter_shuffle_2d_fusion =
       [](const Match& match,
          const std::unordered_map<std::string, Value*>& vmap) {
         const auto& match_vmap = match.values_map;
-        auto input_ = getIValue("input", match_vmap, vmap).value();
-        if (!(input_.isTensor())) {
-          return false;
-        }
-        auto view_shape_ = getIValue("view_shape", match_vmap, vmap).value();
-        if (!(view_shape_.isIntList())) {
-          return false;
-        }
-        auto trans_dim0_ = getIValue("trans_dim0", match_vmap, vmap).value();
-        if (!(trans_dim0_.isInt())) {
-          return false;
-        }
-        auto trans_dim1_ = getIValue("trans_dim1", match_vmap, vmap).value();
-        if (!(trans_dim1_.isInt())) {
-          return false;
-        }
-        auto flattern_shape_ =
-            getIValue("flattern_shape", match_vmap, vmap).value();
-        if (!(flattern_shape_.isInt())) {
-          return false;
-        }
 
-        auto trans_dim0_val = trans_dim0_.toInt();
-        auto trans_dim1_val = trans_dim1_.toInt();
+        // current node is the second "view" node
+        Node* node = match.anchor;
+        // get the first "view" node
+        auto first_view_node =
+            node->input(0)->node()->input(0)->node()->input(0)->node();
+        // get the input tensor from the first "view" node
+        auto input_ = first_view_node->input(0);
+        auto inputType = input_->type()->cast<TensorType>();
+        auto inputTensor = *inputType;
+        // if the input tensor does not have dim info
+        if (!inputType->dim().has_value()) {
+          return false;
+        }
+        // get the view shape
+        auto view_shape_ = first_view_node->input(1);
+        // get the flattern shape
+        auto flattern_shape_ = node->input(1);
+        // get the transpose node
+        auto trans_node = node->input(0)->node()->input(0)->node();
+
+        auto trans_dim0_ = trans_node->input(1);
+        auto trans_dim1_ = trans_node->input(2);
+        // if the transpose dim has not set
+        if (!toIValue(trans_dim0_).has_value() ||
+            !toIValue(trans_dim1_).has_value()) {
+          return false;
+        }
+        auto trans_dim0_val = toIValue(trans_dim0_).value().toInt();
+        auto trans_dim1_val = toIValue(trans_dim1_).value().toInt();
         auto dim0_val =
             trans_dim0_val < trans_dim1_val ? trans_dim0_val : trans_dim1_val;
         auto dim1_val =
@@ -76,46 +86,57 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
           return false;
         }
 
-        auto input_val = input_.toTensor();
-        auto view_shape_val = view_shape_.toIntVector();
-        auto flattern_shape_val = flattern_shape_.toIntVector();
+        // if the view shape and flattern shape is not set
+        if (!toIValue(view_shape_).has_value() ||
+            !toIValue(flattern_shape_).has_value()) {
+          return false;
+        }
+        auto view_shape_list = toIValue(view_shape_).value().toIntVector();
+        auto flattern_shape_list =
+            toIValue(flattern_shape_).value().toIntVector();
+
         // ex. [n, c, h, w] => [n, groups, c // groups, h, w]
-        if ((input_val.ndimension() - view_shape_val.size()) != -1) {
+        if ((inputType->dim().value() - view_shape_list.size()) != -1) {
           return false;
         }
 
         TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim0_val >= 0);
         TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim1_val >= 0);
-        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim0_val + 1 < input_val.ndimension());
-        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim1_val + 1 < input_val.ndimension());
-        if (view_shape_val[dim0_val] * view_shape_val[dim1_val] !=
-            input_val.size(dim0_val)) {
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+            dim0_val + 1 < inputType->dim().value());
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+            dim1_val + 1 < inputType->dim().value());
+
+        auto view_shape_dim0_val = view_shape_list[dim0_val];
+        auto view_shape_dim1_val = view_shape_list[dim1_val];
+        // c => groups, c // groups
+        if (view_shape_dim0_val * view_shape_dim1_val !=
+            inputTensor.sizes()[dim0_val].value()) {
+          return false;
+        }
+        // output view shape should be the same as the input
+        if (flattern_shape_list.size() != inputType->dim().value()) {
           return false;
         }
 
-        if (flattern_shape_val.size() != input_val.ndimension()) {
-          return false;
-        }
-
-        for (int i = 0; i < flattern_shape_val.size(); i++) {
-          if (flattern_shape_val[i] != input_val.size(i)) {
+        for (int i = 0; i < flattern_shape_list.size(); i++) {
+          if (flattern_shape_list[i] != inputTensor.sizes()[i].value()) {
             // [n, c, h, w] => view [n, groups, c // groups, h, w] => tranpose
             // [n, c // groups, groups, h, w]
             // => view [n, -1, h, w]
             //    or
             //    view [n, c, h, w]
-            if ((flattern_shape_val[i] != -1) || (i != dim0_val)) {
+            if ((flattern_shape_list[i] != -1) || (i != dim0_val)) {
               return false;
             }
           }
         }
-
         return true;
       };
 
   SubgraphRewriter rewriter_shuffle_2d;
   rewriter_shuffle_2d.RegisterRewritePattern(shuffle, shuffle_2d_fusion);
-  rewriter_shuffle_2d.runOnGraph(graph);
+  rewriter_shuffle_2d.runOnGraph(graph, filter_shuffle_2d_fusion);
 }
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
