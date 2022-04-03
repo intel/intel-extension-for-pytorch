@@ -202,7 +202,7 @@ IPEX_VERBOSE=1 python ResNet50.py
 
 3. Set multiple options when running model
 ```bash
-IPEX_VERBOSE=1 IPEX_ONEDNN_LAYOUT=1 python ResNet50.py
+IPEX_VERBOSE=1 IPEX_LAYOUT_OPT=1 python ResNet50.py
 ```
 
 ## Feature Introduction
@@ -218,7 +218,7 @@ AOT compilation is supported on ATS-P or PVC separately with below config:
 Multi-target AOT compilation to support both ATS-P and PVC is not allowed currently.
 
 ### oneDNN specific layouts:
-All models listed in above "Verified Models" can run with IPEX_ONEDNN_LAYOUT=1 on ATS-P L0 backend. However, not all supported models can gain performance improvement through this feature.
+All models listed in above "Verified Models" can run with IPEX_LAYOUT_OPT=1. However, not all supported models can gain performance improvement through this feature.
 
 ### Fusion pattern support:
 All fusions patterns are only available in PyTorch JIT mode.
