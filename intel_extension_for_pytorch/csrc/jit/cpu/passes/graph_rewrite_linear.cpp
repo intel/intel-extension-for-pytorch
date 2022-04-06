@@ -255,8 +255,8 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
         linear_add_rstring_v2.format(env), linear_add_fused);
   }
 
-  rewriter_add_v1.runOnGraph(graph, fuse_add_filter_v1);
-  rewriter_add_v2.runOnGraph(graph, fuse_add_filter_v2);
+  rewriter_add_v1.runOnGraph(graph, fuse_add_filter(graph, /* accumu_id */ 1));
+  rewriter_add_v2.runOnGraph(graph, fuse_add_filter(graph, /* accumu_id */ 0));
 }
 
 } // namespace graph_rewrite
