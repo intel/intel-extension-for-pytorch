@@ -82,7 +82,10 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   // We can memcpy the memory if both tensors have the same type AND both
   // tensors are contiguous after dimension coalescing and reordering.
   bool same_type = iter.dtype(0) == iter.dtype(1);
-  bool memcpy_eligible = same_type && iter.is_contiguous();
+  bool same_conj = iter.tensor(0).is_conj() == iter.tensor(1).is_conj();
+  bool same_neg = iter.tensor(0).is_neg() == iter.tensor(1).is_neg();
+  bool memcpy_eligible =
+      same_type && same_conj && same_neg && iter.is_contiguous();
 
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
@@ -119,11 +122,33 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
             iter, [=](scalar_t src_val) { return src_val; });
       });
     } else {
-      IPEX_DISPATCH_ALL_TYPES_AND3(
-          kBool, kHalf, kBFloat16, dtype, "copy_", [&] {
+      if (same_neg) {
+        if (!same_conj && same_type) {
+          IPEX_DISPATCH_COMPLEX_TYPES(dtype, "copy_conj", [&] {
             dpcpp_kernel_for_tensor_iter(
-                iter, [=](scalar_t src_val) { return src_val; });
+                iter, [=](scalar_t src_val) { return std::conj(src_val); });
           });
+        } else {
+          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+              kBool, kHalf, kBFloat16, dtype, "copy_", [&] {
+                dpcpp_kernel_for_tensor_iter(
+                    iter, [=](scalar_t src_val) { return src_val; });
+              });
+        }
+      } else {
+        if (!same_conj && same_type) {
+          IPEX_DISPATCH_COMPLEX_TYPES(dtype, "copy_conj", [&] {
+            dpcpp_kernel_for_tensor_iter(
+                iter, [=](scalar_t src_val) { return std::conj(-src_val); });
+          });
+        } else {
+          IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+              kBool, kHalf, kBFloat16, dtype, "copy_", [&] {
+                dpcpp_kernel_for_tensor_iter(
+                    iter, [=](scalar_t src_val) { return -src_val; });
+              });
+        }
+      }
     }
   }
 
