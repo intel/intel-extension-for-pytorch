@@ -52,36 +52,42 @@ class TestNNMethod(TestCase):
         y_cpu = layer_norm(x_cpu)
 
         y_cpu.backward(grad_i)
+        layer_norm_weight_cpu = layer_norm.weight.clone()
+        layer_norm_weight_grad_cpu = layer_norm.weight.grad.clone()
+        x_grad_cpu = x_cpu.grad.clone()
+        layer_norm.zero_grad()
 
         print("x_cpu = ", x_cpu)
-        print("layer_norm = ", layer_norm.weight.cpu())
+        print("layer_norm = ", layer_norm_weight_cpu)
         print("y_cpu = ", y_cpu)
-        print("x_cpu.grad = ", x_cpu.grad)
-        print("layer_norm.grad = ", layer_norm.weight.grad)
+        print("x_cpu.grad = ", x_grad_cpu)
+        print("layer_norm.grad = ", layer_norm_weight_grad_cpu)
         # x_cpu.grad.detach()
         # x_cpu.grad.zero_()
 
         # layer_norm_dpcpp = torch.load("./log/layer_norm.pt").to(dpcpp_device)
         layer_norm_dpcpp = layer_norm.to(dpcpp_device)
-        layer_norm.zero_grad()
 
         x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
         y_dpcpp = layer_norm_dpcpp(x_dpcpp)
 
         y_dpcpp.backward(grad_dpcpp_i)
+        layer_norm_weight_dpcpp = layer_norm_dpcpp.weight.clone()
+        layer_norm_weight_grad_dpcpp = layer_norm_dpcpp.weight.grad.clone()
+        x_grad_dpcpp = x_dpcpp.grad.clone()
+        layer_norm_dpcpp.zero_grad()
 
         print("x_dpcpp = ", x_dpcpp.cpu())
-        print("layer_norm_dpcpp = ", layer_norm_dpcpp.weight.cpu())
+        print("layer_norm_dpcpp = ", layer_norm_weight_dpcpp.cpu())
         print("y_dpcpp = ", y_dpcpp.cpu())
-        print("x_dpcpp.grad = ", x_dpcpp.grad.cpu())
-        print("layer_norm_dpcpp.grad = ", layer_norm_dpcpp.weight.grad.cpu())
-        self.assertEqual(x_cpu, x_dpcpp.cpu())
-        self.assertEqual(layer_norm.weight.cpu(),
-                         layer_norm_dpcpp.weight.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.cpu())
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
-        self.assertEqual(layer_norm.weight.grad,
-                         layer_norm_dpcpp.weight.grad.cpu())
+        print("x_dpcpp.grad = ", x_grad_dpcpp.cpu())
+        print("layer_norm_dpcpp.grad = ", layer_norm_weight_grad_dpcpp.cpu())
+
+        self.assertEqual(x_cpu, x_dpcpp)
+        self.assertEqual(layer_norm_weight_cpu, layer_norm_weight_dpcpp)
+        self.assertEqual(y_cpu, y_dpcpp)
+        self.assertEqual(x_grad_cpu, x_grad_dpcpp)
+        self.assertEqual(layer_norm_weight_grad_cpu, layer_norm_weight_grad_dpcpp)
 
     def test_layer_norm_bert(self, dtype=torch.float):
         linear = nn.Linear(512, 512)
@@ -102,8 +108,8 @@ class TestNNMethod(TestCase):
         real1 = layer_norm1(y)
         real2 = layer_norm2(y)
 
-        self.assertEqual(ref1, real1.cpu(), rtol=10e-5, atol=10e-5)
-        self.assertEqual(ref2, real2.cpu(), rtol=10e-5, atol=10e-5)
+        self.assertEqual(ref1, real1, rtol=10e-5, atol=10e-5)
+        self.assertEqual(ref2, real2, rtol=10e-5, atol=10e-5)
 
     def test_layer_norm_bfp16_training(self, dtype=torch.bfloat16):
         layernorm = nn.LayerNorm(10)
@@ -113,7 +119,7 @@ class TestNNMethod(TestCase):
 
         ref = layernorm(x)
         ref.backward(gy)
-        ref_gx = x.grad
+        ref_gx = x.grad.clone()
         print(ref)
         print(ref_gx)
 
@@ -126,7 +132,7 @@ class TestNNMethod(TestCase):
 
         real = layernorm(x)
         real.backward(gy)
-        real_gx = x.grad
+        real_gx = x.grad.clone()
         print(real.cpu())
         print(real_gx.cpu())
 
@@ -134,8 +140,8 @@ class TestNNMethod(TestCase):
         print(diff)
         zero = torch.zeros([10, 10])
 
-        self.assertEqual(ref, real.cpu().float(), rtol=10e-4, atol=10e-2)
-        self.assertEqual(diff, zero, rtol=10e-4, atol=10e-2)
+        self.assertEqual(ref, real.float(), rtol=10e-4, atol=10e-2)
+        self.assertEqual(ref_gx, real_gx.float(), rtol=10e-4, atol=10e-2)
 
     def test_layer_norm_half(self, dtype=torch.half):
         x_i = torch.randn([1, 1, 3, 3], device=cpu_device)
@@ -145,7 +151,7 @@ class TestNNMethod(TestCase):
         y_cpu = layernorm(x_i)
         layernorm.to(dpcpp_device).to(dtype)
         y_dpcpp = layernorm(x_dpcpp_i)
-        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-2, rtol=0)
+        self.assertEqual(y_cpu, y_dpcpp.float(), atol=1e-2, rtol=0)
 
     def test_layer_norm_bfloat16(self, dtype=torch.bfloat16):
         x_i = torch.randn([1, 1, 3, 3], device=cpu_device)
@@ -155,4 +161,4 @@ class TestNNMethod(TestCase):
         y_cpu = layernorm(x_i)
         layernorm.to(dpcpp_device).to(dtype)
         y_dpcpp = layernorm(x_dpcpp_i)
-        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-1, rtol=0)
+        self.assertEqual(y_cpu, y_dpcpp.float(), atol=1e-1, rtol=0)
