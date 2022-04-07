@@ -224,7 +224,9 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     // Type conversions are performed on the CPU for CPU-GPU copies and on
     // the src device for GPU-GPU copies.
     if (iter.device_type(0) == kXPU) {
-      dst_contig = dst.is_contiguous() ? dst : at::empty_like(dst);
+      dst_contig = dst.is_contiguous()
+          ? dst
+          : at::empty_like(dst, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
       if (dst.is_quantized()) {
         src_contig =
             expand_as_quantized_dpcpp(iter.tensor(1).to(iter.dtype(0)), dst)
@@ -237,7 +239,7 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
       bool same_type = iter.dtype(0) == iter.dtype(1);
       dst_contig = (dst.is_contiguous() && same_type)
           ? dst
-          : at::empty_like(dst, iter.dtype(1));
+          : at::empty_like(dst, iter.dtype(1), LEGACY_CONTIGUOUS_MEMORY_FORMAT);
       src_contig = iter.tensor(1).expand_as(dst).contiguous();
     }
 
