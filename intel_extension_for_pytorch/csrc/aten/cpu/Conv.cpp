@@ -48,7 +48,18 @@ void convolution_kernel_output(
       (IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
       "input and output are need contiguous tensor for "
       "convolution_kernel_output");
-  const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
+  const ideep::tensor mkldnn_input_ = itensor_view_from_dense(input);
+  ideep::tensor mkldnn_input = mkldnn_input_;
+  // The following code forces the 3D input to channels last, which is a
+  // temporary workaround before channels last 1D is formally supported in
+  // PyTorch.
+  if (mkldnn_input_.ndims() == 3 &&
+      !mkldnn_input_.get_desc().is_channels_last()) {
+    ideep::tensor mkldnn_input_conv1d{
+        mkldnn_input_.get_desc().to_format(ideep::format_tag::nwc)};
+    mkldnn_input_conv1d.feed_from(mkldnn_input_);
+    mkldnn_input = mkldnn_input_conv1d;
+  }
   auto output_sizes = output.sizes();
 
   ideep::tensor mkldnn_output = itensor_view_from_dense(output);
@@ -109,9 +120,19 @@ at::Tensor convolution_kernel(
   std::vector<int64_t> output_sizes =
       calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
-  auto output = at::empty(
-      output_sizes,
-      input.options().memory_format(input.suggest_memory_format()));
+  at::Tensor output;
+  if (input.dim() != 3) {
+    output = at::empty(
+        output_sizes,
+        input.options().memory_format(input.suggest_memory_format()));
+  } else {
+    // This a temporary workaround before channels last 1D is formally supported
+    // in PyTorch. We will force to return nwc output.
+    std::vector<int64_t> output_strides = {
+        (output_sizes[1] * output_sizes[2]), 1, output_sizes[1]};
+    output = at::empty_strided(output_sizes, output_strides, input.options());
+  }
+
   convolution_kernel_output(
       input,
       mkldnn_weight,

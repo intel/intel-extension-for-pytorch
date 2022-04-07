@@ -175,7 +175,8 @@ class tensor : public memory {
     };
 
     inline bool is_channels_last() const {
-      if (!is_plain() || !(data.ndims != 4 || data.ndims != 5))
+      if (!is_plain() ||
+          !(data.ndims == 4 || data.ndims == 5 || data.ndims == 3))
         return false;
       const auto& dims = data.dims;
       const auto& strides = blocking_strides();
@@ -184,11 +185,15 @@ class tensor : public memory {
         return strides[n] == dims[h] * dims[w] * dims[c] &&
             strides[h] == dims[w] * dims[c] && strides[w] == dims[c] &&
             strides[c] == 1;
-      } else {
+      } else if (data.ndims == 5) {
         const auto n = 0, c = 1, d = 2, h = 3, w = 4;
         return strides[n] == dims[d] * dims[h] * dims[w] * dims[c] &&
             strides[d] == dims[h] * dims[w] * dims[c] &&
             strides[h] == dims[w] * dims[c] && strides[w] == dims[c] &&
+            strides[c] == 1;
+      } else {
+        const auto n = 0, c = 1, w = 2;
+        return strides[n] == dims[w] * dims[c] && strides[w] == dims[c] &&
             strides[c] == 1;
       }
     };
@@ -808,8 +813,14 @@ class tensor : public memory {
       auto channels_last = old_desc.is_channels_last();
       if (channels_last) {
         // goihw (abcde) => gohwi (abdec) or goidhw (abcdef) => gohwi (abdefc)
-        grouped_desc = grouped_desc.to_format(
-            old_desc.get_ndims() == 4 ? format_tag::abdec : format_tag::abdefc);
+        auto memory_format = format_tag::abdec;
+        auto dim = old_desc.get_ndims();
+        if (dim == 5) {
+          memory_format = format_tag::abdefc;
+        } else if (dim == 3) {
+          memory_format = format_tag::abdc;
+        }
+        grouped_desc = grouped_desc.to_format(memory_format);
       }
     }
 

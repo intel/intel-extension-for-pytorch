@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
+#include <ATen/quantized/QTensorImpl.h>
 #include <oneapi/dnnl/dnnl_graph.hpp>
 #include <torch/csrc/jit/ir/ir.h>
 
@@ -202,6 +203,13 @@ struct LlgaTensorDesc {
   QuantizerPtr quantizer_;
 };
 
+// Initially, oneDNN Graph also used to have blocked layout for tensors between
+// partitions, and the LlgaTensorImpl wrapper helped us bypass guard checks.
+// oneDNN Graph has switched over to using strided tensors between partitions.
+// So why are we still wrapping tensors between partitions with LlgaTensorImpl?
+// The answer is that it helps us bypass guard checks because the strides of
+// tensors between partitions would be different from the ones the guard is
+// otherwise expecting.
 struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
   LlgaTensorImpl(
       Storage&& storage,
@@ -214,17 +222,11 @@ struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
 
   // Override a bunch of methods inherited from TensorImpl to return error
   // messages.
-  bool is_contiguous(
-      at::MemoryFormat memory_format =
-          at::MemoryFormat::Contiguous) const override;
-  IntArrayRef strides() const override;
-  int64_t stride(int64_t d) const override;
-  void set_size(int64_t dim, int64_t new_size) override;
-  void set_stride(int64_t dim, int64_t new_stride) override;
-  void set_storage_offset(int64_t storage_offset) override;
   bool has_storage() const override;
-  const Storage& storage() const override;
-  int64_t storage_offset() const override;
+  static Tensor llga_to_aten_tensor(LlgaTensorImpl* llgaImpl);
+  static Tensor llga_to_aten_tensor(
+      LlgaTensorImpl* llgaImpl,
+      QuantizerPtr quantizer);
 
  private:
   LlgaTensorDesc desc_;

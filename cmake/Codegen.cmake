@@ -137,21 +137,8 @@ foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
     else(MSVC)
       set(EXTRA_FLAGS "-DCPU_CAPABILITY=${CPU_CAPABILITY} -DCPU_CAPABILITY_${CPU_CAPABILITY}")
     endif(MSVC)
-    # Disable certain warnings for GCC-9.X
-    #[[
-    if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9.0.0))
-      if(("${NAME}" STREQUAL "native/cpu/GridSamplerKernel.cpp") AND ("${CPU_CAPABILITY}" STREQUAL "DEFAULT"))
-        # See https://github.com/pytorch/pytorch/issues/38855
-        set(EXTRA_FLAGS "${EXTRA_FLAGS} -Wno-uninitialized")
-      endif()
-      if("${NAME}" STREQUAL "native/quantized/cpu/kernels/QuantizedOpKernels.cpp")
-        # See https://github.com/pytorch/pytorch/issues/38854
-        set(EXTRA_FLAGS "${EXTRA_FLAGS} -Wno-deprecated-copy")
-      endif()
-    endif()
-    ]]
     set_source_files_properties(${NEW_IMPL} PROPERTIES COMPILE_FLAGS "${FLAGS} ${EXTRA_FLAGS}")
-    # message(${NEW_IMPL} - ${FLAGS})
+    # message("SRC: ${NEW_IMPL} FLAG: ${FLAGS} ${EXTRA_FLAGS}")
   endforeach()
 endforeach()
 

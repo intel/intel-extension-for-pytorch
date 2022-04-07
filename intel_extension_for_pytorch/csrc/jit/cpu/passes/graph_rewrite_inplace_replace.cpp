@@ -1,101 +1,12 @@
-#include "graph_rewrite_inplace_replace.h"
+#include <torch/csrc/jit/passes/remove_mutation.h>
+#include <torch/csrc/jit/passes/restore_mutation.h>
+#include "graph_rewrite.h"
+#include "graph_rewrite_utils.h"
+#include "utils.h"
+
 namespace torch {
 namespace jit {
 namespace graph_rewrite {
-
-bool hasSideEffectInDefNode(Node* def_node, int position) {
-  bool checkresult = false;
-  if (def_node->blocks().size() != 0) {
-    // if the def node has blocks, check into the blocks
-    for (auto sub : def_node->blocks()) {
-      checkresult = checkresult ||
-          hasSideEffectInBlocks(sub, def_node->outputs()[position]);
-    }
-  } else {
-    if (def_node->hasAttribute(attr::Subgraph)) {
-      // if the def node has subgraph, check into the subgraph
-      checkresult = hasSideEffectOrAliasInSubgraphs(
-          def_node, def_node->outputs()[position]);
-    } else {
-      checkresult =
-          def_node->hasSideEffects() || (def_node->kind() == prim::Param);
-    }
-  }
-
-  return checkresult;
-}
-
-bool hasSideEffectInBlocks(Block* block, Value* v) {
-  bool checkresult = false;
-  // find the position of target value in its def node from block outputs
-  // for example, here find %block_output.1 == (%input.1) or (%input.2)
-  // and the posion is 0:
-  // %block_output.1 : Tensor = prim::If()
-  //     block0():
-  //       %input.1 : Tensor = ipex::LlgaFusionGroup
-  //       -> (%input.1)
-  //     block1():
-  //       %input.2 : Tensor = prim::FallbackGraph
-  //       -> (%input.2)
-  int position = v->offset();
-  auto def_node = block->outputs()[position]->node();
-  checkresult = hasSideEffectInDefNode(def_node, position);
-  return checkresult;
-}
-
-bool hasSideEffectOrAliasInSubgraphs(Node* node, Value* v) {
-  bool checkresult = false;
-  // A LLGAFusionGroup must have its fallbackgraph, we only need to check one of
-  // them
-  if (node->kind().toQualString() ==
-      Symbol::fromQualString("ipex::LlgaFusionGroup").toQualString()) {
-    return false;
-  }
-  // get the subgraph of the def node
-  auto subgraph = node->g(attr::Subgraph);
-
-  // find the position of target value in its def node in subgraph
-  // for example, here find (%input.1), and the posion is 0:
-  // graph(---),
-  //    %input.1 : Tensor = Ops
-  //    return (%input.1)
-  int position = v->offset();
-  auto def_node = subgraph->outputs()[position]->node();
-  std::unique_ptr<AliasDb> aliasDb_ = std::make_unique<AliasDb>(subgraph);
-
-  checkresult = hasSideEffectInDefNode(def_node, position);
-
-  // for def node in subgraph, has to check its alias too
-  bool mayAliasInputs = (def_node->kind() != prim::ListConstruct) &&
-      aliasDb_->mayContainAlias(
-          def_node->inputs(), def_node->outputs()[position]);
-
-  checkresult = checkresult || mayAliasInputs;
-  return checkresult;
-}
-
-bool hasSideEffectOrAlias(Value* v, AliasDb* aliasDb) {
-  // bail on the input def node with side effects, blocks, or graph / graph
-  // inputs
-  Node* n = v->node();
-  bool unhandled_node = false;
-  if (n->blocks().size() != 0) {
-    for (int i = 0; i < n->blocks().size(); i++) {
-      unhandled_node =
-          unhandled_node || hasSideEffectInBlocks(n->blocks()[i], v);
-    }
-  } else if (n->hasAttribute(attr::Subgraph)) {
-    unhandled_node = hasSideEffectOrAliasInSubgraphs(n, v);
-  } else {
-    unhandled_node = n->hasSideEffects() || (v->node()->kind() == prim::Param);
-  }
-
-  // if the output isn't contained or alias by the inputs to its node, it's
-  // unique. No need to check for alias if the node is a ListConstruct.
-  bool mayAliasInputs = (v->node()->kind() != prim::ListConstruct) &&
-      aliasDb->mayContainAlias(v->node()->inputs(), v);
-  return unhandled_node || mayAliasInputs || (v->node()->kind() == prim::Param);
-}
 
 void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph) {
   std::string aten_softmax = R"(

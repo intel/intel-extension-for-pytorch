@@ -121,9 +121,13 @@ def pack_optimizer_params_and_states(optimizer, param_pair, attrs, pack_dtype):
                                     # have same shapes with the parameter, they should share same layout with 
                                     # the parameter. Thus we need pack the state as we did to parameters.
                                     if attr['op'] in utils._weight_prepack.IPEX_WEIGHT_PREPACK_MODULE:
-                                        if attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
-                                            memory_format = torch.channels_last \
-                                                if attr['op'] is torch.nn.Conv2d else torch.channels_last_3d
+                                        if attr['op'] is torch.nn.Conv1d or attr['op'] is torch.nn.Conv2d or attr['op'] is torch.nn.Conv3d:
+                                            if attr['op'] is torch.nn.Conv2d:
+                                                memory_format = torch.channels_last
+                                            elif attr['op'] is torch.nn.Conv3d:
+                                                memory_format = torch.channels_last_3d
+                                            else:
+                                                memory_format = torch.contiguous_format
                                             value_temp = state_value.to(memory_format=memory_format) \
                                                 if attr['weight_channels_last'] else state_value
                                             state[state_key] = attr['ctx'].pack(value_temp)

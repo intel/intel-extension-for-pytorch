@@ -34,7 +34,9 @@ void PrePackingOpsFolder(Block* b) {
             Symbol::fromQualString("ipex_prepack::conv_transpose2d_prepack") ||
         n->kind() ==
             Symbol::fromQualString(
-                "ipex_prepack::convolution_leaky_relu_prepack"));
+                "ipex_prepack::convolution_leaky_relu_prepack") ||
+        n->kind() ==
+            Symbol::fromQualString("ipex_prepack::convolution_gelu_prepack"));
   };
 
   std::unordered_set<Node*> nodes_to_delete;

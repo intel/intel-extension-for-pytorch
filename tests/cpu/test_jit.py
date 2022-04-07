@@ -275,6 +275,33 @@ class ConvSum(nn.Module):
         b = self.conv1(x)
         return a+b
 
+class ConvSumWithAliasV1(nn.Module):
+    def __init__(self, dim, **kwargs):
+        super(ConvSumWithAliasV1, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](32, 32, kernel_size=3, stride=1, padding=1, groups=32)
+
+    def forward(self, x):
+        cnn_feat = x.clone()
+        # the written's tensor is conv's input
+        y = self.conv(cnn_feat) + cnn_feat
+        return y
+
+
+class ConvSumWithAliasV2(nn.Module):
+    def __init__(self, dim, **kwargs):
+        super(ConvSumWithAliasV2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](32, 32, kernel_size=3, stride=1, padding=1, groups=32)
+
+    def forward(self, x):
+        cnn_feat = x.transpose(2, 3)
+        # the written's tensor is  an alias of one tensor
+        y = self.conv(cnn_feat.clone()) + cnn_feat
+        return y
+
 class ConvScalarSum(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvScalarSum, self).__init__()
@@ -422,6 +449,32 @@ class LinearAdd(nn.Module):
     def forward(self, x):
         x1 = x.clone()
         return torch.add(self.linear(x),self.linear1(x1))
+
+class LinearAddWithAliasV1(nn.Module):
+    def __init__(self, **kwargs):
+        super(LinearAddWithAliasV1, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(32, 32, **kwargs)
+
+    def forward(self, x):
+        cnn_feat = x.clone()
+        # the written's tensor is linear's input
+        y = self.linear(cnn_feat) + cnn_feat
+        return y
+
+class LinearAddWithAliasV2(nn.Module):
+    def __init__(self, **kwargs):
+        super(LinearAddWithAliasV2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(32, 32, **kwargs)
+
+    def forward(self, x):
+        # the written's tensor is alias of one tensor
+        cnn_feat = x.transpose(0, 1)
+        y = self.linear(cnn_feat.clone()) + cnn_feat
+        return y
 
 class Linear_Reshape_Relu(nn.Module):
     def __init__(self, in_channels, out_channels,dest_shape, **kwargs):
@@ -575,6 +628,15 @@ class ConvElu(nn.Module):
         b = self.elu(a)
         c = torch.add(b, b)
         return c
+
+class ConvGelu(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvGelu, self).__init__()
+        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.approximate = kwargs["approximate"]
+
+    def forward(self, x):
+        return F.gelu(self.conv(x), approximate=self.approximate)
 
 class ConvTranspose2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
@@ -815,17 +877,17 @@ class Tester(TestCase):
                 trace_fused_model = torch.jit.freeze(trace_fused_model)
                 y = trace_fused_model(x)
 
-#enable fusiong in ipex.
+                # enable fusiong in ipex.
                 fused_tresult = trace_fused_model(x)
-#conv relu fusion, conv sum fusion or conv sum relu fusion
+                # conv relu fusion, conv sum fusion or conv sum relu fusion
                 trace_graph = trace_fused_model.graph_for(x)
                 fused_tresult = trace_fused_model(x)
             self.assertEqual(result, fused_tresult, prec=prec)
-#check if the fused node exists in the graph
+            # check if the fused node exists in the graph
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-#check if certain node does not exist in the graph
+            # check if certain node does not exist in the graph
             if kind_not_in_graph is not None:
                 self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
@@ -836,7 +898,7 @@ class Tester(TestCase):
         for level, use_channels_last in options:
             ipex.enable_onednn_fusion(True)
             model = model.eval()
-#It will be removed after jit support conv_bn folding
+            #It will be removed after jit support conv_bn folding
             if level == 'O0':
                 try:
                     model = optimization.fuse(model)
@@ -854,24 +916,24 @@ class Tester(TestCase):
             x3 = x.clone()
 
             with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
-#bf16, native path
+                # bf16, native path
                 result = model(x)
                 trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
                 trace_fused_model = torch.jit.freeze(trace_fused_model)
-#enable fusion path.
+                # enable fusion path.
                 fused_tresult = trace_fused_model(x3)
-#bf16, jit trace path
+                # bf16, jit trace path
                 trace_graph = trace_fused_model.graph_for(x3)
                 fused_tresult = trace_fused_model(x3)
 
             self.assertEqual(fused_tresult, result, prec=prec)
-            self.assertEqual(fused_tresult.dtype, torch.bfloat16)
+            # self.assertEqual(fused_tresult.dtype, result.dtype)
 
-#check if the fused node exists in the graph
+            # check if the fused node exists in the graph
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-#check if certain node does not exist in the graph
+            # check if certain node does not exist in the graph
             if kind_not_in_graph is not None:
                 self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
@@ -901,7 +963,7 @@ class Tester(TestCase):
         self.assertTrue(all(n.kind() != pack_node for n in freeze_graph.nodes()))
 # for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
         self.assertTrue(any(n.kind() == imperative_node for n in trace_graph.nodes()))
-        
+
 
     def test_concat_linear(self):
         def check_op_count(graph_str, op_names=[]):
@@ -1331,6 +1393,12 @@ class Tester(TestCase):
 #torch.randn(batch_size, in_channels, image_size, image_size),
 #kind_in_graph = "ipex::conv2d_elu",
 #prec = 0.02)
+            for approximate in ["none", "tanh"]:
+                self._test_output(
+                    ConvGelu(dim, in_channels, out_channels, kernel_size, image_size, approximate=approximate),
+                    x,
+                    kind_in_graph="ipex_prepack::convolution_gelu_run",
+                    kind_not_in_graph="ipex_prepack::convolution_gelu_prepack")
 
     def test_output_conv_bn(self):
         batch_size = 8
@@ -1371,7 +1439,7 @@ class Tester(TestCase):
             if use_channels_last:
                 x = x.to(memory_format=torch.channels_last)
                 model = model.to(memory_format=torch.channels_last)
-            
+
             model = ipex.optimize(model, dtype=dtype, conv_bn_folding=False)
 
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype), torch.no_grad():
@@ -1853,7 +1921,7 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 prec=0.1)
 
-#add outputs' have different data format
+            #add outputs' have different data format
             m = ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
             if dim == 2:
                 m.conv = m.conv.to(memory_format=torch.torch.channels_last)
@@ -1877,6 +1945,38 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
                 prec=0.1,
                 use_channels_last=[False])
+
+    def test_conv_sum_with_alias(self):
+        batch_size = 4
+        in_channels = 32
+        image_size = 32
+        for dim in [2, 3]:
+            input_size = [batch_size, in_channels, image_size, image_size]
+            if dim == 3:
+                input_size.append(image_size)
+            x = torch.randn(input_size)
+            self._test_output(
+                ConvSumWithAliasV1(dim),
+                x,
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_run")
+            self._test_output_bf16(
+                ConvSumWithAliasV1(dim),
+                x,
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_run",
+                prec=0.1)
+            self._test_output(
+                ConvSumWithAliasV2(dim),
+                x,
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_run")
+            self._test_output_bf16(
+                ConvSumWithAliasV2(dim),
+                x,
+                kind_in_graph="ipex_prepack::convolution_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_run",
+                prec=0.1)
 
     def test_output_conv_scalar_sum(self):
         batch_size = 8
@@ -2256,6 +2356,29 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_add_run",
+            prec=0.02)
+        self._test_output(
+            LinearAddWithAliasV1(bias=True),
+            torch.rand(32, 32),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearAddWithAliasV1(bias=True),
+            torch.rand(32, 32),
+            kind_in_graph="ipex_prepack::linear_run",
+            prec=0.02)
+        self._test_output(
+            LinearAddWithAliasV2(bias=True),
+            torch.rand(32, 32),
+             kind_in_graph="aten::linear") 
+        self._test_output_bf16(
+            LinearAddWithAliasV2(bias=True),
+            torch.rand(32, 32),
+            kind_in_graph="ipex_prepack::linear_run",
+            prec=0.02)
 
     def test_output_linear_reshape_relu(self):
         self._test_output(
