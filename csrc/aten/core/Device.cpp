@@ -22,7 +22,7 @@ void set_device(DeviceIndex device) {
   AT_DPCPP_CHECK(dpcppSetDevice(static_cast<int>(device)));
 }
 
-DeviceIndex get_devie_index_from_ptr(void* ptr) {
+DeviceIndex get_device_index_from_ptr(void* ptr) {
   DeviceIndex device_index;
   AT_DPCPP_CHECK(dpcppGetDeviceIdFromPtr(&device_index, ptr));
   return device_index;

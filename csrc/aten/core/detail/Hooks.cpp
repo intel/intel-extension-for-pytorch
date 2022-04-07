@@ -49,7 +49,7 @@ int XPUHooks::getDeviceCount() const {
 }
 
 at::Device XPUHooks::getDeviceFromPtr(void* data) const {
-  auto device = get_devie_index_from_ptr(data);
+  auto device = get_device_index_from_ptr(data);
   return {DeviceType::XPU, static_cast<int16_t>(device)};
 }
 

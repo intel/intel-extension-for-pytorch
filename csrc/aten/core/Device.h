@@ -17,7 +17,7 @@ IPEX_API DeviceIndex current_device();
 
 IPEX_API void set_device(DeviceIndex device);
 
-DeviceIndex get_devie_index_from_ptr(void* ptr);
+DeviceIndex get_device_index_from_ptr(void* ptr);
 
 IPEX_API DeviceProp* getCurrentDeviceProperties();
 
