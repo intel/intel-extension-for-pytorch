@@ -137,6 +137,30 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::dequantize', 'aten::linear'])
                 self.checkPatterns(graph, patterns)
 
+    def test_reshape_6D_linear(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(in_features=64, out_features=192, bias=True)
+            def forward(self, x):
+                x = x.reshape(4, 8, 7, 8, 8, 64).transpose(2, 3)
+                x = self.linear(x)
+                return x
+
+        for bias in [True, False]:
+            x = torch.randn(4, 56, 64, 64)
+            m = M()
+
+            patterns = [
+                ["aten::dequantize", "aten::linear"]
+            ]
+
+            for qscheme in [torch.per_tensor_affine, torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1, config_name="reshape_6D_linear", qscheme=qscheme)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                self.assertFused(graph, ['aten::linear', 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)
+
     def test_max_pool2d(self):
         for [
                 spatial,
