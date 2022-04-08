@@ -18,13 +18,12 @@ namespace impl {
 
 void avg_pool2d_out_template(
     Tensor& output,
-    const Tensor& input_,
+    const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "avg_pool2d: kernel_size must either be a single int, or a tuple "
@@ -52,20 +51,39 @@ void avg_pool2d_out_template(
       padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
   TORCH_CHECK(
-      (input_.ndimension() == 4), "only support 4 dims on DPCPP device now!");
+      (input.ndimension() == 3 || input.ndimension() == 4),
+      "non-empty 3D or 4D (batch mode) tensor expected for input");
 
   /* sizes */
-  const auto nbatch = input_.size(-4);
-  const auto nInputPlane = input_.size(-3);
-  const auto inputHeight = input_.size(-2);
-  const auto inputWidth = input_.size(-1);
+  const int64_t nbatch = input.ndimension() == 4 ? input.size(-4) : 1;
+  const auto nInputPlane = input.size(-3);
+  const auto inputHeight = input.size(-2);
+  const auto inputWidth = input.size(-1);
 
   const auto outputHeight =
       pooling_output_shape<int64_t>(inputHeight, kH, padH, dH, 1, ceil_mode);
   const auto outputWidth =
       pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, 1, ceil_mode);
 
-  auto memory_format = input_.suggest_memory_format();
+  /* PyTorch support two cases of AvgPool2d:
+     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+     This case does not support channel last format. For a 3-dim tensor,
+     the suggest_memory_format can only be Contiguous or ChannelsLast1D
+     (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input (C,
+     H, W) case. Then the suggest_memory_format can only be Contiguous.
+     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+     This case supports Contiguous and ChannelsLast2D memory_format. */
+
+  /* get contiguous input */
+  auto smf = input.suggest_memory_format();
+  Tensor input_;
+  if (input.ndimension() == 3) {
+    input_ = input.contiguous();
+    smf = at::MemoryFormat::Contiguous;
+  } else {
+    input_ = input.contiguous(smf);
+  }
+
   pool2d_shape_check(
       input_,
       kH,
@@ -81,22 +99,19 @@ void avg_pool2d_out_template(
       inputWidth,
       outputHeight,
       outputWidth,
-      memory_format);
+      smf);
 
-  Tensor input = input_;
-  if (is_smf_channels_last(input_)) {
-    output.resize_(
-        {nbatch, nInputPlane, outputHeight, outputWidth},
-        at::MemoryFormat::ChannelsLast);
+  /* resize output/indices */
+  if (input.ndimension() == 3) {
+    output.resize_({nInputPlane, outputHeight, outputWidth}, smf);
   } else {
-    input = input_.contiguous();
-    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
   if (count_include_pad) {
     ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
         output,
-        input,
+        input_,
         nbatch,
         nInputPlane,
         0,
@@ -117,7 +132,7 @@ void avg_pool2d_out_template(
   } else {
     ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         output,
-        input,
+        input_,
         nbatch,
         nInputPlane,
         0,
@@ -140,23 +155,13 @@ void avg_pool2d_out_template(
 
 Tensor& avg_pool2d_backward_out_template(
     Tensor& gradInput,
-    const Tensor& gradOutput_,
+    const Tensor& gradOutput,
     const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
-  Tensor gradOutput;
-  /* resize */
-  if (is_smf_channels_last(input)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
-  } else {
-    gradInput.resize_as_(input);
-    gradOutput = gradOutput_.contiguous();
-  }
-
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "avg_pool2d: kernel_size must either be a single int, or a tuple "
@@ -183,11 +188,12 @@ Tensor& avg_pool2d_backward_out_template(
   const int padW =
       padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
-  const auto ndim = input.ndimension();
-  TORCH_CHECK((ndim == 4), "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(
+      (input.ndimension() == 3 || input.ndimension() == 4),
+      "non-empty 3D or 4D (batch mode) tensor expected for input");
 
   /* sizes */
-  const auto nbatch = input.size(-4);
+  const int64_t nbatch = input.ndimension() == 4 ? input.size(-4) : 1;
   const auto nInputPlane = input.size(-3);
   const auto inputHeight = input.size(-2);
   const auto inputWidth = input.size(-1);
@@ -199,7 +205,7 @@ Tensor& avg_pool2d_backward_out_template(
   auto memory_format = input.suggest_memory_format();
   avg_pool2d_backward_shape_check(
       input,
-      gradOutput_,
+      gradOutput,
       nbatch,
       kH,
       kW,
@@ -322,8 +328,8 @@ Tensor avg_pool2d(
 
 Tensor& avg_pool2d_backward_out(
     Tensor& grad_input,
-    const Tensor& grad_output,
-    const Tensor& input,
+    const Tensor& grad_output_,
+    const Tensor& self_,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
@@ -333,10 +339,31 @@ Tensor& avg_pool2d_backward_out(
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool2d operator does not support divisor");
+
+  /* PyTorch support two cases of AvgPool2d:
+     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+     This case does not support channel last format. For a 3-dim tensor,
+     the suggest_memory_format can only be Contiguous or ChannelsLast1D
+     (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input (C,
+     H, W) case. Then the suggest_memory_format can only be Contiguous.
+     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+     This case supports Contiguous and ChannelsLast2D memory_format. */
+  Tensor self, grad_output;
+  if (self_.ndimension() == 3) {
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    grad_input.resize_as_(self);
+  } else {
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    grad_input.resize_as_(self, smf);
+  }
+
   impl::avg_pool2d_backward_out_template(
       grad_input,
       grad_output,
-      input,
+      self,
       kernel_size,
       stride,
       padding,
@@ -346,28 +373,48 @@ Tensor& avg_pool2d_backward_out(
 }
 
 Tensor avg_pool2d_backward(
-    const Tensor& grad_output,
-    const Tensor& input,
+    const Tensor& grad_output_,
+    const Tensor& self_,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor grad_input = is_smf_channels_last(input)
-      ? at::empty_like(input, at::MemoryFormat::ChannelsLast)
-      : at::empty_like(input, MemoryFormat::Contiguous);
+  TORCH_CHECK(
+      !divisor_override.has_value(),
+      "dpcpp_avg_pool2d operator does not support divisor");
 
-  return at::AtenIpexTypeXPU::avg_pool2d_backward_out(
+  /* PyTorch support two cases of AvgPool2d:
+     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+     This case does not support channel last format. For a 3-dim tensor,
+     the suggest_memory_format can only be Contiguous or ChannelsLast1D
+     (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input (C,
+     H, W) case. Then the suggest_memory_format can only be Contiguous.
+     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+     This case supports Contiguous and ChannelsLast2D memory_format. */
+  Tensor self, grad_output, grad_input;
+  if (self_.ndimension() == 3) {
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    grad_input = at::empty_like(self);
+  } else {
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    grad_input = at::empty_like(self, smf);
+  }
+
+  impl::avg_pool2d_backward_out_template(
       grad_input,
       grad_output,
-      input,
+      self,
       kernel_size,
       stride,
       padding,
       ceil_mode,
-      count_include_pad,
-      divisor_override);
+      count_include_pad);
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU

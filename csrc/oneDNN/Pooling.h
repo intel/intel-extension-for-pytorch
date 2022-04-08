@@ -71,19 +71,59 @@ static at::Tensor pooling(
   memory::dims padding;
   memory::format_tag format_any = memory::format_tag::any;
 
-  if (srcDepth == 0) {
-    format = (4 == src.ndimension() && is_smf_channels_last(src))
-        ? memory::format_tag::nhwc
-        : memory::format_tag::nchw;
+  auto ndim = src.ndimension();
+  // FIXME:
+  // XPU path only supports pool2d (ndim equals 3 or 4)
+  // and pool3d (ndim equals 4 or 5)
+  // need to suuport the pool1d operator (ndim equals 2 or 3)
+  TORCH_CHECK(
+      ndim == 3 || ndim == 4 || ndim == 5,
+      "oneDNN only supports pooling with 3-dim, 4-dim or 5-dim.");
+
+  if ((ndim == 4 && srcDepth == 0) || ndim == 3) {
+    /*
+      This path is used for AvgPool2d/AdaptiveAvgPool2d
+      Takeing AvgPool2d for example, PyTorch support two cases of AvgPool2d:
+      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+      For this case, the nbatch (n) value set as 1,
+      and does not support channel last format. For a 3-dim tensor,
+      the PyTorch suggest_memory_format can only be Contiguous or
+      ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the
+      sementics of Input (C, H, W) case. Then the suggest_memory_format can
+      only be Contiguous for this Pool2d with 3-dim input, and the corresponding
+      oneDNN format is nchw.
+      2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+      This case supports Contiguous and ChannelsLast2D memory_format.
+      For Contiguous situation, the oneDNN format is nchw.
+      For ChannelsLast2D situation, the oneDNN format is nhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::nhwc
+                                       : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
-  } else {
-    format = (5 == src.ndimension() && is_smf_channels_last(src))
-        ? memory::format_tag::ndhwc
-        : memory::format_tag::ncdhw;
+  } else if (ndim == 5 || (ndim == 4 && srcDepth != 0)) {
+    /*
+      This path is used for AvgPool3d/AdaptiveAvgPool3d.
+      Takeing MaxPool3d for example, PyTorch support two cases of MaxPool3d:
+      1. 4D: Input (C, D, H, W),  Output (C, D0, H0, W0), Kernel (kD, kH, kW)
+      For this case, the nbatch (n) value set as 1, and srcDepth != 0
+      The srcDepth != 0 is used to distinguish from Pooling2D (N, C, H, W).
+      This case does not support channel last format. For a 4-dim tensor,
+      the PyTorch suggest_memory_format can only be Contiguous or
+      ChannelsLast (nhwc), the ChannelsLast (nhwc) does not match the
+      sementics of Input (C, D, H, W) case. Then the suggest_memory_format
+      can only be Contiguous for this Pool2d with 3-dim input, and the
+      corresponding oneDNN format is nchw.
+      2. 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0), Kernel (kD, kH,
+      kW) This case supports Contiguous and ChannelsLast2D memory_format. For
+      Contiguous situation, the oneDNN format is ncdhw. For ChannelsLast2D
+      situation, the oneDNN format is ndhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::ndhwc
+                                       : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
     kernel = {kD, kH, kW};
@@ -149,7 +189,7 @@ static at::Tensor pooling(
   DPCPP_ONEDNN_EXEC(
       pooling_fwd, strm, {{DNNL_ARG_SRC, src_m}, {DNNL_ARG_DST, dst_m}});
   return dst;
-}
+} // namespace oneDNN
 
 template <algorithm alg_kind>
 static std::tuple<at::Tensor, at::Tensor> pooling(
@@ -192,19 +232,58 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   memory::dims padding;
 
   auto ndim = src.ndimension();
+  // FIXME:
+  // XPU path only supports pool2d (ndim equals 3 or 4)
+  // and pool3d (ndim equals 4 or 5)
+  // need to suuport the pool1d operator (ndim equals 2 or 3)
+  TORCH_CHECK(
+      ndim == 3 || ndim == 4 || ndim == 5,
+      "oneDNN only supports pooling with 3-dim, 4-dim or 5-dim.");
 
-  if (srcDepth == 0) {
-    format = onednn_pool_use_channels_last(src)
-        ? (3 == ndim ? memory::format_tag::nwc : memory::format_tag::nhwc)
-        : (3 == ndim ? memory::format_tag::ncw : memory::format_tag::nchw);
+  if ((ndim == 4 && srcDepth == 0) || ndim == 3) {
+    /*
+      This path is used for MaxPool2d/AdaptiveMaxPool2d
+      Takeing MaxPool2d for example, PyTorch support two cases of MaxPool2d:
+      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+      For this case, the nbatch (n) value set as 1,
+      and does not support channel last format. For a 3-dim tensor,
+      the PyTorch suggest_memory_format can only be Contiguous or
+      ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the
+      sementics of Input (C, H, W) case. Then the suggest_memory_format can
+      only be Contiguous for this Pool2d with 3-dim input, and the corresponding
+      oneDNN format is nchw.
+      2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+      This case supports Contiguous and ChannelsLast2D memory_format.
+      For Contiguous situation, the oneDNN format is nchw.
+      For ChannelsLast2D situation, the oneDNN format is nhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::nhwc
+                                       : memory::format_tag::nchw;
     src_tz = {nbatch, nInputPlane, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstHeight, dstWidth};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
-  } else {
-    format = onednn_pool_use_channels_last(src) ? memory::format_tag::ndhwc
-                                                : memory::format_tag::ncdhw;
+  } else if (ndim == 5 || (ndim == 4 && srcDepth != 0)) {
+    /*
+      This path is used for MaxPool3d/AdaptiveMaxPool3d.
+      Takeing MaxPool3d for example, PyTorch support two cases of MaxPool3d:
+      1. 4D: Input (C, D, H, W),  Output (C, D0, H0, W0), Kernel (kD, kH, kW)
+      For this case, the nbatch (n) value set as 1, and srcDepth != 0
+      The srcDepth != 0 is used to distinguish from Pooling2D (N, C, H, W).
+      This case does not support channel last format. For a 4-dim tensor,
+      the PyTorch suggest_memory_format can only be Contiguous or
+      ChannelsLast (nhwc), the ChannelsLast (nhwc) does not match the
+      sementics of Input (C, D, H, W) case. Then the suggest_memory_format
+      can only be Contiguous for this Pool2d with 3-dim input, and the
+      corresponding oneDNN format is nchw.
+      2. 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0), Kernel (kD, kH,
+      kW) This case supports Contiguous and ChannelsLast2D memory_format. For
+      Contiguous situation, the oneDNN format is ncdhw. For ChannelsLast2D
+      situation, the oneDNN format is ndhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::ndhwc
+                                       : memory::format_tag::ncdhw;
     src_tz = {nbatch, nInputPlane, srcDepth, srcHeight, srcWidth};
     dst_tz = {nbatch, nInputPlane, dstDepth, dstHeight, dstWidth};
     kernel = {kD, kH, kW};
@@ -319,7 +398,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   }
 
   return {dst, idx};
-}
+} // namespace xpu
 
 template <alg alg_kind>
 static at::Tensor pooling_backward(
@@ -349,9 +428,9 @@ static at::Tensor pooling_backward(
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
 
   auto data_t = get_onednn_dtype(diff_dst);
-  if (data_t == memory::data_type::f16) {
-    // rise error
-  }
+  TORCH_CHECK(
+      data_t == memory::data_type::f32 || data_t == memory::data_type::bf16,
+      "oneDNN only supports pooling backward with fp32 and bf16 datatype");
 
   memory::format_tag format;
 
@@ -362,21 +441,59 @@ static at::Tensor pooling_backward(
   memory::dims padding;
   memory::format_tag format_any = memory::format_tag::any;
 
-  if (diff_src_depth == 0) {
-    format = (4 == diff_src.ndimension() && is_smf_channels_last(diff_src))
-        ? memory::format_tag::nhwc
-        : memory::format_tag::nchw;
+  auto ndim = src.ndimension();
+  // FIXME:
+  // XPU path only supports pool2d (ndim equals 3 or 4)
+  // and pool3d (ndim equals 4 or 5)
+  // need to suuport the pool1d operator (ndim equals 2 or 3)
+  TORCH_CHECK(
+      ndim == 3 || ndim == 4 || ndim == 5,
+      "oneDNN only supports pooling with 3-dim, 4-dim or 5-dim.");
 
+  if ((ndim == 4 && diff_src_depth == 0) || ndim == 3) {
+    /*
+      This path is used for AvgPool2d/AdaptiveAvgPool2d
+      Takeing AvgPool2d for example, PyTorch support two cases of AvgPool2d:
+      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+         For this case, the nbatch (n) value set as 1,
+         and does not support channel last format. For a 3-dim tensor,
+         the PyTorch suggest_memory_format can only be Contiguous or
+         ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the
+         sementics of Input (C, H, W) case. Then the suggest_memory_format can
+      only be Contiguous for this Pool2d with 3-dim input, and the corresponding
+         oneDNN format is nchw.
+      2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+         This case supports Contiguous and ChannelsLast2D memory_format.
+         For Contiguous situation, the oneDNN format is nchw.
+         For ChannelsLast2D situation, the oneDNN format is nhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::nhwc
+                                       : memory::format_tag::nchw;
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
-  } else {
-    format = (5 == diff_src.ndimension() && is_smf_channels_last(diff_src))
-        ? memory::format_tag::ndhwc
-        : memory::format_tag::ncdhw;
-
+  } else if (ndim == 5 || (ndim == 4 && diff_src_depth != 0)) {
+    /*
+      This path is used for AvgPool3d/AdaptiveAvgPool3d.
+      Takeing MaxPool3d for example, PyTorch support two cases of MaxPool3d:
+      1. 4D: Input (C, D, H, W),  Output (C, D0, H0, W0), Kernel (kD, kH, kW)
+         For this case, the nbatch (n) value set as 1, and srcDepth != 0
+         The srcDepth != 0 is used to distinguish from Pooling2D (N, C, H, W).
+         This case does not support channel last format. For a 4-dim tensor,
+         the PyTorch suggest_memory_format can only be Contiguous or
+         ChannelsLast (nhwc), the ChannelsLast (nhwc) does not match the
+         sementics of Input (C, D, H, W) case. Then the suggest_memory_format
+      can only be Contiguous for this Pool2d with 3-dim input, and the
+      corresponding oneDNN format is nchw.
+      2. 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0), Kernel (kD, kH,
+      kW) This case supports Contiguous and ChannelsLast2D memory_format. For
+      Contiguous situation, the oneDNN format is ncdhw. For ChannelsLast2D
+      situation, the oneDNN format is ndhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::ndhwc
+                                       : memory::format_tag::ncdhw;
     diff_src_tz = {
         nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
     diff_dst_tz = {
@@ -388,9 +505,9 @@ static at::Tensor pooling_backward(
 
   auto diff_src_md = memory::desc({diff_src_tz}, data_t, format);
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto src_md = src_ctx.is_plain()
-      ? memory::desc(src.sizes().vec(), data_t, format)
-      : src_ctx.meta();
+  // src should have the same size of diff_src_tz
+  auto src_md = src_ctx.is_plain() ? memory::desc({diff_src_tz}, data_t, format)
+                                   : src_ctx.meta();
   auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format_any);
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
 
@@ -489,9 +606,9 @@ static at::Tensor pooling_backward(
 
   auto prop_kind = dnnl::prop_kind::forward_training;
   auto data_t = get_onednn_dtype(diff_dst);
-  if (data_t == memory::data_type::f16) {
-    // rise error
-  }
+  TORCH_CHECK(
+      data_t == memory::data_type::f32 || data_t == memory::data_type::bf16,
+      "oneDNN only supports pooling backward with fp32 and bf16 datatype");
 
   memory::format_tag format;
   memory::dims diff_src_tz;
@@ -500,21 +617,59 @@ static at::Tensor pooling_backward(
   memory::dims stride;
   memory::dims padding;
 
-  auto ndim = diff_dst.ndimension();
-  if (diff_src_depth == 0) {
-    format = onednn_pool_use_channels_last(diff_dst)
-        ? (3 == ndim ? memory::format_tag::nwc : memory::format_tag::nhwc)
-        : (3 == ndim ? memory::format_tag::ncw : memory::format_tag::nchw);
+  auto ndim = src.ndimension();
+  // FIXME:
+  // XPU path only supports pool2d (ndim equals 3 or 4)
+  // and pool3d (ndim equals 4 or 5)
+  // need to suuport the pool1d operator (ndim equals 2 or 3)
+  TORCH_CHECK(
+      ndim == 3 || ndim == 4 || ndim == 5,
+      "oneDNN only supports pooling with 3-dim, 4-dim or 5-dim.");
 
+  if ((ndim == 4 && diff_src_depth == 0) || ndim == 3) {
+    /*
+      This path is used for MaxPool2d/AdaptiveMaxPool2d
+      Takeing MaxPool2d for example, PyTorch support two cases of MaxPool2d:
+      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+      For this case, the nbatch (n) value set as 1,
+      and does not support channel last format. For a 3-dim tensor,
+      the PyTorch suggest_memory_format can only be Contiguous or
+      ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the
+      sementics of Input (C, H, W) case. Then the suggest_memory_format can
+      only be Contiguous for this Pool2d with 3-dim input, and the corresponding
+      oneDNN format is nchw.
+      2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+      This case supports Contiguous and ChannelsLast2D memory_format.
+      For Contiguous situation, the oneDNN format is nchw.
+      For ChannelsLast2D situation, the oneDNN format is nhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::nhwc
+                                       : memory::format_tag::nchw;
     diff_src_tz = {nbatch, nInputPlane, diff_src_height, diff_src_width};
     diff_dst_tz = {nbatch, nInputPlane, diff_dst_height, diff_dst_width};
     kernel = {kH, kW};
     stride = {dH, dW};
     padding = {padH, padW};
-  } else {
-    format = onednn_pool_use_channels_last(diff_dst)
-        ? memory::format_tag::ndhwc
-        : memory::format_tag::ncdhw;
+  } else if (ndim == 5 || (ndim == 4 && diff_src_depth != 0)) {
+    /*
+      This path is used for MaxPool3d/AdaptiveMaxPool3d.
+      Takeing MaxPool3d for example, PyTorch support two cases of MaxPool3d:
+      1. 4D: Input (C, D, H, W),  Output (C, D0, H0, W0), Kernel (kD, kH, kW)
+      For this case, the nbatch (n) value set as 1, and srcDepth != 0
+      The srcDepth != 0 is used to distinguish from Pooling2D (N, C, H, W).
+      This case does not support channel last format. For a 4-dim tensor,
+      the PyTorch suggest_memory_format can only be Contiguous or
+      ChannelsLast (nhwc), the ChannelsLast (nhwc) does not match the
+      sementics of Input (C, D, H, W) case. Then the suggest_memory_format
+      can only be Contiguous for this Pool2d with 3-dim input, and the
+      corresponding oneDNN format is nchw.
+      2. 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0), Kernel (kD, kH,
+      kW) This case supports Contiguous and ChannelsLast2D memory_format. For
+      Contiguous situation, the oneDNN format is ncdhw. For ChannelsLast2D
+      situation, the oneDNN format is ndhwc.
+    */
+    format = is_smf_channels_last(src) ? memory::format_tag::ndhwc
+                                       : memory::format_tag::ncdhw;
     diff_src_tz = {
         nbatch, nInputPlane, diff_src_depth, diff_src_height, diff_src_width};
     diff_dst_tz = {
@@ -527,9 +682,9 @@ static at::Tensor pooling_backward(
   auto format_any = memory::format_tag::any;
   auto diff_src_md = memory::desc({diff_src_tz}, data_t, format);
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto src_md = src_ctx.is_plain()
-      ? memory::desc(src.sizes().vec(), data_t, format)
-      : src_ctx.meta();
+  // src should have the same size of diff_src_tz
+  auto src_md = src_ctx.is_plain() ? memory::desc({diff_src_tz}, data_t, format)
+                                   : src_ctx.meta();
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
   auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format_any);
   if (Settings::I().is_layout_opt_enabled()) {

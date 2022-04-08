@@ -19,52 +19,78 @@ void adaptive_avg_pool2d_out_template(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size) {
+  for (int64_t i = 0; i < input.ndimension(); i++) {
+    TORCH_CHECK(
+        input.size(i) > 0,
+        "adaptive_average_pool2d_dpcpp(): expected input to have non-empty spatial "
+        "dimensions, "
+        "but input has sizes ",
+        input.sizes(),
+        " with dimension ",
+        i,
+        " being "
+        "empty");
+  }
+
   TORCH_CHECK(
-      (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
+      (input.ndimension() == 3 || input.ndimension() == 4),
+      "non-empty 3D or 4D (batch mode) tensor expected for input");
 
-  // bool ceil_mode = false;
-  auto nOutputCols = output_size[1];
-  auto nOutputRows = output_size[0];
+  TORCH_CHECK(
+      output_size.size() == 2,
+      "adaptive_average_pool2d: internal error: output_size.size() must be 2");
 
-  // Input is NCHW format
-  auto nInputCols = input.size(3);
-  auto nInputRows = input.size(2);
-  auto nInputPlane = input.size(1);
-  auto batchSize = input.size(0);
+  auto outputWidth = output_size[1];
+  auto outputHeight = output_size[0];
 
-  int dW = DPCPP::floor((float)2 * nInputCols / nOutputCols) -
-      DPCPP::floor((float)nInputCols / nOutputCols);
-  int dH = DPCPP::floor((float)2 * nInputRows / nOutputRows) -
-      DPCPP::floor((float)nInputRows / nOutputRows);
+  /* sizes */
+  const int64_t nbatch = input.ndimension() == 4 ? input.size(-4) : 1;
+  const auto nInputPlane = input.size(-3);
+  const auto inputHeight = input.size(-2);
+  const auto inputWidth = input.size(-1);
 
-  int kW = DPCPP::ceil((float)2 * nInputCols / nOutputCols) -
-      DPCPP::floor((float)nInputCols / nOutputCols);
-  int kH = DPCPP::ceil((float)2 * nInputRows / nOutputRows) -
-      DPCPP::floor((float)nInputRows / nOutputRows);
+  int dH = std::floor((float)2 * inputHeight / outputHeight) -
+      std::floor((float)inputHeight / outputHeight);
+  int dW = std::floor((float)2 * inputWidth / outputWidth) -
+      std::floor((float)inputWidth / outputWidth);
 
-  int padW = (dW * (nOutputCols - 1) + kW - nInputCols) / 2;
-  int padH = (dH * (nOutputRows - 1) + kH - nInputRows) / 2;
+  int kH = std::ceil((float)2 * inputHeight / outputHeight) -
+      std::floor((float)inputHeight / outputHeight);
+  int kW = std::ceil((float)2 * inputWidth / outputWidth) -
+      std::floor((float)inputWidth / outputWidth);
 
-  Tensor input_ = input;
-  auto smf = input.suggest_memory_format();
-  if (is_smf_channels_last(input)) {
-    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols}, smf);
-  } else {
+  int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
+  int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
+
+  /* PyTorch support two cases of AdaptiveAvgPool2d:
+     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+     This case does not support channel last format. For a 3-dim tensor,
+     the suggest_memory_format can only be Contiguous or ChannelsLast1D
+     (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input (C,
+     H, W) case. Then the suggest_memory_format can only be Contiguous.
+     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+     This case supports Contiguous and ChannelsLast2D memory_format. */
+  Tensor input_;
+  if (input.ndimension() == 3) {
     input_ = input.contiguous();
-    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
+    output.resize_({nInputPlane, outputHeight, outputWidth});
+  } else {
+    auto smf = input.suggest_memory_format();
+    input_ = input.contiguous(smf);
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       output,
       input_,
-      batchSize,
+      nbatch,
       nInputPlane,
       0,
-      nInputRows,
-      nInputCols,
+      inputHeight,
+      inputWidth,
       0,
-      nOutputRows,
-      nOutputCols,
+      outputHeight,
+      outputWidth,
       0,
       kH,
       kW,
@@ -78,43 +104,33 @@ void adaptive_avg_pool2d_out_template(
 
 void adaptive_avg_pool2d_backward_out_template(
     Tensor& gradInput,
-    const Tensor& gradOutput_,
+    const Tensor& gradOutput,
     const Tensor& input) {
   TORCH_CHECK(
-      (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
-  Tensor gradOutput;
-  /* resize */
-  auto smf = input.suggest_memory_format();
-  if (is_smf_channels_last(input)) {
-    gradInput.resize_as_(input, smf);
-    gradOutput = gradOutput_.contiguous(smf);
-  } else {
-    gradInput.resize_as_(input);
-    gradOutput = gradOutput_.contiguous();
-  }
+      (input.ndimension() == 3 || input.ndimension() == 4),
+      "non-empty 3D or 4D (batch mode) tensor expected for input");
 
-  auto output_size_vec = gradOutput.sizes();
-  auto nOutputCols = output_size_vec[3];
-  auto nOutputRows = output_size_vec[2];
+  auto outputHeight = gradOutput.size(-2);
+  auto outputWidth = gradOutput.size(-1);
 
-  // Input is NCHW format
-  auto nInputCols = input.size(3);
-  auto nInputRows = input.size(2);
-  auto nInputPlane = input.size(1);
-  auto batchSize = input.size(0);
+  /* sizes */
+  const int64_t nbatch = input.ndimension() == 4 ? input.size(-4) : 1;
+  const auto nInputPlane = input.size(-3);
+  const auto inputHeight = input.size(-2);
+  const auto inputWidth = input.size(-1);
 
-  int dW = DPCPP::floor((float)2 * nInputCols / nOutputCols) -
-      DPCPP::floor((float)nInputCols / nOutputCols);
-  int dH = DPCPP::floor((float)2 * nInputRows / nOutputRows) -
-      DPCPP::floor((float)nInputRows / nOutputRows);
+  int dH = std::floor((float)2 * inputHeight / outputHeight) -
+      std::floor((float)inputHeight / outputHeight);
+  int dW = std::floor((float)2 * inputWidth / outputWidth) -
+      std::floor((float)inputWidth / outputWidth);
 
-  int kW = DPCPP::ceil((float)2 * nInputCols / nOutputCols) -
-      DPCPP::floor((float)nInputCols / nOutputCols);
-  int kH = DPCPP::ceil((float)2 * nInputRows / nOutputRows) -
-      DPCPP::floor((float)nInputRows / nOutputRows);
+  int kH = std::ceil((float)2 * inputHeight / outputHeight) -
+      std::floor((float)inputHeight / outputHeight);
+  int kW = std::ceil((float)2 * inputWidth / outputWidth) -
+      std::floor((float)inputWidth / outputWidth);
 
-  int padW = (dW * (nOutputCols - 1) + kW - nInputCols) / 2;
-  int padH = (dH * (nOutputRows - 1) + kH - nInputRows) / 2;
+  int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
+  int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
 
@@ -123,14 +139,14 @@ void adaptive_avg_pool2d_backward_out_template(
       gradInput,
       gradOutput,
       input,
-      batchSize,
+      nbatch,
       nInputPlane,
       0,
-      nInputRows,
-      nInputCols,
+      inputHeight,
+      inputWidth,
       0,
-      nOutputRows,
-      nOutputCols,
+      outputHeight,
+      outputWidth,
       0,
       kH,
       kW,
@@ -179,20 +195,57 @@ Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
 }
 
 Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
-    Tensor& gradInput,
-    const Tensor& gradOutput,
-    const Tensor& input) {
-  impl::adaptive_avg_pool2d_backward_out_template(gradInput, gradOutput, input);
-  return gradInput;
+    Tensor& grad_input,
+    const Tensor& grad_output_,
+    const Tensor& self_) {
+  /* PyTorch support two cases of AdaptiveAvgPool2d:
+     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+     This case does not support channel last format. For a 3-dim tensor,
+     the PyTorch suggest_memory_format can only be Contiguous or
+     ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the sementics
+     of Input (C, H, W) case. Then the suggest_memory_format can only be
+     Contiguous.
+     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+     This case supports Contiguous and ChannelsLast2D memory_format. */
+  Tensor self, grad_output;
+  if (self_.ndimension() == 3) {
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    grad_input.resize_as_(self);
+  } else {
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    grad_input.resize_as_(self_, smf);
+  }
+  impl::adaptive_avg_pool2d_backward_out_template(
+      grad_input, grad_output, self);
+  return grad_input;
 }
 
 Tensor _adaptive_avg_pool2d_backward(
-    const Tensor& grad_output,
-    const Tensor& self) {
-  auto smf = self.suggest_memory_format();
-  Tensor grad_input = is_smf_channels_last(self)
-      ? at::empty_like(self, smf)
-      : at::empty_like(self, MemoryFormat::Contiguous);
+    const Tensor& grad_output_,
+    const Tensor& self_) {
+  /* PyTorch support two cases of AdaptiveAvgPool2d:
+     1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
+     This case does not support channel last format. For a 3-dim tensor,
+     the PyTorch suggest_memory_format can only be Contiguous or
+     ChannelsLast1D (nwc), the ChannelsLast1D (nwc) does not match the sementics
+     of Input (C, H, W) case. Then the suggest_memory_format can only be
+     Contiguous.
+     2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
+     This case supports Contiguous and ChannelsLast2D memory_format. */
+  Tensor self, grad_output, grad_input;
+  if (self_.ndimension() == 3) {
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    grad_input = at::empty_like(self);
+  } else {
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    grad_input = at::empty_like(self_, smf);
+  }
   impl::adaptive_avg_pool2d_backward_out_template(
       grad_input, grad_output, self);
   return grad_input;

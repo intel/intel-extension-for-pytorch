@@ -33,6 +33,11 @@ void adaptive_max_pool3d_out_template(
         "empty");
   }
 
+  /* Applies a 3D adaptive max pooling over an input signal composed of
+     several input planes. This op only support 4D and 5D input. 4D: Input (C,
+     D, H, W),  Output (C, D0, H0, W0) 5D: Input (N, C, D, H, W),  Output (N, C,
+     D0, H0, W0)
+  */
   TORCH_CHECK(
       (input.ndimension() == 4 || input.ndimension() == 5),
       "non-empty 4D or 5D (batch mode) tensor expected for input");
@@ -41,54 +46,51 @@ void adaptive_max_pool3d_out_template(
       output_size.size() == 3,
       "adaptive_max_pool3d: internal error: output_size.size() must be 3");
 
-  auto smf = input.suggest_memory_format();
-  Tensor input_ = is_smf_channels_last(input) ? input : input.contiguous();
-
-  int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
-  int64_t nblock = input_.size(-4);
-  int64_t inputDepth = input_.size(-3);
-  int64_t inputHeight = input_.size(-2);
-  int64_t inputWidth = input_.size(-1);
+  int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
+  int64_t nblock = input.size(-4);
+  int64_t inputDepth = input.size(-3);
+  int64_t inputHeight = input.size(-2);
+  int64_t inputWidth = input.size(-1);
 
   int64_t outputDepth = output_size[0];
   int64_t outputHeight = output_size[1];
   int64_t outputWidth = output_size[2];
 
-  int dD = DPCPP::floor((float)2 * inputDepth / outputDepth) -
-      DPCPP::floor((float)inputDepth / outputDepth);
-  int dH = DPCPP::floor((float)2 * inputHeight / outputHeight) -
-      DPCPP::floor((float)inputHeight / outputHeight);
-  int dW = DPCPP::floor((float)2 * inputWidth / outputWidth) -
-      DPCPP::floor((float)inputWidth / outputWidth);
+  int dD = std::floor((float)2 * inputDepth / outputDepth) -
+      std::floor((float)inputDepth / outputDepth);
+  int dH = std::floor((float)2 * inputHeight / outputHeight) -
+      std::floor((float)inputHeight / outputHeight);
+  int dW = std::floor((float)2 * inputWidth / outputWidth) -
+      std::floor((float)inputWidth / outputWidth);
 
-  int kD = DPCPP::ceil((float)2 * inputDepth / outputDepth) -
-      DPCPP::floor((float)inputDepth / outputDepth);
-  int kH = DPCPP::ceil((float)2 * inputHeight / outputHeight) -
-      DPCPP::floor((float)inputHeight / outputHeight);
-  int kW = DPCPP::ceil((float)2 * inputWidth / outputWidth) -
-      DPCPP::floor((float)inputWidth / outputWidth);
+  int kD = std::ceil((float)2 * inputDepth / outputDepth) -
+      std::floor((float)inputDepth / outputDepth);
+  int kH = std::ceil((float)2 * inputHeight / outputHeight) -
+      std::floor((float)inputHeight / outputHeight);
+  int kW = std::ceil((float)2 * inputWidth / outputWidth) -
+      std::floor((float)inputWidth / outputWidth);
 
   int padD = (dD * (outputDepth - 1) + kD - inputDepth) / 2;
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  if (input_.ndimension() == 4) {
+  Tensor input_;
+  if (input.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
     // cannot give channels last for 4D tensor from frontend user perspective
     // the 2nd dim is outputDepth, not channel dim
+    input_ = input.contiguous();
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (at::MemoryFormat::ChannelsLast3d == smf) {
-      output.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast3d);
-      indices.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast3d);
-    } else {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-    }
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = input.suggest_memory_format();
+    input_ = input.contiguous(smf);
+    output.resize_(
+        {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
+    indices.resize_(
+        {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }
 
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
@@ -116,20 +118,9 @@ void adaptive_max_pool3d_out_template(
 
 Tensor& adaptive_max_pool3d_backward_out_template(
     Tensor& gradInput,
-    const Tensor& gradOutput_,
+    const Tensor& gradOutput,
     const Tensor& input,
     const Tensor& indices) {
-  Tensor gradOutput;
-  /* resize */
-  auto smf = input.suggest_memory_format();
-  if (is_smf_channels_last(input)) {
-    gradInput.resize_as_(input, smf);
-    gradOutput = gradOutput_.contiguous(smf);
-  } else {
-    gradInput.resize_as_(input);
-    gradOutput = gradOutput_.contiguous();
-  }
-
   int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
   int64_t nblock = input.size(-4);
   int64_t gradInputDepth = input.size(-3);
@@ -140,19 +131,19 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   int64_t gradOutputHeight = gradOutput.size(-2);
   int64_t gradOutputWidth = gradOutput.size(-1);
 
-  int dD = DPCPP::floor((float)2 * gradInputDepth / gradOutputDepth) -
-      DPCPP::floor((float)gradInputDepth / gradOutputDepth);
-  int dH = DPCPP::floor((float)2 * gradInputHeight / gradOutputHeight) -
-      DPCPP::floor((float)gradInputHeight / gradOutputHeight);
-  int dW = DPCPP::floor((float)2 * gradInputWidth / gradOutputWidth) -
-      DPCPP::floor((float)gradInputWidth / gradOutputWidth);
+  int dD = std::floor((float)2 * gradInputDepth / gradOutputDepth) -
+      std::floor((float)gradInputDepth / gradOutputDepth);
+  int dH = std::floor((float)2 * gradInputHeight / gradOutputHeight) -
+      std::floor((float)gradInputHeight / gradOutputHeight);
+  int dW = std::floor((float)2 * gradInputWidth / gradOutputWidth) -
+      std::floor((float)gradInputWidth / gradOutputWidth);
 
-  int kD = DPCPP::ceil((float)2 * gradInputDepth / gradOutputDepth) -
-      DPCPP::floor((float)gradInputDepth / gradOutputDepth);
-  int kH = DPCPP::ceil((float)2 * gradInputHeight / gradOutputHeight) -
-      DPCPP::floor((float)gradInputHeight / gradOutputHeight);
-  int kW = DPCPP::ceil((float)2 * gradInputWidth / gradOutputWidth) -
-      DPCPP::floor((float)gradInputWidth / gradOutputWidth);
+  int kD = std::ceil((float)2 * gradInputDepth / gradOutputDepth) -
+      std::floor((float)gradInputDepth / gradOutputDepth);
+  int kH = std::ceil((float)2 * gradInputHeight / gradOutputHeight) -
+      std::floor((float)gradInputHeight / gradOutputHeight);
+  int kW = std::ceil((float)2 * gradInputWidth / gradOutputWidth) -
+      std::floor((float)gradInputWidth / gradOutputWidth);
 
   int padD = (dD * (gradOutputDepth - 1) + kD - gradInputDepth) / 2;
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
@@ -205,21 +196,54 @@ std::tuple<Tensor, Tensor> adaptive_max_pool3d(
 
 Tensor& adaptive_max_pool3d_backward_out(
     Tensor& grad_input,
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& indices) {
+    const Tensor& grad_output_,
+    const Tensor& self_,
+    const Tensor& indices_) {
+  Tensor self, grad_output, indices;
+  if (self_.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    indices = indices_.contiguous();
+    grad_input.resize_as_(self);
+  } else {
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    indices = indices_.contiguous(smf);
+    grad_input.resize_as_(self, smf);
+  }
   impl::adaptive_max_pool3d_backward_out_template(
       grad_input, grad_output, self, indices);
   return grad_input;
 }
 
 Tensor adaptive_max_pool3d_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& indices) {
-  Tensor grad_input;
-  auto smf = self.suggest_memory_format();
-  grad_input = at::zeros_like(self, smf);
+    const Tensor& grad_output_,
+    const Tensor& self_,
+    const Tensor& indices_) {
+  Tensor self, grad_output, indices, grad_input;
+  if (self_.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    indices = indices_.contiguous();
+    grad_input = at::empty_like(self);
+  } else {
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    indices = indices_.contiguous(smf);
+    grad_input = at::empty_like(self, smf);
+  }
   impl::adaptive_max_pool3d_backward_out_template(
       grad_input, grad_output, self, indices);
   return grad_input;

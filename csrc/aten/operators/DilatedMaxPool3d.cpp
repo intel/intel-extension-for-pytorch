@@ -19,7 +19,7 @@ namespace impl {
 void max_pool3d_with_indices_out_template(
     Tensor& output,
     Tensor& indices,
-    const Tensor& input_,
+    const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
@@ -72,15 +72,15 @@ void max_pool3d_with_indices_out_template(
       : safe_downcast<int, int64_t>(dilation[2]);
 
   TORCH_CHECK(
-      (input_.ndimension() == 4 || input_.ndimension() == 5),
+      (input.ndimension() == 4 || input.ndimension() == 5),
       "non-empty 4D or 5D (batch mode) tensor expected for input");
 
   /* sizes */
-  const int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
-  const int64_t nblock = input_.size(-4);
-  const int64_t inputDepth = input_.size(-3);
-  const int64_t inputHeight = input_.size(-2);
-  const int64_t inputWidth = input_.size(-1);
+  const int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
+  const int64_t nblock = input.size(-4);
+  const int64_t inputDepth = input.size(-3);
+  const int64_t inputHeight = input.size(-2);
+  const int64_t inputWidth = input.size(-1);
 
   const int64_t outputDepth = pooling_output_shape<int64_t>(
       inputDepth, kD, padD, dD, dilationD, ceil_mode);
@@ -90,7 +90,7 @@ void max_pool3d_with_indices_out_template(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
   pool3d_shape_check(
-      input_,
+      input,
       nblock,
       kD,
       kH,
@@ -113,42 +113,29 @@ void max_pool3d_with_indices_out_template(
       "max_pool3d_with_indices_out_template()",
       /*check_input_size=*/true);
 
-  /* get contiguous input */
-  Tensor input = input_.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-          input_.is_contiguous(at::MemoryFormat::ChannelsLast3d)
-      ? input_
-      : input_.contiguous();
-
+  Tensor input_;
   if (input.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
     // cannot give channels last for 4D tensor from frontend user perspective
     // the 2nd dim is outputDepth, not channel dim
+    input_ = input.contiguous();
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-      output.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast);
-      indices.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast);
-    } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-      output.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast3d);
-      indices.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast3d);
-    } else {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-    }
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = input.suggest_memory_format();
+    input_ = input.contiguous(smf);
+    output.resize_(
+        {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
+    indices.resize_(
+        {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }
 
   ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
       output,
       indices,
-      input,
+      input_,
       nbatch,
       nblock,
       inputDepth,
@@ -170,7 +157,7 @@ void max_pool3d_with_indices_out_template(
 
 Tensor& max_pool3d_with_indices_backward_out_template(
     Tensor& gradInput,
-    const Tensor& gradOutput_,
+    const Tensor& gradOutput,
     const Tensor& input,
     const Tensor& indices,
     IntArrayRef kernel_size,
@@ -178,19 +165,6 @@ Tensor& max_pool3d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  Tensor gradOutput;
-  /* resize */
-  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast);
-  } else if (input.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
-    gradInput.resize_as_(input, at::MemoryFormat::ChannelsLast3d);
-    gradOutput = gradOutput_.contiguous(at::MemoryFormat::ChannelsLast3d);
-  } else {
-    gradInput.resize_as_(input);
-    gradOutput = gradOutput_.contiguous();
-  }
-
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "max_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -338,14 +312,32 @@ std::tuple<Tensor, Tensor> max_pool3d_with_indices(
 
 Tensor& max_pool3d_with_indices_backward_out(
     Tensor& grad_input,
-    const Tensor& grad_output,
-    const Tensor& self,
+    const Tensor& grad_output_,
+    const Tensor& self_,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode,
-    const Tensor& indices) {
+    const Tensor& indices_) {
+  Tensor self, grad_output, indices;
+  if (self_.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    indices = indices_.contiguous();
+    grad_input.resize_as_(self);
+  } else {
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    indices = indices_.contiguous(smf);
+    grad_input.resize_as_(self, smf);
+  }
   impl::max_pool3d_with_indices_backward_out_template(
       grad_input,
       grad_output,
@@ -360,32 +352,43 @@ Tensor& max_pool3d_with_indices_backward_out(
 }
 
 Tensor max_pool3d_with_indices_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
+    const Tensor& grad_output_,
+    const Tensor& self_,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode,
-    const Tensor& indices) {
-  Tensor grad_input;
-  if (self.is_contiguous(MemoryFormat::ChannelsLast)) {
-    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast);
-  } else if (self.is_contiguous(MemoryFormat::ChannelsLast3d)) {
-    grad_input = at::zeros_like(self, MemoryFormat::ChannelsLast3d);
+    const Tensor& indices_) {
+  Tensor self, grad_output, indices, grad_input;
+  if (self_.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    indices = indices_.contiguous();
+    grad_input = at::empty_like(self);
   } else {
-    grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    indices = indices_.contiguous(smf);
+    grad_input = at::empty_like(self, smf);
   }
-  return at::AtenIpexTypeXPU::max_pool3d_with_indices_backward_out(
+  impl::max_pool3d_with_indices_backward_out_template(
       grad_input,
       grad_output,
       self,
+      indices,
       kernel_size,
       stride,
       padding,
       dilation,
-      ceil_mode,
-      indices);
+      ceil_mode);
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU

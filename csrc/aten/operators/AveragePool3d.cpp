@@ -24,13 +24,6 @@ void avg_pool3d_out_template(
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
-  //  TensorArg output_arg{ output, "output", 1 };
-  //  TensorArg input_arg{ input, "input", 2 };
-  //
-  //  checkAllSameGPU("avg_pool3d_out_sycl", {output_arg, input_arg});
-
-  Tensor input_ = is_smf_channels_last(input) ? input : input.contiguous();
-
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -65,16 +58,21 @@ void avg_pool3d_out_template(
   const int padW =
       padding.size() == 1 ? padD : safe_downcast<int, int64_t>(padding[2]);
 
+  /* Applies a 3D average pooling over an input signal composed of
+     several input planes. This op only support 4D and 5D input. 4D: Input (C,
+     D, H, W),  Output (C, D0, H0, W0) 5D: Input (N, C, D, H, W),  Output (N, C,
+     D0, H0, W0)
+  */
   TORCH_CHECK(
-      (input_.ndimension() == 4 || input_.ndimension() == 5),
-      "non-empty 4D or 5D (batch mode) tensor expected for input_");
+      (input.ndimension() == 4 || input.ndimension() == 5),
+      "non-empty 4D or 5D (batch mode) tensor expected for input");
 
   /* sizes */
-  const int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
-  const int64_t nblock = input_.size(-4);
-  const int64_t idepth = input_.size(-3);
-  const int64_t iheight = input_.size(-2);
-  const int64_t iwidth = input_.size(-1);
+  const int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
+  const int64_t nblock = input.size(-4);
+  const int64_t idepth = input.size(-3);
+  const int64_t iheight = input.size(-2);
+  const int64_t iwidth = input.size(-1);
 
   const int64_t outputDepth =
       pooling_output_shape<int64_t>(idepth, kD, padD, dD, 1, ceil_mode);
@@ -84,7 +82,7 @@ void avg_pool3d_out_template(
       pooling_output_shape<int64_t>(iwidth, kW, padW, dW, 1, ceil_mode);
 
   pool3d_shape_check(
-      input_,
+      input,
       nblock,
       kD,
       kH,
@@ -107,18 +105,20 @@ void avg_pool3d_out_template(
       "avg_pool3d_out_template()",
       /*check_input_size=*/true);
 
-  if (input_.ndimension() == 4) {
+  Tensor input_;
+  if (input.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
     // cannot give channels last for 4D tensor from frontend user perspective
     // the 2nd dim is outputDepth, not channel dim
+    input_ = input.contiguous();
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    if (is_smf_channels_last(input_)) {
-      output.resize_(
-          {nbatch, nblock, outputDepth, outputHeight, outputWidth},
-          at::MemoryFormat::ChannelsLast3d);
-    } else {
-      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-    }
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = input.suggest_memory_format();
+    input_ = input.contiguous(smf);
+    output.resize_(
+        {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
   }
 
   if (count_include_pad) {
@@ -168,31 +168,13 @@ void avg_pool3d_out_template(
 
 Tensor& avg_pool3d_backward_out_template(
     Tensor& gradInput,
-    const Tensor& gradOutput_,
+    const Tensor& gradOutput,
     const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
-  //  TensorArg gradInput_arg{ gradInput, "gradInput", 1 };
-  //  TensorArg gradOutput_arg{ gradOutput, "gradOutput", 2 };
-  //  TensorArg input_arg{ input, "input", 3 };
-  //
-  //  checkAllSameGPU("avg_pool3d_backward_out_sycl",
-  //                  {gradInput_arg, gradOutput_arg, input_arg});
-
-  Tensor gradOutput;
-  /* resize */
-  auto smf = input.suggest_memory_format();
-  if (is_smf_channels_last(input)) {
-    gradInput.resize_as_(input, smf);
-    gradOutput = gradOutput_.contiguous(smf);
-  } else {
-    gradInput.resize_as_(input);
-    gradOutput = gradOutput_.contiguous();
-  }
-
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -364,8 +346,8 @@ Tensor avg_pool3d(
 
 Tensor& avg_pool3d_backward_out(
     Tensor& grad_input,
-    const Tensor& grad_output,
-    const Tensor& self,
+    const Tensor& grad_output_,
+    const Tensor& self_,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
@@ -375,6 +357,23 @@ Tensor& avg_pool3d_backward_out(
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool3d operator does not support divisor");
+  Tensor self, grad_output;
+  if (self_.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    grad_input.resize_as_(self);
+  } else {
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    grad_input.resize_as_(self_, smf);
+  }
+
   impl::avg_pool3d_backward_out_template(
       grad_input,
       grad_output,
@@ -388,22 +387,35 @@ Tensor& avg_pool3d_backward_out(
 }
 
 Tensor avg_pool3d_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
+    const Tensor& grad_output_,
+    const Tensor& self_,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor grad_input;
-  auto smf = self.suggest_memory_format();
-  if (is_smf_channels_last(self)) {
-    grad_input = at::zeros_like(self, smf);
+  TORCH_CHECK(
+      !divisor_override.has_value(),
+      "dpcpp_avg_pool3d operator does not support divisor");
+
+  Tensor self, grad_output, grad_input;
+  if (self_.ndimension() == 4) {
+    // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
+    self = self_.contiguous();
+    grad_output = grad_output_.contiguous();
+    grad_input = at::empty_like(self);
   } else {
-    grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+    // 5D: Input (N, C, D, H, W),  Output (N, C, D0, H0, W0)
+    // smf supports ChannelsLast3D and Contiguous cases.
+    auto smf = self_.suggest_memory_format();
+    self = self_.contiguous(smf);
+    grad_output = grad_output_.contiguous(smf);
+    grad_input = at::empty_like(self, smf);
   }
-  return at::AtenIpexTypeXPU::avg_pool3d_backward_out(
+  impl::avg_pool3d_backward_out_template(
       grad_input,
       grad_output,
       self,
@@ -411,8 +423,8 @@ Tensor avg_pool3d_backward(
       stride,
       padding,
       ceil_mode,
-      count_include_pad,
-      divisor_override);
+      count_include_pad);
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU
