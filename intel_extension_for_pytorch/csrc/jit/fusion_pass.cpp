@@ -352,6 +352,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // concat multi-linear with same input
   FrozenConcatLinear(graph);
 
+  // ipex einsum
+  graph_rewrite::FusedEinsumPost(graph);
+
   // Fuse the scores calculation(dim + matmul + (add)? + softmax) for
   // Multi-Head-Attention
   graph_rewrite::FuseMHAScoreCalc(graph);

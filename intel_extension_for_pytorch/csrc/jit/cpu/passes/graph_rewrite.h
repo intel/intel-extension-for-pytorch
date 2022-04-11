@@ -52,6 +52,7 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTranspose2dOp(std::shared_ptr<Graph>& graph);
 
+void FusedEinsumPost(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

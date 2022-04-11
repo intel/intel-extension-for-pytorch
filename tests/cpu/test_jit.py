@@ -786,6 +786,27 @@ class Bottleneck_v2(nn.Module):
         y3 += x
         return y3.relu_()
 
+class EinsumAdd(nn.Module):
+    def __init__(self, equation):
+        super(EinsumAdd, self).__init__()
+        self.equation = equation
+    def forward(self, input1, input2, bias):
+        return torch.einsum(self.equation, input1, input2) + bias
+
+class EinsumAddInplace(nn.Module):
+    def __init__(self, equation):
+        super(EinsumAddInplace, self).__init__()
+        self.equation = equation
+    def forward(self, input1, input2, bias):
+        return torch.einsum(self.equation, input1, input2).add_(bias)
+
+class EinsumAddInplaceV1(nn.Module):
+    def __init__(self, equation):
+        super(EinsumAddInplaceV1, self).__init__()
+        self.equation = equation
+    def forward(self, input1, input2, bias):
+        return bias.add_(torch.einsum(self.equation, input1, input2))
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
@@ -2465,6 +2486,101 @@ class Tester(TestCase):
         out = traced_mod(M, batch1, batch2)
         expected = torch.baddbmm(M, batch1, batch2)
         self.assertTrue(torch.allclose(out, expected))
+
+    def test_einsum_add(self):
+        def _test_fp32(model_test, input1, input2, bias, kind_in_graph='ipex::einsum_binary', prec=1e-3):
+            model = copy.deepcopy(model_test)
+            model = model.eval()
+            model = ipex.optimize(model, dtype=torch.float32)
+            with torch.no_grad():
+                res_ref = model(input1, input2, bias)
+                tr_model = torch.jit.trace(model, (input1, input2, bias))
+                tr_model = torch.jit.freeze(tr_model)
+                tr_model(input1, input2, bias)
+                tr_model(input1, input2, bias)
+                trace_graph = tr_model.graph_for(input1, input2, bias)
+                res_jit = tr_model(input1, input2, bias,)
+                self.assertEqual(res_ref, res_jit, prec)
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+
+        bias = torch.randn(3,2304)
+        input1 = torch.randn(2, 3, 768)
+        input2 = torch.randn(768, 2304)
+        model_v1 = EinsumAdd('bsh,ho->bso')
+        _test_fp32(model_v1, input1, input2, bias)
+        
+        bias = torch.randn(2304)
+        input1 = torch.randn(4, 3, 768)
+        input2 = torch.randn(768, 2304)
+        model_v1 = EinsumAddInplace('bsh,ho->bso')
+        _test_fp32(model_v1, input1, input2, bias)
+        
+        bias = torch.randn(4, 3, 2304)
+        input1 = torch.randn(4, 3, 768)
+        input2 = torch.randn(768, 2304)
+        model_v1 = EinsumAddInplaceV1('bsh,ho->bso')
+        _test_fp32(model_v1, input1, input2, bias, kind_in_graph='aten::einsum')
+
+        bias1 = torch.randn(2, 1, 128, 128)
+        input3 = torch.randn(2, 4, 128, 768)
+        input4 = torch.randn(2, 4, 128, 768)
+        model_v2 = EinsumAdd("bnqd,bnkd->bnqk")
+        _test_fp32(model_v2, input3, input4, bias1)
+        
+        bias1 = torch.randn(8, 1, 1, 128)
+        input3 = torch.randn(8, 4, 128, 768)
+        input4 = torch.randn(8, 4, 128, 768)
+        model_v2 = EinsumAdd("bnqd,bnkd->bnqk")
+        _test_fp32(model_v2, input3, input4, bias1)
+
+        bias1 = torch.randn(2, 4, 128, 768)
+        input1 = torch.randn(2, 4, 128, 768)
+        input2 = torch.randn(4, 768, 768)
+        model_v2 = EinsumAdd("balh,ahr->balr")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(768)
+        input1 = torch.randn(128, 1024)
+        input2 = torch.randn(768, 1024)
+        model_v2 = EinsumAdd("mc,nc->mn")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(768)
+        input1 = torch.randn(128, 1024)
+        input2 = torch.randn(1024, 768)
+        model_v2 = EinsumAdd("mc,cn->mn")
+        _test_fp32(model_v2, input1, input2, bias1)
+        
+        bias1 = torch.randn(1024)
+        input1 = torch.randn(1024, 1024)
+        input2 = torch.randn(1024, 1024)
+        model_v2 = EinsumAdd("mc,cn->nm")
+        _test_fp32(model_v2, input1, input2, bias1)
+        
+        bias1 = torch.randn(768)
+        input1 = torch.randn(2, 128, 1024)
+        input2 = torch.randn(1024, 23, 768)
+        model_v2 = EinsumAdd("bqc,chv->bqhv")
+        _test_fp32(model_v2, input1, input2, bias1)
+        
+        bias = torch.randn(768)
+        input1 = torch.randn(2, 128, 16, 64)
+        input2 = torch.randn(16,64, 768)
+        model = EinsumAdd("bqhc,hco->bqo")
+        _test_fp32(model, input1, input2, bias)
+        
+        bias = torch.randn(8)
+        input1 = torch.randn(8)
+        input2 = torch.randn(8)
+        model = EinsumAdd("i,i->")
+        _test_fp32(model, input1, input2, bias)
+       
+        #the output of torch.einsum("ij,j") is tensor([]) 
+        bias = torch.randn(1)
+        input1 = torch.randn(0, 3) 
+        input2 = torch.randn(3)
+        model = EinsumAdd(("ij,j"))
+        _test_fp32(model, input1, input2, bias)
 
     def test_ipex_softmax(self):
         self._test_output(
