@@ -13,7 +13,7 @@ engine& Engine::getEngine() {
 }
 
 stream& Stream::getStream() {
-  static stream cpu_stream{Engine::getEngine(), nullptr};
+  static stream cpu_stream{Engine::getEngine()};
   return cpu_stream;
 }
 

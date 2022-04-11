@@ -25,6 +25,14 @@ static auto bmm_add = Symbol::fromQualString("ipex::bmm_add");
 namespace torch_ipex {
 namespace cpu {
 
+at::Tensor bmm_impl(
+    const at::Tensor& tensor1,
+    const at::Tensor& tensor2,
+    at::Tensor out,
+    const ideep::attr_t& attr,
+    const std::vector<ideep::tensor>& postop_tensors,
+    const float dst_coeff);
+
 at::Tensor dil_matmul_div(
     const at::Tensor& left,
     const at::Tensor& right,

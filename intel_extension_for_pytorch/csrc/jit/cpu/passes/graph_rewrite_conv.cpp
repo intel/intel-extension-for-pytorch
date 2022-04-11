@@ -4,7 +4,6 @@
 #include "graph_rewrite_utils.h"
 
 #include <ATen/code_template.h>
-#include <torch/csrc/jit/ir/alias_analysis.h>
 
 namespace torch {
 namespace jit {
@@ -431,8 +430,8 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
         conv_add_relu_rstring.format(env), conv_add_relu_fused);
   }
 
-  rewriter_add_v1.runOnGraph(graph, fuse_add_filter(graph, /* accumu_id */ 1));
-  rewriter_add_v2.runOnGraph(graph, fuse_add_filter(graph, /* accumu_id */ 0));
+  rewriter_add_v1.runOnGraph(graph, fuse_add_filter_v1);
+  rewriter_add_v2.runOnGraph(graph, fuse_add_filter_v2);
   rewriter_add_relu.runOnGraph(graph);
 }
 
