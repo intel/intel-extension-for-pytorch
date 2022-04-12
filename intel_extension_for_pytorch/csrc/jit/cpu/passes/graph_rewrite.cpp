@@ -468,11 +468,12 @@ void fuseBmmAdd(std::shared_ptr<Graph>& graph) {
   // fliter the unsupported case
   auto fusion_filter = [](const Match& match,
                           const std::unordered_map<std::string, Value*>& vmap) {
-    Node* node = match.anchor;
     const auto& match_vmap = match.values_map;
 
-    auto batch1 = node->input(1)->type()->cast<TensorType>();
-    auto batch2 = node->input(2)->type()->cast<TensorType>();
+    auto batch1 =
+        getValue("batch1", match_vmap, vmap)->type()->cast<TensorType>();
+    auto batch2 =
+        getValue("batch2", match_vmap, vmap)->type()->cast<TensorType>();
     if (batch1->dim() != batch2->dim()) {
       return false;
     }

@@ -2497,7 +2497,7 @@ class Tester(TestCase):
                 tr_model(input1, input2, bias)
                 trace_graph = tr_model.graph_for(input1, input2, bias)
                 res_jit = tr_model(input1, input2, bias,)
-                self.assertEqual(res_ref, res_jit, prec)
+                self.assertEqual(res_ref, res_jit, atol=prec, rtol=prec)
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
         bias = torch.randn(3,2304)
