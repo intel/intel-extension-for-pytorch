@@ -7,17 +7,12 @@
 #include <runtime/Utils.h>
 
 #include <quantized/QUtil.h>
-#include "Cat.h"
 #include "ReQuantization.h"
 #include "comm/ParamUtils.h"
 
-using namespace dnnl;
 using namespace at::native;
 
 namespace at {
-
-using namespace AtenIpexTypeXPU::impl;
-
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor q_cat(
@@ -45,7 +40,7 @@ Tensor q_cat(
       scale_out,
       zero_point_out,
       MemoryFormat::Contiguous);
-  dnnl_cat(out, tensors_cat_array, tensors.size(), dim);
+  xpu::oneDNN::concat(out, tensors_cat_array, dim);
   return out;
 }
 

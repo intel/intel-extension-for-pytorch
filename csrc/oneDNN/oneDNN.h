@@ -7,6 +7,7 @@
 
 #include "BatchNorm.h"
 #include "Binary.h"
+#include "Concat.h"
 #include "Conv.h"
 #include "Eltwise.h"
 #include "GRU.h"

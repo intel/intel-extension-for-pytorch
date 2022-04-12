@@ -15,8 +15,6 @@
 #include <oneDNN/oneDNN.h>
 #include <tensor/Context.h>
 
-#include "Cat.h"
-
 using namespace dnnl;
 using namespace xpu::dpcpp;
 using namespace xpu::oneDNN;
@@ -345,153 +343,6 @@ static void cat(
   }
 }
 
-void dnnl_cat(Tensor& output, TensorList inputs, int numInputs, int dimension) {
-  int i, j;
-  int64_t offset;
-  Tensor notSkippedTensor; // non-owning reference
-  auto should_skip = [](const Tensor& t) {
-    return !t.defined() && t.dim() == 1;
-  };
-
-  int nDims = 0;
-  for (i = 0; i < numInputs; i++) {
-    if (should_skip(inputs[i])) {
-      continue;
-    }
-    nDims = inputs[i].dim();
-    notSkippedTensor = inputs[i];
-  }
-
-  // If all inputs are empty tensors, return an empty tensor
-  if (!notSkippedTensor.defined()) {
-    return;
-  }
-
-  TORCH_CHECK(numInputs > 0, "invalid number of inputs");
-  TORCH_CHECK(dimension >= 0, "invalid dimension");
-
-  bool first_tensor_is_channels_last = false;
-  Tensor first_tensor = inputs[0];
-  auto ft_ndim = first_tensor.ndimension();
-  auto ft_smf = first_tensor.suggest_memory_format();
-  first_tensor_is_channels_last = is_smf_channels_last(first_tensor);
-
-  std::vector<Tensor> cat_tensors;
-  int64_t cat_dim_size = 0;
-  for (int i = 0; i < numInputs; i++) {
-    Tensor tensor = inputs[i];
-    if (should_skip(tensor)) {
-      continue;
-    }
-    check_shape_except_dim(notSkippedTensor, tensor, dimension);
-    cat_dim_size += tensor.size(dimension);
-    auto ndim = tensor.ndimension();
-    if (true == first_tensor_is_channels_last) {
-      Tensor cl_tensor = tensor.contiguous(get_cl_tag_by_ndim(ndim));
-      cat_tensors.push_back(cl_tensor);
-    } else {
-      // only support ndim == 1, 2, 3, 6 for nchw format
-      // if first tensor is plain format, convert all the following tensors to
-      // nchw format to algin pytorch behavior
-      Tensor nchw_tensor = tensor.contiguous();
-      cat_tensors.push_back(nchw_tensor);
-    }
-  }
-
-  std::vector<int64_t> size(nDims);
-  for (int dim = 0; dim < nDims; dim++) {
-    int64_t result_dim_size = notSkippedTensor.size(dim);
-    if (dim == dimension) {
-      result_dim_size = cat_dim_size;
-    }
-    size[dim] = result_dim_size;
-  }
-  memory::dims output_dims = size;
-  output.resize_(size, ft_smf);
-
-  Device curDevice = Device(kXPU, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-
-  std::vector<memory::desc> cat_tensors_md;
-  std::vector<memory> cat_tensors_mem;
-  for (size_t i = 0; i < cat_tensors.size(); i++) {
-    std::vector<int64_t> dims;
-    for (size_t j = 0; j < cat_tensors[i].dim(); j++) {
-      dims.push_back(cat_tensors[i].size(j));
-    }
-
-    memory::dims input_tz = dims;
-    auto data_t = get_onednn_dtype(cat_tensors[i]);
-    auto ndim = cat_tensors[i].ndimension();
-    bool is_channels_last = is_smf_channels_last(first_tensor);
-    auto format_plain = get_dnnl_default_format(ndim, is_channels_last);
-
-    memory::desc tensor_md;
-    if (!Settings::I().is_layout_opt_enabled()) {
-      tensor_md = memory::desc({input_tz}, data_t, format_plain);
-    } else {
-      auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(
-          cat_tensors[i]);
-      tensor_md = input_ctx.is_plain()
-          ? memory::desc({input_tz}, data_t, format_plain)
-          : input_ctx.meta();
-    }
-    cat_tensors_md.push_back(tensor_md);
-
-    auto input_usr_memory =
-        dpcpp_onednn_memory(tensor_md, engine, cat_tensors[i].data_ptr());
-    cat_tensors_mem.push_back(input_usr_memory);
-  }
-
-  auto data_t = get_onednn_dtype(cat_tensors[0]);
-  auto format_plain =
-      get_dnnl_default_format(ft_ndim, first_tensor_is_channels_last);
-  auto output_md = memory::desc(output_dims, data_t, format_plain);
-  auto concat_pd = concat::primitive_desc(
-      output_md, static_cast<int>(dimension), cat_tensors_md, engine);
-
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, output_dims, static_cast<int>(dimension), cat_tensors_md);
-#endif
-
-  // Tensor output;
-  memory output_usr_memory;
-  if (!Settings::I().is_layout_opt_enabled()) {
-    output_usr_memory =
-        dpcpp_onednn_memory(output_md, engine, output.data_ptr());
-  } else {
-    auto expected_output_md = concat_pd.dst_desc();
-    if (output_md != expected_output_md) {
-      // reallocate memory for some blk fmt
-      output = at::AtenIpexTypeXPU::empty_opaque_tensor(
-          expected_output_md, cat_tensors[0].options(), c10::nullopt);
-      output_usr_memory =
-          dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
-    } else {
-      output_usr_memory =
-          dpcpp_onednn_memory(output_md, engine, output.data_ptr());
-    }
-  }
-
-  std::unordered_map<int, memory> args = {
-      {DNNL_ARG_DST, output_usr_memory},
-  };
-  for (int i = 0; i < (int)cat_tensors.size(); i++) {
-    args.insert({DNNL_ARG_MULTIPLE_SRC + i, cat_tensors_mem[i]});
-  }
-
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-#ifdef USE_PRIMITIVE_CACHE
-  auto concat_p = fetch_or_create_m<dnnl::concat>(key, concat_pd);
-#else
-  auto concat_p = dnnl::concat(concat_pd);
-#endif
-
-  DPCPP_ONEDNN_EXEC(concat_p, strm, args);
-}
-
 } // namespace impl
 
 Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
@@ -518,9 +369,10 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
 
   // DNNL cat does not support double datatype now.
   if (!allSameType || skip_dnnl_cat) {
-    impl::cat(out, tensors, tensors.size(), dim, allSameType);
+    auto atens = at::AtenIpexTypeXPU::to_plain_if_needed(tensors);
+    impl::cat(out, at::TensorList(atens), atens.size(), dim, allSameType);
   } else {
-    impl::dnnl_cat(out, tensors, tensors.size(), dim);
+    xpu::oneDNN::concat(out, tensors, dim);
   }
   return out;
 }

@@ -206,6 +206,8 @@ class RegisterDispatchKey:
     })
 
     lazy_reorder_block_list = set([
+        '_cat',
+        '_cat_out'
         'convolution_overrideable',
         'convolution_backward_overrideable',
         'relu',
