@@ -7,6 +7,7 @@
 #include "csrc/jit/cpu/kernels/ConcatBnRelu.h"
 #include "csrc/jit/cpu/kernels/ConvPacked.h"
 #include "csrc/jit/cpu/kernels/ConvTransposePacked.h"
+#include "csrc/jit/cpu/kernels/Einsum.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
@@ -550,6 +551,23 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::bmm_add(Tensor input, Tensor batch1, Tensor batch2, Scalar alpha) -> "
+        "Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = dil_bmm_add(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toTensor(),
+                (std::move(peek(stack, 2, 4))).toTensor(),
+                (std::move(peek(stack, 3, 4))).toScalar());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::mha_scores_calc(Tensor q, Tensor k, Tensor rel_qk, Scalar "
         "alpha, "
         "Scalar dim_per_head, int softmax_dim, ScalarType ? dtype) -> Tensor",
@@ -766,6 +784,22 @@ RegisterOperators op({
                 (std::move(peek(stack, 10, 12))).toBool(),
                 (std::move(peek(stack, 11, 12))).toInt());
             drop(stack, 12);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::einsum_binary(str equation, Tensor[] tensors, Tensor add_arg, Scalar alpha) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = einsum_binary(
+                (std::move(peek(stack, 0, 4))).toStringView(),
+                (std::move(peek(stack, 1, 4))).toTensorList(),
+                (std::move(peek(stack, 2, 4))).toTensor(),
+                (std::move(peek(stack, 3, 4))).toScalar());
+
+            drop(stack, 4);
             pack(stack, std::move(result));
             return 0;
           };

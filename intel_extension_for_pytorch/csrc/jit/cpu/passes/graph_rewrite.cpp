@@ -453,6 +453,42 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph) {
   }
 }
 
+void fuseBmmAdd(std::shared_ptr<Graph>& graph) {
+  std::array<std::string, 2> add_operators = {"add", "add_"};
+
+  auto bmm_add_rstring_v1 = R"(
+    graph(%input, %batch1, %batch2, %alpha):
+        %x = aten::bmm(%batch1, %batch2)
+        %res = aten::add(%x, %input, %alpha)
+        return (%res))";
+  std::string bmm_add_fused = R"(
+    graph(%input, %batch1, %batch2, %alpha):
+        %res = ipex::bmm_add(%input, %batch1, %batch2, %alpha)
+        return (%res))";
+  // fliter the unsupported case
+  auto fusion_filter = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    Node* node = match.anchor;
+    const auto& match_vmap = match.values_map;
+
+    auto batch1 = node->input(1)->type()->cast<TensorType>();
+    auto batch2 = node->input(2)->type()->cast<TensorType>();
+    if (batch1->dim() != batch2->dim()) {
+      return false;
+    }
+
+    if (batch1->dim().value() < 3) {
+      return false;
+    }
+
+    return true;
+  };
+
+  SubgraphRewriter rewriter_add_v1;
+  rewriter_add_v1.RegisterRewritePattern(bmm_add_rstring_v1, bmm_add_fused);
+  rewriter_add_v1.runOnGraph(graph, fusion_filter);
+}
+
 void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
   std::string aten_concat_bn_relu = R"(
       graph(%input : Tensor[], %dim:int, %weight, %bias, %running_mean, %running_var, %training, %momentum, %eps, %cudnn_enabled):
