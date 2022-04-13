@@ -57,6 +57,15 @@ at::Tensor linear_gelu_run(
   return op_context->run(input, ideep::attr_t::fuse_gelu());
 }
 
+at::Tensor linear_tanh_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::linear_tanh_run", std::vector<c10::IValue>({}));
+
+  return op_context->run(input, ideep::attr_t::fuse_tanh());
+}
+
 at::Tensor linear_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {

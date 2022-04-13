@@ -366,6 +366,16 @@ class LinearGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.linear(x))
 
+class LinearTanh(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearTanh, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return F.tanh(self.linear(x))
+
 class LinearSigmoid(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearSigmoid, self).__init__()
@@ -2331,6 +2341,28 @@ class Tester(TestCase):
             LinearGelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_gelu_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
+            prec=5e-3)
+
+    def test_output_linear_tanh(self):
+        self._test_output(
+            LinearTanh(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearTanh(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_tanh_run",
+            kind_not_in_graph="ipex_prepack::linear_prepack",
+            prec=5e-3)
+        self._test_output(
+            LinearTanh(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearTanh(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_tanh_run",
             kind_not_in_graph="ipex_prepack::linear_prepack",
             prec=5e-3)
 

@@ -101,11 +101,12 @@ void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph) {
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_relu, rewriter_gelu, rewriter_silu,
-      rewriter_sigmoid, rewriter_swish;
+      rewriter_sigmoid, rewriter_swish, rewriter_tanh;
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> silu_operators = {"silu", "silu_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
+  std::array<std::string, 2> tanh_operators = {"tanh", "tanh_"};
 
   auto linear_relu_rstring = CodeTemplate(R"(
      graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
@@ -118,6 +119,19 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
     graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
         %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
         %res = ipex_prepack::linear_relu_run(%input, %packed_weight)
+        return (%res))";
+
+  auto linear_tanh_rstring = CodeTemplate(R"(
+     graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %res = aten::${tanh}(%x)
+        return (%res))");
+
+  std::string linear_tanh_fused = R"(
+    graph(%input, %weight, %bias, %out_features:int, %in_features:int, %batch_size:int, %weight_is_prepacked:bool):
+        %packed_weight = ipex_prepack::linear_prepack(%weight, %bias, %out_features, %in_features, %batch_size, %weight_is_prepacked)
+        %res = ipex_prepack::linear_tanh_run(%input, %packed_weight)
         return (%res))";
 
   std::string linear_gelu = R"(
@@ -174,6 +188,13 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
         linear_relu_rstring.format(env), linear_relu_fused);
   }
 
+  for (const auto& tanh : tanh_operators) {
+    TemplateEnv env;
+    env.s("tanh", tanh);
+    rewriter_tanh.RegisterRewritePattern(
+        linear_tanh_rstring.format(env), linear_tanh_fused);
+  }
+
   for (const auto& silu : silu_operators) {
     TemplateEnv env;
     env.s("silu", silu);
@@ -198,6 +219,7 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
   rewriter_gelu.RegisterRewritePattern(linear_gelu, linear_gelu_fused);
 
   rewriter_relu.runOnGraph(graph);
+  rewriter_tanh.runOnGraph(graph);
   rewriter_gelu.runOnGraph(graph);
 }
 
