@@ -40,5 +40,22 @@ at::Tensor empty_aten_tensor_from_desc(
 
 int mkldnn_set_verbose(int level);
 
+// ##Background##
+// This function returns the input tensor's stride with a workaround that checks
+// (and fixes) the stride when the input tensor has dim size 1. Currently oneDNN
+// is not expected the behavior that with dim size 1, a PyTorch tensor's stride
+// is meanless and may not follow strict contiguous context, which may make
+// oneDNN go into ref path (perf drop). For example: A tensor with shape [1,
+// 768] and stride [1536, 1] is not expected to current oneDNN though PyTorch
+// will think it is contiguous since dim0 is size 1. Such a Tensor can be
+// constructed by slice [:,0,:] from another tensor with shape [1, 2, 768] and
+// stride [1536, 768, 1], and it is a real case in Albert model pooler layer.
+// ##Performance Impact##
+// It takes ~0.05us on average for calling this function when creating a mkldnn
+// tensor.
+// ##TODO##
+// Will remove this workaround after oneDNN's fix.
+dnnl::memory::dims get_stride_with_size_1_fix(const at::Tensor& tensor);
+
 } // namespace cpu
 } // namespace torch_ipex

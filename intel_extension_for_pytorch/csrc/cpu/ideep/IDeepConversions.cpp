@@ -37,6 +37,53 @@ using IDeepTensorWrapperPtr = c10::intrusive_ptr<IDeepTensorWrapper>;
 using MKLDNNTensorImpl = at::OpaqueTensorImpl<IDeepTensorWrapperPtr>;
 using MKLDNNTensor = at::Tensor;
 
+dnnl::memory::dims get_stride_with_size_1_fix(const at::Tensor& tensor) {
+  bool need_check_stride = false;
+  bool is_channelslast_contiguous = false;
+  auto strides_ = tensor.strides().vec();
+  auto dim_ = tensor.dim();
+  // check if the tensor need to check (dim size contains 1 and is contiguous)
+  for (int i = 0; i < dim_; i++) {
+    if (tensor.size(i) == 1) {
+      if (tensor.is_contiguous()) {
+        need_check_stride = true;
+      } else if (
+          tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+          tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
+        is_channelslast_contiguous = true;
+        need_check_stride = true;
+      }
+      break;
+    }
+  }
+  if (need_check_stride) {
+    // default contiguous dim is last dim, while channel last contiguous dim fix
+    // to channel dim (idx = 1)
+    int contiguous_idx = is_channelslast_contiguous ? 1 : dim_ - 1;
+    // contiguous dim must have stride 1
+    strides_[contiguous_idx] = 1;
+    // loop for checking each dim from last to first
+    for (int i = dim_ - 1; i >= 0; i--) {
+      // only check stride where dim size is 1 and not the contiguous dim that
+      // has already set
+      if (tensor.size(i) == 1 && i != contiguous_idx) {
+        if (i == dim_ - 1 && is_channelslast_contiguous) {
+          // handle the last dim when channel last contiguous
+          strides_[i] = tensor.size(contiguous_idx) * strides_[contiguous_idx];
+        } else if (i == 0 && is_channelslast_contiguous) {
+          // handle the first dim when channel last contiguous
+          strides_[i] = tensor.size(2) * strides_[2];
+        } else {
+          // for other cases, they are next_dim_stride*next_dim_size since
+          // stride computation order is from last to first
+          strides_[i] = tensor.size(i + 1) * strides_[i + 1];
+        }
+      }
+    }
+  }
+  return strides_;
+}
+
 ideep::tensor::data_type get_mkldnn_dtype(at::ScalarType type) {
   switch (type) {
     case at::ScalarType::Float:
@@ -75,10 +122,11 @@ ideep::tensor itensor_view_from_dense(const at::Tensor& tensor) {
       tensor.scalar_type() == at::ScalarType::Float ||
           tensor.scalar_type() == at::ScalarType::BFloat16,
       "itensor_view_from_dense expects float tensor input");
+
   return {
       {tensor.sizes().vec(),
        get_mkldnn_dtype(tensor.scalar_type()),
-       tensor.strides().vec()},
+       get_stride_with_size_1_fix(tensor)},
       tensor.data_ptr()};
 }
 
