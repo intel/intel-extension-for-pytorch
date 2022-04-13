@@ -242,10 +242,10 @@ def _check_env_flag(name, default=''):
 
 
 def get_git_head_sha(base_dir):
-    ipex_git_sha = subprocess.check_output(['git', 'rev-parse', '--', 'HEAD'], cwd=base_dir).decode('ascii').strip()
+    ipex_git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=base_dir).decode('ascii').strip()
     if os.path.isdir(os.path.join(base_dir, '..', '.git')):
         torch_git_sha = subprocess.check_output(
-            ['git', 'rev-parse', '--', 'HEAD'],
+            ['git', 'rev-parse', 'HEAD'],
             cwd=os.path.join(base_dir, '..')).decode('ascii').strip()
     else:
         torch_git_sha = ''
