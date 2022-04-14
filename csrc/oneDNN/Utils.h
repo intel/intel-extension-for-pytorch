@@ -235,5 +235,42 @@ static inline bool binary_valid(
   return false;
 }
 
+static inline bool softmax_valid(const at::Tensor& self) {
+  if (!self.is_contiguous())
+    return false;
+
+  // the datatype should be supported by oneDNN primitive.
+  switch (self.scalar_type()) {
+    case at::ScalarType::Half:
+      break;
+    case at::ScalarType::Float:
+      break;
+    case at::ScalarType::BFloat16:
+      break;
+    default:
+      return false;
+  };
+  return true;
+}
+
+static inline bool softmax_backward_valid(
+    const at::Tensor& grad,
+    const at::Tensor& output,
+    const at::Tensor& input) {
+  if (!grad.is_contiguous() || !output.is_contiguous())
+    return false;
+
+  // the datatype should be supported by oneDNN primitive.
+  switch (input.scalar_type()) {
+    case at::ScalarType::Float:
+      break;
+    case at::ScalarType::BFloat16:
+      break;
+    default:
+      return false;
+  };
+  return true;
+}
+
 } // namespace oneDNN
 } // namespace xpu

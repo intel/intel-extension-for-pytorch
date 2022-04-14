@@ -447,8 +447,12 @@ Tensor host_softmax(
   AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
-  auto input = input_.contiguous();
-  Tensor output = at::native::empty_like(input);
+  TORCH_CHECK(
+      input_.is_contiguous(),
+      "** host_softmax only supports contiguous input tensor");
+
+  Tensor output = at::native::empty_like(input_);
+  Tensor input = input_;
   if (input.dim() == 0)
     input = input.view(1);
   int64_t dim = maybe_wrap_dim(dim_, input.dim());
@@ -497,15 +501,22 @@ Tensor host_softmax_backward(
   AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
+  TORCH_CHECK(
+      grad_.is_contiguous(),
+      "** host_softmax_backward only supports contiguous grad tensor");
+  TORCH_CHECK(
+      output_.is_contiguous(),
+      "** host_softmax_backward only supports contiguous output tensor");
+
   int64_t dim = maybe_wrap_dim(dim_, grad_.dim());
-  auto grad = grad_.contiguous();
-  Tensor gI = at::empty_like(grad);
+  Tensor gI = at::empty_like(grad_);
+  Tensor grad = grad_;
   if (grad.dim() == 0)
     grad = grad.view(1);
   TORCH_CHECK(
       dim >= 0 && dim < grad.dim(),
       "dim must be non-negative and less than input dimensions");
-  auto output = output_.contiguous();
+  Tensor output = output_;
   if (output.dim() == 0)
     output = output.view(1);
   IPEX_DISPATCH_FLOATING_TYPES_AND(
@@ -538,216 +549,33 @@ Tensor host_softmax_backward(
   return gI;
 }
 
-void get_dnnl_format(
-    const Tensor& input,
-    memory::format_tag& dnnl_format,
-    memory::dims& input_tz) {
-  auto input_sizes = input.sizes();
-  auto input_ndim = input_sizes.size();
-
-  if (input_ndim == 1) {
-    dnnl_format = memory::format_tag::x;
-    input_tz = {input.size(0)};
-  } else if (input_ndim == 2) {
-    dnnl_format = memory::format_tag::nc;
-    input_tz = {input.size(0), input.size(1)};
-  } else if (input_ndim == 3) {
-    dnnl_format = memory::format_tag::tnc;
-    input_tz = {input.size(0), input.size(1), input.size(2)};
-  } else if (input_ndim == 4) {
-    dnnl_format = memory::format_tag::nchw;
-    input_tz = {
-        /*n*/ input.size(0),
-        /*c*/ input.size(1),
-        /*h*/ input.size(2),
-        /*w*/ input.size(3)};
-  } else {
-    std::stringstream ss;
-    ss << "DPCPP softmax backend got shape=" << input_sizes
-       << ", expected input with rank 1 to  rank 4 shape";
-    AT_ERROR(ss.str());
-  }
-}
-
-Tensor _softmax_onednn(
-    const Tensor& input,
-    const int64_t dim,
-    const bool half_to_float) {
-  TORCH_CHECK(input.dim() <= 4 && input.dim() >= 1, "Input Dims out of range");
-
-  Device curDevice = Device(at::kXPU, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  memory::format_tag dnnl_format;
-  memory::dims input_tz;
-  get_dnnl_format(input, dnnl_format, input_tz);
-
-  auto data_t = get_onednn_dtype(input);
-
-  auto input_ctx =
-      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
-  auto input_md = input_ctx.is_plain()
-      ? memory::desc({input_tz}, data_t, get_onednn_strides(input))
-      : input_ctx.meta();
-
-  auto axis = dim < 0 ? dim + input.dim() : dim;
-
-  // Create operation descriptor.
-  auto softmax_forward_desc =
-      softmax_forward::desc(prop_kind::forward, input_md, axis);
-
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, input_md, axis);
-#endif
-
-  // Create primitive descriptor.
-  auto softmax_forward_pd =
-      softmax_forward::primitive_desc(softmax_forward_desc, engine);
-
-  Tensor output;
-  if (input_ctx.is_plain()) {
-    output = at::empty_like(input);
-  } else {
-    output = empty_opaque_tensor(
-        softmax_forward_pd.dst_desc(), input.options(), c10::nullopt);
-  }
-  auto input_usr_memory =
-      dpcpp_onednn_memory(input_md, engine, input.data_ptr());
-  auto output_usr_memory = dpcpp_onednn_memory(
-      softmax_forward_pd.dst_desc(), engine, output.data_ptr());
-
-  // Create the primitive.
-#ifdef USE_PRIMITIVE_CACHE
-  auto softmax_onednn_forward =
-      fetch_or_create_m<softmax_forward>(key, softmax_forward_pd);
-#else
-  auto softmax_onednn_forward = softmax_forward(softmax_forward_pd);
-#endif
-
-  // Primitive execution.
-  DPCPP_ONEDNN_EXEC(
-      softmax_onednn_forward,
-      strm,
-      {{DNNL_ARG_SRC, input_usr_memory}, {DNNL_ARG_DST, output_usr_memory}});
-
-  return output;
-}
-
-Tensor _softmax_backward_onednn(
-    const Tensor& grad,
-    const Tensor& output,
-    int64_t dim,
-    bool half_to_float) {
-  TORCH_CHECK(grad.dim() <= 4 && grad.dim() >= 1, "Input Dims out of range");
-
-  Device curDevice = Device(at::kXPU, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = GpuStreamManager::Instance().get_stream();
-  auto gI = at::empty_like(grad);
-  memory::format_tag output_dnnl_format;
-  memory::format_tag grad_dnnl_format;
-  memory::dims output_tz;
-  memory::dims grad_tz;
-
-  get_dnnl_format(output, output_dnnl_format, output_tz);
-  get_dnnl_format(grad, grad_dnnl_format, grad_tz);
-
-  auto output_t = get_onednn_dtype(output);
-  auto grad_t = get_onednn_dtype(grad);
-
-  auto axis = dim < 0 ? dim + grad.dim() : dim;
-
-  auto output_ctx =
-      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(output);
-  auto output_md = output_ctx.is_plain()
-      ? memory::desc({output_tz}, output_t, output_dnnl_format)
-      : output_ctx.meta();
-  auto output_memory =
-      dpcpp_onednn_memory(output_md, engine, output.data_ptr());
-
-  auto grad_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad);
-  auto grad_md = grad_ctx.is_plain()
-      ? memory::desc({grad_tz, grad_t, grad_dnnl_format})
-      : grad_ctx.meta();
-  auto grad_usr_memory = dpcpp_onednn_memory(grad_md, engine, grad.data_ptr());
-
-  auto softmax_forward_desc =
-      softmax_forward::desc(prop_kind::forward, output_md, axis);
-  auto softmax_forward_pd =
-      softmax_forward::primitive_desc(softmax_forward_desc, engine);
-
-  Tensor grad_opt;
-  auto grad_memory = grad_usr_memory;
-  if (grad_ctx.is_plain() && (!output_ctx.is_plain())) {
-    grad_opt = empty_opaque_tensor(
-        softmax_forward_pd.dst_desc(), grad.options(), c10::nullopt);
-    grad_memory = dpcpp_onednn_memory(
-        softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
-    grad_md = softmax_forward_pd.dst_desc();
-    xpu::oneDNN::reorder(grad, grad_opt);
-  }
-
-  auto softmax_backward_desc = softmax_backward::desc(grad_md, output_md, axis);
-  auto softmax_backward_pd = softmax_backward::primitive_desc(
-      softmax_backward_desc, engine, softmax_forward_pd);
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, grad_md, output_md, axis);
-#endif
-
-  auto plain_gi_md = memory::desc({grad_tz, grad_t, grad_dnnl_format});
-  auto expected_gi_md = softmax_backward_pd.diff_src_desc();
-  if (plain_gi_md != expected_gi_md) {
-    gI = empty_opaque_tensor(expected_gi_md, grad.options(), c10::nullopt);
-  }
-  auto gi_memory = dpcpp_onednn_memory(expected_gi_md, engine, gI.data_ptr());
-
-  // Create the primitive.
-#ifdef USE_PRIMITIVE_CACHE
-  auto softmax_onednn_backward =
-      fetch_or_create_m<softmax_backward>(key, softmax_backward_pd);
-#else
-  auto softmax_onednn_backward = softmax_backward(softmax_backward_pd);
-#endif
-
-  // Primitive execution.
-  DPCPP_ONEDNN_EXEC(
-      softmax_onednn_backward,
-      strm,
-      {{DNNL_ARG_DST, output_memory},
-       {DNNL_ARG_DIFF_SRC, gi_memory},
-       {DNNL_ARG_DIFF_DST, grad_memory}});
-
-  return gI;
-}
-
 // We now use DPCPP softmax fwd kernel instead of oneDNN softmax fwd kernel
 Tensor _softmax(
-    const Tensor& input,
+    const Tensor& input_,
     const int64_t dim,
     const bool half_to_float) {
-  checkBackend("_softmax", {input}, Backend::XPU);
+  checkBackend("_softmax", {input_}, Backend::XPU);
 
-  if (input.scalar_type() != at::ScalarType::Float &&
-      input.scalar_type() != at::ScalarType::Half &&
-      input.scalar_type() != at::ScalarType::BFloat16) {
-    // oneDNN does not support this type. Use native kernel instead.
+  // 1.check oneDNN support input scalar_t or not
+  // 2.check the input tensor is contiguous or not
+  // when satify the aformentioned two conditions,
+  // the oneDNN path will be selected,
+  // all the other cases will go to DPCPP path
+  if (xpu::oneDNN::softmax_valid(input_)) {
+    return xpu::oneDNN::softmax(input_, dim, half_to_float);
+  } else {
+    Tensor input = to_plain_if_needed(input_).contiguous();
     return host_softmax<impl::SoftMaxForwardEpilogue>(
         input, dim, half_to_float);
-  } else {
-    return _softmax_onednn(input, dim, half_to_float);
   }
 }
 
-// We now use DPCPP softmax bwd kernel instead of oneDNN softmax bwd kernel
 Tensor _softmax_backward_data(
-    const Tensor& grad,
-    const Tensor& output,
+    const Tensor& grad_,
+    const Tensor& output_,
     int64_t dim,
     const Tensor& input) {
-  bool half_to_float = grad.scalar_type() != input.scalar_type();
+  bool half_to_float = grad_.scalar_type() != input.scalar_type();
   if (half_to_float) {
     TORCH_CHECK(
         !half_to_float,
@@ -755,42 +583,42 @@ Tensor _softmax_backward_data(
         "conversion is not supported on DPCPP");
   }
 
-#if 0
-  // Skip oneDNN kernel due to its bad performance.
-  if ((input.scalar_type() == at::ScalarType::Float ||
-      input.scalar_type() == at::ScalarType::BFloat16) &&
-      grad.is_contiguous() && output.is_contiguous()) {
-    return _softmax_backward_onednn(grad, output, dim, half_to_float);
+  // 1.check oneDNN support input scalar_t or not
+  // 2.check the input tensor is contiguous or not
+  // when satify the aformentioned two conditions,
+  // the oneDNN path will be selected,
+  // all the other cases will go to DPCPP path
+  if (xpu::oneDNN::softmax_backward_valid(grad_, output_, input)) {
+    return xpu::oneDNN::softmax_backward(grad_, output_, dim, half_to_float);
   } else {
-    // Use native kernel instead.
+    auto grad = to_plain_if_needed(grad_).contiguous();
+    auto output = to_plain_if_needed(output_).contiguous();
     Tensor tmp = grad * output;
     return host_softmax_backward<impl::SoftMaxBackwardEpilogue>(
-      tmp, output, dim, half_to_float);
-
+        tmp, output, dim, half_to_float);
   }
-#endif
-
-  Tensor tmp = grad * output;
-  return host_softmax_backward<impl::SoftMaxBackwardEpilogue>(
-      tmp, output, dim, half_to_float);
 }
 
-Tensor _log_softmax(const Tensor& self, int64_t dim, bool half_to_float) {
+Tensor _log_softmax(const Tensor& self_, int64_t dim, bool half_to_float) {
+  Tensor self = self_.contiguous();
   return host_softmax<impl::LogSoftMaxForwardEpilogue>(
       self, dim, half_to_float);
 }
 
 Tensor _log_softmax_backward_data(
-    const Tensor& grad,
-    const Tensor& output,
+    const Tensor& grad_,
+    const Tensor& output_,
     int64_t dim,
     const Tensor& input) {
-  bool half_to_float = grad.scalar_type() != input.scalar_type();
+  bool half_to_float = grad_.scalar_type() != input.scalar_type();
   if (half_to_float) {
     TORCH_INTERNAL_ASSERT(
         !half_to_float,
         "softmax with half to float conversion is not supported on DPCPP");
   }
+
+  auto grad = grad_.contiguous();
+  auto output = output_.contiguous();
   return host_softmax_backward<impl::LogSoftMaxBackwardEpilogue>(
       grad, output, dim, half_to_float);
 }
