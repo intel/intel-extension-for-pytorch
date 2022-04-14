@@ -9,8 +9,6 @@
 #include <oneDNN/oneDNN.h>
 #include "comm/ParamUtils.h"
 
-#include "ConvTranspose.h"
-
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -816,7 +814,7 @@ Tensor _convolution_out(
   Tensor output_;
 
   if (transposed_) {
-    output_ = dpcpp_convolution_transpose(
+    output_ = xpu::oneDNN::deconvolution(
         input,
         weight,
         bias,
@@ -1061,7 +1059,7 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
 
   if (output_mask[0]) {
     if (transposed) {
-      grad_input = dpcpp_convolution_transpose_backward_input(
+      grad_input = xpu::oneDNN::deconvolution_backward_data(
           input,
           weight,
           grad_output,
@@ -1085,7 +1083,7 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   if (output_mask[1] || output_mask[2]) {
     if (transposed) {
       std::tie(grad_weight, grad_bias) =
-          dpcpp_convolution_transpose_backward_weights(
+          xpu::oneDNN::deconvolution_backward_weights(
               input,
               weight,
               grad_output,

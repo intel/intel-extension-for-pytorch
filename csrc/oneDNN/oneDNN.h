@@ -9,6 +9,7 @@
 #include "Binary.h"
 #include "Concat.h"
 #include "Conv.h"
+#include "Deconv.h"
 #include "Eltwise.h"
 #include "GRU.h"
 #include "LSTM.h"
