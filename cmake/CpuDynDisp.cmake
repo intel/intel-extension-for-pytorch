@@ -195,11 +195,11 @@ link_directories(${PYTORCH_INSTALL_DIR}/lib)
 add_dependencies(${PLUGIN_NAME} dnnl_graph)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
+target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
   target_link_libraries(${PLUGIN_NAME} PUBLIC graphcompiler_static ${DNNL_GRAPHCOMPILER_LLVM_LIB})
 endif()
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
