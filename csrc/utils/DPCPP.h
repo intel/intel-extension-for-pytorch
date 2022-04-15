@@ -106,10 +106,6 @@ namespace DPCPP_EXT = DPCPP::ext::oneapi;
 #define DPCPP_DEVICE // for device only
 #define DPCPP_BOTH // for both host and device
 
-// dpcpp device configuration
-// TODO: set subgourp size with api get_max_sub_group_size
-#define DPCPP_SUB_GROUP_SIZE (1L)
-
 #define THREAD_WORK_SIZE 16
 
 // info value type
