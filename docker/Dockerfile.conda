@@ -1,8 +1,7 @@
-# syntax = docker/dockerfile:experimental
+# syntax = docker/dockerfile:1
 # based onhttps://github.com/pytorch/pytorch/blob/master/Dockerfile
 #
-# NOTE: To build this you will need a docker version > 18.06 with
-#       experimental enabled and DOCKER_BUILDKIT=1
+# NOTE: To build this you will need a docker version >= 19.03 and DOCKER_BUILDKIT=1
 #
 #       If you do not use buildkit you are not going to have a good time
 #
@@ -42,21 +41,21 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
     /opt/conda/bin/conda clean -ya
 
 FROM dev-base AS build
-ARG IPEX_VERSION=v1.11.100
+ARG IPEX_VERSION=v1.11.0
 ARG PYTORCH_VERSION=v1.11.0
 ARG TORCHVISION_VERSION=0.12.0+cpu
 ARG TORCHAUDIO_VERSION=0.11.0+cpu
 COPY --from=conda /opt/conda /opt/conda
 RUN --mount=type=cache,target=/opt/ccache \
-    pip install torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} -f https://download.pytorch.org/whl/torch_stable.html && \
+    python -m pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} -f https://download.pytorch.org/whl/torch_stable.html && \
     git clone https://github.com/intel/intel-extension-for-pytorch && \
     cd intel-extension-for-pytorch && \
     git checkout ${IPEX_VERSION} && \
     git submodule sync && \
     git submodule update --init --recursive && \
-    pip3 install -r requirements.txt && \
+    python -m pip install --no-cache-dir -r requirements.txt && \
     python setup.py bdist_wheel && \
-    pip3 install dist/*.whl && \
+    python -m pip install --no-cache-dir dist/*.whl && \
     cd .. && rm -rf intel-extension-for-pytorch
 
 FROM dev-base as dev
