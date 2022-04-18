@@ -823,6 +823,24 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::einsum_binary(str equation, Tensor[] tensors, Scalar add_arg, Scalar alpha) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto other_ard =
+                at::ones(1).fill_((std::move(peek(stack, 2, 4))).toScalar());
+            auto result = einsum_binary(
+                (std::move(peek(stack, 0, 4))).toStringView(),
+                (std::move(peek(stack, 1, 4))).toTensorList(),
+                other_ard,
+                (std::move(peek(stack, 3, 4))).toScalar());
+
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 
 });
 } // namespace jit
