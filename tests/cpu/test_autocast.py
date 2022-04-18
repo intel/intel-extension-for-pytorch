@@ -345,7 +345,7 @@ class TestLSTM(TestCase):
     def _lstm_params_list(self):
         params_dict = {
             "input_size": [1, 2],
-            "hidden_size": [5],
+            "hidden_size": [5, 32],
             "num_layers": [1, 3],
             "bidirectional": [False, True],
             "bias": [False, True],
