@@ -56,7 +56,6 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
             self.assertEqual(outputs[1], ref_out1)
             self.assertEqual(outputs[2], ref_out2)
 
-    @unittest.skipIf(True, "Pytorch has trace issue for Modules with ParameterList")
     def test_inference(self):
         model = copy.deepcopy(self.merged)
         self._test_inference_only(model)

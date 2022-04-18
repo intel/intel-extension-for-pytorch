@@ -1,5 +1,6 @@
 #include "initialization.h"
 #include <stdio.h>
+#include <torch/csrc/jit/passes/autocast.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include <torch/torch.h>
 #include <regex>
@@ -19,12 +20,21 @@ void init_jit_fusion_pass() {
   });
 }
 
+void disable_autocast_for_jit_script() {
+  // We need disable autocast pass by default after
+  // https://github.com/pytorch/pytorch/pull/74178. Will remove this after we
+  // can extend the cast policy for this autocast pass.
+  torch::jit::setAutocastMode(false);
+}
+
 InitIPEX::InitIPEX() = default;
 InitIPEX::~InitIPEX() = default;
 InitIPEX::InitIPEX(InitIPEX&&) noexcept = default;
 InitIPEX& InitIPEX::operator=(InitIPEX&&) noexcept = default;
 
-static auto init = InitIPEX().init(&init_jit_fusion_pass);
+static auto init = InitIPEX()
+                       .init(&init_jit_fusion_pass)
+                       .init(&disable_autocast_for_jit_script);
 
 void InitIPEX::check_pytorch_version() {
   int IPEX_VERSION_MAJOR = 0;

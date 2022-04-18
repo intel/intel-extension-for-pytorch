@@ -110,7 +110,7 @@ at::Tensor upsample_nearest1d(
 
 at::Tensor upsample_nearest1d_vec(
     const at::Tensor& input,
-    c10::optional<at::IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     c10::optional<at::ArrayRef<double>> scale_factors);
 
 at::Tensor upsample_nearest2d(
@@ -121,7 +121,7 @@ at::Tensor upsample_nearest2d(
 
 at::Tensor upsample_nearest2d_vec(
     const at::Tensor& input,
-    c10::optional<at::IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     c10::optional<at::ArrayRef<double>> scale_factors);
 
 at::Tensor upsample_nearest3d(
@@ -133,7 +133,7 @@ at::Tensor upsample_nearest3d(
 
 at::Tensor upsample_nearest3d_vec(
     const at::Tensor& input,
-    c10::optional<at::IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     c10::optional<at::ArrayRef<double>> scale_factors);
 
 at::Tensor upsample_linear1d(
@@ -144,7 +144,7 @@ at::Tensor upsample_linear1d(
 
 at::Tensor upsample_linear1d_vec(
     const at::Tensor& input,
-    c10::optional<at::IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     bool align_corners,
     c10::optional<at::ArrayRef<double>> scale_factors);
 
@@ -157,7 +157,7 @@ at::Tensor upsample_bilinear2d(
 
 at::Tensor upsample_bilinear2d_vec(
     const at::Tensor& input,
-    c10::optional<at::IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     bool align_corners,
     c10::optional<at::ArrayRef<double>> scale_factors);
 
@@ -171,7 +171,7 @@ at::Tensor upsample_trilinear3d(
 
 at::Tensor upsample_trilinear3d_vec(
     const at::Tensor& input,
-    c10::optional<at::IntArrayRef> output_size,
+    at::OptionalIntArrayRef output_size,
     bool align_corners,
     c10::optional<at::ArrayRef<double>> scale_factors);
 
