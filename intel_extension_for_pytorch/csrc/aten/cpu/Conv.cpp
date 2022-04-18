@@ -169,7 +169,7 @@ at::Tensor convolution_forward_impl(
       memory_format = at::MemoryFormat::ChannelsLast3d;
     }
   }
-  auto input_ = input.to(memory_format);
+  auto input_ = input.contiguous(memory_format);
   at::Tensor weight_ = weight;
   // if weight is not packed, convert format, and weight will has same format
   // with input.
