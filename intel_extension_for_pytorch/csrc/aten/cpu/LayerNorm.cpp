@@ -172,7 +172,7 @@ at::Tensor layer_norm(
   // TODO: enable training path ??
   if (weight_opt.has_value() && weight_opt.value().defined() &&
       bias_opt.has_value() && bias_opt.value().defined() &&
-      !at::GradMode::is_enabled()) {
+      !at::GradMode::is_enabled() && input.dim() >= 2 && input.dim() <= 5) {
     return layer_norm_forward(
         input, normalized_shape, weight_opt.value(), bias_opt.value(), eps);
   }
