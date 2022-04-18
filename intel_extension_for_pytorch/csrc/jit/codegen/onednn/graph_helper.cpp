@@ -212,6 +212,7 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setAttr("data_format", std::string("NCX"))
         .setAttr("epsilon", Operator::Float, 7);
   } else if (nodeKind == Symbol::aten("layer_norm")) {
+    REQ(node->input(1)->node()->kind() == prim::Constant);
     auto normalized_shape = Operator::Ints(node, 1);
     REQ(normalized_shape.size() == 1);
     return Operator(node, opkind::LayerNorm)

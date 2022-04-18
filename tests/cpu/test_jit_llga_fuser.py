@@ -251,6 +251,22 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
+    def test_unsupported_layer_norm(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                # The value of normalized_shape is dependent on the input
+                return F.layer_norm(x, x.shape)        
+        
+        x = torch.randn(2, 5, 10, 10)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
+    @llga_fp32_bf16_test_env
     @unittest.skipIf(True, 'Enable once cat is supported')
     def test_cat(self):
         def cat_along_dim(d):
