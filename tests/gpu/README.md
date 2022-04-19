@@ -1,4 +1,4 @@
-# How to Write and RUN Test Case
+# How to Write and RUN Test Case In Example
 
 ## Notice
 
@@ -158,3 +158,68 @@ class TestTorchMethod(TestCase):
         y_dpcpp = torch.abs(x_dpcpp)
         self.assertEqual(y.to(cpu_device), y_dpcpp.to(cpu_device))
 ```
+
+# How to RUN and DEBUG Test Cases of Pytorch Test Suite
+
+## RUN the Whole Test Suite
+
+* run the shell script under `tests/gpu/experimental` like:
+
+```
+bash tests/gpu/experimental/run_tests.sh
+```
+
+* the default log file is under `tests/gpu/experimental/logs`, but you can also save your own log file at where you want:
+
+```
+cd tests/gpu/experimental
+bash run_tests.sh -L <path-to>/full_logfile.log
+```
+
+## RUN ONE Specific Test
+
+* pass necessary flags `-S` and `-F <filename> -V <classname> -K <testcase>` to the shell script like:
+
+```
+cd tests/gpu/experimental
+bash run_tests.sh -S -F test_unary_ufuncs.py -V TestUnaryUfuncsXPU -K test_abs_zero_xpu_float32
+```
+
+## RUN a Serial of a Specific OP or Class
+
+* you can run a specific test class which contains all test cases within it, just leave the `-K` argument as empty
+
+* you can run a serial specific test cases with different dtypes as also, just pass a prefix of the full test name like:
+```
+bash run_tests.sh -S -F test_unary_ufuncs.py -V TestUnaryUfuncsXPU -K test_abs_zero
+```
+
+## SKIP ONE Specific Test
+
+* to add the test name with its class into `common/pytorch_test_base.py` like:
+
+```
+DISABLED_TORCH_TESTS_XPU_ONLY = {
+    "TestUnaryUfuncsXPU": {
+        'test_abs_zero', # reasons
+    },
+}
+```
+
+* some cases which missed an implementation of without XPU support were skipped by default. If you want to run it anyway, please contact the developer Xunsong, Huang <xunsong.huang@intel.com> for details.
+
+## USE the UT Analyzer to get analysis data
+
+* pass `--logfile <path-to>/<filename>` to the UT analyzer under `tests/gpu/experimental/common` like:
+
+```
+python ut_analyzer.py --logfile my_logfile.log
+```
+
+* this analyzer will output a summary of result like pass rate, fail rate, etc. And also it will dump out detailed log list for each classified field under `tests/gpu/pytorch/logs` as well.
+
+## Known Issues
+
+* the whole test will hang after finishing the TestReductionXPU class. A SIGTERM is necessary for continuing the remained tests.
+
+

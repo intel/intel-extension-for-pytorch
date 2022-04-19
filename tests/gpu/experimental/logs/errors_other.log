@@ -1,0 +1,816 @@
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_sqrt_xpu_bfloat16 ... RuntimeError: could not create a memory
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_sqrt_xpu_float32 ... RuntimeError: could not create a memory
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_large_dim_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_size1_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_every_other_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_contig_vs_transposed_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_expand_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_index_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_non_contig_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_nonzero_empty_xpu ... IndexError: Dimension out of range (expected to be in range of [-1, 0], but got 1)
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_extremal_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_extremal_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_extremal_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_extremal_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_extremal_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_hard_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_lgamma_xpu_bfloat16 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_lgamma_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_lgamma_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_lgamma_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_float32 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_int64 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_uint8 ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_unary_ufuncs.py::TestUnaryUfuncsXPU::test_reference_numerics_normal_square_xpu_complex64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_view_ops.py::TestOldViewOpsXPU::test_expand_xpu ... RuntimeError: could not create a primitive
+test_view_ops.py::TestOldViewOpsXPU::test_memory_format_resize_as_xpu ... RuntimeError: Unsupported memory formatPreserve
+test_view_ops.py::TestOldViewOpsXPU::test_reshape_view_semantics_xpu_uint8 ... RuntimeError: unsupported Storage type
+test_view_ops.py::TestOldViewOpsXPU::test_view_xpu ... RuntimeError: could not create a primitive
+test_shape_ops.py::TestShapeOpsXPU::test_flip_large_tensor_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_spectral_ops.py::TestFFTXPU::test_batch_istft_xpu ... RuntimeError: could not create a primitive
+test_spectral_ops.py::TestFFTXPU::test_complex_stft_onesided_xpu ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_complex_stft_roundtrip_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_cufft_plan_cache_xpu_float64 ... AttributeError: module 'torch.backends' has no attribute 'xpu'
+test_spectral_ops.py::TestFFTXPU::test_fft2_fftn_equivalence_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft2_numpy_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_ifft_rfft_irfft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_input_modification_xpu ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_round_trip_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_round_trip_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_type_promotion_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_type_promotion_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fft_type_promotion_xpu_int8 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fftn_round_trip_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_fftn_round_trip_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_istft_linearity_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_istft_of_sine_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_istft_round_trip_simple_cases_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_istft_round_trip_various_params_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_istft_round_trip_with_padding_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_fft_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_fft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_hfft_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_hfft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_ifft_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_ifft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_ihfft_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_ihfft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_irfft_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_irfft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_rfft_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_1d_fft_rfft_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_fftn_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_fftn_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_ifftn_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_ifftn_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_irfftn_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_irfftn_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_rfftn_xpu_float32 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_spectral_ops.py::TestFFTXPU::test_reference_nd_fft_rfftn_xpu_float64 ... RuntimeError: fft: IPEX not compiled with MKL support
+test_numpy_interop.py::TestNumPyInteropXPU::test_has_storage_numpy_xpu ... RuntimeError: unsupported Storage type
+test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool1d_indices_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool2d_indices_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_float16 ... RuntimeError: oneDNN only supports pooling backward with fp32 and bf16 datatype
+test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool_zero_batch_dim_xpu ... RuntimeError: adaptive_max_pool2d_dpcpp(): expected input to have non-empty spatial dimensions, but input has sizes [0, 16, 1, 50] with dimension 0 being empty
+test_nn.py::TestNNDeviceTypeXPU::test_AvgPool2d_empty_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_AvgPool3d_backward_after_cat_dim1_device_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_Conv2d_backward_depthwise_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_Conv2d_naive_groups_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_Conv2d_size_1_kernel_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_ConvTranspose2d_size_1_kernel_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_ConvTranspose3d_size_1_kernel_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int32_int32_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int32_int32_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int32_int32_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int32_int64_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int32_int64_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int32_int64_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int64_int32_float16 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int64_int32_float32 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_empty_per_sample_weights_and_offsets_xpu_int64_int32_float64 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int32_int32_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int32_int32_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int32_int32_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int32_int64_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int32_int64_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int32_int64_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int64_int32_float16 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int64_int32_float32 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_new_offsets_xpu_int64_int32_float64 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_int32_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_int32_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_no_offsets_xpu_int32_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int32_int32_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int32_int32_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int32_int32_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int32_int64_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int32_int64_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int32_int64_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int64_int32_float16 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int64_int32_float32 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_EmbeddingBag_per_sample_weights_and_offsets_xpu_int64_int32_float64 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_FractionalMaxPool2d_zero_batch_xpu ... RuntimeError: fractional_max_pool2d(): expected input to have non-empty spatial dimensions.
+test_nn.py::TestNNDeviceTypeXPU::test_FractionalMaxPool3d_zero_batch_xpu ... RuntimeError: fractional_max_pool3d_out_template(): non-empty 4D or 5D (batch mode) tensor expected for input, but got: 5
+test_nn.py::TestNNDeviceTypeXPU::test_InstanceNorm1d_general_xpu ... RuntimeError: tensor does not have a device
+test_nn.py::TestNNDeviceTypeXPU::test_InstanceNorm2d_general_xpu ... RuntimeError: tensor does not have a device
+test_nn.py::TestNNDeviceTypeXPU::test_InstanceNorm3d_general_xpu ... RuntimeError: tensor does not have a device
+test_nn.py::TestNNDeviceTypeXPU::test_MarginLoss_empty_xpu_float32 ... RuntimeError: non-empty vector or matrix expected, got size: [0, 10]
+test_nn.py::TestNNDeviceTypeXPU::test_MarginLoss_empty_xpu_float64 ... RuntimeError: non-empty vector or matrix expected, got size: [0, 10]
+test_nn.py::TestNNDeviceTypeXPU::test_MaxPool1d_indices_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_MaxPool2d_indices_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_MaxPool3d_indices_xpu_float16 ... RuntimeError: oneDNN only supports pooling backward with fp32 and bf16 datatype
+test_nn.py::TestNNDeviceTypeXPU::test_MaxPool3d_indices_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_MaxPool_zero_batch_dim_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_MaxUnpool_zero_batch_dim_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_ReflectionPad_empty_xpu_float32 ... RuntimeError: non-empty 2D or 3D (batch mode) tensor expected for input, but got: [ XPUFloatType{0,3,10} ]
+test_nn.py::TestNNDeviceTypeXPU::test_ReplicationPad3d_large_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_nn.py::TestNNDeviceTypeXPU::test_TransformerDecoderLayer_empty_xpu ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_TransformerDecoder_empty_xpu ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_TransformerEncoderLayer_empty_xpu ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_TransformerEncoder_empty_xpu ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_Transformer_empty_xpu ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_Unfold_empty_xpu ... RuntimeError: Expected non-empty 3D or 4D input tensor, but got input of size [0, 3, 3, 4]
+test_nn.py::TestNNDeviceTypeXPU::test_adaptive_pooling_zero_batch_xpu_float32 ... TypeError: test_adaptive_pooling_zero_batch() got multiple values for argument 'dtype'
+test_nn.py::TestNNDeviceTypeXPU::test_adaptive_pooling_zero_batch_xpu_float64 ... TypeError: test_adaptive_pooling_zero_batch() got multiple values for argument 'dtype'
+test_nn.py::TestNNDeviceTypeXPU::test_affine_2d_rotate0_xpu ... RuntimeError: invalid src/dst dimension in oneDNN reorder ...
+test_nn.py::TestNNDeviceTypeXPU::test_affine_2d_rotate45_xpu ... RuntimeError: invalid src/dst dimension in oneDNN reorder ...
+test_nn.py::TestNNDeviceTypeXPU::test_affine_2d_rotate90_xpu ... RuntimeError: invalid src/dst dimension in oneDNN reorder ...
+test_nn.py::TestNNDeviceTypeXPU::test_affine_2d_rotateRandom_xpu ... RuntimeError: invalid src/dst dimension in oneDNN reorder ...
+test_nn.py::TestNNDeviceTypeXPU::test_affine_3d_rotateRandom_xpu ... RuntimeError: invalid src/dst dimension in oneDNN reorder ...
+test_nn.py::TestNNDeviceTypeXPU::test_avg_pool2d_nhwc_xpu_float16 ... RuntimeError: oneDNN only supports pooling backward with fp32 and bf16 datatype
+test_nn.py::TestNNDeviceTypeXPU::test_avg_pool2d_nhwc_xpu_float32 ... RuntimeError: dpcpp_avg_pool2d operator does not support divisor
+test_nn.py::TestNNDeviceTypeXPU::test_avg_pool2d_nhwc_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_batchnorm_affine_mixed_xpu_bfloat16 ... RuntimeError: tensor does not have a device
+test_nn.py::TestNNDeviceTypeXPU::test_batchnorm_affine_mixed_xpu_float16 ... RuntimeError: could not create a primitive descriptor iterator
+test_nn.py::TestNNDeviceTypeXPU::test_batchnorm_affine_xpu_bfloat16 ... RuntimeError: tensor does not have a device
+test_nn.py::TestNNDeviceTypeXPU::test_batchnorm_affine_xpu_float32 ... RuntimeError: tensor does not have a device
+test_nn.py::TestNNDeviceTypeXPU::test_batchnorm_eval_mixed_xpu_float16 ... RuntimeError: could not create a primitive descriptor iterator
+test_nn.py::TestNNDeviceTypeXPU::test_batchnorm_grad_xpu ... RuntimeError: DPCPP batch_norm backend got unsupported type=Double
+test_nn.py::TestNNDeviceTypeXPU::test_clip_grad_norm_multi_device_xpu ... TypeError: only_fn() missing 1 required positional argument: 'device'
+test_nn.py::TestNNDeviceTypeXPU::test_contig_wrong_stride_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv1d_same_padding_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv1d_same_padding_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv1d_valid_padding_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv1d_valid_padding_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv2d_same_padding_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv2d_same_padding_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv2d_valid_padding_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv2d_valid_padding_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv3d_same_padding_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv3d_same_padding_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv3d_valid_padding_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv3d_valid_padding_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv_large_nosplit_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_nn.py::TestNNDeviceTypeXPU::test_conv_large_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_nn.py::TestNNDeviceTypeXPU::test_conv_nhwc_support_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_conv_noncontig_weights_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_device_mask_xpu ... AttributeError: 'PackedSequence' object has no attribute 'is_xpu'
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int32_int32_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int32_int32_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int32_int32_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int32_int64_float16 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int32_int64_float32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int32_int64_float64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int64_int32_float16 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int64_int32_float32 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_device_xpu_int64_int32_float64 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_empty_input_xpu_int32_int32 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_empty_input_xpu_int32_int64 ... RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_bag_empty_input_xpu_int64_int32 ... RuntimeError: Expected tensor for argument #1 'offsets' to have scalar type Long; but got XPUIntType instead (while checking arguments for embedding_bag_dpcpp)
+test_nn.py::TestNNDeviceTypeXPU::test_embedding_dense_grad_xpu ... RuntimeError: dot: oneMKL library not found in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_fold_xpu ... RuntimeError: dot: oneMKL library not found in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_fractional_max_pool2d_xpu ... RuntimeError: expected scalar type Float but found Double
+test_nn.py::TestNNDeviceTypeXPU::test_fractional_max_pool3d_xpu ... RuntimeError: expected scalar type Float but found Double
+test_nn.py::TestNNDeviceTypeXPU::test_fractional_max_pool_nan_inf_xpu_float16 ... RuntimeError: expected scalar type Float but found Half
+test_nn.py::TestNNDeviceTypeXPU::test_fractional_max_pool_nan_inf_xpu_float64 ... RuntimeError: expected scalar type Float but found Double
+test_nn.py::TestNNDeviceTypeXPU::test_instancenorm_raises_error_for_single_spatial_element_during_training_xpu ... RuntimeError: DPCPP batch_norm backend got unsupported type=Double
+test_nn.py::TestNNDeviceTypeXPU::test_linear_empty_xpu ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_max_pool2d_nhwc_xpu_float16 ... RuntimeError: oneDNN only supports pooling backward with fp32 and bf16 datatype
+test_nn.py::TestNNDeviceTypeXPU::test_max_pool2d_nhwc_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float16 ... RuntimeError: oneDNN only supports pooling backward with fp32 and bf16 datatype
+test_nn.py::TestNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_maxpool3d_non_square_backward_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_maxpool_indices_no_batch_dim_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_module_to_empty_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_multihead_attention_dtype_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_nll_loss_byte_target_matches_long_xpu ... RuntimeError: expected scalar type Long but found Byte
+test_nn.py::TestNNDeviceTypeXPU::test_pool3d_large_size_int64_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_nn.py::TestNNDeviceTypeXPU::test_pool3d_size_one_feature_dim_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_pool_large_size_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_pooling_shape_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_prelu_backward_32bit_indexing_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_nn.py::TestNNDeviceTypeXPU::test_rnn_fused_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_rnn_retain_variables_xpu_float16 ... RuntimeError: could not create a primitive descriptor iterator
+test_nn.py::TestNNDeviceTypeXPU::test_rnn_retain_variables_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_softplus_low_threshold_xpu ... torch.autograd.gradcheck.GradcheckError: Jacobian mismatch for output 0 with respect to input 0,
+test_nn.py::TestNNDeviceTypeXPU::test_threshold_inplace_overlap_xpu ... RuntimeError: unsupported operation: more than one element of the written-to tensor refers to a single memory location. Please clone() the tensor before performing the operation.
+test_nn.py::TestNNDeviceTypeXPU::test_triplet_margin_with_distance_loss_default_parity_xpu ... RuntimeError: dot: oneMKL library not found in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_triplet_margin_with_distance_loss_xpu ... RuntimeError: dot: oneMKL library not found in compilation
+test_nn.py::TestNNDeviceTypeXPU::test_upsamplingNearest1d_launch_config_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_upsamplingNearest2d_launch_config_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_upsamplingNearest2d_launch_rocm_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_upsamplingNearest2d_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_upsamplingNearest3d_launch_config_xpu ... RuntimeError: could not construct a memory descriptor using a format tag
+test_nn.py::TestNNDeviceTypeXPU::test_variable_sequence_xpu_float16 ... RuntimeError: could not create a primitive descriptor iterator
+test_nn.py::TestNNDeviceTypeXPU::test_variable_sequence_xpu_float32 ... RuntimeError: The size of tensor a (2) must match the size of tensor b (16) at non-singleton dimension 1
+test_nn.py::TestNNDeviceTypeXPU::test_variable_sequence_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_modules.py::TestModuleXPU::test_forward_nn_AvgPool1d_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_modules.py::TestModuleXPU::test_forward_nn_Linear_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_modules.py::TestModuleXPU::test_pickle_nn_AvgPool1d_xpu_float64 ... RuntimeError: could not construct a memory descriptor using a format tag
+test_modules.py::TestModuleXPU::test_pickle_nn_Linear_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_bool ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_int16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_int32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_int64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_int8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_add_xpu_uint8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_bool ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_int16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_int32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_int64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_int8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_div_xpu_uint8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_bool ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_int16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_int32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_int64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_int8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_mul_xpu_uint8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_bool ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_int16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_int32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_int64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_int8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_list_slow_path__foreach_sub_xpu_uint8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_add_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_add_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_add_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_add_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_div_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_div_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_div_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_div_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_mul_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_mul_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_mul_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_mul_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_sub_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_sub_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_sub_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalar_fastpath__foreach_sub_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_add_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_add_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_add_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_add_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_div_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_div_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_div_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_div_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_mul_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_mul_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_mul_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_mul_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_sub_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_sub_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_sub_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_scalarlist_fastpath__foreach_sub_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_add_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_add_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_add_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_add_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_div_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_div_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_div_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_div_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_mul_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_mul_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_mul_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_mul_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_sub_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_sub_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_sub_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_binary_op_tensorlists_fastpath__foreach_sub_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_maximum_xpu_complex128 ... RuntimeError: maximum does not support complex inputs.
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_maximum_xpu_complex64 ... RuntimeError: maximum does not support complex inputs.
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_maximum_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_maximum_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_minimum_xpu_complex128 ... RuntimeError: minimum does not support complex inputs.
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_minimum_xpu_complex64 ... RuntimeError: minimum does not support complex inputs.
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_minimum_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_fastpath__foreach_minimum_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_maximum_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_maximum_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_maximum_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_maximum_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_minimum_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_minimum_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_minimum_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_minmax_float_inf_nan__foreach_minimum_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcdiv_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcdiv_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcdiv_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcdiv_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcmul_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcmul_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcmul_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_pointwise_op_fastpath__foreach_addcmul_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_bfloat16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_complex128 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_complex64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_float16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_int16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_int32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_int64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_int8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_abs_xpu_uint8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_acos_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_acos_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_asin_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_asin_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_atan_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_atan_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_ceil_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_ceil_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_cos_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_cos_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_cosh_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_cosh_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_erf_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_erf_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_erfc_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_erfc_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_exp_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_exp_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_expm1_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_expm1_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_floor_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_floor_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_frac_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_frac_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log10_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log10_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log1p_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log1p_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log2_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log2_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_log_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_int16 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_int32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_int64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_int8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_neg_xpu_uint8 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_reciprocal_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_reciprocal_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_round_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_round_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sigmoid_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sigmoid_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sin_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sin_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sinh_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sinh_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sqrt_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_sqrt_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_tan_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_tan_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_tanh_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_tanh_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_trunc_xpu_float32 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_foreach.py::TestForeachXPU::test_unary_fastpath__foreach_trunc_xpu_float64 ... AttributeError: type object 'torch._C._autograd.ProfilerActivity' has no attribute 'XPU'
+test_torch.py::TestTorchDeviceTypeXPU::test_broadcast_xpu ... RuntimeError: could not create a primitive descriptor for a reorder primitive
+test_torch.py::TestTorchDeviceTypeXPU::test_copy_all_dtypes_and_devices_xpu ... RuntimeError: unsupported Storage type
+test_torch.py::TestTorchDeviceTypeXPU::test_cublas_config_nondeterministic_alert_xpu ... AttributeError: module 'torch.version' has no attribute 'xpu'
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_bfloat16 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_float16 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_float32 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_float64 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_int16 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_int32 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_int64 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_int8 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_capsule_conversion_xpu_uint8 ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_bfloat16 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_float16 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_float32 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_float64 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_int16 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_int32 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_int64 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_int8 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_diff_streams_xpu_uint8 ... TypeError: stream must be ``int`` or ``none``
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_bfloat16 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_float16 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_float32 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_float64 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_int16 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_int32 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_int64 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_int8 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_conversion_with_streams_xpu_uint8 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_bfloat16 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_float16 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_float32 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_float64 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_int16 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_int32 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_int64 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_int8 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_protocol_conversion_xpu_uint8 ... ValueError: Unknown device type xpu for Dlpack
+test_torch.py::TestTorchDeviceTypeXPU::test_dlpack_shared_storage_xpu ... RuntimeError: Cannot pack tensors on xpu:0
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_bfloat16 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_float16 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_float32 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_float64 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_int16 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_int32 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_int64 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_int8 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_index_copy_scalars_xpu_uint8 ... RuntimeError: expected excluded dim between -1 and dims - 1
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_fill_mem_overlap_xpu ... RuntimeError: not implemented THDPCPPTensor_copyIgnoringOverlaps
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_large_tensor_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_bfloat16 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_float16 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_float32 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_float64 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_int16 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_int32 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_int64 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_int8 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_scatter_xpu_uint8 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_bfloat16 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_float16 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_float32 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_float64 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_int16 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_int32 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_int64 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_int8 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_masked_select_xpu_uint8 ... RuntimeError: expected scalar type Bool but found Byte
+test_torch.py::TestTorchDeviceTypeXPU::test_memory_format_clone_xpu ... RuntimeError: could not create a primitive
+test_torch.py::TestTorchDeviceTypeXPU::test_memory_format_type_shortcuts_xpu ... RuntimeError: could not create a primitive
+test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_deterministic_xpu_float16 ... RuntimeError: Device type XPU is not supported for torch.Generator() api.
+test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_deterministic_xpu_float32 ... RuntimeError: Device type XPU is not supported for torch.Generator() api.
+test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_deterministic_xpu_float64 ... RuntimeError: Device type XPU is not supported for torch.Generator() api.
+test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_empty_w_replacement_xpu ... RuntimeError: cannot reshape tensor of 0 elements into shape [0, -1] because the unspecified dimension size -1 can be any value and is ambiguous
+test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_empty_wo_replacement_xpu ... RuntimeError: cannot reshape tensor of 0 elements into shape [0, -1] because the unspecified dimension size -1 can be any value and is ambiguous
+test_torch.py::TestTorchDeviceTypeXPU::test_nondeterministic_alert_gather_xpu ... RuntimeError: Input tensor must have same size as output tensor apart from the specified dimension
+test_torch.py::TestTorchDeviceTypeXPU::test_pdist_norm_large_xpu ... RuntimeError: Provided range is out of integer limits. Pass `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
+test_torch.py::TestTorchDeviceTypeXPU::test_pickle_gradscaler_xpu ... AttributeError: module 'intel_extension_for_pytorch.xpu' has no attribute 'amp'
+test_torch.py::TestTorchDeviceTypeXPU::test_pin_memory_from_constructor_xpu ... RuntimeError: Pinned memory requires CUDA. PyTorch splits its backend into two shared libraries: a CPU library and a CUDA library; this error has occurred because you are trying to use some CUDA functionality, but the CUDA library has not been loaded by the dynamic linker for some reason.  The CUDA library MUST be loaded, EVEN IF you don't directly use any symbols from the CUDA library! One common culprit is a lack of -Wl,--no-as-needed in your link arguments; many dynamic linkers will delete dynamic library dependencies if you don't depend on any of their symbols.  You can check if this has occurred by using ldd on your binary to see if there is a dependency on *_cuda.so library.
+test_torch.py::TestTorchDeviceTypeXPU::test_repeat_interleave_xpu ... RuntimeError: expected scalar type Int but found Long
+test_torch.py::TestTorchDeviceTypeXPU::test_scatter_add_bool_xpu ... RuntimeError: scatter add only supports float, bfloat16, int, int64 and double type
+test_torch.py::TestTorchDeviceTypeXPU::test_serialization_xpu ... TypeError: only_fn() missing 1 required positional argument: 'device'
+test_vmap.py::TestVmapBatchedGradientXPU::test_lgamma_xpu ... RuntimeError: lgamma: oneMKL library not found in compilation
+test_vmap.py::TestVmapBatchedGradientXPU::test_sigmoid_xpu ... RuntimeError: different elements ...
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_cat_all_dtypes_and_devices_xpu ... RuntimeError: could not construct a memory descriptor using strides
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_cat_different_devices_xpu ... TypeError: only_fn() missing 1 required positional argument: 'device'
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_cat_empty_legacy_xpu ... RuntimeError: Tensors must have same number of dimensions
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_like_fn_stride_proparation_vs_tensoriterator_unary_op_xpu ... RuntimeError: unsupported operation: more than one element of the written-to tensor refers to a single memory location. Please clone() the tensor before performing the operation.
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_range_factories_64bit_indexing_xpu ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_signal_window_functions_xpu_float32 ... RuntimeError: DispatchStub: unsupported device typexpu
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_signal_window_functions_xpu_float64 ... RuntimeError: DispatchStub: unsupported device typexpu
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_tensor_device_xpu ... TypeError: only_fn() missing 1 required positional argument: 'device'
+test_tensor_creation_ops.py::TestTensorCreationXPU::test_vander_types_xpu_float32 ... RuntimeError: could not create a primitive descriptor for a reorder primitive
+test_indexing.py::TestIndexingXPU::test_empty_ndim_index_xpu ... RuntimeError: index is out of bounds for dimension with size 0
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_float_power_exceptions_xpu ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_lerp_xpu_float32 ... RuntimeError: weight should be of dimension max(self.dim(), end.dim()) or lesser
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_lerp_xpu_float64 ... RuntimeError: weight should be of dimension max(self.dim(), end.dim()) or lesser
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_pow_xpu_bfloat16 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_pow_xpu_float16 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_pow_xpu_float32 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_binary_ufuncs.py::TestBinaryUfuncsXPU::test_pow_xpu_float64 ... RuntimeError: DPCPP power didn't support complex dtype yet.
+test_linalg.py::TestLinalgXPU::test_addbmm_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_addmm_sizes_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_addmm_xpu_float32 ... RuntimeError: Insufficient registers in requested bundle
+test_linalg.py::TestLinalgXPU::test_addmm_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_addmv_rowmajor_colmajor_incx_incy_lda_xpu_float32 ... RuntimeError: Insufficient registers in requested bundle
+test_linalg.py::TestLinalgXPU::test_addmv_rowmajor_colmajor_incx_incy_lda_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_addmv_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_baddbmm_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_blas_alpha_beta_empty_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_blas_nan_out_xpu_bfloat16 ... RuntimeError: Insufficient registers in requested bundle
+test_linalg.py::TestLinalgXPU::test_blas_nan_out_xpu_float16 ... RuntimeError: std::future_error: Broken promise
+test_linalg.py::TestLinalgXPU::test_blas_nan_out_xpu_float32 ... RuntimeError: std::future_error: Broken promise
+test_linalg.py::TestLinalgXPU::test_blas_nan_out_xpu_float64 ... RuntimeError: std::future_error: Broken promise
+test_linalg.py::TestLinalgXPU::test_bmm_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_cholesky_ex_out_info_error_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_cholesky_ex_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_dot_vs_numpy_xpu_float32 ... RuntimeError: dot: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_einsum_random_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_einsum_sublist_format_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_einsum_xpu_float64 ... RuntimeError: dot: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_householder_product_xpu_float32 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_householder_product_xpu_float64 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_inverse_many_batches_xpu_float32 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_inverse_many_batches_xpu_float64 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_inverse_xpu_float32 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_inverse_xpu_float64 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_linalg_svd_compute_uv_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_linalg_svd_compute_uv_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_matrix_power_negative_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_matrix_power_non_negative_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_mm_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_multi_dot_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_ormqr_xpu_float32 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_ormqr_xpu_float64 ... RuntimeError: lu: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_strided_mm_bmm_xpu_float32 ... RuntimeError: could not construct a memory descriptor using strides
+test_linalg.py::TestLinalgXPU::test_strided_mm_bmm_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_svd_lowrank_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_memory_allocation_xpu_float32 ... RuntimeError: DPCPP out of memory. Tried to allocate 4096.00 GiB (GPU 
+test_linalg.py::TestLinalgXPU::test_svd_memory_allocation_xpu_float64 ... RuntimeError: DPCPP out of memory. Tried to allocate 8192.00 GiB (GPU 
+test_linalg.py::TestLinalgXPU::test_svd_no_singularvectors_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_square_col_maj_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_square_col_maj_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_square_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_square_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_all_col_maj_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_all_col_maj_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_all_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_all_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_some_col_maj_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_some_col_maj_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_some_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_tall_some_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svd_xpu_float64 ... RuntimeError: Double datatype matmul is not supported. Include oneMKL library in compilation
+test_linalg.py::TestLinalgXPU::test_svdvals_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_linalg.py::TestLinalgXPU::test_svdvals_xpu_float64 ... RuntimeError: svd: oneMKL library not found in compilation
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_float16 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_float32 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_float64 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_int16 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_int32 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_int64 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_all_any_vs_numpy_xpu_int8 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_default_all_xpu ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_default_any_xpu ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_offbounds_all_xpu ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_offbounds_any_xpu ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_single_all_xpu ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_single_any_xpu ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_single_keepdim_all_xpu ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_dim_single_keepdim_any_xpu ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_empty_tensor_empty_slice_amax_xpu ... RuntimeError: operation does not have an identity
+test_reductions.py::TestReductionsXPU::test_empty_tensor_nonempty_slice_amax_xpu ... RuntimeError: operation does not have an identity
+test_reductions.py::TestReductionsXPU::test_median_corner_cases_xpu ... RuntimeError: median cannot be called with empty tensor
+test_reductions.py::TestReductionsXPU::test_mode_large_xpu ... RuntimeError: Input tensor must have same size as output tensor apart from the specified dimension
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_bfloat16 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_complex128 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_complex64 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_float16 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_float32 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_float64 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_int16 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_int32 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_int64 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_all_xpu_int8 ... RuntimeError: all only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_bfloat16 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_complex128 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_complex64 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_float16 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_float32 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_float64 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_int16 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_int32 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_int64 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_result_dtype_any_xpu_int8 ... RuntimeError: any only supports torch.uint8 and torch.bool dtypes
+test_reductions.py::TestReductionsXPU::test_tensor_compare_ops_argmax_argmix_kthvalue_dim_empty_xpu ... RuntimeError: cannot perform reduction function argmax on a tensor with no elements because the operation does not have an identity
+test_reductions.py::TestReductionsXPU::test_tensor_compare_ops_empty_xpu ... RuntimeError: operation does not have an identity
+test_ops.py::TestCommonXPU::test_reference_testing_cat_xpu_complex64 ... RuntimeError: could not construct a memory descriptor using strides
+test_ops.py::TestCommonXPU::test_reference_testing_fmod_xpu_float32 ... RuntimeError: src element is not the same as dst
+test_ops.py::TestCommonXPU::test_reference_testing_fmod_xpu_int64 ... RuntimeError: src element is not the same as dst
+test_ops.py::TestCommonXPU::test_reference_testing_linalg_tensorinv_xpu_float32 ... RuntimeError: svd: oneMKL library not found in compilation
+test_ops.py::TestCommonXPU::test_reference_testing_nn_functional_layer_norm_xpu_float32 ... IndexError: Dimension out of range (expected to be in range of [-1, 0], but got 1)
+test_ops.py::TestCommonXPU::test_reference_testing_remainder_xpu_float32 ... RuntimeError: src element is not the same as dst
+test_ops.py::TestCommonXPU::test_reference_testing_repeat_xpu_float32 ... RuntimeError: could not create a primitive
+test_ops.py::TestCommonXPU::test_reference_testing_tile_xpu_float32 ... RuntimeError: could not create a primitive
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_bfloat16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_bool ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_float16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_float32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_float64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_int16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_int32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_int64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_int8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_device_type_inference_xpu_uint8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_factory_shape_invariants_check_xpu ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_bfloat16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_bool ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_float16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_float32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_float64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_int16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_int32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_int64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_int8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_from_lists_xpu_uint8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_bfloat16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_bool ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_float16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_float32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_float64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_int16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_int32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_int64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_int8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_shape_inference_xpu_uint8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_bfloat16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_bool ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_float16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_float32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_float64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_int16 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_int32 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_int64 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_int8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_constructor_xpu_uint8 ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse_csr.py::TestSparseCSRXPU::test_sparse_csr_print_xpu ... RuntimeError: device type of values (xpu) must be CPU or CUDA
+test_sparse.py::TestSparseUnaryUfuncsXPU::test_sparse_consistency_sqrt_xpu_complex64 ... RuntimeError: unsupported dtype for self:ComplexFloat
+test_sparse.py::TestSparseUnaryUfuncsXPU::test_sparse_consistency_sqrt_xpu_int64 ... RuntimeError: unsupported dtype for self:Long
+test_sparse.py::TestSparseUnaryUfuncsXPU::test_sparse_consistency_sqrt_xpu_uint8 ... RuntimeError: unsupported dtype for self:Byte
+test_sort_and_select.py::TestSortAndSelectXPU::test_kthvalue_scalar_xpu_float32 ... IndexError: dimension specified as 0 but tensor has no dimensions
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_bfloat16 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_float16 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_float32 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_float64 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_int16 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_int32 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_int64 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_int8 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_msort_xpu_uint8 ... RuntimeError: expect dim between 0 and dims - 1
+test_sort_and_select.py::TestSortAndSelectXPU::test_sort_large_xpu_uint8 ... TypeError: '<' not supported between instances of 'NoneType' and 'int'
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_float32 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_float64 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_int16 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_int32 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_int64 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_int8 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_consecutive_xpu_uint8 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_float32 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_float64 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_int16 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_int32 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_int64 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_int8 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_sort_and_select.py::TestSortAndSelectXPU::test_unique_xpu_uint8 ... IndexError: select(): index 0 out of range for tensor of size [0] at dimension 0
+test_view_ops.py::TestViewOpsXPU::test_view_dtype_xpu_float16 ... RuntimeError: unsupported operation: more than one element of the written-to tensor refers to a single memory location. Please clone() the tensor before performing the operation.
+test_view_ops.py::TestViewOpsXPU::test_view_dtype_xpu_float32 ... RuntimeError: unsupported operation: more than one element of the written-to tensor refers to a single memory location. Please clone() the tensor before performing the operation.
+test_view_ops.py::TestViewOpsXPU::test_view_dtype_xpu_float64 ... RuntimeError: unsupported operation: more than one element of the written-to tensor refers to a single memory location. Please clone() the tensor before performing the operation.
+test_view_ops.py::TestViewOpsXPU::test_view_tensor_dsplit_xpu_uint8 ... RuntimeError: unsupported Storage type
+test_view_ops.py::TestViewOpsXPU::test_view_tensor_hsplit_xpu_uint8 ... RuntimeError: unsupported Storage type
+test_view_ops.py::TestViewOpsXPU::test_view_tensor_split_xpu_uint8 ... RuntimeError: unsupported Storage type
+test_view_ops.py::TestViewOpsXPU::test_view_tensor_vsplit_xpu_uint8 ... RuntimeError: unsupported Storage type
+test_tensor_creation_ops.py::TestRandomTensorCreationXPU::test_randperm_device_compatibility_xpu ... RuntimeError: Device type XPU is not supported for torch.Generator() api.
