@@ -2539,12 +2539,18 @@ class Tester(TestCase):
                 self.assertEqual(res_ref, res_jit, atol=prec, rtol=prec)
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-        bias = torch.randn(3,2304)
+        bias = torch.randn(2, 3, 2304)
         input1 = torch.randn(2, 3, 768)
         input2 = torch.randn(768, 2304)
         model_v1 = EinsumAdd('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias)
-        
+       
+        bias = torch.randn(1, 1, 1, 4)
+        input1 = torch.randn(12, 1, 4, 16)
+        input2 = torch.randn(12, 4, 4, 16)
+        model_v1 = EinsumAdd('bqhc,bkhc->bhqk')
+        _test_fp32(model_v1, input1, input2, bias)
+
         bias = torch.randn(2304)
         input1 = torch.randn(4, 3, 768)
         input2 = torch.randn(768, 2304)
@@ -2570,7 +2576,7 @@ class Tester(TestCase):
         model_v1 = EinsumAddInplaceV1('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias, kind_in_graph='aten::einsum')
 
-        bias1 = torch.randn(2, 1, 128, 128)
+        bias1 = torch.randn(2, 4, 128, 128)
         input3 = torch.randn(2, 4, 128, 768)
         input4 = torch.randn(2, 4, 128, 768)
         model_v2 = EinsumAdd("bnqd,bnkd->bnqk")

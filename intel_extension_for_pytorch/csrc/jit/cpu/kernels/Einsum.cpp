@@ -47,6 +47,8 @@ using at::Tensor;
  * \param right_: the right operand of matmul
  * \param sum_dim_: the reduction dim info
  * \param keep_dim: keep the target dim of output
+ * \param udi_left unsqueezed info for every dim
+ * \param udi_right unsqueezed info for every dim
  * \param add_arg: the other input of binary post-op
  * \param alpha: the multiplier for other.
  * \return: the ouput of einsum+binary
@@ -56,6 +58,8 @@ static Tensor sumproduct_pair(
     const Tensor& right_,
     IntArrayRef sum_dims_,
     bool keepdim,
+    const std::vector<bool> udi_left,
+    const std::vector<bool> udi_right,
     const Tensor& add_arg,
     const c10::Scalar& alpha) {
   // assumes that tensors have been pre-unsqueezed (so that all dimensions match
@@ -73,8 +77,8 @@ static Tensor sumproduct_pair(
   Tensor left = left_;
   Tensor right = right_;
   for (const auto i : c10::irange(dim)) {
-    auto sl = left.size(i) > 1;
-    auto sr = right.size(i) > 1;
+    auto sl = left.size(i) > 1 || (left.size(i) == 1 && udi_left[i] == 0);
+    auto sr = right.size(i) > 1 || (right.size(i) == 1 && udi_right[i] == 0);
     if (sum_dims[i]) { // first dimensions that will be summed over after
                        // multiplication
       if (sl && sr) { // dimensions nontrivially in both left and right must be
@@ -124,7 +128,6 @@ static Tensor sumproduct_pair(
   }; // avoid warining about not using d
   for (auto& d : ro)
     out_size.push_back(right.size(d));
-
   std::vector<int64_t> lpermutation(lro);
   lpermutation.insert(lpermutation.end(), lo.begin(), lo.end());
   lpermutation.insert(lpermutation.end(), sum_dims_.begin(), sum_dims_.end());
@@ -210,7 +213,6 @@ static Tensor sumproduct_pair(
   for (auto i : rpermutation) {
     right_shape.push_back(right.size(i));
   }
-
   auto lo_count = lo.size();
   auto ro_count = ro.size();
   if (ro_count > 1) { //
@@ -218,12 +220,11 @@ static Tensor sumproduct_pair(
     for (; i <= ro_count - 1; i++) {
       right_shape[dim - lo_count - i] = 1;
     }
-    right_shape[dim - ro_count - i] = ro_size;
+    right_shape[dim - lo_count - i] = ro_size;
   }
   auto lro_count = lro.size();
   auto min_size = std::min(lo_count, ro_count);
   auto max_size = std::max(lo_count, ro_count);
-
   for (int i = dim - 1; i >= dim - max_size; i--) {
     if (left_shape[i] == 1 && left_shape[i] == right_shape[i] &&
         min_size >= 0) {
@@ -232,20 +233,21 @@ static Tensor sumproduct_pair(
       min_size--;
     } else if (min_size == 0 && lo_count > ro_count) {
       auto diff_dim = lo_count - ro_count;
-      for (auto i = 0; i < diff_dim; i++) {
+      for (auto j = 0; j < diff_dim; j++) {
         right_shape.pop_back();
         right_shape.insert(right_shape.begin() + lro_count, 1);
       }
     } else {
       auto diff_dim = ro_count - lo_count;
-      while (diff_dim--) {
+      while (diff_dim-- && i >= dim - max_size) {
+        left_shape.insert(left_shape.begin() + lro_count, 1);
         left_shape.pop_back();
-        left_shape.insert(left_shape.begin(), 1);
+        i--;
       }
     }
   }
   if (ro_count > 1) {
-    for (auto i = 0; i < ro_count - 1; i++) {
+    while (right_shape[right_shape.size() - 1] == 1) {
       right_shape.pop_back();
       right_shape.insert(right_shape.begin() + lro_count, 1);
     }
@@ -317,14 +319,15 @@ unsigned char einsum_index_to_label(uint8_t index) {
  *https://pytorch.org/docs/stable/generated/torch.einsum.html
  *\param operands: The tensors to compute the Einstein summation of.
  *\return tuple<has_zero_size_dim, out_size, dim_last_op, sum_dims,
- *permuted_operands>
+ *permuted_operands, unsqueezed_dim_info>
  */
 std::tuple<
     bool,
     int64_t,
     std::vector<std::size_t>,
     std::vector<int64_t>,
-    std::vector<Tensor>>
+    std::vector<Tensor>,
+    std::vector<std::vector<bool>>>
 einsum_prepare(
     c10::string_view equation,
     const c10::List<at::Tensor>& operands) {
@@ -517,6 +520,11 @@ einsum_prepare(
   // same operand. Finally we permute the operands to align dimensions as
   // per the perm_out_index we computed above.
   std::vector<Tensor> permuted_operands;
+
+  // for the dim where size=1, should know whthere it is unsqueezed.
+  // eg: (12,1,4,16) & (12,4,4,16)
+  auto unsqueezed_dim_info =
+      std::vector<std::vector<bool>>(2, std::vector<bool>(perm_index, 0));
   for (const auto i : c10::irange(num_ops)) {
     std::vector<int64_t> perm_shape(perm_index, -1);
     std::vector<int64_t> label_dim(TOTAL_LABELS, -1);
@@ -558,6 +566,11 @@ einsum_prepare(
       }
     }
 
+    for (auto ind = 0; ind < perm_index; ind++) {
+      if (perm_shape[ind] == -1) {
+        unsqueezed_dim_info[i][ind] = 1;
+      }
+    }
     // Add dimensions for missing labels
     for (int64_t& index : perm_shape) {
       if (index == -1) {
@@ -565,7 +578,6 @@ einsum_prepare(
         index = j++;
       }
     }
-
     permuted_operands.push_back(operand.permute(perm_shape));
   }
 
@@ -631,7 +643,12 @@ einsum_prepare(
   }
 
   return std::make_tuple(
-      has_zero_size_dim, out_size, dim_last_op, sum_dims, permuted_operands);
+      has_zero_size_dim,
+      out_size,
+      dim_last_op,
+      sum_dims,
+      permuted_operands,
+      unsqueezed_dim_info);
 }
 
 //! function: einsum_binary
@@ -655,8 +672,11 @@ at::Tensor einsum_binary(
   auto dim_last_op = std::get<2>(prepare_res);
   auto sum_dims = std::get<3>(prepare_res);
   auto permuted_operands = std::get<4>(prepare_res);
+  auto unsqueezed_dim_info = std::get<5>(prepare_res);
   Tensor result = permuted_operands[0];
   Tensor operand = permuted_operands[1];
+  std::vector<bool> udi_result = unsqueezed_dim_info[0];
+  std::vector<bool> udi_operand = unsqueezed_dim_info[1];
   auto f_alpha = alpha.to<float>();
 
   // Fast path for when an operand has zero sized dim
@@ -676,7 +696,15 @@ at::Tensor einsum_binary(
     result = result.flatten().dot(operand.flatten());
     result = result + f_alpha * add_arg;
   } else {
-    result = sumproduct_pair(result, operand, sum_dims, false, add_arg, alpha);
+    result = sumproduct_pair(
+        result,
+        operand,
+        sum_dims,
+        false,
+        udi_result,
+        udi_operand,
+        add_arg,
+        alpha);
   }
   return result;
 }
