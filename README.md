@@ -90,8 +90,8 @@ If you are using different version of oneMKL, the MKL path might be different.
 1.  Download source code of corresponding PyTorch
 
 ```bash
-git clone https://github.com/pytorch/pytorch.git -b v1.7.1
-cd pytorch
+git clone https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu -b pytorch-1.10
+cd frameworks.ai.pytorch.private-gpu
 git submodule update --init --recursive
 ```
 
@@ -109,8 +109,7 @@ Follow instrcutions in <PATH_To_frameworks.ai.pytorch.ipex-gpu>/tests/gpu/device
 ## Build and Install PyTorch
 
 ```bash
-cd pytorch
-git am <PATH_To_frameworks.ai.pytorch.ipex-gpu>/torch_patches/*
+cd frameworks.ai.pytorch.private-gpu
 python3 setup.py install --user
 ```
 **Note:** We recommend using **GCC** compiler for building PyTorch.
@@ -134,6 +133,39 @@ input = input.to("xpu")
 model = model.to("xpu")
 ```
 
+### How to get accurate End to End model execution time
+
+To get accurate End to End model execution time, users need call torch.xpu.synchronize() in model script right before calculating elapsed time. This API waits for all GPU kernels which are executing on device being completed, so that calculting the elasped time after the call can cover both CPU and GPU execution time.
+
+#### Training Model Example
+```bash
+        # compute gradient and do SGD step
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+        # sync for time measurement
+        torch.xpu.synchronize()
+
+        # measure elapsed time
+        end_Batch = time.time()
+        batch_time.update(time.time() - start_Batch)
+        iter_time.append(end_Batch - start_Batch)
+```
+
+#### Inference Model Example
+```bash
+        # compute output
+        output = model(input)
+
+        # sync for time measurement
+        torch.xpu.synchronize()
+
+        # measure elapsed time
+        end = time.time()
+        batch_time.update(end - start)
+        iter_time.append(end - start)
+```
 ## Verified Models
 
 Please download pre-optimized models for Intel® Extension for PyTorch* GPU through below command:
@@ -151,7 +183,6 @@ git clone https://github.com/intel-innersource/frameworks.ai.pytorch.gpu-models/
 | **Transformer** | FP32 | FP32 |
 | **SSD-ResNet50** | N/A | FP32/BF16 |
 | **SE-ResNeXt50-32x4d** | FP32 | N/A |
-
 
 ## Build Option List
 The following build options are supported in Intel® Extension for PyTorch* GPU.
@@ -251,7 +282,7 @@ export CCL_STAGING_BUFFER=regular
 Multi-tile ResNet50 training is verified with DistributedDataParallel (DDP) on 2-tile ATS-P. For supporting this scenario, oneCCL Bindings for Pytorch* based on oneCCL 2021.5 version shall be built and used. 
 
 ```bash
-git clone -b chengjun/ccl_torch1.7_gpu https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
+git clone -b chengjun/xpu_torch_ccl_1.10 https://github.com/intel-innersource/frameworks.ai.pytorch.torch-ccl.git
 git submodule update --init --recursive
 COMPUTE_BACKEND=dpcpp_level_zero python setup.py install
 ```
@@ -263,16 +294,88 @@ mpiexec -n 2 python main.py -a resnet50 -e -b 1024 --pretrained --jit --xpu 0 $d
 ```
 
 ### Profile tool:
-autograd.profiler supports profiling kernel time spent on "xpu" device. Update model as below:
-
+torch.autograd.profiler_legacy supports profiling kernel time spent on "xpu" device. Pesudo example looks like:
 ```bash
-with torch.autograd.profiler.profile(enabled=True, use_xpu=True) as prof:
-    # put what you want to profile here. Such as:
-    # output = YourModel(input)
-print(prof.table())
+with torch.autograd.profiler_legacy.profile(enabled=True, use_xpu=True) as prof:
+       fwd
+       bwd
+       weight update
+print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+print(prof.table(sort_by="id", row_limit=100000))
 ```
 
-Flag ```enabled``` and ```use_xpu``` should be set to True to enable this feature.
+#### Training Model Example
+```bash
+        with torch.autograd.profiler_legacy.profile(use_xpu=True, record_shapes=False) as prof:
+
+            if args.gpu is not None:
+                input = input.xpu(args.gpu, non_blocking=True)
+                target = target.xpu(args.gpu, non_blocking=True)
+            elif args.xpu is not None:
+                input = input.to("xpu")
+                target = target.to("xpu")
+
+            # compute output
+            output = model(input)
+            loss = criterion(output, target)
+
+            # compute gradient and do SGD step
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+
+        # sync for time measurement
+        torch.xpu.synchronize()
+        profiling_path = os.path.abspath('../') + '/report/'
+        torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), profiling_path + 'rn50_training_profiling.pt')
+        prof.export_chrome_trace(profiling_path + 'rn50_training_profiling.json')
+        print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+        print(prof.key_averages(group_by_input_shape=True).table())
+        print(prof.table(sort_by="id", row_limit=100000))
+```
+
+#### Inference Model Example
+```bash
+            with torch.autograd.profiler_legacy.profile(use_xpu=True, record_shapes=False) as prof:
+
+                if args.xpu is not None:
+                    input = input.to("xpu")
+
+                if args.channels_last:
+                    input = input.to(memory_format=torch.channels_last)
+
+                # compute output
+                output = model(input)
+
+            # sync for time measurement
+            torch.xpu.synchronize()
+            profiling_path = os.path.abspath('../') + '/report/'
+            torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), profiling_path + 'rn50_inference_profiling.pt')
+            prof.export_chrome_trace(profiling_path + 'rn50_inference_profiling.json')
+            print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+            print(prof.key_averages(group_by_input_shape=True).table())
+            print(prof.table(sort_by="id", row_limit=100000))
+```
+#### Profiling Results
+The output from BERT training model looks like (omitting some columns):
+```bash
+#---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
+# Name                         Self CPU %  Self CPU       CPU total %  CPU total  CPU time avg    Self XPU       Self XPU %     XPU total  XPU time avg    # of Calls  
+#---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
+# aten::mm                      15.06%     122.520ms        15.49%     126.016ms     431.563us     172.356ms        24.70%     172.356ms     590.262us           292  
+# aten::bmm                     5.35%      43.484ms         5.58%      45.342ms     314.877us      70.894ms        10.16%      70.894ms     492.318us           144  
+# aten::addmm                   5.00%      40.692ms         5.16%      41.965ms     285.478us      64.013ms         9.17%      64.013ms     435.461us           147  
+# bernoulliDistr                0.28%       2.303ms         0.28%       2.303ms      31.541us      36.179ms         5.18%      36.179ms     495.599us            73  
+# aten::_fused_dropout          0.85%       6.915ms         1.23%      10.004ms     137.045us      35.081ms         5.03%      71.260ms     976.164us            73  
+# dnnl_reorder                  7.01%      57.012ms         7.06%      57.433ms     297.579us      30.084ms         4.31%      30.084ms     155.876us           193  
+# transformer_adamWMasterWeight 2.01%      16.347ms         2.07%      16.874ms      42.827us      25.825ms         3.70%      25.825ms      65.546us           394  
+# aten::norm                    5.31%      43.159ms         5.55%      45.163ms     114.337us      22.140ms         3.17%      22.140ms      56.051us           395  
+#---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
+# Self CPU time total: 813.282ms
+# XPU time total: 697.936ms
+```
+
+Note the difference between Self XPU time and XPU total time - operators can call other operators, Self XPU time excludes time spent in children operator calls, while XPU total time includes it. You can choose to sort by the self xpu time by passing sort_by="self_xpu_time_total" into the table call.
 
 ### ITT support:
 ITT is Intel® VTune™ Profiler's Instrumentation and Tracing Technology. To enable this feature, <br>
