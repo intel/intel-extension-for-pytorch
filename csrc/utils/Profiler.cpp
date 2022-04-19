@@ -13,7 +13,7 @@ namespace xpu {
 namespace dpcpp {
 
 #if defined(USE_PROFILER)
-struct DPCPPEventStubImpl : public KernelEventBase {
+struct DPCPPEventStubImpl : public torch::profiler::impl::KernelEventBase {
  public:
   DPCPPEventStubImpl() = delete;
   DPCPPEventStubImpl(sycl::event event)
@@ -35,15 +35,18 @@ struct DPCPPEventStubImpl : public KernelEventBase {
   bool is_ext_mark; // True to mark the external lib kernels
 };
 
-struct DPCPPProfilerStubsImpl : public XPUStubs {
-  void record(int* device, KernelEventStub* event, int64_t* cpu_ns)
-      const override {
+struct DPCPPProfilerStubsImpl : public torch::profiler::impl::XPUStubs {
+  void record(
+      int* device,
+      torch::profiler::impl::KernelEventStub* event,
+      int64_t* cpu_ns) const override {
     // event has been marked by markKernel, so this record need do nothing
     *device = -1;
   }
 
-  float timeDiff(const KernelEventStub& event, const KernelEventStub& event2)
-      const override {
+  float timeDiff(
+      const torch::profiler::impl::KernelEventStub& event,
+      const torch::profiler::impl::KernelEventStub& event2) const override {
     DPCPPEventStubImpl* dpcpp_event =
         dynamic_cast<DPCPPEventStubImpl*>(event.get());
     DPCPPEventStubImpl* dpcpp_event2 =
@@ -51,7 +54,8 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
     return dpcpp_event->elapsed(*dpcpp_event2);
   }
 
-  float elapsed(const KernelEventStub& event) const override {
+  float elapsed(
+      const torch::profiler::impl::KernelEventStub& event) const override {
     DPCPPEventStubImpl* dpcpp_event =
         dynamic_cast<DPCPPEventStubImpl*>(event.get());
     return dpcpp_event->elapsed();
@@ -147,7 +151,7 @@ bool is_profiler_enabled() {
 
 void dpcpp_mark(std::string name, sycl::event& event) {
 #if defined(USE_PROFILER)
-  KernelEventStub dpcpp_evt_stub;
+  torch::profiler::impl::KernelEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
   markKernel(std::move(name), dpcpp_evt_stub);
 #endif
@@ -158,7 +162,7 @@ void dpcpp_mark(
     sycl::event& start_event,
     sycl::event& end_event) {
 #if defined(USE_PROFILER)
-  KernelEventStub dpcpp_evt_stub;
+  torch::profiler::impl::KernelEventStub dpcpp_evt_stub;
   dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
   markKernel(std::move(name), dpcpp_evt_stub);
 #endif
