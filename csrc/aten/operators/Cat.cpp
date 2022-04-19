@@ -5,6 +5,7 @@
 
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
+#include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
@@ -323,7 +324,7 @@ static void cat(
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
       xpu::dpcpp::detail::canUse32BitIndexMath(result) && allContiguous &&
       all32BitIndexable && allSameType) {
-    IPEX_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
         at::ScalarType::Half,
         at::ScalarType::Bool,
         at::ScalarType::BFloat16,
@@ -353,7 +354,10 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
       if (tensor.scalar_type() == ScalarType::Bool ||
           tensor.scalar_type() == ScalarType::Short ||
           tensor.scalar_type() == ScalarType::Double ||
-          tensor.scalar_type() == ScalarType::Long || tensor.dim() > 12) {
+          tensor.scalar_type() == ScalarType::Long ||
+          tensor.scalar_type() == ScalarType::ComplexFloat ||
+          tensor.scalar_type() == ScalarType::ComplexDouble ||
+          tensor.dim() > MAX_TENSORINFO_DIMS) {
         skip_dnnl_cat = true;
       }
       break;
