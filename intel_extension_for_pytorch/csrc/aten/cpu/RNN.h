@@ -40,7 +40,10 @@ class IPEXLSTMOp : public torch::autograd::Function<IPEXLSTMOp> {
       bool has_biases,
       bool bidirectional,
       bool batch_first,
-      bool train);
+      bool train,
+      double scale,
+      int64_t zp,
+      int64_t dtype);
   static std::vector<at::Tensor> forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
@@ -58,7 +61,10 @@ class IPEXLSTMOp : public torch::autograd::Function<IPEXLSTMOp> {
       bool has_biases,
       bool bidirectional,
       bool batch_first,
-      bool train);
+      bool train,
+      double scale,
+      int64_t zp,
+      int64_t dtype);
 
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
@@ -81,7 +87,10 @@ std::vector<at::Tensor> ipex_lstm_layer(
     bool has_biases,
     bool bidirectional,
     bool batch_first,
-    bool train);
+    bool train,
+    double scale,
+    int64_t zp,
+    int64_t dtype);
 
 std::vector<at::Tensor> ipex_lstm_layer_backward(
     const at::Tensor& input,
@@ -124,18 +133,9 @@ std::vector<at::Tensor> ipex_lstm_layer_forward(
     bool has_biases,
     bool bidirectional,
     bool batch_first,
-    bool train);
-
-static std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
-    const at::Tensor& input,
-    std::vector<at::Tensor> hx,
-    std::vector<at::Tensor> params,
-    bool has_biases,
-    int64_t num_layers,
-    double dropout_p,
     bool train,
-    bool bidirectional,
-    bool batch_first);
-
+    double scale,
+    int64_t zp,
+    int64_t dtype);
 } // namespace cpu
 } // namespace torch_ipex

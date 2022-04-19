@@ -1,5 +1,6 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
+#include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <string>
 #include "csrc/jit/cpu/passes/graph_rewrite.h"
@@ -70,8 +71,11 @@ void IpexQuantFusion(std::shared_ptr<Graph>& graph) {
     rewriter.RegisterRewritePattern(info.pattern, info.replacement);
     rewriter.runOnGraph(graph, info.filters);
   }
+  GRAPH_DUMP("Before IpexQuantFusion", graph);
   graph_rewrite::replaceEmbeddingBagWithQEmbeddingBag(graph);
   graph_rewrite::replaceInteractionWithQInteraction(graph);
+  graph_rewrite::replaceLstmWithQLstm(graph);
+  GRAPH_DUMP("After IpexQuantFusion", graph);
 }
 
 } // namespace jit
