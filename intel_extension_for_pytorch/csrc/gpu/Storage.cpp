@@ -781,7 +781,7 @@ class THXPStorage_Bridge {
         fd != -1,
         "_set_from_file couldn't retrieve a file "
         "descriptor from given object");
-    THWStorage* storage = Storage_readFileRaw<int>(fd, self->cdata);
+    auto storage = THXStorage_readFileRaw<int>(fd, self->cdata);
     if (storage == nullptr)
       return nullptr;
     Py_INCREF(self);

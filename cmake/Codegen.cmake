@@ -32,10 +32,12 @@ GEN_BACKEND(xpu_functions.yaml XPUNativeFunctions.h RegisterXPU.cpp RegisterAuto
 GEN_BACKEND(quantizedxpu_functions.yaml QuantizedXPUNativeFunctions.h RegisterQuantizedXPU.cpp)
 GEN_BACKEND(sparsexpu_functions.yaml SparseXPUNativeFunctions.h RegisterSparseXPU.cpp)
 
-list(APPEND gpu_generated_src ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterXPU.cpp
-        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterAutogradXPU.cpp
-        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterQuantizedXPU.cpp
-        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterSparseXPU.cpp)
+#list(APPEND gpu_generated_src ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterXPU.cpp
+#        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterAutogradXPU.cpp
+#        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterQuantizedXPU.cpp
+#        ${BUILD_IPEX_GPU_ATEN_GENERATED}/RegisterSparseXPU.cpp)
+
+set(gpu_generated_src "")
 
 add_custom_target(IPEX_GPU_GEN_TARGET DEPENDS ${gpu_generated_src})
 set(IPEX_GPU_GEN_FILES ${gpu_generated_src})

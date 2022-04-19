@@ -627,7 +627,7 @@ static Tensor& _exec_fft(
     batched_out_sizes[i + 1] = out_sizes[dim[i]];
   }
 
-  const auto value_type = c10::toValueType(input.scalar_type());
+  const auto value_type = c10::toRealValueType(input.scalar_type());
   out.resize_(batched_out_sizes, MemoryFormat::Contiguous);
   // run the FFT
   impl::_fft_with_size(
@@ -723,7 +723,8 @@ Tensor _fft_c2r(
   DimVector out_sizes(in_sizes.begin(), in_sizes.end());
   out_sizes[dim.back()] = last_dim_size;
   auto out = at::empty(
-      out_sizes, self.options().dtype(c10::toValueType(self.scalar_type())));
+      out_sizes,
+      self.options().dtype(c10::toRealValueType(self.scalar_type())));
   return impl::_exec_fft(
       out,
       input,

@@ -1116,7 +1116,7 @@ static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
   sizes.pop_back();
   sizes[input.dim() - 2] = std::min(m, n);
   Tensor S_empty;
-  ScalarType dtype = toValueType(typeMetaToScalarType(input.dtype()));
+  ScalarType dtype = toRealValueType(typeMetaToScalarType(input.dtype()));
   S_empty = at::empty(sizes, input.options().dtype(dtype));
   return std::tuple<Tensor, Tensor, Tensor>(U_empty, S_empty, VT_empty);
 }
@@ -2149,7 +2149,7 @@ Tensor inverse(const Tensor& self) {
   if (self.numel() == 0) {
     return at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
-  native::squareCheckInputs(self);
+  native::squareCheckInputs(self, "inverse");
   return at::AtenIpexTypeXPU::_inverse_helper(self);
 }
 
@@ -2711,7 +2711,7 @@ Tensor cholesky(const Tensor& self, bool upper) {
   if (self.size(-1) == 0) {
     return at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
-  native::squareCheckInputs(self);
+  native::squareCheckInputs(self, "cholesky");
   auto raw_cholesky_output = at::AtenIpexTypeXPU::_cholesky_helper(self, upper);
   if (upper) {
     return raw_cholesky_output.triu_();
