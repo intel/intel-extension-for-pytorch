@@ -41,3 +41,4 @@ supported:
   - empty_quantized
   - transpose_
   - as_strided_
+  - _reshape_alias
