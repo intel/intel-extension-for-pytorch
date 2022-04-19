@@ -59,7 +59,7 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
     return zero_point_;
   }
 
-  bool equalTo(QuantizerPtr other) override {
+  bool equalTo(QuantizerPtr other) const override {
     if (!other.get() || other->qscheme() != kPerTensorAffine) {
       return false;
     }
@@ -68,6 +68,10 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
     return scalar_type() == other_per_tensor_affine->scalar_type() &&
         scale() == other_per_tensor_affine->scale() &&
         zero_point() == other_per_tensor_affine->zero_point();
+  }
+
+  Tensor& dequantize_out(Tensor& out, const Tensor& t) override {
+    TORCH_CHECK(false, "not implemented");
   }
 
  private:
@@ -137,7 +141,7 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
         rtensor, qtensor_contig, scales_, zero_points_, axis_);
   }
 
-  bool equalTo(QuantizerPtr other) override {
+  bool equalTo(QuantizerPtr other) const override {
     if (!other.get() || other->qscheme() != kPerChannelAffine) {
       return false;
     }
@@ -147,6 +151,10 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
         scales().equal(other_per_channel_affine->scales()) &&
         zero_points().equal(other_per_channel_affine->zero_points()) &&
         axis() == other_per_channel_affine->axis();
+  }
+
+  Tensor& dequantize_out(Tensor& out, const Tensor& t) override {
+    TORCH_CHECK(false, "not implemented");
   }
 
  private:

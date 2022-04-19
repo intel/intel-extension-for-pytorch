@@ -324,7 +324,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       input,
       gradOutput,
       indices,
-      nbatch,
       kH,
       kW,
       dH,

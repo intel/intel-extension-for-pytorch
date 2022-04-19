@@ -650,7 +650,7 @@ std::tuple<Tensor&, Tensor&> linalg_slogdet_out(
   checkSameDevice("linalg_slogdet", sign, input, "sign");
   checkSameDevice("linalg_slogdet", logabsdet, input, "logabsdet");
   checkLinalgCompatibleDtype("linalg_slogdet", sign, input, "sign");
-  ScalarType real_dtype = toValueType(input.scalar_type());
+  ScalarType real_dtype = toRealValueType(input.scalar_type());
   // logabsdet is always real-valued here
   checkLinalgCompatibleDtype(
       "linalg_slogdet", logabsdet.scalar_type(), real_dtype, "logabsdet");
