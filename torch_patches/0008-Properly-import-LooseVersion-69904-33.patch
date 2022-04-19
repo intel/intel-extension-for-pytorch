@@ -1,0 +1,110 @@
+From 3d2e432aa55290bfd2078e1a8165c93f7518a0c3 Mon Sep 17 00:00:00 2001
+From: Guo Yejun <yejun.guo@intel.com>
+Date: Mon, 14 Mar 2022 12:01:37 +0800
+Subject: [PATCH 08/12] Properly import LooseVersion (#69904) (#33)
+
+cherry-pick 07767569c964552702bf374da753212eb9cde327, with conflict
+fixed in test, to fix issue with higher version of setuptools 60.9.3
+introduced by conda source conda-forge.
+
+Summary:
+This fixes regression introduced by https://github.com/pytorch/pytorch/pull/57040
+
+Somehow importing `distutils` from `setuptool` caused import of
+`distutils.versions`, which is not a documented dependency and got
+change with the release of
+[setuptools-59.6.0](https://github.com/pypa/setuptools/tree/v59.6.0)
+We should not rely on that, as
+`import distutils` never re-imports `distutils.version`, which one can
+see by observing
+https://github.com/python/cpython/blob/3.9/Lib/distutils/__init__.py
+or by running:
+```
+% python3 -c "import distutils;print(distutils.__version__, dir(distutils))"
+3.7.5 ['__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__path__', '__spec__', '__version__', 'sys']
+% python3 -c "from setuptools import distutils;print(distutils.__version__, dir(distutils))"
+3.7.5 ['__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__path__', '__spec__', '__version__', 'archive_util', 'ccompiler', 'cmd', 'config', 'core', 'debug', 'dep_util', 'dir_util', 'dist', 'errors', 'extension', 'fancy_getopt', 'file_util', 'filelist', 'log', 'spawn', 'sys', 'sysconfig', 'util', 'version']
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/69904
+
+Reviewed By: albanD, atalman, janeyx99
+
+Differential Revision: D33094453
+
+Pulled By: malfet
+
+fbshipit-source-id: aaf1adb7c6f293c4e376ccff21c64cd6ba625e97
+
+Co-authored-by: Nikita Shulga <nshulga@fb.com>
+---
+ tools/setup_helpers/cmake.py                          | 8 ++++----
+ torch/testing/_internal/common_methods_invocations.py | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/tools/setup_helpers/cmake.py b/tools/setup_helpers/cmake.py
+index ed0df72e89..a29430520d 100644
+--- a/tools/setup_helpers/cmake.py
++++ b/tools/setup_helpers/cmake.py
+@@ -8,7 +8,7 @@ import re
+ from subprocess import check_call, check_output, CalledProcessError
+ import sys
+ import sysconfig
+-from setuptools import distutils  # type: ignore[import]
++from distutils.version import LooseVersion
+ from typing import IO, Any, Dict, List, Optional, Union, cast
+ 
+ from . import which
+@@ -120,10 +120,10 @@ class CMake:
+             return cmake_command
+         cmake3 = which('cmake3')
+         cmake = which('cmake')
+-        if cmake3 is not None and CMake._get_version(cmake3) >= distutils.version.LooseVersion("3.10.0"):
++        if cmake3 is not None and CMake._get_version(cmake3) >= LooseVersion("3.10.0"):
+             cmake_command = 'cmake3'
+             return cmake_command
+-        elif cmake is not None and CMake._get_version(cmake) >= distutils.version.LooseVersion("3.10.0"):
++        elif cmake is not None and CMake._get_version(cmake) >= LooseVersion("3.10.0"):
+             return cmake_command
+         else:
+             raise RuntimeError('no cmake or cmake3 with version >= 3.10.0 found')
+@@ -134,7 +134,7 @@ class CMake:
+ 
+         for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
+             if 'version' in line:
+-                return distutils.version.LooseVersion(line.strip().split(' ')[2])
++                return LooseVersion(line.strip().split(' ')[2])
+         raise RuntimeError('no version found')
+ 
+     def run(self, args: List[str], env: Dict[str, str]) -> None:
+diff --git a/torch/testing/_internal/common_methods_invocations.py b/torch/testing/_internal/common_methods_invocations.py
+index 41abeb73f2..42582268b5 100644
+--- a/torch/testing/_internal/common_methods_invocations.py
++++ b/torch/testing/_internal/common_methods_invocations.py
+@@ -37,7 +37,7 @@ from torch.testing._internal.common_utils import \
+      GRADCHECK_NONDET_TOL, skipIfTBB)
+ import torch.testing._internal.opinfo_helper as opinfo_helper
+ 
+-from setuptools import distutils
++from distutils.version import LooseVersion
+ 
+ if TEST_SCIPY:
+     import scipy.special
+@@ -9355,11 +9355,11 @@ op_db: List[OpInfo] = [
+                    skips=(
+                        # Reference: https://github.com/pytorch/pytorch/pull/49155#issuecomment-742664611
+                        DecorateInfo(unittest.skip("Skipped!"), 'TestUnaryUfuncs', 'test_reference_numerics_extremal',
+-                                    active_if=TEST_SCIPY and distutils.version.LooseVersion(scipy.__version__) < "1.4.0"),
++                                    active_if=TEST_SCIPY and LooseVersion(scipy.__version__) < "1.4.0"),
+                        DecorateInfo(unittest.skip("Skipped!"), 'TestUnaryUfuncs', 'test_reference_numerics_hard',
+-                                    active_if=TEST_SCIPY and distutils.version.LooseVersion(scipy.__version__) < "1.4.0"),
++                                    active_if=TEST_SCIPY and LooseVersion(scipy.__version__) < "1.4.0"),
+                        DecorateInfo(unittest.skip("Skipped!"), 'TestUnaryUfuncs', 'test_reference_numerics_normal',
+-                                    active_if=TEST_SCIPY and distutils.version.LooseVersion(scipy.__version__) < "1.4.0"),
++                                    active_if=TEST_SCIPY and LooseVersion(scipy.__version__) < "1.4.0"),
+                    )),
+     UnaryUfuncInfo('lgamma',
+                    ref=reference_lgamma if TEST_SCIPY else _NOTHING,
+-- 
+2.25.1
+

@@ -1,42 +1,30 @@
-From 60e513b65271d0a7184dcae2dbd6f8e45baa4e06 Mon Sep 17 00:00:00 2001
-From: johnlu <chengjun.lu@intel.com>
-Date: Thu, 4 Mar 2021 20:59:55 +0800
-Subject: [PATCH 07/17] 7.Add API for intel XPU to register new tensor type.
+From e583a1b78114c24d7653636f56455ea25e6dfffd Mon Sep 17 00:00:00 2001
+From: chengjunlu <chengjun.lu@intel.com>
+Date: Thu, 7 Apr 2022 12:11:01 +0800
+Subject: [PATCH 10/12] 7.Add API for intel XPU to register new tensor type.
+ (#36)
 
 ---
- setup.py                            |   1 +
- torch/csrc/tensor/python_tensor.cpp | 124 ++++++++++++++++++----------
+ torch/csrc/tensor/python_tensor.cpp | 135 ++++++++++++++++------------
  torch/csrc/tensor/python_tensor.h   |   4 +
  torch/csrc/utils/tensor_types.cpp   |   2 +-
  torch/csrc/utils/tensor_types.h     |   1 +
- 5 files changed, 88 insertions(+), 44 deletions(-)
+ 4 files changed, 84 insertions(+), 58 deletions(-)
 
-diff --git a/setup.py b/setup.py
-index 355bce6b6a..f8e75da934 100644
---- a/setup.py
-+++ b/setup.py
-@@ -882,6 +882,7 @@ if __name__ == '__main__':
-                 'include/torch/csrc/onnx/*.h',
-                 'include/torch/csrc/utils/*.h',
-                 'include/torch/csrc/generic/*.h',
-+                'include/torch/csrc/tensor/*.h',
-                 'include/pybind11/*.h',
-                 'include/pybind11/detail/*.h',
-                 'include/TH/*.h*',
 diff --git a/torch/csrc/tensor/python_tensor.cpp b/torch/csrc/tensor/python_tensor.cpp
-index 46fd6d595e..3e473c24e4 100644
+index 32ff8d72d8..b8f710a2ed 100644
 --- a/torch/csrc/tensor/python_tensor.cpp
 +++ b/torch/csrc/tensor/python_tensor.cpp
-@@ -56,7 +56,7 @@ static_assert(std::is_standard_layout<PyTensorType>::value, "PyTensorType must b
+@@ -57,7 +57,7 @@ static_assert(std::is_standard_layout<PyTensorType>::value, "PyTensorType must b
  // This is always an instance of VariableType
  static PyTensorType* default_tensor_type;
  
--static void py_bind_tensor_types(const std::vector<PyTensorType>& tensor_types);
+-static void py_bind_tensor_types(const std::vector<PyTensorType*>& tensor_types);
 +static void py_bind_tensor_type(const PyTensorType& tensor_types);
  
  static TypeError unavailable_type(const PyTensorType& type) {
    return TypeError("type %s not available. Torch not compiled with CUDA enabled.", type.name);
-@@ -178,26 +178,47 @@ static void py_initialize_tensor_type(PyTypeObject& type, const char* name, PyOb
+@@ -191,26 +191,47 @@ static void py_initialize_tensor_type(PyTypeObject& type, const char* name, PyOb
    }
  }
  
@@ -98,40 +86,48 @@ index 46fd6d595e..3e473c24e4 100644
  
    auto storage_name = std::string(toString(type->get_scalar_type())) + "Storage";
    THPObjectPtr storage(PyObject_GetAttrString(module_obj.get(), storage_name.c_str()));
-@@ -245,8 +266,6 @@ static THPObjectPtr get_tensor_dict() {
+@@ -258,24 +279,6 @@ static THPObjectPtr get_tensor_dict() {
    return res;
  }
  
--static std::vector<PyTensorType> tensor_types;
+-// A note about the lifetime of the various PyTensorType: normally
+-// PyTypeObject instances are statically allocated, but we want to create them
+-// dynamically at init time, because their exact number depends on
+-// torch::utils::all_declared_types(). The memory for each PyTensorType is
+-// allocated by initialize_aten_types() and never freed: technically it's a
+-// leak, but it's not a problem since we want them to be alive for the whole time
+-// of the process anyway.
+-//
+-// An alternative is to use a std::vector<PyTensorType> instead, and let
+-// std::vector to manage the lifetime of its items. This is problematic
+-// though, because it means that the memory of PyTensorType is deallocated at
+-// some point during the exit: if by chance we have another global destructor
+-// and/or atexit() function which tries to access the PyTensorTypes, we risk
+-// an use-after-free error. This happens for example if we embed CPython and
+-// call Py_Finalize inside an atexit() function which was registered before
+-// importing torch.
+-static std::vector<PyTensorType*> tensor_types;
 -
  void set_default_tensor_type(PyTensorType* type) {
    if (!at::isFloatingType(type->get_scalar_type())) {
      throw TypeError("only floating-point types are supported as the default type");
-@@ -273,13 +292,14 @@ void set_default_tensor_type(PyTensorType* type) {
+@@ -302,13 +305,13 @@ void set_default_tensor_type(PyTensorType* type) {
    }
  }
  
--static void initialize_aten_types(std::vector<PyTensorType>& tensor_types) {
+-static void initialize_aten_types(std::vector<PyTensorType*>& tensor_types) {
 +static void initialize_aten_types(std::vector<std::unique_ptr<PyTensorType>>& tensor_types) {
    // includes CUDA types even when PyTorch is not built with CUDA
    auto declared_types = torch::utils::all_declared_types();
    tensor_types.resize(declared_types.size());
  
    for (size_t i = 0, end = declared_types.size(); i != end; i++) {
--    auto& tensor_type = tensor_types[i];
+-    tensor_types[i] = new PyTensorType();
 +    tensor_types[i] = std::make_unique<PyTensorType>();
-+    auto& tensor_type = *tensor_types[i];
+     auto& tensor_type = *tensor_types[i];
      Backend backend = declared_types[i].first;
      ScalarType scalar_type = declared_types[i].second;
-     set_type(tensor_type, backend, scalar_type);
-@@ -309,46 +329,64 @@ void initialize_python_bindings() {
- 
-   // Initialize each Python type object torch.FloatTensor, torch.DoubleTensor, etc.
-   for (auto& tensor_type : tensor_types) {
--    py_initialize_tensor_type(tensor_type.py_type, tensor_type.name, tensor_dict.get());
-+    py_initialize_tensor_type(tensor_type->py_type, tensor_type->name, tensor_dict.get());
-   }
- 
+@@ -345,40 +348,58 @@ void initialize_python_bindings() {
    // Add the type objects to their corresponding modules. e.g. torch.FloatTensor
    // is added to the `torch` module as `FloatTensor`. Also add all the type
    // objects to the set torch._tensor_classes.
@@ -162,7 +158,7 @@ index 46fd6d595e..3e473c24e4 100644
 +  return (PyObject*)ret;
  }
  
--static void py_bind_tensor_types(const std::vector<PyTensorType>& tensor_types) {
+-static void py_bind_tensor_types(const std::vector<PyTensorType*>& tensor_types) {
 +static void py_bind_tensor_type(const PyTensorType& tensor_type) {
    auto torch_module = THPObjectPtr(PyImport_ImportModule("torch"));
    if (!torch_module) throw python_error();
@@ -171,7 +167,7 @@ index 46fd6d595e..3e473c24e4 100644
    if (!tensor_classes) throw python_error();
  
 -  for (auto& tensor_type : tensor_types) {
--    auto name = std::string(tensor_type.name);
+-    auto name = std::string(tensor_type->name);
 -    auto idx = name.rfind('.');
 -    auto type_name = name.substr(idx + 1);
 -    auto module_name = name.substr(0, idx);
@@ -183,7 +179,7 @@ index 46fd6d595e..3e473c24e4 100644
 +  auto type_name = name.substr(idx + 1);
 +  auto module_obj = get_py_module(tensor_type.get_backend());
  
--    PyObject* type_obj = (PyObject*)&tensor_type;
+-    PyObject* type_obj = (PyObject*)tensor_type;
 -    Py_INCREF(type_obj);
 -    if (PyModule_AddObject(module_obj.get(), type_name.c_str(), type_obj) < 0) {
 -      throw python_error();
@@ -203,23 +199,22 @@ index 46fd6d595e..3e473c24e4 100644
  
  static bool PyTensorType_Check(PyObject* obj) {
    auto it = std::find_if(tensor_types.begin(), tensor_types.end(),
--    [obj](const PyTensorType& x) {
--      return (PyObject*)&x == obj;
+-    [obj](PyTensorType *x) {
+-      return (PyObject*)x == obj;
 +    [obj](const std::unique_ptr<PyTensorType>& x) {
 +      return (PyObject*)(x.get()) == obj;
      });
    return it != tensor_types.end();
  }
-@@ -371,10 +409,10 @@ void py_set_default_dtype(PyObject* obj) {
+@@ -402,10 +423,10 @@ void py_set_default_dtype(PyObject* obj) {
      auto scalar_type = ((THPDtype*)obj)->scalar_type;
      auto backend = default_tensor_type->get_backend();
      auto it = std::find_if(tensor_types.begin(), tensor_types.end(),
--      [backend, scalar_type](const PyTensorType& x) {
--        return x.get_backend() == backend && x.get_scalar_type() == scalar_type;
+-      [backend, scalar_type](PyTensorType *x) {
 +      [backend, scalar_type](const std::unique_ptr<PyTensorType>& x) {
-+        return x->get_backend() == backend && x->get_scalar_type() == scalar_type;
+         return x->get_backend() == backend && x->get_scalar_type() == scalar_type;
        });
--    set_default_tensor_type(&*it);
+-    set_default_tensor_type(*it);
 +    set_default_tensor_type((*it).get());
    } else {
      throw TypeError("invalid dtype object");
@@ -247,7 +242,7 @@ index acf73b9e02..148627f79f 100644
  //
  // TODO: This is nuts!  There is no reason to let the default tensor type id
 diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
-index e29fb93c52..c1563732f2 100644
+index 3cceda5de5..3781391fa8 100644
 --- a/torch/csrc/utils/tensor_types.cpp
 +++ b/torch/csrc/utils/tensor_types.cpp
 @@ -15,7 +15,7 @@ using namespace at;

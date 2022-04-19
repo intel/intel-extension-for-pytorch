@@ -1,0 +1,25 @@
+From c9fdbae991eabd295a7fd8576453e702e023c7f0 Mon Sep 17 00:00:00 2001
+From: Guo Yejun <yejun.guo@intel.com>
+Date: Mon, 21 Mar 2022 18:56:25 +0800
+Subject: [PATCH 09/12] upgrade protobuf from tag: v3.13.0.1 (d1eca4e4) to
+ v3.18.2 (6c6b0778) (#34)
+
+due to the vulnerability discovered at
+https://nvd.nist.gov/vuln/detail/CVE-2021-22570, need to upgrade
+protobuf to version 3.15 or above.
+
+IPEX CPU solved this issue with protobuf tag v3.18.2 (6c6b0778)
+---
+ third_party/protobuf | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/third_party/protobuf b/third_party/protobuf
+index d1eca4e4b4..6c6b0778b7 160000
+--- a/third_party/protobuf
++++ b/third_party/protobuf
+@@ -1 +1 @@
+-Subproject commit d1eca4e4b421cd2997495c4b4e65cea6be4e9b8a
++Subproject commit 6c6b0778b70f35f93c2f0dee30e5d12ad2a83eea
+-- 
+2.25.1
+

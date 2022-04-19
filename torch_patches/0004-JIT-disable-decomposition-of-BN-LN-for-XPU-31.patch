@@ -1,0 +1,26 @@
+From fac1bb693309722b047abf8c13efc81548927fbf Mon Sep 17 00:00:00 2001
+From: Feng Yuan <feng1.yuan@intel.com>
+Date: Thu, 24 Feb 2022 15:23:23 +0800
+Subject: [PATCH 04/12] JIT: disable decomposition of BN/LN for XPU (#31)
+
+Signed-off-by: Feng Yuan <feng1.yuan@intel.com>
+---
+ torch/csrc/jit/passes/decompose_ops.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/torch/csrc/jit/passes/decompose_ops.cpp b/torch/csrc/jit/passes/decompose_ops.cpp
+index 0706c9c14a..e2db04b0aa 100644
+--- a/torch/csrc/jit/passes/decompose_ops.cpp
++++ b/torch/csrc/jit/passes/decompose_ops.cpp
+@@ -42,7 +42,7 @@ bool isDecomposableNorm(Node* normalize_op) {
+   auto device = input->type()->expectRef<TensorType>().device();
+   // As of now, we do the decomposition for batchnorm/layernorm on GPU device
+   // only
+-  if (!device || (*device).is_cpu()) {
++  if (!device || (*device).is_cpu() || (*device).is_xpu()) {
+     return false;
+   }
+ 
+-- 
+2.25.1
+

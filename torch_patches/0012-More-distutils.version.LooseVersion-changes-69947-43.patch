@@ -1,0 +1,65 @@
+From cb9f926ad257791545466cc6be1774df19828ef3 Mon Sep 17 00:00:00 2001
+From: Kim <kimyangbaochen@vip.qq.com>
+Date: Mon, 18 Apr 2022 16:30:24 +0800
+Subject: [PATCH 12/12] More distutils.version.LooseVersion changes (#69947)
+ (#43)
+
+Summary: Pull Request resolved: https://github.com/pytorch/pytorch/pull/69947
+
+Reviewed By: seemethere
+
+Differential Revision: D33111996
+
+Pulled By: malfet
+
+fbshipit-source-id: e7d2cc4ed3e39452e809965e360b05f0b409ec0d
+
+Co-authored-by: Nikita Shulga <nshulga@fb.com>
+---
+ torch/testing/_internal/common_cuda.py | 4 ++--
+ torch/utils/tensorboard/__init__.py    | 5 +----
+ 2 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/torch/testing/_internal/common_cuda.py b/torch/testing/_internal/common_cuda.py
+index 5d0849bb84..78af6dcc96 100644
+--- a/torch/testing/_internal/common_cuda.py
++++ b/torch/testing/_internal/common_cuda.py
+@@ -6,7 +6,7 @@ import torch.cuda
+ from torch.testing._internal.common_utils import TEST_NUMBA
+ import inspect
+ import contextlib
+-from setuptools import distutils
++from distutils.version import LooseVersion
+ 
+ 
+ TEST_CUDA = torch.cuda.is_available()
+@@ -16,7 +16,7 @@ CUDA_DEVICE = torch.device("cuda:0") if TEST_CUDA else None
+ TEST_CUDNN = TEST_CUDA and torch.backends.cudnn.is_acceptable(torch.tensor(1., device=CUDA_DEVICE))
+ TEST_CUDNN_VERSION = torch.backends.cudnn.version() if TEST_CUDNN else 0
+ 
+-CUDA11OrLater = torch.version.cuda and distutils.version.LooseVersion(torch.version.cuda) >= "11.0"
++CUDA11OrLater = torch.version.cuda and LooseVersion(torch.version.cuda) >= "11.0"
+ CUDA9 = torch.version.cuda and torch.version.cuda.startswith('9.')
+ SM53OrLater = torch.cuda.is_available() and torch.cuda.get_device_capability() >= (5, 3)
+ SM60OrLater = torch.cuda.is_available() and torch.cuda.get_device_capability() >= (6, 0)
+diff --git a/torch/utils/tensorboard/__init__.py b/torch/utils/tensorboard/__init__.py
+index bb1885d756..7512ed6fab 100644
+--- a/torch/utils/tensorboard/__init__.py
++++ b/torch/utils/tensorboard/__init__.py
+@@ -1,12 +1,9 @@
+ import tensorboard
+-from setuptools import distutils
+-
+-LooseVersion = distutils.version.LooseVersion
++from distutils.version import LooseVersion
+ 
+ if not hasattr(tensorboard, '__version__') or LooseVersion(tensorboard.__version__) < LooseVersion('1.15'):
+     raise ImportError('TensorBoard logging requires TensorBoard version 1.15 or above')
+ 
+-del distutils
+ del LooseVersion
+ del tensorboard
+ 
+-- 
+2.25.1
+
