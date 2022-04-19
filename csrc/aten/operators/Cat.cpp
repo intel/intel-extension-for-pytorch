@@ -353,7 +353,7 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
       if (tensor.scalar_type() == ScalarType::Bool ||
           tensor.scalar_type() == ScalarType::Short ||
           tensor.scalar_type() == ScalarType::Double ||
-          tensor.scalar_type() == ScalarType::Long) {
+          tensor.scalar_type() == ScalarType::Long || tensor.dim() > 12) {
         skip_dnnl_cat = true;
       }
       break;

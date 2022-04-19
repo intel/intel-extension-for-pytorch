@@ -44,8 +44,19 @@ static inline dnnl::memory::format_tag get_dnnl_default_format(
       return memory::format_tag::abcdef;
     case 7:
       return memory::format_tag::abcdefg;
+    case 8:
+      return memory::format_tag::abcdefgh;
+    case 9:
+      return memory::format_tag::abcdefghi;
+    case 10:
+      return memory::format_tag::abcdefghij;
+    case 11:
+      return memory::format_tag::abcdefghijk;
+    case 12:
+      return memory::format_tag::abcdefghijkl;
     default:
-      return memory::format_tag::any;
+      TORCH_INTERNAL_ASSERT(
+          false, "oneDNN doesn't support tensor dimension > 12");
   }
 }
 
