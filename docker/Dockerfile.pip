@@ -23,7 +23,6 @@ RUN apt-get update -y && \
     ${PYTHON}-pip \
     google-perftools \
     libjemalloc-dev \
-    libtcmalloc-minimal4 \
     numactl
 
 RUN ${PYTHON} -m pip --no-cache-dir install --upgrade \
@@ -47,6 +46,6 @@ RUN python -m pip install --no-cache-dir \
     python -m pip install --no-cache-dir \
     intel_extension_for_pytorch==${IPEX_VERSION} -f ${IPEX_URL}
 
-RUN ln -sf /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4.5.3 /usr/lib/x86_64-linux-gnu/libtcmalloc.so
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libjemalloc.so /usr/lib/x86_64-linux-gnu/libtcmalloc.so
 ENV DNNL_MAX_CPU_ISA="AVX512_CORE_AMX"
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so:/usr/local/lib/libiomp5.so:/usr/lib/x86_64-linux-gnu/libtcmalloc.so":${LD_PRELOAD}
