@@ -48,4 +48,4 @@ RUN python -m pip install --no-cache-dir \
 
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libjemalloc.so /usr/lib/x86_64-linux-gnu/libtcmalloc.so
 ENV DNNL_MAX_CPU_ISA="AVX512_CORE_AMX"
-ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so:/usr/local/lib/libiomp5.so:/usr/lib/x86_64-linux-gnu/libtcmalloc.so":${LD_PRELOAD}
+ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so:/usr/lib/x86_64-linux-gnu/libtcmalloc.so:/usr/local/lib/libiomp5.so":${LD_PRELOAD}
