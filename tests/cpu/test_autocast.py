@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+from torch.testing._internal.common_utils import TestCase as TorchTestCase
 import time
 import sys
 import itertools
@@ -341,7 +342,7 @@ class M(nn.Module):
         x, h = self.lstm(x, h)
         return x, h
 
-class TestLSTM(TestCase):
+class TestLSTM(TorchTestCase):
     def _lstm_params_list(self):
         params_dict = {
             "input_size": [1, 2],
@@ -366,7 +367,7 @@ class TestLSTM(TestCase):
             input = input.to(torch.bfloat16)
         return input
 
-    def _test_lstm(self, training, bf16, prec=1e-5):
+    def _test_lstm(self, training, bf16, rtol=1.3e-6, atol=1e-5):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -414,27 +415,27 @@ class TestLSTM(TestCase):
 
                     torch.manual_seed(rand_seed)
                     y_ipex, hy_ipex = model_ipex(input_ipex, (h_ipex, c_ipex))
-                self.assertEqual(y_cpu, y_ipex, prec=prec)
-                self.assertEqual(hy_cpu[0], hy_ipex[0], prec=prec)
-                self.assertEqual(hy_cpu[1], hy_ipex[1], prec=prec)
+                self.assertEqual(y_cpu, y_ipex, rtol=rtol, atol=atol)
+                self.assertEqual(hy_cpu[0], hy_ipex[0], rtol=rtol, atol=atol)
+                self.assertEqual(hy_cpu[1], hy_ipex[1], rtol=rtol, atol=atol)
 
                 if training:
                     y_cpu.sum().backward(retain_graph=True)
                     y_ipex.sum().backward(retain_graph=True)
-                    self.assertEqual(input_ipex.grad, input_cpu.grad, prec=prec)
-                    self.assertEqual(model_ipex.lstm.weight_ih_l0.grad, model_cpu.lstm.weight_ih_l0.grad, prec=prec)
-                    self.assertEqual(model_ipex.lstm.weight_hh_l0.grad, model_cpu.lstm.weight_hh_l0.grad, prec=prec)
+                    self.assertEqual(input_ipex.grad, input_cpu.grad, rtol=rtol, atol=atol)
+                    self.assertEqual(self._cast_dtype(model_ipex.lstm.weight_ih_l0.grad, bf16), model_cpu.lstm.weight_ih_l0.grad, rtol=rtol, atol=atol)
+                    self.assertEqual(self._cast_dtype(model_ipex.lstm.weight_hh_l0.grad, bf16), model_cpu.lstm.weight_hh_l0.grad, rtol=rtol, atol=atol)
                     if bias:
-                        self.assertEqual(model_ipex.lstm.bias_ih_l0.grad, model_cpu.lstm.bias_ih_l0.grad, prec=prec)
-                        self.assertEqual(model_ipex.lstm.bias_hh_l0.grad, model_cpu.lstm.bias_hh_l0.grad, prec=prec)
+                        self.assertEqual(self._cast_dtype(model_ipex.lstm.bias_ih_l0.grad, bf16), model_cpu.lstm.bias_ih_l0.grad, rtol=rtol, atol=atol)
+                        self.assertEqual(self._cast_dtype(model_ipex.lstm.bias_hh_l0.grad, bf16), model_cpu.lstm.bias_hh_l0.grad, rtol=rtol, atol=atol)
                     if not empty_state:
                         hy_cpu[0].sum().backward(retain_graph=True)
                         hy_ipex[0].sum().backward(retain_graph=True)
-                        self.assertEqual(h_ipex.grad, h_cpu.grad, prec=prec)
+                        self.assertEqual(h_ipex.grad, h_cpu.grad, rtol=rtol, atol=atol)
 
                         hy_cpu[1].sum().backward(retain_graph=True)
                         hy_ipex[1].sum().backward(retain_graph=True)
-                        self.assertEqual(c_ipex.grad, c_cpu.grad, prec=prec)
+                        self.assertEqual(c_ipex.grad, c_cpu.grad, rtol=rtol, atol=atol)
 
     def _test_lstm_pack_padded_sequence(self):
         embedding_dim = 1024
@@ -477,11 +478,11 @@ class TestLSTM(TestCase):
     def test_lstm_op(self):
         self._test_lstm(training=False, bf16=False)
 
-        self._test_lstm(training=False, bf16=True, prec=2e-2)
+        self._test_lstm(training=False, bf16=True, rtol=0.02, atol=0.02)
 
         self._test_lstm(training=True, bf16=False)
 
-        self._test_lstm(training=True, bf16=True, prec=5e-2)
+        self._test_lstm(training=True, bf16=True, rtol=0.02, atol=0.03)
 
     def test_lstm_pack_padded_sequence(self):
         self._test_lstm_pack_padded_sequence()
