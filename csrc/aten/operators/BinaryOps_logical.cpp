@@ -17,8 +17,8 @@ namespace impl {
 void logical_and_kernel_dpcpp(TensorIterator iter) {
   auto scalarType =
       (iter.dtype() == ScalarType::Bool) ? iter.input_dtype() : iter.dtype();
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kBool, kHalf, scalarType, "logical_and_kernel", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      kBool, kHalf, kBFloat16, scalarType, "logical_and_kernel", [&]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t a, scalar_t b) -> scalar_t {
               return static_cast<scalar_t>(a && b);
@@ -29,8 +29,8 @@ void logical_and_kernel_dpcpp(TensorIterator iter) {
 void logical_or_kernel_dpcpp(TensorIterator iter) {
   auto scalarType =
       (iter.dtype() == ScalarType::Bool) ? iter.input_dtype() : iter.dtype();
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kBool, kHalf, scalarType, "logical_or_kernel", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      kBool, kHalf, kBFloat16, scalarType, "logical_or_kernel", [&]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t a, scalar_t b) -> scalar_t {
               return static_cast<scalar_t>(a || b);
@@ -41,8 +41,8 @@ void logical_or_kernel_dpcpp(TensorIterator iter) {
 void logical_xor_kernel_dpcpp(TensorIterator iter) {
   auto scalarType =
       (iter.dtype() == ScalarType::Bool) ? iter.input_dtype() : iter.dtype();
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kBool, kHalf, scalarType, "logical_xor_kernel", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      kBool, kHalf, kBFloat16, scalarType, "logical_xor_kernel", [&]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t a, scalar_t b) -> scalar_t {
               return static_cast<scalar_t>(bool(a) != bool(b));
