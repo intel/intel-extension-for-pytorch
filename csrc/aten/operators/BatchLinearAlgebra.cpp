@@ -15,7 +15,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-#ifdef USE_ONEMKL
 // Used as an interface between the different BLAS-like libraries
 enum class TransposeType {
   NoTranspose,
@@ -23,6 +22,7 @@ enum class TransposeType {
   ConjTranspose,
 };
 
+#ifdef USE_ONEMKL
 // Transforms TransposeType into the BLAS / LAPACK format
 static oneapi::mkl::transpose to_blas(TransposeType trans) {
   switch (trans) {
