@@ -22,7 +22,7 @@ Tensor min(const Tensor& self);
 namespace impl {
 
 void eq_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,

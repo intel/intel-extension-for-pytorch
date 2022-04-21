@@ -3,6 +3,7 @@
 #include <ATen/ATen.h>
 
 #include <c10/util/Half.h>
+#include <c10/util/complex.h>
 #include <utils/DPCPP.h>
 #include "General.h"
 
@@ -982,6 +983,36 @@ struct Numerics<double> {
   }
   static inline double sgn(double a) {
     return DPCPP::sign(a);
+  }
+};
+
+template <>
+struct Numerics<c10::complex<float>> {
+  static inline c10::complex<float> abs(c10::complex<float> a) {
+    return std::abs(a);
+  }
+
+  static inline c10::complex<float> exp(c10::complex<float> a) {
+    return std::exp(a);
+  }
+
+  static inline bool eq(c10::complex<float> a, c10::complex<float> b) {
+    return a == b;
+  }
+};
+
+template <>
+struct Numerics<c10::complex<double>> {
+  static inline c10::complex<double> abs(c10::complex<double> a) {
+    return std::abs(a);
+  }
+
+  static inline c10::complex<double> exp(c10::complex<double> a) {
+    return std::exp(a);
+  }
+
+  static inline bool eq(c10::complex<double> a, c10::complex<double> b) {
+    return a == b;
   }
 };
 

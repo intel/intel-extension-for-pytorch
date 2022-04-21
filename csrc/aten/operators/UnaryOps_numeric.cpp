@@ -14,8 +14,63 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+namespace impl {
 
-IPEX_OUT_ALL_UNARY_FUNC_OPS(abs_out, Numerics<scalar_t>::abs, Real);
+template <typename func_t>
+static inline Tensor& unary_op_impl_with_complex_to_float_out(
+    Tensor& result,
+    const Tensor& self,
+    const func_t& fn,
+    bool promotes_integer_to_float) {
+  if (self.is_complex() && !result.is_complex()) {
+    // Checks if the corresponding float type can be cast to the desired dtype
+    const auto float_type = c10::toValueType(self.scalar_type());
+    TORCH_CHECK(
+        canCast(float_type, result.scalar_type()),
+        "result type ",
+        float_type,
+        " can't be cast to the desired output type ",
+        result.scalar_type());
+
+    // Runs the function complex->complex, as TensorIterator expects
+    Tensor complex_result = at::empty({0}, self.options());
+    auto iter = TensorIterator::unary_op(complex_result, self);
+    fn(iter);
+
+    // Copies the complex result to the actual result and returns it
+    at::native::resize_output(result, complex_result.sizes());
+    result.copy_(at::real(complex_result));
+    return result;
+  }
+
+  if (promotes_integer_to_float) {
+    auto iter = TensorIterator::unary_float_op(result, self);
+    fn(iter);
+    iter.cast_outputs();
+    return result;
+  }
+
+  auto iter = TensorIterator::unary_op(result, self);
+  fn(iter);
+  return result;
+}
+
+void abs_kernel(TensorIterator& iter) {
+  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      ScalarType::Half,
+      ScalarType::BFloat16,
+      ScalarType::Bool,
+      iter.common_dtype(),
+      "abs",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return Numerics<scalar_t>::abs(a);
+        });
+      });
+}
+
+} // namespace impl
+
 IPEX_OUT_ALL_UNARY_FUNC_OPS(neg_out, Numerics<scalar_t>::neg, Real);
 
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
@@ -70,6 +125,11 @@ Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
         });
       });
   return out;
+}
+
+Tensor& abs_out(const Tensor& self, Tensor& result) {
+  return impl::unary_op_impl_with_complex_to_float_out(
+      result, self, impl::abs_kernel, /*promotes_integer_to_float=*/false);
 }
 
 } // namespace AtenIpexTypeXPU
