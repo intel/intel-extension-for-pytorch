@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
+#include <ATen/native/Resize.h>
 
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
@@ -13,6 +14,28 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+#ifdef USE_ONEMKL
+// Used as an interface between the different BLAS-like libraries
+enum class TransposeType {
+  NoTranspose,
+  Transpose,
+  ConjTranspose,
+};
+
+// Transforms TransposeType into the BLAS / LAPACK format
+static oneapi::mkl::transpose to_blas(TransposeType trans) {
+  switch (trans) {
+    case TransposeType::Transpose:
+      return oneapi::mkl::transpose::trans;
+    case TransposeType::NoTranspose:
+      return oneapi::mkl::transpose::nontrans;
+    case TransposeType::ConjTranspose:
+      return oneapi::mkl::transpose::conjtrans;
+  }
+  TORCH_INTERNAL_ASSERT(false, "Invalid transpose type");
+}
+#endif
 
 static inline std::tuple<bool, bool> _parse_qr_mode(c10::string_view mode) {
   bool compute_q;
@@ -37,6 +60,275 @@ static inline std::tuple<bool, bool> _parse_qr_mode(c10::string_view mode) {
 }
 
 namespace impl {
+
+#ifdef USE_ONEMKL
+template <typename scalar_t>
+int64_t mkl_getrf_scratchpad(
+    DPCPP::queue& queue,
+    int64_t m,
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t batch_size) {
+  return oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>(
+      queue, m, n, lda, stride_a, stride_ipiv, batch_size);
+}
+
+template <>
+int64_t mkl_getrf_scratchpad<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t m,
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t batch_size) {
+  return oneapi::mkl::lapack::getrf_batch_scratchpad_size<std::complex<double>>(
+      queue, m, n, lda, stride_a, stride_ipiv, batch_size);
+}
+
+template <>
+int64_t mkl_getrf_scratchpad<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t m,
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t batch_size) {
+  return oneapi::mkl::lapack::getrf_batch_scratchpad_size<std::complex<float>>(
+      queue, m, n, lda, stride_a, stride_ipiv, batch_size);
+}
+
+template <typename scalar_t>
+int64_t mkl_getrs_scratchpad(
+    DPCPP::queue& queue,
+    oneapi::mkl::transpose* trans,
+    int64_t* n,
+    int64_t* nrhs,
+    int64_t* lda,
+    int64_t* ldb,
+    int64_t group_count,
+    int64_t* group_sizes) {
+  return oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>(
+      queue, trans, n, nrhs, lda, ldb, group_count, group_sizes);
+}
+
+template <>
+int64_t mkl_getrs_scratchpad<c10::complex<double>>(
+    DPCPP::queue& queue,
+    oneapi::mkl::transpose* trans,
+    int64_t* n,
+    int64_t* nrhs,
+    int64_t* lda,
+    int64_t* ldb,
+    int64_t group_count,
+    int64_t* group_sizes) {
+  return oneapi::mkl::lapack::getrs_batch_scratchpad_size<std::complex<double>>(
+      queue, trans, n, nrhs, lda, ldb, group_count, group_sizes);
+}
+
+template <>
+int64_t mkl_getrs_scratchpad<c10::complex<float>>(
+    DPCPP::queue& queue,
+    oneapi::mkl::transpose* trans,
+    int64_t* n,
+    int64_t* nrhs,
+    int64_t* lda,
+    int64_t* ldb,
+    int64_t group_count,
+    int64_t* group_sizes) {
+  return oneapi::mkl::lapack::getrs_batch_scratchpad_size<std::complex<float>>(
+      queue, trans, n, nrhs, lda, ldb, group_count, group_sizes);
+}
+
+template <typename scalar_t>
+void mkl_getrf(
+    DPCPP::queue& queue,
+    int64_t m,
+    int64_t n,
+    scalar_t* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    int64_t batch_size,
+    scalar_t* scratchpad,
+    int scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getrf_batch,
+      queue,
+      m,
+      n,
+      a,
+      lda,
+      stride_a,
+      ipiv,
+      stride_ipiv,
+      batch_size,
+      scratchpad,
+      scratchpadsize);
+}
+
+template <>
+void mkl_getrf<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t m,
+    int64_t n,
+    c10::complex<double>* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    int64_t batch_size,
+    c10::complex<double>* scratchpad,
+    int scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getrf_batch,
+      queue,
+      m,
+      n,
+      reinterpret_cast<std::complex<double>*>(a),
+      lda,
+      stride_a,
+      ipiv,
+      stride_ipiv,
+      batch_size,
+      reinterpret_cast<std::complex<double>*>(scratchpad),
+      scratchpadsize);
+}
+
+template <>
+void mkl_getrf<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t m,
+    int64_t n,
+    c10::complex<float>* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    int64_t batch_size,
+    c10::complex<float>* scratchpad,
+    int scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getrf_batch,
+      queue,
+      m,
+      n,
+      reinterpret_cast<std::complex<float>*>(a),
+      lda,
+      stride_a,
+      ipiv,
+      stride_ipiv,
+      batch_size,
+      reinterpret_cast<std::complex<float>*>(scratchpad),
+      scratchpadsize);
+}
+
+template <typename scalar_t>
+void mkl_getrs(
+    DPCPP::queue& queue,
+    oneapi::mkl::transpose* trans,
+    int64_t* n,
+    int64_t* nrhs,
+    scalar_t** a,
+    int64_t* lda,
+    int64_t** ipiv,
+    scalar_t** b,
+    int64_t* ldb,
+    int64_t group_count,
+    int64_t* group_sizes,
+    scalar_t* scratchpad,
+    int64_t scratchpad_size) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getrs_batch,
+      queue,
+      trans,
+      n,
+      nrhs,
+      a,
+      lda,
+      ipiv,
+      b,
+      ldb,
+      group_count,
+      group_sizes,
+      scratchpad,
+      scratchpad_size);
+}
+
+template <>
+void mkl_getrs<c10::complex<double>>(
+    DPCPP::queue& queue,
+    oneapi::mkl::transpose* trans,
+    int64_t* n,
+    int64_t* nrhs,
+    c10::complex<double>** a,
+    int64_t* lda,
+    int64_t** ipiv,
+    c10::complex<double>** b,
+    int64_t* ldb,
+    int64_t group_count,
+    int64_t* group_sizes,
+    c10::complex<double>* scratchpad,
+    int64_t scratchpad_size) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getrs_batch,
+      queue,
+      trans,
+      n,
+      nrhs,
+      reinterpret_cast<std::complex<double>**>(a),
+      lda,
+      ipiv,
+      reinterpret_cast<std::complex<double>**>(b),
+      ldb,
+      group_count,
+      group_sizes,
+      reinterpret_cast<std::complex<double>*>(scratchpad),
+      scratchpad_size);
+}
+
+template <>
+void mkl_getrs<c10::complex<float>>(
+    DPCPP::queue& queue,
+    oneapi::mkl::transpose* trans,
+    int64_t* n,
+    int64_t* nrhs,
+    c10::complex<float>** a,
+    int64_t* lda,
+    int64_t** ipiv,
+    c10::complex<float>** b,
+    int64_t* ldb,
+    int64_t group_count,
+    int64_t* group_sizes,
+    c10::complex<float>* scratchpad,
+    int64_t scratchpad_size) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getrs_batch,
+      queue,
+      trans,
+      n,
+      nrhs,
+      reinterpret_cast<std::complex<float>**>(a),
+      lda,
+      ipiv,
+      reinterpret_cast<std::complex<float>**>(b),
+      ldb,
+      group_count,
+      group_sizes,
+      reinterpret_cast<std::complex<float>*>(scratchpad),
+      scratchpad_size);
+}
+#endif
 
 #ifdef USE_ONEMKL
 void error_handle(
@@ -179,14 +471,11 @@ static void apply_lu_dpcpp_(
   int64_t stride_ipiv = (m < n) ? m : n;
   scalar_t* a = (scalar_t*)(self_.data_ptr());
   int64_t* ipiv = (int64_t*)(pivots_.data_ptr());
-  int64_t scratchpadsize =
-      oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue, m, n, lda, stride_a, stride_ipiv, batch_size);
+  int64_t scratchpadsize = mkl_getrf_scratchpad<scalar_t>(
+      dpcpp_queue, m, n, lda, stride_a, stride_ipiv, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::lapack::getrf_batch,
+    mkl_getrf<scalar_t>(
         dpcpp_queue,
         m,
         n,
@@ -208,10 +497,11 @@ static void apply_lu_dpcpp_(
 
 template <typename scalar_t>
 static void apply_lu_solve_dpcpp_(
-    Tensor& b_,
-    Tensor& lu_,
-    Tensor& pivots_,
-    std::vector<int64_t>& infos_) {
+    const Tensor& b_,
+    const Tensor& lu_,
+    const Tensor& pivots_,
+    std::vector<int64_t>& infos_,
+    TransposeType t) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -222,8 +512,7 @@ static void apply_lu_solve_dpcpp_(
   for (auto i = 0; i < group_count; i++)
     group_sizes[i] = std::min(local_size, batch_size - i * local_size);
 
-  std::vector<oneapi::mkl::transpose> trans(
-      group_count, oneapi::mkl::transpose::nontrans);
+  std::vector<oneapi::mkl::transpose> trans(group_count, to_blas(t));
   std::vector<int64_t> n(group_count, lu_.size(-2));
   std::vector<int64_t> nrhs(group_count, b_.size(-1));
   std::vector<int64_t> lda(group_count, lu_.size(-2));
@@ -244,21 +533,18 @@ static void apply_lu_solve_dpcpp_(
     b.push_back(&b_ptr[i * stride_b]);
   }
 
-  int64_t scratchpadsize =
-      oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue,
-          trans.data(),
-          n.data(),
-          nrhs.data(),
-          lda.data(),
-          ldb.data(),
-          group_count,
-          group_sizes);
+  int64_t scratchpadsize = mkl_getrs_scratchpad<scalar_t>(
+      dpcpp_queue,
+      trans.data(),
+      n.data(),
+      nrhs.data(),
+      lda.data(),
+      ldb.data(),
+      group_count,
+      group_sizes);
   Tensor scratchpad_at = at::empty({scratchpadsize}, b_.options());
   try {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::lapack::getrs_batch,
+    mkl_getrs<scalar_t>(
         dpcpp_queue,
         trans.data(),
         n.data(),
@@ -975,6 +1261,174 @@ std::tuple<Tensor, Tensor, Tensor> _lu_with_info(
       self_working_copy, pivots_tensor.to(kInt), infos_tensor);
 }
 
+// Solves a system of linear equations matmul(input, x) = other in-place
+static Tensor& linalg_solve_out_info(
+    Tensor& result,
+    Tensor& infos,
+    const Tensor& input,
+    const Tensor& other) {
+  at::native::checkSameDevice("linalg_solve", result, input);
+  at::native::checkSameDevice("linalg_solve", other, input, "other");
+  at::native::checkLinalgCompatibleDtype("linalg_solve", result, input);
+
+  TORCH_CHECK(
+      input.scalar_type() == other.scalar_type(),
+      "input dtype ",
+      input.scalar_type(),
+      " does not match other dtype ",
+      other.scalar_type());
+
+  TORCH_CHECK(
+      input.dim() >= 2,
+      "input should have at least 2 dimensions, but has ",
+      input.dim(),
+      " dimensions instead");
+  TORCH_CHECK(
+      other.dim() >= 1,
+      "other should have at least 1 dimension, but has ",
+      other.dim(),
+      " dimensions instead");
+
+  // Two types of 'other' tensors are supported:
+  // - 1-dimensional (1D) tensor or batch of 1D tensors (vector case)
+  // - 2-dimensional (2D) tensor or batch of 2D tensors (matrix case)
+  // original torch.solve supported only the matrix case, while NumPy works for
+  // both cases for the batched input we need to be able to distinguish them
+  bool vector_case = at::native::linalg_solve_is_vector_rhs(input, other);
+
+  bool is_batched_column_major = false;
+  if (vector_case) {
+    is_batched_column_major = result.is_contiguous();
+  } else if (!vector_case && result.dim() >= 2) {
+    is_batched_column_major = result.transpose(-2, -1).is_contiguous();
+  }
+
+  // if 'other' is a batch of 2D tensors, then 'input' can be non-batched and
+  // will be broadcasted
+  auto expected_shape =
+      IntArrayRef(input.sizes().data(), input.dim() - 1); // input.shape[:-1]
+  if (!vector_case && other.dim() > 2) {
+    expected_shape = other.sizes();
+  }
+
+  bool result_equal_expected_shape = result.sizes().equals(expected_shape);
+  bool result_input_same_type = (result.scalar_type() == input.scalar_type());
+
+  // if result is not empty and not in batched column major format
+  bool copy_needed = (result.numel() != 0 && !is_batched_column_major);
+  copy_needed |= !result_input_same_type; // or result does not have the same
+                                          // dtype as input
+  copy_needed |=
+      (result.numel() != 0 &&
+       !result_equal_expected_shape); // or result does not have the expected
+                                      // shape
+  // we have to allocate a temporary tensor
+  if (copy_needed) {
+    Tensor result_tmp = at::empty({0}, input.options());
+    result_tmp = linalg_solve_out_info(result_tmp, infos, input, other);
+    at::native::resize_output(result, result_tmp.sizes());
+    result.copy_(result_tmp);
+    return result;
+  }
+  // else use result's storage directly
+
+  // we need to unsqueeze 'other' because 2-dimensional tensors are expected in
+  // the implementation
+  Tensor other_ = vector_case ? other.unsqueeze(-1) : other;
+
+  // _linalg_broadcast_batch_dims also includes linearSolveCheckInputs
+  // it checks for squareness of 'input' and 'shape' compatibility of 'other'
+  // and 'input'
+  Tensor other_broadcasted, input_broadcasted;
+  std::tie(other_broadcasted, input_broadcasted) =
+      at::native::_linalg_broadcast_batch_dims(other_, input, "linalg_solve");
+
+  auto squeezed_other_broadcasted = at::squeeze(other_broadcasted, -1);
+  auto squeezed_result_shape = squeezed_other_broadcasted.sizes();
+
+  // if result has no elements we can modify it
+  if (result.numel() == 0) {
+    if (vector_case) {
+      result.resize_(squeezed_result_shape);
+    } else {
+      at::native::resize_as_(
+          result,
+          other_broadcasted.transpose(-2, -1),
+          MemoryFormat::Contiguous);
+      result.transpose_(-2, -1);
+    }
+  }
+
+  auto expected_result_shape =
+      vector_case ? squeezed_result_shape : other_broadcasted.sizes();
+  TORCH_INTERNAL_ASSERT(result.sizes().equals(expected_result_shape));
+  TORCH_INTERNAL_ASSERT(result.scalar_type() == input.scalar_type());
+  TORCH_INTERNAL_ASSERT(result.device() == input.device());
+
+  // result tensor must be in batched column major order (Fortran contiguous)
+  // for 2D inputs or C contiguous for 1D input
+  if (vector_case) {
+    TORCH_INTERNAL_ASSERT(result.is_contiguous());
+  } else {
+    TORCH_INTERNAL_ASSERT(result.transpose(-2, -1).is_contiguous());
+  }
+
+  // for 1-dimensional 'other', we need to unsqueeze the result before passing
+  // to "apply_solve"
+  if (vector_case) {
+    result = result.unsqueeze_(-1);
+  }
+
+  // lu_stub+lu_solve_stub perform calculations in-place and 'result' must be a
+  // copy of 'other_broadcasted'
+  result.copy_(other_broadcasted);
+
+  auto input_working_copy =
+      at::native::cloneBatchedColumnMajor(input_broadcasted);
+
+  infos.resize_({std::max<int64_t>(1, native::batchCount(input_broadcasted))})
+      .zero_();
+  std::vector<int64_t> infos_vec_1(native::batchCount(input_broadcasted), 0);
+  std::vector<int64_t> infos_vec_2(native::batchCount(input_broadcasted), 0);
+  // compute the LU factorization of 'input_working_copy'
+  auto pivots_shape =
+      IntArrayRef(input_broadcasted.sizes().data(), input_broadcasted.dim() - 2)
+          .vec(); // input_broadcasted.shape[:-2]
+  pivots_shape.push_back(std::min(input.size(-2), input.size(-1)));
+  Tensor pivots = at::empty(pivots_shape, input.options().dtype(kInt));
+  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      input_working_copy.scalar_type(), "linalg_solve_dpcpp", [&] {
+        impl::apply_lu_dpcpp_<scalar_t>(
+            input_working_copy, pivots, infos_vec_1);
+        // solve the linear system using the LU factorization
+        impl::apply_lu_solve_dpcpp_<scalar_t>(
+            result,
+            input_working_copy,
+            pivots,
+            infos_vec_2,
+            TransposeType::NoTranspose);
+      });
+
+  std::copy(
+      infos_vec_1.begin(),
+      infos_vec_1.end(),
+      infos.template data_ptr<int64_t>());
+
+  if (input_working_copy.dim() > 2) {
+    native::batchCheckErrors(infos_vec_2, "lu_solve_dpcpp");
+  } else {
+    native::singleCheckErrors(infos_vec_2[0], "lu_solve_dpcpp");
+  }
+
+  // for 1-dimensional 'other', we need to squeeze the result after
+  // "apply_solve"
+  if (vector_case) {
+    result = result.squeeze_(-1);
+  }
+
+  return result;
+}
+
 Tensor _lu_solve_helper(
     const Tensor& self,
     const Tensor& LU_data,
@@ -992,7 +1446,11 @@ Tensor _lu_solve_helper(
   }
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_solve_dpcpp", [&] {
     impl::apply_lu_solve_dpcpp_<scalar_t>(
-        self_working_copy, LU_data_working_copy, LU_pivots_working_copy, infos);
+        self_working_copy,
+        LU_data_working_copy,
+        LU_pivots_working_copy,
+        infos,
+        TransposeType::NoTranspose);
   });
   if (self.dim() > 2) {
     native::batchCheckErrors(infos, "lu_solve_dpcpp");
@@ -1066,7 +1524,11 @@ std::tuple<Tensor, Tensor> _solve_helper(const Tensor& self, const Tensor& A) {
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "solve_dpcpp", [&] {
     impl::apply_lu_dpcpp_<scalar_t>(A_working_copy, pivots_tensor, infos);
     impl::apply_lu_solve_dpcpp_<scalar_t>(
-        self_working_copy, A_working_copy, pivots_tensor, infos);
+        self_working_copy,
+        A_working_copy,
+        pivots_tensor,
+        infos,
+        TransposeType::NoTranspose);
   });
   if (self.dim() > 2) {
     native::batchCheckErrors(infos, "lu_solve_dpcpp");
@@ -1528,6 +1990,80 @@ Tensor& cholesky_out(Tensor& out, const Tensor& self, bool upper) {
   Tensor out_tmp = at::AtenIpexTypeXPU::cholesky(self, upper);
   out.resize_as_(out_tmp).copy_(out_tmp);
   return out;
+}
+
+Tensor linalg_solve(const Tensor& input, const Tensor& other) {
+  return at::native::linalg_solve(input, other);
+}
+
+Tensor& linalg_solve_out(
+    const Tensor& input,
+    const Tensor& other,
+    Tensor& result) {
+  auto infos =
+      at::empty({0}, input.options().dtype(kLong).device(DeviceType::CPU));
+  result = linalg_solve_out_info(result, infos, input, other);
+
+  // Now check MKL error codes
+  bool vector_case = native::linalg_solve_is_vector_rhs(input, other);
+  if (vector_case ? result.dim() > 1 : result.dim() > 2) {
+    native::batchCheckErrors(infos.to(ScalarType::Int), "linalg_solve");
+  } else {
+    native::singleCheckErrors(infos.item<int64_t>(), "linalg_solve");
+  }
+
+  return result;
+}
+
+Tensor _det_lu_based_helper_backward_helper(
+    const Tensor& det_grad,
+    const Tensor& det,
+    const Tensor& self,
+    const Tensor& lu,
+    const Tensor& pivs) {
+  auto eps = at::native::_get_epsilon(c10::toValueType(self.scalar_type()));
+  auto n = self.size(-1);
+  auto eps_tensor = at::tensor(eps, self.options());
+  auto condition_diagonal = [&](const Tensor& x) {
+    auto x_diag = x.diagonal(0, -2, -1);
+    auto x_diag_conditioned = at::where(x_diag == 0.0, eps_tensor, x_diag);
+    x_diag.copy_(x_diag_conditioned);
+  };
+
+  // create a matrix d := (det_grad * det.conj()) I
+  // NOTE: we do not use the shorter version
+  // auto d = at::zeros_like(self);
+  // d.diagonal(0, -2, -1).copy_((det_grad * det.conj()).unsqueeze(-1));
+  // to avoid in-place operations to eliminate potential issues with Vmap
+  auto det_expanded_sizes = det.sizes().vec();
+  det_expanded_sizes.push_back(n);
+  auto d_diag = det_grad * det.conj();
+  auto d = at::diag_embed(d_diag.unsqueeze(-1).expand(det_expanded_sizes));
+  // make sure that d is Fortran-contiguous. The transposition is sufficient as
+  // d is a diagonal square matrix
+  d = d.transpose(-2, -1);
+
+  // we want to condition the diagonal of the lu Tensor, but it is not allowed
+  // to modify arguments of backward functions in-place, hence the cloning.
+  auto lu_clone = lu.clone();
+  condition_diagonal(lu_clone);
+
+  auto trans = self.is_complex() ? TransposeType::ConjTranspose
+                                 : TransposeType::Transpose;
+  std::vector<int64_t> infos(native::batchCount(d), 0);
+
+  // d is modified in-place and will contain the result
+  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      d.scalar_type(), "_det_lu_based_helper_backward_helper", [&] {
+        impl::apply_lu_solve_dpcpp_<scalar_t>(d, lu_clone, pivs, infos, trans);
+      });
+
+  if (d.dim() > 2) {
+    native::batchCheckErrors(infos, "_det_lu_based_helper_backward_helper");
+  } else {
+    native::singleCheckErrors(infos[0], "_det_lu_based_helper_backward_helper");
+  }
+  return d;
 }
 
 } // namespace AtenIpexTypeXPU
