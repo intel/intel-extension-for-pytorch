@@ -12,8 +12,14 @@ class TestFill(TestCase):
         Regression desc:
           fill_ may set values to part of large-size tensor.
         '''
-        output = torch.randn((2, 3136, 218089)).xpu()
-        output_cpu = output.to("cpu")
-        output.fill_(2.22)
-        output_cpu.fill_(2.22)
-        self.assertEqual(output.to("cpu"), output_cpu)
+        torch.xpu.synchronize()
+        torch.xpu.empty_cache()
+
+        output_cpu = torch.zeros([2, 8, 256, 512, 224])
+        output_xpu = output_cpu.xpu()
+
+        output_cpu.fill_(-1575e-2)
+        output_xpu.fill_(-1575e-2)
+        self.assertEqual(output_xpu.to("cpu"), output_cpu)
+
+        torch.xpu.empty_cache()
