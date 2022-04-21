@@ -21,15 +21,20 @@ namespace AtenIpexTypeXPU {
 
 Tensor& exponential_(
     Tensor& self,
-    double lambd,
+    double lambda,
     c10::optional<Generator> generator) {
+  TORCH_CHECK(
+      lambda >= 0.0,
+      "exponential_ expects lambda >= 0.0, but found lambda=",
+      lambda);
   auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
       generator, getDefaultDPCPPGenerator());
 #ifdef USE_ONEMKL
-  if (lambd > 0 && self.is_contiguous()) {
+  if (lambda > 0 && lambda < std::numeric_limits<double>::max() &&
+      self.is_contiguous() && self.scalar_type() == at::ScalarType::Float) {
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);
-      scalar_t scale = static_cast<scalar_t>(std::abs(1 / lambd));
+      scalar_t scale = static_cast<scalar_t>(std::abs(1 / lambda));
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       uint64_t seed;
       {
@@ -51,25 +56,32 @@ Tensor& exponential_(
 #endif
   {
     auto iter = TensorIterator::nullary_op(self);
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
-      using accscalar_t = acc_type<scalar_t>;
-      auto lambda = static_cast<accscalar_t>(lambd);
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "exponential_dpcpp_",
+        [&]() {
+          // IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(),
+          // "exponential_dpcpp_", [&] {
+          using accscalar_t = acc_type<scalar_t>;
+          auto lambd = static_cast<accscalar_t>(lambda);
 
-      // define lambda for exponential transformation
-      auto exponential_func = [lambda](accscalar_t rand) {
-        accscalar_t sample;
-        sample = DPCPP::log(rand);
-        return static_cast<scalar_t>(
-            static_cast<accscalar_t>(-1.0) / lambda * sample);
-      };
-      distribution_nullary_kernel<scalar_t, accscalar_t>(
-          iter,
-          gen,
-          [](RandomState<Philox4_32_10>* state) {
-            return state->uniform<scalar_t>();
-          },
-          exponential_func);
-    });
+          // define lambd for exponential transformation
+          auto exponential_func = [lambd](accscalar_t rand) {
+            accscalar_t sample;
+            sample = DPCPP::log(rand);
+            return static_cast<scalar_t>(
+                static_cast<accscalar_t>(-1.0) / lambd * sample);
+          };
+          distribution_nullary_kernel<scalar_t, accscalar_t>(
+              iter,
+              gen,
+              [](RandomState<Philox4_32_10>* state) {
+                return state->uniform<scalar_t>();
+              },
+              exponential_func);
+        });
   }
 
   return self;

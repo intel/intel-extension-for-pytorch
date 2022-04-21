@@ -47,6 +47,12 @@ Tensor _s_where(
     const Tensor& condition,
     const Tensor& self,
     const Tensor& other) {
+  TORCH_CHECK(
+      self.dtype() == other.dtype(),
+      "expected scalar type ",
+      self.dtype(),
+      " but found ",
+      other.dtype());
   Tensor ret = at::empty(self.sizes(), self.options());
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
