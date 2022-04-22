@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/MemoryOverlap.h>
 #include <ATen/native/SortingUtils.h>
 #include <c10/macros/Macros.h>
 
@@ -182,6 +183,7 @@ void kthvalue_template(
     Tensor& values,
     Tensor& indices) {
   int64_t dim = maybe_wrap_dim(dim_, self.dim());
+  at::assert_no_overlap(self, values);
   TORCH_CHECK(
       self.numel() > 0,
       "cannot perform reduction function kthvalue",

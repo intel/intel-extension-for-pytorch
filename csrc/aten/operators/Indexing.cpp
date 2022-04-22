@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
+#include <ATen/MemoryOverlap.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/TensorImplUtils.h>
@@ -36,6 +37,10 @@ void indexSelect(
     const Tensor& src,
     int dim,
     const Tensor& indices) {
+  at::assert_no_internal_overlap(dst);
+  at::assert_no_overlap(dst, src);
+  at::assert_no_overlap(dst, indices);
+
   int srcDims = src.dim();
   int dstDims = dst.dim();
   int idxDims = indices.dim();
@@ -257,6 +262,10 @@ void indexAdd(
   TORCH_CHECK(
       numIndices == (src.dim() == 0 ? 1 : src.size(dim)),
       "index_add_(): Number of indices should be equal to self.size(dim)");
+
+  at::assert_no_internal_overlap(dst);
+  at::assert_no_overlap(dst, indices);
+  at::assert_no_overlap(dst, src);
 
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -1225,6 +1234,7 @@ Tensor trace(const Tensor& self) {
 
 Tensor& masked_fill_(Tensor& self, const Tensor& mask_, const Scalar& value) {
   c10::MaybeOwned<Tensor> mask = expand_inplace(self, mask_, "masked_fill_");
+  at::assert_no_partial_overlap(self, mask_);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1385,6 +1395,35 @@ Tensor& _index_put_impl_(
 }
 
 Tensor& take_out(const Tensor& self, const Tensor& index, Tensor& out) {
+  // Type and device checks
+  TORCH_CHECK(
+      index.scalar_type() == ScalarType::Long,
+      "take(): Expected a long tensor for index, but got ",
+      index.scalar_type());
+  TORCH_CHECK(
+      self.scalar_type() == out.scalar_type(),
+      "take(): self and out expected to havethe same dtype, but got self.dtype = ",
+      self.scalar_type(),
+      " and out.dtype = ",
+      out.scalar_type());
+  TORCH_CHECK(
+      self.device() == out.device() && self.device() == index.device(),
+      "take(): self, index and out expected to be in the same device, but got self.device = ",
+      self.device(),
+      ", index.device = ",
+      index.device(),
+      ", and out.device = ",
+      out.device());
+
+  // index checks
+  TORCH_CHECK_INDEX(
+      !(self.numel() == 0 && index.numel() != 0),
+      "take(): tried to take from an empty tensor");
+
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, index);
+  at::assert_no_overlap(out, self);
+
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
