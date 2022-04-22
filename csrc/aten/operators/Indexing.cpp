@@ -510,12 +510,14 @@ void indexCopy(
 
   TensorInfo<scalar_t, unsigned int> src_info =
       getTensorInfo<scalar_t, unsigned int>(source);
-  int src_dim = src_info.collapseDims(0);
+  auto src_collapse_dim = (source.dim() == 0) ? -1 : dim;
+  int src_dim = src_info.collapseDims(src_collapse_dim);
   src_info.reduceDim(src_dim);
 
   TensorInfo<scalar_t, unsigned int> dst_info =
       getTensorInfo<scalar_t, unsigned int>(dst);
-  int dst_fill_dim = dst_info.collapseDims(dim);
+  auto dst_collapse_dim = (dst.dim() == 0) ? -1 : dim;
+  int dst_fill_dim = dst_info.collapseDims(dst_collapse_dim);
   dst_info.reduceDim(dst_fill_dim);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
