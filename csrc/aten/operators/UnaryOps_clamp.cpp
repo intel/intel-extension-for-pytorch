@@ -4,19 +4,74 @@
 #include <utils/DPCPP.h>
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-#include "comm/Pairwise.h"
-#include "comm/Pointwise.h"
 
 #include "Loops.h"
+#include "comm/ATDispatch.h"
 
 using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_OUT_ALL_CALLABLE_1_CONST_UNARY_OPS(clamp_max_out, TensorMinValueOp);
-IPEX_OUT_ALL_CALLABLE_1_CONST_UNARY_OPS(clamp_min_out, TensorMaxValueOp);
-IPEX_OUT_ALL_CALLABLE_2_CONST_UNARY_OPS(clamp_min_max, TensorClampOp);
+Tensor& clamp_max_out(const Tensor& self, const Scalar& max, Tensor& out) {
+  auto iter = TensorIterator::unary_op(out, self);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "clamp_max_out",
+      [&]() {
+        auto val = max.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t in) -> scalar_t {
+          return Numerics<scalar_t>::isnan(in)
+              ? in
+              : Numerics<scalar_t>::gt(in, val) ? val : in;
+        });
+      });
+  return out;
+}
+
+Tensor& clamp_min_out(const Tensor& self, const Scalar& min, Tensor& out) {
+  auto iter = TensorIterator::unary_op(out, self);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "clamp_min_out",
+      [&]() {
+        auto val = min.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t in) -> scalar_t {
+          return Numerics<scalar_t>::isnan(in)
+              ? in
+              : Numerics<scalar_t>::lt(in, val) ? val : in;
+        });
+      });
+  return out;
+}
+
+Tensor& clamp_min_max(
+    const Tensor& self,
+    const Scalar& min,
+    const Scalar& max,
+    Tensor& out) {
+  auto iter = TensorIterator::unary_op(out, self);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "clamp_min_max",
+      [&]() {
+        auto minValue = min.to<scalar_t>();
+        auto maxValue = max.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t in) -> scalar_t {
+          auto val = Numerics<scalar_t>::lt(in, maxValue) ? in : maxValue;
+          return Numerics<scalar_t>::isnan(in)
+              ? in
+              : Numerics<scalar_t>::gt(minValue, val) ? minValue : val;
+        });
+      });
+  return out;
+}
 
 Tensor& clamp_out(
     const Tensor& self,
