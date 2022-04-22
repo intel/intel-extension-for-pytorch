@@ -3,7 +3,6 @@ from torch.testing._internal.common_utils import TestCase
 
 import time
 import intel_extension_for_pytorch
-from torchvision import transforms
 
 from torch.jit._recursive import wrap_cpp_module
 from torch.quantization.quantize_jit import (
