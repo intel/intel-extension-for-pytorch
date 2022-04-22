@@ -108,50 +108,54 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   Tensor output = self.clone().reshape(-1);
   int64_t num_inp = output.numel();
   Tensor sorted_indices = at::empty({num_inp}, index_options);
+  Tensor inverse_indices = at::empty({num_inp}, index_options);
+  Tensor counts = at::empty({num_inp}, index_options);
   auto sorted_indices_begin = sorted_indices.data_ptr<int64_t>();
   at::AtenIpexTypeXPU::iota(
       sorted_indices_begin, sorted_indices_begin + num_inp, (int64_t)0);
-  if (!consecutive) {
-    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, int64_t>(
-        output.data_ptr<scalar_t>(),
-        sorted_indices.data_ptr<int64_t>(),
-        output.size(0), // prb_size
-        1, // batch_size
-        output.stride(0), // stride
-        Numerics<scalar_t>::upper_bound(),
-        [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
-  }
 
-  Tensor inverse_indices, counts;
-  int64_t num_out;
+  if (num_inp > 0) {
+    if (!consecutive) {
+      at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, int64_t>(
+          output.data_ptr<scalar_t>(),
+          sorted_indices.data_ptr<int64_t>(),
+          output.size(0), // prb_size
+          1, // batch_size
+          output.stride(0), // stride
+          Numerics<scalar_t>::upper_bound(),
+          [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
+    }
 
-  scalar_t* output_data = output.data_ptr<scalar_t>();
-  inverse_indices = compute_inverse<scalar_t, int64_t>(
-      output_data,
-      num_inp,
-      sorted_indices,
-      return_inverse,
-      index_options,
-      [](auto lhs, auto rhs) -> bool {
-        if (lhs != rhs) {
-          return true;
-        }
-        return false;
-      });
+    int64_t num_out;
 
-  std::tie(counts, num_out) = compute_unique<scalar_t, int64_t>(
-      output_data,
-      num_inp,
-      sorted_indices,
-      return_counts,
-      index_options,
-      [](auto lhs, auto rhs) -> bool {
-        if (lhs != rhs) {
+    scalar_t* output_data = output.data_ptr<scalar_t>();
+    inverse_indices = compute_inverse<scalar_t, int64_t>(
+        output_data,
+        num_inp,
+        sorted_indices,
+        return_inverse,
+        index_options,
+        [](auto lhs, auto rhs) -> bool {
+          if (lhs != rhs) {
+            return true;
+          }
           return false;
-        }
-        return true;
-      });
-  output.resize_(num_out);
+        });
+
+    std::tie(counts, num_out) = compute_unique<scalar_t, int64_t>(
+        output_data,
+        num_inp,
+        sorted_indices,
+        return_counts,
+        index_options,
+        [](auto lhs, auto rhs) -> bool {
+          if (lhs != rhs) {
+            return false;
+          }
+          return true;
+        });
+    output.resize_(num_out);
+  }
 
   if (return_inverse) {
     inverse_indices.resize_(self.sizes());
