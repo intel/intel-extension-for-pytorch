@@ -58,6 +58,22 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
+        shape = [[8], [7, 8], [7, 8, 512], [16, 7, 8, 512], [16, 7, 8, 512, 35]]
+        for i in range(len(shape)):
+            for j in range(len(shape[i])):
+                dim = j - 1
+                x = torch.randn(shape[i])
+                grad = torch.randn(shape[i])
+                x_cpu = x.clone().requires_grad_()
+                y_cpu = F.softmax(x_cpu, dim)
+                y_cpu.backward(grad.clone())
+
+                x_dpcpp = x.clone().to(dpcpp_device).requires_grad_()
+                y_dpcpp = F.softmax(x_dpcpp, dim)
+                y_dpcpp.backward(grad.clone().to(dpcpp_device))
+                self.assertEqual(y_cpu, y_dpcpp.cpu())
+                self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
     def test_softmax_non_contiguous(self, dtype=torch.float):
 
         x_cpu = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]],

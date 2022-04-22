@@ -250,6 +250,9 @@ static inline bool softmax_valid(const at::Tensor& self) {
   if (!self.is_contiguous())
     return false;
 
+  if (self.sizes().size() > 4 || self.sizes().size() < 1)
+    return false;
+
   // the datatype should be supported by oneDNN primitive.
   switch (self.scalar_type()) {
     case at::ScalarType::Half:
@@ -269,6 +272,9 @@ static inline bool softmax_backward_valid(
     const at::Tensor& output,
     const at::Tensor& input) {
   if (!grad.is_contiguous() || !output.is_contiguous())
+    return false;
+
+  if (input.sizes().size() > 4 || input.sizes().size() < 1)
     return false;
 
   // the datatype should be supported by oneDNN primitive.
