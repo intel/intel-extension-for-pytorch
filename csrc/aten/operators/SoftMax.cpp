@@ -510,6 +510,11 @@ Tensor host_softmax_backward(
 
   int64_t dim = maybe_wrap_dim(dim_, grad_.dim());
   Tensor gI = at::empty_like(grad_);
+
+  if (output_.numel() == 0) {
+    return gI;
+  }
+
   Tensor grad = grad_;
   if (grad.dim() == 0)
     grad = grad.view(1);

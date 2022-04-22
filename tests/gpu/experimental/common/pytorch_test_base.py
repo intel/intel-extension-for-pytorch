@@ -175,7 +175,7 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_grid_sample_large_index_2d",  # too slow
         # "test_grid_sample_large_index_3d",  # too slow
         "test_softmax_64bit_indexing",  # too slow
-        "test_softmax_results",     # core dumped ... Floating point exception
+        # "test_softmax_results",     # core dumped ... Floating point exception
     },
 }
 
