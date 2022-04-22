@@ -255,6 +255,8 @@ supported:
   - gt.Tensor_out
   - grid_sampler_2d
   - grid_sampler_3d
+  - grid_sampler_2d_backward
+  - grid_sampler_3d_backward
   - hardshrink
   - hardshrink.out
   - hardshrink_backward
