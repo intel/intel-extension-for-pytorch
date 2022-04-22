@@ -169,7 +169,14 @@ std::tuple<Tensor&, Tensor&> adaptive_max_pool2d_out(
     Tensor& indices,
     const Tensor& self,
     IntArrayRef output_size) {
-  impl::adaptive_max_pool2d_out_template(out, indices, self, output_size);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "adaptive_max_pool2d_out",
+      [&]() {
+        impl::adaptive_max_pool2d_out_template(out, indices, self, output_size);
+      });
   return std::tuple<Tensor&, Tensor&>(out, indices);
 }
 
@@ -210,8 +217,14 @@ Tensor& adaptive_max_pool2d_backward_out(
     indices = indices_.contiguous(smf);
     grad_input.resize_as_(self, smf);
   }
-  impl::adaptive_max_pool2d_backward_out_template(
-      grad_input, grad_output, self, indices);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      grad_output.scalar_type(),
+      "adaptive_max_pool2d_backward_out",
+      [&]() {
+        impl::adaptive_max_pool2d_backward_out_template(
+            grad_input, grad_output, self, indices);
+      });
   return grad_input;
 }
 
@@ -241,8 +254,14 @@ Tensor adaptive_max_pool2d_backward(
     indices = indices_.contiguous(smf);
     grad_input = at::empty_like(self, smf);
   }
-  impl::adaptive_max_pool2d_backward_out_template(
-      grad_input, grad_output, self, indices);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      grad_output.scalar_type(),
+      "adaptive_max_pool2d_backward",
+      [&]() {
+        impl::adaptive_max_pool2d_backward_out_template(
+            grad_input, grad_output, self, indices);
+      });
   return grad_input;
 }
 

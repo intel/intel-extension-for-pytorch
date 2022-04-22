@@ -164,7 +164,14 @@ Tensor& adaptive_avg_pool2d_out(
     Tensor& out,
     const Tensor& self,
     IntArrayRef output_size) {
-  impl::adaptive_avg_pool2d_out_template(out, self, output_size);
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "adaptive_avg_pool2d_out",
+      [&]() {
+        impl::adaptive_avg_pool2d_out_template(out, self, output_size);
+      });
   return out;
 }
 
@@ -218,8 +225,14 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
     grad_output = grad_output_.contiguous(smf);
     grad_input.resize_as_(self_, smf);
   }
-  impl::adaptive_avg_pool2d_backward_out_template(
-      grad_input, grad_output, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      grad_output.scalar_type(),
+      "adaptive_avg_pool2d_backward_out_dpcpp",
+      [&]() {
+        impl::adaptive_avg_pool2d_backward_out_template(
+            grad_input, grad_output, self);
+      });
   return grad_input;
 }
 
@@ -246,8 +259,14 @@ Tensor _adaptive_avg_pool2d_backward(
     grad_output = grad_output_.contiguous(smf);
     grad_input = at::empty_like(self_, smf);
   }
-  impl::adaptive_avg_pool2d_backward_out_template(
-      grad_input, grad_output, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      grad_output.scalar_type(),
+      "_adaptive_avg_pool2d_backward",
+      [&]() {
+        impl::adaptive_avg_pool2d_backward_out_template(
+            grad_input, grad_output, self);
+      });
   return grad_input;
 }
 
