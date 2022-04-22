@@ -421,7 +421,7 @@ Tensor& tril_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
     return result;
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),
@@ -442,7 +442,7 @@ Tensor& triu_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
   if (self.numel() == 0) {
     return result;
   }
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),

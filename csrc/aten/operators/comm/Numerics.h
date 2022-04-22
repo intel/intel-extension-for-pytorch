@@ -999,6 +999,11 @@ struct Numerics<c10::complex<float>> {
   static inline bool eq(c10::complex<float> a, c10::complex<float> b) {
     return a == b;
   }
+
+  static inline bool ne(c10::complex<float> a, c10::complex<float> b) {
+    return a != b;
+    ;
+  }
 };
 
 template <>
@@ -1013,6 +1018,10 @@ struct Numerics<c10::complex<double>> {
 
   static inline bool eq(c10::complex<double> a, c10::complex<double> b) {
     return a == b;
+  }
+
+  static inline bool ne(c10::complex<double> a, c10::complex<double> b) {
+    return a != b;
   }
 };
 

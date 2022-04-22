@@ -54,7 +54,7 @@ Tensor _s_where(
       " but found ",
       other.dtype());
   Tensor ret = at::empty(self.sizes(), self.options());
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
