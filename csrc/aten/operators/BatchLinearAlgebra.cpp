@@ -1992,6 +1992,43 @@ Tensor& cholesky_out(Tensor& out, const Tensor& self, bool upper) {
   return out;
 }
 
+std::tuple<Tensor, Tensor> linalg_eig(const Tensor& input) {
+  return at::native::linalg_eig(input);
+}
+
+std::tuple<Tensor&, Tensor&> linalg_eig_out(
+    const Tensor& input,
+    Tensor& values,
+    Tensor& vectors) {
+  auto input_tmp = input.cpu();
+  // fall back to CPU
+  // 1, mkl doesn't have GPU interface for GEEV routine. and Due to this lack of
+  // uniqueness, different hardware and software may compute different
+  // eigenvectors.
+  // 2, we will try to dep on IPEX oneMKL package as long as if it supports CPU
+  // device
+  // 3, magma CPU is potential path, as well
+
+  auto options = input.options().device(at::kCPU);
+  ScalarType values_type = input.scalar_type();
+  ScalarType vectors_type = input.scalar_type();
+  if (!input.is_complex()) {
+    // for real-valued input we can have either real- or complex-valued output
+    ScalarType input_complex_dtype = toComplexType(input.scalar_type());
+    values_type = values.is_complex() ? input_complex_dtype : values_type;
+    vectors_type = vectors.is_complex() ? input_complex_dtype : vectors_type;
+  }
+  Tensor values_tmp = at::empty({0}, options.dtype(values_type));
+  Tensor vectors_tmp = at::empty({0}, options.dtype(vectors_type));
+  std::tie(values_tmp, vectors_tmp) =
+      at::native::linalg_eig_out(input_tmp, values_tmp, vectors_tmp);
+  at::native::resize_output(values, values_tmp.sizes());
+  at::native::resize_output(vectors, vectors_tmp.sizes());
+  values.copy_(values_tmp);
+  vectors.copy_(vectors_tmp);
+  return std::tuple<Tensor&, Tensor&>(values, vectors);
+}
+
 Tensor linalg_solve(const Tensor& input, const Tensor& other) {
   return at::native::linalg_solve(input, other);
 }

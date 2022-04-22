@@ -644,6 +644,8 @@ supported:
   - linalg_slogdet
   - linalg_slogdet.out
   - _det_lu_based_helper
+  - linalg_eig
+  - linalg_eig.out
   - _det_lu_based_helper_backward_helper
   - linalg_solve
   - linalg_solve.out
