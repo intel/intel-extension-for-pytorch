@@ -474,7 +474,8 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
       auto w = at::cat({_params[i], _params[i + 1]}, 1);
       weights.push_back(w);
     }
-    calibrate({input}, weights, {output}, "lstm", op_id, OP_TYPE_DEFAULT);
+    // oneDNN LSTM: input and output share the same scale and zero_point
+    calibrate({input}, weights, {input}, "lstm", op_id, OP_TYPE_DEFAULT);
     return std::make_tuple(output, hy, cy);
   }
   params p = get_params(op_id);

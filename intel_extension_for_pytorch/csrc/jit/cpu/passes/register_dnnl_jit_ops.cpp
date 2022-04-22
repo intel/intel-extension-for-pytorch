@@ -16,6 +16,7 @@
 #include "csrc/jit/cpu/kernels/MaxPool2D.h"
 #include "csrc/jit/cpu/kernels/Mha.h"
 #include "csrc/jit/cpu/kernels/OpContext.h"
+#include "csrc/jit/cpu/kernels/RNN.h"
 #include "csrc/jit/cpu/kernels/Shuffle.h"
 #include "csrc/jit/cpu/kernels/Softmax.h"
 
@@ -762,6 +763,33 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4))).toScalarType());
             drop(stack, 4);
             pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::quantized_lstm(Tensor quantized_input, Tensor[] hx, Tensor [] quantized_weights, bool has_biases, int num_layers, float dropout_p, bool train, bool bidirectional, bool batch_first, float scale, int zp, int dtype) -> (Tensor, Tensor, Tensor)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = quantized_lstm(
+                (std::move(peek(stack, 0, 12))).toTensor(),
+                (std::move(peek(stack, 1, 12))).toTensorList(),
+                (std::move(peek(stack, 2, 12))).toTensorList(),
+                (std::move(peek(stack, 3, 12))).toBool(),
+                (std::move(peek(stack, 4, 12))).toInt(),
+                (std::move(peek(stack, 5, 12))).toDouble(),
+                (std::move(peek(stack, 6, 12))).toBool(),
+                (std::move(peek(stack, 7, 12))).toBool(),
+                (std::move(peek(stack, 8, 12))).toBool(),
+                (std::move(peek(stack, 9, 12))).toDouble(),
+                (std::move(peek(stack, 10, 12))).toInt(),
+                (std::move(peek(stack, 11, 12))).toInt());
+            drop(stack, 12);
+
+            pack(stack, std::move(std::get<0>(result)));
+            pack(stack, std::move(std::get<1>(result)));
+            pack(stack, std::move(std::get<2>(result)));
             return 0;
           };
         },

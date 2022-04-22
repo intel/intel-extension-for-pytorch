@@ -1,3 +1,4 @@
+import sys
 import unittest
 import itertools
 import torch
@@ -6,6 +7,7 @@ import torch.nn.functional as F
 from torch.testing import FileCheck
 import copy
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_autocast import get_rand_seed
 
 import intel_extension_for_pytorch as ipex
 
@@ -101,6 +103,60 @@ class TestIpexOps(JitLlgaTestCase):
         for qscheme in [torch.per_tensor_symmetric]:
             graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, config_name="interaction", qscheme=qscheme)
             self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
+
+    def test_lstm(self):
+        class M(nn.Module):
+            def __init__(self, input_size, hidden_size, num_layers, bidirectional=False, bias=False, dropout=0, batch_first=False):
+                super(M, self).__init__()
+                self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+
+            def forward(self, x, h = None):
+                x, h = self.lstm(x, h)
+                return x, h
+
+        def _lstm_params_list():
+            params_dict = {
+                "input_size": [1, 32],
+                "hidden_size": [16],
+                "num_layers": [3],
+                "bidirectional": [False, True],
+                "bias": [False, True],
+                "empty_state": [False, True],
+                "batch_first": [False, True],
+                "dropout": [0, 0.4, 1],
+                "batch_size": [1, 2],
+                "seq_len": [48]
+            }
+
+            params_list = []
+            for key, value in params_dict.items():
+                params_list.append(value)
+            return params_list
+
+
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        params_list = _lstm_params_list()
+        for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
+            # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
+            if dropout > 0 and num_layers == 1:
+                continue
+
+            num_directions = 2 if bidirectional else 1                
+            
+            if batch_first:
+                x = torch.randn(batch_size, seq_len, input_size)
+            else:
+                x = torch.randn(seq_len, batch_size, input_size)
+            h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+            c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+
+            m = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+
+            graph = self.checkQuantizeTrace(m, [x], atol=3e-2, rtol=1e-1, config_name="lstm")
+            self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
 
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_convert(self):

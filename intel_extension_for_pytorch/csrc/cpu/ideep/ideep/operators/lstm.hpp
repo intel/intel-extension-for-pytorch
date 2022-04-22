@@ -18,6 +18,10 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
       tensor& dst_iter_c,
       const bool reverse = false,
       const prop_kind aprop = prop_kind::forward_inference,
+      const float scale = -1.,
+      const int32_t zp = -1,
+      const int weights_scale_mask = -1,
+      const std::vector<float>& weights_scales = scale_t(),
       const engine& aengine = engine::cpu_engine()) {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
                              : rnn_direction::unidirectional_left2right;
@@ -30,13 +34,21 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
     auto weights_layer_desc = weights_layer.get_desc().to_format_any();
     auto weights_iter_desc = weights_iter.get_desc().to_format_any();
 
+    attr_t op_attr;
+    if (src_layer.get_data_type() == data_type::u8) {
+      weights_layer_desc = weights_layer_desc.to_type(data_type::s8);
+      weights_iter_desc = weights_iter_desc.to_type(data_type::s8);
+
+      op_attr.set_rnn_data_qparams(scale, zp);
+      op_attr.set_rnn_weights_qparams(weights_scale_mask, weights_scales);
+    }
+
     auto bias_desc = bias.get_desc();
     auto dst_layer_desc = dst_layer.get_desc();
     auto dst_iter_desc = dst_iter.get_desc();
     auto dst_iter_c_desc = dst_iter_c.get_desc();
 
     // Use user mode scratchpad
-    auto op_attr = dnnl::primitive_attr();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
     auto pd = primitive_desc(
@@ -55,9 +67,9 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
         aengine);
 
     auto expected_weights_layer =
-        weights_layer.reorder_if_differ_in(pd.weights_layer_desc());
+        weights_layer.reorder_if_differ_in(pd.weights_layer_desc(), op_attr);
     auto expected_weights_iter =
-        weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
+        weights_iter.reorder_if_differ_in(pd.weights_iter_desc(), op_attr);
     tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(

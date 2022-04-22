@@ -453,6 +453,78 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph) {
   }
 }
 
+void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph) {
+  std::vector<std::string> patterns;
+  std::vector<std::string> replacements;
+
+  for (auto* n : graph->block()->nodes()) {
+    if (n->kind() == aten::lstm) {
+      std::string weight_pattern = "";
+      std::vector<std::string> ListConstruct;
+      std::vector<std::string> header;
+
+      size_t id = 0;
+      auto weights_ListConstructNode = n->input(2)->node();
+
+      bool maybe_quantized_lstm = std::any_of(
+          weights_ListConstructNode->inputs().begin(),
+          weights_ListConstructNode->inputs().end(),
+          [](auto& v) {
+            return v->node()->kind() == Symbol::aten("dequantize");
+          });
+
+      if (!maybe_quantized_lstm)
+        return;
+
+      for (auto input : weights_ListConstructNode->inputs()) {
+        if (input->node()->kind() == Symbol::aten("dequantize")) {
+          std::string dequant = "%dq_out_" + std::to_string(id) +
+              " : Tensor = aten::dequantize(" + "%dq_in_" + std::to_string(id) +
+              ")";
+          weight_pattern.append(dequant);
+
+          header.push_back("%dq_in_" + std::to_string(id));
+          ListConstruct.push_back("%dq_out_" + std::to_string(id));
+        } else {
+          header.push_back("%bias_in_" + std::to_string(id));
+          ListConstruct.push_back("%bias_in_" + std::to_string(id));
+        }
+        ++id;
+      }
+
+      std::string complete_header =
+          "graph(%quantized_input, %h, %has_biases, %num_layers, %dropout_p, %train, %bidirectional, %batch_fist, %scale, %zp, %dtype," +
+          c10::Join(", ", header) + R"(
+              ): )";
+      std::string complete_LC = "%weights = prim::ListConstruct(" +
+          c10::Join(", ", ListConstruct) + ")";
+
+      std::string QLstmPattern = complete_header + R"(
+              %input : Tensor = aten::dequantize(%quantized_input) )" +
+          weight_pattern + complete_LC + R"(
+              %output, %hy, %cy = aten::lstm(%input, %h, %weights, %has_biases, %num_layers, %dropout_p, %train, %bidirectional, %batch_fist) 
+              %quantized_output = aten::quantize_per_tensor(%output, %scale, %zp, %dtype)
+              return (%quantized_output, %hy, %cy) )";
+
+      std::string QLstmReplacement = complete_header + R"(
+              %quantized_weights : Tensor[] = prim::ListConstruct( )" +
+          c10::Join(", ", header) + R"(
+              )
+              %quantized_output, %hy, %cy = ipex::quantized_lstm(%quantized_input, %h, %quantized_weights, %has_biases, %num_layers, %dropout_p, %train, %bidirectional, %batch_fist, %scale, %zp, %dtype)
+              return (%quantized_output, %hy, %cy) )";
+
+      patterns.push_back(QLstmPattern);
+      replacements.push_back(QLstmReplacement);
+    }
+  }
+
+  SubgraphRewriter rewriter;
+  for (size_t i = 0; i < patterns.size(); i++) {
+    rewriter.RegisterRewritePattern(patterns[i], replacements[i]);
+    rewriter.runOnGraph(graph);
+  }
+}
+
 void fuseBmmAdd(std::shared_ptr<Graph>& graph) {
   std::array<std::string, 2> add_operators = {"add", "add_"};
 
