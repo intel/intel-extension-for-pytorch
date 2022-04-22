@@ -182,13 +182,18 @@ void kthvalue_template(
     Tensor& values,
     Tensor& indices) {
   int64_t dim = maybe_wrap_dim(dim_, self.dim());
-  int64_t slicesize = self.size(dim);
   TORCH_CHECK(
       self.numel() > 0,
       "cannot perform reduction function kthvalue",
       " on tensor with no elements because the operation does not have "
       "an identity");
-  TORCH_CHECK(k >= 1 && k <= slicesize, "selected number k out of range");
+
+  if (self.dim() > 0) {
+    int64_t slicesize = self.size(dim);
+    TORCH_CHECK(k >= 1 && k <= slicesize, "selected number k out of range");
+  } else {
+    TORCH_CHECK(k <= 1, "selected number k out of range");
+  }
 
   _reduction_with_indices_allocate_or_resize_output(
       values, indices, self, dim, keepdim);
