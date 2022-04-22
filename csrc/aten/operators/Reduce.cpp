@@ -619,7 +619,7 @@ static void std_var_kernel(
 }
 
 static void sum_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),

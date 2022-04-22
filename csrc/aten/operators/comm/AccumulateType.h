@@ -50,6 +50,16 @@ struct AccumulateType<int64_t> {
   using type = int64_t;
 };
 
+template <>
+struct AccumulateType<c10::complex<float>> {
+  using type = c10::complex<float>;
+};
+
+template <>
+struct AccumulateType<c10::complex<double>> {
+  using type = c10::complex<double>;
+};
+
 template <typename T>
 using acc_type = typename AccumulateType<T>::type;
 

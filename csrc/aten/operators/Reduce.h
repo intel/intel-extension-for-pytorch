@@ -492,8 +492,8 @@ struct ReduceOp {
     // Handle the head of input slice where data is not aligned
     arg_t value = ident;
     // sycl provided the composition so we don't need to rewrite it.
-    constexpr int align_bytes =
-        alignof(at::native::Memory::aligned_vector<scalar_t, input_vec_size>);
+    constexpr int align_bytes = alignof(
+        at::native::Memory::aligned_vector_loop<scalar_t, input_vec_size>);
     constexpr int align_elements = align_bytes / sizeof(scalar_t);
     int shift = ((uint64_t)data) % align_bytes / sizeof(scalar_t);
     if (shift > 0) {
@@ -515,8 +515,8 @@ struct ReduceOp {
     }
 
     // Do the vectorized reduction
-    using load_t = typename at::native::Memory::
-        aligned_vector<scalar_t, input_vec_size>::type;
+    using load_t =
+        at::native::Memory::aligned_vector_loop<scalar_t, input_vec_size>;
 
     index_t idx = config.input_idx(pos);
     const index_t stride = config.step_input;
@@ -536,9 +536,8 @@ struct ReduceOp {
       values = reinterpret_cast<const load_t*>(data)[idx];
 #pragma unroll
       for (index_t i = 0; i < input_vec_size; ++i) {
-        auto val = bitwise_cast<scalar_t>(values[i]);
-        value_list[i] =
-            ops.reduce(value_list[i], val, shift + idx * input_vec_size + i);
+        value_list[i] = ops.reduce(
+            value_list[i], values[i], shift + idx * input_vec_size + i);
       }
       idx += stride;
     }
@@ -570,8 +569,8 @@ struct ReduceOp {
     const index_t stride = config.step_input;
 
     using arg_vec_t = at::detail::Array<arg_t, output_vec_size>;
-    using load_t = typename at::native::Memory::
-        aligned_vector<scalar_t, output_vec_size>::type;
+    using load_t =
+        at::native::Memory::aligned_vector_loop<scalar_t, output_vec_size>;
     const load_t* data = reinterpret_cast<const load_t*>(data_);
 
     arg_vec_t value_list[vt0];
@@ -595,9 +594,8 @@ struct ReduceOp {
       for (index_t i = 0; i < vt0; ++i) {
 #pragma unroll(output_vec_size)
         for (index_t j = 0; j < output_vec_size; ++j) {
-          auto val = bitwise_cast<scalar_t>(values[i][j]);
           value_list[i][j] =
-              ops.reduce(value_list[i][j], val, idx + i * stride);
+              ops.reduce(value_list[i][j], values[i][j], idx + i * stride);
         }
       }
       idx += stride * vt0;
@@ -621,8 +619,7 @@ struct ReduceOp {
       }
 #pragma unroll(output_vec_size)
       for (index_t j = 0; j < output_vec_size; ++j) {
-        auto val = bitwise_cast<scalar_t>(values[i][j]);
-        value_list[i][j] = ops.reduce(value_list[i][j], val, idx);
+        value_list[i][j] = ops.reduce(value_list[i][j], values[i][j], idx);
       }
       idx += stride;
     }
