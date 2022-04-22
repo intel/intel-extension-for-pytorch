@@ -23,6 +23,11 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
       Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
       dtype_convert_by_scalar(
           to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
+
+      // max_pooling3d bwd case 5D(oneDNN) -> 4D(PyTorch)
+      if (from.ndimension() != ctx.dims().size()) {
+        to = to.reshape(from.sizes());
+      }
       return to;
     }
   }
