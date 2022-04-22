@@ -259,7 +259,8 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   int32_t num_gate = 3;
   int32_t num_bias_gate = 4;
 
-  auto data_t = memory::data_type::f32;
+  auto data_dt = get_onednn_dtype(src_layer);
+  auto data_f32_dt = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_tnc = memory::format_tag::tnc;
   auto format_ldnc = memory::format_tag::ldnc;
@@ -290,23 +291,27 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       at::empty(weights_iter_dims, weight_iter.options()).zero_();
   auto diff_bias = at::empty(bias_dims, bias.options()).zero_();
 
-  auto src_layer_md = memory::desc({src_layer_dims}, data_t, format_any);
+  auto src_layer_md = memory::desc({src_layer_dims}, data_dt, format_any);
   auto weights_layer_md =
-      memory::desc({weights_layer_dims}, data_t, format_any);
-  auto weights_iter_md = memory::desc({weights_iter_dims}, data_t, format_any);
-  auto bias_md = memory::desc({bias_dims}, data_t, format_any);
-  auto src_iter_md = memory::desc({src_iter_dims}, data_t, format_any);
-  auto dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
-  auto dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
-  auto diff_src_layer_md = memory::desc({src_layer_dims}, data_t, format_any);
-  auto diff_src_iter_md = memory::desc({src_iter_dims}, data_t, format_any);
+      memory::desc({weights_layer_dims}, data_dt, format_any);
+  auto weights_iter_md = memory::desc({weights_iter_dims}, data_dt, format_any);
+  auto bias_md = memory::desc({bias_dims}, data_f32_dt, format_any);
+  auto src_iter_md = memory::desc({src_iter_dims}, data_dt, format_any);
+  auto dst_layer_md = memory::desc({dst_layer_dims}, data_dt, format_any);
+  auto dst_iter_md = memory::desc({dst_iter_dims}, data_dt, format_any);
+  auto diff_src_layer_md =
+      memory::desc({src_layer_dims}, data_f32_dt, format_any);
+  auto diff_src_iter_md =
+      memory::desc({src_iter_dims}, data_f32_dt, format_any);
   auto diff_weights_layer_md =
-      memory::desc({weights_layer_dims}, data_t, format_any);
+      memory::desc({weights_layer_dims}, data_f32_dt, format_any);
   auto diff_weights_iter_md =
-      memory::desc({weights_iter_dims}, data_t, format_any);
-  auto diff_bias_md = memory::desc({bias_dims}, data_t, format_any);
-  auto diff_dst_layer_md = memory::desc({dst_layer_dims}, data_t, format_any);
-  auto diff_dst_iter_md = memory::desc({dst_iter_dims}, data_t, format_any);
+      memory::desc({weights_iter_dims}, data_f32_dt, format_any);
+  auto diff_bias_md = memory::desc({bias_dims}, data_f32_dt, format_any);
+  auto diff_dst_layer_md =
+      memory::desc({dst_layer_dims}, data_f32_dt, format_any);
+  auto diff_dst_iter_md =
+      memory::desc({dst_iter_dims}, data_f32_dt, format_any);
   rnn_direction dir = reverse ? rnn_direction::unidirectional_right2left
                               : rnn_direction::unidirectional_left2right;
 
@@ -343,58 +348,62 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       diff_dst_iter_md);
 
   auto src_layer_usr_memory = dpcpp_onednn_memory(
-      {{src_layer_dims}, data_t, format_tnc}, engine, src_layer.data_ptr());
+      {{src_layer_dims}, data_dt, format_tnc}, engine, src_layer.data_ptr());
 
   auto src_iter_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_dims}, data_t, format_ldnc}, engine, src_iter.data_ptr());
+      {{src_iter_dims}, data_dt, format_ldnc}, engine, src_iter.data_ptr());
 
   auto dst_layer_usr_memory = dpcpp_onednn_memory(
-      {{dst_layer_dims}, data_t, format_tnc}, engine, dst_layer.data_ptr());
+      {{dst_layer_dims}, data_dt, format_tnc}, engine, dst_layer.data_ptr());
 
   auto dst_iter_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_dims}, data_t, format_ldnc}, engine, dst_iter.data_ptr());
+      {{dst_iter_dims}, data_dt, format_ldnc}, engine, dst_iter.data_ptr());
 
   auto weights_layer_usr_memory = dpcpp_onednn_memory(
-      {{weights_layer_dims}, data_t, format_ldigo},
+      {{weights_layer_dims}, data_dt, format_ldigo},
       engine,
       weight_layer.data_ptr());
 
   auto weights_iter_usr_memory = dpcpp_onednn_memory(
-      {{weights_iter_dims}, data_t, format_ldigo},
+      {{weights_iter_dims}, data_dt, format_ldigo},
       engine,
       weight_iter.data_ptr());
 
   auto bias_usr_memory = dpcpp_onednn_memory(
-      {{bias_dims}, data_t, format_ldgo}, engine, bias.data_ptr());
+      {{bias_dims}, data_dt, format_ldgo}, engine, bias.data_ptr());
 
   auto diff_src_layer_usr_memory = dpcpp_onednn_memory(
-      {{src_layer_dims}, data_t, format_tnc},
+      {{src_layer_dims}, data_dt, format_tnc},
       engine,
       diff_src_layer.data_ptr());
 
   auto diff_src_iter_usr_memory = dpcpp_onednn_memory(
-      {{src_iter_dims}, data_t, format_ldnc}, engine, diff_src_iter.data_ptr());
+      {{src_iter_dims}, data_dt, format_ldnc},
+      engine,
+      diff_src_iter.data_ptr());
 
   auto diff_dst_layer_usr_memory = dpcpp_onednn_memory(
-      {{dst_layer_dims}, data_t, format_tnc},
+      {{dst_layer_dims}, data_dt, format_tnc},
       engine,
       diff_dst_layer.data_ptr());
 
   auto diff_dst_iter_usr_memory = dpcpp_onednn_memory(
-      {{dst_iter_dims}, data_t, format_ldnc}, engine, diff_dst_iter.data_ptr());
+      {{dst_iter_dims}, data_dt, format_ldnc},
+      engine,
+      diff_dst_iter.data_ptr());
 
   auto diff_weights_layer_usr_memory = dpcpp_onednn_memory(
-      {{weights_layer_dims}, data_t, format_ldigo},
+      {{weights_layer_dims}, data_dt, format_ldigo},
       engine,
       diff_weight_layer.data_ptr());
 
   auto diff_weights_iter_usr_memory = dpcpp_onednn_memory(
-      {{weights_iter_dims}, data_t, format_ldigo},
+      {{weights_iter_dims}, data_dt, format_ldigo},
       engine,
       diff_weight_iter.data_ptr());
 
   auto diff_bias_usr_memory = dpcpp_onednn_memory(
-      {{bias_dims}, data_t, format_ldgo}, engine, diff_bias.data_ptr());
+      {{bias_dims}, data_dt, format_ldgo}, engine, diff_bias.data_ptr());
 
   auto gru_backward_pd = lbr_gru_backward::primitive_desc(
       gru_backward_desc, engine, gru_forward_pd);
@@ -532,7 +541,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   auto diff_dst_iter_memory = diff_dst_iter_usr_memory;
   if (diff_dst_iter_usr_memory.get_desc() != expected_diff_dst_iter_md) {
     diff_dst_iter_ = empty_opaque_tensor(
-        expected_diff_dst_layer_md, diff_dst_iter.options(), c10::nullopt);
+        expected_diff_dst_iter_md, diff_dst_iter.options(), c10::nullopt);
     diff_dst_iter_memory = dpcpp_onednn_memory(
         expected_diff_dst_layer_md, engine, diff_dst_iter_.data_ptr());
     xpu::oneDNN::reorder(new_diff_dst_iter, diff_dst_iter_);

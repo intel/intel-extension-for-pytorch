@@ -116,6 +116,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward_layer(
   } else {
     bias = at::zeros({num_bias_gate * hidden_size}, weight1.options());
   }
+  // fit Bias's dtype to which oneDNN allowed
+  if (weight1.scalar_type() != ScalarType::Half)
+    bias = bias.to(at::kFloat);
 
   std::tie(grad_input, grad_hx, grad_weight_ih, grad_weight_hh, grad_bias) =
       xpu::oneDNN::gru_backward(
@@ -378,6 +381,10 @@ std::tuple<Tensor, Tensor> gru(
     layer_input = num_directions == 1
         ? layer_output[0]
         : at::cat(layer_output, /*output_channels*/ -1);
+
+    if (dropout != 0 && train && layer < num_layers - 1) {
+      layer_input = at::dropout(layer_input, dropout, /*train=*/true);
+    }
   }
   auto output = layer_input;
   auto hy = at::stack(layer_hy, 0);
