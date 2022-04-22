@@ -75,7 +75,8 @@ if(BUILD_SEPARATE_OPS)
       set(op_lib intel-ext-pt-gpu-op-${obj})
       add_library(${op_lib} SHARED ${op_src})
       append_target_property(${op_lib} LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
-      if(NOT obj MATCHES "Gamma$") # need to fix op Gamma with -O0
+      # need to fix op Gamma and Reduce with -O0
+      if(NOT obj MATCHES "Gamma$" AND NOT obj MATCHES "Reduce$")
           append_target_property(${op_lib} LINK_FLAGS ${OPT_LEVEL})
       endif()
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
