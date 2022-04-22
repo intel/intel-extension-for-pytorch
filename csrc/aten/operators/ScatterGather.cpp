@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/MemoryOverlap.h>
 
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
@@ -458,6 +459,9 @@ Tensor& scatter_(
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
+  at::assert_no_internal_overlap(self);
+  at::assert_no_overlap(self, index);
+  at::assert_no_overlap(self, src);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -472,8 +476,13 @@ Tensor scatter(
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
+  at::assert_no_internal_overlap(self);
   Tensor out = at::empty_like(self);
   out.copy_(self);
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, index);
+  at::assert_no_overlap(out, src);
+
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -488,8 +497,11 @@ Tensor scatter(
     int64_t dim,
     const Tensor& index,
     const Scalar& value) {
+  at::assert_no_internal_overlap(self);
   Tensor out = at::empty_like(self);
   out.copy_(self);
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, index);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -505,9 +517,12 @@ Tensor& scatter_out(
     const Tensor& index,
     const Scalar& value,
     Tensor& out) {
+  at::assert_no_internal_overlap(self);
   if (!self.is_same(out)) {
     out.copy_(self);
   }
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, index);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -523,9 +538,13 @@ Tensor& scatter_add_out(
     const Tensor& index,
     const Tensor& src,
     Tensor& out) {
+  at::assert_no_internal_overlap(self);
   if (!self.is_same(out)) {
     out.copy_(self);
   }
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, index);
+  at::assert_no_overlap(out, src);
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -541,7 +560,15 @@ Tensor& gather_out(
     int64_t dim,
     const Tensor& index,
     bool sparse_grad) {
+  at::assert_no_internal_overlap(self);
   out.resize_(index.sizes());
+
+  bool check_result = out.defined();
+  if (check_result) {
+    at::assert_no_internal_overlap(out);
+    at::assert_no_overlap(out, self);
+    at::assert_no_partial_overlap(out, index);
+  }
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,

@@ -347,6 +347,19 @@ static void cat(
 } // namespace impl
 
 Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
+  // Inputs cannot alias the output tensor
+  for (const auto i : c10::irange(tensors.size())) {
+    auto lap = at::get_overlap_status(out, tensors[i]);
+    TORCH_CHECK(
+        lap != at::MemOverlapStatus::PARTIAL &&
+            lap != at::MemOverlapStatus::FULL,
+        0,
+        "unsupported operation: the input tensors cannot refer to any of the "
+        "output memory locations. Found overlap in input tensor ",
+        i);
+  }
+  at::assert_no_internal_overlap(out);
+
   bool skip_dnnl_cat = false;
   for (int i = 0; i < tensors.size(); i++) {
     Tensor tensor = tensors[i];
