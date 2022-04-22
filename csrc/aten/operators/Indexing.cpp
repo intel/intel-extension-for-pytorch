@@ -1149,12 +1149,25 @@ Tensor& index_fill_(
     int64_t dim,
     const Tensor& index,
     const Scalar& value) {
+  if (!self.is_complex() && value.isComplex()) {
+    TORCH_CHECK(
+        false,
+        "index_fill_(): Converting complex Scalar to non-complex type is not supported");
+  }
+
+  // Handle the case when `self` is 0-dim
+  Tensor self_nonzero_dim = (self.dim() == 0) ? self.unsqueeze(-1) : self;
+
+  TORCH_CHECK(index.dim() <= 1, "Index has to be a vector/scalar");
+
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "indexFill",
-      [&]() { impl::indexFill<scalar_t>(self, dim, index, value); });
+      [&]() {
+        impl::indexFill<scalar_t>(self_nonzero_dim, dim, index, value);
+      });
   return self;
 }
 
