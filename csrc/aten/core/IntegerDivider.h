@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assert.h>
+#include <utils/DPCPP.h>
 
 // A utility class to implement integer division by muliplication, given a fixed
 // divisor.
@@ -98,9 +99,14 @@ struct IntDivider<unsigned int> {
   }
 
   inline unsigned int div(unsigned int n) const {
+#if defined(__SYCL_DEVICE_ONLY__)
+    uint32_t t = DPCPP::mul_hi(m1, n);
+    return (t + n) >> shift;
+#else
     // Using uint64_t so that the addition does not overflow.
     uint64_t t = ((uint64_t)n * m1) >> 32;
     return (t + n) >> shift;
+#endif
   }
 
   inline unsigned int mod(unsigned int n) const {
