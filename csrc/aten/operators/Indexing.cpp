@@ -1158,8 +1158,9 @@ Tensor& index_copy_(
       source.size(dim),
       ")");
 
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "indexCopy",
@@ -1183,8 +1184,9 @@ Tensor& index_fill_(
 
   TORCH_CHECK(index.dim() <= 1, "Index has to be a vector/scalar");
 
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "indexFill",
@@ -1235,7 +1237,8 @@ Tensor trace(const Tensor& self) {
 Tensor& masked_fill_(Tensor& self, const Tensor& mask_, const Scalar& value) {
   c10::MaybeOwned<Tensor> mask = expand_inplace(self, mask_, "masked_fill_");
   at::assert_no_partial_overlap(self, mask_);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
@@ -1258,7 +1261,8 @@ Tensor& masked_scatter_(
     Tensor& self,
     const Tensor& mask,
     const Tensor& source) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
@@ -1270,7 +1274,8 @@ Tensor& masked_scatter_(
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
   c10::MaybeOwned<Tensor> b_self, b_mask;
   std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
