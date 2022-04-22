@@ -2,9 +2,8 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
+#include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-#include "comm/Pairwise.h"
-#include "comm/Pointwise.h"
 
 #include "Loops.h"
 
@@ -15,11 +14,16 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 void frac_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(at::kHalf, iter.dtype(), "frac_xpu", [&]() {
-    dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-      return a - Numerics<scalar_t>::trunc(a);
-    });
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "frac_xpu",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return a - Numerics<scalar_t>::trunc(a);
+        });
+      });
 }
 
 } // namespace impl
@@ -39,7 +43,20 @@ Tensor& frac_(Tensor& self) {
   return at::AtenIpexTypeXPU::frac_out(self, self);
 }
 
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(trunc_out, Numerics<scalar_t>::trunc, Real);
+Tensor& trunc_out(const Tensor& self, Tensor& out) {
+  auto iter = TensorIterator::unary_op(out, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "trunc_out",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return Numerics<scalar_t>::trunc(a);
+        });
+      });
+  return out;
+} // namespace AtenIpexTypeXPU
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
