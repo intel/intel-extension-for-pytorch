@@ -150,8 +150,8 @@ struct multi_outputs_store_helper {
 } // namespace detail
 
 struct LoadWithoutCast {
-  template <typename scalar_t>
-  scalar_t load(char* base_ptr, uint32_t offset, int arg) {
+  template <typename scalar_t, typename offset_t>
+  scalar_t load(char* base_ptr, offset_t offset, int arg) {
     return *(reinterpret_cast<scalar_t*>(base_ptr) + offset);
   }
 };
@@ -173,16 +173,16 @@ struct LoadWithCast {
     }
   }
 
-  template <typename scalar_t>
-  scalar_t load(char* base_ptr, uint32_t offset, int arg) {
+  template <typename scalar_t, typename offset_t>
+  scalar_t load(char* base_ptr, offset_t offset, int arg) {
     void* ptr = base_ptr + element_sizes[arg] * offset;
     return c10::fetch_and_cast<scalar_t>(dtypes[arg], ptr);
   }
 };
 
 struct StoreWithoutCast {
-  template <typename scalar_t>
-  void store(scalar_t value, char* base_ptr, uint32_t offset) {
+  template <typename scalar_t, typename offset_t>
+  void store(scalar_t value, char* base_ptr, offset_t offset) {
     *(reinterpret_cast<scalar_t*>(base_ptr) + offset) = value;
   }
 };
@@ -192,8 +192,8 @@ struct StoreWithCast {
   uint32_t element_size;
   StoreWithCast(at::ScalarType dtype)
       : dtype(dtype), element_size(c10::elementSize(dtype)) {}
-  template <typename scalar_t>
-  void store(scalar_t value, char* base_ptr, uint32_t offset) {
+  template <typename scalar_t, typename offset_t>
+  void store(scalar_t value, char* base_ptr, offset_t offset) {
     void* ptr = base_ptr + element_size * offset;
     c10::cast_and_store<scalar_t>(dtype, ptr, value);
   }
@@ -306,7 +306,7 @@ struct vec_unroll {
     for (int i = 0; i < vec_size; i++) {
       if (i < remaining) {
         int linear_idx = thread_idx * vec_size + i;
-        int offset = output_offset_calculator.get(linear_idx)[0];
+        auto offset = output_offset_calculator.get(linear_idx)[0];
         storer.template store<return_t>(from[i], data[0], offset);
       }
     }

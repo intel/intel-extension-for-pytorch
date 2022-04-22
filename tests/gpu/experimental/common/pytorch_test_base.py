@@ -43,9 +43,6 @@ DISABLED_TORCH_TESTS_ANY = {
 
 DISABLED_TORCH_TESTS_XPU_ONLY = {
     # to be added
-    "TestShapeOpsXPU": {
-        "test_flip_xpu",    # core dumped ... free(): invalid size
-    },
     "TestBinaryUfuncsXPU": {
         "test_complex_scalar_pow_tensor",   # complex not supported yet
         "test_cumulative_trapezoid",    # core dumped ... Floating point exception

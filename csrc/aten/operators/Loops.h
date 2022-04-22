@@ -24,77 +24,37 @@ namespace AtenIpexTypeXPU {
 // device;
 constexpr int OVER_SUBSCRIBE_DSS_FACTOR = 16;
 
-// Work around for passing the offsets to the dpcpp kernel instead of using
-// OffsetCalculator.
-// Need to change it back to OffsetCalculator with dpcpp
-template <typename IndexType = uint32_t>
-struct SyclOffsetCal {
-  int dims;
-  // Make the information to be basic data types to avoid compiler issue.
-  IndexType sizes[MAX_TENSORINFO_DIMS];
-  IndexType strides[MAX_TENSORINFO_DIMS];
-
-  IndexType get(IndexType linear_idx) const {
-    IndexType offset = 0;
-
-    for (int dim = 0; dim < dims; ++dim) {
-      // Make the code as naive as possible.
-      offset += (linear_idx % sizes[dim]) * strides[dim];
-      linear_idx = linear_idx / sizes[dim];
-    }
-    return offset;
-  }
-};
-
-template <typename IndexType>
-static SyclOffsetCal<IndexType> make_offset_calculator(
-    const TensorIterator& iter,
-    int n) {
-  SyclOffsetCal<IndexType> offset;
-  if (n < iter.ntensors()) {
-    auto dims = iter.ndim();
-    offset.dims = dims;
-    auto strides = iter.strides(n);
-    auto sizes = iter.shape();
-    for (int i = 0; i < dims; i++) {
-      offset.sizes[i] = sizes[i];
-      offset.strides[i] = strides[i];
-    }
-  } else {
-    offset.dims = 0;
-  }
-  return offset;
-}
-
-template <int N>
-static OffsetCalculator<N> make_offset_calculator(const TensorIterator& iter) {
+template <int N, bool signed_strides = false>
+static OffsetCalculator<N, uint32_t, signed_strides> make_offset_calculator(
+    const TensorIterator& iter) {
   TORCH_INTERNAL_ASSERT(N <= iter.ntensors());
   std::array<const int64_t*, N> strides;
   for (int i = 0; i < N; i++) {
     strides[i] = iter.strides(i).data();
   }
-  return OffsetCalculator<N>(iter.ndim(), iter.shape().data(), strides.data());
+  return OffsetCalculator<N, uint32_t, signed_strides>(
+      iter.ndim(), iter.shape().data(), strides.data());
 }
 
-template <int N>
-static OffsetCalculator<N> make_input_offset_calculator(
-    const TensorIterator& iter) {
+template <int N, bool signed_strides = false>
+static OffsetCalculator<N, uint32_t, signed_strides>
+make_input_offset_calculator(const TensorIterator& iter) {
   // array size can not be 0, this happens when N == 0
   constexpr int array_size = std::max<int>(N, 1);
-  TORCH_INTERNAL_ASSERT(N == iter.ntensors() - iter.noutputs());
+  TORCH_INTERNAL_ASSERT(N <= iter.ntensors() - iter.noutputs());
   std::array<const int64_t*, array_size> strides;
   int64_t element_sizes[array_size];
   for (int i = 0; i < N; i++) {
     strides[i] = iter.strides(i + iter.noutputs()).data();
     element_sizes[i] = iter.element_size(i + iter.noutputs());
   }
-  return OffsetCalculator<N>(
+  return OffsetCalculator<N, uint32_t, signed_strides>(
       iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
-template <int num_outputs = 1>
-static OffsetCalculator<num_outputs> make_output_offset_calculator(
-    const TensorIterator& iter) {
+template <int num_outputs = 1, bool signed_strides = false>
+static OffsetCalculator<num_outputs, uint32_t, signed_strides>
+make_output_offset_calculator(const TensorIterator& iter) {
   TORCH_INTERNAL_ASSERT(num_outputs == iter.noutputs());
   std::array<const int64_t*, num_outputs> strides;
   int64_t element_sizes[num_outputs];
@@ -102,7 +62,7 @@ static OffsetCalculator<num_outputs> make_output_offset_calculator(
     strides[i] = iter.strides(i).data();
     element_sizes[i] = iter.element_size(i);
   }
-  return OffsetCalculator<num_outputs>(
+  return OffsetCalculator<num_outputs, uint32_t, signed_strides>(
       iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
@@ -376,13 +336,13 @@ static inline void launch_vectorized_kernel(
 #undef VEC_LOOPS_KERNEL
 }
 
-template <typename func_t>
+template <typename func_t, bool singed_strides = false>
 void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
   using traits = function_traits<func_t>;
   constexpr int ntensors = traits::arity + 1;
 
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
-  TORCH_INTERNAL_ASSERT(iter.ninputs() == traits::arity);
+  TORCH_INTERNAL_ASSERT(iter.ninputs() >= traits::arity);
   TORCH_INTERNAL_ASSERT(iter.noutputs() == 1);
 
   at::detail::Array<char*, ntensors> data;
@@ -400,8 +360,9 @@ void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
       launch_vectorized_kernel(numel, f, data);
     } else {
       auto input_offset_calculator =
-          make_input_offset_calculator<traits::arity>(iter);
-      auto output_offset_calculator = make_output_offset_calculator(iter);
+          make_input_offset_calculator<traits::arity, singed_strides>(iter);
+      auto output_offset_calculator =
+          make_output_offset_calculator<1, singed_strides>(iter);
       auto loader = at::native::Memory::LoadWithoutCast();
       auto storer = at::native::Memory::StoreWithoutCast();
       launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
@@ -435,8 +396,9 @@ void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
           storer);
     } else {
       auto input_offset_calculator =
-          make_input_offset_calculator<traits::arity>(iter);
-      auto output_offset_calculator = make_output_offset_calculator(iter);
+          make_input_offset_calculator<traits::arity, singed_strides>(iter);
+      auto output_offset_calculator =
+          make_output_offset_calculator<1, singed_strides>(iter);
       launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
           numel,
           f,
@@ -449,7 +411,7 @@ void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
   }
 }
 
-template <typename func_t>
+template <typename func_t, bool sined_strides = false>
 void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kXPU);
@@ -466,7 +428,7 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
     return;
   }
 
-  dpcpp_loops_kernel(iter, f);
+  dpcpp_loops_kernel<func_t, sined_strides>(iter, f);
 }
 
 template <typename func_t>

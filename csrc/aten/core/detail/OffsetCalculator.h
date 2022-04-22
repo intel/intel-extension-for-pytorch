@@ -10,30 +10,33 @@
 /// OffsetCalculator calculates the offset in bytes of a linear index for NARGS
 /// operands that share the same shape, but may have different strides.
 
-template <int NARGS, typename index_t = uint32_t>
+template <int NARGS, typename index_t = uint32_t, bool signed_strides = false>
 struct OffsetCalculator {
   static constexpr int MAX_DIMS = 12;
 
-  // The offset for each argument (in bytes). Wrapper around fixed-size array.
-  using offset_type = xpu::dpcpp::Array<index_t, NARGS>;
+  // We allow having negative strides to implement some operations like
+  // torch.flip
+  using stride_t =
+      std::conditional_t<signed_strides, std::make_signed_t<index_t>, index_t>;
 
+  // The offset for each argument (in bytes). Wrapper around fixed-size array.
+  using offset_type = xpu::dpcpp::Array<stride_t, std::max<int>(NARGS, 1)>;
+
+  // if element_sizes is nullptr, then the strides will be in bytes, otherwise
+  // the strides will be in # of elements.
   OffsetCalculator(
       int dims,
       const int64_t* sizes,
       const int64_t* const* strides,
       const int64_t* element_sizes = nullptr)
       : dims(dims) {
-    TORCH_CHECK(dims <= MAX_DIMS, "tensor has too many (>25) dims");
-    for (int dim = 0; dim < MAX_DIMS; ++dim) {
-      if (dim < dims) {
-        sizes_[dim] = IntDivider<index_t>(sizes[dim]);
-      } else {
-        sizes_[dim] = IntDivider<index_t>(1);
-      }
+    TORCH_CHECK(dims <= MAX_DIMS, "tensor has too many (>", MAX_DIMS, ") dims");
+    for (int i = 0; i < dims; i++) {
+      sizes_[i] = IntDivider<index_t>(sizes[i]);
       for (int arg = 0; arg < NARGS; arg++) {
         int64_t element_size =
             (element_sizes == nullptr ? 1LL : element_sizes[arg]);
-        strides_[dim][arg] = dim < dims ? strides[arg][dim] / element_size : 0;
+        strides_[i][arg] = strides[arg][i] / element_size;
       }
     }
   }
@@ -62,28 +65,7 @@ struct OffsetCalculator {
 
   int dims;
   IntDivider<index_t> sizes_[MAX_DIMS];
-  index_t strides_[MAX_DIMS][NARGS];
-};
-
-// This is for the loops kernel with no input operand.
-// TODO: To remove this if the index_t strides_[MAX_DIMS][std::max(NARGS, 1)]
-// can be optimized.
-template <typename index_t>
-struct OffsetCalculator<0, index_t> {
-  static constexpr int MAX_DIMS = 12;
-
-  // The offset for each argument (in bytes). Wrapper around fixed-size array.
-  using offset_type = xpu::dpcpp::Array<index_t, 1>;
-
-  OffsetCalculator(
-      int dims,
-      const int64_t* sizes,
-      const int64_t* const* strides,
-      const int64_t* element_sizes = nullptr) {}
-
-  offset_type get(index_t linear_idx) const {
-    return {};
-  }
+  stride_t strides_[MAX_DIMS][std::max<int>(NARGS, 1)];
 };
 
 template <int NARGS, typename index_t = uint32_t>

@@ -2,6 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/native/TensorTransformations.h>
+#include "Loops.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
@@ -20,103 +21,81 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-constexpr size_t dim_bitset_size = 64;
-
-template <typename scalar_t>
-void flip_dpcpp_kernel(
-    const Tensor& in_tensor,
-    Tensor& out_tensor,
-    const int64_t total_dims,
-    const std::vector<int64_t>& stride_contiguous_v,
-    const std::bitset<dim_bitset_size>& flip_dims_b) {
-  const std::vector<int64_t>& sizes_v = in_tensor.sizes().vec();
-  const std::vector<int64_t>& strides_v = in_tensor.strides().vec();
-
-  Tensor stride_contiguous_t = at::empty(
-      {static_cast<int64_t>(stride_contiguous_v.size())},
-      in_tensor.options().dtype(at::ScalarType::Long));
-  Tensor sizes_t = at::empty(
-      {static_cast<int64_t>(sizes_v.size())},
-      in_tensor.options().dtype(at::ScalarType::Long));
-  Tensor strides_t = at::empty(
-      {static_cast<int64_t>(strides_v.size())},
-      in_tensor.options().dtype(at::ScalarType::Long));
-
-  for (int64_t i = 0; i < stride_contiguous_v.size(); i++)
-    stride_contiguous_t[i] = stride_contiguous_v[i];
-  for (int64_t i = 0; i < sizes_v.size(); i++)
-    sizes_t[i] = sizes_v[i];
-  for (int64_t i = 0; i < strides_v.size(); i++)
-    strides_t[i] = strides_v[i];
-
-  const int64_t N = in_tensor.numel();
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(N, tileSize, rng, GRange);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_tensor_d = in_tensor.data_ptr<scalar_t>();
-    auto out_tensor_d = out_tensor.data_ptr<scalar_t>();
-    auto stride_contiguous_d = stride_contiguous_t.data_ptr<int64_t>();
-    auto sizes_d = sizes_t.data_ptr<int64_t>();
-    auto strides_d = strides_t.data_ptr<int64_t>();
-
-    // auto local_output_data = dpcpp_local_acc_t<scalar_t>(1024, cgh);
-
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto in_tensor_ptr = in_tensor_d;
-      auto out_tensor_ptr = out_tensor_d;
-      auto stride_contiguous_ptr = stride_contiguous_d;
-      auto sizes_ptr = sizes_d;
-      auto strides_ptr = strides_d;
-      auto linear_index = item.get_global_id(0);
-
-      int64_t cur_indices = linear_index;
-      int64_t rem = 0;
-      int64_t dst_offset = 0;
-
-      for (int64_t d = 0; d < total_dims; d++) {
-        int64_t temp = cur_indices;
-        cur_indices = cur_indices / stride_contiguous_ptr[d];
-        rem = temp - cur_indices * stride_contiguous_ptr[d];
-        dst_offset += flip_dims_b[d]
-            ? (sizes_ptr[d] - 1 - cur_indices) * strides_ptr[d]
-            : cur_indices * strides_ptr[d];
-        cur_indices = rem;
-      }
-      out_tensor_ptr[linear_index] = in_tensor_ptr[dst_offset];
-    };
-    cgh.parallel_for(DPCPP::nd_range<1>(GRange, tileSize), kfn);
-  };
-
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
 Tensor flip_dpcpp(const Tensor& self, IntArrayRef& dims) {
-  auto in_tensor = self;
-  const int64_t total_dims = in_tensor.dim();
+  const int64_t total_dims = self.dim();
+  // It wraps the dims and checks that there are no repeated dims
   auto flip_dims_b = at::dim_list_to_bitset(dims, total_dims);
-  Tensor out_tensor =
-      at::empty_like(in_tensor, in_tensor.contiguous().options());
 
-  // create contiguous strides for input tensor
-  auto stride_contiguous_v = std::vector<int64_t>(total_dims);
-  for (int64_t i = total_dims - 1; i >= 0; i--) {
-    if (i == total_dims - 1)
-      stride_contiguous_v[i] = 1;
-    else
-      stride_contiguous_v[i] =
-          Max<int64_t>(in_tensor.size(i + 1), 1) * stride_contiguous_v[i + 1];
+  Tensor out_tensor = at::empty_like(self, MemoryFormat::Preserve);
+
+  // Count dimensions in which we need to do work
+  int n = 0;
+  auto strides = DimVector(self.strides());
+  for (int64_t i = 0; i < total_dims; i++) {
+    if (flip_dims_b[i] && self.size(i) > 1 && self.stride(i) != 0) {
+      n++;
+      strides[i] = 0;
+    }
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, in_tensor.scalar_type(), "flip_dpcpp", [&] {
-        flip_dpcpp_kernel<scalar_t>(
-            in_tensor,
-            out_tensor,
-            total_dims,
-            stride_contiguous_v,
-            flip_dims_b);
+  // Nothing to do, we return fast
+  if (n == 0 || self.numel() <= 1) {
+    out_tensor.copy_(self);
+    return out_tensor;
+  }
+
+  // create dummy output with 0 strides at flipped dimension, to prevent
+  // tensorIterator from coalescing flipped dims
+  const auto restrided_self = self.as_strided(self.sizes(), strides);
+  auto iter =
+      TensorIteratorConfig()
+          .set_check_mem_overlap(false)
+          .check_all_same_dtype(false)
+          .declare_static_dtype_and_device(self.scalar_type(), self.device())
+          .add_output(out_tensor)
+          .add_input(self)
+          .add_input(restrided_self)
+          .build();
+
+  auto* data = reinterpret_cast<char*>(iter.data_ptr(0));
+  const auto sizes = iter.shape();
+  // This is a SmallVector of _signed_ ints
+  auto strides_bytes = DimVector(iter.strides(0));
+  const auto strides_self = iter.strides(1);
+  const auto strides_dummy = iter.strides(2);
+
+  // To understand this transformation, think of a 3D cube.
+  //   - The data ptr points to the lower-left most vertex of the cube
+  //   - The strides tell us how to move in each dimension,
+  //     that is, data + stride[i] advances one element in the dimension i
+  // To flip a dimension:
+  //   - We move the pointer to the opposite vertex of the cube
+  //   - We iterate in the opposite direction (invert the strides)
+
+  for (int i = 0; i < iter.ndim(); i++) {
+    // We know that an dimension has a zero stride and self[i] does not, as we
+    // defined above Note that it may be the case that strides_dummy[i] = 0 not
+    // because we set it, but because strides_self[i] == 0. We do not want to do
+    // anything there
+    if (strides_dummy[i] == 0 && strides_self[i] != 0) {
+      data += strides_bytes[i] * (sizes[i] - 1);
+      strides_bytes[i] *= -1;
+    }
+  }
+  iter._unsafe_set_arg_strides(0, strides_bytes);
+  iter._unsafe_set_arg_data(0, reinterpret_cast<void*>(data));
+
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "flip_xpu",
+      [&]() {
+        auto functor = [](scalar_t a) { return a; };
+        dpcpp_kernel_for_tensor_iter<
+            decltype(functor),
+            /*signed_strides=*/true>(iter, functor);
       });
 
   return out_tensor;
