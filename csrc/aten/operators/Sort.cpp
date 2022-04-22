@@ -32,6 +32,13 @@ std::tuple<Tensor&, Tensor&> sort_out(
   sorted.resize_as_(input);
   indices.resize_(input.sizes());
 
+  // check if input is scalar
+  if (input.dim() == 0 && input.numel() == 1) {
+    indices.zero_();
+    sorted.copy_(input);
+    return std::tuple<Tensor&, Tensor&>(sorted, indices);
+  }
+
   dim = maybe_wrap_dim(dim, input);
 
   // How large are the slices that we are sorting?
