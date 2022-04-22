@@ -32,20 +32,31 @@ namespace impl {
 
 template <typename scalar_t>
 void indexSelect(
-    Tensor& dst,
+    const Tensor& dst,
     const Tensor& src,
     int dim,
     const Tensor& indices) {
-  int srcDims = src.dim() == 0 ? 1 : src.dim();
-  int dstDims = dst.dim() == 0 ? 1 : dst.dim();
-  int idxDims = indices.dim() == 0 ? 1 : indices.dim();
+  int srcDims = src.dim();
+  int dstDims = dst.dim();
+  int idxDims = indices.dim();
 
-  TORCH_CHECK(srcDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(dstDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(idxDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(
+      srcDims <= MAX_DPCPPTORCH_DIMS && srcDims > 0,
+      "src tensor dim should be > 0 and < ",
+      MAX_DPCPPTORCH_DIMS);
+  TORCH_CHECK(
+      dstDims <= MAX_DPCPPTORCH_DIMS && dstDims > 0,
+      "dst tensor dim should be > 0 and < ",
+      MAX_DPCPPTORCH_DIMS);
+  TORCH_CHECK(
+      idxDims <= MAX_DPCPPTORCH_DIMS && idxDims > 0,
+      "index tensor dim should be > 0 and < ",
+      MAX_DPCPPTORCH_DIMS);
   TORCH_CHECK(
       idxDims <= 1, "Index is supposed to be an empty tensor or a vector");
-  TORCH_CHECK(dim < srcDims, "Indexing dim is out of bounds");
+  TORCH_CHECK(
+      dim >= -1 && dim < srcDims,
+      "Indexing dim should be >= -1 and < dims - 1");
   TORCH_CHECK(srcDims > 0, "Source tensor is empty");
 
   TORCH_CHECK(
@@ -60,7 +71,8 @@ void indexSelect(
   indices_info.collapseDims();
 
   auto new_size = src.sizes().vec();
-  new_size[dim] = indices_info.sizes[0];
+  auto collapse_dim = (dim == -1) ? new_size.size() - 1 : dim;
+  new_size[collapse_dim] = indices_info.sizes[0];
   dst.resize_(new_size);
 
   ptrdiff_t dst_num_elem = dst.numel();
@@ -70,12 +82,12 @@ void indexSelect(
 
   TensorInfo<scalar_t, unsigned int> dst_info =
       getTensorInfo<scalar_t, unsigned int>(dst);
-  int dst_select_dim = dst_info.collapseDims(dim);
+  int dst_select_dim = dst_info.collapseDims(collapse_dim);
   dst_info.reduceDim(dst_select_dim);
 
   TensorInfo<scalar_t, unsigned int> src_info =
       getTensorInfo<scalar_t, unsigned int>(src);
-  int src_select_dim = src_info.collapseDims(dim);
+  int src_select_dim = src_info.collapseDims(collapse_dim);
   src_info.reduceDim(src_select_dim);
 
   // The `src` is partitioned into two parts:
@@ -1026,13 +1038,13 @@ Tensor& index_select_out(
     const Tensor& self,
     int64_t dim,
     const Tensor& index) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
       "indexSelect",
-      [&]() { impl::indexSelect<scalar_t>(out, self, dim, index); });
+      [=]() { impl::indexSelect<scalar_t>(out, self, dim, index); });
   return out;
 }
 
