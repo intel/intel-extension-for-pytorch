@@ -988,6 +988,50 @@ struct Numerics<double> {
 
 template <>
 struct Numerics<c10::complex<float>> {
+  static inline c10::complex<float> acos(c10::complex<float> a) {
+    return std::acos(a);
+  }
+
+  static inline c10::complex<float> sin(c10::complex<float> a) {
+    return std::sin(a);
+  }
+
+  static inline c10::complex<float> cosh(c10::complex<float> a) {
+    return std::cosh(a);
+  }
+
+  static inline c10::complex<float> sinh(c10::complex<float> a) {
+    return std::sinh(a);
+  }
+
+  static inline c10::complex<float> asin(c10::complex<float> a) {
+    return std::asin(a);
+  }
+
+  static inline c10::complex<float> cos(c10::complex<float> a) {
+    return std::cos(a);
+  }
+
+  static inline c10::complex<float> atan(c10::complex<float> a) {
+    return std::atan(a);
+  }
+
+  static inline c10::complex<float> tan(c10::complex<float> a) {
+    return std::tan(a);
+  }
+
+  static inline c10::complex<float> tanh(c10::complex<float> a) {
+    return std::tanh(a);
+  }
+
+  static inline c10::complex<float> neg(c10::complex<float> a) {
+    return -a;
+  }
+
+  static inline c10::complex<float> rsqrt(c10::complex<float> a) {
+    return c10::complex<float>(1.0, 0) / std::sqrt(a);
+  }
+
   static inline c10::complex<float> abs(c10::complex<float> a) {
     return std::abs(a);
   }
@@ -1008,6 +1052,50 @@ struct Numerics<c10::complex<float>> {
 
 template <>
 struct Numerics<c10::complex<double>> {
+  static inline c10::complex<double> acos(c10::complex<double> a) {
+    return std::acos(a);
+  }
+
+  static inline c10::complex<double> sin(c10::complex<double> a) {
+    return std::sin(a);
+  }
+
+  static inline c10::complex<double> cosh(c10::complex<double> a) {
+    return std::cosh(a);
+  }
+
+  static inline c10::complex<double> sinh(c10::complex<double> a) {
+    return std::sinh(a);
+  }
+
+  static inline c10::complex<double> asin(c10::complex<double> a) {
+    return std::asin(a);
+  }
+
+  static inline c10::complex<double> cos(c10::complex<double> a) {
+    return std::cos(a);
+  }
+
+  static inline c10::complex<double> atan(c10::complex<double> a) {
+    return std::atan(a);
+  }
+
+  static inline c10::complex<double> tan(c10::complex<double> a) {
+    return std::tan(a);
+  }
+
+  static inline c10::complex<double> tanh(c10::complex<double> a) {
+    return std::tanh(a);
+  }
+
+  static inline c10::complex<double> neg(c10::complex<double> a) {
+    return -a;
+  }
+
+  static inline c10::complex<double> rsqrt(c10::complex<double> a) {
+    return c10::complex<double>(1.0, 0) / std::sqrt(a);
+  }
+
   static inline c10::complex<double> abs(c10::complex<double> a) {
     return std::abs(a);
   }

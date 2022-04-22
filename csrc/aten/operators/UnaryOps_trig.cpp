@@ -5,6 +5,7 @@
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
+#include "comm/Unary.h"
 
 #include "Loops.h"
 
@@ -13,26 +14,42 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sin_out, Numerics<scalar_t>::sin, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(cosh_out, Numerics<scalar_t>::cosh, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sinh_out, Numerics<scalar_t>::sinh, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(acos_out, Numerics<scalar_t>::acos, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(asin_out, Numerics<scalar_t>::asin, Real);
-
-IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(cos, Numerics<scalar_t>::cos, Real);
-IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tan, Numerics<scalar_t>::tan, Real);
-IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(atan, Numerics<scalar_t>::atan, Real);
-
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(tanh_out, Numerics<scalar_t>::tanh, Real);
-
-Tensor& tanh_(Tensor& self) {
-  return at::tanh_out(self, self);
-}
-
-Tensor tanh(const Tensor& self) {
-  auto result = at::empty_like(self);
-  return at::tanh_out(result, self);
-}
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    sin_out,
+    Numerics<scalar_t>::sin,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    cosh_out,
+    Numerics<scalar_t>::cosh,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    sinh_out,
+    Numerics<scalar_t>::sinh,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    acos_out,
+    Numerics<scalar_t>::acos,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    asin_out,
+    Numerics<scalar_t>::asin,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    cos_out,
+    Numerics<scalar_t>::cos,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    tan_out,
+    Numerics<scalar_t>::tan,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    atan_out,
+    Numerics<scalar_t>::atan,
+    unary_float_op);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    tanh_out,
+    Numerics<scalar_t>::tanh,
+    unary_float_op);
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

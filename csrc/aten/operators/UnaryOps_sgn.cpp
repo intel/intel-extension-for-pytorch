@@ -7,14 +7,22 @@
 #include "comm/Pointwise.h"
 
 #include "Loops.h"
-#include "comm/zmath.h"
+#include "comm/Unary.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(sgn, Numerics<scalar_t>::sgn, Real);
+IPEX_UNARY_LOOPS_FUNC_COMPLEX(sgn_xpu, at::AtenIpexTypeXPU::sgn_impl, unary_op);
 
 IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(sign_out, TensorSignOp);
+
+Tensor& sgn_out(const Tensor& self, Tensor& out) {
+  if (self.is_complex()) {
+    return at::AtenIpexTypeXPU::sgn_xpu(self, out);
+  } else {
+    return at::AtenIpexTypeXPU::sign_out(out, self);
+  }
+}
 
 Tensor sign(const Tensor& self) {
   auto out = at::empty_like(self);

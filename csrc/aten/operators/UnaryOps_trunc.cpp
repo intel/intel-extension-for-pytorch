@@ -15,11 +15,7 @@ namespace impl {
 
 void frac_kernel(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.dtype(),
-      "frac_xpu",
-      [&]() {
+      ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "frac_xpu", [&]() {
         dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
           return a - Numerics<scalar_t>::trunc(a);
         });
@@ -32,15 +28,6 @@ Tensor& frac_out(Tensor& result, const Tensor& self) {
   auto iter = TensorIterator::unary_op(result, self);
   impl::frac_kernel(iter);
   return result;
-}
-
-Tensor frac(const Tensor& self) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::frac_out(result, self);
-}
-
-Tensor& frac_(Tensor& self) {
-  return at::AtenIpexTypeXPU::frac_out(self, self);
 }
 
 Tensor& trunc_out(const Tensor& self, Tensor& out) {
@@ -56,7 +43,7 @@ Tensor& trunc_out(const Tensor& self, Tensor& out) {
         });
       });
   return out;
-} // namespace AtenIpexTypeXPU
+}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

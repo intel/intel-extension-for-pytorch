@@ -5,6 +5,7 @@
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
+#include "comm/Unary.h"
 
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
@@ -14,7 +15,10 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(rsqrt_out, Numerics<scalar_t>::rsqrt, Real);
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
+    rsqrt_out,
+    Numerics<scalar_t>::rsqrt,
+    unary_float_op);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sqrt, Numerics<scalar_t>::sqrt, Real);
 
 Tensor& sqrt_out(Tensor& result, const Tensor& self) {

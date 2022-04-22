@@ -221,9 +221,7 @@ supported:
   - fmod.Tensor_out
   - fmod_.Scalar
   - fmod_.Tensor
-  - frac
   - frac.out
-  - frac_
   - fractional_max_pool2d
   - fractional_max_pool2d.output
   - fractional_max_pool2d_backward

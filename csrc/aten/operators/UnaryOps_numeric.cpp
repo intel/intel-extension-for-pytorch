@@ -6,6 +6,7 @@
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
+#include "comm/Unary.h"
 #include "comm/zmath.h"
 
 #include "Loops.h"
@@ -71,13 +72,16 @@ void abs_kernel(TensorIterator& iter) {
 
 } // namespace impl
 
-IPEX_OUT_ALL_UNARY_FUNC_OPS(neg_out, Numerics<scalar_t>::neg, Real);
-
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(round_out, Numerics<scalar_t>::round, Real);
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
+
+IPEX_UNARY_LOOPS_FUNC_ALL_ALL_COMPLEX(
+    neg_out,
+    Numerics<scalar_t>::neg,
+    unary_op);
 
 Tensor remainder(const Tensor& self, const Scalar& other) {
   auto out = at::empty_like(self);
@@ -113,8 +117,8 @@ Tensor& conj_out(Tensor& out, const Tensor& self) {
 }
 
 Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
-  auto iter = TensorIterator::unary_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
