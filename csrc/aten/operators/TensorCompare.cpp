@@ -7,38 +7,29 @@
 
 #include "comm/ATDispatch.h"
 
+#include "Loops.h"
+
 using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename scalar_t, typename scalar1_t>
-class where_functor {
- public:
-  where_functor() {}
-  void operator()(
-      scalar_t& ret_val,
-      const scalar1_t& cond_val,
-      const scalar_t& self_val,
-      const scalar_t& other_val) const {
-    ret_val = cond_val ? self_val : other_val;
-  }
-};
-
-template <typename scalar_t>
-void _s_where(
-    at::Tensor& ret,
-    const at::Tensor& condition,
-    const at::Tensor& self,
-    const at::Tensor& other) {
-  if (condition.scalar_type() == at::ScalarType::Byte) {
-    DPCPP_tensor_apply4<scalar_t, uint8_t, scalar_t, scalar_t>(
-        ret, condition, self, other, where_functor<scalar_t, uint8_t>());
-  } else {
-    DPCPP_tensor_apply4<scalar_t, bool, scalar_t, scalar_t>(
-        ret, condition, self, other, where_functor<scalar_t, bool>());
-  }
+void where_kernel(TensorIterator& iter, ScalarType condition_type) {
+  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      kHalf, kBFloat16, kBool, iter.dtype(), "where_dpcpp", [&] {
+        if (condition_type == at::ScalarType::Byte) {
+          dpcpp_kernel_for_tensor_iter(
+              iter,
+              [=](uint8_t cond_val, scalar_t self_val, scalar_t other_val)
+                  -> scalar_t { return cond_val ? self_val : other_val; });
+        } else {
+          dpcpp_kernel_for_tensor_iter(
+              iter,
+              [=](bool cond_val, scalar_t self_val, scalar_t other_val)
+                  -> scalar_t { return cond_val ? self_val : other_val; });
+        }
+      });
 }
 
 } // namespace impl
@@ -54,13 +45,14 @@ Tensor _s_where(
       " but found ",
       other.dtype());
   Tensor ret = at::empty(self.sizes(), self.options());
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      at::ScalarType::Bool,
-      ret.scalar_type(),
-      "where",
-      [&] { impl::_s_where<scalar_t>(ret, condition, self, other); });
+  auto iter = at::TensorIteratorConfig()
+                  .check_all_same_dtype(false)
+                  .add_output(ret)
+                  .add_input(condition)
+                  .add_input(self)
+                  .add_input(other)
+                  .build();
+  impl::where_kernel(iter, condition.scalar_type());
   return ret;
 }
 
