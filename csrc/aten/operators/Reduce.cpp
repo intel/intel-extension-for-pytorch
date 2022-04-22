@@ -25,6 +25,10 @@ namespace impl {
 
 using DimMask = TensorIterator::DimMask;
 
+// This is in an extra file to work around strange interaction of
+// bitset on Windows with operator overloading
+constexpr size_t dim_bitset_size = 64;
+
 static DimMask make_dim_mask(IntArrayRef dims, int64_t ndim) {
   auto mask = DimMask();
   if (dims.empty()) {
@@ -65,6 +69,11 @@ static Tensor review_reduce_result(
     int ndim,
     DimMask mask,
     bool keepdim) {
+  TORCH_CHECK(
+      ndim <= (int)dim_bitset_size,
+      "only tensors with up to ",
+      dim_bitset_size,
+      " dims are supported");
   if (keepdim) {
     return result;
   }
