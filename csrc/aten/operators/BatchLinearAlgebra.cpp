@@ -1560,6 +1560,11 @@ std::tuple<Tensor&, Tensor&> solve_out(
     Tensor& lu,
     const Tensor& self,
     const Tensor& A) {
+  native::checkSameDevice("solve", solution, self, "solution");
+  native::checkSameDevice("solve", lu, self, "lu");
+  native::checkLinalgCompatibleDtype("solve", solution, self, "solution");
+  native::checkLinalgCompatibleDtype("solve", lu, self, "lu");
+
   Tensor solution_tmp, lu_tmp;
   std::tie(solution_tmp, lu_tmp) = at::AtenIpexTypeXPU::_solve_helper(self, A);
   solution.resize_as_(solution_tmp).copy_(solution_tmp);
@@ -1703,13 +1708,83 @@ Tensor ormqr(
     bool left,
     bool transpose) {
   TORCH_CHECK(
-      self.dim() == 2, "input must be 2-d matrix, input shape=", self.sizes());
+      self.dim() >= 2, "torch.ormqr: input must have at least 2 dimensions.");
   TORCH_CHECK(
-      input3.dim() == 2, "c must be 2-d matrix, c shape=", input3.sizes());
+      input3.dim() >= 2, "torch.ormqr: other must have at least 2 dimensions.");
+
+  int64_t left_size_condition = left ? -2 : -1;
+  TORCH_CHECK(
+      input3.size(left_size_condition) >= input2.size(-1),
+      "torch.ormqr: other.shape[",
+      left_size_condition,
+      "] must be greater than or equal to tau.shape[-1]");
+  TORCH_CHECK(
+      input3.size(left_size_condition) == self.size(-2),
+      "torch.ormqr: other.shape[",
+      left_size_condition,
+      "] must be equal to input.shape[-2]");
+  TORCH_CHECK(
+      self.dim() - input2.dim() == 1,
+      "torch.ormqr: ",
+      "Expected tau to have one dimension less than input, but got tau.ndim equal to ",
+      input2.dim(),
+      " and input.ndim is equal to ",
+      self.dim());
+  TORCH_CHECK(
+      self.dim() == input3.dim(),
+      "torch.ormqr: ",
+      "Expected other to have the same number of dimensions as input, but got other.ndim equal to ",
+      input3.dim(),
+      " and input.ndim is equal to ",
+      self.dim());
+
+  if (self.dim() > 2) {
+    auto expected_batch_shape =
+        IntArrayRef(self.sizes().data(), self.dim() - 2); // self.shape[:-2]
+    auto actual_batch_tau_shape = IntArrayRef(
+        input2.sizes().data(), input2.dim() - 1); // input2.shape[:-1]
+    TORCH_CHECK(
+        actual_batch_tau_shape.equals(expected_batch_shape),
+        "torch.ormqr: Expected batch dimensions of tau to be equal to input.shape[:-2], but got ",
+        actual_batch_tau_shape);
+
+    auto actual_batch_other_shape = IntArrayRef(
+        input3.sizes().data(), input3.dim() - 2); // input3.shape[:-2]
+    TORCH_CHECK(
+        actual_batch_other_shape.equals(expected_batch_shape),
+        "torch.ormqr: Expected batch dimensions of other to be equal to input.shape[:-2], but got ",
+        actual_batch_other_shape);
+  }
+
+  TORCH_CHECK(
+      input2.scalar_type() == self.scalar_type(),
+      "torch.ormqr: Expected input and tau to have the same dtype, but input has dtype",
+      self.scalar_type(),
+      " and tau has dtype ",
+      input2.scalar_type());
+  TORCH_CHECK(
+      input3.scalar_type() == self.scalar_type(),
+      "torch.ormqr: Expected input and other to have the same dtype, but input has dtype",
+      self.scalar_type(),
+      " and other has dtype ",
+      input3.scalar_type());
+
+  native::checkSameDevice("torch.ormqr", input2, self, "tau");
+  native::checkSameDevice("torch.ormqr", input3, self, "other");
+
   int64_t infos = 0;
-  // int64_t m = self.size(-2), n = self.size(-1), k = input2.size(-1);
   int64_t m = input3.size(0), n = input3.size(1), k = input2.size(-1);
   auto c_working_copy = native::cloneBatchedColumnMajor(input3);
+
+  native::checkSameDevice("torch.ormqr", c_working_copy, self);
+
+  TORCH_CHECK(
+      c_working_copy.scalar_type() == self.scalar_type(),
+      "torch.ormqr: Expected input and result to have the same dtype, but input has dtype",
+      self.scalar_type(),
+      " and result has dtype ",
+      c_working_copy.scalar_type());
+
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "ormqr_dpcpp", [&] {
     impl::apply_ormqr_dpcpp_<scalar_t>(
         self,
@@ -1733,6 +1808,80 @@ Tensor& ormqr_out(
     const Tensor& input3,
     bool left,
     bool transpose) {
+  TORCH_CHECK(
+      self.dim() >= 2, "torch.ormqr: input must have at least 2 dimensions.");
+  TORCH_CHECK(
+      input3.dim() >= 2, "torch.ormqr: other must have at least 2 dimensions.");
+
+  int64_t left_size_condition = left ? -2 : -1;
+  TORCH_CHECK(
+      input3.size(left_size_condition) >= input2.size(-1),
+      "torch.ormqr: other.shape[",
+      left_size_condition,
+      "] must be greater than or equal to tau.shape[-1]");
+
+  TORCH_CHECK(
+      input3.size(left_size_condition) == self.size(-2),
+      "torch.ormqr: other.shape[",
+      left_size_condition,
+      "] must be equal to input.shape[-2]");
+
+  TORCH_CHECK(
+      self.dim() - input2.dim() == 1,
+      "torch.ormqr: ",
+      "Expected tau to have one dimension less than input, but got tau.ndim equal to ",
+      input2.dim(),
+      " and input.ndim is equal to ",
+      self.dim());
+  TORCH_CHECK(
+      self.dim() == input3.dim(),
+      "torch.ormqr: ",
+      "Expected other to have the same number of dimensions as input, but got other.ndim equal to ",
+      input3.dim(),
+      " and input.ndim is equal to ",
+      self.dim());
+
+  if (self.dim() > 2) {
+    auto expected_batch_shape =
+        IntArrayRef(self.sizes().data(), self.dim() - 2); // self.shape[:-2]
+    auto actual_batch_tau_shape = IntArrayRef(
+        input2.sizes().data(), input2.dim() - 1); // input2.shape[:-1]
+    TORCH_CHECK(
+        actual_batch_tau_shape.equals(expected_batch_shape),
+        "torch.ormqr: Expected batch dimensions of tau to be equal to input.shape[:-2], but got ",
+        actual_batch_tau_shape);
+
+    auto actual_batch_other_shape = IntArrayRef(
+        input3.sizes().data(), input3.dim() - 2); // input3.shape[:-2]
+    TORCH_CHECK(
+        actual_batch_other_shape.equals(expected_batch_shape),
+        "torch.ormqr: Expected batch dimensions of other to be equal to input.shape[:-2], but got ",
+        actual_batch_other_shape);
+  }
+
+  TORCH_CHECK(
+      input2.scalar_type() == self.scalar_type(),
+      "torch.ormqr: Expected input and tau to have the same dtype, but input has dtype",
+      self.scalar_type(),
+      " and tau has dtype ",
+      input2.scalar_type());
+  TORCH_CHECK(
+      input3.scalar_type() == self.scalar_type(),
+      "torch.ormqr: Expected input and other to have the same dtype, but input has dtype",
+      self.scalar_type(),
+      " and other has dtype ",
+      input3.scalar_type());
+  TORCH_CHECK(
+      out.scalar_type() == self.scalar_type(),
+      "torch.ormqr: Expected input and result to have the same dtype, but input has dtype",
+      self.scalar_type(),
+      " and result has dtype ",
+      out.scalar_type());
+
+  native::checkSameDevice("torch.ormqr", input2, self, "tau");
+  native::checkSameDevice("torch.ormqr", input3, self, "other");
+  native::checkSameDevice("torch.ormqr", out, self);
+
   if (self.size(-1) == 0) {
     out.resize_as_(input3);
     return out;
@@ -1952,6 +2101,8 @@ Tensor& cholesky_solve_out(
     const Tensor& self,
     const Tensor& input2,
     bool upper) {
+  native::checkSameDevice("cholesky_solve", out, self);
+  native::checkLinalgCompatibleDtype("cholesky_solve", out, self);
   Tensor out_tmp = at::AtenIpexTypeXPU::cholesky_solve(self, input2, upper);
   out.resize_as_(out_tmp).copy_(out_tmp);
   return out;

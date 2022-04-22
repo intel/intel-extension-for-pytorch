@@ -305,6 +305,24 @@ Tensor dot(const Tensor& self, const Tensor& other) {
 #endif
 }
 
+static void check_addr_scalar(
+    const ScalarType dtype,
+    const Scalar& scalar,
+    const std::string& scalar_name) {
+  TORCH_CHECK(
+      !scalar.isBoolean() || dtype == at::ScalarType::Bool,
+      "Boolean ",
+      scalar_name,
+      " only supported for Boolean results.");
+  TORCH_CHECK(
+      at::isFloatingType(dtype) || at::isComplexType(dtype) ||
+          scalar.isIntegral(true),
+      "For integral input tensors, "
+      "argument ",
+      scalar_name,
+      " must not be a floating point number.");
+}
+
 Tensor addr(
     const Tensor& self,
     const Tensor& vec1,
@@ -312,6 +330,10 @@ Tensor addr(
     Scalar beta,
     Scalar alpha) {
   Tensor result = at::AtenIpexTypeXPU::ger(vec1, vec2) * alpha;
+
+  check_addr_scalar(result.scalar_type(), beta, "beta");
+  check_addr_scalar(result.scalar_type(), alpha, "alpha");
+
   if (beta.to<double>() == 0.0) {
     return result;
   }

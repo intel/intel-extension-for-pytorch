@@ -381,6 +381,39 @@ std::tuple<Tensor&, Tensor&> mode_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
+  TORCH_CHECK(
+      self.layout() == Layout::Strided,
+      "mode only supports strided layout, got: ",
+      self.layout());
+  TORCH_CHECK(
+      self.device() == values.device(),
+      "expected device '",
+      self.device(),
+      "' but got '",
+      values.device(),
+      "' for values output");
+  TORCH_CHECK(
+      self.device() == indices.device(),
+      "expected device '",
+      self.device(),
+      "' but got '",
+      indices.device(),
+      "' for indices output");
+  TORCH_CHECK(
+      self.scalar_type() == values.scalar_type(),
+      "expected scalar type '",
+      self.scalar_type(),
+      "' but got '",
+      values.scalar_type(),
+      "' for values output");
+  TORCH_CHECK(
+      indices.scalar_type() == ScalarType::Long,
+      "expected scalar type '",
+      ScalarType::Long,
+      "' but got '",
+      indices.scalar_type(),
+      "' for indices output");
+
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "mode", [&] {
         impl::mode_out_template<scalar_t>(values, indices, self, dim, keepdim);

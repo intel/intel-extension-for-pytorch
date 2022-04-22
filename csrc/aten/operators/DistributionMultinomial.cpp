@@ -164,24 +164,45 @@ void sample_multinomial_without_replacement(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+// TODO: FLT_MANT_DIG is 24?
+constexpr int64_t FLOAT32_MAX_CONSECUTIVE_INT = 1 << (24);
+
 Tensor& multinomial_out(
     Tensor& result,
     const Tensor& self_,
     int64_t num_samples,
     bool replacement,
     c10::optional<Generator> gen_) {
+  TORCH_CHECK(
+      result.device() == self_.device(),
+      "multinomial arguments must have the same device");
+  TORCH_CHECK(
+      self_.dim() > 0 && self_.dim() <= 2, "prob_dist must be 1 or 2 dim");
+  TORCH_CHECK(
+      at::isFloatingType(self_.scalar_type()),
+      "multinomial only supports floating-point dtypes for input, got: ",
+      self_.scalar_type());
+  TORCH_CHECK(
+      result.scalar_type() == ScalarType::Long,
+      "multinomial expects Long tensor out, got: ",
+      result.scalar_type());
+  TORCH_CHECK(num_samples > 0, "cannot sample n_sample <= 0 samples");
+  int64_t n_categories = self_.size(-1);
+  TORCH_CHECK(
+      replacement || (num_samples <= n_categories),
+      "cannot sample n_sample > prob_dist.size(-1) samples without replacement");
+  // Since the index tensor is float, numCategories cannot exceed max
+  // float integer precision
+  TORCH_CHECK(
+      n_categories <= FLOAT32_MAX_CONSECUTIVE_INT,
+      "number of categories cannot exceed 2^24");
+
   auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
       gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   auto shape = self_.sizes();
-  TORCH_CHECK(
-      shape.size() > 0 && shape.size() <= 2,
-      "prob_dist must be 1 or 2 dims. got ",
-      shape.size());
   auto num_dists = shape.size() == 1 ? 1 : shape[0];
   auto num_categories = shape.size() == 1 ? shape[0] : shape[1];
-  TORCH_CHECK(
-      num_samples <= num_categories || replacement,
-      "cannot sample n_sample > prob_dist size samples without replacement");
+
   Tensor self = self_.contiguous();
   result.resize_({num_dists, num_samples});
 
@@ -220,8 +241,23 @@ Tensor& multinomial_out(
           norm_dist);
     });
   } else {
-    // Sample with replacement
+    auto is_valid = ((self.max() < INFINITY) & (self.min() >= 0)).item();
+    TORCH_CHECK(
+        is_valid.to<bool>(),
+        "probability tensor contains either `inf`, `nan` or element < 0");
 
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+    bool zero_prob_condition;
+    if (self.dim() == 1) {
+      zero_prob_condition = (self.sum() == 0).item().to<bool>();
+    } else {
+      zero_prob_condition = (self.sum(1) == 0).sum().item().to<bool>();
+    }
+    TORCH_CHECK(
+        !zero_prob_condition,
+        "invalid multinomial distribution (sum of probabilities <= 0)");
+
+    // Sample with replacement
     // we will use the same uniform distribution to draw the multinomial.
     // Prefix sum along rows
     Tensor prefix_sum = norm_dist.cumsum(1);

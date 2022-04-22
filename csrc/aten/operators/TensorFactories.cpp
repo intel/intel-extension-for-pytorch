@@ -116,10 +116,7 @@ Tensor empty_strided_dpcpp(
 
 Tensor& eye_out_dpcpp(Tensor& result, int64_t n, int64_t m) {
   TORCH_CHECK(n >= 0, "n must be greater or equal to 0, got ", n);
-
-  if (m < 0) {
-    m = n;
-  }
+  TORCH_CHECK(m >= 0, "m must be greater or equal to 0, got ", m);
 
   result.resize_({n, m});
   result.zero_();
@@ -133,7 +130,7 @@ Tensor& eye_out_dpcpp(Tensor& result, int64_t n, int64_t m) {
 }
 
 Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
-  return eye_out_dpcpp(result, n, /*m=*/-1);
+  return eye_out_dpcpp(result, n, n);
 }
 
 template <typename scalar_t>

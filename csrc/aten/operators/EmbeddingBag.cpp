@@ -500,19 +500,20 @@ template <
     typename vec_t,
     typename elem_t,
     typename scalar_t,
-    typename accscalar_t>
+    typename accscalar_t,
+    typename index_t>
 void vec_chunk_kernel_embeddingbag(
     const int64_t mode,
-    int64_t* input,
-    int64_t* offset,
+    index_t* input,
+    index_t* offset,
     scalar_t* weight,
     scalar_t* output,
-    int64_t* offset2bag,
-    int64_t* bag_size,
+    index_t* offset2bag,
+    index_t* bag_size,
     bool per_sample_weights_defined,
     scalar_t* per_sample_weights,
     int64_t per_sample_weights_stride,
-    int64_t* max_indices,
+    index_t* max_indices,
     int64_t WGNumber,
     int64_t numBags,
     bool feature_full_divide,
@@ -584,9 +585,9 @@ void vec_chunk_kernel_embeddingbag(
       }
 
       vec_t weightFeatMax;
-      int64_t bag_size_ = 0;
+      index_t bag_size_ = 0;
       // watch out register spill out when vec_size is large
-      int64_t maxWord[vec_size] = {0};
+      index_t maxWord[vec_size] = {0};
 
       for (int64_t emb = begin; emb < end; emb++) {
         vec_t* weight_vec =
@@ -640,7 +641,7 @@ void vec_chunk_kernel_embeddingbag(
 
       if (mode == MODE_MEAN) {
         if (end == begin) {
-          bag_size[bag] = static_cast<int64_t>(0);
+          bag_size[bag] = static_cast<index_t>(0);
         } else {
           for (auto id = 0; id < vec_size; id++) {
             if ((insideBagId * vec_size + id) < weight_feature_size) {
@@ -651,7 +652,7 @@ void vec_chunk_kernel_embeddingbag(
               auto _res = static_cast<scalar_t>(acc_sum);
               weightFeatSum[id] =
                   at::native::Memory::detail::bitwise_cast<elem_t>(_res);
-              bag_size[bag] = static_cast<int64_t>(bag_size_);
+              bag_size[bag] = static_cast<index_t>(bag_size_);
             }
           }
         }
@@ -700,21 +701,21 @@ void vec_chunk_kernel_embeddingbag(
   1. Chunk design may cause some resource waste when work items is handling the
   tail of last bag in one loop.
 */
-template <typename scalar_t>
+template <typename scalar_t, typename index_t>
 void EmbeddingBag_updateOutputKernel(
     const int64_t mode,
-    int64_t* input_data,
-    int64_t* offset_data,
+    index_t* input_data,
+    index_t* offset_data,
     scalar_t* weight_data,
     scalar_t* output_data,
-    int64_t* offset2bag_data,
+    index_t* offset2bag_data,
     int64_t input_length,
     int64_t numBags,
     int64_t weight_feature_size,
     int64_t weight_stride0,
     int64_t weight_stride1,
-    int64_t* bag_size_data,
-    int64_t* max_indices_data,
+    index_t* bag_size_data,
+    index_t* max_indices_data,
     scalar_t* per_sample_weights_data,
     int64_t per_sample_weights_stride) {
   using accscalar_t = acc_type<scalar_t>;
@@ -851,7 +852,8 @@ void EmbeddingBag_updateOutputKernel(
             vec_t,                                                            \
             elem_t,                                                           \
             scalar_t,                                                         \
-            accscalar_t>(                                                     \
+            accscalar_t,                                                      \
+            index_t>(                                                         \
             mode,                                                             \
             input,                                                            \
             offset,                                                           \
@@ -1066,9 +1068,10 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
     bool sparse,
     const Tensor& per_sample_weights) {
   auto indices_arg = TensorArg(indices, "indices", 1);
-  checkScalarType("embedding_bag_dpcpp", indices_arg, kLong);
+  checkScalarTypes("embedding_bag_dpcpp", indices_arg, {kLong, kInt});
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
-  checkScalarType("embedding_bag_dpcpp", offsets_arg, kLong);
+  checkScalarTypes("embedding_bag_dpcpp", offsets_arg, {kLong, kInt});
+  IsOnSameDevice("embedding_bag_dpcpp", indices_arg, offsets_arg);
   auto weight_arg = TensorArg(weight, "weight", 1);
   IsOnSameDevice("embedding_bag_dpcpp", weight_arg, indices_arg);
   IsOnSameDevice("embedding_bag_dpcpp", weight_arg, offsets_arg);
@@ -1094,24 +1097,28 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
       weight.scalar_type(),
       "embedding_bag_dpcpp",
       [&] {
-        EmbeddingBag_updateOutputKernel<scalar_t>(
-            mode,
-            indices.data_ptr<int64_t>(),
-            offsets.data_ptr<int64_t>(),
-            weight.data_ptr<scalar_t>(),
-            output.data_ptr<scalar_t>(),
-            offset2bag.data_ptr<int64_t>(),
-            numIndices,
-            numBags,
-            featureSize,
-            weight.stride(0),
-            weight.stride(1),
-            bag_size.data_ptr<int64_t>(),
-            mode == MODE_MAX ? max_indices.data_ptr<int64_t>() : NULL,
-            per_sample_weights.defined()
-                ? per_sample_weights.data_ptr<scalar_t>()
-                : NULL,
-            per_sample_weights.defined() ? per_sample_weights.stride(0) : 0);
+        IPEX_DISPATCH_INDEX_TYPES(
+            indices.scalar_type(), "embedding_bag_dpcpp", [&] {
+              EmbeddingBag_updateOutputKernel<scalar_t, index_t>(
+                  mode,
+                  indices.data_ptr<index_t>(),
+                  offsets.data_ptr<index_t>(),
+                  weight.data_ptr<scalar_t>(),
+                  output.data_ptr<scalar_t>(),
+                  offset2bag.data_ptr<index_t>(),
+                  numIndices,
+                  numBags,
+                  featureSize,
+                  weight.stride(0),
+                  weight.stride(1),
+                  bag_size.data_ptr<index_t>(),
+                  mode == MODE_MAX ? max_indices.data_ptr<index_t>() : NULL,
+                  per_sample_weights.defined()
+                      ? per_sample_weights.data_ptr<scalar_t>()
+                      : NULL,
+                  per_sample_weights.defined() ? per_sample_weights.stride(0)
+                                               : 0);
+            });
       });
 
   return std::tuple<Tensor, Tensor, Tensor, Tensor>(

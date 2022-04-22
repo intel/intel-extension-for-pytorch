@@ -12,6 +12,19 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+#define CHECK_NORMAL_TENSOR_STD(std)                            \
+  do {                                                          \
+    TORCH_CHECK(                                                \
+        !std.is_complex(),                                      \
+        "normal expects standard deviation to be non-complex"); \
+    TORCH_CHECK(                                                \
+        std.numel() == 0 || std.min().ge(0).item<bool>(),       \
+        "normal expects all elements of std >= 0.0");           \
+  } while (0)
+
+#define CHECK_NORMAL_STD(std) \
+  TORCH_CHECK(std >= 0.0, "normal expects std >= 0.0, but found std ", std);
+
 bool resize_output_for_normal(
     at::Tensor& output,
     const at::Tensor& mean,
@@ -142,6 +155,7 @@ Tensor normal(
     const Tensor& mean,
     double std,
     c10::optional<Generator> generator) {
+  CHECK_NORMAL_STD(std);
   Tensor ret = at::empty_like(mean, MemoryFormat::Contiguous);
   normal_out(mean, std, generator, ret);
   return ret;
@@ -151,6 +165,7 @@ Tensor normal(
     double mean,
     const Tensor& std,
     c10::optional<Generator> generator) {
+  CHECK_NORMAL_TENSOR_STD(std);
   Tensor ret = at::empty_like(std, MemoryFormat::Contiguous);
   normal_out(mean, std, generator, ret);
   return ret;
@@ -160,6 +175,7 @@ Tensor normal(
     const Tensor& mean,
     const Tensor& std,
     c10::optional<Generator> generator) {
+  CHECK_NORMAL_TENSOR_STD(std);
   Tensor ret = at::empty({0}, mean.options(), MemoryFormat::Contiguous);
   normal_out(mean, std, generator, ret);
   return ret;

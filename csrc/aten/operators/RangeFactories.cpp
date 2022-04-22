@@ -52,6 +52,13 @@ Tensor& linspace_dpcpp_out(
   const auto steps = optional_steps.value_or(100);
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
 
+  if (!optional_steps.has_value()) {
+    TORCH_WARN_ONCE(
+        "Not providing a value for linspace's steps is deprecated and will "
+        "throw a runtime error in a future release. This warning will appear "
+        "only once per process.");
+  }
+
   if (result.numel() != steps) {
     result.resize_({steps});
   }
@@ -100,6 +107,13 @@ Tensor& logspace_dpcpp_out(
     double base) {
   const auto steps = optional_steps.value_or(100);
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
+
+  if (!optional_steps.has_value()) {
+    TORCH_WARN_ONCE(
+        "Not providing a value for logspace's steps is deprecated and will "
+        "throw a runtime error in a future release. This warning will appear "
+        "only once per process.");
+  }
 
   if (result.numel() != steps) {
     result.resize_({steps});
