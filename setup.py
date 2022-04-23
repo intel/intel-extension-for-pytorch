@@ -57,6 +57,7 @@ if not torch._C._GLIBCXX_USE_CXX11_ABI:
     sys.exit(1)
 
 os.environ.setdefault('IPEX_BACKEND', 'gpu')
+os.environ.setdefault('IPEX_BUILD_TYPE', 'Development')
 base_dir = os.path.dirname(os.path.abspath(__file__))
 ipex_pydir = os.path.join(base_dir, 'intel_extension_for_pytorch')
 ipex_scripts = os.path.join(base_dir, 'scripts')
@@ -91,10 +92,24 @@ def _get_env_backend():
         return env_backend_options[0]
     else:
         if env_backend_val not in env_backend_options:
-            print("Intel PyTorch Extension only supports CPU and GPU now.")
+            print("Intel Extension for Pytorch only supports CPU and GPU now.")
             sys.exit(1)
         else:
             return env_backend_val
+
+
+def _get_build_type():
+    build_type_var_name = 'IPEX_BUILD_TYPE'
+    build_type_options = ['Release', 'Development']
+    build_type_val = os.getenv(build_type_var_name)
+    if build_type_val is None or build_type_val.strip() == '':
+        return build_type_options[0]
+    else:
+        if build_type_val not in build_type_options:
+            print("Intel Extension for Pytorch Build Type only supports Release and Development now.")
+            sys.exit(1)
+        else:
+            return build_type_val
 
 
 def get_git_head_sha(base_dir):
@@ -137,8 +152,9 @@ def get_build_version(ipex_git_sha):
             print("ERROR:", v, "is not found in", version_file)
             sys.exit(1)
     version = versions['VERSION_MAJOR'] + '.' + versions['VERSION_MINOR'] + '.' + versions['VERSION_PATCH']
+    version_backend = version + (('+' + _get_env_backend() if (_get_env_backend() in ['xpu', 'cpu', 'gpu']) else 'Unknown'))
     version_sha = version + (('+' + ipex_git_sha) if (ipex_git_sha != 'Unknown') else '')
-    return version, version_sha
+    return version, version_backend, version_sha
 
 
 def create_version_files(base_dir, version, git_sha_dict):
@@ -166,10 +182,11 @@ git_sha_dict = {
     "__onednn_git_sha__": get_submodule_commit(base_dir, "third_party/oneDNN"),
 }
 
-version, version_sha = get_build_version(git_sha_dict.get('__ipex_git_sha__', 'Unknown'))
+version, version_backend, version_sha = get_build_version(git_sha_dict.get('__ipex_git_sha__', 'Unknown'))
 
 # Generate version info (intel_extension_for_pytorch.__version__)
 create_version_files(base_dir, version, git_sha_dict)
+
 
 class DPCPPExt(Extension, object):
     def __init__(self, name, project_dir=os.path.dirname(__file__)):
@@ -376,7 +393,7 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "README.md"),
 
 setup(
     name='intel_extension_for_pytorch',
-    version=version_sha,
+    version=version_backend if (_get_build_type() == "Release") else version_sha,
     description='Intel Extension for PyTorch',
     author='Intel PyTorch Team',
     url='https://github.com/intel/intel-extension-for-pytorch',
