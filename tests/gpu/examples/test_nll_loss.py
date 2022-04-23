@@ -33,7 +33,7 @@ class TestNNMethod(TestCase):
         input_dpcpp.requires_grad = True
         output_dpcpp = F.nll_loss(input_dpcpp, target_dpcpp)
         output_dpcpp.backward(x_dpcpp)
-        print("SYCL: ", output.to("cpu"))
+        print("SYCL: ", output_dpcpp.to("cpu"))
         print("SYCL: ", input_dpcpp.grad.to("cpu"))
         self.assertEqual(output, output_dpcpp.cpu())
         self.assertEqual(input.grad, input_dpcpp.grad.cpu())
