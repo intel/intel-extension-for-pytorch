@@ -440,13 +440,14 @@ Tensor embedding_bag_backward_dpcpp_kernel(
       segment_offsets.data_ptr<int64_t>(),
       num_of_segments);
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       grad.scalar_type(),
       "embedding_bag_backward_dpcpp_compute_grad_weight",
       [&] {
         TensorOptions op;
-        if (grad.dtype() == at::kBFloat16) {
+        if (grad.dtype() == at::kBFloat16 || grad.dtype() == at::kHalf) {
           op = grad.options().dtype(at::kFloat);
         } else {
           op = grad.options();

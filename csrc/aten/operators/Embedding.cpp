@@ -128,7 +128,8 @@ Tensor embedding_dense_backward_dpcpp(
 
   int64_t stride = grad_weight.stride(0);
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       grad_.scalar_type(),
       "embedding_backward",
