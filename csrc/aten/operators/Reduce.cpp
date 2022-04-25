@@ -1,5 +1,6 @@
 #include <ATen/Context.h>
 #include <ATen/WrapDimUtils.h>
+#include <ATen/WrapDimUtilsMulti.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/native/ReduceOps.h>
 #include <ATen/native/ReduceOpsUtils.h>
@@ -25,17 +26,13 @@ namespace impl {
 
 using DimMask = TensorIterator::DimMask;
 
-// This is in an extra file to work around strange interaction of
-// bitset on Windows with operator overloading
-constexpr size_t dim_bitset_size = 64;
-
 static DimMask make_dim_mask(IntArrayRef dims, int64_t ndim) {
   auto mask = DimMask();
   if (dims.empty()) {
     mask.flip();
   } else {
     for (int64_t dim : dims) {
-      mask.set(maybe_wrap_dim(dim, ndim));
+      mask = at::dim_list_to_bitset(dims, ndim);
     }
   }
   return mask;
@@ -69,11 +66,6 @@ static Tensor review_reduce_result(
     int ndim,
     DimMask mask,
     bool keepdim) {
-  TORCH_CHECK(
-      ndim <= (int)dim_bitset_size,
-      "only tensors with up to ",
-      dim_bitset_size,
-      " dims are supported");
   if (keepdim) {
     return result;
   }
@@ -985,6 +977,10 @@ Tensor norm(const Tensor& self, Scalar p) {
 }
 
 inline Tensor& _all(Tensor& result, TensorIterator& iter) {
+  TORCH_CHECK(
+      result.scalar_type() == at::ScalarType::Byte ||
+          result.scalar_type() == at::ScalarType::Bool,
+      "all only supports torch.uint8 and torch.bool dtypes");
   if (iter.numel() == 0) {
     result.fill_(1);
   } else {
@@ -995,11 +991,6 @@ inline Tensor& _all(Tensor& result, TensorIterator& iter) {
 }
 
 Tensor all(const at::Tensor& self) {
-  TORCH_CHECK(
-      self.scalar_type() == at::ScalarType::Byte ||
-          self.scalar_type() == at::ScalarType::Bool,
-      "all only supports torch.uint8 and torch.bool dtypes");
-
   Tensor result = at::empty({0}, self.options());
   auto iter =
       impl::make_reduction("all", result, self, {}, false, self.scalar_type());
@@ -1008,10 +999,6 @@ Tensor all(const at::Tensor& self) {
 }
 
 Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
-  TORCH_CHECK(
-      self.scalar_type() == at::ScalarType::Byte ||
-          self.scalar_type() == at::ScalarType::Bool,
-      "all only supports torch.uint8 and torch.bool dtypes");
   dim = maybe_wrap_dim(dim, self.dim());
   if (_dimreduce_return_trivial(result, self, 1, dim, keepdim)) {
     return result;
@@ -1028,6 +1015,10 @@ Tensor all(const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 inline Tensor& _any(Tensor& result, TensorIterator& iter) {
+  TORCH_CHECK(
+      result.scalar_type() == at::ScalarType::Byte ||
+          result.scalar_type() == at::ScalarType::Bool,
+      "any only supports torch.uint8 and torch.bool dtypes");
   if (iter.numel() == 0) {
     result.fill_(0);
   } else {
@@ -1038,11 +1029,6 @@ inline Tensor& _any(Tensor& result, TensorIterator& iter) {
 }
 
 Tensor any(const at::Tensor& self) {
-  TORCH_CHECK(
-      self.scalar_type() == at::ScalarType::Byte ||
-          self.scalar_type() == at::ScalarType::Bool,
-      "any only supports torch.uint8 and torch.bool dtypes");
-
   Tensor result = at::empty({0}, self.options());
   auto iter =
       impl::make_reduction("any", result, self, {}, false, self.scalar_type());
@@ -1051,10 +1037,6 @@ Tensor any(const at::Tensor& self) {
 }
 
 Tensor& any_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
-  TORCH_CHECK(
-      self.scalar_type() == at::ScalarType::Byte ||
-          self.scalar_type() == at::ScalarType::Bool,
-      "any only supports torch.uint8 and torch.bool dtypes");
   dim = maybe_wrap_dim(dim, self.dim());
   if (_dimreduce_return_trivial(result, self, 0, dim, keepdim)) {
     return result;
