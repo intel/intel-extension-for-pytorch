@@ -74,7 +74,11 @@ void abs_kernel(TensorIterator& iter) {
 
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(round_out, Numerics<scalar_t>::round, Real);
+
+IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
+    round_out,
+    [](scalar_t a) -> scalar_t { return ::nearbyintf(static_cast<float>(a)); },
+    unary_op);
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
 
