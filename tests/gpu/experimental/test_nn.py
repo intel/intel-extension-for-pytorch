@@ -16907,8 +16907,9 @@ class TestNNDeviceType(NNTestCase):
             # test softmax with large input value which casues exp() to overflow
             self._test_bfloat16_ops(torch.nn.Softmax(dim=dim), device, inp_dims=(16, 33, 15, 16), prec=0.05, scale_factor=1000.0)
 
+    # TODO: retrieve torch.half case if it is supported
     @onlyXPU
-    @dtypes(torch.half, torch.float)
+    @dtypes(torch.bfloat16, torch.float)
     def test_conv_nhwc(self, device, dtype):
         def helper(n, c, h, w, out_channels, kernel_size, groups):
             input = torch.randint(-3, 3, (n, c, h, w), dtype=dtype, device=device)\
@@ -16919,18 +16920,19 @@ class TestNNDeviceType(NNTestCase):
             for p in conv.parameters():
                 p.data = torch.randint_like(p, -3, 3)
 
-            # use FP64 channels-first conv as reference
-            ref_input = input.detach().clone().contiguous().double().requires_grad_()
+            # TODO: support XPU FP64 convolution fwd/bwd and FP16 convolution bwd.
+            # use CPU FP64 channels-first conv as reference for now
+            ref_input = input.detach().clone().contiguous().cpu().double().requires_grad_()
             ref_conv = nn.Conv2d(c, out_channels, kernel_size, groups=groups)
             # load_state_dict will restore the stride & memory_layout on ref_conv.weight.
             ref_conv.load_state_dict(conv.state_dict())
-            ref_conv = ref_conv.to(device='xpu', dtype=torch.double, memory_format=torch.contiguous_format)
+            ref_conv = ref_conv.to(device='cpu', dtype=torch.double, memory_format=torch.contiguous_format)
 
             out = conv(input)
             ref_out = ref_conv(ref_input)
 
             grad = torch.randint_like(out, -3, 3)
-            ref_grad = grad.detach().clone().double().contiguous()
+            ref_grad = grad.detach().clone().cpu().double().contiguous()
 
             out.backward(grad)
             ref_out.backward(ref_grad)
@@ -17063,8 +17065,9 @@ class TestNNDeviceType(NNTestCase):
             self._test_conv_nhwc_nchw(nn.Conv2d, n, c, h, w, k, filter_size, device)
             self._test_conv_nhwc_nchw(nn.ConvTranspose2d, n, c, h, w, k, filter_size, device)
 
+    # TODO: retrieve torch.double case if it is supported
     @onlyXPU
-    @dtypes(torch.float, torch.double)
+    @dtypes(torch.float)
     def test_conv_nhwc_support(self, device, dtype):
         input = torch.randn((1, 16, 1, 1), dtype=dtype, device="xpu", requires_grad=True)
         weight = torch.randn((8, 16, 3, 3), dtype=dtype, device="xpu", requires_grad=True)
