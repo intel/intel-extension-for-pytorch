@@ -279,13 +279,13 @@ class XPUNonDefaultStream():
         for d in range(torch.xpu.device_count()):
             self.beforeStreams.append(torch.xpu.current_stream(d))
             deviceStream = torch.xpu.Stream(device=d)
-            ipex._C._setCurrentStream(deviceStream._cdata)
+            intel_extension_for_pytorch._C._setCurrentStream(deviceStream._cdata)
         torch.xpu.set_device(beforeDevice)
 
     def __exit__(self, exec_type, exec_value, traceback):
         beforeDevice = torch.xpu.current_device()
         for d in range(torch.xpu.device_count()):
-            ipex._C._setCurrentStream(self.beforeStreams[d]._cdata)
+            intel_extension_for_pytorch._C._setCurrentStream(self.beforeStreams[d]._cdata)
         torch.xpu.set_device(beforeDevice)
 
 def skipXPUMemoryLeakCheckIf(condition):
@@ -412,6 +412,7 @@ class DPCPPTestBase(DeviceTypeTestBase):
         torch.cdouble,
         torch.cfloat,
     }
+    primary_device = ''
     precision = DEFAULT_FLOATING_PRECISION
 
     @staticmethod
@@ -421,6 +422,25 @@ class DPCPPTestBase(DeviceTypeTestBase):
             if value is not None:
                 return value
             return defval
+
+    @classmethod
+    def get_primary_device(cls):
+        return cls.primary_device
+
+    @classmethod
+    def get_all_devices(cls):
+        primary_device_idx = int(cls.get_primary_device().split(':')[1])
+        num_devices = torch.xpu.device_count()
+
+        prim_device = cls.get_primary_device()
+        xpu_str = 'xpu:{0}'
+        non_primary_devices = [xpu_str.format(idx) for idx in range(num_devices) if idx != primary_device_idx]
+        return [prim_device] + non_primary_devices
+
+    @classmethod
+    def setUpClass(cls):
+        # Acquires the current device as the primary (test) device
+        cls.primary_device = 'xpu:{0}'.format(torch.xpu.current_device())
 
     # Overrides to instantiate tests that are known to run quickly
     # and correctly on XPU.

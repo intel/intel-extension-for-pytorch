@@ -109,7 +109,7 @@ Tensor& normal_(
     double mean,
     double std,
     c10::optional<Generator> generator) {
-  TORCH_CHECK(std > 0.0, "normal_ expects std > 0.0, but found std=", std);
+  TORCH_CHECK(std >= 0.0, "normal_ expects std >= 0.0, but found std=", std);
   auto iter = TensorIterator::nullary_op(self);
   normal_dpcpp(iter, mean, std, generator);
   return self;
