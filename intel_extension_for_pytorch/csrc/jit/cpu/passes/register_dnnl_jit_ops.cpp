@@ -865,10 +865,57 @@ RegisterOperators op({
         "ipex::einsum_binary(str equation, Tensor[] tensors, Tensor add_arg, Scalar alpha) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
+            auto other_arg = std::move(peek(stack, 2, 4));
+            if (other_arg.isDouble()) {
+              auto other_arg_st = at::ones(1).fill_(other_arg.toDouble());
+              auto result = einsum_binary(
+                  (std::move(peek(stack, 0, 4))).toStringView(),
+                  (std::move(peek(stack, 1, 4))).toTensorList(),
+                  other_arg_st,
+                  (std::move(peek(stack, 3, 4))).toScalar());
+              drop(stack, 4);
+              pack(stack, std::move(result));
+            } else {
+              auto result = einsum_binary(
+                  (std::move(peek(stack, 0, 4))).toStringView(),
+                  (std::move(peek(stack, 1, 4))).toTensorList(),
+                  other_arg.toTensor(),
+                  (std::move(peek(stack, 3, 4))).toScalar());
+              drop(stack, 4);
+              pack(stack, std::move(result));
+            }
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::einsum_binary(str equation, Tensor[] tensors, Scalar add_arg, Scalar alpha) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto other_arg = std::move(peek(stack, 2, 4));
+            auto other_arg_st = at::ones(1).fill_(other_arg.toScalar());
             auto result = einsum_binary(
                 (std::move(peek(stack, 0, 4))).toStringView(),
                 (std::move(peek(stack, 1, 4))).toTensorList(),
-                (std::move(peek(stack, 2, 4))).toTensor(),
+                other_arg_st,
+                (std::move(peek(stack, 3, 4))).toScalar());
+
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::einsum_binary(str equation, Tensor[] tensors, double add_arg, Scalar alpha) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto other_ard =
+                at::ones(1).fill_((std::move(peek(stack, 2, 4))).toDouble());
+            auto result = einsum_binary(
+                (std::move(peek(stack, 0, 4))).toStringView(),
+                (std::move(peek(stack, 1, 4))).toTensorList(),
+                other_ard,
                 (std::move(peek(stack, 3, 4))).toScalar());
 
             drop(stack, 4);
