@@ -41,9 +41,8 @@ void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
     trigamma_kernel_xpu(iter);
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "polygamma_xpu", [&]() {
-      dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-        return calc_polygamma(int(n), a);
-      });
+      dpcpp_kernel_for_tensor_iter(
+          iter, [=](scalar_t a) -> scalar_t { return calc_polygamma(a, n); });
     });
   }
 }
@@ -149,6 +148,7 @@ Tensor digamma_out(Tensor& out, const Tensor& self) {
 }
 
 Tensor polygamma(int64_t n, const Tensor& self) {
+  TORCH_CHECK(n >= 0, "polygamma(n, x) does not support negative n.");
   Tensor result = at::empty_like(self);
   auto iter = TensorIterator::unary_op(result, self);
   impl::polygamma_kernel_xpu(iter, n);
