@@ -321,7 +321,7 @@ class TestPrepackCases(TestCase):
                     ipex_optimizer.zero_grad()
                     loss2.backward()
                     ipex_optimizer.step()
-            self.assertEqual(y1, y2.float(), rtol=5e-2, atol=1e-2)
+            self.assertEqual(y1, y2.float(), rtol=5e-2, atol=5e-2)
 
 
     @skipIfNoTorchVision
