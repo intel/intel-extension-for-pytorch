@@ -17,10 +17,10 @@ namespace impl {
 void logical_not_kernel(TensorIterator& iter) {
   // NOTE: We should not dispatch on types which aren't in below
   // ALL_TYPES_AND... Therefore, we add the check here.
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool, kHalf, kBFloat16, iter.dtype(0), "logical_not_dpcpp", [&]() {});
 
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kBool, kHalf, kBFloat16, iter.dtype(1), "logical_not_dpcpp", [&]() {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t a) -> bool { return !a; });
