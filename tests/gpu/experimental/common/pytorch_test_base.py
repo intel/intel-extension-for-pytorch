@@ -44,12 +44,8 @@ DISABLED_TORCH_TESTS_ANY = {
 DISABLED_TORCH_TESTS_XPU_ONLY = {
     # to be added
     "TestBinaryUfuncsXPU": {
-        "test_complex_scalar_pow_tensor",   # complex not supported yet
-        "test_cumulative_trapezoid",    # core dumped ... Floating point exception
-        "test_int_and_float_pow",   # core dumped ... free(): invalid size
-    },
-    "TestIndexingXPU": {
-        "test_take_along_dim",  # core dumped ... corrupted size vs. prev_size
+        "test_cumulative_trapezoid",    # core dumped ... Floating point exception # cumsum issue @Yu, Kevin
+        "test_int_and_float_pow",   # core dumped ... free(): invalid size #KernelPointWiseApply2
     },
     "TestForeachXPU": {
         "test_binary_op_scalar_slowpath",  # core dumped ... munmap_chunk(): invalid pointer

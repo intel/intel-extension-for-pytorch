@@ -21,6 +21,9 @@ std::tuple<Tensor&, Tensor&> sort_out(
     const Tensor& input,
     long dim,
     bool order) {
+  if (input.numel() == 0)
+    return {sorted, indices};
+
   int64_t dims = sorted.dim() == 0 ? 1 : sorted.dim();
   TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   dims = input.dim() == 0 ? 1 : input.dim();
