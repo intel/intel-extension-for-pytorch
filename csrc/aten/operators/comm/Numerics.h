@@ -1040,13 +1040,24 @@ struct Numerics<c10::complex<float>> {
     return std::exp(a);
   }
 
+  static inline c10::complex<float> log(c10::complex<float> a) {
+    return std::log(a);
+  }
+
+  static inline c10::complex<float> log2(c10::complex<float> a) {
+    return std::log2(a);
+  }
+
+  static inline c10::complex<float> log10(c10::complex<float> a) {
+    return std::log10(a);
+  }
+
   static inline bool eq(c10::complex<float> a, c10::complex<float> b) {
     return a == b;
   }
 
   static inline bool ne(c10::complex<float> a, c10::complex<float> b) {
     return a != b;
-    ;
   }
 };
 
@@ -1104,6 +1115,17 @@ struct Numerics<c10::complex<double>> {
     return std::exp(a);
   }
 
+  static inline c10::complex<double> log(c10::complex<double> a) {
+    return std::log(a);
+  }
+
+  static inline c10::complex<double> log2(c10::complex<double> a) {
+    return std::log2(a);
+  }
+
+  static inline c10::complex<double> log10(c10::complex<double> a) {
+    return std::log10(a);
+  }
   static inline bool eq(c10::complex<double> a, c10::complex<double> b) {
     return a == b;
   }
