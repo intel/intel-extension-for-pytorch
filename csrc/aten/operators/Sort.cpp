@@ -32,6 +32,10 @@ std::tuple<Tensor&, Tensor&> sort_out(
   sorted.resize_as_(input);
   indices.resize_(input.sizes());
 
+  if (input.dim() == 1 && input.numel() == 0) {
+    return std::tuple<Tensor&, Tensor&>(sorted, indices);
+  }
+
   // check if input is scalar
   if (input.dim() == 0 && input.numel() == 1) {
     indices.zero_();
