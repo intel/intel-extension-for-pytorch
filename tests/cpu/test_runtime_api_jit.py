@@ -294,6 +294,35 @@ class TestJITMultiStreamModule(JitTestCase):
         self.assertEqual(y_runtime2[1].size(0), 1)
         self.assertEqual(y_runtime2[2].size(0), 1)
 
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_stream_number_auto_bf16_jit_model(self):
+        model = torch.nn.Softmax(dim=-1)
+        model.eval()
+        for i in range(ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()):
+            batch_size = list(range(i+1)).__len__()
+            x = torch.rand(batch_size, 64)
+
+            # Calculate the reference result
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+                traced_model = torch.jit.trace(model, x)
+            traced_model = torch.jit.freeze(traced_model)
+
+            # Warm Up
+            for i in range(3):
+                traced_model(x)
+
+            # Calculate the reference result
+            y = traced_model(x)
+
+            cpu_pool = ipex.cpu.runtime.CPUPool(core_ids=list(range(i+1)))
+
+            # The stream number will be determined automatically.
+            multi_stream_model = ipex.cpu.runtime.MultiStreamModule(traced_model, cpu_pool=cpu_pool)
+            y_runtime = multi_stream_model(x)
+            stream_num_ground_truth = ipex.cpu.runtime.get_default_num_streams(cpu_pool)
+            self.assertEqual(y, y_runtime)
+            self.assertEqual(multi_stream_model.get_stream_number(), stream_num_ground_truth)
+
 class TestLLGARuntimeAPI(JitLlgaTestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     def test_task_async_api_int8_jit_model(self):
