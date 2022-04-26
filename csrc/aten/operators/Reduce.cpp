@@ -614,9 +614,12 @@ static void std_var_kernel(
     TensorIterator& iter,
     bool unbiased,
     bool take_sqrt) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "std", [&]() {
-    std_var_kernel_impl<scalar_t>(iter, unbiased, take_sqrt);
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "std",
+      [&]() { std_var_kernel_impl<scalar_t>(iter, unbiased, take_sqrt); });
 }
 
 static void sum_kernel(TensorIterator& iter) {
