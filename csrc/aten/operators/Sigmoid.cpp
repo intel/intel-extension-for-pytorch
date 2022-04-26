@@ -16,20 +16,6 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
-void sigmoid(Tensor& output, const Tensor& self) {
-  output.resize_as_(self);
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(output)
-                  .add_input(self)
-                  .build();
-  dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t v) -> scalar_t {
-    scalar_t one = (scalar_t)1.0;
-    return one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(v)));
-  });
-}
-
-template <typename scalar_t>
 void sigmoid_backward(
     Tensor& gradInput,
     const Tensor& gradOutput,
@@ -58,12 +44,21 @@ void sigmoid_backward(
 }
 
 Tensor& sigmoid_out(const Tensor& self, Tensor& out) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      self.scalar_type(),
+      iter.common_dtype(),
       "_sigmoid_out",
-      [&]() { impl::sigmoid<scalar_t>(out, self); });
+      [&]() {
+        out.resize_as_(self);
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
+          scalar_t one = (scalar_t)1.0;
+          return one /
+              (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(a)));
+        });
+      });
+
   return out;
 }
 
@@ -86,7 +81,6 @@ Tensor& sigmoid_backward_out(
 Tensor& sigmoid_out(const Tensor& self, Tensor& out) {
   return impl::sigmoid_out(self, out);
 }
-
 Tensor& sigmoid_backward_out(
     const Tensor& grad_output,
     const Tensor& output,
