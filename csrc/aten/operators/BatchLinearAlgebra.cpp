@@ -846,8 +846,6 @@ static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
 template <typename scalar_t>
 static void apply_svd(
     DPCPP::queue& dpcpp_queue,
-    oneapi::mkl::jobsvd jobu,
-    oneapi::mkl::jobsvd jobvt,
     scalar_t* self_data,
     int64_t lda,
     int64_t self_stride,
@@ -862,8 +860,21 @@ static void apply_svd(
     int64_t S_stride,
     scalar_t* VT_data,
     int64_t ldvt,
-    int64_t VT_stride) {
+    int64_t VT_stride,
+    char jobz) {
 #ifdef USE_ONEMKL
+  oneapi::mkl::jobsvd jobu, jobvt;
+  if (jobz == 'N') {
+    jobu = oneapi::mkl::jobsvd::N;
+    jobvt = oneapi::mkl::jobsvd::N;
+  } else if (jobz == 'S') {
+    jobu = oneapi::mkl::jobsvd::S;
+    jobvt = oneapi::mkl::jobsvd::S;
+  } else {
+    jobu = oneapi::mkl::jobsvd::A;
+    jobvt = oneapi::mkl::jobsvd::A;
+  }
+
   std::int64_t scratchpadsize =
       oneapi::mkl::lapack::gesvd_scratchpad_size<scalar_t>(
           dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
@@ -901,8 +912,6 @@ static void apply_svd(
 template <>
 void apply_svd<c10::complex<double>>(
     DPCPP::queue& dpcpp_queue,
-    oneapi::mkl::jobsvd jobu,
-    oneapi::mkl::jobsvd jobvt,
     c10::complex<double>* self_data,
     int64_t lda,
     int64_t self_stride,
@@ -917,8 +926,21 @@ void apply_svd<c10::complex<double>>(
     int64_t S_stride,
     c10::complex<double>* VT_data,
     int64_t ldvt,
-    int64_t VT_stride) {
+    int64_t VT_stride,
+    char jobz) {
 #ifdef USE_ONEMKL
+  oneapi::mkl::jobsvd jobu, jobvt;
+  if (jobz == 'N') {
+    jobu = oneapi::mkl::jobsvd::N;
+    jobvt = oneapi::mkl::jobsvd::N;
+  } else if (jobz == 'S') {
+    jobu = oneapi::mkl::jobsvd::S;
+    jobvt = oneapi::mkl::jobsvd::S;
+  } else {
+    jobu = oneapi::mkl::jobsvd::A;
+    jobvt = oneapi::mkl::jobsvd::A;
+  }
+
   std::int64_t scratchpadsize =
       oneapi::mkl::lapack::gesvd_scratchpad_size<std::complex<double>>(
           dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
@@ -957,8 +979,6 @@ void apply_svd<c10::complex<double>>(
 template <>
 void apply_svd<c10::complex<float>>(
     DPCPP::queue& dpcpp_queue,
-    oneapi::mkl::jobsvd jobu,
-    oneapi::mkl::jobsvd jobvt,
     c10::complex<float>* self_data,
     int64_t lda,
     int64_t self_stride,
@@ -973,8 +993,21 @@ void apply_svd<c10::complex<float>>(
     int64_t S_stride,
     c10::complex<float>* VT_data,
     int64_t ldvt,
-    int64_t VT_stride) {
+    int64_t VT_stride,
+    char jobz) {
 #ifdef USE_ONEMKL
+  oneapi::mkl::jobsvd jobu, jobvt;
+  if (jobz == 'N') {
+    jobu = oneapi::mkl::jobsvd::N;
+    jobvt = oneapi::mkl::jobsvd::N;
+  } else if (jobz == 'S') {
+    jobu = oneapi::mkl::jobsvd::S;
+    jobvt = oneapi::mkl::jobsvd::S;
+  } else {
+    jobu = oneapi::mkl::jobsvd::A;
+    jobvt = oneapi::mkl::jobsvd::A;
+  }
+
   std::int64_t scratchpadsize =
       oneapi::mkl::lapack::gesvd_scratchpad_size<std::complex<float>>(
           dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
@@ -2015,23 +2048,10 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
     std::int64_t lda = m;
     std::int64_t ldu = m;
     std::int64_t ldvt = n;
-    oneapi::mkl::jobsvd jobu, jobvt;
-    if (jobz == 'N') {
-      jobu = oneapi::mkl::jobsvd::N;
-      jobvt = oneapi::mkl::jobsvd::N;
-    } else if (jobz == 'S') {
-      jobu = oneapi::mkl::jobsvd::S;
-      jobvt = oneapi::mkl::jobsvd::S;
-    } else {
-      jobu = oneapi::mkl::jobsvd::A;
-      jobvt = oneapi::mkl::jobsvd::A;
-    }
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
         self.scalar_type(), "svd_xpu", [&] {
           impl::apply_svd<scalar_t>(
               dpcpp_queue,
-              jobu,
-              jobvt,
               self_working_copy.data_ptr<scalar_t>(),
               lda,
               self_stride,
@@ -2046,7 +2066,8 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
               S_stride,
               VT_working_copy.data_ptr<scalar_t>(),
               ldvt,
-              VT_stride);
+              VT_stride,
+              jobz);
         });
     if (self.dim() > 2) {
       native::batchCheckErrors(infos, "svd_xpu");
