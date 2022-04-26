@@ -576,12 +576,15 @@ class DistributedTrainingLauncher(Launcher):
         self.set_env("MASTER_PORT", str(args.master_port))
         mpi_pin_domain = self.get_mpi_pin_domain(args.nproc_per_node, args.ccl_worker_count, total_cores_per_node)
         self.set_env("I_MPI_PIN_DOMAIN", mpi_pin_domain)
+        mpi_pin_domain = os.environ["I_MPI_PIN_DOMAIN"]
 
         ppn = args.nproc_per_node
         cores_per_rank = total_cores_per_node // ppn
 
-        opm_num_threads = cores_per_rank - args.ccl_worker_count
-        self.set_multi_thread_and_allocator(opm_num_threads,
+        omp_num_threads = cores_per_rank - args.ccl_worker_count
+        self.set_env("OMP_NUM_THREADS", omp_num_threads)
+        omp_num_threads = os.environ["OMP_NUM_THREADS"]
+        self.set_multi_thread_and_allocator(omp_num_threads,
                                             args.disable_iomp,
                                             True,
                                             args.enable_tcmalloc,
@@ -594,7 +597,7 @@ class DistributedTrainingLauncher(Launcher):
 
         os.environ["LAUNCH_CMD"] = "#"
         cmd = ['mpiexec.hydra']
-        mpi_config = "-l -np {} -ppn {} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node)
+        mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node, mpi_pin_domain, omp_num_threads)
         mpi_config += args.more_mpi_params
         if args.nnodes > 1:
             mpi_config += " -hostfile {}".format(args.hostfile)
