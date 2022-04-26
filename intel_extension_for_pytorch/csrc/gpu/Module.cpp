@@ -586,6 +586,26 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_onemkl_verbose(level);
   });
 
+  m.def("_enable_simple_trace", []() {
+#ifdef BUILD_SIMPLE_TRACE
+    Settings::I().enable_simple_trace();
+#endif
+  });
+
+  m.def("_disable_simple_trace", []() {
+#ifdef BUILD_SIMPLE_TRACE
+    Settings::I().disable_simple_trace();
+#endif
+  });
+
+  m.def("_is_simple_trace_enabled", []() {
+#ifdef BUILD_SIMPLE_TRACE
+    return Settings::I().is_simple_trace_enabled();
+#else
+    return false;
+#endif
+  });
+
   auto set_module_attr = [&](const char* name, PyObject* v) {
     // PyObject_SetAttrString doesn't steal reference. So no need to incref.
     if (PyObject_SetAttrString(m.ptr(), name, v) < 0) {

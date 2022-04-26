@@ -116,6 +116,15 @@ Settings::Settings() {
   }
   */
 
+#ifdef BUILD_SIMPLE_TRACE
+  simple_trace_enabled = false;
+  DPCPP_ENV_TYPE_DEF(
+      env_simple_trace, SIMPLE_TRACE, simple_trace_enabled, show_opt);
+  if (env_simple_trace.has_value() && (env_simple_trace.value() != 0)) {
+    simple_trace_enabled = true;
+  }
+#endif
+
   if (show_opt) {
     std::cerr << " *********************************************************"
               << std::endl;
@@ -223,6 +232,23 @@ bool Settings::is_double_disabled() const {
   return true;
 #endif
 }
+
+#ifdef BUILD_SIMPLE_TRACE
+bool Settings::is_simple_trace_enabled() const {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  return simple_trace_enabled;
+}
+
+void Settings::enable_simple_trace() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  simple_trace_enabled = true;
+}
+
+void Settings::disable_simple_trace() {
+  std::lock_guard<std::mutex> lock(s_mutex);
+  simple_trace_enabled = false;
+}
+#endif
 
 } // namespace dpcpp
 } // namespace xpu

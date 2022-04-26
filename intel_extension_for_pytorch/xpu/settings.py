@@ -95,6 +95,25 @@ class onemkl_verbose(object):
         set_onemkl_verbose(ONEMKL_VERB_LEVEL.OFF)
         return False
 
+# Basic ONOFF
+class ONOFF():
+    def __init__(self, checker, enable, disable):
+        self._init_status = checker()
+        self._enabled = True
+        self._disabled = False
+        self._enable_fn = enable
+        self._disable_fn = disable
+
+    def __enter__(self):
+        if self._init_status == self._disabled:
+            self._enable_fn()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._init_status == self._disabled:
+            self._disable_fn()
+        return False
+
 
 # Sync Execution Mode
 def using_xpu_sync_mode():
@@ -106,19 +125,9 @@ def enable_xpu_sync_mode():
 def disable_xpu_sync_mode():
     _C._disable_xpu_sync_mode()
 
-class xpu_sync_mode():
+class xpu_sync_mode(ONOFF):
     def __init__(self):
-        self.sync_exec = using_xpu_sync_mode()
-
-    def __enter__(self):
-        if not self.sync_exec:
-            enable_xpu_sync_mode()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if not self.sync_exec:
-            disable_xpu_sync_mode()
-        return False
+        super().__init__(using_xpu_sync_mode, enable_xpu_sync_mode, disable_xpu_sync_mode)
 
 
 # oneDNN Layout
@@ -131,24 +140,43 @@ def enable_layout_opt():
 def disable_layout_opt():
     _C._disable_layout_opt()
 
-class layout_opt():
+class layout_opt(ONOFF):
     def __init__(self):
-        self.layout_enabled = using_layout_opt()
+        super().__init__(using_layout_opt, enable_layout_opt, disable_layout_opt)
 
-    def __enter__(self):
-        if not self.layout_enabled:
-            enable_layout_opt()
-        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if not self.layout_enabled:
-            disable_layout_opt()
-        return False
+# Simple Trace
+def using_simple_trace():
+    return _C._is_simple_trace_enabled()
+
+def enable_simple_trace():
+    _C._enable_simple_trace()
+
+def disable_simple_trace():
+    _C._disable_simple_trace()
+
+class simple_trace(ONOFF):
+    def __init__(self):
+        super().__init__(using_simple_trace, enable_simple_trace, disable_simple_trace)
+
+# # TF32 Execution Mode
+# # NOTE: TF32 mode is not available yet.
+# def using_tf32_mode():
+#     return _C._is_tf32_mode_enabled()
+# 
+# def enable_tf32_mode():
+#     _C._enable_tf32_mode()
+# 
+# def disable_tf32_mode():
+#     _C._disable_tf32_mode()
+# 
+# class tf32_mode(ONOFF):
+#     def __init__(self):
+#         super().__init__(using_tf32_mode, enable_tf32_mode, disable_tf32_mode)
 
 # Tile Partition As Device
 def using_tile_as_device():
     return _C._is_tile_as_device_enabled()
-
 
 # # XPU Backend
 # # NOTE: XPU Backend is not available yet.
@@ -162,28 +190,3 @@ def using_tile_as_device():
 # 
 # def set_xpu_backend(backend):
 #     XPU_BACKEND.set_value(_C._set_xpu_backend, backend)
-# 
-# # TF32 Execution Mode
-# # NOTE: TF32 mode is not available yet.
-# def using_tf32_mode():
-#     return _C._is_tf32_mode_enabled()
-# 
-# def enable_tf32_mode():
-#     _C._enable_tf32_mode()
-# 
-# def disable_tf32_mode():
-#     _C._disable_tf32_mode()
-# 
-# class tf32_mode():
-#     def __init__(self):
-#         self.tf32_enabled = using_tf32_mode()
-# 
-#     def __enter__(self):
-#         if not self.tf32_enabled:
-#             enable_tf32_mode()
-#         return self
-# 
-#     def __exit__(self, exc_type, exc_val, exc_tb):
-#         if not self.tf32_enabled:
-#             disable_tf32_mode()
-#         return False

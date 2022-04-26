@@ -45,13 +45,6 @@ namespace dpcpp {
 }
 }
 
-#include <utils/Settings.h>
-namespace xpu {
-namespace dpcpp {
-  void wait_for_queue_finish();
-}
-}
-
 namespace at {
 
 // NB: TORCH_LIBRARY_IMPL must be in an anonymous namespace to avoid
@@ -59,23 +52,30 @@ namespace at {
 // at namespace already.
 namespace {
 
+#ifdef BUILD_SIMPLE_TRACE
 class IpexSimpleTrace {
 public:
-  IpexSimpleTrace(const char * name) : _name(name) {
-    indent++;
-    gindex++;
-    print_indent();
-    printf("step into %s (%d)\n", _name, gindex);
-    fflush(stdout);
+  IpexSimpleTrace(const char* name) :
+    _name(name),
+    _enabled(Settings::I().is_simple_trace_enabled()) {
+    if (_enabled) {
+      indent++;
+      gindex++;
+      print_indent();
+      printf("Step into OP: %s (Nesting Level %d)\n", _name, gindex);
+      fflush(stdout);
+    }
   }
   ~IpexSimpleTrace() {
-    if (Settings::I().is_xpu_sync_mode_enabled()) {
-      wait_for_queue_finish();
+    if (_enabled) {
+      if (Settings::I().is_xpu_sync_mode_enabled()) {
+        wait_for_queue_finish();
+      }
+      print_indent();
+      printf("Step out of OP: %s\n", _name);
+      fflush(stdout);
+      indent--;
     }
-    print_indent();
-    printf("step out of %s\n", _name);
-    fflush(stdout);
-    indent--;
   }
 private:
   void print_indent() {
@@ -85,11 +85,13 @@ private:
   }
   static int indent;
   static int gindex;
-  const char * _name;
+  const bool _enabled;
+  const char* _name;
 };
 
 int IpexSimpleTrace::indent = -1;
 int IpexSimpleTrace::gindex = -1;
+#endif
 
 ${dispatch_helpers}
 

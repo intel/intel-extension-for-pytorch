@@ -31,6 +31,10 @@ endif()
 message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
 target_include_directories(intel-ext-pt-python PUBLIC ${pybind11_INCLUDE_DIRS})
 
+if(BUILD_SIMPLE_TRACE)
+  target_compile_definitions(intel-ext-pt-python PUBLIC BUILD_SIMPLE_TRACE)
+endif()
+
 if (USE_ITT)
     target_compile_definitions(intel-ext-pt-python PUBLIC USE_ITT)
     target_include_directories(intel-ext-pt-python PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

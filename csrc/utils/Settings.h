@@ -42,6 +42,12 @@ class IPEX_API Settings final {
 
   bool is_double_disabled() const;
 
+#ifdef BUILD_SIMPLE_TRACE
+  bool is_simple_trace_enabled() const;
+  void enable_simple_trace();
+  void disable_simple_trace();
+#endif
+
  private:
   int verbose_level;
   XPU_BACKEND xpu_backend;
@@ -50,6 +56,10 @@ class IPEX_API Settings final {
   bool tile_as_device_enabled;
   bool layout_opt_enabled;
   bool tf32_mode_enabled;
+
+#ifdef BUILD_SIMPLE_TRACE
+  bool simple_trace_enabled;
+#endif
 };
 
 } // namespace dpcpp
