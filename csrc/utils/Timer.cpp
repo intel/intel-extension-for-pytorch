@@ -22,6 +22,7 @@ void ipex_timer::event_duration(uint64_t us) {
 ipex_timer::~ipex_timer() {
   if (vlevel_ >= 1) {
     auto pre = start_;
+    auto end = high_resolution_clock::now();
     std::cout << "<" << tag_ << ">";
     for (int i = 0; i < stamp_.size(); i++) {
       auto stamp = stamp_.at(i);
@@ -34,8 +35,7 @@ ipex_timer::~ipex_timer() {
       std::cout << " event_duration_" << j << "(" << event_duration_.at(j)
                 << "us)";
     }
-    std::cout << " total("
-              << duration_cast<microseconds>(stamp_.back() - start_).count()
+    std::cout << " total(" << duration_cast<microseconds>(end - start_).count()
               << "us)" << std::endl;
   }
 }
