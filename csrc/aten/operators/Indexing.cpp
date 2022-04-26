@@ -374,7 +374,9 @@ void indexAdd(
               IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
           auto src_offset_ =
               IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-          g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
+          atomicAdd(
+              (dpcpp_global_ptr_pt<scalar_t>)&(g_dst_ptr[dst_offset_]),
+              g_src_ptr[src_offset_] * alpha_val);
 
           for (int iter = 1; iter < n_work_item_iter; iter++) {
             auto __inner_idx = iter * wgroup_size + ii_;
@@ -383,7 +385,9 @@ void indexAdd(
                   __inner_idx, dst_info);
               src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
                   __inner_idx, src_info);
-              g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_] * alpha_val;
+              atomicAdd(
+                  (dpcpp_global_ptr_pt<scalar_t>)&(g_dst_ptr[dst_offset_]),
+                  g_src_ptr[src_offset_] * alpha_val);
             }
           }
         });
@@ -1086,12 +1090,9 @@ Tensor& index_add_(
     const Tensor& index,
     const Tensor& source,
     const Scalar& alpha) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "indexAdd",
-      [&]() { impl::indexAdd<scalar_t>(self, dim, index, source, alpha); });
+  IPEX_DISPATCH_ATOMIC_ALL_TYPES(self.scalar_type(), "index_add_", [&] {
+    impl::indexAdd<scalar_t>(self, dim, index, source, alpha);
+  });
   return self;
 }
 

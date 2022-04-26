@@ -34,7 +34,7 @@ class TestTorchMethod(TestCase):
         x = torch.ones([5, 3], device=cpu_device)
         t = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=torch.float)
         index = torch.tensor([0, 4, 2])
-        x.index_add_(0, index, t)
+        x.index_add_(0, index, t, alpha=2)
         print("x = ", x)
 
         x_dpcpp = torch.ones([5, 3], device=dpcpp_device)
