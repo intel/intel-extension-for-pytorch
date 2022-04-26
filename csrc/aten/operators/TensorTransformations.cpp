@@ -163,8 +163,13 @@ Tensor roll_dpcpp(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
     start += size;
 
   auto total_dims = in_tensor.dim();
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, in_tensor.scalar_type(), "roll_dpcpp", [&] {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      in_tensor.scalar_type(),
+      "roll_dpcpp",
+      [&] {
         roll_dpcpp_kernel<scalar_t>(
             in_tensor,
             out_tensor,
