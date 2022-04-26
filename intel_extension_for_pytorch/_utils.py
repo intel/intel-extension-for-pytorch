@@ -32,7 +32,11 @@ def _get_device_index(device: Union[Device, str, int], optional: bool = False,
                 raise ValueError('Expected a xpu or cpu device, but got: {}'.format(device))
         elif device.type != 'xpu':
             raise ValueError('Expected a xpu device, but got: {}'.format(device))
-    return _torch_get_device_index(device, optional, allow_cpu)
+    device_index = _torch_get_device_index(device, optional, allow_cpu)
+    if device_index is None:
+        return 0
+    else:
+        return device_index
 
 
 # def _dummy_type(name: str) -> type:

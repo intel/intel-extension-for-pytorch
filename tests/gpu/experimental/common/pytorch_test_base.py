@@ -156,13 +156,25 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         "test_sparse_mm",   # core dumped ... Floating point exception
     },
     "TestNNDeviceTypeXPU": {
-        # "test_conv_ndhwc",  # core dumped ... Segmentation fault
-        # "test_conv_nhwc",   # core dumped ... Segmentation fault
         "test_conv_transposed_large",   # core dumped ... Floating point exception
-        # "test_grid_sample_large_index_2d",  # too slow
-        # "test_grid_sample_large_index_3d",  # too slow
         "test_softmax_64bit_indexing",  # too slow
-        # "test_softmax_results",     # core dumped ... Floating point exception
+    },
+    "TestFFTXPU": {
+        'test_batch_istft', # core dumped ... double free or corruption
+        'test_fft2_fftn_equivalence',   # core dumped ... double free or corruption
+        'test_fft2_numpy',  # core dumped ... corrupted size vs. prev_size
+        'test_fft_input_modification',  # core dumped ... Segmentation fault
+        'test_fft_ifft_rfft_irfft',     # core dumped ... Segmentation fault 
+        'test_fft_round_trip',  # core dumped ... corrupted size vs. prev_size
+        'test_fft_type_promotion',  # core dumped ... double free or corruption
+        'test_fftn_round_trip',     # core dumped ... Segmentation fault
+        'test_istft_of_sine',   # core dumped ... Segmentation fault
+        'test_istft_round_trip_simple_cases',   # core dumped ... corrupted size vs. prev_size
+        'test_istft_round_trip_various_params',     # core dumped ... corrupted size vs. prev_size
+        'test_istft_round_trip_with_padding',   # core dumped ... corrupted size vs. prev_size
+        'test_istft_throws',    # core dumped ... corrupted size vs. prev_size
+        'test_reference_1d',    # core dumped ... double free or corruption
+        'test_reference_nd',    # core dumped ... double free or corruption
     },
 }
 
