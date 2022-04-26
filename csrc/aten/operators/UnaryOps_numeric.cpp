@@ -70,6 +70,28 @@ void abs_kernel(TensorIterator& iter) {
       });
 }
 
+void angle_kernel(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(iter.common_dtype(), "angle", [&]() {
+    dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+      return at::AtenIpexTypeXPU::angle_impl(a);
+    });
+  });
+}
+
+void conj_physical_kernel(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      ScalarType::Bool,
+      ScalarType::BFloat16,
+      ScalarType::Half,
+      iter.common_dtype(),
+      "conj",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return at::AtenIpexTypeXPU::conj_impl(a);
+        });
+      });
+}
+
 } // namespace impl
 
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
@@ -138,6 +160,35 @@ Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
 Tensor& abs_out(const Tensor& self, Tensor& result) {
   return impl::unary_op_impl_with_complex_to_float_out(
       result, self, impl::abs_kernel, /*promotes_integer_to_float=*/false);
+}
+
+Tensor& conj_physical_out(const Tensor& self, Tensor& result) {
+  auto iter = TensorIterator::unary_op(result, self);
+  impl::conj_physical_kernel(iter);
+  return result;
+}
+
+Tensor& conj_physical_(Tensor& self) {
+  if (!self.is_complex())
+    return self;
+  return at::AtenIpexTypeXPU::conj_physical_out(self, self);
+}
+
+Tensor& angle_out(const Tensor& self, Tensor& result) {
+  return impl::unary_op_impl_with_complex_to_float_out(
+      result, self, impl::angle_kernel, /*promotes_integer_to_float=*/true);
+}
+
+Tensor angle(const Tensor& self) {
+  if (self.is_complex()) {
+    const auto float_type = c10::toValueType(self.scalar_type());
+    Tensor result = at::empty({0}, self.options().dtype(float_type));
+    return at::angle_out(result, self);
+  }
+  Tensor result;
+  auto iter = TensorIterator::unary_float_op(result, self);
+  impl::angle_kernel(iter);
+  return iter.output();
 }
 
 } // namespace AtenIpexTypeXPU
