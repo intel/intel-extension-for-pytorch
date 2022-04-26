@@ -480,8 +480,11 @@ struct TensorDigammaOp {
 template <typename T>
 struct TensorErfinvOp {
   void operator()(T& out, T& in) const {
-    using compute_type = typename std::
-        conditional<std::is_same<T, at::Half>::value, float, T>::type;
+    using compute_type = typename std::conditional<
+        std::is_same<T, at::Half>::value ||
+            std::is_same<T, at::BFloat16>::value,
+        float,
+        T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type a[4] = {
@@ -532,8 +535,11 @@ struct TensorErfinvOp {
   }
 
   void operator()(T& v) const {
-    using compute_type = typename std::
-        conditional<std::is_same<T, at::Half>::value, float, T>::type;
+    using compute_type = typename std::conditional<
+        std::is_same<T, at::Half>::value ||
+            std::is_same<T, at::BFloat16>::value,
+        float,
+        T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type a[4] = {
