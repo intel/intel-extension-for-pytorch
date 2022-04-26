@@ -232,6 +232,8 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
+  } else {
+    tensor.resize_({N, num_dim}).contiguous();
   }
 }
 
