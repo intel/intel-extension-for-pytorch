@@ -845,45 +845,29 @@ static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
 
 template <typename scalar_t>
 static void apply_svd(
-    Tensor& self,
-    Tensor& U,
-    Tensor& S,
-    Tensor& VT,
-    char jobz,
-    std::vector<int64_t>& infos) {
+    DPCPP::queue& dpcpp_queue,
+    oneapi::mkl::jobsvd jobu,
+    oneapi::mkl::jobsvd jobvt,
+    scalar_t* self_data,
+    int64_t lda,
+    int64_t self_stride,
+    int64_t batchsize,
+    int64_t m,
+    int64_t n,
+    TensorOptions self_opt,
+    scalar_t* U_data,
+    int64_t ldu,
+    int64_t U_stride,
+    scalar_t* S_data,
+    int64_t S_stride,
+    scalar_t* VT_data,
+    int64_t ldvt,
+    int64_t VT_stride) {
 #ifdef USE_ONEMKL
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  using value_t = typename c10::scalar_value_type<scalar_t>::type;
-  scalar_t* self_data = (scalar_t*)(self.data_ptr());
-  scalar_t* U_data = (scalar_t*)U.data_ptr();
-  value_t* S_data = (value_t*)S.data_ptr();
-  scalar_t* VT_data = (scalar_t*)VT.data_ptr();
-  auto self_stride = at::native::matrixStride(self);
-  auto U_stride = at::native::matrixStride(U);
-  auto S_stride = S.size(-1);
-  auto VT_stride = at::native::matrixStride(VT);
-  auto batchsize = at::native::batchCount(self);
-
-  auto m = self.size(-2);
-  auto n = self.size(-1);
-  std::int64_t lda = m;
-  std::int64_t ldu = m;
-  std::int64_t ldvt = n;
-  oneapi::mkl::jobsvd jobu, jobvt;
-  if (jobz == 'N') {
-    jobu = oneapi::mkl::jobsvd::N;
-    jobvt = oneapi::mkl::jobsvd::N;
-  } else if (jobz == 'S') {
-    jobu = oneapi::mkl::jobsvd::S;
-    jobvt = oneapi::mkl::jobsvd::S;
-  } else {
-    jobu = oneapi::mkl::jobsvd::A;
-    jobvt = oneapi::mkl::jobsvd::A;
-  }
   std::int64_t scratchpadsize =
       oneapi::mkl::lapack::gesvd_scratchpad_size<scalar_t>(
           dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
-  Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_opt);
 
   for (int64_t i = 0; i < batchsize; i++) {
     scalar_t* self_working_ptr = &self_data[i * self_stride];
@@ -907,6 +891,118 @@ static void apply_svd(
         VT_working_ptr,
         ldvt,
         (scalar_t*)(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  }
+#else
+  AT_ERROR("svd: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void apply_svd<c10::complex<double>>(
+    DPCPP::queue& dpcpp_queue,
+    oneapi::mkl::jobsvd jobu,
+    oneapi::mkl::jobsvd jobvt,
+    c10::complex<double>* self_data,
+    int64_t lda,
+    int64_t self_stride,
+    int64_t batchsize,
+    int64_t m,
+    int64_t n,
+    TensorOptions self_opt,
+    c10::complex<double>* U_data,
+    int64_t ldu,
+    int64_t U_stride,
+    c10::complex<double>* S_data,
+    int64_t S_stride,
+    c10::complex<double>* VT_data,
+    int64_t ldvt,
+    int64_t VT_stride) {
+#ifdef USE_ONEMKL
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::gesvd_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_opt);
+
+  for (int64_t i = 0; i < batchsize; i++) {
+    c10::complex<double>* self_working_ptr = &self_data[i * self_stride];
+    c10::complex<double>* U_working_ptr = &U_data[i * U_stride];
+    double S_working = S_data[i * S_stride].real();
+    double* S_working_ptr = &S_working;
+    c10::complex<double>* VT_working_ptr = &VT_data[i * VT_stride];
+
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::gesvd,
+        dpcpp_queue,
+        jobu,
+        jobvt,
+        m,
+        n,
+        reinterpret_cast<std::complex<double>*>(self_working_ptr),
+        lda,
+        S_working_ptr,
+        reinterpret_cast<std::complex<double>*>(U_working_ptr),
+        ldu,
+        reinterpret_cast<std::complex<double>*>(VT_working_ptr),
+        ldvt,
+        reinterpret_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  }
+#else
+  AT_ERROR("svd: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void apply_svd<c10::complex<float>>(
+    DPCPP::queue& dpcpp_queue,
+    oneapi::mkl::jobsvd jobu,
+    oneapi::mkl::jobsvd jobvt,
+    c10::complex<float>* self_data,
+    int64_t lda,
+    int64_t self_stride,
+    int64_t batchsize,
+    int64_t m,
+    int64_t n,
+    TensorOptions self_opt,
+    c10::complex<float>* U_data,
+    int64_t ldu,
+    int64_t U_stride,
+    c10::complex<float>* S_data,
+    int64_t S_stride,
+    c10::complex<float>* VT_data,
+    int64_t ldvt,
+    int64_t VT_stride) {
+#ifdef USE_ONEMKL
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::gesvd_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, jobu, jobvt, m, n, lda, ldu, ldvt);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_opt);
+
+  for (int64_t i = 0; i < batchsize; i++) {
+    c10::complex<float>* self_working_ptr = &self_data[i * self_stride];
+    c10::complex<float>* U_working_ptr = &U_data[i * U_stride];
+    float S_working = S_data[i * S_stride].real();
+    float* S_working_ptr = &S_working;
+    c10::complex<float>* VT_working_ptr = &VT_data[i * VT_stride];
+
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::gesvd,
+        dpcpp_queue,
+        jobu,
+        jobvt,
+        m,
+        n,
+        reinterpret_cast<std::complex<float>*>(self_working_ptr),
+        lda,
+        S_working_ptr,
+        reinterpret_cast<std::complex<float>*>(U_working_ptr),
+        ldu,
+        reinterpret_cast<std::complex<float>*>(VT_working_ptr),
+        ldvt,
+        reinterpret_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
         scratchpadsize);
   }
 #else
@@ -1907,15 +2003,51 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
 
   if (self.numel() > 0) {
     auto self_working_copy = native::cloneBatchedColumnMajor(self);
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "svd_xpu", [&] {
-      impl::apply_svd<scalar_t>(
-          self_working_copy,
-          U_working_copy,
-          S_working_copy,
-          VT_working_copy,
-          jobz,
-          infos);
-    });
+    auto& dpcpp_queue = dpcppGetCurrentQueue();
+    auto self_stride = at::native::matrixStride(self_working_copy);
+    auto U_stride = at::native::matrixStride(U_working_copy);
+    auto S_stride = S_working_copy.size(-1);
+    auto VT_stride = at::native::matrixStride(VT_working_copy);
+    auto batchsize = at::native::batchCount(self_working_copy);
+
+    auto m = self_working_copy.size(-2);
+    auto n = self_working_copy.size(-1);
+    std::int64_t lda = m;
+    std::int64_t ldu = m;
+    std::int64_t ldvt = n;
+    oneapi::mkl::jobsvd jobu, jobvt;
+    if (jobz == 'N') {
+      jobu = oneapi::mkl::jobsvd::N;
+      jobvt = oneapi::mkl::jobsvd::N;
+    } else if (jobz == 'S') {
+      jobu = oneapi::mkl::jobsvd::S;
+      jobvt = oneapi::mkl::jobsvd::S;
+    } else {
+      jobu = oneapi::mkl::jobsvd::A;
+      jobvt = oneapi::mkl::jobsvd::A;
+    }
+    IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+        self.scalar_type(), "svd_xpu", [&] {
+          impl::apply_svd<scalar_t>(
+              dpcpp_queue,
+              jobu,
+              jobvt,
+              self_working_copy.data_ptr<scalar_t>(),
+              lda,
+              self_stride,
+              batchsize,
+              m,
+              n,
+              self.options(),
+              U_working_copy.data_ptr<scalar_t>(),
+              ldu,
+              U_stride,
+              S_working_copy.data_ptr<scalar_t>(),
+              S_stride,
+              VT_working_copy.data_ptr<scalar_t>(),
+              ldvt,
+              VT_stride);
+        });
     if (self.dim() > 2) {
       native::batchCheckErrors(infos, "svd_xpu");
     } else {
