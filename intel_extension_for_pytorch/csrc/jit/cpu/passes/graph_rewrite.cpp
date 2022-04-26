@@ -24,8 +24,13 @@ c10::optional<IValue> getIValue(
   return toIValue(getValue(name, match_vmap, vmap));
 }
 
+// FuseShuffle is matching the channelshuffle pattern, where:
+// (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
+// (2) the tranpose is for groups => [n, c // groups, grpups, h, w]
+// (3) the output view shape should be the same as the input tensor shape
 void FuseShuffle(std::shared_ptr<Graph>& graph) {
-  std::string shuffle = R"(
+  // below is channelshuffle for staic view shape pattern
+  std::string channelshuffle_with_static_shape = R"(
       graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
         %r1 = aten::view(%input, %view_shape)
         %r2 = aten::transpose(%r1, %trans_dim0, %trans_dim1)
@@ -33,16 +38,41 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
         %r4 = aten::view(%r3, %flattern_shape)
         return (%r4) )";
 
-  std::string shuffle_2d_fusion = R"(
+  std::string shuffle_2d_fusion_with_static_shape = R"(
       graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
         %r = ipex::shuffle_2d(%input, %view_shape, %trans_dim0, %trans_dim1)
         return (%r) )";
 
-  // this filter passes only for the following conditions:
-  // (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
-  // (2) the tranpose is for groups => [n, c // groups, grpups, h, w]
-  // (3) the output view shape should be the same as the input tensor shape
-  auto filter_shuffle_2d_fusion =
+  // below is channelshuffle for dynamic view shape pattern
+  std::string dynamic_shape_input = R"(
+      graph(%input, %idx_0:int, %idx_1:int, %idx_2:int, %idx_3:int, %div_g, %g:int, %type, %flattern_c):
+        %n_ = aten::size(%input, %idx_0)
+        %c_ = aten::size(%input, %idx_1)
+        %tensor_c_ = prim::NumToTensor(%c_)
+        %h_ = aten::size(%input, %idx_2)
+        %w_ = aten::size(%input, %idx_3)
+        %c_div_g_ = aten::div(%tensor_c_, %div_g, %type)
+        %int_c_div_g_ = aten::Int(%c_div_g_)
+        %view_shape:int[] = prim::ListConstruct(%n_, %g, %int_c_div_g_, %h_, %w_) )";
+
+  std::string channelshuffle_for_dynamic_shape = R"(
+        %r1 = aten::view(%input, %view_shape)
+        %r2 = aten::transpose(%r1, %idx_1, %idx_2)
+        %r3 = aten::contiguous(%r2, %idx_0)
+        %flattern_shape:int[] = prim::ListConstruct(%n_, %flattern_c, %h_, %w_)
+        %r4 = aten::view(%r3, %flattern_shape)
+        return (%r4) )";
+
+  std::string shuffle_2d_fusion_for_dynamic_shape = R"(
+        %r = ipex::shuffle_2d(%input, %view_shape, %idx_1, %idx_2)
+        return (%r) )";
+
+  std::string channelshuffle_with_dynamic_shape =
+      dynamic_shape_input + channelshuffle_for_dynamic_shape;
+  std::string shuffle_2d_fusion_with_dynamic_shape =
+      dynamic_shape_input + shuffle_2d_fusion_for_dynamic_shape;
+
+  auto filter_shuffle_2d_static_fusion =
       [](const Match& match,
          const std::unordered_map<std::string, Value*>& vmap) {
         const auto& match_vmap = match.values_map;
@@ -86,11 +116,12 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
           return false;
         }
 
-        // if the view shape and flattern shape is not set
+        // if the view shape or flattern shape is not set
         if (!toIValue(view_shape_).has_value() ||
             !toIValue(flattern_shape_).has_value()) {
           return false;
         }
+
         auto view_shape_list = toIValue(view_shape_).value().toIntVector();
         auto flattern_shape_list =
             toIValue(flattern_shape_).value().toIntVector();
@@ -134,10 +165,43 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
         return true;
       };
 
-  SubgraphRewriter rewriter_shuffle_2d;
-  rewriter_shuffle_2d.RegisterRewritePattern(shuffle, shuffle_2d_fusion);
-  rewriter_shuffle_2d.runOnGraph(graph, filter_shuffle_2d_fusion);
-}
+  auto filter_shuffle_2d_dynamic_fusion =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        const auto& match_vmap = match.values_map;
+
+        auto n_idx = getIValue("idx_0", match_vmap, vmap);
+        auto c_idx = getIValue("idx_1", match_vmap, vmap);
+        auto h_idx = getIValue("idx_2", match_vmap, vmap);
+        auto w_idx = getIValue("idx_3", match_vmap, vmap);
+        if (!n_idx.has_value() || !c_idx.has_value() || !h_idx.has_value() ||
+            !w_idx.has_value()) {
+          return false;
+        }
+
+        auto n_idx_ = n_idx.value().toInt();
+        auto c_idx_ = c_idx.value().toInt();
+        auto h_idx_ = h_idx.value().toInt();
+        auto w_idx_ = w_idx.value().toInt();
+
+        if ((n_idx_ != 0) || (c_idx_ != 1) || (h_idx_ != 2) || (w_idx_ != 3)) {
+          return false;
+        }
+
+        return true;
+      };
+
+  SubgraphRewriter rewriter_shuffle_2d_dynamic;
+  rewriter_shuffle_2d_dynamic.RegisterRewritePattern(
+      channelshuffle_with_dynamic_shape, shuffle_2d_fusion_with_dynamic_shape);
+  rewriter_shuffle_2d_dynamic.runOnGraph(
+      graph, filter_shuffle_2d_dynamic_fusion);
+  SubgraphRewriter rewriter_shuffle_2d_static;
+  rewriter_shuffle_2d_static.RegisterRewritePattern(
+      channelshuffle_with_static_shape, shuffle_2d_fusion_with_static_shape);
+  rewriter_shuffle_2d_static.runOnGraph(graph, filter_shuffle_2d_static_fusion);
+
+} // namespace graph_rewrite
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   std::string aten_add_layernorm = R"(

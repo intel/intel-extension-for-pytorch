@@ -582,9 +582,9 @@ class ConvTranspose2d(nn.Module):
         x = self.conv_transpose2d(x)
         return x
 
-class ChannelShuffle(nn.Module):
+class ChannelShuffle_with_Static_Shape(nn.Module):
     def __init__(self, batchsize, num_channels, height, width, groups):
-        super(ChannelShuffle, self).__init__()
+        super(ChannelShuffle_with_Static_Shape, self).__init__()
         self.batchsize = batchsize
         self.num_channels = num_channels
         self.height = height
@@ -596,6 +596,32 @@ class ChannelShuffle(nn.Module):
         x = x.view(self.batchsize, self.groups, channels_per_group, self.height, self.width)
         x = torch.transpose(x, 1, 2).contiguous()
         x = x.view(self.batchsize, -1, self.height, self.width)
+        return x
+
+class ChannelShuffle_with_Dynamic_Shape(nn.Module):
+    def __init__(self, groups):
+        super(ChannelShuffle_with_Dynamic_Shape, self).__init__()
+        self.groups = groups
+
+    def forward(self, x):
+        batchsize, num_channels, height, width = x.size()
+        channels_per_group = num_channels // self.groups
+        x = x.view(batchsize, self.groups, channels_per_group, height, width)
+        x = torch.transpose(x, 1, 2).contiguous()
+        x = x.view(batchsize, -1, height, width)
+        return x
+
+class NotChannelShuffle(nn.Module):
+    def __init__(self, groups):
+        super(NotChannelShuffle, self).__init__()
+        self.groups = groups
+
+    def forward(self, x):
+        batchsize, num_channels, height, width = x.size()
+        channels_per_group = num_channels // self.groups
+        x = x.view(batchsize, self.groups, channels_per_group, width, height)
+        x = torch.transpose(x, 1, 2).contiguous()
+        x = x.view(batchsize, -1, width, height)
         return x
 
 class MatmulDiv(nn.Module):
@@ -2446,9 +2472,18 @@ class Tester(TestCase):
 
     def test_channel_shuffle(self):
         self._test_output(
-            ChannelShuffle(10, 16, 50, 50, 4),
+            ChannelShuffle_with_Static_Shape(10, 16, 50, 50, 4),
             torch.rand(10, 16, 50, 50),
             kind_in_graph="ipex::shuffle_2d")
+        self._test_output(
+            ChannelShuffle_with_Dynamic_Shape(4),
+            torch.rand(10, 16, 50, 50),
+            kind_in_graph="ipex::shuffle_2d")
+        self._test_output(
+            NotChannelShuffle(4),
+            torch.rand(10, 16, 50, 60),
+            kind_not_in_graph="ipex::shuffle_2d")
+
 
     def test_jit_function(self):
         # test hool trace and script can works for function
