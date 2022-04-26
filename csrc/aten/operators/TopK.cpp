@@ -596,6 +596,9 @@ void Topk(
   at::AtenIpexTypeXPU::resize_(topK, topKSize, c10::nullopt);
   at::AtenIpexTypeXPU::resize_(indices, topKSize, c10::nullopt);
 
+  if (k == 0)
+    return;
+
 // static_cast is required to ensure that the correct type (INDEX_T)
 // is provided to the kernel for the arguments.
 #define RUN_K(INDEX_T, DIM, DIR)                                 \

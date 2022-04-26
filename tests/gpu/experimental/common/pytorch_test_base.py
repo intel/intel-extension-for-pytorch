@@ -43,24 +43,18 @@ DISABLED_TORCH_TESTS_ANY = {
 
 DISABLED_TORCH_TESTS_XPU_ONLY = {
     # to be added
-    "TestBinaryUfuncsXPU": {
-        "test_cumulative_trapezoid",    # core dumped ... Floating point exception # cumsum issue @Yu, Kevin
-        "test_int_and_float_pow",   # core dumped ... free(): invalid size #KernelPointWiseApply2
-    },
-    "TestForeachXPU": {
-        "test_binary_op_scalar_slowpath",  # core dumped ... munmap_chunk(): invalid pointer
-        "test_binary_op_scalarlist_slowpath",  # core dumped ... munmap_chunk(): invalid pointer
-        "test_binary_op_tensorlists_slowpath",  # core dumped ... munmap_chunk(): invalid pointer
-        "test_minmax_slowpath",  # core dumped ... munmap_chunk(): invalid pointer
-        "test_pointwise_op_slowpath",  # core dumped ... munmap_chunk(): invalid pointer
-        "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer
-    },
-    "TestTensorCreationXPU": {
-        "test_linspace",    # too slow
-    },
-    "TestSortAndSelectXPU": {
-        "test_topk_zero",   # core dumped ... Floating point exception
-    },
+    # "TestBinaryUfuncsXPU": {
+    #     "test_cumulative_trapezoid",    # core dumped ... Floating point exception -> cumsum issue @Yu, Kevin
+    #     "test_int_and_float_pow",   # core dumped ... free(): invalid size -> KernelPointWiseApply2
+    # },
+    # "TestForeachXPU": {
+    #     "test_binary_op_scalar_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
+    #     "test_binary_op_scalarlist_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
+    #     "test_binary_op_tensorlists_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
+    #     "test_minmax_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
+    #     "test_pointwise_op_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
+    #     "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
+    # },
     "TestAutogradDeviceTypeXPU": {
         "test_cdist_same_inputs",   # too slow
         "test_cdist",   # too slow

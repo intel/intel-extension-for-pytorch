@@ -1,4 +1,5 @@
 #include <ATen/NativeFunctions.h>
+#include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
@@ -44,6 +45,42 @@ struct LogspaceOp {
   const accT start_, step_, base_;
 };
 
+// TODO: move it to the loops for more generic supporting.
+template <typename scalar_t, typename func_t>
+void dpcpp_elementwise_kernel_with_index_impl(
+    scalar_t* out_ptr,
+    int64_t N,
+    func_t f) {
+  if (N > std::numeric_limits<int>::max()) {
+    dpcpp_elementwise_kernel_with_index_impl(
+        out_ptr + std::numeric_limits<int>::max(),
+        N - std::numeric_limits<int>::max(),
+        f);
+  }
+  int64_t thread_number = std::min(N, (int64_t)std::numeric_limits<int>::max());
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto idx = item_id.get_linear_id();
+      out_ptr[idx] = f(idx);
+    };
+    cgh.parallel_for(DPCPP::range</*dim=*/1>(thread_number), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+}
+
+template <typename func_t>
+void dpcpp_elementwise_kernel_with_index(at::Tensor& output, func_t f) {
+  using scalar_t = typename function_traits<func_t>::result_type;
+  int64_t N = output.numel();
+  if (N == 0) {
+    return;
+  }
+
+  return dpcpp_elementwise_kernel_with_index_impl(
+      output.data_ptr<scalar_t>(), N, f);
+}
+
 Tensor& linspace_dpcpp_out(
     Tensor& result,
     Scalar start,
@@ -62,40 +99,41 @@ Tensor& linspace_dpcpp_out(
   if (result.numel() != steps) {
     result.resize_({steps});
   }
-  Tensor r = result.is_contiguous() ? result : result.contiguous();
+
+  bool is_contiguous = result.is_contiguous();
+  Tensor r = !is_contiguous
+      ? at::empty_like(result, LEGACY_CONTIGUOUS_MEMORY_FORMAT)
+      : result;
 
   if (steps == 0) {
     // skip
   } else if (steps == 1) {
     r.fill_(start);
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES(r.scalar_type(), "linspace_dpcpp", [&]() {
-      scalar_t scalar_start = start.to<scalar_t>();
-      scalar_t scalar_end = end.to<scalar_t>();
-      scalar_t step =
-          (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
-      LinspaceOp<scalar_t> linspace_method(scalar_start, step);
-      auto& dpcpp_queue = dpcppGetCurrentQueue();
-      auto cgf = DPCPP_Q_CGF(cgh) {
-        auto r_data = r.data_ptr<scalar_t>();
-        // kernel function per work-item
-        auto kfn = DPCPP_Q_KFN() {
-          auto ptr = r_data;
-          dpcpp_tabulate(ptr, ptr + steps, linspace_method);
-        };
-        // kick off kernel
-        // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task(kfn);
-      };
+    IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+        kHalf, kBFloat16, r.scalar_type(), "linspace_xpu", [&]() {
+          scalar_t scalar_start = start.to<scalar_t>();
+          scalar_t scalar_end = end.to<scalar_t>();
+          scalar_t step =
+              (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
+          const int64_t halfway = steps / 2;
+          dpcpp_elementwise_kernel_with_index(
+              r,
+              [scalar_start, scalar_end, steps, step, halfway](
+                  int64_t ind) -> scalar_t {
+                if (ind < halfway) {
+                  return scalar_start + (step * ind);
+                }
 
-      // submit to DPCPP queue
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-    });
+                return scalar_end - step * (steps - ind - 1);
+              });
+        });
   }
 
-  if (!result.is_contiguous()) {
+  if (!is_contiguous) {
     result.copy_(r);
   }
+
   return result;
 }
 
