@@ -46,7 +46,6 @@ void pow_tensor_tensor_kernel(TensorIterator& iter) {
 void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
   if (isFloatingType(iter.dtype())) {
     const auto exp = exp_scalar.to<double>();
-
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
@@ -84,6 +83,28 @@ void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
   } else if (isComplexType(iter.dtype())) {
     // TODO: support complex dtype
     TORCH_CHECK(0, "DPCPP power didn't support complex dtype yet.");
+  } else {
+    const auto exp = exp_scalar.to<long>();
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "pow", [&]() {
+      if (exp == 2) {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t base) -> scalar_t { return base * base; });
+      } else if (exp == 3) {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t base) -> scalar_t { return base * base * base; });
+      } else if (exp == -1) {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t base) -> scalar_t { return 1.0 / base; });
+      } else if (exp == -2) {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t base) -> scalar_t {
+          return 1.0 / (base * base);
+        });
+      } else {
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
+          return Numerics<scalar_t>::pow(base, exp);
+        });
+      }
+    });
   }
 }
 
