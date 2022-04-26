@@ -8,28 +8,86 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    def test_cumprod(self, dtype=torch.float):
-        x1 = torch.randn(10, device=cpu_device)
-        x1_dpcpp = x1.to(dpcpp_device)
-        print("(10) cpu", torch.cumprod(x1, dim=0))
-        print("(10) dpcpp", torch.cumprod(x1_dpcpp, dim=0).cpu())
-        self.assertEqual(torch.cumprod(x1, dim=0),
-                         torch.cumprod(x1_dpcpp, dim=0).to(cpu_device))
+    def test_cumprod_1d_dim0(self, dtype=torch.float):
+        print("\n-----------------------1D, dim=0---------------------------------------------")
+        x1 = torch.randn(65, device=cpu_device)
+        x1_dpcpp = x1.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x1, dim=0), torch.cumprod(
+            x1_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=1.3e-6, atol=1e-5)
 
-        x1_dpcpp = x1.to(dpcpp_device).to(torch.float16)
-        # print("(10) half cpu", torch.cumprod(x1, dim=0))
-        print("(10) half dpcpp", torch.cumprod(x1_dpcpp, dim=0).cpu())
+    def test_cumprod_1d_dim0_half(self, dtype=torch.half):
+        print("\n-----------------------1D, dim=0 half---------------------------------------------")
+        x1 = torch.randn(65, device=cpu_device)
+        x1_dpcpp = x1.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x1, dim=0), torch.cumprod(
+            x1_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=10e-4, atol=10e-2)
 
-        x2 = torch.randn(3, 2, 4, device=cpu_device)
-        x2_dpcpp = x2.to(dpcpp_device)
-        print("(3, 2, 4) cpu", torch.cumprod(x2, dim=0))
-        print("(3, 2, 4) dpcpp", torch.cumprod(x2_dpcpp, dim=0).cpu())
-        self.assertEqual(torch.cumprod(x2, dim=0),
-                         torch.cumprod(x2_dpcpp, dim=0).to(cpu_device))
+    def test_cumprod_2d_dim0(self, dtype=torch.float):
+        print("\n-----------------------2D, dim=0---------------------------------------------")
+        x2 = torch.randn(65, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=0), torch.cumprod(
+            x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=1.3e-6, atol=1e-5)
 
-        x3 = torch.randn(4, 2, 4, device=cpu_device)
-        x3_dpcpp = x3.to(cpu_device)
-        print("(4, 2, 4) cpu", torch.cumprod(x3, dim=2))
-        print("(4, 2, 4) dpcpp", torch.cumprod(x3_dpcpp, dim=2).cpu())
-        self.assertEqual(torch.cumprod(x3, dim=2),
-                         torch.cumprod(x3_dpcpp, dim=2).to(cpu_device))
+    def test_cumprod_2d_dim0_half(self, dtype=torch.half):
+        print("\n-----------------------2D, dim=0 half---------------------------------------------")
+        x2 = torch.randn(65, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=0), torch.cumprod(
+            x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=10e-4, atol=10e-2)
+
+    def test_cumprod_2d_dim1(self, dtype=torch.float):
+        print("\n-----------------------2D, dim=1---------------------------------------------")
+        x2 = torch.randn(65, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=1), torch.cumprod(
+            x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=1.3e-6, atol=1e-5)
+
+    def test_cumprod_2d_dim1_half(self, dtype=torch.half):
+        print("\n-----------------------2D, dim=1 half---------------------------------------------")
+        x2 = torch.randn(65, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=1), torch.cumprod(
+            x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=10e-4, atol=10e-2)
+
+    def test_cumprod_3d_dim0(self, dtype=torch.float):
+        print("\n-----------------------3D, dim=0---------------------------------------------")
+        x2 = torch.randn(33, 65, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=0), torch.cumprod(
+            x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=1.3e-6, atol=1e-5)
+
+    def test_cumprod_3d_dim0_half(self, dtype=torch.half):
+        print("\n-----------------------3D, dim=0 half---------------------------------------------")
+        x2 = torch.randn(33, 65, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=0), torch.cumprod(
+            x2_dpcpp, dim=0).to(cpu_device).to(torch.float), rtol=10e-4, atol=10e-2)
+
+    def test_cumprod_3d_dim1(self, dtype=torch.float):
+        print("\n-----------------------3D, dim=1---------------------------------------------")
+        x2 = torch.randn(65, 33, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=1), torch.cumprod(
+            x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=1.3e-6, atol=1e-5)
+
+    def test_cumprod_3d_dim1_half(self, dtype=torch.half):
+        print("\n-----------------------3D, dim=1 half---------------------------------------------")
+        x2 = torch.randn(65, 33, 65, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=1), torch.cumprod(
+            x2_dpcpp, dim=1).to(cpu_device).to(torch.float), rtol=10e-4, atol=10e-2)
+
+    def test_cumprod_3d_dim2(self, dtype=torch.float):
+        print("\n-----------------------3D, dim=2---------------------------------------------")
+        x2 = torch.randn(65, 65, 33, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=2), torch.cumprod(
+            x2_dpcpp, dim=2).to(cpu_device).to(torch.float), rtol=1.3e-6, atol=1e-5)
+
+    def test_cumprod_3d_dim2_half(self, dtype=torch.half):
+        print("\n-----------------------3D, dim=2---------------------------------------------")
+        x2 = torch.randn(65, 65, 33, device=cpu_device)
+        x2_dpcpp = x2.to(dpcpp_device).to(dtype)
+        self.assertEqual(torch.cumprod(x2, dim=2), torch.cumprod(
+            x2_dpcpp, dim=2).to(cpu_device).to(torch.float), rtol=10e-4, atol=10e-2)
