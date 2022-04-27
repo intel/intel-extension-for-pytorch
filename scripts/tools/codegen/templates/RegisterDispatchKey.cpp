@@ -85,8 +85,8 @@ private:
   }
   static int indent;
   static int gindex;
-  const bool _enabled;
   const char* _name;
+  const bool _enabled;
 };
 
 int IpexSimpleTrace::indent = -1;

@@ -12,8 +12,7 @@
 #include <c10/util/Exception.h>
 
 // alias for dpcpp namespace
-namespace DPCPP = cl::sycl;
-namespace DPCPP_EXT = DPCPP::ext::oneapi;
+namespace DPCPP = sycl;
 
 // Kernel inside print utils
 #if defined(__SYCL_DEVICE_ONLY__)
@@ -293,21 +292,21 @@ static constexpr auto dpcpp_global_and_local_fence =
 static constexpr auto dpcpp_host_buf = DPCPP::access::target::host_buffer;
 static constexpr auto dpcpp_const_buf = DPCPP::access::target::constant_buffer;
 static constexpr auto dpcpp_local_buf = DPCPP::access::target::local;
-static constexpr auto dpcpp_global_buf = DPCPP::access::target::global_buffer;
+static constexpr auto dpcpp_device_buf = DPCPP::access::target::device;
 
 // dpcpp memory ordering
-static constexpr auto dpcpp_mem_odr_rlx = DPCPP_EXT::memory_order::relaxed;
-static constexpr auto dpcpp_mem_odr_acq = DPCPP_EXT::memory_order::acquire;
-static constexpr auto dpcpp_mem_odr_rel = DPCPP_EXT::memory_order::release;
-static constexpr auto dpcpp_mem_odr_acq_rel = DPCPP_EXT::memory_order::acq_rel;
-static constexpr auto dpcpp_mem_odr_seq_cst = DPCPP_EXT::memory_order::seq_cst;
+static constexpr auto dpcpp_mem_odr_rlx = DPCPP::memory_order::relaxed;
+static constexpr auto dpcpp_mem_odr_acq = DPCPP::memory_order::acquire;
+static constexpr auto dpcpp_mem_odr_rel = DPCPP::memory_order::release;
+static constexpr auto dpcpp_mem_odr_acq_rel = DPCPP::memory_order::acq_rel;
+static constexpr auto dpcpp_mem_odr_seq_cst = DPCPP::memory_order::seq_cst;
 
 // dpcpp memory scope
-static constexpr auto dpcpp_mem_scp_wi = DPCPP_EXT::memory_scope::work_item;
-static constexpr auto dpcpp_mem_scp_sg = DPCPP_EXT::memory_scope::sub_group;
-static constexpr auto dpcpp_mem_scp_wg = DPCPP_EXT::memory_scope::work_group;
-static constexpr auto dpcpp_mem_scp_dev = DPCPP_EXT::memory_scope::device;
-static constexpr auto dpcpp_mem_scp_sys = DPCPP_EXT::memory_scope::system;
+static constexpr auto dpcpp_mem_scp_wi = DPCPP::memory_scope::work_item;
+static constexpr auto dpcpp_mem_scp_sg = DPCPP::memory_scope::sub_group;
+static constexpr auto dpcpp_mem_scp_wg = DPCPP::memory_scope::work_group;
+static constexpr auto dpcpp_mem_scp_dev = DPCPP::memory_scope::device;
+static constexpr auto dpcpp_mem_scp_sys = DPCPP::memory_scope::system;
 
 // dpcpp ptr type
 template <typename T>
@@ -416,7 +415,7 @@ template <
     DPCPP::access::mode Mode = dpcpp_rw_mode,
     int Dims = 1>
 DPCPP_DEVICE using dpcpp_global_acc_t =
-    DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_global_buf>;
+    DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_device_buf>;
 
 template <typename ScalarType, int Dims = 1>
 DPCPP_DEVICE using dpcpp_const_acc_t =
@@ -431,7 +430,7 @@ DPCPP_HOST using dpcpp_host_acc_t =
 
 // dpcpp atomic
 template <typename T>
-using dpcpp_atomic_ref_relaxed_t = DPCPP_EXT::
+using dpcpp_atomic_ref_relaxed_t = DPCPP::
     atomic_ref<T, dpcpp_mem_odr_rlx, dpcpp_mem_scp_dev, dpcpp_global_space>;
 
 template <typename T>
