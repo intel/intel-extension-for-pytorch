@@ -139,13 +139,13 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer
         "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer
     },
-    "TestJitXPU": {
-        "test_variant_consistency_jit", # core dumped ... munmap_chunk(): invalid pointer
-    },
-    "TestMathBitsXPU": {
-        "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
-        "test_neg_view",   # core dumped ... munmap_chunk(): invalid pointer
-    },
+    # "TestJitXPU": {
+    #     "test_variant_consistency_jit", # core dumped ... munmap_chunk(): invalid pointer
+    # },
+    # "TestMathBitsXPU": {
+        # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
+        # "test_neg_view",   # core dumped ... munmap_chunk(): invalid pointer
+    # },
     "TestSparseCSRXPU": {
         "test_add",     # core dumped ... Floating point exception
         "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
