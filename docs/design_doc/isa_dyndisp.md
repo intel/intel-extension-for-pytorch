@@ -365,7 +365,7 @@ Here three ISA related private APIs could do same debug work. Which contains:
 >2. Max binary supported ISA level only depends on built complier version.
 >3. Current ISA level, it is equal minimal of `max CPU ISA level` and `max binary ISA level`.
 
-### Sample:
+### Example:
 ```cmd
 python
 Python 3.9.7 (default, Sep 16 2021, 13:09:58)
@@ -380,6 +380,20 @@ Type "help", "copyright", "credits" or "license" for more information.
 'AMX'
 >>> quit()
 ```
+
+## Select ISA level manually.
+---
+By default, IPEX dispatches to the kernels with maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable `ATEN_CPU_CAPABILITY` (same environment variable from PyTorch). The available values are {`avx2`, `avx512`, `avx512_vnni`, `avx512_bf16`, `amx`}. The effective ISA level would be the minimal level between `ATEN_CPU_CAPABILITY` and the maximum level supported by the hardware.
+### Example:
+```cmd
+$ python -c 'import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())'
+AMX
+$ ATEN_CPU_CAPABILITY=avx2 python -c 'import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())'
+AVX2
+```
+>**Note:**
+>
+>`core._get_current_isa_level()` is an IPEX internal function used for checking the current effective ISA level. It is used for debugging purpose only and subjects to change.
 
 ## CPU feature check
 ---
