@@ -4,6 +4,7 @@
 #include <ATen/core/DimVector.h>
 #include <ATen/native/ReduceOps.h>
 #include <ATen/native/ReduceOpsUtils.h>
+#include <ATen/native/SharedReduceOps.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <c10/core/ScalarType.h>
@@ -19,6 +20,33 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+inline ScalarType get_dtype_from_self(
+    const Tensor& self,
+    const optional<ScalarType>& dtype,
+    bool promote_integers) {
+  if (dtype.has_value()) {
+    return dtype.value();
+  }
+  ScalarType src_type = self.scalar_type();
+  if (promote_integers && at::isIntegralType(src_type, /*includeBool=*/true)) {
+    return kLong;
+  }
+  return src_type;
+}
+
+inline ScalarType get_dtype_from_result(
+    Tensor& result,
+    optional<ScalarType> dtype) {
+  TORCH_CHECK(
+      result.defined(),
+      "Cannot create a new tensor inside a reduction op. You likely tried to call an operator with an out argument but the out argument was an undefined tensor.");
+  if (dtype.has_value()) {
+    return dtype.value();
+  } else {
+    return result.scalar_type();
+  }
+}
 
 Tensor& mul_out(Tensor& out, const Tensor& self, const Tensor& other);
 
@@ -538,6 +566,14 @@ template <
     typename scalar_t,
     typename acc_t = scalar_t,
     typename out_t = scalar_t>
+void nansum_kernel_impl(TensorIterator& iter) {
+  dpcpp_reduce_kernel<scalar_t, out_t>(iter, NanSumOps<acc_t, out_t>{});
+}
+
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 void prod_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter, func_wrapper<out_t>(ReduceProdOps<acc_t>()), 1);
@@ -753,6 +789,54 @@ Tensor sum(
 
 Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype) {
   return at::AtenIpexTypeXPU::sum(self, std::vector<int64_t>{}, false, dtype);
+}
+
+Tensor& nansum_out(
+    const Tensor& self,
+    IntArrayRef dim,
+    bool keepdim,
+    optional<ScalarType> opt_dtype,
+    Tensor& result) {
+  TORCH_CHECK(
+      !c10::isComplexType(self.scalar_type()),
+      "nansum does not support complex inputs");
+  // For integral types, use existing sum as
+  // integral types don't have `Nan`.
+  if (c10::isIntegralType(self.scalar_type(), true)) {
+    return at::sum_out(result, self, dim, keepdim, opt_dtype);
+  }
+
+  ScalarType dtype = get_dtype_from_result(result, opt_dtype);
+  auto iter = make_reduction("nansum", result, self, dim, keepdim, dtype);
+  if (iter.numel() == 0) {
+    result = result.zero_();
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.dtype(),
+        "nansum",
+        [&]() {
+          using accscalar_t = acc_type<scalar_t>;
+          nansum_kernel_impl<scalar_t, accscalar_t>(iter);
+        });
+  }
+  return result;
+}
+
+Tensor nansum(
+    const Tensor& self,
+    IntArrayRef dim,
+    bool keepdim,
+    c10::optional<ScalarType> opt_dtype) {
+  ScalarType dtype = get_dtype_from_self(self, opt_dtype, true);
+  Tensor result = create_reduction_result(self, dim, keepdim, dtype);
+  return at::AtenIpexTypeXPU::nansum_out(self, dim, keepdim, dtype, result);
+}
+
+Tensor nansum(const Tensor& self, c10::optional<ScalarType> dtype) {
+  return at::AtenIpexTypeXPU::nansum(
+      self, std::vector<int64_t>{}, false, dtype);
 }
 
 Tensor& prod_out_impl(

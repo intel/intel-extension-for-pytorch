@@ -553,6 +553,9 @@ supported:
   - sum
   - sum.IntList_out
   - sum.dim_IntList
+  - nansum
+  - nansum.IntList_out
+  - nansum.dim_IntList
 #  - svd        # should not register
 #  - svd.U  # dispatch is False
   - take
