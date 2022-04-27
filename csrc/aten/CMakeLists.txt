@@ -1,4 +1,4 @@
-FILE(GLOB aten_ops_src "operators/*.cpp")
+FILE(GLOB aten_ops_src "operators/*.cpp" "operators/sparse/*.cpp")
 
 # Reset the order of src files to compile slow files first
 list(APPEND slow_patterns

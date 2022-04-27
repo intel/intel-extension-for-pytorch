@@ -56,6 +56,8 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     #     "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     # },
     # "TestAutogradDeviceTypeXPU": {
+    #     "test_cdist_same_inputs",   # too slow    -> no slow in AOT
+    #     "test_cdist",   # too slow   -> no slow in AOT
     #     "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op.
     # },
     "TestTorchDeviceTypeXPU": {
@@ -153,7 +155,7 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         'test_fft2_fftn_equivalence',   # core dumped ... double free or corruption
         'test_fft2_numpy',  # core dumped ... corrupted size vs. prev_size
         'test_fft_input_modification',  # core dumped ... Segmentation fault
-        'test_fft_ifft_rfft_irfft',     # core dumped ... Segmentation fault 
+        'test_fft_ifft_rfft_irfft',     # core dumped ... Segmentation fault
         'test_fft_round_trip',  # core dumped ... corrupted size vs. prev_size
         'test_fft_type_promotion',  # core dumped ... double free or corruption
         'test_fftn_round_trip',     # core dumped ... Segmentation fault

@@ -17,3 +17,5 @@ supported:
   - sparse_dim
   - sparse_mask
   - _coalesce
+  - add.Tensor
+  - add_.Tensor
