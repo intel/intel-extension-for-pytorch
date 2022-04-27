@@ -281,12 +281,17 @@ std::tuple<Tensor, Tensor> _unique(
     const Tensor& self,
     const bool sorted,
     const bool return_inverse) {
-  return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique", [&] {
-    Tensor output, inverse;
-    std::tie(output, inverse, std::ignore) =
-        impl::unique_template<scalar_t>(self, false, return_inverse, false);
-    return std::make_tuple(output, inverse);
-  });
+  return IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "_unique",
+      [&] {
+        Tensor output, inverse;
+        std::tie(output, inverse, std::ignore) =
+            impl::unique_template<scalar_t>(self, false, return_inverse, false);
+        return std::make_tuple(output, inverse);
+      });
 }
 
 std::tuple<Tensor, Tensor, Tensor> _unique2(
@@ -294,10 +299,15 @@ std::tuple<Tensor, Tensor, Tensor> _unique2(
     const bool sorted,
     const bool return_inverse,
     const bool return_counts) {
-  return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique", [&] {
-    return impl::unique_template<scalar_t>(
-        self, false, return_inverse, return_counts);
-  });
+  return IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "_unique2",
+      [&] {
+        return impl::unique_template<scalar_t>(
+            self, false, return_inverse, return_counts);
+      });
 }
 
 std::tuple<Tensor, Tensor, Tensor> unique_dim(
@@ -306,10 +316,15 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim(
     const bool sorted,
     const bool return_inverse,
     const bool return_counts) {
-  return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique_dim", [&] {
-    return impl::unique_dim_template<scalar_t>(
-        self, dim, false, return_inverse, return_counts);
-  });
+  return IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "unique_dim",
+      [&] {
+        return impl::unique_dim_template<scalar_t>(
+            self, dim, false, return_inverse, return_counts);
+      });
 }
 
 std::tuple<Tensor, Tensor, Tensor> unique_dim_consecutive(
@@ -317,10 +332,15 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_consecutive(
     const int64_t dim,
     const bool return_inverse,
     const bool return_counts) {
-  return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique_dim", [&] {
-    return impl::unique_dim_template<scalar_t>(
-        self, dim, true, return_inverse, return_counts);
-  });
+  return IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "unique_dim_consecutive",
+      [&] {
+        return impl::unique_dim_template<scalar_t>(
+            self, dim, true, return_inverse, return_counts);
+      });
 }
 
 std::tuple<Tensor, Tensor, Tensor> unique_consecutive(
@@ -329,10 +349,15 @@ std::tuple<Tensor, Tensor, Tensor> unique_consecutive(
     const bool return_counts,
     c10::optional<int64_t> dim) {
   if (!dim.has_value()) {
-    return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique", [&] {
-      return impl::unique_template<scalar_t>(
-          self, true, return_inverse, return_counts);
-    });
+    return IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        self.scalar_type(),
+        "unique_consecutive",
+        [&] {
+          return impl::unique_template<scalar_t>(
+              self, true, return_inverse, return_counts);
+        });
   }
   return at::AtenIpexTypeXPU::unique_dim_consecutive(
       self, dim.value(), return_inverse, return_counts);
