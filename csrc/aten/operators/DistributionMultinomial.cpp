@@ -168,26 +168,27 @@ void sample_multinomial_without_replacement(
 constexpr int64_t FLOAT32_MAX_CONSECUTIVE_INT = 1 << (24);
 
 Tensor& multinomial_out(
-    Tensor& result,
-    const Tensor& self_,
+    const Tensor& self_original,
     int64_t num_samples,
     bool replacement,
-    c10::optional<Generator> gen_) {
+    c10::optional<Generator> generator,
+    Tensor& result) {
   TORCH_CHECK(
-      result.device() == self_.device(),
+      result.device() == self_original.device(),
       "multinomial arguments must have the same device");
   TORCH_CHECK(
-      self_.dim() > 0 && self_.dim() <= 2, "prob_dist must be 1 or 2 dim");
+      self_original.dim() > 0 && self_original.dim() <= 2,
+      "prob_dist must be 1 or 2 dim");
   TORCH_CHECK(
-      at::isFloatingType(self_.scalar_type()),
+      at::isFloatingType(self_original.scalar_type()),
       "multinomial only supports floating-point dtypes for input, got: ",
-      self_.scalar_type());
+      self_original.scalar_type());
   TORCH_CHECK(
       result.scalar_type() == ScalarType::Long,
       "multinomial expects Long tensor out, got: ",
       result.scalar_type());
   TORCH_CHECK(num_samples > 0, "cannot sample n_sample <= 0 samples");
-  int64_t n_categories = self_.size(-1);
+  int64_t n_categories = self_original.size(-1);
   TORCH_CHECK(
       replacement || (num_samples <= n_categories),
       "cannot sample n_sample > prob_dist.size(-1) samples without replacement");
@@ -198,12 +199,12 @@ Tensor& multinomial_out(
       "number of categories cannot exceed 2^24");
 
   auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
-      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
-  auto shape = self_.sizes();
+      generator, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto shape = self_original.sizes();
   auto num_dists = shape.size() == 1 ? 1 : shape[0];
   auto num_categories = shape.size() == 1 ? shape[0] : shape[1];
 
-  Tensor self = self_.contiguous();
+  Tensor self = self_original.contiguous();
   result.resize_({num_dists, num_samples});
 
   if (shape.size() == 1) {
@@ -319,8 +320,9 @@ Tensor multinomial(
       "cannot sample n_sample > prob_dist size samples without replacement");
 
   Tensor ret = at::empty({num_dists, num_samples}, self.options().dtype(kLong));
+
   at::AtenIpexTypeXPU::multinomial_out(
-      ret, self, num_samples, replacement, generator);
+      self, num_samples, replacement, generator, ret);
   return ret;
 }
 

@@ -3990,6 +3990,7 @@ else:
 
         backward_func(self, device)
 
+    @skipXPUIf(True, "XPU EmbeddingBag backward in max mode is implemented deterministically, so this case is skipped")
     def test_nondeterministic_alert_EmbeddingBag_max(self, device):
         module = torch.nn.EmbeddingBag(
             4, 3, None, 2., False, 'max',

@@ -390,7 +390,7 @@ supported:
   - multilabel_margin_loss_forward
   - multilabel_margin_loss_forward.output
   - multinomial
-#  - multinomial.out  # different signature
+  - multinomial.out
   - mv
   - mvlgamma
   - mvlgamma_

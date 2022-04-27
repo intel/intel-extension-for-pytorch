@@ -885,13 +885,15 @@ class TestReductions(TestCase):
         # CPU Input Tensor
         x = torch.ones(2)
 
+        # This test case exception string is revised because we have to register mode_out as it is registered by stub in pytorch.
+        # After registeration of mode_out(mode.values), the arguments tensor's device checking is triggered when dispatch, instead of in kernel.
         with self.assertRaisesRegex(RuntimeError,
-                                    "expected device .* but got .* for values"):
+                                    "Expected all tensors to be on the same device, but found at least two devices, xpu:0 and cpu"):
             values = torch.tensor([], device=device)
             torch.mode(x, -1, True, out=(values, torch.tensor([], dtype=torch.long)))
 
         with self.assertRaisesRegex(RuntimeError,
-                                    "expected device .* but got .* for indices"):
+                                    "Expected all tensors to be on the same device, but found at least two devices, cpu and xpu:0"):
             indices = torch.tensor([], device=device)
             torch.mode(x, -1, True, out=(torch.tensor([]), indices))
 

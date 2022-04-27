@@ -29,6 +29,18 @@ constexpr int MODE_MAX = 2;
 constexpr int64_t NROWS_PER_THREAD = 10;
 constexpr int64_t WARP_SIZE = 64;
 
+std::pair<Tensor, Tensor> promoteIndicesAndOffsets(
+    const Tensor& indices,
+    const Tensor& offsets) {
+  const auto commonType =
+      promoteTypes(offsets.scalar_type(), indices.scalar_type());
+  return {
+      indices.scalar_type() == commonType ? indices
+                                          : indices.toType(commonType),
+      offsets.scalar_type() == commonType ? offsets
+                                          : offsets.toType(commonType)};
+}
+
 void krn_partials_per_segment(
     int64_t* ret,
     const int64_t* segment_offsets,
@@ -1062,16 +1074,19 @@ Tensor embedding_bag_backward_dpcpp_max(
 
 std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
     const Tensor& weight,
-    const Tensor& indices,
-    const Tensor& offsets,
+    const Tensor& indices_,
+    const Tensor& offsets_,
     const bool scale_grad_by_freq,
     const int64_t mode,
     bool sparse,
     const Tensor& per_sample_weights) {
+  Tensor indices, offsets;
+  std::tie(indices, offsets) = promoteIndicesAndOffsets(indices_, offsets_);
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarTypes("embedding_bag_dpcpp", indices_arg, {kLong, kInt});
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
   checkScalarTypes("embedding_bag_dpcpp", offsets_arg, {kLong, kInt});
+  checkSameType("embedding_bag_dpcpp", indices_arg, offsets_arg);
   IsOnSameDevice("embedding_bag_dpcpp", indices_arg, offsets_arg);
   auto weight_arg = TensorArg(weight, "weight", 1);
   IsOnSameDevice("embedding_bag_dpcpp", weight_arg, indices_arg);
