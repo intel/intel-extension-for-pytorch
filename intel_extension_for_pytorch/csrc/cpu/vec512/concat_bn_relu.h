@@ -37,7 +37,6 @@ static void _concat_bn_relu_kernel_channels_last(
     int64_t total_size_except_channels,
     int64_t ci,
     int64_t co) {
-  int64_t i = 0, j = 0, k = 0;
   auto zero = _mm512_set1_ps(0.0);
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
@@ -48,10 +47,10 @@ static void _concat_bn_relu_kernel_channels_last(
     static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
-  for (i = 0; i < total_size_except_channels; ++i) {
-    for (j = 0; j < in_ptr.size(); ++j) {
+  for (int64_t i = 0; i < total_size_except_channels; ++i) {
+    for (int64_t j = 0; j < in_ptr.size(); ++j) {
       auto concat_in_ptr = in_ptr[j] + i * in_ch[j + 1] - (i + 1) * in_ch[j];
-      for (k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
+      for (int64_t k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
         auto in = _mm512_loadu_ps(concat_in_ptr + k);
         auto beta = _mm512_loadu_ps(beta_ptr + k);
         auto scale = _mm512_loadu_ps(scale_ptr + k);
@@ -73,7 +72,6 @@ void _concat_bn_relu_kernel_channels_last<at::BFloat16, float>(
     int64_t total_size_except_channels,
     int64_t ci,
     int64_t co) {
-  int64_t i = 0, j = 0, k = 0;
   auto zero = _mm512_set1_ps(0.0);
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
@@ -84,10 +82,10 @@ void _concat_bn_relu_kernel_channels_last<at::BFloat16, float>(
     static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
-  for (i = 0; i < total_size_except_channels; ++i) {
-    for (j = 0; j < in_ptr.size(); ++j) {
+  for (int64_t i = 0; i < total_size_except_channels; ++i) {
+    for (int64_t j = 0; j < in_ptr.size(); ++j) {
       auto concat_in_ptr = in_ptr[j] + i * in_ch[j + 1] - (i + 1) * in_ch[j];
-      for (k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
+      for (int64_t k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
         auto in =
             cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(concat_in_ptr + k)));
         auto beta = _mm512_loadu_ps(beta_ptr + k);
