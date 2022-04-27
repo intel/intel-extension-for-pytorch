@@ -456,6 +456,24 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex_prepack::linear_tanh_run(Tensor input, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_tanh_run(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 2);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
     Operator(
         "ipex_prepack::linear_sigmoid_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "

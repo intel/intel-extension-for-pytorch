@@ -29,6 +29,10 @@ at::Tensor linear_gelu_run(
     const c10::intrusive_ptr<LinearOpContext>& op_context,
     c10::string_view approximate);
 
+at::Tensor linear_tanh_run(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
 at::Tensor linear_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context);
