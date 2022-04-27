@@ -16,13 +16,13 @@ namespace impl {
 
 void minimum_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter(
+    dpcpp_kernel_with_scalars(
         iter, [](bool a, bool b) -> bool { return a && b; });
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "minimum_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter(
-          iter,
-          [](scalar_t a, scalar_t b) -> scalar_t { return std::min(a, b); });
+      dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+        return std::min(a, b);
+      });
     });
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -31,7 +31,7 @@ void minimum_kernel(TensorIterator& iter) {
         iter.dtype(),
         "min_elementwise_dpcpp",
         [&]() {
-          dpcpp_kernel_for_tensor_iter(
+          dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 if (a != a) {
                   return a;
@@ -47,13 +47,13 @@ void minimum_kernel(TensorIterator& iter) {
 
 void maximum_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter(
+    dpcpp_kernel_with_scalars(
         iter, [](bool a, bool b) -> bool { return a || b; });
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "maximum_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter(
-          iter,
-          [](scalar_t a, scalar_t b) -> scalar_t { return std::max(a, b); });
+      dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+        return std::max(a, b);
+      });
     });
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -62,7 +62,7 @@ void maximum_kernel(TensorIterator& iter) {
         iter.dtype(),
         "max_elementwise_dpcpp",
         [&]() {
-          dpcpp_kernel_for_tensor_iter(
+          dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
                 if (a != a) {
                   return a;
