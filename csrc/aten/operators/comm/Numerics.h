@@ -1028,6 +1028,10 @@ struct Numerics<c10::complex<float>> {
     return -a;
   }
 
+  static inline c10::complex<float> sqrt(c10::complex<float> a) {
+    return std::sqrt(a);
+  }
+
   static inline c10::complex<float> rsqrt(c10::complex<float> a) {
     return c10::complex<float>(1.0, 0) / std::sqrt(a);
   }
@@ -1101,6 +1105,10 @@ struct Numerics<c10::complex<double>> {
 
   static inline c10::complex<double> neg(c10::complex<double> a) {
     return -a;
+  }
+
+  static inline c10::complex<double> sqrt(c10::complex<double> a) {
+    return std::sqrt(a);
   }
 
   static inline c10::complex<double> rsqrt(c10::complex<double> a) {
