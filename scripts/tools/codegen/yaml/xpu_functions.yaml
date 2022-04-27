@@ -155,6 +155,11 @@ supported:
 #  - clamp_max_  # different signature
   - clamp_min.out
 #  - clamp_min_  # different signature
+  - clamp.Tensor
+  - clamp_.Tensor
+  - clamp.Tensor_out
+  - clamp_min.Tensor_out
+  - clamp_max.Tensor_out
   - clone
   - col2im
   - col2im.out

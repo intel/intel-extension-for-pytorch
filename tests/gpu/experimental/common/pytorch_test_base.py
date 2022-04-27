@@ -55,29 +55,18 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     #     "test_pointwise_op_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     #     "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     # },
-    "TestAutogradDeviceTypeXPU": {
-        "test_cdist_same_inputs",   # too slow
-        "test_cdist",   # too slow
-        "test_sparse_backward",     # core dumped ... Segmentation fault
-    },
+    # "TestAutogradDeviceTypeXPU": {
+    #     "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op.
+    # },
     "TestTorchDeviceTypeXPU": {
-        "test_cdist_large_batch",   # too slow
-        "test_cdist_large",     # too slow
-        "test_cdist_non_contiguous_batch",  # too slow
-        "test_cdist_non_contiguous",  # too slow
-        "test_cdist_norm_batch",  # too slow
-        "test_cdist_norm",  # too slow
-        "test_conv_transposed_large",   # too slow
-        "test_cov",     # core dumped ... free(): invalid size
-        "test_dim_function_empty",  # core dumped ... Floating point exception
-        "test_index_select",    # core dumped ... munmap_chunk(): invalid pointer
+        # "test_cdist_large_batch",   # too slow  -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
+        # "test_cdist_large",     # too slow -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
+        # "test_conv_transposed_large",   # too slow  -> <deconvolution> start barrier(606us) submit(10387us) end barrier(122us) event wait(75568616us) event_duration_0(74985075us) total(75579744us)
+        # "test_cov",     # core dumped ... free(): invalid size  -> accurate issue.
+        # "test_dim_function_empty",  # core dumped ... Floating point exception -> cumsum issue in handling numel or dim = 0. Should be fixed by Kevin.
+        # "test_index_select",    # core dumped ... munmap_chunk(): invalid pointer  -> RuntimeError: index_select(): Expected dtype int64 for index but got: Int
         "test_large_cumprod",   # too slow
         "test_large_cumsum",   # too slow
-        "test_memory_format_cpu_and_xpu_ops",   # core dumped ... Segmentation fault
-        "test_take",    # core dumped ... free(): invalid size
-    },
-    "TestDevicePrecisionXPU": {
-        "test_clamp",   # core dumped ... Segmentation fault
     },
     "TestReductionsXPU": {
         "test_mode",    # too slow
