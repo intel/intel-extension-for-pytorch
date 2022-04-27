@@ -585,7 +585,7 @@ Tensor _convolution_out(
         params.dilation,
         params.groups);
   } else {
-    output_ = convolution(
+    output_ = xpu::oneDNN::convolution(
         output,
         input,
         weight,

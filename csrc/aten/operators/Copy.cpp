@@ -300,8 +300,8 @@ inline bool onednn_strides_check(const Tensor& src) {
   auto adims = xpu::oneDNN::get_onednn_dims(src);
   int ndims = (int)adims.size();
   auto dims = adims.data();
-  auto data_type =
-      static_cast<dnnl_data_type_t>(xpu::oneDNN::get_onednn_dtype(src));
+  auto data_type = static_cast<dnnl_data_type_t>(
+      xpu::oneDNN::get_onednn_dtype(src, /*allow_undef*/ true));
   auto strides_info = xpu::oneDNN::get_onednn_strides(src);
   auto strides = strides_info.empty() ? nullptr : &strides_info[0];
 

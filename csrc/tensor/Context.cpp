@@ -18,7 +18,13 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from) {
   if (from.scalar_type() == at::ScalarType::Long) {
     mem_desc_t opaque_md = {ctx.meta().data};
     // FIXME: to decide AB or BA plain format
-    mem_desc_t plain_md = {ctx.dims(), ctx.dtype(), ctx.get_plain_tag()};
+    mem_desc_t plain_md = {
+        ctx.dims(),
+        ctx.dtype(),
+        xpu::oneDNN::get_dnnl_default_format(
+            ctx.dims().size(),
+            /*is_channels_last*/ false,
+            /*allow_undef*/ true)};
     if (opaque_md == plain_md) {
       Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
       dtype_convert_by_scalar(

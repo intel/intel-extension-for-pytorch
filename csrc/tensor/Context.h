@@ -73,25 +73,6 @@ struct DPCPPTensorContext {
     return size;
   }
 
-  mem_layout_tag_t get_plain_tag() {
-    switch (meta_.dims().size()) {
-      case 1:
-        return mem_layout_tag_t::a;
-      case 2:
-        return mem_layout_tag_t::ab;
-      case 3:
-        return mem_layout_tag_t::abc;
-      case 4:
-        return mem_layout_tag_t::abcd;
-      case 5:
-        return mem_layout_tag_t::abcde;
-      case 6:
-        return mem_layout_tag_t::abcdef;
-      default:
-        return mem_layout_tag_t::undef;
-    }
-  }
-
   bool is_plain() {
     if (meta_.dims().size() == 0 && meta_.data_type() == mem_dtype_t::undef) {
       return true;

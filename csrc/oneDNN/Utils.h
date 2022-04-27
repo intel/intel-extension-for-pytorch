@@ -25,7 +25,8 @@ enum post_attr {
 
 static inline dnnl::memory::format_tag get_dnnl_default_format(
     int ndims,
-    bool is_channels_last = false) {
+    bool is_channels_last = false,
+    bool allow_undef = false) {
   switch (ndims) {
     case 1:
       return memory::format_tag::a;
@@ -55,8 +56,10 @@ static inline dnnl::memory::format_tag get_dnnl_default_format(
     case 12:
       return memory::format_tag::abcdefghijkl;
     default:
-      TORCH_INTERNAL_ASSERT(
-          false, "oneDNN doesn't support tensor dimension > 12");
+      if (!allow_undef) {
+        TORCH_CHECK(false, "oneDNN doesn't support tensor dimension > 12");
+      }
+      return memory::format_tag::undef;
   }
 }
 
@@ -76,7 +79,9 @@ static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
   };
 }
 
-static inline memory::data_type get_onednn_dtype(const at::Tensor& tensor) {
+static inline memory::data_type get_onednn_dtype(
+    const at::Tensor& tensor,
+    bool allow_undef = false) {
   switch (tensor.scalar_type()) {
     case at::ScalarType::Byte:
       return memory::data_type::u8;
@@ -95,6 +100,12 @@ static inline memory::data_type get_onednn_dtype(const at::Tensor& tensor) {
     case at::ScalarType::BFloat16:
       return memory::data_type::bf16;
     default:
+      if (!allow_undef) {
+        TORCH_CHECK(
+            false,
+            c10::toString(tensor.scalar_type()),
+            " is not supported in oneDNN!");
+      }
       return memory::data_type::undef;
   };
 }
