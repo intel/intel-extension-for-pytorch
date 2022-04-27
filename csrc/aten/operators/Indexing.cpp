@@ -66,7 +66,8 @@ void indexSelect(
 
   TORCH_CHECK(
       indices.scalar_type() == ScalarType::Long,
-      "index_select(): Expected dtype int64 for index");
+      "index_select(): Expected dtype int64 for index but got: ",
+      indices.scalar_type());
   TORCH_CHECK(
       src.scalar_type() == dst.scalar_type(),
       "index_select(): Source and result must have the same scalar type");
@@ -1011,7 +1012,7 @@ void index_put(
 }
 
 template <typename scalar_t>
-void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
+void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -1026,6 +1027,18 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
     return;
   }
 
+  TensorInfo<scalar_t, uint32_t> src_info =
+      getTensorInfo<scalar_t, uint32_t>(src);
+  src_info.collapseDims();
+
+  TensorInfo<scalar_t, uint32_t> dst_info =
+      getTensorInfo<scalar_t, uint32_t>(dst);
+  dst_info.collapseDims();
+
+  TensorInfo<int64_t, uint32_t> idx_info =
+      getTensorInfo<int64_t, uint32_t>(index);
+  idx_info.collapseDims();
+
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<scalar_t>();
@@ -1037,9 +1050,16 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
       auto dst_ptr = dst_data;
       auto idx_ptr = idx_data;
 
-      auto idx = item.get_linear_id();
-      auto offset = idx_ptr[idx];
-      dst_ptr[idx] = src_ptr[offset];
+      auto linear_idx = item.get_linear_id();
+      auto idx_offset =
+          IndexToOffset<int64_t, uint32_t>::get(linear_idx, idx_info);
+      auto idx = idx_ptr[idx_offset];
+      auto source_offset =
+          IndexToOffset<scalar_t, uint32_t>::get(idx, src_info);
+      auto dst_offset =
+          IndexToOffset<scalar_t, uint32_t>::get(linear_idx, dst_info);
+
+      dst_ptr[dst_offset] = src_ptr[source_offset];
     };
 
     cgh.parallel_for(DPCPP::range<1>(dst_num_elem), kfn);
@@ -1432,12 +1452,13 @@ Tensor& take_out(const Tensor& self, const Tensor& index, Tensor& out) {
   at::assert_no_overlap(out, index);
   at::assert_no_overlap(out, self);
 
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
+      at::ScalarType::Bool,
       self.scalar_type(),
-      "Take",
-      [&]() { impl::Take<scalar_t>(out, self, index); });
+      "take",
+      [&]() { impl::take_dpcpp<scalar_t>(out, self, index); });
 
   return out;
 }
