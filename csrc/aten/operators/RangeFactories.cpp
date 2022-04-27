@@ -283,8 +283,12 @@ Tensor& arange_dpcpp_out(
     Scalar start,
     Scalar end,
     Scalar step) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, result.scalar_type(), "arange_dpcpp", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      result.scalar_type(),
+      "arange_dpcpp",
+      [&]() {
         using accscalar_t = acc_type<scalar_t>;
         auto xstart = start.to<accscalar_t>();
         auto xend = end.to<accscalar_t>();
