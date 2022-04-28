@@ -681,7 +681,7 @@ void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
       tensor, mask, TensorMaskedFillOp<scalar_t, unsigned char>(value));
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename mask_t>
 void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   c10::MaybeOwned<Tensor> mask =
       expand_inplace(tensor, mask_, "masked_scatter_");
@@ -750,7 +750,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
     auto acc_src_data = contigSrc.data_ptr<scalar_t>();
-    auto acc_mask_data = (*mask).data_ptr<bool>();
+    auto acc_mask_data = static_cast<mask_t*>((*mask).data_ptr());
     auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
     auto acc_tensor_data = tensor.data_ptr<scalar_t>();
 
@@ -777,7 +777,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   DPCPP_Q_SUBMIT(dpcpp_queue, cgfMaskedScatter);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename mask_t>
 void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
 
@@ -840,13 +840,14 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       getTensorInfo<scalar_t, uint64_t>(src);
   src_info.collapseDims();
 
-  TensorInfo<bool, uint64_t> mask_info = getTensorInfo<bool, uint64_t>(mask);
+  TensorInfo<mask_t, uint64_t> mask_info =
+      getTensorInfo<mask_t, uint64_t>(mask);
   mask_info.collapseDims();
 
   // command group function
   auto cgfMaskedSelect = DPCPP_Q_CGF(cgh) {
     auto acc_src_data = src.data_ptr<scalar_t>();
-    auto acc_mask_data = mask.data_ptr<bool>();
+    auto acc_mask_data = static_cast<mask_t*>(mask.data_ptr());
     auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
     auto acc_tensor_data = tensorContig.data_ptr<scalar_t>();
 
@@ -862,7 +863,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       if (linear_index < size) {
         // The mask tensor maybe not contiguos.
         auto mask_offset =
-            IndexToOffset<bool, uint64_t>().get(linear_index, mask_info);
+            IndexToOffset<mask_t, uint64_t>().get(linear_index, mask_info);
         if (mask_ptr[mask_offset]) {
           // The src tensor maybe not contiguos.
           auto src_offset =
@@ -1290,7 +1291,19 @@ Tensor& masked_scatter_(
       at::ScalarType::Half,
       self.scalar_type(),
       "MaskedScatter",
-      [&]() { impl::MaskedScatter<scalar_t>(self, mask, source); });
+      [&]() {
+        if (mask.dtype() == ScalarType::Bool) {
+          impl::MaskedScatter<scalar_t, bool>(self, mask, source);
+        } else if (mask.dtype() == ScalarType::Byte) {
+          TORCH_WARN(
+              "masked_scatter_ received a mask with dtype torch.uint8, this behavior is now deprecated,"
+              "please use a mask with dtype torch.bool instead.");
+          impl::MaskedScatter<scalar_t, uint8_t>(self, mask, source);
+        } else {
+          AT_ERROR(
+              "masked_scatter: expected BoolTensor or ByteTensor for mask");
+        }
+      });
   return self;
 }
 
@@ -1303,7 +1316,18 @@ Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
       at::ScalarType::Half,
       self.scalar_type(),
       "MaskedSelect",
-      [&]() { impl::MaskedSelect<scalar_t>(out, *b_self, *b_mask); });
+      [&]() {
+        if (mask.dtype() == ScalarType::Bool) {
+          impl::MaskedSelect<scalar_t, bool>(out, *b_self, *b_mask);
+        } else if (mask.dtype() == ScalarType::Byte) {
+          TORCH_WARN(
+              "indexing with dtype torch.uint8 is now deprecated, "
+              "please use a mask with dtype torch.bool instead.");
+          impl::MaskedSelect<scalar_t, uint8_t>(out, *b_self, *b_mask);
+        } else {
+          AT_ERROR("masked_select: expected BoolTensor or ByteTensor for mask");
+        }
+      });
   return out;
 }
 
