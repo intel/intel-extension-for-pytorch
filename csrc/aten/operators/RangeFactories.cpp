@@ -109,6 +109,27 @@ Tensor& linspace_dpcpp_out(
     // skip
   } else if (steps == 1) {
     r.fill_(start);
+  } else if (isIntegralType(r.scalar_type(), 0)) {
+    IPEX_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "linspace_xpu", [&]() {
+      scalar_t scalar_start = start.to<scalar_t>();
+      scalar_t scalar_end = end.to<scalar_t>();
+      // Cast `end` and `start` to `float`, since range can be larger than
+      // scalar_t for integral types
+      float step =
+          (static_cast<float>(scalar_end) - static_cast<float>(scalar_start)) /
+          (steps - 1);
+      const int64_t halfway = steps / 2;
+      dpcpp_elementwise_kernel_with_index(
+          r,
+          [scalar_start, scalar_end, steps, step, halfway](
+              int64_t ind) -> scalar_t {
+            if (ind < halfway) {
+              return scalar_start + (step * ind);
+            }
+
+            return scalar_end - step * (steps - ind - 1);
+          });
+    });
   } else {
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
         kHalf, kBFloat16, r.scalar_type(), "linspace_xpu", [&]() {
@@ -188,7 +209,7 @@ Tensor& logspace_dpcpp_out(
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     });
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         r.scalar_type(),

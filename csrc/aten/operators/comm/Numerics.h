@@ -1044,6 +1044,12 @@ struct Numerics<c10::complex<float>> {
     return std::exp(a);
   }
 
+  static inline c10::complex<float> pow(
+      c10::complex<float> a,
+      c10::complex<float> b) {
+    return std::pow(a, b);
+  }
+
   static inline c10::complex<float> log(c10::complex<float> a) {
     return std::log(a);
   }
@@ -1121,6 +1127,12 @@ struct Numerics<c10::complex<double>> {
 
   static inline c10::complex<double> exp(c10::complex<double> a) {
     return std::exp(a);
+  }
+
+  static inline c10::complex<double> pow(
+      c10::complex<double> a,
+      c10::complex<double> b) {
+    return std::pow(a, b);
   }
 
   static inline c10::complex<double> log(c10::complex<double> a) {
