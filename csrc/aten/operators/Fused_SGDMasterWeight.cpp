@@ -151,8 +151,8 @@ void vec_kernel_sgdmw(
               static_cast<float>(momentum * temp_momentum_buffer_value);
           temp_momentum_buffer_value +=
               static_cast<float>(grad_elm * dampening);
-          momentum_buffer_ptr[linear_idx] = temp_momentum_buffer_value;
         }
+        momentum_buffer_ptr[linear_idx] = temp_momentum_buffer_value;
 
         // nesterov
         if (nesterov) {
@@ -215,10 +215,10 @@ void vec_kernel_sgdmw(
               static_cast<float>(momentum * temp_momentum_buffer_value);
           temp_momentum_buffer_value +=
               static_cast<float>(grad_elm * dampening);
-          momentum_buffer_vec[id][v_index] =
-              at::native::Memory::detail::bitwise_cast<elem_mw_t>(
-                  temp_momentum_buffer_value);
         }
+        momentum_buffer_vec[id][v_index] =
+            at::native::Memory::detail::bitwise_cast<elem_mw_t>(
+                temp_momentum_buffer_value);
 
         // nesterov
         if (nesterov) {
@@ -374,24 +374,25 @@ at::Tensor& fused_SGDMasterWeight(
            weight_decay,
            momentum_buffer_not_existed}));
 
-  auto master_w = master_weight.contiguous();
-  auto w = weight.contiguous();
-  auto gw = grad.contiguous();
-  auto mb = momentum_buffer.contiguous();
+  auto memory_format = master_weight.suggest_memory_format();
+  master_weight = master_weight.contiguous(memory_format);
+  weight = weight.contiguous(memory_format);
+  grad = grad.contiguous(memory_format);
+  momentum_buffer = momentum_buffer.contiguous(memory_format);
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      w.scalar_type(),
+      weight.scalar_type(),
       "fused_SGDMasterWeight",
       [&] {
         impl::ComputeSGDMasterWeightDecayKernel<scalar_t>(
-            master_w,
-            w,
-            gw,
+            master_weight,
+            weight,
+            grad,
             weight_decay,
             momentum_buffer_not_existed,
-            mb,
+            momentum_buffer,
             momentum,
             dampening,
             nesterov,

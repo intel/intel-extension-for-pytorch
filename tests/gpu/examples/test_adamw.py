@@ -17,6 +17,44 @@ beta1 = 0.9
 beta2 = 0.999
 adam_epsilon = 1e-6
 weight_decay = 0.01
+dtype = torch.bfloat16
+
+# model cpu
+class ModelCPU(nn.Module):
+    def __init__(self):
+        super(ModelCPU, self).__init__()
+        self.m = nn.Sequential(
+            nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
+            nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+            nn.ReLU(inplace=True),
+            nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
+        )
+        self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
+
+    def forward(self, x):
+        x = self.m(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+# model xpu
+class ModelXPU(nn.Module):
+    def __init__(self):
+        super(ModelXPU, self).__init__()
+        self.m = nn.Sequential(
+            nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
+            nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+            nn.ReLU(inplace=True),
+            nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
+        )
+        self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
+
+    def forward(self, x):
+        x = self.m(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
 
 class CPUReferenceAdamMasterWeight(Optimizer):
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
@@ -116,47 +154,14 @@ class CPUReferenceAdamMasterWeight(Optimizer):
         return loss
 
 class TestNNMethod(TestCase):
-    def test_FusedAdamWMasterWeight_transformer(self, dtype=torch.bfloat16):
-        # model cpu
-        class model_cpu(nn.Module):
-            def __init__(self):
-                super(model_cpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # model xpu
-        class model_xpu(nn.Module):
-            def __init__(self):
-                super(model_xpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
+    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="AdamW optimizer does not support onednn block format")
+    def create_model(self, transformer, correct_bias, amsgrad):
         # create model
-        model_cpu = model_cpu()
+        global ModelCPU
+        global ModelXPU
+        model_cpu = ModelCPU()
         model_cpu.train()
-        model_xpu = model_xpu()
+        model_xpu = ModelXPU()
         model_xpu.train()
 
         # align the master weight in cpu model and xpu model in float32
@@ -172,544 +177,185 @@ class TestNNMethod(TestCase):
                                                      betas=(beta1, beta2),
                                                      eps=adam_epsilon,
                                                      weight_decay=weight_decay,
-                                                     transformer=True,
-                                                     correct_bias=True)
+                                                     transformer=transformer,
+                                                     correct_bias=correct_bias)
         optimizer_xpu = torch.xpu.optim.AdamWMasterWeight(model_xpu.parameters(),
                                                           lr=lr,
                                                           betas=(beta1, beta2),
                                                           eps=adam_epsilon,
                                                           weight_decay=weight_decay,
-                                                          transformer=True,
-                                                          correct_bias=True)
+                                                          transformer=transformer,
+                                                          correct_bias=correct_bias)
 
         # model xpu bf16
         model_xpu = model_xpu.to(device=device, dtype=torch.bfloat16)
+        return model_cpu, model_xpu, optimizer_cpu, optimizer_xpu
 
-        # criterion
+    def training_step(self, model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format):
+        input = torch.randn(128, 512, 7, 7)
+        target = torch.empty(128, dtype=torch.long).random_(1000)
+
+        input_xpu = input.clone().to(device=device, dtype=dtype).requires_grad_()
+        input_xpu = input_xpu.contiguous(memory_format=mem_format)
+        target_xpu = target.to(device)
+        input_cpu = input.clone().float().cpu().requires_grad_()
+        input_cpu = input_cpu.contiguous(memory_format=mem_format)
+        target_cpu = target.detach().clone().cpu()
+
+        # forward
+        output_cpu = model_cpu(input_cpu)
+        output_xpu = model_xpu(input_xpu)
+        torch.xpu.synchronize()
+        # align output
+        output_cpu.data = output_xpu.detach().clone().cpu().float().data
+        torch.xpu.synchronize()
+
+        # loss
         criterion = nn.CrossEntropyLoss()
+        loss_cpu = criterion(output_cpu, target_cpu)
+        loss_xpu = criterion(output_xpu, target_xpu)
+        torch.xpu.synchronize()
 
+        # align loss
+        loss_xpu.data = loss_cpu.clone().to(device='xpu').data
+        torch.xpu.synchronize()
+
+        # optimizer
+        optimizer_cpu.zero_grad()
+        optimizer_xpu.zero_grad()
+
+        # backward
+        loss_cpu.backward()
+        loss_xpu.backward()
+        torch.xpu.synchronize()
+
+        # align grad
+        p_cpu_list = list(model_cpu.parameters())
+        p_xpu_list = list(model_xpu.parameters())
+        for k in range(len(p_cpu_list)):
+            p_xpu_list[k].grad.data = p_cpu_list[k].grad.detach().clone().to(device='xpu', dtype=torch.bfloat16).data
+            torch.xpu.synchronize()
+
+        # update
+        optimizer_cpu.step()
+        optimizer_xpu.step()
+        torch.xpu.synchronize()
+
+    def check_result(self, model_xpu, model_cpu):
+        # checking updated weight
+        for layer1 in model_xpu.modules():
+            for layer2 in model_cpu.modules():
+                if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
+                    bn_xpu_weight = layer1.weight.clone().cpu().float()
+                    bn_xpu_bias = layer1.bias.clone().cpu().float()
+                    bn_cpu_weight = layer2.weight.clone().cpu().float()
+                    bn_cpu_bias = layer2.bias.clone().cpu().float()
+
+                    # checking
+                    self.assertEqual(bn_cpu_weight, bn_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+                    self.assertEqual(bn_cpu_bias, bn_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+
+                if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
+                    conv_xpu_weight = layer1.weight.clone().cpu().float()
+                    conv_cpu_weight = layer2.weight.clone().cpu().float()
+
+                    # checking
+                    self.assertEqual(conv_cpu_weight, conv_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+
+                if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
+                    fc_xpu_weight = layer1.weight.clone().cpu().float()
+                    fc_xpu_bias = layer1.bias.clone().cpu().float()
+                    fc_cpu_weight = layer2.weight.clone().cpu().float()
+                    fc_cpu_bias = layer2.bias.clone().cpu().float()
+
+                    # checking
+                    self.assertEqual(fc_cpu_weight, fc_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+                    self.assertEqual(fc_cpu_bias, fc_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+
+    def test_FusedAdamWMasterWeight_transformer(self, dtype=torch.bfloat16):
+        transformer = True
+        correct_bias = True
+        amsgrad = False
+        # ### test contiguous_format ### #
+        mem_format = torch.contiguous_format
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
         for i in range(num_iter):
             print('\n\niter: ', i)
-            # input
-            input = torch.randn(128, 512, 7, 7, requires_grad=True)
-            target = torch.empty(128, dtype=torch.long).random_(1000)
-            input_xpu = input.detach().clone().to(device=device, dtype=dtype).requires_grad_()
-            target_xpu = target.to(device)
-            input_cpu = input.detach().clone().float().cpu().requires_grad_()
-            target_cpu = target.detach().clone().cpu()
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_xpu, model_cpu)
 
-            # forward
-            output_cpu = model_cpu(input_cpu)
-            output_xpu = model_xpu(input_xpu)
-            torch.xpu.synchronize()
-
-            # align output
-            output_cpu.data = output_xpu.detach().clone().cpu().float().data
-            torch.xpu.synchronize()
-
-            # loss
-            loss_cpu = criterion(output_cpu, target_cpu)
-            loss_xpu = criterion(output_xpu, target_xpu)
-            torch.xpu.synchronize()
-
-            # align loss
-            loss_xpu.data = loss_cpu.clone().to(device='xpu').data
-            torch.xpu.synchronize()
-
-            # optimizer
-            optimizer_cpu.zero_grad()
-            optimizer_xpu.zero_grad()
-
-            # backward
-            loss_cpu.backward()
-            loss_xpu.backward()
-            torch.xpu.synchronize()
-
-            # align grad
-            p_cpu_list = list(model_cpu.parameters())
-            p_xpu_list = list(model_xpu.parameters())
-            for k in range(len(p_cpu_list)):
-                p_xpu_list[k].grad.data = p_cpu_list[k].grad.detach().clone().to(device='xpu', dtype=torch.bfloat16).data
-                torch.xpu.synchronize()
-
-            # update
-            optimizer_cpu.step()
-            optimizer_xpu.step()
-            torch.xpu.synchronize()
-
-            # checking updated weight
-            for layer1 in model_xpu.modules():
-                for layer2 in model_cpu.modules():
-                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
-                        bn_xpu_weight = layer1.weight.clone().cpu().float()
-                        bn_xpu_bias = layer1.bias.clone().cpu().float()
-                        bn_cpu_weight = layer2.weight.clone().cpu().float()
-                        bn_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(bn_cpu_weight, bn_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(bn_cpu_bias, bn_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
-                        conv_xpu_weight = layer1.weight.clone().cpu().float()
-                        conv_cpu_weight = layer2.weight.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(conv_cpu_weight, conv_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
-                        fc_xpu_weight = layer1.weight.clone().cpu().float()
-                        fc_xpu_bias = layer1.bias.clone().cpu().float()
-                        fc_cpu_weight = layer2.weight.clone().cpu().float()
-                        fc_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(fc_cpu_weight, fc_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(fc_cpu_bias, fc_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+        # ### test channels_last format ### #
+        mem_format = torch.channels_last
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
+        model_cpu = model_cpu.to(memory_format=mem_format)
+        model_xpu = model_xpu.to(memory_format=mem_format)
+        for i in range(num_iter):
+            print('\n\niter: ', i)
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_xpu, model_cpu)
 
     def test_FusedAdamWMasterWeight_transformer_no_correct_bias(self, dtype=torch.bfloat16):
-        # model cpu
-        class model_cpu(nn.Module):
-            def __init__(self):
-                super(model_cpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # model xpu
-        class model_xpu(nn.Module):
-            def __init__(self):
-                super(model_xpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # create model
-        model_cpu = model_cpu()
-        model_cpu.train()
-        model_xpu = model_xpu()
-        model_xpu.train()
-
-        # align the master weight in cpu model and xpu model in float32
-        p_cpu_list = list(model_cpu.parameters())
-        p_xpu_list = list(model_xpu.parameters())
-        for k in range(len(p_cpu_list)):
-            p_xpu_list[k].data = p_cpu_list[k].detach().clone().to(device='xpu', dtype=torch.float32).data
-            torch.xpu.synchronize()
-
-        # optimizer
-        optimizer_cpu = CPUReferenceAdamMasterWeight(model_cpu.parameters(),
-                                                     lr=lr,
-                                                     betas=(beta1, beta2),
-                                                     eps=adam_epsilon,
-                                                     weight_decay=weight_decay,
-                                                     transformer=True,
-                                                     correct_bias=False)
-        optimizer_xpu = torch.xpu.optim.AdamWMasterWeight(model_xpu.parameters(),
-                                                          lr=lr,
-                                                          betas=(beta1, beta2),
-                                                          eps=adam_epsilon,
-                                                          weight_decay=weight_decay,
-                                                          transformer=True,
-                                                          correct_bias=False)
-
-        # model xpu bf16
-        model_xpu = model_xpu.to(device=device, dtype=torch.bfloat16)
-
-        # criterion
-        criterion = nn.CrossEntropyLoss()
-
+        transformer = True
+        correct_bias = False
+        amsgrad = False
+        # ### test contiguous_format ### #
+        mem_format = torch.contiguous_format
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
         for i in range(num_iter):
             print('\n\niter: ', i)
-            # input
-            input = torch.randn(128, 512, 7, 7, requires_grad=True)
-            target = torch.empty(128, dtype=torch.long).random_(1000)
-            input_xpu = input.detach().clone().to(device=device, dtype=dtype).requires_grad_()
-            target_xpu = target.to(device)
-            input_cpu = input.detach().clone().float().cpu().requires_grad_()
-            target_cpu = target.detach().clone().cpu()
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_cpu, model_xpu)
 
-            # forward
-            output_cpu = model_cpu(input_cpu)
-            output_xpu = model_xpu(input_xpu)
-            torch.xpu.synchronize()
-
-            # align output
-            output_cpu.data = output_xpu.detach().clone().cpu().float().data
-            torch.xpu.synchronize()
-
-            # loss
-            loss_cpu = criterion(output_cpu, target_cpu)
-            loss_xpu = criterion(output_xpu, target_xpu)
-            torch.xpu.synchronize()
-
-            # align loss
-            loss_xpu.data = loss_cpu.clone().to(device='xpu').data
-            torch.xpu.synchronize()
-
-            # optimizer
-            optimizer_cpu.zero_grad()
-            optimizer_xpu.zero_grad()
-
-            # backward
-            loss_cpu.backward()
-            loss_xpu.backward()
-            torch.xpu.synchronize()
-
-            # align grad
-            p_cpu_list = list(model_cpu.parameters())
-            p_xpu_list = list(model_xpu.parameters())
-            for k in range(len(p_cpu_list)):
-                p_xpu_list[k].grad.data = p_cpu_list[k].grad.detach().clone().to(device='xpu', dtype=torch.bfloat16).data
-                torch.xpu.synchronize()
-
-            # update
-            optimizer_cpu.step()
-            optimizer_xpu.step()
-            torch.xpu.synchronize()
-
-            # checking updated weight
-            for layer1 in model_xpu.modules():
-                for layer2 in model_cpu.modules():
-                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
-                        bn_xpu_weight = layer1.weight.clone().cpu().float()
-                        bn_xpu_bias = layer1.bias.clone().cpu().float()
-                        bn_cpu_weight = layer2.weight.clone().cpu().float()
-                        bn_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(bn_cpu_weight, bn_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(bn_cpu_bias, bn_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
-                        conv_xpu_weight = layer1.weight.clone().cpu().float()
-                        conv_cpu_weight = layer2.weight.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(conv_cpu_weight, conv_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
-                        fc_xpu_weight = layer1.weight.clone().cpu().float()
-                        fc_xpu_bias = layer1.bias.clone().cpu().float()
-                        fc_cpu_weight = layer2.weight.clone().cpu().float()
-                        fc_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(fc_cpu_weight, fc_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(fc_cpu_bias, fc_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+        # ### test channels_last format ### #
+        mem_format = torch.channels_last
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
+        model_cpu = model_cpu.to(memory_format=mem_format)
+        model_xpu = model_xpu.to(memory_format=mem_format)
+        for i in range(num_iter):
+            print('\n\niter: ', i)
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_xpu, model_cpu)
 
     def test_FusedAdamWMasterWeight_official(self, dtype=torch.bfloat16):
-        # model cpu
-        class model_cpu(nn.Module):
-            def __init__(self):
-                super(model_cpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # model xpu
-        class model_xpu(nn.Module):
-            def __init__(self):
-                super(model_xpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # create model
-        model_cpu = model_cpu()
-        model_cpu.train()
-        model_xpu = model_xpu()
-        model_xpu.train()
-
-        # align the master weight in cpu model and xpu model in float32
-        p_cpu_list = list(model_cpu.parameters())
-        p_xpu_list = list(model_xpu.parameters())
-        for k in range(len(p_cpu_list)):
-            p_xpu_list[k].data = p_cpu_list[k].detach().clone().to(device='xpu', dtype=torch.float32).data
-            torch.xpu.synchronize()
-
-        # optimizer
-        optimizer_cpu = torch.optim.AdamW(model_cpu.parameters(),
-                                          lr=lr,
-                                          betas=(beta1, beta2),
-                                          eps=adam_epsilon,
-                                          weight_decay=weight_decay)
-        optimizer_xpu = torch.xpu.optim.AdamWMasterWeight(model_xpu.parameters(),
-                                                          lr=lr,
-                                                          betas=(beta1, beta2),
-                                                          eps=adam_epsilon,
-                                                          weight_decay=weight_decay)
-
-        # model xpu bf16
-        model_xpu = model_xpu.to(device=device, dtype=torch.bfloat16)
-
-        # criterion
-        criterion = nn.CrossEntropyLoss()
-
+        transformer = False
+        correct_bias = True
+        amsgrad = False
+        # ### test contiguous_format ### #
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
+        mem_format = torch.contiguous_format
         for i in range(num_iter):
             print('\n\niter: ', i)
-            # input
-            input = torch.randn(128, 512, 7, 7, requires_grad=True)
-            target = torch.empty(128, dtype=torch.long).random_(1000)
-            input_xpu = input.detach().clone().to(device=device, dtype=dtype).requires_grad_()
-            target_xpu = target.to(device)
-            input_cpu = input.detach().clone().float().cpu().requires_grad_()
-            target_cpu = target.detach().clone().cpu()
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_cpu, model_xpu)
 
-            # forward
-            output_cpu = model_cpu(input_cpu)
-            output_xpu = model_xpu(input_xpu)
-            torch.xpu.synchronize()
-
-            # align output
-            output_cpu.data = output_xpu.detach().clone().cpu().float().data
-            torch.xpu.synchronize()
-
-            # loss
-            loss_cpu = criterion(output_cpu, target_cpu)
-            loss_xpu = criterion(output_xpu, target_xpu)
-            torch.xpu.synchronize()
-
-            # align loss
-            loss_xpu.data = loss_cpu.clone().to(device='xpu').data
-            torch.xpu.synchronize()
-
-            # optimizer
-            optimizer_cpu.zero_grad()
-            optimizer_xpu.zero_grad()
-
-            # backward
-            loss_cpu.backward()
-            loss_xpu.backward()
-            torch.xpu.synchronize()
-
-            # align grad
-            p_cpu_list = list(model_cpu.parameters())
-            p_xpu_list = list(model_xpu.parameters())
-            for k in range(len(p_cpu_list)):
-                p_xpu_list[k].grad.data = p_cpu_list[k].grad.detach().clone().to(device='xpu', dtype=torch.bfloat16).data
-                torch.xpu.synchronize()
-
-            # update
-            optimizer_cpu.step()
-            optimizer_xpu.step()
-            torch.xpu.synchronize()
-
-            # checking updated weight
-            for layer1 in model_xpu.modules():
-                for layer2 in model_cpu.modules():
-                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
-                        bn_xpu_weight = layer1.weight.clone().cpu().float()
-                        bn_xpu_bias = layer1.bias.clone().cpu().float()
-                        bn_cpu_weight = layer2.weight.clone().cpu().float()
-                        bn_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(bn_cpu_weight, bn_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(bn_cpu_bias, bn_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
-                        conv_xpu_weight = layer1.weight.clone().cpu().float()
-                        conv_cpu_weight = layer2.weight.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(conv_cpu_weight, conv_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
-                        fc_xpu_weight = layer1.weight.clone().cpu().float()
-                        fc_xpu_bias = layer1.bias.clone().cpu().float()
-                        fc_cpu_weight = layer2.weight.clone().cpu().float()
-                        fc_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(fc_cpu_weight, fc_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(fc_cpu_bias, fc_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+        # ### test channels_last format ### #
+        mem_format = torch.channels_last
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
+        model_cpu = model_cpu.to(memory_format=mem_format)
+        model_xpu = model_xpu.to(memory_format=mem_format)
+        for i in range(num_iter):
+            print('\n\niter: ', i)
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_xpu, model_cpu)
 
     def test_FusedAdamWMasterWeight_official_amsgrad(self, dtype=torch.bfloat16):
-        # model cpu
-        class model_cpu(nn.Module):
-            def __init__(self):
-                super(model_cpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # model xpu
-        class model_xpu(nn.Module):
-            def __init__(self):
-                super(model_xpu, self).__init__()
-                self.m = nn.Sequential(
-                    nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
-                    nn.BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-                    nn.ReLU(inplace=True),
-                    nn.AvgPool2d(kernel_size=7, stride=1, padding=0),
-                )
-                self.fc = nn.Linear(in_features=2048, out_features=1000, bias=True)
-
-            def forward(self, x):
-                x = self.m(x)
-                x = x.view(x.size(0), -1)
-                x = self.fc(x)
-                return x
-
-        # create model
-        model_cpu = model_cpu()
-        model_cpu.train()
-        model_xpu = model_xpu()
-        model_xpu.train()
-
-        # align the master weight in cpu model and xpu model in float32
-        p_cpu_list = list(model_cpu.parameters())
-        p_xpu_list = list(model_xpu.parameters())
-        for k in range(len(p_cpu_list)):
-            p_xpu_list[k].data = p_cpu_list[k].detach().clone().to(device='xpu', dtype=torch.float32).data
-            torch.xpu.synchronize()
-
-        # optimizer
-        optimizer_cpu = torch.optim.AdamW(model_cpu.parameters(),
-                                          lr=lr,
-                                          betas=(beta1, beta2),
-                                          eps=adam_epsilon,
-                                          weight_decay=weight_decay,
-                                          amsgrad=True)
-        optimizer_xpu = torch.xpu.optim.AdamWMasterWeight(model_xpu.parameters(),
-                                                          lr=lr,
-                                                          betas=(beta1, beta2),
-                                                          eps=adam_epsilon,
-                                                          weight_decay=weight_decay,
-                                                          amsgrad=True)
-
-        # model xpu bf16
-        model_xpu = model_xpu.to(device=device, dtype=torch.bfloat16)
-
-        # criterion
-        criterion = nn.CrossEntropyLoss()
-
+        transformer = False
+        correct_bias = True
+        amsgrad = True
+        # ### test contiguous_format ### #
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
+        mem_format = torch.contiguous_format
         for i in range(num_iter):
             print('\n\niter: ', i)
-            # input
-            input = torch.randn(128, 512, 7, 7, requires_grad=True)
-            target = torch.empty(128, dtype=torch.long).random_(1000)
-            input_xpu = input.detach().clone().to(device=device, dtype=dtype).requires_grad_()
-            target_xpu = target.to(device)
-            input_cpu = input.detach().clone().float().cpu().requires_grad_()
-            target_cpu = target.detach().clone().cpu()
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_cpu, model_xpu)
 
-            # forward
-            output_cpu = model_cpu(input_cpu)
-            output_xpu = model_xpu(input_xpu)
-            torch.xpu.synchronize()
-
-            # align output
-            output_cpu.data = output_xpu.detach().clone().cpu().float().data
-            torch.xpu.synchronize()
-
-            # loss
-            loss_cpu = criterion(output_cpu, target_cpu)
-            loss_xpu = criterion(output_xpu, target_xpu)
-            torch.xpu.synchronize()
-
-            # align loss
-            loss_xpu.data = loss_cpu.clone().to(device='xpu').data
-            torch.xpu.synchronize()
-
-            # optimizer
-            optimizer_cpu.zero_grad()
-            optimizer_xpu.zero_grad()
-
-            # backward
-            loss_cpu.backward()
-            loss_xpu.backward()
-            torch.xpu.synchronize()
-
-            # align grad
-            p_cpu_list = list(model_cpu.parameters())
-            p_xpu_list = list(model_xpu.parameters())
-            for k in range(len(p_cpu_list)):
-                p_xpu_list[k].grad.data = p_cpu_list[k].grad.detach().clone().to(device='xpu', dtype=torch.bfloat16).data
-                torch.xpu.synchronize()
-
-            # update
-            optimizer_cpu.step()
-            optimizer_xpu.step()
-            torch.xpu.synchronize()
-
-            # checking updated weight
-            for layer1 in model_xpu.modules():
-                for layer2 in model_cpu.modules():
-                    if (isinstance(layer1, nn.BatchNorm2d) and isinstance(layer2, nn.BatchNorm2d)):
-                        bn_xpu_weight = layer1.weight.clone().cpu().float()
-                        bn_xpu_bias = layer1.bias.clone().cpu().float()
-                        bn_cpu_weight = layer2.weight.clone().cpu().float()
-                        bn_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(bn_cpu_weight, bn_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(bn_cpu_bias, bn_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Conv2d) and isinstance(layer2, nn.Conv2d)):
-                        conv_xpu_weight = layer1.weight.clone().cpu().float()
-                        conv_cpu_weight = layer2.weight.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(conv_cpu_weight, conv_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-
-                    if (isinstance(layer1, nn.Linear) and isinstance(layer2, nn.Linear)):
-                        fc_xpu_weight = layer1.weight.clone().cpu().float()
-                        fc_xpu_bias = layer1.bias.clone().cpu().float()
-                        fc_cpu_weight = layer2.weight.clone().cpu().float()
-                        fc_cpu_bias = layer2.bias.clone().cpu().float()
-
-                        # checking
-                        self.assertEqual(fc_cpu_weight, fc_xpu_weight.cpu().float(), atol=checking_atol, rtol=checking_rtol)
-                        self.assertEqual(fc_cpu_bias, fc_xpu_bias.cpu().float(), atol=checking_atol, rtol=checking_rtol)
+        # ### test channels_last format ### #
+        mem_format = torch.channels_last
+        model_cpu, model_xpu, optimizer_cpu, optimizer_xpu = self.create_model(transformer, correct_bias, amsgrad)
+        model_cpu = model_cpu.to(memory_format=mem_format)
+        model_xpu = model_xpu.to(memory_format=mem_format)
+        for i in range(num_iter):
+            print('\n\niter: ', i)
+            self.training_step(model_cpu, model_xpu, optimizer_cpu, optimizer_xpu, mem_format)
+            self.check_result(model_xpu, model_cpu)

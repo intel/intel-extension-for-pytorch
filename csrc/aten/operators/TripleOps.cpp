@@ -346,8 +346,12 @@ Tensor fusion_amdd(
     float momentum,
     float dampening,
     float lr) {
-  // RECORD_FUNCTION("fusion_amdd", std::vector<c10::IValue>({top_half,
-  // bot_half, grad})); There is only for FP32 update
+  // support contiguous and channels_last contiguous
+  auto memory_format = p.suggest_memory_format();
+  p = p.contiguous(memory_format);
+  d_p = d_p.contiguous(memory_format);
+  buf = buf.contiguous(memory_format);
+
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, d_p.scalar_type(), "fusion_amdd_kernel", [&]() {
         fusion_amdd_kernel<scalar_t>(

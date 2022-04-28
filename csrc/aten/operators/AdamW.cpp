@@ -417,22 +417,23 @@ Tensor& fused_adamWMasterWeight(
       std::vector<c10::IValue>(
           {master_weight, weight, grad, amsgrad, avg, avg_sq, max_avg_sq}));
 
-  // always accept contiguous input
-  auto master_w = master_weight.contiguous();
-  auto w = weight.contiguous();
-  auto gw = grad.contiguous();
+  // support contiguous and channels_last contiguous
+  auto memory_format = master_weight.suggest_memory_format();
+  master_weight = master_weight.contiguous(memory_format);
+  weight = weight.contiguous(memory_format);
+  grad = grad.contiguous(memory_format);
 
   // scalar_t = weight dtype = grad dtype
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      w.scalar_type(),
+      weight.scalar_type(),
       "apply_migrated_official_AdamW_dpcpp",
       [&] {
         impl::ComputeAdamWKernel<scalar_t>(
-            master_w,
-            w,
-            gw,
+            master_weight,
+            weight,
+            grad,
             amsgrad,
             avg,
             avg_sq,
@@ -469,22 +470,23 @@ Tensor& transformer_adamWMasterWeight(
       std::vector<c10::IValue>(
           {master_weight, weight, grad, avg, avg_sq, max_avg_sq}));
 
-  // always accept contiguous input
-  auto master_w = master_weight.contiguous();
-  auto w = weight.contiguous();
-  auto gw = grad.contiguous();
+  // support contiguous and channels_last contiguous
+  auto memory_format = master_weight.suggest_memory_format();
+  master_weight = master_weight.contiguous(memory_format);
+  weight = weight.contiguous(memory_format);
+  grad = grad.contiguous(memory_format);
 
   // scalar_t = weight dtype = grad dtype
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      w.scalar_type(),
+      weight.scalar_type(),
       "apply_migrated_transformer_AdamW_dpcpp",
       [&] {
         impl::ComputeAdamWKernel<scalar_t>(
-            master_w,
-            w,
-            gw,
+            master_weight,
+            weight,
+            grad,
             /*amsgrad*/ false,
             avg,
             avg_sq,
