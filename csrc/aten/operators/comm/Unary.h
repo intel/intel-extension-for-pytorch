@@ -18,7 +18,7 @@ namespace AtenIpexTypeXPU {
     IPEX_DISPATCH_##types##_AND2(                                    \
         at::ScalarType::Half,                                        \
         at::ScalarType::BFloat16,                                    \
-        self.scalar_type(),                                          \
+        iter.dtype(),                                                \
         #op,                                                         \
         [&]() {                                                      \
           dpcpp_kernel_for_tensor_iter(                              \
@@ -31,7 +31,7 @@ namespace AtenIpexTypeXPU {
 #define IPEX_FUNC_BASE_OPS(op, func, creator, types)             \
   Tensor& op(const Tensor& self, Tensor& out) {                  \
     auto iter = TensorIterator::creator(out, self);              \
-    IPEX_DISPATCH_##types(self.scalar_type(), #op, [&]() {       \
+    IPEX_DISPATCH_##types(iter.dtype(), #op, [&]() {             \
       dpcpp_kernel_for_tensor_iter(                              \
           iter, [](scalar_t a) -> scalar_t { return func(a); }); \
     });                                                          \

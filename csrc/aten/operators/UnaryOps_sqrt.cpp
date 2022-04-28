@@ -15,10 +15,20 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    rsqrt_out,
-    Numerics<scalar_t>::rsqrt,
-    unary_float_op);
+Tensor& rsqrt_out(const Tensor& self, Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "rsqrt",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return Numerics<scalar_t>::rsqrt(a);
+        });
+      });
+  return out;
+}
 
 Tensor& sqrt_out(Tensor& result, const Tensor& self) {
   auto iter = TensorIterator::unary_float_op(result, self);

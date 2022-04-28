@@ -147,7 +147,7 @@ Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      self.scalar_type(),
+      iter.common_dtype(),
       "reciprocal_xpu",
       [&] {
         dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
