@@ -82,6 +82,78 @@ static inline DPCPP_DEVICE void atomicAdd(
   target.fetch_add(val);
 }
 
+template <typename T, size_t n>
+struct AtomicAddIntegerImpl;
+
+template <typename T>
+struct AtomicAddIntegerImpl<T, 1> {
+  inline DPCPP_DEVICE void operator()(T* address, T val) {
+    size_t offset = (size_t)address & 3;
+    uint32_t* address_as_ui = (uint32_t*)((char*)address - offset);
+    uint32_t assumed = *address_as_ui;
+    uint32_t shift = offset * 8;
+    uint32_t newval;
+    uint32_t newval_byte;
+
+    dpcpp_atomic_ref_relaxed_t<uint32_t> target(*address_as_ui);
+    do {
+      newval = assumed;
+      newval_byte = (newval >> shift) & 0xff;
+      // preserve size in initial cast. Casting directly to uint32_t pads
+      // negative signed values with 1's (e.g. signed -1 = unsigned ~0).
+      newval = static_cast<uint8_t>(Numerics<int8_t>::add(val, newval_byte));
+      newval = (assumed & ~(0x000000ff << shift)) | (newval << shift);
+    } while (!target.compare_exchange_strong(assumed, newval));
+  }
+};
+
+template <typename T>
+struct AtomicAddIntegerImpl<T, 2> {
+  inline DPCPP_DEVICE void operator()(T* address, T val) {
+    size_t offset = (size_t)address & 2;
+    uint32_t* address_as_ui = (uint32_t*)((char*)address - offset);
+    bool is_32_align = offset;
+    uint32_t assumed = *address_as_ui;
+    uint32_t newval;
+    uint32_t newval_bytes;
+    dpcpp_atomic_ref_relaxed_t<uint32_t> target(*address_as_ui);
+
+    do {
+      newval = assumed;
+      newval_bytes = is_32_align ? newval >> 16 : newval & 0xffff;
+      // preserve size in initial cast. Casting directly to uint32_t pads
+      // negative signed values with 1's (e.g. signed -1 = unsigned ~0).
+      newval = static_cast<uint16_t>(Numerics<int16_t>::add(val, newval_bytes));
+      newval = is_32_align ? (assumed & 0xffff) | (newval << 16)
+                           : (assumed & 0xffff0000) | newval;
+    } while (!target.compare_exchange_strong(assumed, newval));
+  }
+};
+
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_global_ptr_pt<uint8_t>& address,
+    uint8_t val) {
+  AtomicAddIntegerImpl<uint8_t, sizeof(uint8_t)>()(address, val);
+}
+
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_global_ptr_pt<int8_t>& address,
+    int8_t val) {
+  AtomicAddIntegerImpl<int8_t, sizeof(int8_t)>()(address, val);
+}
+
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_global_ptr_pt<int16_t>& address,
+    int16_t val) {
+  AtomicAddIntegerImpl<int16_t, sizeof(int16_t)>()(address, val);
+}
+
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_global_ptr_pt<bool>& address,
+    bool val) {
+  *address = address && val;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
