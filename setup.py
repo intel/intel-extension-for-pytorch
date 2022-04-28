@@ -291,6 +291,7 @@ class DPCPPBuild(BuildExtension, object):
                 'CMAKE_PROJECT_VERSION': version,
                 'PYTHON_EXECUTABLE': sys.executable,
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
+                'PYTHON_PLATFORM_INFO': platform.platform(),
                 'LIB_NAME': ext.name,
             }
 

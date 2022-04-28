@@ -65,6 +65,8 @@ function (print_configuration_summary)
     message(STATUS "  CMake version         : ${CMAKE_VERSION}")
     message(STATUS "  CMake command         : ${CMAKE_COMMAND}")
     message(STATUS "  System                : ${CMAKE_SYSTEM_NAME}")
+    message(STATUS "  Platform              : ${PYTHON_PLATFORM_INFO}")
+
     message(STATUS "  Target name           : ${LIB_NAME}")
     message(STATUS "  Target version        : ${CMAKE_PROJECT_VERSION}")
     message(STATUS "  Install path          : ${CMAKE_INSTALL_PREFIX}")
