@@ -63,22 +63,6 @@ static inline dnnl::memory::format_tag get_dnnl_default_format(
   }
 }
 
-static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
-  switch (tensor.scalar_type()) {
-    case at::ScalarType::Byte:
-    case at::ScalarType::Char:
-    case at::ScalarType::Int:
-    case at::ScalarType::Half:
-    case at::ScalarType::Float:
-    case at::ScalarType::BFloat16:
-    case at::ScalarType::QInt8:
-    case at::ScalarType::QUInt8:
-      return true;
-    default:
-      return false;
-  };
-}
-
 static inline memory::data_type get_onednn_dtype(
     const at::Tensor& tensor,
     bool allow_undef = false) {
@@ -108,6 +92,13 @@ static inline memory::data_type get_onednn_dtype(
       }
       return memory::data_type::undef;
   };
+}
+
+static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
+  return get_onednn_dtype(tensor, /*allow_undef*/ true) ==
+          memory::data_type::undef
+      ? false
+      : true;
 }
 
 static inline memory::dims get_onednn_dims(const at::Tensor& tensor) {

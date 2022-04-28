@@ -50,17 +50,17 @@ class XPUTimer : public Timer {
     xpu::dpcpp::DPCPPEvent& start_event = getEvent(start);
     xpu::dpcpp::DPCPPEvent& end_event = getEvent(end);
     // It is possible users did not call backward or run codes in
-    // no-sync mode, in this case, some cudaEvents like "backward_compute_end"
+    // no-sync mode, in this case, some Events like "backward_compute_end"
     // or "backward_comm_start" or "backward_comm_end" will not be recorded.
-    // cudaEvent is created when it is first time to be recorded.
+    // Event is created when it is first time to be recorded.
     // If it is never recorded/created, skip synchronize and calculation.
-    // Otherwise it will throw cuda errors.
+    // Otherwise it will throw errors.
     if (!start_event.isCreated() || !end_event.isCreated()) {
       return c10::nullopt;
     }
     // set_runtime_stats_and_log is called at the beginning of forward call,
-    // when it is cheap to synchronize the cuda events of previous iteration,
-    // as mostly all cuda operations are finished in previous iteration.
+    // when it is cheap to synchronize the events of previous iteration,
+    // as mostly all operations are finished in previous iteration.
     start_event.synchronize();
     end_event.synchronize();
     float milliseconds = start_event.elapsed_time(end_event);

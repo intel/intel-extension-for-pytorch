@@ -68,7 +68,7 @@ struct MinMaxReductionOps {
     return {a.first, a.second + base_idx};
   }
 
-#if defined(__CUDACC__) || defined(__HIPCC__)
+#if 0
   static C10_DEVICE arg_t warp_shfl_down(arg_t arg, int offset) {
     return arg_t(
         WARP_SHFL_DOWN(arg.first, offset), WARP_SHFL_DOWN(arg.second, offset));

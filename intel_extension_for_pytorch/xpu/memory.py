@@ -21,7 +21,7 @@ def empty_cache() -> None:
 
 
 def memory_stats(device: Union[Device, int] = None) -> Dict[str, Any]:
-    r"""Returns a dictionary of CUDA memory allocator statistics for a
+    r"""Returns a dictionary of XPU memory allocator statistics for a
     given device.
 
     The return value of this function is a dictionary of statistics, each of
@@ -104,7 +104,7 @@ def memory_stats_as_nested_dict(device: Union[Device, int] = None) -> Dict[str, 
 
 
 def reset_accumulated_memory_stats(device: Union[Device, int] = None) -> None:
-    r"""Resets the "accumulated" (historical) stats tracked by the CUDA memory allocator.
+    r"""Resets the "accumulated" (historical) stats tracked by the XPU memory allocator.
 
     See :func:`~torch.xpu.memory_stats` for details. Accumulated stats correspond to
     the `"allocated"` and `"freed"` keys in each individual stat dict, as well as
@@ -124,7 +124,7 @@ def reset_accumulated_memory_stats(device: Union[Device, int] = None) -> None:
 
 
 def reset_peak_memory_stats(device: Union[Device, int] = None) -> None:
-    r"""Resets the "peak" stats tracked by the CUDA memory allocator.
+    r"""Resets the "peak" stats tracked by the XPU memory allocator.
 
     See :func:`~torch.xpu.memory_stats` for details. Peak stats correspond to the
     `"peak"` key in each individual stat dict.
