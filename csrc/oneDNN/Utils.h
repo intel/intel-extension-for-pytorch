@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <core/MemoryFormat.h>
+#include <core/detail/TensorInfo.h>
 #include <oneapi/dnnl/dnnl.hpp>
 #include <tensor/Context.h>
 #include <utils/Macros.h>
@@ -288,6 +289,24 @@ static inline bool softmax_backward_valid(
     default:
       return false;
   };
+  return true;
+}
+
+static inline bool cat_valid(const TensorList& tensors) {
+  for (int i = 0; i < tensors.size(); i++) {
+    const Tensor& tensor = tensors[i];
+    if (tensor.defined()) {
+      if (tensor.scalar_type() == ScalarType::Bool ||
+          tensor.scalar_type() == ScalarType::Short ||
+          tensor.scalar_type() == ScalarType::Double ||
+          tensor.scalar_type() == ScalarType::Long ||
+          tensor.scalar_type() == ScalarType::ComplexFloat ||
+          tensor.scalar_type() == ScalarType::ComplexDouble ||
+          tensor.dim() > MAX_TENSORINFO_DIMS) {
+        return false;
+      }
+    }
+  }
   return true;
 }
 

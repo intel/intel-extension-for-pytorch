@@ -360,23 +360,6 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   }
   at::assert_no_internal_overlap(out);
 
-  bool skip_dnnl_cat = false;
-  for (int i = 0; i < tensors.size(); i++) {
-    Tensor tensor = tensors[i];
-    if (tensor.defined()) {
-      if (tensor.scalar_type() == ScalarType::Bool ||
-          tensor.scalar_type() == ScalarType::Short ||
-          tensor.scalar_type() == ScalarType::Double ||
-          tensor.scalar_type() == ScalarType::Long ||
-          tensor.scalar_type() == ScalarType::ComplexFloat ||
-          tensor.scalar_type() == ScalarType::ComplexDouble ||
-          tensor.dim() > MAX_TENSORINFO_DIMS) {
-        skip_dnnl_cat = true;
-      }
-      break;
-    }
-  }
-
   ScalarType firstType = tensors[0].scalar_type();
   bool allSameType =
       std::all_of(tensors.begin(), tensors.end(), [firstType](const Tensor& t) {
@@ -385,7 +368,7 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   allSameType = allSameType && (out.scalar_type() == firstType);
 
   // DNNL cat does not support double datatype now.
-  if (!allSameType || skip_dnnl_cat) {
+  if (!allSameType || !xpu::oneDNN::cat_valid(tensors)) {
     auto atens = at::AtenIpexTypeXPU::to_plain_if_needed(tensors);
     impl::cat(out, at::TensorList(atens), atens.size(), dim, allSameType);
   } else {
