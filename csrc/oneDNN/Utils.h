@@ -9,6 +9,9 @@
 
 using namespace dnnl;
 
+// FIXME: In some cases, for example, concat, reorder, and etc.
+// oneDNN only supports dims <= 6 for now.
+#define MAX_ONEDNN_SUPPORTED_DIMS 6
 #define ONEDNN_SCALES_MASK_BY_CHANNEL(x) (1 << x)
 
 namespace xpu {
@@ -302,7 +305,7 @@ static inline bool cat_valid(const TensorList& tensors) {
           tensor.scalar_type() == ScalarType::Long ||
           tensor.scalar_type() == ScalarType::ComplexFloat ||
           tensor.scalar_type() == ScalarType::ComplexDouble ||
-          tensor.dim() > MAX_TENSORINFO_DIMS) {
+          tensor.dim() > MAX_ONEDNN_SUPPORTED_DIMS) {
         return false;
       }
     }
