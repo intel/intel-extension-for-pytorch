@@ -196,6 +196,8 @@ Tensor cholesky_inverse(const Tensor& self, bool upper) {
 }
 
 Tensor& ger_out(Tensor& out, const Tensor& self, const Tensor& vec2) {
+// TODO: Will implement ger kernel on all floating and int datatype, exclude
+// float32 and float64
 #ifdef USE_ONEMKL
   TORCH_CHECK(
       self.dim() == 1, "input must be 1-d vector. input shape=", self.sizes());
@@ -330,10 +332,10 @@ Tensor addr(
     const Tensor& vec2,
     const Scalar& beta,
     const Scalar& alpha) {
-  Tensor result = at::AtenIpexTypeXPU::ger(vec1, vec2) * alpha;
+  check_addr_scalar(self.scalar_type(), beta, "beta");
+  check_addr_scalar(self.scalar_type(), alpha, "alpha");
 
-  check_addr_scalar(result.scalar_type(), beta, "beta");
-  check_addr_scalar(result.scalar_type(), alpha, "alpha");
+  Tensor result = at::AtenIpexTypeXPU::ger(vec1, vec2) * alpha;
 
   if (beta.to<double>() == 0.0) {
     return result;
@@ -343,11 +345,11 @@ Tensor addr(
 
 Tensor& addr_out(
     Tensor& result,
-    const Tensor& self,
+    Tensor& self,
     const Tensor& vec1,
     const Tensor& vec2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   auto addr_result = at::AtenIpexTypeXPU::addr(self, vec1, vec2, beta, alpha);
   // Validates safe casting
   const auto result_dtype = addr_result.scalar_type();
@@ -366,8 +368,8 @@ Tensor& addr_(
     Tensor& self,
     const Tensor& vec1,
     const Tensor& vec2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   return at::AtenIpexTypeXPU::addr_out(self, self, vec1, vec2, beta, alpha);
 }
 

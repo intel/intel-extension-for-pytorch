@@ -90,8 +90,8 @@ supported:
   - addmm.out  # newly added
 #  - addmm_	# different signature
   - addmv.out  # newly added
-#  - addr	# different signature
-#  - addr_	# different signature
+  - addr
+  - addr_
   - all
   - all.dim
   - all.out
@@ -146,8 +146,9 @@ supported:
   - cholesky.out
   - cholesky_inverse
   - cholesky_inverse.out
-  - cholesky_solve
-  - cholesky_solve.out
+# - cholesky_solve # CompositeExplicitAutograd
+# - cholesky_solve.out # CompositeExplicitAutograd
+  - _cholesky_solve_helper
 #  - clamp  # different signature
   - clamp.out
 #  - clamp_  # different signature
@@ -538,8 +539,8 @@ supported:
   - softshrink.out
 #  - softshrink_backward  # different signature
   - softshrink_backward.grad_input
-  - solve
-  - solve.solution
+# - solve # CompositeExplicitAutograd
+# - solve.solution # CompositeExplicitAutograd
   - sort
   - sort.values
   - sqrt.out
