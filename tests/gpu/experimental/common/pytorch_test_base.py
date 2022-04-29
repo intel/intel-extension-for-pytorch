@@ -60,76 +60,76 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     #     "test_cdist",   # too slow   -> no slow in AOT
     #     "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op.
     # },
-    "TestTorchDeviceTypeXPU": {
+    # "TestTorchDeviceTypeXPU": {
         # "test_cdist_large_batch",   # too slow  -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
         # "test_cdist_large",     # too slow -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
         # "test_conv_transposed_large",   # too slow  -> <deconvolution> start barrier(606us) submit(10387us) end barrier(122us) event wait(75568616us) event_duration_0(74985075us) total(75579744us)
         # "test_cov",     # core dumped ... free(): invalid size  -> accurate issue.
         # "test_dim_function_empty",  # core dumped ... Floating point exception -> cumsum issue in handling numel or dim = 0. Should be fixed by Kevin.
         # "test_index_select",    # core dumped ... munmap_chunk(): invalid pointer  -> RuntimeError: index_select(): Expected dtype int64 for index but got: Int
-        "test_large_cumprod",   # too slow
-        "test_large_cumsum",   # too slow
-    },
-    "TestReductionsXPU": {
-        "test_mode",    # too slow
-        "test_nansum_out_dtype",    # too slow
-        "test_nansum",  # too slow
-        "test_noncontiguous_all",   # too slow
-        "test_noncontiguous_expanded",  # too slow
-        "test_noncontiguous_innermost",     # too slow
-        "test_noncontiguous_outermost",     # too slow
-        "test_noncontiguous_transposed",    # too slow
-        "test_numpy_named_args",    # too slow
-        "test_prod_bool",   # too slow
-        "test_prod_gpu",    # too slow
-        "test_quantile_backward",   # too slow
-        "test_quantile_error",  # too slow
-        "test_quantile",    # too slow
-        "test_reduction_empty_any_all",     # too slow
-        "test_reduction_split",     # too slow
-        "test_reduction_vectorize_along_input_corner",  # too slow
-        "test_reduction_vectorize_along_output",  # too slow
-        "test_std_correction_vs_numpy",     # too slow
-        "test_std_mean_all_dims",   # too slow
-        "test_std_mean_correction",     # too slow
-        "test_std_mean_some_dims",  # too slow
-        "test_std_mean",    # too slow
-        "test_std_vs_numpy",    # too slow
-        "test_sum_dim_reduction_uint8_overflow",    # too slow
-        "test_sum_noncontig",   # too slow
-        "test_sum_vs_numpy",    # too slow
-        "test_tensor_reduce_ops_empty",     # too slow
-        "test_var_correction_vs_numpy",     # too slow
-        "test_var_large_input",     # too slow
-        "test_var_mean_all_dims",   # too slow
-        "test_var_mean_correction",     # too slow
-        "test_var_mean_some_dims",  # too slow
-        "test_var_mean",    # too slow
-        "test_var_stability2",  # too slow
-        "test_var_stability",   # too slow
-        "test_var_unbiased",    # too slow
-        "test_var_vs_numpy",    # too slow
-        "test_var",     # too slow
-    },
-    "TestUnaryUfuncsXPU": {
-        "test_batch_vs_slicing",   # too slow
-        "test_frexp_out",    # core dumped ... free(): invalid size
-        "test_out_arg_all_dtypes",   # core dumped ... Segmentation fault
-    },
-    "TestCommonXPU": {
-        "test_dtypes",  # core dumped ... munmap_chunk(): invalid pointer
-        "test_out",     # core dumped ... free(): invalid size
-        "test_variant_consistency_eager",   # core dumped ... munmap_chunk(): invalid pointer
-        "test_multiple_devices",    # multi device not ready
-    },
-    "TestGradientsXPU": {
-        "test_fn_grad", # core dumped ... munmap_chunk(): invalid pointer
-        "test_fn_gradgrad", # core dumped ... munmap_chunk(): invalid pointer
-        "test_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer
-        "test_inplace_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer
-        "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer
-        "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer
-    },
+        # "test_large_cumprod",   # too slow  -> OOM on my gen9 host
+        # "test_large_cumsum",   # too slow -> OOM on my gen9 host
+    # },
+    # "TestReductionsXPU": {
+        # "test_mode",    # too slow -> no too slow in AOT
+        # "test_nansum_out_dtype",    # too slow
+        # "test_nansum",  # too slow
+        # "test_noncontiguous_all",   # too slow
+        # "test_noncontiguous_expanded",  # too slow
+        # "test_noncontiguous_innermost",     # too slow
+        # "test_noncontiguous_outermost",     # too slow
+        # "test_noncontiguous_transposed",    # too slow
+        # "test_numpy_named_args",    # too slow  -> passed
+        # "test_prod_bool",   # too slow
+        # "test_prod_gpu",    # too slow  -> passed
+        # "test_quantile_backward",   # too slow
+        # "test_quantile_error",  # too slow  -> passed
+        # "test_quantile",    # too slow
+        # "test_reduction_empty_any_all",     # too slow
+        # "test_reduction_split",     # too slow
+        # "test_reduction_vectorize_along_input_corner",  # too slow
+        # "test_reduction_vectorize_along_output",  # too slow -> passed
+        # "test_std_correction_vs_numpy",     # too slow
+        # "test_std_mean_all_dims",   # too slow -> passed
+        # "test_std_mean_correction",     # too slow
+        # "test_std_mean_some_dims",  # too slow -> passed
+        # "test_std_mean",    # too slow
+        # "test_std_vs_numpy",    # too slow
+        # "test_sum_dim_reduction_uint8_overflow",    # too slow
+        # "test_sum_noncontig",   # too slow
+        # "test_sum_vs_numpy",    # too slow
+        # "test_tensor_reduce_ops_empty",     # too slow
+        # "test_var_correction_vs_numpy",     # too slow
+        # "test_var_large_input",     # too slow
+        # "test_var_mean_all_dims",   # too slow
+        # "test_var_mean_correction",     # too slow
+        # "test_var_mean_some_dims",  # too slow
+        # "test_var_mean",    # too slow
+        # "test_var_stability2",  # too slow
+        # "test_var_stability",   # too slow
+        # "test_var_unbiased",    # too slow
+        # "test_var_vs_numpy",    # too slow
+    #     "test_var",     # too slow
+    # },
+    # "TestUnaryUfuncsXPU": {
+    #     "test_batch_vs_slicing",   # too slow
+    #     "test_frexp_out",    # core dumped ... free(): invalid size  -> OOM ../neo/opencl/source/os_interface/linux/drm_command_stream.inl
+    #     "test_out_arg_all_dtypes",   # core dumped ... Segmentation fault
+    # },
+    # "TestCommonXPU": {
+        # "test_dtypes",  # core dumped ... munmap_chunk(): invalid pointer
+        # "test_out",     # core dumped ... free(): invalid size  -> oneDNN assert
+        # "test_variant_consistency_eager",   # core dumped ... munmap_chunk(): invalid pointer
+        # "test_multiple_devices",    # multi device not ready   -> issue in test scripts
+    # },
+    # "TestGradientsXPU": {
+        # "test_fn_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+        # "test_fn_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+        # "test_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+        # "test_inplace_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+        # "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+        # "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+    # },
     # "TestJitXPU": {
     #     "test_variant_consistency_jit", # core dumped ... munmap_chunk(): invalid pointer
     # },
