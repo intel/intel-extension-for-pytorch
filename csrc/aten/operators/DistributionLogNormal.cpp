@@ -54,7 +54,8 @@ Tensor& log_normal_(
   TORCH_CHECK(
       std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
 #ifdef USE_ONEMKL
-  if (self.is_contiguous()) {
+  if (self.is_contiguous() &&
+      (self.scalar_type() == kFloat || self.scalar_type() == kDouble)) {
     auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
         gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
 

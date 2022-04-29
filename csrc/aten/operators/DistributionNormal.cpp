@@ -111,8 +111,16 @@ Tensor& normal_(
     double std,
     c10::optional<Generator> generator) {
   TORCH_CHECK(std >= 0.0, "normal_ expects std >= 0.0, but found std=", std);
-  auto iter = TensorIterator::nullary_op(self);
-  normal_dpcpp(iter, mean, std, generator);
+  if (self.is_complex()) {
+    auto float_tensor = at::view_as_real(self);
+    // variance for normal distribution of the real and imaginary values
+    // is half of the input variance
+    auto iter = TensorIterator::nullary_op(float_tensor);
+    normal_dpcpp(iter, mean, std / (std::sqrt(2)), generator);
+  } else {
+    auto iter = TensorIterator::nullary_op(self);
+    normal_dpcpp(iter, mean, std, generator);
+  }
   return self;
 }
 
