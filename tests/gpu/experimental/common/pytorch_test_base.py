@@ -146,10 +146,15 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         "test_sparse_addmm",    # core dumped ... Floating point exception
         "test_sparse_mm",   # core dumped ... Floating point exception
     },
-    "TestNNDeviceTypeXPU": {
-        "test_conv_transposed_large",   # core dumped ... Floating point exception
-        "test_softmax_64bit_indexing",  # too slow
-    },
+    # "TestNNDeviceTypeXPU": {
+        # "test_conv_ndhwc",  # core dumped ... Segmentation fault
+        # "test_conv_nhwc",   # core dumped ... Segmentation fault
+        # "test_conv_transposed_large",   # core dumped ... Floating point exception
+        # "test_grid_sample_large_index_2d",  # too slow
+        # "test_grid_sample_large_index_3d",  # too slow
+        # "test_softmax_64bit_indexing",  # too slow
+        # "test_softmax_results",     # core dumped ... Floating point exception
+    # },
     "TestFFTXPU": {
         'test_batch_istft', # core dumped ... double free or corruption
         'test_fft2_fftn_equivalence',   # core dumped ... double free or corruption
