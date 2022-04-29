@@ -11,6 +11,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;

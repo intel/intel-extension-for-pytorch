@@ -6,6 +6,7 @@
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "UpSample.h"
 

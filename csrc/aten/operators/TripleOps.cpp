@@ -13,6 +13,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/PSTLFunctions.h"
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 using namespace at::sparse;

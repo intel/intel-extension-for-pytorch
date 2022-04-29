@@ -8,6 +8,7 @@
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Distributions.h"
 #include "Random.h"

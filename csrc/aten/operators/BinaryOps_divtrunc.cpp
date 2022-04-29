@@ -4,9 +4,9 @@
 
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
-#include "BinaryOps_divtrunc.h"
 #include "Loops.h"
 #include "comm/zmath.h"
 

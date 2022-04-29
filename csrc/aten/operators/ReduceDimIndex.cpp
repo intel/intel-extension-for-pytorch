@@ -6,6 +6,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -102,8 +103,8 @@ std::tuple<Tensor&, Tensor&> _min_out(
 }
 
 std::tuple<Tensor, Tensor> _min(const Tensor& self, int64_t dim, bool keepdim) {
-  auto min = empty({0}, self.options());
-  auto min_indices = empty({0}, self.options().dtype(kLong));
+  auto min = at::empty({0}, self.options());
+  auto min_indices = at::empty({0}, self.options().dtype(kLong));
   return AtenIpexTypeXPU::_min_out(min, min_indices, self, dim, keepdim);
 }
 
@@ -140,8 +141,8 @@ std::tuple<Tensor&, Tensor&> _max_out(
 }
 
 std::tuple<Tensor, Tensor> _max(const Tensor& self, int64_t dim, bool keepdim) {
-  auto max = empty({0}, self.options());
-  auto max_indices = empty({0}, self.options().dtype(kLong));
+  auto max = at::empty({0}, self.options());
+  auto max_indices = at::empty({0}, self.options().dtype(kLong));
   return AtenIpexTypeXPU::_max_out(max, max_indices, self, dim, keepdim);
 }
 

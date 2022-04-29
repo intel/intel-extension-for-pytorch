@@ -2,6 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 #include "Loops.h"

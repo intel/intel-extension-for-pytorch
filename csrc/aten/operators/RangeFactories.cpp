@@ -9,6 +9,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Algorithm.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <cmath>
 #include <limits>

@@ -11,6 +11,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 #include "Reduce.h"

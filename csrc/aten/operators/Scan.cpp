@@ -8,6 +8,7 @@
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 #include "comm/PSTLFunctions.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace at::detail;
 using namespace xpu::dpcpp;

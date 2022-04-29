@@ -4,6 +4,7 @@
 #include <core/Generator.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Distributions.h"
 #include "Random.h"

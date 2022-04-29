@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 
 #include <core/TensorImplUtils.h>
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

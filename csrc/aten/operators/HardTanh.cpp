@@ -5,6 +5,7 @@
 #include <utils/DPCPP.h>
 #include "Loops.h"
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {

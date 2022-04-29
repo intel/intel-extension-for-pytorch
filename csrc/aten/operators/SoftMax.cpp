@@ -6,6 +6,7 @@
 #include <intrinsic/ipex_intrinsic.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include "comm/RegistrationDeclarations.h"
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"

@@ -4,6 +4,7 @@
 
 #include <oneDNN/oneDNN.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <tuple>
 

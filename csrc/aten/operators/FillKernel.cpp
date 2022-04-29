@@ -5,6 +5,7 @@
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 

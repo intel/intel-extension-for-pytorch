@@ -8,6 +8,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 
@@ -327,8 +328,8 @@ Tensor addr(
     const Tensor& self,
     const Tensor& vec1,
     const Tensor& vec2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   Tensor result = at::AtenIpexTypeXPU::ger(vec1, vec2) * alpha;
 
   check_addr_scalar(result.scalar_type(), beta, "beta");

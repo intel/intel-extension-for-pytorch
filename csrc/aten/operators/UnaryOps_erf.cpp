@@ -4,6 +4,7 @@
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 

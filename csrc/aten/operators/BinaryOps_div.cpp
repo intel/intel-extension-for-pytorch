@@ -4,10 +4,9 @@
 
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
-#include "BinaryOps_divfloor.h"
-#include "BinaryOps_divtrunc.h"
 #include "Loops.h"
 #include "comm/zmath.h"
 
@@ -30,6 +29,9 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
 }
 
 } // namespace impl
+
+void div_floor_kernel(TensorIterator& iter);
+void div_trunc_kernel(TensorIterator& iter);
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_float_op(result, self, other);

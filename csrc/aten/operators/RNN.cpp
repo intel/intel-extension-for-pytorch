@@ -5,6 +5,7 @@
 
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include "comm/RegistrationDeclarations.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;

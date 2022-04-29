@@ -4,6 +4,7 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include "comm/ApplyUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "comm/ATDispatch.h"
 

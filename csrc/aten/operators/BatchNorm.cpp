@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include "comm/RegistrationDeclarations.h"
 
 #include <oneDNN/oneDNN.h>
 

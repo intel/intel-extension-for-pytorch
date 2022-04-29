@@ -8,6 +8,7 @@
 
 #include "ScatterGather.h"
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;

@@ -16,6 +16,7 @@
 #include <runtime/Utils.h>
 
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <oneDNN/Utils.h>
 #include <oneDNN/oneDNN.h>

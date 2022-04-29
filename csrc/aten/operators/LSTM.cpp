@@ -9,6 +9,7 @@
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;

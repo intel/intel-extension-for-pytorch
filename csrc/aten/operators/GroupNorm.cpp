@@ -5,6 +5,7 @@
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

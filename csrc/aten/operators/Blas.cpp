@@ -11,6 +11,7 @@
 
 #include <quantized/QUtil.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <c10/util/typeid.h>
 
@@ -581,8 +582,8 @@ Tensor& addmm_(
     Tensor& self,
     const Tensor& m1,
     const Tensor& m2,
-    Scalar beta,
-    Scalar alpha) {
+    const Scalar& beta,
+    const Scalar& alpha) {
   Tensor bias = at::empty_like(self).copy_(self);
   // oneDNN cannot support result/bias (write/read) use the same memory.
   // we will remove copy to keep performance once matmul refactor done.

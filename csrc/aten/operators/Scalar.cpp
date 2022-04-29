@@ -3,6 +3,7 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

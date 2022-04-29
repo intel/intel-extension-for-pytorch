@@ -1,5 +1,7 @@
 #include <ATen/ATen.h>
 
+#include "comm/RegistrationDeclarations.h"
+
 namespace at {
 namespace AtenIpexTypeXPU {
 

@@ -9,6 +9,7 @@
 #include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
 #include "comm/PSTLFunctions.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <intrinsic/ipex_intrinsic.h>
+#include "comm/RegistrationDeclarations.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {

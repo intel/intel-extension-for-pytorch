@@ -14,6 +14,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/SimpleReduce.h"
 
 using namespace xpu::dpcpp::detail;

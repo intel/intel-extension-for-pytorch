@@ -7,6 +7,7 @@
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 #include "EltwiseNaiveKer.h"
@@ -145,7 +146,7 @@ Tensor& sub_out(
   return result;
 }
 
-Tensor sub(const Tensor& self, const Tensor& other, const Scalar alpha) {
+Tensor sub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
   impl::sub_check(self, other);
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
@@ -154,23 +155,23 @@ Tensor sub(const Tensor& self, const Tensor& other, const Scalar alpha) {
   return iter.output();
 }
 
-Tensor& sub_(Tensor& self, const Tensor& other, Scalar alpha) {
+Tensor& sub_(Tensor& self, const Tensor& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::sub_out(self, other, alpha, self);
 }
 
-Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
+Tensor rsub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::sub(other, self, alpha);
 }
 
-Tensor sub(const Tensor& self, Scalar other, Scalar alpha) {
+Tensor sub(const Tensor& self, const Scalar& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::sub(self, wrapped_scalar_tensor(other), alpha);
 }
 
-Tensor& sub_(Tensor& self, Scalar other, Scalar alpha) {
+Tensor& sub_(Tensor& self, const Scalar& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::sub_(self, wrapped_scalar_tensor(other), alpha);
 }
 
-Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
+Tensor rsub(const Tensor& self, const Scalar& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::rsub(self, wrapped_scalar_tensor(other), alpha);
 }
 

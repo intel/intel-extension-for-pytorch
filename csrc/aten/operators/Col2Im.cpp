@@ -9,6 +9,7 @@
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"

@@ -8,6 +8,7 @@
 
 #include <oneDNN/oneDNN.h>
 #include "comm/ParamUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace dnnl;
 using namespace at::native;

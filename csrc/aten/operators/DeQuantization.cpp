@@ -11,6 +11,7 @@
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 

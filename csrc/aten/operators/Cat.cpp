@@ -9,6 +9,7 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <core/Memory.h>
 #include <core/MemoryFormat.h>

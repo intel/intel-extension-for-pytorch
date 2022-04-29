@@ -3,6 +3,7 @@
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 

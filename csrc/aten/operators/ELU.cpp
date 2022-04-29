@@ -4,6 +4,7 @@
 #include "Loops.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

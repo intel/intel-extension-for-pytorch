@@ -12,6 +12,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"

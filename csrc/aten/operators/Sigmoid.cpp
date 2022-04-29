@@ -6,6 +6,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 

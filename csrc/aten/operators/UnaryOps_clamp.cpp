@@ -5,6 +5,7 @@
 #include <utils/DPCPP.h>
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 #include "comm/ATDispatch.h"

@@ -13,6 +13,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace at::native;
 using namespace xpu::dpcpp::detail;

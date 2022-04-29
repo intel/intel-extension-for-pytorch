@@ -7,6 +7,7 @@
 #include "Distributions.h"
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <aten/operators/MemoryAccess.h>
 

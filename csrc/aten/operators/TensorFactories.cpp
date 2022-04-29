@@ -14,6 +14,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/PSTLFunctions.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace at::native;
 using namespace xpu::dpcpp;
@@ -596,7 +597,7 @@ Tensor& std_out(
       out, self, dim, unbiased, keepdim, true);
 }
 
-Tensor std_out(
+Tensor& std_out(
     const Tensor& self,
     c10::optional<IntArrayRef>(_dim),
     c10::optional<int64_t>(_correction),

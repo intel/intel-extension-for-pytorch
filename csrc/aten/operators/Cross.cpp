@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

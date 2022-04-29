@@ -6,6 +6,7 @@
 #include <quantized/Quantizer.h>
 #include "Loops.h"
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace dnnl;
 using namespace at::native;

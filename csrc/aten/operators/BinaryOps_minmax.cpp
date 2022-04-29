@@ -4,6 +4,7 @@
 
 #include <utils/DPCPP.h>
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 #include "Loops.h"

@@ -9,6 +9,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Math.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 #include "Random.h"
@@ -135,13 +136,13 @@ Tensor digamma(const Tensor& self) {
   return result;
 }
 
-Tensor digamma_(Tensor& self) {
+Tensor& digamma_(Tensor& self) {
   auto iter = TensorIterator::unary_op(self, self);
   impl::digamma_kernel_xpu(iter);
   return self;
 }
 
-Tensor digamma_out(Tensor& out, const Tensor& self) {
+Tensor& digamma_out(Tensor& out, const Tensor& self) {
   auto iter = TensorIterator::unary_op(out, self);
   impl::digamma_kernel_xpu(iter);
   return out;

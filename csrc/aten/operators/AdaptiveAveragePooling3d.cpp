@@ -5,6 +5,7 @@
 
 #include <oneDNN/oneDNN.h>
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include <vector>
 
@@ -196,7 +197,7 @@ Tensor adaptive_avg_pool3d(const at::Tensor& input, IntArrayRef output_size) {
     Tensor out = input.mean({-1, -2, -3}, /* keepdim = */ true);
     return out;
   } else {
-    return _adaptive_avg_pool3d(input, output_size);
+    return at::AtenIpexTypeXPU::_adaptive_avg_pool3d(input, output_size);
   }
 }
 

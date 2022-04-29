@@ -4,9 +4,9 @@
 
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
-#include "BinaryOps_divtrunc.h"
 #include "Loops.h"
 #include "comm/Numerics.h"
 #include "comm/zmath.h"
@@ -15,6 +15,9 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+void div_trunc_kernel(TensorIterator& iter);
+
 namespace impl {
 
 static void div_floor_kernel_dpcpp(TensorIterator& iter) {
@@ -68,6 +71,8 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
 }
 
 } // namespace impl
+
+void div_trunc_kernel(TensorIterator& iter);
 
 Tensor& floor_divide_out(
     Tensor& result,

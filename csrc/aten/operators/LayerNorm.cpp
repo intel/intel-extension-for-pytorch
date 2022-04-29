@@ -3,6 +3,7 @@
 #include <ATen/NativeFunctions.h>
 
 #include <oneDNN/oneDNN.h>
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
 

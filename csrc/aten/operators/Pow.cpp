@@ -4,6 +4,7 @@
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/Pointwise.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 using namespace xpu::dpcpp;
@@ -147,7 +148,7 @@ Tensor& pow_out(Tensor& result, const Tensor& base, const Scalar& exp) {
   return result;
 }
 
-Tensor& pow_out(Tensor& result, Scalar base, const Tensor& exp) {
+Tensor& pow_out(Tensor& result, const Scalar& base, const Tensor& exp) {
   if (base.isComplex() && base.toComplexDouble() == 1.0) {
     result.resize_as_(exp).fill_(1);
   } else if (!base.isComplex() && base.toDouble() == 1.0) {

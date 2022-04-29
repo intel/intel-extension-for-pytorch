@@ -9,6 +9,7 @@
 #include "Utils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -536,7 +537,8 @@ Tensor& _fft_r2c_out(
     int64_t normalization,
     bool onesided,
     Tensor& out) {
-  auto result = _fft_r2c(self, dim, normalization, /*onesided=*/true);
+  auto result = at::AtenIpexTypeXPU::_fft_r2c(
+      self, dim, normalization, /*onesided=*/true);
   if (onesided) {
     native::resize_output(out, result.sizes());
     return out.copy_(result);
@@ -558,7 +560,8 @@ Tensor& _fft_c2r_out(
     int64_t normalization,
     int64_t last_dim_size,
     Tensor& out) {
-  auto result = _fft_c2r(self, dim, normalization, last_dim_size);
+  auto result =
+      at::AtenIpexTypeXPU::_fft_c2r(self, dim, normalization, last_dim_size);
   native::resize_output(out, result.sizes());
   return out.copy_(result);
 }
@@ -569,7 +572,8 @@ Tensor& _fft_c2c_out(
     int64_t normalization,
     bool forward,
     Tensor& out) {
-  auto result = _fft_c2c(self, dim, normalization, forward);
+  auto result =
+      at::AtenIpexTypeXPU::_fft_c2c(self, dim, normalization, forward);
   native::resize_output(out, result.sizes());
   return out.copy_(result);
 }
@@ -583,7 +587,8 @@ Tensor _fft_c2r(
   auto input = self;
   if (dim.size() > 1) {
     auto c2c_dims = dim.slice(0, dim.size() - 1);
-    input = at::_fft_c2c(self, c2c_dims, normalization, /*forward=*/false);
+    input = at::AtenIpexTypeXPU::_fft_c2c(
+        self, c2c_dims, normalization, /*forward=*/false);
     dim = dim.slice(dim.size() - 1);
   }
 

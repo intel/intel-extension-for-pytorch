@@ -9,6 +9,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 using namespace xpu::dpcpp;
