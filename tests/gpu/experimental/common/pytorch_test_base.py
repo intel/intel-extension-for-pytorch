@@ -137,15 +137,15 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
         # "test_neg_view",   # core dumped ... munmap_chunk(): invalid pointer
     # },
-    "TestSparseCSRXPU": {
-        "test_add",     # core dumped ... Floating point exception
-        "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
-        "test_csr_matvec",     # core dumped ... Floating point exception
-        "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
-        "test_mm",      # core dumped ... Floating point exception
-        "test_sparse_addmm",    # core dumped ... Floating point exception
-        "test_sparse_mm",   # core dumped ... Floating point exception
-    },
+    # "TestSparseCSRXPU": {
+        # "test_add",     # core dumped ... Floating point exception
+        # "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
+        # "test_csr_matvec",     # core dumped ... Floating point exception
+        # "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
+        # "test_mm",      # core dumped ... Floating point exception
+        # "test_sparse_addmm",    # core dumped ... Floating point exception
+        # "test_sparse_mm",   # core dumped ... Floating point exception
+    # },
     # "TestNNDeviceTypeXPU": {
         # "test_conv_ndhwc",  # core dumped ... Segmentation fault
         # "test_conv_nhwc",   # core dumped ... Segmentation fault
@@ -156,21 +156,21 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_softmax_results",     # core dumped ... Floating point exception
     # },
     "TestFFTXPU": {
-        'test_batch_istft', # core dumped ... double free or corruption
-        'test_fft2_fftn_equivalence',   # core dumped ... double free or corruption
-        'test_fft2_numpy',  # core dumped ... corrupted size vs. prev_size
-        'test_fft_input_modification',  # core dumped ... Segmentation fault
-        'test_fft_ifft_rfft_irfft',     # core dumped ... Segmentation fault
-        'test_fft_round_trip',  # core dumped ... corrupted size vs. prev_size
-        'test_fft_type_promotion',  # core dumped ... double free or corruption
-        'test_fftn_round_trip',     # core dumped ... Segmentation fault
-        'test_istft_of_sine',   # core dumped ... Segmentation fault
-        'test_istft_round_trip_simple_cases',   # core dumped ... corrupted size vs. prev_size
-        'test_istft_round_trip_various_params',     # core dumped ... corrupted size vs. prev_size
-        'test_istft_round_trip_with_padding',   # core dumped ... corrupted size vs. prev_size
-        'test_istft_throws',    # core dumped ... corrupted size vs. prev_size
-        'test_reference_1d',    # core dumped ... double free or corruption
-        'test_reference_nd',    # core dumped ... double free or corruption
+        # 'test_batch_istft', # failures
+        'test_fft2_fftn_equivalence',   # hang
+        'test_fft2_numpy',  # hang
+        'test_fft_input_modification',  # hang
+        # 'test_fft_ifft_rfft_irfft',     # failures
+        # 'test_fft_round_trip',  # failures
+        # 'test_fft_type_promotion',  # pass
+        'test_fftn_round_trip',     # hang
+        # 'test_istft_of_sine',   # failures
+        # 'test_istft_round_trip_simple_cases',   # failures
+        # 'test_istft_round_trip_various_params',     # failures
+        # 'test_istft_round_trip_with_padding',   # failures
+        # 'test_istft_throws',    # pass
+        # 'test_reference_1d',    # failures
+        'test_reference_nd',    # hang
     },
 }
 
