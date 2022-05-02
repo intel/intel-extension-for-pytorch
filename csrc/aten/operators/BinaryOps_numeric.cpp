@@ -3,6 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
+#include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
@@ -35,6 +36,11 @@ Tensor fmod(const Tensor& self, const Tensor& other) {
 Tensor& fmod_(Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::fmod_out(self, self, other);
 }
+
+IPEX_BINARY_LOOPS_FUNC_FLOAT_ALL(
+    copysign_out,
+    Numerics<scalar_t>::copysign,
+    binary_float_op)
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

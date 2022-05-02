@@ -13,7 +13,6 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
-#include "Loops.h"
 #include "Reduce.h"
 
 using namespace at::native;

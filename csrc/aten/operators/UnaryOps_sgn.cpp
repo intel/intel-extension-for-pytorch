@@ -2,13 +2,13 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
+#include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
-#include "comm/Unary.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {

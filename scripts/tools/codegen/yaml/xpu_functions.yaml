@@ -175,6 +175,7 @@ supported:
   - convolution_backward_overrideable
   - convolution_overrideable
   - copy_
+  - copysign.out
   - cos.out
 #  - cos_
   - cosh.out
