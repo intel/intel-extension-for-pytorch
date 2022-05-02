@@ -140,6 +140,16 @@ supported:
   - bitwise_or.Tensor_out
 #  - bitwise_xor.Scalar_out  # different signature
   - bitwise_xor.Tensor_out
+  - bitwise_left_shift.Tensor_out
+  - bitwise_left_shift.Tensor_Scalar
+  - bitwise_left_shift_.Tensor_Scalar
+  - bitwise_left_shift.Tensor_Scalar_out
+  - bitwise_left_shift.Scalar_Tensor
+  - bitwise_right_shift.Tensor_out
+  - bitwise_right_shift.Tensor_Scalar
+  - bitwise_right_shift_.Tensor_Scalar
+  - bitwise_right_shift.Tensor_Scalar_out
+  - bitwise_right_shift.Scalar_Tensor
   - bmm
   - bmm.out
   - cauchy_
