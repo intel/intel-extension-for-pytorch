@@ -61,10 +61,13 @@ Tensor eq(const Tensor& self, const Scalar& other_) {
 }
 
 bool equal(const Tensor& self, const Tensor& other) {
-  Tensor result = at::empty_like(self, self.options().dtype(kBool));
-
   if (!self.sizes().equals(other.sizes()))
     return false;
+
+  if (self.numel() == 0)
+    return true;
+
+  Tensor result = at::empty_like(self, self.options().dtype(kBool));
 
   at::AtenIpexTypeXPU::eq_out(self, other, result);
   Tensor min = at::AtenIpexTypeXPU::min(result);
@@ -95,6 +98,9 @@ bool equal(const Tensor& self, const Tensor& other) {
   if (self.element_size() != other.element_size()) {
     return false;
   }
+
+  if (self.numel() == 0)
+    return true;
 
   return at::AtenIpexTypeXPU::equal(self, other);
 }
