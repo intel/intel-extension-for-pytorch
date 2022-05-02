@@ -58,6 +58,7 @@ supported:
 #  - _var  # different schema
   - abs.out
   - acos.out
+  - acosh.out
   - adaptive_avg_pool2d.out
 #  - adaptive_avg_pool3d        # should not register
   - _adaptive_avg_pool3d
@@ -105,7 +106,9 @@ supported:
   - argmin
   - as_strided
   - asin.out
+  - asinh.out
   - atan.out
+  - atanh.out
   - atan2
   - atan2.out
   - atan2_

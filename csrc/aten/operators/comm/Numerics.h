@@ -456,11 +456,17 @@ struct Numerics<at::Half> {
   static inline at::Half cosh(at::Half a) {
     return DPCPP::cosh(float(a));
   }
+  static inline at::Half acosh(at::Half a) {
+    return DPCPP::acosh(float(a));
+  }
   static inline at::Half asin(at::Half a) {
     return DPCPP::asin(float(a));
   }
   static inline at::Half sinh(at::Half a) {
     return DPCPP::sinh(float(a));
+  }
+  static inline at::Half asinh(at::Half a) {
+    return DPCPP::asinh(float(a));
   }
   static inline at::Half tan(at::Half a) {
     return DPCPP::tan(float(a));
@@ -470,6 +476,9 @@ struct Numerics<at::Half> {
   }
   static inline at::Half tanh(float a) {
     return DPCPP::tanh(float(a));
+  }
+  static inline at::Half atanh(float a) {
+    return DPCPP::atanh(float(a));
   }
   static inline at::Half erf(float a) {
     return DPCPP::erf(float(a));
@@ -608,11 +617,17 @@ struct Numerics<at::BFloat16> {
   static inline at::BFloat16 cosh(at::BFloat16 a) {
     return DPCPP::cosh(float(a));
   }
+  static inline at::BFloat16 acosh(at::BFloat16 a) {
+    return DPCPP::acosh(float(a));
+  }
   static inline at::BFloat16 asin(at::BFloat16 a) {
     return DPCPP::asin(float(a));
   }
   static inline at::BFloat16 sinh(at::BFloat16 a) {
     return DPCPP::sinh(float(a));
+  }
+  static inline at::BFloat16 asinh(at::BFloat16 a) {
+    return DPCPP::asinh(float(a));
   }
   static inline at::BFloat16 tan(at::BFloat16 a) {
     return DPCPP::tan(float(a));
@@ -622,6 +637,9 @@ struct Numerics<at::BFloat16> {
   }
   static inline at::BFloat16 tanh(float a) {
     return DPCPP::tanh(float(a));
+  }
+  static inline at::BFloat16 atanh(float a) {
+    return DPCPP::atanh(float(a));
   }
   static inline at::BFloat16 erf(float a) {
     return DPCPP::erf(float(a));
@@ -762,11 +780,17 @@ struct Numerics<float> {
   static inline float cosh(float a) {
     return DPCPP::cosh(a);
   }
+  static inline float acosh(float a) {
+    return DPCPP::acosh(a);
+  }
   static inline float asin(float a) {
     return DPCPP::asin(a);
   }
   static inline float sinh(float a) {
     return DPCPP::sinh(a);
+  }
+  static inline float asinh(float a) {
+    return DPCPP::asinh(a);
   }
   static inline float tan(float a) {
     return DPCPP::tan(a);
@@ -776,6 +800,9 @@ struct Numerics<float> {
   }
   static inline float tanh(float a) {
     return DPCPP::tanh(a);
+  }
+  static inline float atanh(float a) {
+    return DPCPP::atanh(a);
   }
   static inline float erf(float a) {
     return DPCPP::erf(a);
@@ -914,11 +941,17 @@ struct Numerics<double> {
   static inline double cosh(double a) {
     return DPCPP::cosh(a);
   }
+  static inline double acosh(double a) {
+    return DPCPP::acosh(a);
+  }
   static inline double asin(double a) {
     return DPCPP::asin(a);
   }
   static inline double sinh(double a) {
     return DPCPP::sinh(a);
+  }
+  static inline double asinh(double a) {
+    return DPCPP::asinh(a);
   }
   static inline double tan(double a) {
     return DPCPP::tan(a);
@@ -928,6 +961,9 @@ struct Numerics<double> {
   }
   static inline double tanh(double a) {
     return DPCPP::tanh(a);
+  }
+  static inline double atanh(double a) {
+    return DPCPP::atanh(a);
   }
   static inline double erf(double a) {
     return DPCPP::erf(a);
@@ -1000,8 +1036,16 @@ struct Numerics<c10::complex<float>> {
     return std::cosh(a);
   }
 
+  static inline c10::complex<float> acosh(c10::complex<float> a) {
+    return std::acosh(a);
+  }
+
   static inline c10::complex<float> sinh(c10::complex<float> a) {
     return std::sinh(a);
+  }
+
+  static inline c10::complex<float> asinh(c10::complex<float> a) {
+    return std::asinh(a);
   }
 
   static inline c10::complex<float> asin(c10::complex<float> a) {
@@ -1022,6 +1066,10 @@ struct Numerics<c10::complex<float>> {
 
   static inline c10::complex<float> tanh(c10::complex<float> a) {
     return std::tanh(a);
+  }
+
+  static inline c10::complex<float> atanh(c10::complex<float> a) {
+    return std::atanh(a);
   }
 
   static inline c10::complex<float> neg(c10::complex<float> a) {
@@ -1085,7 +1133,15 @@ struct Numerics<c10::complex<double>> {
     return std::cosh(a);
   }
 
+  static inline c10::complex<double> acosh(c10::complex<double> a) {
+    return std::acosh(a);
+  }
+
   static inline c10::complex<double> sinh(c10::complex<double> a) {
+    return std::sinh(a);
+  }
+
+  static inline c10::complex<double> asinh(c10::complex<double> a) {
     return std::sinh(a);
   }
 
@@ -1107,6 +1163,10 @@ struct Numerics<c10::complex<double>> {
 
   static inline c10::complex<double> tanh(c10::complex<double> a) {
     return std::tanh(a);
+  }
+
+  static inline c10::complex<double> atanh(c10::complex<double> a) {
+    return std::atanh(a);
   }
 
   static inline c10::complex<double> neg(c10::complex<double> a) {
