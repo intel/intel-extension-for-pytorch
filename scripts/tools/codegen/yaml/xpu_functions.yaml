@@ -98,6 +98,7 @@ supported:
   - all.out
   - amax
   - amax.out
+  - amin.out
   - any
   - any.dim
   - any.out

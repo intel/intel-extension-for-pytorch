@@ -917,6 +917,23 @@ Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
   return at::AtenIpexTypeXPU::mean(self, IntArrayRef{}, false, dtype);
 }
 
+Tensor& amin_out(
+    const Tensor& self,
+    IntArrayRef dim,
+    bool keepdim,
+    Tensor& result) {
+  TORCH_CHECK(
+      self.scalar_type() == result.scalar_type(),
+      "Illegal dtype for self, and out:",
+      self.scalar_type(),
+      result.scalar_type());
+  auto iter = impl::make_reduction(
+      "amin", result, self, dim, keepdim, self.scalar_type());
+  TORCH_CHECK(iter.numel() > 0, "operation does not have an identity");
+  impl::min_kernel(iter);
+  return result;
+}
+
 Tensor min_out(
     Tensor& result,
     const Tensor& self,
