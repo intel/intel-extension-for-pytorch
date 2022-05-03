@@ -396,7 +396,7 @@ DPCPP_DEVICE static inline OutputIt _inclusive_scan(
       binary_op);
 }
 
-template <typename scalar_t, class BinaryOp>
+template <typename scalar_t, typename oscalar_t, class BinaryOp>
 void scanDimCore(
     Tensor& tgt,
     Tensor& src,
@@ -414,7 +414,7 @@ void scanDimCore(
   int64_t batch = totalElements / (scan_dim_size * stride);
 
   auto src_loc_begin = src.data_ptr<scalar_t>();
-  auto tgt_loc_begin = tgt.data_ptr<scalar_t>();
+  auto tgt_loc_begin = tgt.data_ptr<oscalar_t>();
   _inclusive_scan<scalar_t>(
       src_loc_begin,
       src_loc_begin + totalElements,
@@ -428,7 +428,7 @@ void scanDimCore(
       binary_op);
 }
 
-template <typename scalar_t, class BinaryFunction>
+template <typename scalar_t, typename oscalar_t, class BinaryFunction>
 typename std::enable_if<!IS_HALF(scalar_t), void>::type scanDim(
     Tensor& self_,
     const Tensor& src_,
@@ -436,24 +436,32 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanDim(
     scalar_t init,
     ScanBinOpType scanBinOpType,
     BinaryFunction binary_op) {
-  int ndim = src_.dim() == 0 ? 1 : src_.dim();
+  self_.resize_as_(src_);
+  if (src_.dim() == 0) {
+    self_.fill_(src_);
+    return;
+  } else if (src_.numel() == 0) {
+    self_.zero_();
+    return;
+  }
+
   dimension = maybe_wrap_dim(dimension, src_.dim());
   TORCH_CHECK(
-      dimension >= 0 && dimension < ndim,
+      dimension >= 0 && dimension < src_.dim(),
       "dimension ",
       dimension,
       " out of range");
 
-  self_.resize_as_(src_);
   auto self = self_.contiguous();
   auto src = src_.contiguous();
 
-  scanDimCore<scalar_t>(self, src, dimension, init, scanBinOpType, binary_op);
+  scanDimCore<scalar_t, oscalar_t>(
+      self, src, dimension, init, scanBinOpType, binary_op);
 
   self_.copy_(self);
 }
 
-template <typename scalar_t, class BinaryFunction>
+template <typename scalar_t, typename oscalar_t, class BinaryFunction>
 typename std::enable_if<IS_HALF(scalar_t), void>::type scanDim(
     Tensor& self_,
     const Tensor& src_,
@@ -461,19 +469,27 @@ typename std::enable_if<IS_HALF(scalar_t), void>::type scanDim(
     scalar_t init,
     ScanBinOpType scanBinOpType,
     BinaryFunction binary_op) {
-  int ndim = src_.dim() == 0 ? 1 : src_.dim();
+  self_.resize_as_(src_);
+  if (src_.dim() == 0) {
+    self_.fill_(src_);
+    return;
+  } else if (src_.numel() == 0) {
+    self_.zero_();
+    return;
+  }
+
   dimension = maybe_wrap_dim(dimension, src_.dim());
   TORCH_CHECK(
-      dimension >= 0 && dimension < ndim,
+      dimension >= 0 && dimension < src_.dim(),
       "dimension ",
       dimension,
       " out of range");
 
-  self_.resize_as_(src_);
   auto self = self_.contiguous();
   auto src = src_.contiguous();
 
-  scanDimCore<scalar_t>(self, src, dimension, init, scanBinOpType, binary_op);
+  scanDimCore<scalar_t, oscalar_t>(
+      self, src, dimension, init, scanBinOpType, binary_op);
 
   self_.copy_(self);
 }
@@ -485,16 +501,29 @@ Tensor& cumsum_out(
     int64_t dim,
     c10::optional<at::ScalarType> dtype,
     Tensor& out) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "cumsum", [&]() {
-        impl::scanDim<scalar_t>(
-            out,
-            self,
-            dim,
-            ScalarConvert<float, scalar_t>::to(0.0),
-            SCAN_BIN_ADD,
-            AddOp<scalar_t>());
-      });
+  if (self.dtype() == at::ScalarType::Bool) {
+    IPEX_DISPATCH_ALL_TYPES_AND(
+        at::ScalarType::Bool, out.scalar_type(), "cumsum", [&]() {
+          impl::scanDim<bool, scalar_t>(
+              out,
+              self,
+              dim,
+              ScalarConvert<float, bool>::to(0.0),
+              SCAN_BIN_ADD,
+              AddOp<bool>());
+        });
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND(
+        at::ScalarType::Half, self.scalar_type(), "cumsum", [&]() {
+          impl::scanDim<scalar_t, scalar_t>(
+              out,
+              self,
+              dim,
+              ScalarConvert<float, scalar_t>::to(0.0),
+              SCAN_BIN_ADD,
+              AddOp<scalar_t>());
+        });
+  }
   return out;
 }
 
@@ -505,7 +534,7 @@ Tensor& cumprod_out(
     Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "cumprod", [&]() {
-        impl::scanDim<scalar_t>(
+        impl::scanDim<scalar_t, scalar_t>(
             out,
             self,
             dim,

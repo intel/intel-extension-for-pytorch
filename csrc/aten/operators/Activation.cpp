@@ -360,7 +360,7 @@ Tensor& relu_(Tensor& self) {
   } else {
     self = to_plain_if_needed_(self);
     auto iter = TensorIterator::unary_op(self, self);
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
         iter.dtype(),
