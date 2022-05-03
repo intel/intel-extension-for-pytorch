@@ -22,17 +22,27 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 void digamma_kernel_xpu(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "digamma_xpu", [&]() {
-    dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t a) -> scalar_t { return calc_digamma(a); });
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "digamma_xpu",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t a) -> scalar_t { return calc_digamma(a); });
+      });
 }
 
 void trigamma_kernel_xpu(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "trigamma_xpu", [&]() {
-    dpcpp_kernel_for_tensor_iter(
-        iter, [=](scalar_t a) -> scalar_t { return calc_trigamma(a); });
-  });
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "trigamma_xpu",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t a) -> scalar_t { return calc_trigamma(a); });
+      });
 }
 
 void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
@@ -41,20 +51,34 @@ void polygamma_kernel_xpu(TensorIterator& iter, int64_t n) {
   } else if (n == 1) {
     trigamma_kernel_xpu(iter);
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "polygamma_xpu", [&]() {
-      dpcpp_kernel_for_tensor_iter(
-          iter, [=](scalar_t a) -> scalar_t { return calc_polygamma(a, n); });
-    });
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.common_dtype(),
+        "polygamma_xpu",
+        [&]() {
+          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
+            return calc_polygamma(a, n);
+          });
+        });
   }
 }
 
 } // namespace impl
 
+static inline void lgamma_check(const Tensor& self) {
+  TORCH_INTERNAL_ASSERT(
+      at::isFloatingType(self.scalar_type()),
+      "Only support floating data type for now.");
+}
+
 Tensor lgamma(const Tensor& self) {
 #ifdef USE_ONEMKL
+  lgamma_check(self);
   int64_t n = self.numel();
   Tensor out = at::empty_like(self);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma", [&] {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
@@ -64,7 +88,6 @@ Tensor lgamma(const Tensor& self) {
         (scalar_t*)self.data_ptr(),
         (scalar_t*)out.data_ptr());
   });
-
   return out;
 #else
   AT_ERROR("lgamma: oneMKL library not found in compilation");
@@ -73,8 +96,10 @@ Tensor lgamma(const Tensor& self) {
 
 Tensor& lgamma_(Tensor& self) {
 #ifdef USE_ONEMKL
+  lgamma_check(self);
   int64_t n = self.numel();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma_", [&] {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
@@ -130,40 +155,44 @@ Tensor& mvlgamma_(Tensor& self, int64_t p) {
 }
 
 Tensor digamma(const Tensor& self) {
-  Tensor result = at::empty_like(self);
-  auto iter = TensorIterator::unary_op(result, self);
+  Tensor result = !at::isFloatingType(self.scalar_type())
+      ? at::empty(self.sizes(), self.options().dtype(at::kFloat))
+      : at::empty_like(self);
+  auto iter = TensorIterator::unary_float_op(result, self);
   impl::digamma_kernel_xpu(iter);
   return result;
 }
 
 Tensor& digamma_(Tensor& self) {
-  auto iter = TensorIterator::unary_op(self, self);
+  auto iter = TensorIterator::unary_float_op(self, self);
   impl::digamma_kernel_xpu(iter);
   return self;
 }
 
 Tensor& digamma_out(Tensor& out, const Tensor& self) {
-  auto iter = TensorIterator::unary_op(out, self);
+  auto iter = TensorIterator::unary_float_op(out, self);
   impl::digamma_kernel_xpu(iter);
   return out;
 }
 
 Tensor polygamma(int64_t n, const Tensor& self) {
   TORCH_CHECK(n >= 0, "polygamma(n, x) does not support negative n.");
-  Tensor result = at::empty_like(self);
-  auto iter = TensorIterator::unary_op(result, self);
+  Tensor result = !at::isFloatingType(self.scalar_type())
+      ? at::empty(self.sizes(), self.options().dtype(at::kFloat))
+      : at::empty_like(self);
+  auto iter = TensorIterator::unary_float_op(result, self);
   impl::polygamma_kernel_xpu(iter, n);
   return result;
 }
 
 Tensor& polygamma_(Tensor& self, int64_t n) {
-  auto iter = TensorIterator::unary_op(self, self);
+  auto iter = TensorIterator::unary_float_op(self, self);
   impl::polygamma_kernel_xpu(iter, n);
   return self;
 }
 
 Tensor& polygamma_out(Tensor& out, int64_t n, const Tensor& self) {
-  auto iter = TensorIterator::unary_op(out, self);
+  auto iter = TensorIterator::unary_float_op(out, self);
   impl::polygamma_kernel_xpu(iter, n);
   return out;
 }
