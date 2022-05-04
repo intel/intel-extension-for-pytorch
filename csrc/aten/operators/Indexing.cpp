@@ -605,19 +605,17 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     int64_t size_[1] = {size};
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
     if (size > 0) {
+      auto in = src.data_ptr<scalar_t>();
+      auto out = dst.data_ptr<scalar_t>();
       int64_t strideSelf = dst.dim() == 0 ? 1 : dst.stride(0);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = src.data_ptr<scalar_t>();
-        auto out_data = dst.data_ptr<scalar_t>();
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
-          auto in_ptr = in_data;
-          auto out_ptr = out_data;
           const int64_t bOffset = start + (stride0 + stride1) * id;
-          out_ptr[strideSelf * id] = in_ptr[bOffset];
+          out[strideSelf * id] = in[bOffset];
         };
         cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
       };
@@ -631,22 +629,20 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 2, size_, nullptr);
     dst.zero_();
     if (size > 0) {
+      auto in = src.data_ptr<scalar_t>();
+      auto out = dst.data_ptr<scalar_t>();
       int64_t stride0 = dst.stride(0);
       int64_t stride1 = dst.stride(1);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
       auto& dpcpp_queue = dpcppGetCurrentQueue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_data = src.data_ptr<scalar_t>();
-        auto out_data = dst.data_ptr<scalar_t>();
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
-          auto in_ptr = in_data;
-          auto out_ptr = out_data;
           const int64_t aOffset = start + (stride0 + stride1) * id;
-          out_ptr[aOffset] = in_ptr[strideSrc * id];
+          out[aOffset] = in[strideSrc * id];
         };
-        cgh.parallel_for(DPCPP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for(DPCPP::range<1>(src.numel()), kfn);
       };
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
     }
