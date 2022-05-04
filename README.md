@@ -67,6 +67,7 @@ Code organization
 ```bash
 source ${PATH_To_Your_Compiler}/env/vars.sh
 ```
+
 **Note:**
 please update ${PATH_To_Your_Compiler} to where you install DPC++ compiler with absolute path.
 
@@ -81,6 +82,7 @@ export MKL_DPCPP_ROOT=${PATH_To_Your_oneAPI_basekit}/intel/oneapi/mkl/latest
 export LD_LIBRARY_PATH=${MKL_DPCPP_ROOT}/lib:${MKL_DPCPP_ROOT}/lib64:${MKL_DPCPP_ROOT}/lib/intel64:${LD_LIBRARY_PATH}
 export LIBRARY_PATH=${MKL_DPCPP_ROOT}/lib:${MKL_DPCPP_ROOT}/lib64:${MKL_DPCPP_ROOT}/lib/intel64:${LIBRARY_PATH}
 ```
+
 **Note:**
 please update ${PATH_To_Your_oneAPI_basekit} to where you install oneAPI basekit with absolute path.
 If you are using different version of oneMKL, the MKL path might be different.
@@ -112,6 +114,7 @@ Follow instrcutions in <PATH_To_frameworks.ai.pytorch.ipex-gpu>/tests/gpu/device
 cd frameworks.ai.pytorch.private-gpu
 python3 setup.py install --user
 ```
+
 **Note:** We recommend using **GCC** compiler for building PyTorch.
 
 ## Build and Install Intel® Extension for PyTorch* GPU
@@ -138,33 +141,34 @@ model = model.to("xpu")
 To get accurate End to End model execution time, users need call torch.xpu.synchronize() in model script right before calculating elapsed time. This API waits for all GPU kernels which are executing on device being completed, so that calculting the elasped time after the call can cover both CPU and GPU execution time.
 
 #### Training Model Example
+
 ```bash
-        # compute gradient and do SGD step
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
+  # compute gradient and do SGD step
+  optimizer.zero_grad(set_to_none=True)
+  loss.backward()
+  optimizer.step()
 
-        # sync for time measurement
-        torch.xpu.synchronize()
+  # sync for time measurement
+  torch.xpu.synchronize()
 
-        # measure elapsed time
-        end_Batch = time.time()
-        batch_time.update(time.time() - start_Batch)
-        iter_time.append(end_Batch - start_Batch)
+  # measure elapsed time
+  end_Batch = time.time()
+  batch_time.update(time.time() - start_Batch)
+  iter_time.append(end_Batch - start_Batch)
 ```
 
 #### Inference Model Example
 ```bash
-        # compute output
-        output = model(input)
+  # compute output
+  output = model(input)
 
-        # sync for time measurement
-        torch.xpu.synchronize()
+  # sync for time measurement
+  torch.xpu.synchronize()
 
-        # measure elapsed time
-        end = time.time()
-        batch_time.update(end - start)
-        iter_time.append(end - start)
+  # measure elapsed time
+  end = time.time()
+  batch_time.update(end - start)
+  iter_time.append(end - start)
 ```
 ## Verified Models
 
@@ -173,6 +177,7 @@ Please download pre-optimized models for Intel® Extension for PyTorch* GPU thro
 ```bash
 git clone https://github.com/intel-innersource/frameworks.ai.pytorch.gpu-models/
 ```
+
 | **Model** | **Inference** | **Training** |
 | ------ | ------ | ------ |
 | **ResNet50** | FP32/FP16/BF16/INT8 | FP32/BF16 |
@@ -222,16 +227,19 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 All these options are set to zero by default. User may enable one or more options like below examples.</br>
 
 1. Set single option before running model
+
 ```bash
 export IPEX_VERBOSE=1
 python ResNet50.py
 ```
 2. Set single option when running model
+
 ```bash
 IPEX_VERBOSE=1 python ResNet50.py
 ```
 
 3. Set multiple options when running model
+
 ```bash
 IPEX_VERBOSE=1 IPEX_LAYOUT_OPT=1 python ResNet50.py
 ```
@@ -287,6 +295,7 @@ git submodule update --init --recursive
 COMPUTE_BACKEND=dpcpp_level_zero python setup.py install
 ```
 Example of running multi-tile ResNet50 training with DDP:
+
 ```bash
 cd frameworks.ai.pytorch.gpu-models/ResNet50
 source `python -c "import torch_ccl;print(torch_ccl.cwd)"`/env/setvars.sh
@@ -295,69 +304,74 @@ mpiexec -n 2 python main.py -a resnet50 -e -b 1024 --pretrained --jit --xpu 0 $d
 
 ### Profile tool:
 torch.autograd.profiler_legacy supports profiling kernel time spent on "xpu" device. Pesudo example looks like:
+
 ```bash
 with torch.autograd.profiler_legacy.profile(enabled=True, use_xpu=True) as prof:
-       fwd
-       bwd
-       weight update
+   fwd
+   bwd
+   weight update
 print(prof.key_averages().table(sort_by="self_xpu_time_total"))
 print(prof.table(sort_by="id", row_limit=100000))
 ```
 
 #### Training Model Example
+
 ```bash
-        with torch.autograd.profiler_legacy.profile(use_xpu=True, record_shapes=False) as prof:
+  with torch.autograd.profiler_legacy.profile(use_xpu=True, record_shapes=False) as prof:
 
-            if args.gpu is not None:
-                input = input.xpu(args.gpu, non_blocking=True)
-                target = target.xpu(args.gpu, non_blocking=True)
-            elif args.xpu is not None:
-                input = input.to("xpu")
-                target = target.to("xpu")
+      if args.gpu is not None:
+          input = input.xpu(args.gpu, non_blocking=True)
+          target = target.xpu(args.gpu, non_blocking=True)
+      elif args.xpu is not None:
+          input = input.to("xpu")
+          target = target.to("xpu")
 
-            # compute output
-            output = model(input)
-            loss = criterion(output, target)
+      # compute output
+      output = model(input)
+      loss = criterion(output, target)
 
-            # compute gradient and do SGD step
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
+      # compute gradient and do SGD step
+      optimizer.zero_grad(set_to_none=True)
+      loss.backward()
+      optimizer.step()
 
-        # sync for time measurement
-        torch.xpu.synchronize()
-        profiling_path = os.path.abspath('../') + '/report/'
-        torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), profiling_path + 'rn50_training_profiling.pt')
-        prof.export_chrome_trace(profiling_path + 'rn50_training_profiling.json')
-        print(prof.key_averages().table(sort_by="self_xpu_time_total"))
-        print(prof.key_averages(group_by_input_shape=True).table())
-        print(prof.table(sort_by="id", row_limit=100000))
+  # sync for time measurement
+  torch.xpu.synchronize()
+  profiling_path = os.path.abspath('../') + '/report/'
+  torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), profiling_path + 'rn50_training_profiling.pt')
+  prof.export_chrome_trace(profiling_path + 'rn50_training_profiling.json')
+  print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+  print(prof.key_averages(group_by_input_shape=True).table())
+  print(prof.table(sort_by="id", row_limit=100000))
 ```
 
 #### Inference Model Example
+
 ```bash
-            with torch.autograd.profiler_legacy.profile(use_xpu=True, record_shapes=False) as prof:
+  with torch.autograd.profiler_legacy.profile(use_xpu=True, record_shapes=False) as prof:
 
-                if args.xpu is not None:
-                    input = input.to("xpu")
+      if args.xpu is not None:
+          input = input.to("xpu")
 
-                if args.channels_last:
-                    input = input.to(memory_format=torch.channels_last)
+      if args.channels_last:
+          input = input.to(memory_format=torch.channels_last)
 
-                # compute output
-                output = model(input)
+      # compute output
+      output = model(input)
 
-            # sync for time measurement
-            torch.xpu.synchronize()
-            profiling_path = os.path.abspath('../') + '/report/'
-            torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), profiling_path + 'rn50_inference_profiling.pt')
-            prof.export_chrome_trace(profiling_path + 'rn50_inference_profiling.json')
-            print(prof.key_averages().table(sort_by="self_xpu_time_total"))
-            print(prof.key_averages(group_by_input_shape=True).table())
-            print(prof.table(sort_by="id", row_limit=100000))
+  # sync for time measurement
+  torch.xpu.synchronize()
+  profiling_path = os.path.abspath('../') + '/report/'
+  torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), profiling_path + 'rn50_inference_profiling.pt')
+  prof.export_chrome_trace(profiling_path + 'rn50_inference_profiling.json')
+  print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+  print(prof.key_averages(group_by_input_shape=True).table())
+  print(prof.table(sort_by="id", row_limit=100000))
 ```
+
 #### Profiling Results
 The output from BERT training model looks like (omitting some columns):
+
 ```bash
 #---------------------------- ----------  ----------    ----------    ----------  ------------  ----------     ----------     ---------   ------------   ------------
 # Name                         Self CPU %  Self CPU       CPU total %  CPU total  CPU time avg    Self XPU       Self XPU %     XPU total  XPU time avg    # of Calls  
@@ -388,6 +402,7 @@ with torch.xpu.emit_itt():
     output = YourModel(input)
     torch.xpu.itt.range_pop()
 ```
+
 Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set for VTune.
 
 ### User mode scratchpad:
@@ -397,6 +412,7 @@ To switch to library mode scratchpad, please set USE_SCRATCHPAD_MODE=OFF and reb
 
 ### Master weights support:
 Master weights is partially supported in this release, for assuring accuracy by using FP32 weights in BF16 training gradient update. To use this feature, model shall be updated as following: 
+
 ```bash
 ...
 # optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,weight_decay=1e-4)
@@ -409,6 +425,7 @@ optimizer.zero_grad()
 loss.backward()
 optimizer.step()
 ```
+
 1) optimizer shall be updated to use a new API such as ```SGDMasterWeight``` which contains master weights support
 2) model shall be converted to bfloat16 after optimizer is initiated. Otherwise, optimizer can't get FP32 weights since it is already converted to BF16.
 
@@ -434,10 +451,12 @@ Please build Intel® Extension for PyTorch* GPU after pytorch is built and insta
 ### 2. MKL related issues:
 1) undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2 <br>
 This issue may raise when Intel® Extension for PyTorch* is built with oneMKL library while PyTorch is not build with any MKL library. oneMKL kernel may run into CPU occasionally which causes this issue. Please install MKL library from conda as following:
+
 ```bash
 conda install mkl
 conda install mkl-include
 ```
+
 then clean build PyTorch to solve this issue.
 
 2) OSError: libmkl_intel_lp64.so.1: cannot open shared object file: No such file or directory <br>
@@ -451,13 +470,17 @@ If you still meet the similar issue which cannot open shared object file not lis
 
 3) Can't find oneMKL library when build Intel® Extension for PyTorch* without oneMKL <br>
 Error info: <br>
-/usr/bin/ld: cannot find -lmkl_sycl <br>
-/usr/bin/ld: cannot find -lmkl_intel_ilp64 <br>
-/usr/bin/ld: cannot find -lmkl_core <br>
-/usr/bin/ld: cannot find -lmkl_tbb_thread <br>
-dpcpp: error: linker command failed with exit code 1 (use -v to see invocation) <br>
+
+```bash
+/usr/bin/ld: cannot find -lmkl_sycl
+/usr/bin/ld: cannot find -lmkl_intel_ilp64
+/usr/bin/ld: cannot find -lmkl_core
+/usr/bin/ld: cannot find -lmkl_tbb_thread
+dpcpp: error: linker command failed with exit code 1 (use -v to see invocation)
+```
 
 When PyTorch is built with oneMKL library while Intel® Extension for PyTorch* is built without oneMKL library, we need to set following configuration to solve the link issue:
+
 ```bash
 export USE_ONEMKL=OFF
 export MKL_DPCPP_ROOT=${PATH_To_Your_oneAPI_basekit}/intel/oneapi/mkl/latest
@@ -469,14 +492,15 @@ Please note that the solutions to above issues are workaround. When MKLD-11291 i
 
 ### 3. symbol undefined caused by _GLIBCXX_USE_CXX11_ABI:
 #### Error info: <br>
+
 ```bash
 File "/root/.local/lib/python3.9/site-packages/ipex/__init__.py", line 4, in <module>
     from . import _C
 ImportError: /root/.local/lib/python3.9/site-packages/ipex/lib/libipex_gpu_core.so: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
 ```
 
-This issue appears when Intel® Extension for PyTorch* is compiled with _GLIBCXX_USE_CXX11_ABI=1 and PyTorch is compiled with _GLIBCXX_USE_CXX11_ABI=0, which causes inconsistent.
-<BR>
+This issue appears when Intel® Extension for PyTorch* is compiled with \_GLIBCXX_USE_CXX11_ABI=1 and PyTorch is compiled with \_GLIBCXX_USE_CXX11_ABI=0, which causes inconsistent.
+<br>
 
 #### Background：
 1. DPC++ has no plan to support _GLIBCXX_USE_CXX11_ABI=0 (CMPLRLLVM-34202), Intel® Extension for PyTorch* is always compiled with _GLIBCXX_USE_CXX11_ABI=1. <br>
