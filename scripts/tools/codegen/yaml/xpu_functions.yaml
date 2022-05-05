@@ -224,6 +224,7 @@ supported:
   - erfinv.out
   - erfinv_
   - exp.out
+  - exp2.out
 #  - exp_
   - expm1.out
   - exponential_

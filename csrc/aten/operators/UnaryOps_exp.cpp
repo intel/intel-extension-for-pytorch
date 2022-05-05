@@ -3,6 +3,7 @@
 
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
+#include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
@@ -15,35 +16,23 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& expm1_out(const Tensor& self, Tensor& out) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      ScalarType::BFloat16,
-      ScalarType::Half,
-      iter.common_dtype(),
-      "expm1",
-      [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::expm1(a);
-        });
-      });
-  return out;
-}
+IPEX_UNARY_AND_ALL_OPS(
+    expm1_out,
+    Numerics<scalar_t>::expm1,
+    unary_float_op,
+    FLOATING_TYPES)
 
-Tensor& exp_out(const Tensor& self, Tensor& out) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
-      ScalarType::Half,
-      ScalarType::BFloat16,
-      iter.common_dtype(),
-      "exp",
-      [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::exp(a);
-        });
-      });
-  return out;
-}
+IPEX_UNARY_AND_ALL_OPS(
+    exp_out,
+    Numerics<scalar_t>::exp,
+    unary_float_op,
+    FLOATING_AND_COMPLEX_TYPES)
+
+IPEX_UNARY_AND_ALL_OPS(
+    exp2_out,
+    Numerics<scalar_t>::exp2,
+    unary_float_op,
+    FLOATING_TYPES)
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

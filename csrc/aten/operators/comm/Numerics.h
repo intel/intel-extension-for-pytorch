@@ -407,6 +407,9 @@ struct Numerics<at::Half> {
   static inline at::Half exp(at::Half a) {
     return DPCPP::exp(float(a));
   }
+  static inline at::Half exp2(at::Half a) {
+    return DPCPP::exp2(float(a));
+  }
   static inline at::Half exp10(at::Half a) {
     return DPCPP::exp10(float(a));
   }
@@ -570,6 +573,9 @@ struct Numerics<at::BFloat16> {
 
   static inline at::BFloat16 exp(at::BFloat16 a) {
     return DPCPP::exp(float(a));
+  }
+  static inline at::BFloat16 exp2(at::BFloat16 a) {
+    return DPCPP::exp2(float(a));
   }
   static inline at::BFloat16 exp10(at::BFloat16 a) {
     return DPCPP::exp10(float(a));
@@ -736,6 +742,9 @@ struct Numerics<float> {
   static inline float exp(float a) {
     return DPCPP::exp(a);
   }
+  static inline float exp2(float a) {
+    return DPCPP::exp2(a);
+  }
   static inline float exp10(float a) {
     return DPCPP::exp10(a);
   }
@@ -900,6 +909,9 @@ struct Numerics<double> {
 
   static inline double exp(double a) {
     return DPCPP::exp(a);
+  }
+  static inline double exp2(double a) {
+    return DPCPP::exp2(a);
   }
   static inline double exp10(double a) {
     return DPCPP::exp10(a);
