@@ -292,9 +292,9 @@ struct func_wrapper_t {
   }
 };
 
-template <typename scalar_t, typename func_t>
-func_wrapper_t<scalar_t, func_t> func_wrapper(const func_t& op) {
-  return func_wrapper_t<scalar_t, func_t>{op};
+template <typename out_scalar_t, typename func_t>
+func_wrapper_t<out_scalar_t, func_t> func_wrapper(const func_t& op) {
+  return func_wrapper_t<out_scalar_t, func_t>{op};
 }
 
 template <

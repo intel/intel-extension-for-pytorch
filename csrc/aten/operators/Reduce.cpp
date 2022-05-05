@@ -21,6 +21,21 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+void check_result_is_bytebool(
+    const char* name,
+    const Tensor& self,
+    const Tensor& result) {
+  if (result.defined()) {
+    // Refer [all, any : uint8 compatibility]
+    TORCH_CHECK(
+        result.scalar_type() == ScalarType::Bool ||
+            result.scalar_type() == ScalarType::Byte,
+        name,
+        " only supports bool tensor for result, got: ",
+        result.scalar_type());
+  }
+}
+
 inline ScalarType get_dtype_from_self(
     const Tensor& self,
     const optional<ScalarType>& dtype,
@@ -45,6 +60,17 @@ inline ScalarType get_dtype_from_result(
     return dtype.value();
   } else {
     return result.scalar_type();
+  }
+}
+
+inline ScalarType get_result_or_bytebool_dtype(
+    const Tensor& self,
+    const Tensor& result) {
+  // Refer [all, any : uint8 compatibility]
+  if (result.defined()) {
+    return result.scalar_type();
+  } else {
+    return (self.scalar_type() == kByte) ? kByte : kBool;
   }
 }
 
@@ -328,19 +354,19 @@ struct ReduceMaxOps {
   }
 };
 
-template <typename acc_t>
+template <typename scalar_t, typename acc_t>
 struct ReduceAndOps {
   ReduceAndOps() {}
-  acc_t operator()(acc_t a, acc_t b) const {
-    return a && b;
+  acc_t operator()(scalar_t a, scalar_t b) const {
+    return static_cast<acc_t>(a) && static_cast<acc_t>(b);
   }
 };
 
-template <typename acc_t>
+template <typename scalar_t, typename acc_t>
 struct ReduceOrOps {
   ReduceOrOps() {}
-  acc_t operator()(acc_t a, acc_t b) const {
-    return a || b;
+  acc_t operator()(scalar_t a, scalar_t b) const {
+    return static_cast<acc_t>(a) || static_cast<acc_t>(b);
   }
 };
 
@@ -730,14 +756,16 @@ static void norm_kernel(TensorIterator& iter, Scalar p, IntArrayRef dim) {
       [&]() { norm_kernel_impl<scalar_t>(iter, p, dim); });
 }
 
+template <typename scalar_t>
 void and_kernel(TensorIterator& iter) {
-  dpcpp_reduce_kernel<uint8_t, uint8_t>(
-      iter, func_wrapper<uint8_t>(ReduceAndOps<uint8_t>()), true);
+  dpcpp_reduce_kernel<scalar_t, bool>(
+      iter, func_wrapper<bool>(ReduceAndOps<scalar_t, bool>()), true);
 }
 
+template <typename scalar_t>
 void or_kernel(TensorIterator& iter) {
-  dpcpp_reduce_kernel<uint8_t, uint8_t>(
-      iter, func_wrapper<uint8_t>(ReduceOrOps<uint8_t>()), false);
+  dpcpp_reduce_kernel<scalar_t, bool>(
+      iter, func_wrapper<bool>(ReduceOrOps<scalar_t, bool>()), false);
 }
 
 template <typename scalar_t>
@@ -1086,78 +1114,104 @@ Tensor norm(const Tensor& self, Scalar p) {
 }
 
 inline Tensor& _all(Tensor& result, TensorIterator& iter) {
-  TORCH_CHECK(
-      result.scalar_type() == at::ScalarType::Byte ||
-          result.scalar_type() == at::ScalarType::Bool,
-      "all only supports torch.uint8 and torch.bool dtypes");
   if (iter.numel() == 0) {
     result.fill_(1);
   } else {
-    impl::and_kernel(iter);
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        at::ScalarType::Bool,
+        iter.dtype(),
+        "all",
+        [&]() { impl::and_kernel<scalar_t>(iter); });
   }
 
   return result;
 }
 
 Tensor all(const at::Tensor& self) {
-  Tensor result = at::empty({0}, self.options());
-  auto iter =
-      impl::make_reduction("all", result, self, {}, false, self.scalar_type());
+  Tensor result;
+  auto result_type = get_result_or_bytebool_dtype(self, result);
+  result = at::empty({0}, self.options().dtype(result_type));
+  auto iter = impl::make_reduction(
+      "all", result, self, {}, false, self.scalar_type(), result.scalar_type());
 
   return at::AtenIpexTypeXPU::_all(result, iter);
 }
 
 Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
+  check_result_is_bytebool("all", self, result);
   dim = maybe_wrap_dim(dim, self.dim());
   if (_dimreduce_return_trivial(result, self, 1, dim, keepdim)) {
     return result;
   } else {
     auto iter = impl::make_reduction(
-        "all", result, self, dim, keepdim, self.scalar_type());
+        "all",
+        result,
+        self,
+        dim,
+        keepdim,
+        self.scalar_type(),
+        result.scalar_type());
     return at::AtenIpexTypeXPU::_all(result, iter);
   }
 }
 
 Tensor all(const Tensor& self, int64_t dim, bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
+  Tensor result;
+  auto result_type = get_result_or_bytebool_dtype(self, result);
+  result = at::empty({0}, self.options().dtype(result_type));
   return at::AtenIpexTypeXPU::all_out(result, self, dim, keepdim);
 }
 
 inline Tensor& _any(Tensor& result, TensorIterator& iter) {
-  TORCH_CHECK(
-      result.scalar_type() == at::ScalarType::Byte ||
-          result.scalar_type() == at::ScalarType::Bool,
-      "any only supports torch.uint8 and torch.bool dtypes");
   if (iter.numel() == 0) {
     result.fill_(0);
   } else {
-    impl::or_kernel(iter);
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        at::ScalarType::Bool,
+        iter.dtype(),
+        "any",
+        [&]() { impl::or_kernel<scalar_t>(iter); });
   }
 
   return result;
 }
 
 Tensor any(const at::Tensor& self) {
-  Tensor result = at::empty({0}, self.options());
-  auto iter =
-      impl::make_reduction("any", result, self, {}, false, self.scalar_type());
+  Tensor result;
+  auto result_type = get_result_or_bytebool_dtype(self, result);
+  result = at::empty({0}, self.options().dtype(result_type));
+  auto iter = impl::make_reduction(
+      "any", result, self, {}, false, self.scalar_type(), result.scalar_type());
 
   return at::AtenIpexTypeXPU::_any(result, iter);
 }
 
 Tensor& any_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
+  check_result_is_bytebool("any", self, result);
   dim = maybe_wrap_dim(dim, self.dim());
   if (_dimreduce_return_trivial(result, self, 0, dim, keepdim)) {
     return result;
   } else {
     auto iter = impl::make_reduction(
-        "any", result, self, dim, keepdim, self.scalar_type());
+        "any",
+        result,
+        self,
+        dim,
+        keepdim,
+        self.scalar_type(),
+        result.scalar_type());
     return at::AtenIpexTypeXPU::_any(result, iter);
   }
 }
 
 Tensor any(const Tensor& self, int64_t dim, bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
+  Tensor result;
+  auto result_type = get_result_or_bytebool_dtype(self, result);
+  result = at::empty({0}, self.options().dtype(result_type));
   return at::AtenIpexTypeXPU::any_out(result, self, dim, keepdim);
 }
 
