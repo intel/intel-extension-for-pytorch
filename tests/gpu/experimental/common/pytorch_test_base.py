@@ -130,9 +130,9 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
         # "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
     # },
-    # "TestJitXPU": {
-    #     "test_variant_consistency_jit", # core dumped ... munmap_chunk(): invalid pointer
-    # },
+    "TestJitXPU": {
+        "test_variant_consistency_jit", # hang in fft
+    },
     # "TestMathBitsXPU": {
         # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
         # "test_neg_view",   # core dumped ... munmap_chunk(): invalid pointer
