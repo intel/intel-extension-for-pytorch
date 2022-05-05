@@ -10,17 +10,18 @@ namespace graph_rewrite {
 using namespace at::jit;
 using namespace torch_ipex::cpu;
 
-void insertPrePackedConvTranspose2dOpForATen(Block* b) {
+void insertPrePackedConvTransposeOpForATen(Block* b) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      insertPrePackedConvTranspose2dOpForATen(block);
+      insertPrePackedConvTransposeOpForATen(block);
     }
     // TODO: add conv_transpose3d
-    if (n->kind() == Symbol::fromQualString("aten::conv_transpose2d")) {
+    if (n->kind() == aten::conv_transpose2d ||
+        n->kind() == aten::conv_transpose3d) {
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
       auto prepack_node = graph->create(
-          Symbol::fromQualString("ipex_prepack::conv_transpose2d_prepack"), 1);
+          Symbol::fromQualString("ipex_prepack::conv_transpose_prepack"), 1);
       auto input_size_option = n->inputs()
                                    .at(0)
                                    ->type()
@@ -29,7 +30,8 @@ void insertPrePackedConvTranspose2dOpForATen(Block* b) {
                                    .concrete_sizes();
       // if can't get input shape info, will not do weight prepack.
       if (!(input_size_option.has_value() &&
-            input_size_option.value().size() == 4)) {
+            (input_size_option.value().size() == 4 ||
+             input_size_option.value().size() == 5))) {
         continue;
       }
       IValue input_size_value(input_size_option.value());
@@ -42,7 +44,8 @@ void insertPrePackedConvTranspose2dOpForATen(Block* b) {
                                     .concrete_sizes();
       // weight has not shape info, will not do weight prapacked.
       if (!(weight_size_option.has_value() &&
-            weight_size_option.value().size() == 4)) {
+            (weight_size_option.value().size() == 4 ||
+             weight_size_option.value().size() == 5))) {
         continue;
       }
 
@@ -51,16 +54,43 @@ void insertPrePackedConvTranspose2dOpForATen(Block* b) {
       auto padding = toIValue(n->input(4))->toIntList();
       auto output_padding = toIValue(n->input(5))->toIntList();
 
-      if (padding[0] - output_padding[0] + stride[0] <= 0 ||
-          padding[1] - output_padding[1] + stride[1] <= 0) {
-        continue;
+      auto weight_size = weight_size_option.value();
+      // 2d case.
+      if (weight_size.size() == 4) {
+        if (padding[0] - output_padding[0] + stride[0] <= 0 ||
+            padding[1] - output_padding[1] + stride[1] <= 0) {
+          continue;
+        }
+      }
+      // 3d case.
+      if (weight_size.size() == 5) {
+        if (padding[0] - output_padding[0] + stride[0] <= 0 ||
+            padding[1] - output_padding[1] + stride[1] <= 0 ||
+            padding[2] - output_padding[2] + stride[2] <= 0) {
+          continue;
+        }
       }
 
-      auto weight_size = weight_size_option.value();
-      std::vector<int64_t> k_size = {weight_size[2], weight_size[3]};
+      std::vector<int64_t> k_size = {weight_size[2]};
+      // 2d case.
+      if (weight_size.size() == 4) {
+        k_size.push_back(weight_size[3]);
+      }
+      // 3d case.
+      if (weight_size.size() == 5) {
+        k_size.push_back(weight_size[3]);
+        k_size.push_back(weight_size[4]);
+      }
       // w_is_channels_last is invaild, there will has a check the memory
       // format at convolution kernel side.
       bool w_is_channels_last = false;
+      if (constant_as<at::Tensor>(n->namedInput("weight")).has_value()) {
+        at::Tensor weight_tensor =
+            constant_as<at::Tensor>(n->namedInput("weight")).value();
+        w_is_channels_last =
+            weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+            weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d);
+      }
       int64_t o_channel = weight_size[1];
       IValue kernel_size_value(k_size), weight_is_prepacked_value(false),
           weight_is_channels_last_value(w_is_channels_last),
@@ -87,7 +117,7 @@ void insertPrePackedConvTranspose2dOpForATen(Block* b) {
 
       graph->insertNode(prepack_node);
       auto prepack_conv_transpose = graph->insertNode(graph->create(
-          Symbol::fromQualString("ipex_prepack::conv_transpose2d_run"), 1));
+          Symbol::fromQualString("ipex_prepack::conv_transpose_run"), 1));
       prepack_conv_transpose->addInput(n->inputs().at(0));
       prepack_conv_transpose->addInput(prepack_node->output());
       prepack_conv_transpose->output()->setType(
@@ -101,13 +131,13 @@ void insertPrePackedConvTranspose2dOpForATen(Block* b) {
 
 // For ipex conv_transpose, we can re-pack the packed weight in the op-context
 // if we get an different input size here
-void mayRePackConvTranspose2dOpForIpex(Block* b) {
+void mayRePackConvTransposeOpForIpex(Block* b) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      mayRePackConvTranspose2dOpForIpex(block);
+      mayRePackConvTransposeOpForIpex(block);
     }
     // TODO: add conv_transpose3d
-    if (n->kind() == Symbol::fromQualString("torch_ipex::conv_transpose2d")) {
+    if (n->kind() == Symbol::fromQualString("torch_ipex::conv_transpose")) {
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
       auto input_size_option = n->inputs()
@@ -118,7 +148,8 @@ void mayRePackConvTranspose2dOpForIpex(Block* b) {
                                    .concrete_sizes();
       // if can't get input shape info, will not do weight prepack.
       if (!(input_size_option.has_value() &&
-            input_size_option.value().size() == 4)) {
+            (input_size_option.value().size() == 4 ||
+             input_size_option.value().size() == 5))) {
         continue;
       }
       IValue input_size_value(input_size_option.value());
@@ -131,7 +162,7 @@ void mayRePackConvTranspose2dOpForIpex(Block* b) {
                                       .toCustomClass<ConvTransposeOpContext>();
       convtranspose_op_ctx->may_repack(input_size_option.value());
       auto prepack_convtranspose = graph->insertNode(graph->create(
-          Symbol::fromQualString("ipex_prepack::conv_transpose2d_run"), 1));
+          Symbol::fromQualString("ipex_prepack::conv_transpose_run"), 1));
       prepack_convtranspose->addInput(n->inputs().at(0));
       prepack_convtranspose->addInput(prepack_node);
       prepack_convtranspose->output()->setType(
@@ -143,9 +174,9 @@ void mayRePackConvTranspose2dOpForIpex(Block* b) {
   EliminateDeadCode(b);
 }
 
-void insertPrePackedConvTranspose2dOp(std::shared_ptr<Graph>& graph) {
-  insertPrePackedConvTranspose2dOpForATen(graph->block());
-  mayRePackConvTranspose2dOpForIpex(graph->block());
+void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph) {
+  insertPrePackedConvTransposeOpForATen(graph->block());
+  mayRePackConvTransposeOpForIpex(graph->block());
 }
 
 } // namespace graph_rewrite

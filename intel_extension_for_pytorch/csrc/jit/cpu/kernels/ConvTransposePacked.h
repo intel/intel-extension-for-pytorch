@@ -9,7 +9,7 @@
 namespace torch_ipex {
 namespace cpu {
 namespace detail {
-namespace conv_transpose2d {
+namespace conv_transpose {
 
 c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     at::Tensor&& weight,
@@ -24,7 +24,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     bool weight_is_channels_last,
     std::vector<int64_t>&& input_size);
 
-at::Tensor conv_transpose2d_run(
+at::Tensor conv_transpose_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
 
@@ -68,7 +68,7 @@ at::Tensor unpack(ContextConvTranspose& context, const at::Tensor& tensor);
 // to newly queried format
 void repack_for(ContextConvTranspose& context, std::vector<int64_t> input_size);
 
-} // namespace conv_transpose2d
+} // namespace conv_transpose
 } // namespace detail
 } // namespace cpu
 } // namespace torch_ipex

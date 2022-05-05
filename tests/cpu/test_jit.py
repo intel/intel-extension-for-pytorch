@@ -91,6 +91,7 @@ SIZE = 100
 
 
 conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
+convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
 
 class ConvBatchNorm_Fixed(nn.Module):
@@ -595,13 +596,13 @@ class ConvGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.conv(x), approximate=self.approximate)
 
-class ConvTranspose2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
-        super(ConvTranspose2d, self).__init__()
-        self.conv_transpose2d = nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride, padding, output_padding, groups, bias, dilation)
+class ConvTranspose(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
+        super(ConvTranspose, self).__init__()
+        self.conv_transpose = convtranspose_module[dim](in_channels, out_channels, kernel_size, stride, padding, output_padding, groups, bias, dilation)
 
     def forward(self, x):
-        x = self.conv_transpose2d(x)
+        x = self.conv_transpose(x)
         return x
 
 class ChannelShuffle_with_Static_Shape(nn.Module):
@@ -872,6 +873,8 @@ class Tester(TestCase):
                 x = x.to(memory_format=torch.channels_last_3d)
                 model = model.to(memory_format=torch.channels_last_3d)
 
+            oresult = model(x)
+
             model = ipex.optimize(model, dtype=torch.float32, level=level)
 
             with torch.no_grad():
@@ -880,6 +883,7 @@ class Tester(TestCase):
                 traced_model = torch.jit.freeze(traced_model)
                 tresult = traced_model(x)
 
+            self.assertEqual(oresult, result, prec=prec)
             self.assertEqual(result, tresult, prec=prec)
 
             ipex.enable_onednn_fusion(True)
@@ -935,7 +939,8 @@ class Tester(TestCase):
                 fused_tresult = trace_fused_model(x3)
 #bf16, jit trace path
                 trace_graph = trace_fused_model.graph_for(x3)
-                fused_tresult = trace_fused_model(x3)
+                for _ in range(3):
+                    fused_tresult = trace_fused_model(x3)
 
             self.assertEqual(fused_tresult, result, prec=prec)
             self.assertEqual(fused_tresult.dtype, torch.bfloat16)
@@ -2083,7 +2088,7 @@ class Tester(TestCase):
                 x,
                 kind_not_in_graph="ipex_prepack::convolution_add_run")
 
-    def test_output_conv_transpose2d(self):
+    def test_output_conv_transpose(self):
         def _deconv_params_list():
             params_dict = {
                 "input_height": [12],
@@ -2139,35 +2144,39 @@ class Tester(TestCase):
                 ic = input_channel_per_group * groups
                 oc = output_channel_per_group * groups
 
-                x = torch.randn(2, ic, input_height, input_width)
-                model = ConvTranspose2d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation)
+                for dim in [2, 3]:
+                    if dim == 2:
+                        x = torch.randn(2, ic, input_height, input_width)
+                    else:
+                        x = torch.randn(2, ic, input_depth, input_height, input_width)
+                    model = ConvTranspose(dim, ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation)
 
-                self._test_output(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O0"])
-                self._test_output_bf16(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O0"],
-                    prec=0.02)
-                self._test_output(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O1"])
-                self._test_output_bf16(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O1"],
-                    prec=0.02)
+                    self._test_output(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O0"])
+                    self._test_output_bf16(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O0"],
+                        prec=0.02)
+                    self._test_output(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O1"])
+                    self._test_output_bf16(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O1"],
+                        prec=0.02)
 
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)

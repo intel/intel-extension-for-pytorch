@@ -31,7 +31,7 @@ void PrePackingOpsFolder(Block* b) {
 
         n->kind() == Symbol::fromQualString("ipex_prepack::linear_prepack") ||
         n->kind() ==
-            Symbol::fromQualString("ipex_prepack::conv_transpose2d_prepack") ||
+            Symbol::fromQualString("ipex_prepack::conv_transpose_prepack") ||
         n->kind() ==
             Symbol::fromQualString(
                 "ipex_prepack::convolution_leaky_relu_prepack") ||

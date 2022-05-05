@@ -9,7 +9,7 @@
 namespace torch_ipex {
 namespace cpu {
 namespace detail {
-namespace conv_transpose2d {
+namespace conv_transpose {
 
 c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     at::Tensor&& weight,
@@ -41,11 +41,11 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
       std::move(input_size));
 }
 
-at::Tensor conv_transpose2d_run(
+at::Tensor conv_transpose_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::conv_transpose2d_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::conv_transpose_run", std::vector<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t());
 }
@@ -62,18 +62,20 @@ ContextConvTranspose create(
     const int64_t output_channel,
     const bool weight_is_channels_last,
     const at::IntArrayRef input_size) {
-  const auto stride_expanded = expand_param_if_needed(stride, "stride", 2);
-  const auto padding_expanded = expand_param_if_needed(padding, "padding", 2);
+  auto dim = weight.dim() - 2;
+  const auto stride_expanded = expand_param_if_needed(stride, "stride", dim);
+  const auto padding_expanded = expand_param_if_needed(padding, "padding", dim);
   const auto output_padding_expanded =
-      expand_param_if_needed(output_padding, "output_padding", 2);
+      expand_param_if_needed(output_padding, "output_padding", dim);
   const auto dilation_expanded =
-      expand_param_if_needed(dilation, "dilation", 2);
+      expand_param_if_needed(dilation, "dilation", dim);
 
   bool weight_is_channels_last_ = weight_is_channels_last;
 
   weight_is_channels_last_ =
-      weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  auto memory_format = weight_is_channels_last_ ? at::MemoryFormat::ChannelsLast
+      weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      weight.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
+  auto memory_format = weight_is_channels_last_ ? weight.suggest_memory_format()
                                                 : at::MemoryFormat::Contiguous;
   auto weight_ = weight.contiguous(memory_format);
 
@@ -81,7 +83,7 @@ ContextConvTranspose create(
   ideep::tensor::desc ori_desc(w.get_desc());
   ideep::data_type dtype = w.get_data_type();
   // TODO: adjust padding_r
-  auto expected_desc = get_conv_transpose2d_expected_weights_desc(
+  auto expected_desc = get_conv_transpose_expected_weights_desc(
       w.get_dims(),
       dtype,
       {stride_expanded.begin(), stride_expanded.end()},
@@ -106,18 +108,17 @@ ContextConvTranspose create(
   }
 
   w.transpose_(0, 1);
-  auto w_transpose = w.make_grouped_weights(groups, true);
-  packed_weight.feed_from(w_transpose);
+  packed_weight.feed_from(w, true);
 
   return ContextConvTranspose{
       std::move(ori_desc),
       std::move(packed_weight),
       std::move(at_weight),
       bias.has_value() ? c10::make_optional(*bias) : c10::nullopt,
-      {padding_expanded[0], padding_expanded[1]},
-      {output_padding_expanded[0], output_padding_expanded[1]},
-      {stride_expanded[0], stride_expanded[1]},
-      {dilation_expanded[0], dilation_expanded[1]},
+      padding_expanded,
+      output_padding_expanded,
+      stride_expanded,
+      dilation_expanded,
       kernel_size.vec(),
       groups,
       input_size.vec(),
@@ -131,12 +132,19 @@ at::Tensor run(
     const ideep::attr_t& attr) {
   bool use_channels_last =
       input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
       context.weight_is_channels_last_;
-  auto memory_format = use_channels_last ? at::MemoryFormat::ChannelsLast
-                                         : at::MemoryFormat::Contiguous;
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else if (input.dim() == 5) {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
   auto input_ = input.contiguous(memory_format);
 
-  return conv_transpose2d_kernel_impl(
+  return conv_transpose_kernel_impl(
       input_,
       context.weight_packed_,
       context.bias_,
@@ -154,7 +162,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
     const at::Tensor& input,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask) {
-  return conv_transpose2d_backward_kernel_impl(
+  return conv_transpose_backward_kernel_impl(
       input,
       grad_output,
       context.at_weight_,
@@ -188,9 +196,7 @@ at::Tensor pack(ContextConvTranspose& context, const at::Tensor& tensor) {
         expected_desc, packed_at_tensor.template data_ptr<c10::BFloat16>());
   }
   ideep_tensor.transpose_(0, 1);
-  auto ideep_tensor_transpose =
-      ideep_tensor.make_grouped_weights(context.groups_, true);
-  packed_tensor.feed_from(ideep_tensor_transpose);
+  packed_tensor.feed_from(ideep_tensor, true);
   return packed_at_tensor;
 }
 
@@ -207,7 +213,11 @@ at::Tensor unpack(ContextConvTranspose& context, const at::Tensor& tensor) {
 
   at::Tensor result = at::empty(context.origin_weight_dims_, tensor.options());
   if (context.weight_is_channels_last_) {
-    result = result.to(at::MemoryFormat::ChannelsLast);
+    if (context.original_desc_.get_ndims() == 4) {
+      result = result.to(at::MemoryFormat::ChannelsLast);
+    } else if (context.original_desc_.get_ndims() == 5) {
+      result = result.to(at::MemoryFormat::ChannelsLast3d);
+    }
   }
   ideep::tensor pub_tensor = itensor_view_from_dense(result);
   auto pub_tensor_desc = context.original_desc_.to_type(dtype);
@@ -217,8 +227,7 @@ at::Tensor unpack(ContextConvTranspose& context, const at::Tensor& tensor) {
     pub_tensor.init(pub_tensor_desc, result.template data_ptr<c10::BFloat16>());
   }
   pub_tensor.transpose_(0, 1);
-  pub_tensor = pub_tensor.make_grouped_weights(context.groups_, true);
-  pub_tensor.feed_from(blocked_tensor);
+  pub_tensor.feed_from(blocked_tensor, true);
   return result;
 }
 
@@ -227,7 +236,7 @@ void repack_for(
     std::vector<int64_t> input_size) {
   auto dtype = context.original_desc_.get_data_type();
   ideep::tensor packed_weight;
-  auto packed_desc = get_conv_transpose2d_expected_weights_desc(
+  auto packed_desc = get_conv_transpose_expected_weights_desc(
       context.origin_weight_dims_,
       dtype,
       context.stride_,
@@ -252,7 +261,7 @@ void repack_for(
   context.weight_packed_ = packed_weight;
 }
 
-} // namespace conv_transpose2d
+} // namespace conv_transpose
 } // namespace detail
 } // namespace cpu
 } // namespace torch_ipex

@@ -34,7 +34,7 @@ at::Tensor toOptionalTensor(const IValue& v) {
 using namespace torch_ipex::cpu;
 using namespace torch_ipex::cpu::detail::convolution;
 using namespace torch_ipex::cpu::detail::linear;
-using namespace torch_ipex::cpu::detail::conv_transpose2d;
+using namespace torch_ipex::cpu::detail::conv_transpose;
 
 #define CONV_PREPACK_ARGS                                            \
   "Tensor W, Tensor? B, "                                            \
@@ -375,12 +375,12 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex_prepack::conv_transpose2d_run(Tensor input, "
+        "ipex_prepack::conv_transpose_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
         "W_prepack) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            auto result = conv_transpose2d_run(
+            auto result = conv_transpose_run(
                 (std::move(peek(stack, 0, 2))).toTensor(),
                 (std::move(peek(stack, 1, 2)))
                     .toCustomClass<ConvTransposeOpContext>());

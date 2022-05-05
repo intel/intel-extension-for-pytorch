@@ -40,8 +40,8 @@ ideep::tensor::desc get_conv_expected_weights_desc(
     const ideep::dims& src_dims = ideep::tensor::dims(),
     const ideep::attr_t& attr = ideep::attr_t());
 
-// Get the conv_transpose2d's expected ideep weight tensor desc.
-ideep::tensor::desc get_conv_transpose2d_expected_weights_desc(
+// Get the conv_transpose's expected ideep weight tensor desc.
+ideep::tensor::desc get_conv_transpose_expected_weights_desc(
     const ideep::tensor::dims& weights_dims,
     ideep::tensor::data_type w_dtype = ideep::data_type::f32,
     const ideep::tensor::dims& strides = {1, 1},

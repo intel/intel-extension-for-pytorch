@@ -163,6 +163,18 @@ class tensor : public memory {
       return true;
     }
 
+    inline bool is_ndhwc() const {
+      if (!is_plain() || data.ndims != 5)
+        return false;
+      const auto& dims = data.dims;
+      const auto& strides = blocking_strides();
+      const auto n = 0, c = 1, d = 2, h = 3, w = 4;
+      return strides[n] == dims[d] * dims[h] * dims[w] * dims[c] &&
+          strides[d] == dims[h] * dims[w] * dims[c] &&
+          strides[h] == dims[w] * dims[c] && strides[w] == dims[c] &&
+          strides[c] == 1;
+    }
+
     inline bool is_nhwc() const {
       if (!is_plain() || data.ndims != 4)
         return false;
@@ -802,11 +814,34 @@ class tensor : public memory {
     // handle channels last with groups
     if (is_deconv) {
       // deconv: judge whether is channels last on iohw format
-      // TODO: 3d deconv channels_last check(onednn doesn't has acdefb format).
-      auto channels_last = old_desc.transpose(0, 1).is_nhwc();
-      if (channels_last) {
+      auto old_desc_trans = old_desc.transpose(0, 1);
+      if (old_desc_trans.is_nhwc()) {
         // giohw (acbde) => gihwo (acdeb)
         grouped_desc = grouped_desc.to_format(format_tag::acdeb);
+      } else if (old_desc_trans.is_ndhwc()) {
+        // giodhw (acbdef) => gidhwo (acdefb)
+        // TODO: onednn doesn't have the tag of acdefb for now
+        // grouped_desc = grouped_desc.to_format(format_tag::acdefb);
+        //
+        // work around by re-create desc based on dims and strides.
+        auto ddims = grouped_desc.get_dims();
+        auto ddata_type = grouped_desc.get_data_type();
+        auto g = groups;
+        auto o = ddims[0] / g;
+        auto i = ddims[1];
+        auto d = ddims[2];
+        auto h = ddims[3];
+        auto w = ddims[4];
+        desc new_desc{
+            {g, o, i, d, h, w},
+            ddata_type,
+            {/*g*/ i * d * h * w * o,
+             /*o*/ 1,
+             /*i*/ d * h * w * o,
+             /*d*/ h * w * o,
+             /*h*/ w * o,
+             /*w*/ o}};
+        grouped_desc = new_desc;
       }
     } else {
       // conv: judge whether is channels last on oihw format

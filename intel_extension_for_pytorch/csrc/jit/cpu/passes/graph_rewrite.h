@@ -51,7 +51,7 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
-void insertPrePackedConvTranspose2dOp(std::shared_ptr<Graph>& graph);
+void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite

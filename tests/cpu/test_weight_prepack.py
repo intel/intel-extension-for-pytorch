@@ -613,8 +613,8 @@ class TestPrepackCases(TestCase):
                     model = Deconv2d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation).to(memory_format=torch.channels_last)
                     x = torch.rand((2, ic, input_height, input_width)).to(memory_format=torch.channels_last)
                 elif dims == 3:
-                    model = Deconv3d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation).to(memory_format=torch.channels_last)
-                    x = torch.rand((2, ic, input_depth, input_height, input_width)).to(memory_format=torch.channels_last)
+                    model = Deconv3d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation).to(memory_format=torch.channels_last_3d)
+                    x = torch.rand((2, ic, input_depth, input_height, input_width)).to(memory_format=torch.channels_last_3d)
 
                 for dtype, feed_sample_input in itertools.product([torch.float32, torch.bfloat16], [True, False]):
                     x = x.to(dtype=dtype).float()
@@ -694,6 +694,12 @@ class TestPrepackCases(TestCase):
 
     def test_deconv_2d_training(self):
         self._test_deconv(dims=2, inference=False)
+
+    def test_deconv_3d_inference(self):
+        self._test_deconv(dims=3, inference=True)
+
+    def test_deconv_3d_training(self):
+        self._test_deconv(dims=3, inference=False)
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

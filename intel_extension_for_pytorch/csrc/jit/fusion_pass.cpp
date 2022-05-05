@@ -9,6 +9,7 @@
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
 #include "cpu/passes/frozen_linear_folding.h"
+#include "cpu/passes/graph_rewrite_helper.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -17,7 +18,6 @@
 #include <torch/csrc/jit/passes/batch_mm.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/frozen_conv_folding.h>
-#include <torch/csrc/jit/passes/graph_rewrite_helper.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/remove_dropout.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
@@ -393,7 +393,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
-  graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
+  graph_rewrite::insertPrePackedConvTransposeOp(graph);
 
   // fuse concat+bn+relu for the input float tensors with the same sizes
   // and channelslast format

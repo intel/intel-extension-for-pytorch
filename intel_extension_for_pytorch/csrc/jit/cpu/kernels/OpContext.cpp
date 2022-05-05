@@ -193,7 +193,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
         int64_t output_channel,
         bool weight_is_channels_last,
         std::vector<int64_t>&& input_size) {
-  auto op_context = torch_ipex::cpu::detail::conv_transpose2d::create(
+  auto op_context = torch_ipex::cpu::detail::conv_transpose::create(
       weight,
       bias,
       stride,
@@ -223,8 +223,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
 at::Tensor IpexConvTransposeOpContext::run(
     const at::Tensor& input,
     const ideep::attr_t& attr) {
-  return torch_ipex::cpu::detail::conv_transpose2d::run(
-      op_context_, input, attr);
+  return torch_ipex::cpu::detail::conv_transpose::run(op_context_, input, attr);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexConvTransposeOpContext::
@@ -232,27 +231,27 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexConvTransposeOpContext::
         const at::Tensor& input,
         const at::Tensor& grad_output,
         std::array<bool, 3> output_mask) {
-  return torch_ipex::cpu::detail::conv_transpose2d::run_backward(
+  return torch_ipex::cpu::detail::conv_transpose::run_backward(
       op_context_, input, grad_output, output_mask);
 }
 
 at::Tensor IpexConvTransposeOpContext::get_at_packed_weight() {
-  return torch_ipex::cpu::detail::conv_transpose2d::get_at_packed_weight(
+  return torch_ipex::cpu::detail::conv_transpose::get_at_packed_weight(
       op_context_);
 }
 
 at::Tensor IpexConvTransposeOpContext::pack(const at::Tensor& tensor) {
-  return torch_ipex::cpu::detail::conv_transpose2d::pack(op_context_, tensor);
+  return torch_ipex::cpu::detail::conv_transpose::pack(op_context_, tensor);
 }
 
 at::Tensor IpexConvTransposeOpContext::to_public(const at::Tensor& tensor) {
-  return torch_ipex::cpu::detail::conv_transpose2d::unpack(op_context_, tensor);
+  return torch_ipex::cpu::detail::conv_transpose::unpack(op_context_, tensor);
 }
 
 void IpexConvTransposeOpContext::may_repack(std::vector<int64_t> input_size) {
   if (input_size_.empty() || input_size_ != input_size) {
     input_size_ = input_size;
-    torch_ipex::cpu::detail::conv_transpose2d::repack_for(
+    torch_ipex::cpu::detail::conv_transpose::repack_for(
         op_context_, input_size);
   }
   return;

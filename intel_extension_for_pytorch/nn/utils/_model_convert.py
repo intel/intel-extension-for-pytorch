@@ -81,6 +81,7 @@ def convert_module_data_type(module, dtype):
     module_convert_list = [torch.nn.Conv2d,
                            torch.nn.Conv3d,
                            torch.nn.ConvTranspose2d,
+                           torch.nn.ConvTranspose3d,
                            torch.nn.Linear,
                            torch.nn.Embedding,
                            torch.nn.LSTM]

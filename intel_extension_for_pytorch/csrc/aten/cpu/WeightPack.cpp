@@ -8,12 +8,6 @@
 namespace torch_ipex {
 namespace cpu {
 
-bool is_transposed_2d(const at::Tensor& tensor) {
-  return (
-      tensor.ndimension() == 2 && tensor.stride(0) == 1 &&
-      tensor.stride(1) == tensor.size(0));
-}
-
 namespace {
 
 using weakref_type =
@@ -192,7 +186,7 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
   return std::make_tuple(cached_weight_ih, cached_weight_hh);
 }
 
-ideep::tensor::desc get_conv_transpose2d_expected_weights_desc(
+ideep::tensor::desc get_conv_transpose_expected_weights_desc(
     const ideep::tensor::dims& weights_dims,
     ideep::tensor::data_type w_dtype,
     const ideep::tensor::dims& strides,
