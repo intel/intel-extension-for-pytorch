@@ -610,9 +610,12 @@ template <
     typename acc_t = scalar_t,
     typename out_t = scalar_t>
 void mean_kernel_impl(TensorIterator& iter) {
-  float factor = float(iter.num_output_elements()) / iter.numel();
+  //  returns acc_t for all non-complex dtypes and returns T for c10::complex<T>
+  using factor_t = typename c10::scalar_value_type<acc_t>::type;
+  factor_t factor =
+      static_cast<factor_t>(iter.num_output_elements()) / iter.numel();
   dpcpp_reduce_kernel<scalar_t, out_t>(
-      iter, ReduceMeanOps<acc_t, float>{factor});
+      iter, ReduceMeanOps<acc_t, factor_t>{factor});
 }
 
 template <
@@ -706,15 +709,20 @@ static void prod_kernel(TensorIterator& iter) {
 }
 
 static void mean_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.dtype(),
-      "mean",
-      [&]() {
-        using accscalar_t = acc_type<scalar_t>;
-        mean_kernel_impl<scalar_t, accscalar_t>(iter);
-      });
+  if (iter.dtype() == kHalf) {
+    mean_kernel_impl<at::Half, float>(iter);
+  } else if (iter.dtype(1) == kHalf && iter.dtype() == kFloat) {
+    // type promotion that does cast and reduction in a single kernel
+    mean_kernel_impl<at::Half, float, float>(iter);
+  } else if (iter.dtype() == kBFloat16) {
+    mean_kernel_impl<at::BFloat16, float>(iter);
+  } else if (iter.dtype(1) == kBFloat16 && iter.dtype() == kFloat) {
+    // type promotion that does cast and reduction in a single kernel
+    mean_kernel_impl<at::BFloat16, float, float>(iter);
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX(
+        iter.dtype(), "mean", [&]() { mean_kernel_impl<scalar_t>(iter); });
+  }
 }
 
 static void min_kernel(TensorIterator& iter) {
