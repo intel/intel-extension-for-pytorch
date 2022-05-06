@@ -503,7 +503,8 @@ Tensor scatter(
   out.copy_(self);
   at::assert_no_internal_overlap(out);
   at::assert_no_overlap(out, index);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       out.scalar_type(),
@@ -524,7 +525,8 @@ Tensor& scatter_out(
   }
   at::assert_no_internal_overlap(out);
   at::assert_no_overlap(out, index);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
