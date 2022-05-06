@@ -617,7 +617,9 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::dims _dilation = compatible_dilation(dilation);
 
   auto src_md = memory::desc(src_tz, src_dt, src_fmt);
-  auto wgh_md = memory::desc(wgh_tz, wgh_dt, wgh_fmt);
+  auto wgh_md = onednn_conv_use_channels_last(src, diff_dst)
+      ? memory::desc(wgh_tz, wgh_dt, any_fmt)
+      : memory::desc(wgh_tz, wgh_dt, wgh_fmt);
   auto dst_md = memory::desc(dst_tz, dst_dt, dst_fmt);
   auto bia_md =
       with_bias ? memory::desc(bia_tz, bia_dt, bia_fmt) : memory::desc();
