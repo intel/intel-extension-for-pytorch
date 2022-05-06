@@ -291,82 +291,6 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   }
 }
 
-template <typename T>
-inline void array_copy(T* dst, const T* src, size_t size) {
-  for (size_t i = 0; i < size; ++i)
-    dst[i] = src[i];
-}
-
-inline bool onednn_strides_check(const Tensor& src) {
-  auto adims = xpu::oneDNN::get_onednn_dims(src);
-  int ndims = (int)adims.size();
-  auto dims = adims.data();
-  auto data_type = static_cast<dnnl_data_type_t>(
-      xpu::oneDNN::get_onednn_dtype(src, /*allow_undef*/ true));
-  auto strides_info = xpu::oneDNN::get_onednn_strides(src);
-  auto strides = strides_info.empty() ? nullptr : &strides_info[0];
-
-  auto md = dnnl_memory_desc_t();
-  md.ndims = ndims;
-  array_copy(md.dims, dims, ndims);
-  md.data_type = data_type;
-  array_copy(md.padded_dims, dims, ndims);
-  md.format_kind = dnnl_format_kind_t::dnnl_blocked;
-  if (strides == nullptr || md.ndims == 0 ||
-      md.format_kind != dnnl_format_kind_t::dnnl_blocked)
-    return true;
-
-  dnnl_dims_t blocks = {0};
-  int perm[DNNL_MAX_NDIMS] = {0};
-  for (int d = 0; d < md.ndims; ++d) {
-    // no strides check needed for empty tensor
-    if (md.padded_dims[d] == 0)
-      return true;
-
-    // no strides verification for runtime dims
-    if (strides[d] == DNNL_RUNTIME_DIM_VAL)
-      return true;
-
-    perm[d] = d;
-    blocks[d] = 1;
-  }
-
-  auto block_size = 1;
-  const auto& blk = md.format_desc.blocking;
-  for (int iblk = 0; iblk < blk.inner_nblks; ++iblk) {
-    blocks[blk.inner_idxs[iblk]] *= blk.inner_blks[iblk];
-    block_size *= blk.inner_blks[iblk];
-  }
-
-  // A custom comparator to yield linear order on perm
-  auto idx_sorter = [&](const int a, const int b) -> bool {
-    if (strides[a] == strides[b] && md.padded_dims[a] == md.padded_dims[b])
-      return a < b;
-    else if (strides[a] == strides[b])
-      return md.padded_dims[a] < md.padded_dims[b];
-    else
-      return strides[a] < strides[b];
-  };
-  std::sort(perm, perm + md.ndims, idx_sorter);
-
-  auto min_stride = block_size;
-  for (int idx = 0; idx < md.ndims; ++idx) {
-    const int d = perm[idx];
-
-    // Make an exception for strides[d] == 0 as it has broadcast semantics
-    // Note: owing to being sorted, these are the initial strides
-    if (strides[d] == 0)
-      continue;
-    else if (strides[d] < min_stride)
-      return false;
-
-    // update min_stride for next iteration
-    const auto padded_dim = md.padded_dims[d];
-    min_stride = block_size * strides[d] * (padded_dim / blocks[d]);
-  }
-  return true;
-}
-
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
   if (self.is_same(src)) {
@@ -399,8 +323,8 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // so we call copy_kernel_dpcpp when dimension larger than 6.
   // TODO: All the plain format D2D copy will call copy_kernel_dpcpp
   // once our loops kernel is ready.
-  if (same_device && has_sz_st && onednn_strides_check(self) &&
-      onednn_strides_check(src) &&
+  if (same_device && has_sz_st && xpu::oneDNN::onednn_strides_check(self) &&
+      xpu::oneDNN::onednn_strides_check(src) &&
       xpu::oneDNN::is_supported_onednn_dtype(self) &&
       xpu::oneDNN::is_supported_onednn_dtype(src) &&
       src.dim() <= MAX_ONEDNN_SUPPORTED_DIMS) {

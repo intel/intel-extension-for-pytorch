@@ -119,6 +119,126 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
   return strides;
 }
 
+template <typename T>
+inline void array_copy(T* dst, const T* src, size_t size) {
+  for (size_t i = 0; i < size; ++i)
+    dst[i] = src[i];
+}
+
+inline bool onednn_strides_check(const Tensor& src) {
+  auto adims = xpu::oneDNN::get_onednn_dims(src);
+  int ndims = (int)adims.size();
+  auto dims = adims.data();
+  auto data_type = static_cast<dnnl_data_type_t>(
+      xpu::oneDNN::get_onednn_dtype(src, /*allow_undef*/ true));
+  auto strides_info = xpu::oneDNN::get_onednn_strides(src);
+  auto strides = strides_info.empty() ? nullptr : &strides_info[0];
+
+  auto md = dnnl_memory_desc_t();
+  md.ndims = ndims;
+  array_copy(md.dims, dims, ndims);
+  md.data_type = data_type;
+  array_copy(md.padded_dims, dims, ndims);
+  md.format_kind = dnnl_format_kind_t::dnnl_blocked;
+  if (strides == nullptr || md.ndims == 0 ||
+      md.format_kind != dnnl_format_kind_t::dnnl_blocked)
+    return true;
+
+  dnnl_dims_t blocks = {0};
+  int perm[DNNL_MAX_NDIMS] = {0};
+  for (int d = 0; d < md.ndims; ++d) {
+    // no strides check needed for empty tensor
+    if (md.padded_dims[d] == 0)
+      return true;
+
+    // no strides verification for runtime dims
+    if (strides[d] == DNNL_RUNTIME_DIM_VAL)
+      return true;
+
+    perm[d] = d;
+    blocks[d] = 1;
+  }
+
+  auto block_size = 1;
+  const auto& blk = md.format_desc.blocking;
+  for (int iblk = 0; iblk < blk.inner_nblks; ++iblk) {
+    blocks[blk.inner_idxs[iblk]] *= blk.inner_blks[iblk];
+    block_size *= blk.inner_blks[iblk];
+  }
+
+  // A custom comparator to yield linear order on perm
+  auto idx_sorter = [&](const int a, const int b) -> bool {
+    if (strides[a] == strides[b] && md.padded_dims[a] == md.padded_dims[b])
+      return a < b;
+    else if (strides[a] == strides[b])
+      return md.padded_dims[a] < md.padded_dims[b];
+    else
+      return strides[a] < strides[b];
+  };
+  std::sort(perm, perm + md.ndims, idx_sorter);
+
+  auto min_stride = block_size;
+  for (int idx = 0; idx < md.ndims; ++idx) {
+    const int d = perm[idx];
+
+    // Make an exception for strides[d] == 0 as it has broadcast semantics
+    // Note: owing to being sorted, these are the initial strides
+    if (strides[d] == 0)
+      continue;
+    else if (strides[d] < min_stride)
+      return false;
+
+    // update min_stride for next iteration
+    const auto padded_dim = md.padded_dims[d];
+    min_stride = block_size * strides[d] * (padded_dim / blocks[d]);
+  }
+  return true;
+}
+
+static inline bool is_onednn_matmul_strides(
+    const at::Tensor& tensor,
+    bool is_dst = false) {
+  // https://oneapi-src.github.io/oneDNN/dev_guide_matmul.html
+  // oneDNN matmul only support 2-dim and 3-dim
+  // 2D src(Mxk), wei(KxN), dst(MxN)
+  // 3D src(SxMxK), wei(WxKxN), dst(DxMxN)
+  auto sizes = tensor.sizes();
+  auto tensor_dim = sizes.size();
+  if (tensor_dim != 2 && tensor_dim != 3)
+    return false;
+
+  // the overlaped cases are not supported
+  memory::dims strides = get_onednn_strides(tensor);
+  int64_t storage_size = 1;
+  for (size_t dim = 0; dim < tensor_dim; ++dim)
+    storage_size += (sizes[dim] - 1) * strides[dim];
+  if (storage_size < tensor.numel())
+    return false;
+
+  // the broadcast cases are not supported
+  for (int i = 0; i < tensor_dim; i++) {
+    if (strides[i] == 0)
+      return false;
+  }
+
+  if (is_dst) {
+    // The memory format of the destination tensor should always
+    // be plain with n axis contiguous
+    if (strides[-1] != 1)
+      return false;
+  } else {
+    // the src and weight must have at least one of the axes
+    // m or k and n or k contiguous (i.e., stride=1) respectively.
+    if (strides[-1] != 1 && strides[-2] != 1)
+      return false;
+  }
+
+  if (!onednn_strides_check(tensor))
+    return false;
+
+  return true;
+}
+
 static inline std::vector<int64_t> compatible_groups_conv_strides(
     const at::Tensor& wgh,
     const at::Tensor& wgh_) {

@@ -501,6 +501,7 @@ void matmul(
         ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)}
         : std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
   }
+
   if (po.defined() && beta != 0) {
     TORCH_CHECK(
         check_broadcast(po, result_shape),
@@ -516,22 +517,64 @@ void matmul(
     result.resize_(result_shape);
   }
 
-  xpu::oneDNN::matmul(result, m1, m2, b, attr);
+  // mat1, mat2, res should satisfy oneDNN supported strides
+  Tensor mat1 =
+      xpu::oneDNN::is_onednn_matmul_strides(m1) ? m1 : m1.contiguous();
+  Tensor mat2 =
+      xpu::oneDNN::is_onednn_matmul_strides(m2) ? m2 : m2.contiguous();
+  Tensor res = xpu::oneDNN::is_onednn_matmul_strides(result, true)
+      ? result
+      : result.contiguous();
+  // bias should always contiguous in oneDNN
+  Tensor bias = b.defined() ? b.contiguous() : b;
+
+  xpu::oneDNN::matmul(res, mat1, mat2, bias, attr);
+  if (!res.is_same(result)) {
+    result.copy_(res);
+  }
 }
 
 Tensor& addmm_out(
     const Tensor& self,
-    const Tensor& m1,
-    const Tensor& m2,
+    const Tensor& mat1,
+    const Tensor& mat2,
     const Scalar& beta,
     const Scalar& alpha,
     at::Tensor& result) {
-  checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
-  TORCH_CHECK(m1.dim() == 2 && m2.dim() == 2, "tensors must be 2-D");
+  checkBackend("addmm_out", {result, self, mat1, mat2}, Backend::XPU);
+  TORCH_CHECK(
+      mat1.dim() == 2, "mat1 must be a matrix, got ", mat1.dim(), "-D tensor");
+  TORCH_CHECK(
+      mat2.dim() == 2, "mat2 must be a matrix, got ", mat2.dim(), "-D tensor");
+  TORCH_CHECK(
+      mat1.sizes()[1] == mat2.sizes()[0],
+      "mat1 and mat2 shapes cannot be multiplied (",
+      mat1.sizes()[0],
+      "x",
+      mat1.sizes()[1],
+      " and ",
+      mat2.sizes()[0],
+      "x",
+      mat2.sizes()[1],
+      ")");
 
-  if (m1.is_complex() || m1.scalar_type() == ScalarType::Double) {
+  if (alpha.to<float>() == 0.f || mat1.numel() == 0 || mat2.numel() == 0) {
+    result.resize_({mat1.size(0), mat2.size(1)});
+    if (result.numel() == 0)
+      return result;
+
+    if (self.defined() && beta.to<float>() != 0.f) {
+      result = at::mul_out(
+          result, self, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+    } else {
+      result.zero_();
+    }
+    return result;
+  }
+
+  if (mat1.is_complex() || mat1.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
-    impl::mkl_matmul(result, self, m1, m2, beta, alpha);
+    impl::mkl_matmul(result, self, mat1, mat2, beta, alpha);
     return result;
 #else
     AT_ERROR(
@@ -544,13 +587,13 @@ Tensor& addmm_out(
     // post sum
     matmul(
         result,
-        m1,
-        m2.scalar_type() == m1.scalar_type()
-            ? m2
-            : (m1.scalar_type() == ScalarType::BFloat16 ||
-               m2.scalar_type() == ScalarType::BFloat16)
-                ? m2
-                : m2.to(m1.scalar_type()),
+        mat1,
+        mat2.scalar_type() == mat1.scalar_type()
+            ? mat2
+            : (mat1.scalar_type() == ScalarType::BFloat16 ||
+               mat2.scalar_type() == ScalarType::BFloat16)
+                ? mat2
+                : mat2.to(mat1.scalar_type()),
         at::Tensor(),
         self,
         beta.to<float>(),
@@ -561,13 +604,13 @@ Tensor& addmm_out(
     // bias
     matmul(
         result,
-        m1,
-        m2.scalar_type() == m1.scalar_type()
-            ? m2
-            : (m1.scalar_type() == ScalarType::BFloat16 ||
-               m2.scalar_type() == ScalarType::BFloat16)
-                ? m2
-                : m2.to(m1.scalar_type()),
+        mat1,
+        mat2.scalar_type() == mat1.scalar_type()
+            ? mat2
+            : (mat1.scalar_type() == ScalarType::BFloat16 ||
+               mat2.scalar_type() == ScalarType::BFloat16)
+                ? mat2
+                : mat2.to(mat1.scalar_type()),
         self,
         at::Tensor(),
         beta.to<float>(),
@@ -611,8 +654,26 @@ Tensor addmm(
 
 Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
   checkBackend("mm_out", {result, self, mat2}, Backend::XPU);
-  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(mat2.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(self.dim() == 2, "self must be a matrix");
+  TORCH_CHECK(mat2.dim() == 2, "mat2 must be a matrix");
+  TORCH_CHECK(
+      self.sizes()[1] == mat2.sizes()[0],
+      "mat1 and mat2 shapes cannot be multiplied (",
+      self.sizes()[0],
+      "x",
+      self.sizes()[1],
+      " and ",
+      mat2.sizes()[0],
+      "x",
+      mat2.sizes()[1],
+      ")");
+
+  if (self.numel() == 0 || mat2.numel() == 0) {
+    result.resize_({self.size(0), mat2.size(1)});
+    if (result.numel() > 0)
+      result.zero_();
+    return result;
+  }
 
   if (self.is_complex() || self.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
@@ -672,6 +733,20 @@ Tensor& baddbmm_out(
   checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+
+  if (alpha.to<float>() == 0.f || batch1.numel() == 0 || batch2.numel() == 0) {
+    result.resize_({batch1.size(0), batch1.size(1), batch2.size(2)});
+    if (result.numel() == 0)
+      return result;
+
+    if (input.defined() && beta.to<float>() != 0.f) {
+      result = at::mul_out(
+          result, input, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+    } else {
+      result.zero_();
+    }
+    return result;
+  }
 
   if (batch1.is_complex() || batch2.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
@@ -746,6 +821,21 @@ Tensor& addbmm_out(
       " and ",
       batch2.dim());
 
+  out.resize_({batch1.size(1), batch2.size(2)});
+  if (alpha.to<float>() == 0.f || batch1.numel() == 0 || batch2.numel() == 0) {
+    out.resize_({batch1.size(1), batch2.size(2)});
+    if (out.numel() == 0)
+      return out;
+
+    if (self.defined() && beta.to<float>() != 0.f) {
+      out = at::mul_out(
+          out, self, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+    } else {
+      out.zero_();
+    }
+    return out;
+  }
+
   Tensor b1;
   if (batch1.size(0) > 1) {
     b1 = batch1.transpose(0, 1).contiguous().view({batch1.size(1), -1});
@@ -783,6 +873,14 @@ Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
   checkBackend("bmm_out", {result, self, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+
+  if (self.numel() == 0 || batch2.numel() == 0) {
+    result.resize_({self.size(0), self.size(1), batch2.size(2)});
+    if (result.numel() > 0)
+      result.zero_();
+    return result;
+  }
+
   if (self.is_complex() || self.scalar_type() == ScalarType::Double) {
 #ifdef USE_ONEMKL
     return at::AtenIpexTypeXPU::baddbmm_out(
