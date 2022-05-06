@@ -30,10 +30,10 @@ def summary(logfile, basefile):
 
     with open(logfile) as f:
         for line in f.readlines():
-            ranResultLine = re.search(r'Ran (\d*) tests in (\d*\.?\d*)s', line, matchFlags)
-            failuresLine = re.search(r'failures=(\d*)', line, matchFlags)
-            errorsLine = re.search(r'errors=(\d*)', line, matchFlags)
-            skippedLine = re.search(r'skipped=(\d*)', line, matchFlags)
+            ranResultLine = re.search(r'Ran (\d+) tests in (\d+\.?\d*)s', line, matchFlags)
+            failuresLine = re.search(r'failures=(\d+)', line, matchFlags)
+            errorsLine = re.search(r'errors=(\d+)', line, matchFlags)
+            skippedLine = re.search(r'skipped=(\d+)', line, matchFlags)
 
             if ranResultLine is not None:
                 totalDict['tests'] += int(ranResultLine.group(1))
@@ -57,6 +57,8 @@ def summary(logfile, basefile):
 
     with open(basefile) as bf:
         for line in bf.readlines():
+            if len(line.lstrip()) == 0 or line.lstrip()[0] == '#':
+                continue
             _findall_and_append(line, totalDict, 'too_slow', r'# too slow', matchFlags)
             _findall_and_append(line, totalDict, 'core_dumped', r'# core dumped', matchFlags)
             _findall_and_append(line, totalDict, 'free_issue', r'\.\.\. free', matchFlags)

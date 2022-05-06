@@ -55,12 +55,39 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     #     "test_pointwise_op_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     #     "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     # },
-    # "TestAutogradDeviceTypeXPU": {
+    "TestAutogradDeviceTypeXPU": {
     #     "test_cdist_same_inputs",   # too slow    -> no slow in AOT
     #     "test_cdist",   # too slow   -> no slow in AOT
-    #     "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op.
-    # },
-    # "TestTorchDeviceTypeXPU": {
+        "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op?
+    },
+    "TestTensorCreationXPU": {
+        "test_tensor_ctor_device_inference",    # core dumped ... Segmentation fault
+    },
+    "TestTorchDeviceTypeXPU": {
+        # We need implemented index_put (used by index_add and index_copy)
+        # with deterministic algorithm, otherwise the UT may meet failures.
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1494
+        # for details.
+        "test_index_add_deterministic_xpu",
+        "test_index_copy_deterministic_xpu",
+        "test_index_put_non_accumulate_deterministic_xpu",
+
+        # test_cublas is not needed for XPU
+        "test_cublas_config_nondeterministic_alert",
+        
+        # test_dlpack is not needed for XPU
+        "test_dlpack_capsule_conversion",
+        "test_dlpack_protocol_conversion",
+        "test_dlpack_shared_storage",
+        "test_dlpack_conversion_with_streams",
+        "test_dlpack_conversion_with_diff_streams",
+        "test_dlpack_tensor_invalid_stream",
+        "test_dlpack_error_on_bool_tensor",
+        "test_dlpack_export_requires_grad",
+        "test_dlpack_export_is_conj",
+        "test_dlpack_export_non_strided",
+
+
         # "test_cdist_large_batch",   # too slow  -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
         # "test_cdist_large",     # too slow -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
         # "test_conv_transposed_large",   # too slow  -> <deconvolution> start barrier(606us) submit(10387us) end barrier(122us) event wait(75568616us) event_duration_0(74985075us) total(75579744us)
@@ -69,84 +96,235 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_index_select",    # core dumped ... munmap_chunk(): invalid pointer  -> RuntimeError: index_select(): Expected dtype int64 for index but got: Int
         # "test_large_cumprod",   # too slow  -> OOM on my gen9 host
         # "test_large_cumsum",   # too slow -> OOM on my gen9 host
-    # },
-    # "TestReductionsXPU": {
-        # "test_mode",    # too slow -> no too slow in AOT
-        # "test_nansum_out_dtype",    # too slow
-        # "test_nansum",  # too slow
-        # "test_noncontiguous_all",   # too slow
-        # "test_noncontiguous_expanded",  # too slow
-        # "test_noncontiguous_innermost",     # too slow
-        # "test_noncontiguous_outermost",     # too slow
-        # "test_noncontiguous_transposed",    # too slow
-        # "test_numpy_named_args",    # too slow  -> passed
-        # "test_prod_bool",   # too slow
-        # "test_prod_gpu",    # too slow  -> passed
-        # "test_quantile_backward",   # too slow
-        # "test_quantile_error",  # too slow  -> passed
-        # "test_quantile",    # too slow
-        # "test_reduction_empty_any_all",     # too slow
-        # "test_reduction_split",     # too slow
-        # "test_reduction_vectorize_along_input_corner",  # too slow
-        # "test_reduction_vectorize_along_output",  # too slow -> passed
-        # "test_std_correction_vs_numpy",     # too slow
-        # "test_std_mean_all_dims",   # too slow -> passed
-        # "test_std_mean_correction",     # too slow
-        # "test_std_mean_some_dims",  # too slow -> passed
-        # "test_std_mean",    # too slow
-        # "test_std_vs_numpy",    # too slow
-        # "test_sum_dim_reduction_uint8_overflow",    # too slow
-        # "test_sum_noncontig",   # too slow
-        # "test_sum_vs_numpy",    # too slow
-        # "test_tensor_reduce_ops_empty",     # too slow
-        # "test_var_correction_vs_numpy",     # too slow
-        # "test_var_large_input",     # too slow
-        # "test_var_mean_all_dims",   # too slow
-        # "test_var_mean_correction",     # too slow
-        # "test_var_mean_some_dims",  # too slow
-        # "test_var_mean",    # too slow
-        # "test_var_stability2",  # too slow
-        # "test_var_stability",   # too slow
-        # "test_var_unbiased",    # too slow
-        # "test_var_vs_numpy",    # too slow
-    #     "test_var",     # too slow
-    # },
-    # "TestUnaryUfuncsXPU": {
-    #     "test_batch_vs_slicing",   # too slow
+    },
+    "TestLinalgXPU": {
+        "test_qr",  # core dumped ... Segmetation fault
+    },
+    "TestReductionsXPU": {
+        "test_mode_xpu",    # too slow
+        "test_nansum_out_dtype",    # too slow
+        "test_nansum_vs_numpy",     # too slow
+        "test_nansum",  # too slow
+        "test_noncontiguous_all",   # too slow
+        "test_noncontiguous_expanded",  # too slow
+        "test_noncontiguous_innermost",     # too slow
+        "test_noncontiguous_outermost",     # too slow
+        "test_noncontiguous_transposed",    # too slow
+        "test_numpy_named_args",    # too slow  -> passed
+        "test_prod_bool",   # too slow
+        "test_prod_gpu",    # too slow  -> passed
+        "test_quantile_backward",   # too slow
+        "test_quantile_error",  # too slow  -> passed
+        "test_quantile",    # too slow
+        "test_reduction_empty_any_all",     # too slow
+        "test_reduction_split",     # too slow
+        "test_reduction_vectorize_along_input_corner",  # too slow
+        "test_reduction_vectorize_along_output",  # too slow -> passed
+        "test_std_correction_vs_numpy",     # too slow
+        "test_std_mean_all_dims",   # too slow -> passed
+        "test_std_mean_correction",     # too slow
+        "test_std_mean_some_dims",  # too slow -> passed
+        "test_std_mean",    # too slow
+        "test_std_vs_numpy",    # too slow
+        "test_sum_dim_reduction_uint8_overflow",    # too slow
+        "test_sum_noncontig",   # too slow
+        "test_sum_vs_numpy",    # too slow
+        "test_tensor_reduce_ops_empty",     # too slow
+        "test_var_correction_vs_numpy",     # too slow
+        "test_var_large_input",     # too slow
+        "test_var_mean_all_dims",   # too slow
+        "test_var_mean_correction",     # too slow
+        "test_var_mean_some_dims",  # too slow
+        "test_var_mean",    # too slow
+        "test_var_stability2",  # too slow
+        "test_var_stability",   # too slow
+        "test_var_unbiased",    # too slow
+        "test_var_vs_numpy",    # too slow
+        "test_var",     # too slow
+    },
+    "TestUnaryUfuncsXPU": {
+        # oneMKL doesn't support non-float and non-double data type for lgamma,
+        # which should be supported by torch and ipex.
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1502
+        # for details.
+        "test_contig_size1_large_dim_lgamma_xpu_bfloat16",
+        "test_contig_size1_large_dim_lgamma_xpu_int64",
+        "test_contig_size1_large_dim_lgamma_xpu_uint8",
+        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_contig_size1_large_dim_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_contig_size1_lgamma_xpu_bfloat16",
+        "test_contig_size1_lgamma_xpu_int64",
+        "test_contig_size1_lgamma_xpu_uint8",
+        "test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_contig_size1_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_contig_size1_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_contig_size1_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_contig_vs_every_other_lgamma_xpu_bfloat16",
+        "test_contig_vs_every_other_lgamma_xpu_int64",
+        "test_contig_vs_every_other_lgamma_xpu_uint8",
+        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_contig_vs_every_other_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_contig_vs_transposed_lgamma_xpu_bfloat16",
+        "test_contig_vs_transposed_lgamma_xpu_int64",
+        "test_contig_vs_transposed_lgamma_xpu_uint8",
+        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_contig_vs_transposed_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_non_contig_expand_lgamma_xpu_bfloat16",
+        "test_non_contig_expand_lgamma_xpu_int64",
+        "test_non_contig_expand_lgamma_xpu_uint8",
+        "test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_non_contig_expand_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_non_contig_expand_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_non_contig_expand_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_non_contig_index_lgamma_xpu_bfloat16",
+        "test_non_contig_index_lgamma_xpu_int64",
+        "test_non_contig_index_lgamma_xpu_uint8",
+        "test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_non_contig_index_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_non_contig_index_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_non_contig_index_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_non_contig_lgamma_xpu_bfloat16",
+        "test_non_contig_lgamma_xpu_int64",
+        "test_non_contig_lgamma_xpu_uint8",
+        "test_non_contig_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_non_contig_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_non_contig_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_non_contig_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_non_contig_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_non_contig_mvlgamma_mvlgamma_p_5_xpu_uint8",
+        "test_reference_numerics_hard_lgamma_xpu_bfloat16",
+        "test_reference_numerics_hard_lgamma_xpu_int64",
+        "test_reference_numerics_hard_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_reference_numerics_hard_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_reference_numerics_hard_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_reference_numerics_normal_lgamma_xpu_bfloat16",
+        "test_reference_numerics_normal_lgamma_xpu_int64",
+        "test_reference_numerics_normal_lgamma_xpu_uint8",
+        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_int64",
+        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_1_xpu_uint8",
+        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_int64",
+        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_3_xpu_uint8",
+        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_int64",
+        "test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_uint8",
+
+        "test_batch_vs_slicing",   # too slow
     #     "test_frexp_out",    # core dumped ... free(): invalid size  -> OOM ../neo/opencl/source/os_interface/linux/drm_command_stream.inl
     #     "test_out_arg_all_dtypes",   # core dumped ... Segmentation fault
-    # },
-    # "TestCommonXPU": {
-        # "test_dtypes",  # core dumped ... munmap_chunk(): invalid pointer
+    },
+    "TestCommonXPU": {
+        "test_dtypes",  # core dumped ... Segmentation fault (crashed at linalg_qr)
         # "test_out",     # core dumped ... free(): invalid size  -> oneDNN assert
-        # "test_variant_consistency_eager",   # core dumped ... munmap_chunk(): invalid pointer
+        "test_variant_consistency_eager",   # core dumped ... Segmentation fault (crashed at linalg_qr)
         # "test_multiple_devices",    # multi device not ready   -> issue in test scripts
-    # },
-    # "TestGradientsXPU": {
-        # "test_fn_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-        # "test_fn_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-        # "test_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
+    },
+    "TestGradientsXPU": {
+        "test_fn_grad", # core dumped ... Segmentation fault (crash at linalg_qr)
+        "test_fn_gradgrad", # core dumped ... Segmentation fault (crash at linalg_qr)
+        "test_forward_mode_AD", # core dumped ... Segmentation fault (crash at linalg_qr)
         # "test_inplace_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
         # "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
         # "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-    # },
+    },
     "TestJitXPU": {
         "test_variant_consistency_jit", # hang in fft
     },
-    # "TestMathBitsXPU": {
+    "TestMathBitsXPU": {
         # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
-        # "test_neg_view",   # core dumped ... munmap_chunk(): invalid pointer
-    # },
-    # "TestSparseCSRXPU": {
+        "test_neg_view",  # core dumped ... Segmentation fault (crashed at linalg_qr)
+    },
+    "TestSparseCSRXPU": {
         # "test_add",     # core dumped ... Floating point exception
-        # "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
+        "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
         # "test_csr_matvec",     # core dumped ... Floating point exception
-        # "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
+        "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
         # "test_mm",      # core dumped ... Floating point exception
         # "test_sparse_addmm",    # core dumped ... Floating point exception
         # "test_sparse_mm",   # core dumped ... Floating point exception
-    # },
-    # "TestNNDeviceTypeXPU": {
+    },
+    "TestNNDeviceTypeXPU": {
+        # oneDNN Pooling not support double will cause runtime error:
+        # "could not construct a memory descriptor using a format tag".
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1489
+        # for details.
+        "test_AdaptiveMaxPool1d_indices_xpu_float64",
+        "test_AdaptiveMaxPool2d_indices_xpu_float64",
+        "test_AdaptiveMaxPool3d_indices_xpu_float64",
+        "test_AvgPool2d_empty_xpu",
+        "test_AvgPool3d_backward_after_cat_dim1_device_xpu",
+        "test_MaxPool1d_indices_xpu_float64",
+        "test_MaxPool2d_indices_xpu_float64",
+        "test_MaxPool3d_indices_xpu_float64",
+        "test_MaxPool_zero_batch_dim_xpu",
+        "test_MaxUnpool_zero_batch_dim_xpu",
+        "test_avg_pool2d_nhwc_xpu_float64",
+        "test_max_pool2d_nhwc_xpu_float64",
+        "test_max_pool_nan_inf_xpu_float64",
+        "test_maxpool3d_non_square_backward_xpu",
+        "test_maxpool_indices_no_batch_dim_xpu_float64",
+        "test_pool3d_size_one_feature_dim_xpu",
+        "test_pool_large_size_xpu_float64",
+        "test_pooling_shape_xpu",
+
+        # oneDNN Convolution not support double will cause runtime error:
+        # "could not construct a memory descriptor using a format tag".
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1490
+        # for details.
+        "test_Conv2d_backward_depthwise_xpu_float64",
+        "test_Conv2d_naive_groups_xpu_float64",
+        "test_Conv2d_size_1_kernel_xpu",
+        "test_ConvTranspose2d_size_1_kernel_xpu",
+        "test_ConvTranspose3d_size_1_kernel_xpu",
+        "test_contig_wrong_stride_xpu",
+        "test_conv1d_same_padding_backward_xpu",
+        "test_conv1d_same_padding_xpu",
+        "test_conv1d_valid_padding_backward_xpu",
+        "test_conv1d_valid_padding_xpu",
+        "test_conv2d_same_padding_backward_xpu",
+        "test_conv2d_same_padding_xpu",
+        "test_conv2d_valid_padding_backward_xpu",
+        "test_conv2d_valid_padding_xpu",
+        "test_conv3d_same_padding_backward_xpu",
+        "test_conv3d_same_padding_xpu",
+        "test_conv3d_valid_padding_backward_xpu",
+        "test_conv3d_valid_padding_xpu",
+        "test_conv_noncontig_weights_xpu",
+
+        # oneDNN RNN not support double will cause runtime error:
+        # "could not construct a memory descriptor using a format tag".
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1491
+        # for details.
+        "test_rnn_fused_xpu_float64",
+        "test_rnn_retain_variables_xpu_float64",
+        "test_variable_sequence_xpu_float64",
+
+        # oneDNN Upsample not support double will cause runtime error:
+        # "could not construct a memory descriptor using a format tag".
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1492
+        # for details.
+        "test_upsamplingNearest1d_launch_config_xpu",
+        "test_upsamplingNearest2d_launch_config_xpu",
+        "test_upsamplingNearest2d_launch_rocm_xpu",
+        "test_upsamplingNearest2d_xpu",
+        "test_upsamplingNearest3d_launch_config_xpu",
+
         # "test_conv_ndhwc",  # core dumped ... Segmentation fault
         # "test_conv_nhwc",   # core dumped ... Segmentation fault
         # "test_conv_transposed_large",   # core dumped ... Floating point exception
@@ -154,7 +332,15 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_grid_sample_large_index_3d",  # too slow
         # "test_softmax_64bit_indexing",  # too slow
         # "test_softmax_results",     # core dumped ... Floating point exception
-    # },
+    },
+    "TestModuleXPU": {
+        # oneDNN not support double will cause runtime error:
+        # "could not construct a memory descriptor using a format tag".
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1489
+        # for details.
+        "test_forward_nn_AvgPool1d_xpu_float64",
+        "test_pickle_nn_AvgPool1d_xpu_float64",
+    },
     "TestFFTXPU": {
         # 'test_batch_istft', # failures
         'test_fft2_fftn_equivalence',   # hang
