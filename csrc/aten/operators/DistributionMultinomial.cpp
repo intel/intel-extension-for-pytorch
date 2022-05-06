@@ -232,16 +232,17 @@ Tensor& multinomial_out(
     // Prefix sum along rows
     Tensor prefix_sum = norm_dist.cumsum(1);
 
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
-      sample_multinomial_with_replacement<scalar_t>(
-          rng_engine_inputs,
-          num_samples,
-          num_dists,
-          num_categories,
-          result,
-          prefix_sum,
-          norm_dist);
-    });
+    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+        self.scalar_type(), "multinomial", [&] {
+          sample_multinomial_with_replacement<scalar_t>(
+              rng_engine_inputs,
+              num_samples,
+              num_dists,
+              num_categories,
+              result,
+              prefix_sum,
+              norm_dist);
+        });
   } else {
     auto is_valid = ((self.max() < INFINITY) & (self.min() >= 0)).item();
     TORCH_CHECK(
@@ -280,19 +281,20 @@ Tensor& multinomial_out(
         rng_engine_inputs = gen->philox_engine_inputs(1);
       }
 
-      IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
-        // The kernel can only draw one sample before we have to
-        // recalculate our distribution
-        sample_multinomial_without_replacement<scalar_t>(
-            rng_engine_inputs,
-            num_samples,
-            sample,
-            num_dists,
-            num_categories,
-            result,
-            prefix_sum,
-            norm_dist);
-      });
+      IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+          self.scalar_type(), "multinomial", [&] {
+            // The kernel can only draw one sample before we have to
+            // recalculate our distribution
+            sample_multinomial_without_replacement<scalar_t>(
+                rng_engine_inputs,
+                num_samples,
+                sample,
+                num_dists,
+                num_categories,
+                result,
+                prefix_sum,
+                norm_dist);
+          });
     }
   }
 
