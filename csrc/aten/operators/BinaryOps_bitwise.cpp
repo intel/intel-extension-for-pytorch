@@ -89,31 +89,16 @@ Tensor& bitwise_and_out(const Tensor& self, const Tensor& other, Tensor& out) {
   return out;
 }
 
-Tensor& bitwise_and_out(Tensor& out, const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_and_out(
-      self, wrapped_scalar_tensor(other), out);
-}
-
 Tensor& bitwise_or_out(Tensor& out, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(out, self, other);
   impl::or_kernel_dpcpp(iter);
   return out;
 }
 
-Tensor& bitwise_or_out(Tensor& out, const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_or_out(
-      out, self, wrapped_scalar_tensor(other));
-}
-
 Tensor& bitwise_xor_out(Tensor& out, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(out, self, other);
   impl::xor_kernel_dpcpp(iter);
   return out;
-}
-
-Tensor& bitwise_xor_out(Tensor& out, const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_xor_out(
-      out, self, wrapped_scalar_tensor(other));
 }
 
 Tensor& bitwise_left_shift_out(

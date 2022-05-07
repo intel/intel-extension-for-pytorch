@@ -134,22 +134,5 @@ Tensor conv_tbc(
   return out;
 }
 
-std::tuple<Tensor, Tensor, Tensor> conv_tbc_backward(
-    const Tensor& self,
-    const Tensor& input,
-    const Tensor& weight,
-    const Tensor& bias,
-    int64_t pad) {
-  Tensor dInput = at::empty({}, input.options());
-  Tensor dWeight = at::empty({}, weight.options());
-  Tensor dBias = at::empty({}, bias.options());
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "conv_tbc_backward", [&] {
-        impl::ConvolutionTBC_updateGradInput<scalar_t>(
-            dInput, dWeight, dBias, self, input, weight, bias, pad);
-      });
-  return std::make_tuple(dInput, dWeight, dBias);
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at

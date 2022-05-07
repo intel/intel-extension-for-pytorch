@@ -47,13 +47,5 @@ Tensor& mul_(Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::mul_out(self, self, other);
 }
 
-Tensor mul(const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::mul(self, wrapped_scalar_tensor(other));
-}
-
-Tensor& mul_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::mul_(self, wrapped_scalar_tensor(other));
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at

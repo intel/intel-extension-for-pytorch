@@ -1074,12 +1074,12 @@ static inline Tensor _norm(const Tensor& self, Scalar p) {
 
 // norm - customized outer entrances
 Tensor& norm_out(
-    Tensor& out,
     const Tensor& self,
-    c10::optional<Scalar> p,
+    const c10::optional<Scalar>& p,
     IntArrayRef dim,
     bool keepdim,
-    ScalarType dtype) {
+    ScalarType dtype,
+    Tensor& out) {
   return at::AtenIpexTypeXPU::norm_out(
       out, self, p, dim, keepdim, optional<ScalarType>(dtype));
 }
@@ -1092,33 +1092,6 @@ Tensor& norm_out(
     Tensor& out) {
   return at::AtenIpexTypeXPU::norm_out(
       out, self, p, dim, keepdim, c10::nullopt);
-}
-
-Tensor norm(
-    const Tensor& self,
-    c10::optional<Scalar> p,
-    IntArrayRef dim,
-    bool keepdim,
-    ScalarType dtype) {
-  return at::AtenIpexTypeXPU::norm(
-      self, p, dim, keepdim, optional<ScalarType>(dtype));
-}
-
-Tensor norm(const Tensor& self, c10::optional<Scalar> p, ScalarType dtype) {
-  return at::AtenIpexTypeXPU::norm(
-      self, p, IntArrayRef{}, false, optional<ScalarType>(dtype));
-}
-
-Tensor norm(
-    const Tensor& self,
-    c10::optional<Scalar> p,
-    IntArrayRef dim,
-    bool keepdim) {
-  return at::AtenIpexTypeXPU::norm(self, p, dim, keepdim, c10::nullopt);
-}
-
-Tensor norm(const Tensor& self, Scalar p) {
-  return at::AtenIpexTypeXPU::_norm(self, p);
 }
 
 inline Tensor& _all(Tensor& result, TensorIterator& iter) {

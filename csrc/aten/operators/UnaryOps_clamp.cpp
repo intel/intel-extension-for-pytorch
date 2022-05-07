@@ -140,20 +140,11 @@ Tensor& clamp_out(
   return result;
 }
 
-Tensor& clamp_(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
-  return at::AtenIpexTypeXPU::clamp_out(self, min, max, self);
-}
-
 Tensor& clamp_(
     Tensor& self,
     const c10::optional<Tensor>& min,
     const c10::optional<Tensor>& max) {
   return at::clamp_outf(self, min, max, self);
-}
-
-Tensor clamp(const Tensor& self, optional<Scalar> min, optional<Scalar> max) {
-  auto result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::clamp_out(self, min, max, result);
 }
 
 Tensor clamp(

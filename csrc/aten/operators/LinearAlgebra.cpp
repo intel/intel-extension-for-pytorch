@@ -94,50 +94,6 @@ Tensor chain_matmul_recursion(
 
 } // namespace impl
 
-Tensor chain_matmul(TensorList matrices) {
-  native::checkAllSameDim(matrices, 2);
-
-  TORCH_CHECK(
-      matrices.size() > 0, "chain_matmul: Expected one or more matrices");
-  if (matrices.size() == 1) {
-    return matrices[0];
-  } else if (matrices.size() == 2) {
-    return at::mm(matrices[0], matrices[1]);
-  } else if (matrices.size() == 3) {
-    return impl::chain_matmul_three_matrices(matrices);
-  } else {
-    auto n = matrices.size();
-
-    std::vector<int64_t> p;
-    p.push_back(matrices[0].size(0));
-    for (size_t i = 0; i < n; i++) {
-      p.push_back(matrices[i].size(1));
-    }
-
-    std::vector<std::vector<int64_t>> m(n, std::vector<int64_t>(n, 0));
-
-    std::vector<std::vector<int64_t>> s(n, std::vector<int64_t>(n));
-
-    int64_t j, q;
-
-    for (int64_t l = 1; l < n; l++) {
-      for (int64_t i = 0; i < n - l; i++) {
-        j = i + l;
-        m[i][j] = std::numeric_limits<int64_t>::max();
-        for (int64_t k = i; k < j; k++) {
-          q = m[i][k] + m[k + 1][j] + p[i] * p[k + 1] * p[j + 1];
-          if (q < m[i][j]) {
-            m[i][j] = q;
-            s[i][j] = k;
-          }
-        }
-      }
-    }
-
-    return impl::chain_matmul_recursion(matrices, s, 0, n - 1);
-  }
-}
-
 Tensor& cholesky_inverse_out(Tensor& out, const Tensor& self, bool upper) {
 #ifdef USE_ONEMKL
   TORCH_CHECK(
@@ -195,64 +151,59 @@ Tensor cholesky_inverse(const Tensor& self, bool upper) {
   return AtenIpexTypeXPU::cholesky_inverse_out(out, self, upper);
 }
 
-Tensor& ger_out(Tensor& out, const Tensor& self, const Tensor& vec2) {
-// TODO: Will implement ger kernel on all floating and int datatype, exclude
-// float32 and float64
-#ifdef USE_ONEMKL
-  TORCH_CHECK(
-      self.dim() == 1, "input must be 1-d vector. input shape=", self.sizes());
-  TORCH_CHECK(
-      vec2.dim() == 1, "vec2 must be 1-d vector. vec2 shape=", vec2.sizes());
+// PyTorch deprecates this op, which calls mul_out now
+// we commented its onemkl impl here
 
-  int64_t n = self.size(0); // rows of matrix
-  int64_t m = vec2.size(0); // columns of matrix
-  if (m == 0 || n == 0)
-    return out;
-  int64_t input_stride = self.stride(0);
-  int64_t vec2_stride = vec2.stride(0);
+// Tensor& ger_out(Tensor& out, const Tensor& self, const Tensor& vec2) {
+// // TODO: Will implement ger kernel on all floating and int datatype, exclude
+// // float32 and float64
+// #ifdef USE_ONEMKL
+//   TORCH_CHECK(
+//       self.dim() == 1, "input must be 1-d vector. input shape=",
+//       self.sizes());
+//   TORCH_CHECK(
+//       vec2.dim() == 1, "vec2 must be 1-d vector. vec2 shape=", vec2.sizes());
 
-  out.resize_({n, m}).zero_();
-  TORCH_CHECK(out.is_contiguous(), "the out is not contiguous");
+//   int64_t n = self.size(0); // rows of matrix
+//   int64_t m = vec2.size(0); // columns of matrix
+//   if (m == 0 || n == 0)
+//     return out;
+//   int64_t input_stride = self.stride(0);
+//   int64_t vec2_stride = vec2.stride(0);
 
-  IPEX_DISPATCH_FLOATING_TYPES(out.scalar_type(), "ger_out", [&] {
-    auto& dpcpp_queue = dpcppGetCurrentQueue();
-    auto x = (scalar_t*)self.data_ptr();
-    auto y = (scalar_t*)vec2.data_ptr();
-    auto a = (scalar_t*)out.data_ptr();
-    // The BLAS API is column major. To save the transpose and element move, we
-    // switch the two input. The ger documents
-    // https://spec.oneapi.com/versions/0.6.0/oneMKL/GUID-BD2E87B3-5FA7-4E0C-88E2-1982AB0773A2.html
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::blas::ger,
-        dpcpp_queue,
-        m,
-        n,
-        (float)1.0,
-        y,
-        vec2_stride,
-        x,
-        input_stride,
-        a,
-        m);
-  });
+//   out.resize_({n, m}).zero_();
+//   TORCH_CHECK(out.is_contiguous(), "the out is not contiguous");
 
-  return out;
-#else
-  AT_ERROR("ger: oneMKL library not found in compilation");
-#endif
-}
+//   IPEX_DISPATCH_FLOATING_TYPES(out.scalar_type(), "ger_out", [&] {
+//     auto& dpcpp_queue = dpcppGetCurrentQueue();
+//     auto x = (scalar_t*)self.data_ptr();
+//     auto y = (scalar_t*)vec2.data_ptr();
+//     auto a = (scalar_t*)out.data_ptr();
+//     // The BLAS API is column major. To save the transpose and element move,
+//     we
+//     // switch the two input. The ger documents
+//     //
+//     https://spec.oneapi.com/versions/0.6.0/oneMKL/GUID-BD2E87B3-5FA7-4E0C-88E2-1982AB0773A2.html
+//     DPCPP_ONEMKL_SUBMIT(
+//         dpcpp_queue,
+//         oneapi::mkl::blas::ger,
+//         dpcpp_queue,
+//         m,
+//         n,
+//         (float)1.0,
+//         y,
+//         vec2_stride,
+//         x,
+//         input_stride,
+//         a,
+//         m);
+//   });
 
-Tensor ger(const Tensor& self, const Tensor& vec2) {
-  TORCH_CHECK(
-      self.dim() == 1, "input must be 1-d vector. input shape=", self.sizes());
-  TORCH_CHECK(
-      vec2.dim() == 1, "vec2 must be 1-d vector. vec2 shape=", vec2.sizes());
-  auto n = self.size(0); // rows of matrix
-  auto m = vec2.size(0); // columns of matrix
-  Tensor out = at::zeros({n, m}, self.options());
-  return AtenIpexTypeXPU::ger_out(out, self, vec2);
-}
+//   return out;
+// #else
+//   AT_ERROR("ger: oneMKL library not found in compilation");
+// #endif
+// }
 
 inline void dot_check(const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
@@ -335,7 +286,7 @@ Tensor addr(
   check_addr_scalar(self.scalar_type(), beta, "beta");
   check_addr_scalar(self.scalar_type(), alpha, "alpha");
 
-  Tensor result = at::AtenIpexTypeXPU::ger(vec1, vec2) * alpha;
+  Tensor result = at::ger(vec1, vec2) * alpha;
 
   if (beta.to<double>() == 0.0) {
     return result;

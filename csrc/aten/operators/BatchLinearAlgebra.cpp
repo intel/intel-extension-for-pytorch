@@ -2233,37 +2233,6 @@ Tensor _cholesky_solve_helper(
   return self_working_copy;
 }
 
-Tensor cholesky_solve(const Tensor& self, const Tensor& input2, bool upper) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "b should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  TORCH_CHECK(
-      input2.dim() >= 2,
-      "u should have at least 2 dimensions, but has ",
-      input2.dim(),
-      " dimensions instead");
-  Tensor self_broadcasted, input2_broadcasted;
-  std::tie(self_broadcasted, input2_broadcasted) =
-      native::_linalg_broadcast_batch_dims(
-          self, input2, "cholesky_solve_dpcpp");
-  return at::AtenIpexTypeXPU::_cholesky_solve_helper(
-      self_broadcasted, input2_broadcasted, upper);
-}
-
-Tensor& cholesky_solve_out(
-    Tensor& out,
-    const Tensor& self,
-    const Tensor& input2,
-    bool upper) {
-  native::checkSameDevice("cholesky_solve", out, self);
-  native::checkLinalgCompatibleDtype("cholesky_solve", out, self);
-  Tensor out_tmp = at::AtenIpexTypeXPU::cholesky_solve(self, input2, upper);
-  out.resize_as_(out_tmp).copy_(out_tmp);
-  return out;
-}
-
 Tensor _cholesky_helper(const Tensor& self, bool upper) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);

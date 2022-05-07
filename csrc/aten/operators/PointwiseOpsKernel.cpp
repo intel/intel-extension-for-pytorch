@@ -63,24 +63,6 @@ Tensor& addcmul_out(
   return out;
 }
 
-Tensor addcmul(
-    const Tensor& self,
-    const Tensor& tensor1,
-    const Tensor& tensor2,
-    Scalar value) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::addcmul_out(
-      self, tensor1, tensor2, value, result);
-}
-
-Tensor& addcmul_(
-    Tensor& self,
-    const Tensor& tensor1,
-    const Tensor& tensor2,
-    Scalar value) {
-  return at::AtenIpexTypeXPU::addcmul_out(self, tensor1, tensor2, value, self);
-}
-
 Tensor& addcdiv_out(
     const Tensor& self,
     const Tensor& tensor1,
@@ -110,24 +92,6 @@ Tensor& addcdiv_out(
                   .build();
   impl::addcdiv_kernel(iter, value);
   return out;
-}
-
-Tensor addcdiv(
-    const Tensor& self,
-    const Tensor& tensor1,
-    const Tensor& tensor2,
-    Scalar value) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::addcdiv_out(
-      self, tensor1, tensor2, value, result);
-}
-
-Tensor& addcdiv_(
-    Tensor& self,
-    const Tensor& tensor1,
-    const Tensor& tensor2,
-    Scalar value) {
-  return at::AtenIpexTypeXPU::addcdiv_out(self, tensor1, tensor2, value, self);
 }
 
 } // namespace AtenIpexTypeXPU

@@ -621,37 +621,6 @@ Tensor& addmm_out(
   return result;
 }
 
-Tensor& addmm_(
-    Tensor& self,
-    const Tensor& m1,
-    const Tensor& m2,
-    const Scalar& beta,
-    const Scalar& alpha) {
-  Tensor bias = at::empty_like(self).copy_(self);
-  // oneDNN cannot support result/bias (write/read) use the same memory.
-  // we will remove copy to keep performance once matmul refactor done.
-  at::AtenIpexTypeXPU::addmm_out(bias, m1, m2, beta, alpha, self);
-  return self;
-}
-
-Tensor addmm(
-    const Tensor& input,
-    const Tensor& m1,
-    const Tensor& m2,
-    Scalar beta,
-    Scalar alpha) {
-  Tensor result;
-  if (m1.scalar_type() == at::ScalarType::BFloat16) {
-    // align with bf16 input
-    result = at::empty({0}, m1.options());
-  } else {
-    result = at::empty({0}, input.options());
-  }
-
-  at::AtenIpexTypeXPU::addmm_out(input, m1, m2, beta, alpha, result);
-  return result;
-}
-
 Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
   checkBackend("mm_out", {result, self, mat2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "self must be a matrix");
@@ -1137,7 +1106,7 @@ Tensor& addmv_(
   }
 
   Tensor vec_v = vec.view({vec.size(0), 1});
-  at::AtenIpexTypeXPU::addmm_(self_v, mat, vec_v, beta, alpha);
+  self_v.addmm_(mat, vec_v, beta, alpha);
   return self;
 }
 

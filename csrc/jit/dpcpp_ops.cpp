@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
+#include <ATen/NativeFunctions.h>
 #include <ATen/record_function.h>
 #include <intrinsic/ipex_intrinsic.h>
 #include <oneapi/dnnl/dnnl.hpp>
@@ -7,13 +8,6 @@
 #include <oneDNN/oneDNN.h>
 
 using namespace xpu::oneDNN;
-
-namespace at {
-namespace AtenIpexTypeXPU {
-Tensor add(const Tensor& self, const Tensor& other, const Scalar& alpha);
-Tensor mul(const Tensor& self, Scalar other);
-} // namespace AtenIpexTypeXPU
-} // namespace at
 
 namespace torch {
 namespace jit {
@@ -550,20 +544,19 @@ at::Tensor matmul_fusion_variants(
           (int)(fusion_type));
       output = at::_unsafe_view(self, output_shape);
       if (accumu.defined() && beta != 0.f)
-        output = at::AtenIpexTypeXPU::add(output, accumu, beta);
+        output = at::add(output, accumu, beta);
     }
     return output;
   } else {
     // fallback
     at::Tensor r1;
     if (trans)
-      r1 =
-          at::AtenIpexTypeXPU::mul(at::native::matmul(tensor1, tensor2), alpha);
+      r1 = at::mul(at::native::matmul(tensor1, tensor2), alpha);
     else
-      r1 = at::AtenIpexTypeXPU::mul(
+      r1 = at::mul(
           at::native::matmul(tensor1, tensor2.transpose(-1, -2)), alpha);
-    auto r2 = at::AtenIpexTypeXPU::mul(accumul1, beta1);
-    auto r3 = at::AtenIpexTypeXPU::mul(accumul2, beta2);
+    auto r2 = at::mul(accumul1, beta1);
+    auto r3 = at::mul(accumul2, beta2);
     return r1 + r2 + r3;
   }
 }

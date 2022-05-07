@@ -100,11 +100,6 @@ Tensor minimum(const Tensor& self, const Tensor& other) {
   return iter.output();
 }
 
-// binary min, alias for minimum
-Tensor& min_out(Tensor& result, const Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::minimum_out(result, self, other);
-}
-
 Tensor& maximum_out(Tensor& result, const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
       !self.is_complex() && !other.is_complex(),
@@ -124,11 +119,6 @@ Tensor maximum(const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::maximum_kernel(iter);
   return iter.output();
-}
-
-// binary max, alias for maximum
-Tensor& max_out(Tensor& result, const Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::maximum_out(result, self, other);
 }
 
 } // namespace AtenIpexTypeXPU
