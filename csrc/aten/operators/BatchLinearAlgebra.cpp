@@ -1760,8 +1760,10 @@ std::tuple<Tensor, Tensor> _linalg_qr_helper(
   Tensor R = at::empty(Rt_shape, input.options());
   R.transpose_(-2, -1); // make 'R' with Fortran contiguous memory layout
 
-  // Now fill Q, R tensors with the result
-  impl::apply_linalg_qr_out_dpcpp(input, Q, R, compute_q, reduced_mode);
+  if (input.numel()) {
+    // Now fill Q, R tensors with the result
+    impl::apply_linalg_qr_out_dpcpp(input, Q, R, compute_q, reduced_mode);
+  }
 
   return std::make_tuple(Q, R);
 }
