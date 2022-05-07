@@ -94,10 +94,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "int out_features, int int_features, int? batch_size) "
       "-> __torch__.torch.classes.ipex_prepack.LinearOpContext");
   m.def(
-      "conv_transpose_prepack(Tensor W, Tensor? B, int[2] stride, "
-      "int[2] padding, int[2] output_padding, int groups, int[2] dilation, "
-      "int[2] kernel_size,  int output_channel, "
-      "bool input_is_channels_last, int[4] input_sizes) "
+      "conv_transpose_prepack(Tensor W, Tensor? B, int[] stride, "
+      "int[] padding, int[] output_padding, int groups, int[] dilation, "
+      "int[] kernel_size,  int output_channel, "
+      "bool input_is_channels_last, int[] input_sizes) "
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 }
 

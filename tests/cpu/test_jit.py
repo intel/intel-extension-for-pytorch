@@ -939,8 +939,7 @@ class Tester(TestCase):
                 fused_tresult = trace_fused_model(x3)
 #bf16, jit trace path
                 trace_graph = trace_fused_model.graph_for(x3)
-                for _ in range(3):
-                    fused_tresult = trace_fused_model(x3)
+                fused_tresult = trace_fused_model(x3)
 
             self.assertEqual(fused_tresult, result, prec=prec)
             self.assertEqual(fused_tresult.dtype, torch.bfloat16)

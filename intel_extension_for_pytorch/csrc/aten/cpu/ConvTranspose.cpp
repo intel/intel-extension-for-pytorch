@@ -187,7 +187,7 @@ at::Tensor conv_transpose_backward_input(
 
   ideep::tensor grad_x;
   if (is_channels_last) {
-    grad_input.resize_(input_size, grad_output.suggest_memory_format());
+    grad_input.resize_(input_size, memory_format);
     grad_x = itensor_from_tensor(grad_input);
   }
 
