@@ -275,22 +275,12 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
         LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
         auto& dpcpp_queue = dpcppGetCurrentQueue();
 
-        // command group functions
-        auto cgf = DPCPP_Q_CGF(cgh) {
-          auto r_data = r.data_ptr<scalar_t>();
-
-          // kernel function per work-item
-          auto kfn = DPCPP_Q_KFN() {
-            auto ptr = r_data;
-            dpcpp_tabulate(ptr, ptr + size, linspace_method);
-          };
-          // kick off kernel
-          // (TODO) single_task need replaced due to low efficiency
-          cgh.single_task(kfn);
-        };
-
-        // submit to DPCPP queue
-        DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+        dpcpp_elementwise_kernel_with_index(
+            r, [xstart, xstep](int64_t ind) -> scalar_t {
+              accscalar_t inc = xstep * static_cast<accscalar_t>(ind);
+              accscalar_t val = xstart + inc;
+              return static_cast<scalar_t>(val);
+            });
 
         if (!result.is_contiguous()) {
           result.copy_(r);
