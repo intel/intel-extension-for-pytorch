@@ -334,21 +334,36 @@ Tensor& arange_dpcpp_out(
         if (result.numel() != size) {
           result.resize_({size});
         }
-        LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
         auto& dpcpp_queue = dpcppGetCurrentQueue();
+        const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+        auto max_wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+        const auto wgroup_size_col =
+            (size > max_wgroup_size) ? max_wgroup_size : size;
+        const auto wgroup_num_col =
+            (size + wgroup_size_col - 1) / wgroup_size_col;
 
         // command group functions
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto acc = result.data_ptr<scalar_t>();
+          dpcpp_local_acc_t<accscalar_t> slm_xstart(1, cgh);
+          dpcpp_local_acc_t<accscalar_t> slm_xstep(1, cgh);
 
           // kernel function per work-item
-          auto kfn = DPCPP_Q_KFN() {
+          auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+            slm_xstart[0] = xstart;
+            slm_xstep[0] = xstep;
             auto ptr = acc;
-            dpcpp_tabulate(ptr, ptr + size, linspace_method);
+            auto global_id_col = item_id.get_global_id(0);
+            if (global_id_col < size) {
+              ptr[global_id_col] = slm_xstart[0] + global_id_col * slm_xstep[0];
+            }
           };
           // kick off kernel
-          // (TODO) single_task need replaced due to low efficiency
-          cgh.single_task(kfn);
+          cgh.parallel_for(
+              DPCPP::nd_range</*dim=*/1>(
+                  DPCPP::range<1>(wgroup_num_col * wgroup_size_col),
+                  DPCPP::range<1>(wgroup_size_col)),
+              kfn);
         };
 
         // submit to DPCPP queue
