@@ -127,6 +127,7 @@ supported:
   - baddbmm_
   - bernoulli_.Tensor
   - bernoulli_.float
+  - bernoulli.out
   - binary_cross_entropy
   - binary_cross_entropy.out
   - binary_cross_entropy_backward
