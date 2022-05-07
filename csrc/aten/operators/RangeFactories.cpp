@@ -178,69 +178,62 @@ Tensor& logspace_dpcpp_out(
   if (result.numel() != steps) {
     result.resize_({steps});
   }
-  Tensor r = result.is_contiguous() ? result : result.contiguous();
+
+  bool is_contiguous = result.is_contiguous();
+  Tensor r = !is_contiguous
+      ? at::empty_like(result, LEGACY_CONTIGUOUS_MEMORY_FORMAT)
+      : result;
 
   if (steps == 0) {
     // skip
   } else if (steps == 1) {
-    r.fill_(Numerics<double>::pow(base, start.to<double>()));
+    if (isComplexType(r.scalar_type())) {
+      r.fill_(Numerics<c10::complex<double>>::pow(
+          base, start.to<c10::complex<double>>()));
+    } else {
+      r.fill_(Numerics<double>::pow(base, start.to<double>()));
+    }
   } else if (isIntegralType(r.scalar_type(), /*includeBool=*/false)) {
-    IPEX_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "logspace_dpcpp", [&]() {
+    IPEX_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "logspace_xpu", [&]() {
       float scalar_base =
           static_cast<float>(base); // Use float to avoid promotion to double
       scalar_t scalar_start = start.to<scalar_t>();
       scalar_t scalar_end = end.to<scalar_t>();
       float step = static_cast<float>(scalar_end - scalar_start) / (steps - 1);
-      LogspaceOp<scalar_t, double> logspace_method(
-          scalar_start, step, scalar_base);
-      auto& dpcpp_queue = dpcppGetCurrentQueue();
-      auto cgf = DPCPP_Q_CGF(cgh) {
-        auto r_data = r.data_ptr<scalar_t>();
-        // kernel function per work-item
-        auto kfn = DPCPP_Q_KFN() {
-          auto ptr = r_data;
-          dpcpp_tabulate(ptr, ptr + steps, logspace_method);
-        };
-        // kick off kernel
-        // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task(kfn);
-      };
-
-      // submit to DPCPP queue
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+      const int64_t halfway = steps / 2;
+      dpcpp_elementwise_kernel_with_index(
+          r,
+          [scalar_start, scalar_end, scalar_base, steps, step, halfway](
+              int64_t ind) -> scalar_t {
+            if (ind < halfway) {
+              return std::pow(scalar_base, scalar_start + step * ind);
+            }
+            return std::pow(scalar_base, scalar_end - step * (steps - ind - 1));
+          });
     });
   } else {
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        r.scalar_type(),
-        "logspace_dpcpp",
-        [&]() {
+        kHalf, kBFloat16, r.scalar_type(), "logspace_xpu", [&]() {
           scalar_t scalar_base = static_cast<scalar_t>(base);
           scalar_t scalar_start = start.to<scalar_t>();
           scalar_t scalar_end = end.to<scalar_t>();
           scalar_t step =
               (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
-          LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
-          auto& dpcpp_queue = dpcppGetCurrentQueue();
-          auto cgf = DPCPP_Q_CGF(cgh) {
-            auto r_data = r.data_ptr<scalar_t>();
-            // kernel function per work-item
-            auto kfn = DPCPP_Q_KFN() {
-              auto ptr = r_data;
-              dpcpp_tabulate(ptr, ptr + steps, logspace_method);
-            };
-            // kick off kernel
-            // (TODO) single_task need replaced due to low efficiency
-            cgh.single_task(kfn);
-          };
-
-          // submit to DPCPP queue
-          DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+          const int64_t halfway = steps / 2;
+          dpcpp_elementwise_kernel_with_index(
+              r,
+              [scalar_start, scalar_end, scalar_base, steps, step, halfway](
+                  int64_t ind) -> scalar_t {
+                if (ind < halfway) {
+                  return std::pow(scalar_base, scalar_start + step * ind);
+                }
+                return std::pow(
+                    scalar_base, scalar_end - step * (steps - ind - 1));
+              });
         });
   }
 
-  if (!result.is_contiguous()) {
+  if (!is_contiguous) {
     result.copy_(r);
   }
 
