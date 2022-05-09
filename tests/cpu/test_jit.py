@@ -715,6 +715,27 @@ class DistilMHAScoresCalculation_v2(nn.Module):
         qk = qk.masked_fill(mask, -float("inf"))
         return nn.functional.softmax(qk, dim=-1)
 
+class Maskedfill__softmax(nn.Module):
+    def __init__(self, softmax_dim=-1):
+        super(Maskedfill__softmax, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+
+    def forward(self, qk, mask):
+        mask_shape=[qk.shape[0],1,1,qk.shape[3]]
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk.masked_fill_(mask, -float("inf"))
+        return self.softmax(qk)
+
+class Maskedfill_softmax(nn.Module):
+    def __init__(self):
+        super(Maskedfill_softmax, self).__init__()
+
+    def forward(self, qk, mask):
+        mask_shape=[qk.shape[0],1,1,qk.shape[3]]
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk = qk.masked_fill(mask, -float("inf"))
+        return nn.functional.softmax(qk, dim=-1)
+
 class AtenSoftmaxRepalce(nn.Module):
     def __init__(self, dim=-1):
         super(AtenSoftmaxRepalce, self).__init__()
@@ -1250,24 +1271,36 @@ class Tester(TestCase):
             _test_pure_bf16(pattern_1, pattern1_jit, mat1)
             _test_pure_bf16(pattern_2, pattern2_jit, mat2)
 
-    @unittest.skipIf(True, 'distil mha is will be supported later')
     def test_distil_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
             graph = trace_model.graph_for((mat1, mat2, mask))
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
+        def _check_match_mha_parts(trace_model, qk, mask, node = "ipex::maskedfill_softmax"):
+            graph = trace_model.graph_for((qk, mask))
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
         def _test_pure_bf16(model, trace_model, mat1, mat2, mask, prec=3e-2):
             mat1_bf16 = mat1.to(torch.bfloat16)
             mat2_bf16 = mat2.to(torch.bfloat16)
-            bias_bf16 = mask.to(torch.bfloat16)
-            res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
-            res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
+            mask_bf16 = mask.to(torch.bfloat16)
+            res_ref = model(mat1_bf16, mat2_bf16, mask_bf16)
+            res_jit = trace_model(mat1_bf16, mat2_bf16, mask_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha(trace_model, mat1, mat2, mask)
+
+        def _test_pure_bf16_parts(model, trace_model, qk, mask, prec=3e-2):
+            qk_bf16 = qk.to(torch.bfloat16)
+            mask_bf16 = mask.to(torch.bfloat16)
+            res_ref = model(qk_bf16, mask_bf16)
+            res_jit = trace_model(qk_bf16, mask_bf16)
+            self.assertEqual(res_ref, res_jit, prec=prec)
+            _check_match_mha_parts(trace_model, qk_bf16, mask)
 
         mat1 = torch.randn(56, 12, 384, 384)
         mat2 = torch.randn(56, 12, 384, 384)
         mask = torch.randn(56, 384)
+        qk = torch.matmul(mat1,mat2)
         mask = (mask > 0.5)
 
         mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
@@ -1292,6 +1325,27 @@ class Tester(TestCase):
             _check_match_mha(mha_jit, mat1, mat2, mask)
             _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
 
+        mha_v3 = Maskedfill__softmax()
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v3, (qk, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v3(qk, mask)
+            res_jit = mha_jit(qk, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha_parts(mha_jit, qk, mask)
+            _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
+
+        mha_v4 = Maskedfill_softmax()
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v4, (qk, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v4(qk, mask)
+            res_jit = mha_jit(qk, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha_parts(mha_jit, qk, mask)
+            _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
     def test_conv_fusion(self):
         batch_size = 8

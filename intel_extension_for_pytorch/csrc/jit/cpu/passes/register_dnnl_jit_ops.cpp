@@ -649,6 +649,44 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
+        "ipex::distil_mha_scores_calc(Tensor q, Tensor k, Tensor mask_qk, "
+        "int[] mask_qk_reshp, int transpose_dim_a, int transpose_dim_b, "
+        "Scalar fill, Scalar dim_per_head) "
+        "-> Tensor",
+        [](Stack& stack) {
+          auto result = dil_distil_mha_scores_calc(
+              peek(stack, 0, 8).toTensor(),
+              peek(stack, 1, 8).toTensor(),
+              peek(stack, 2, 8).toTensor(),
+              peek(stack, 3, 8).toIntVector(),
+              peek(stack, 4, 8).toInt(),
+              peek(stack, 5, 8).toInt(),
+              peek(stack, 6, 8).toScalar(),
+              peek(stack, 7, 8).toScalar());
+          drop(stack, 8);
+
+          pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
+        "ipex::maskedfill_softmax(Tensor qk, Tensor mask_qk, "
+        "int[] mask_qk_reshp, "
+        "Scalar fill) "
+        "-> Tensor",
+        [](Stack& stack) {
+          auto result = dil_maskedfill_softmax(
+              peek(stack, 0, 4).toTensor(),
+              peek(stack, 1, 4).toTensor(),
+              peek(stack, 2, 4).toIntVector(),
+              peek(stack, 3, 4).toScalar());
+          drop(stack, 4);
+
+          pack(stack, std::move(result));
+        },
+        aliasAnalysisFromSchema()),
+
+    Operator(
         "ipex::linear_swish_customized(Tensor x, Tensor weight, Tensor ? bias) -> Tensor",
         [](Stack& stack) {
           auto result = dil_linear_swish_customized(
@@ -656,29 +694,6 @@ RegisterOperators op({
               peek(stack, 1, 3).toTensor(),
               toOptionalTensor(std::move(peek(stack, 2, 3))));
           drop(stack, 3);
-          pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::distil_mha_scores_calc(Tensor q, Tensor k, Tensor mask_qk, "
-        "int[] mask_qk_reshp, int transpose_dim_a, int transpose_dim_b, "
-        "Scalar fill, Scalar dim_per_head, int softmax_dim, ScalarType ? dtype) "
-        "-> Tensor",
-        [](Stack& stack) {
-          auto result = dil_distil_mha_scores_calc(
-              peek(stack, 0, 10).toTensor(),
-              peek(stack, 1, 10).toTensor(),
-              peek(stack, 2, 10).toTensor(),
-              peek(stack, 3, 10).toIntVector(),
-              peek(stack, 4, 10).toInt(),
-              peek(stack, 5, 10).toInt(),
-              peek(stack, 6, 10).toScalar(),
-              peek(stack, 7, 10).toScalar(),
-              peek(stack, 8, 10).toInt(),
-              peek(stack, 9, 10));
-          drop(stack, 10);
-
           pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),

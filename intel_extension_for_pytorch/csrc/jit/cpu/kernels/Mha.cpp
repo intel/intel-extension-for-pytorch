@@ -60,7 +60,16 @@ at::Tensor dil_mha_scores_calc(
   }
 }
 /**
- * We split the fusion into two parts - Matmul and Div+Maskedfill+Softmax.
+ * For BF16/FP32 path, We split the distil mha fusion into two parts - Matmul
+ * and Div+Maskedfill+Softmax.
+ * We do input checkings at graph rewrite time,
+ * so we assume here:
+ * Only support last dimension for softmax
+ * Only support contiguous tensor for qk and mask
+ * Only support qk.dim >=2D
+ * Only support 64byte aligned
+ * Only support when expand from the mid dims shape (bs :: seq_length)
+ * Also checking the dtype as None
  **/
 at::Tensor dil_distil_mha_scores_calc(
     const at::Tensor& q,
@@ -70,24 +79,34 @@ at::Tensor dil_distil_mha_scores_calc(
     const int64_t& transpose_dim_a,
     const int64_t& transpose_dim_b,
     const at::Scalar& fill,
-    const at::Scalar& dim_per_head,
-    const int64_t& softmax_dim,
-    const at::IValue& dtype) {
+    const at::Scalar& dim_per_head) {
   IPEX_RECORD_FUNCTION(
       "dil_distil_mha_scores_calc", std::vector<c10::IValue>({}));
-  // we do input checkings at graph rewrite time
-  // so we assume here:
-  // Only support last dimension for softmax
-  // Only support contiguous tensor for qk and mask
-  // Only support qk.dim >=2D
-  // Only support 64byte aligned
-  // Only support when expand from the mid dims shape (bs :: seq_length)
-  // Also checking the dtype as None
   auto _dim_per_head = dim_per_head.to<float>();
   auto _fill = fill.to<float>();
   auto qk = at::Tensor();
   auto _k = k.transpose(transpose_dim_a, transpose_dim_b);
   qk = at::matmul(q, _k);
+  // convert the mask to float for creating vec mask for kernel computation
+  auto _mask_qk = mask_qk.toType(at::kFloat);
+  return DivMaskedfillSoftmax(
+      qk, _mask_qk, mask_qk_reshp, _fill, _dim_per_head);
+}
+
+/**
+ * For INT8 path, since matmul and div would be handled by LLGA fusion group,
+ * We have to handle the rest fusion - Maskedfill+Softmax.
+ * We also do the same input checkings at graph rewrite time like mentioned in
+ * above overload function notes.
+ **/
+at::Tensor dil_maskedfill_softmax(
+    at::Tensor& qk,
+    const at::Tensor& mask_qk,
+    const at::IntArrayRef& mask_qk_reshp,
+    const at::Scalar& fill) {
+  IPEX_RECORD_FUNCTION("dil_maskedfill_softmax", std::vector<c10::IValue>({}));
+  float _dim_per_head = 1;
+  auto _fill = fill.to<float>();
   // convert the mask to float for creating vec mask for kernel computation
   auto _mask_qk = mask_qk.toType(at::kFloat);
   return DivMaskedfillSoftmax(
