@@ -23,27 +23,6 @@ static inline void dpcpp_inclusive_scan(
   }
 }
 
-// alternative for thrust::exclusive_scan
-template <
-    typename InputIterator,
-    typename OutputIterator,
-    typename T,
-    typename AssociativeOperator>
-static inline void dpcpp_exclusive_scan(
-    InputIterator first,
-    InputIterator last,
-    OutputIterator result,
-    T init,
-    AssociativeOperator binary_op) {
-  for (size_t i = 0; (first + i) != last; ++i) {
-    if (i == 0) {
-      *result = init;
-    } else {
-      *(result + i) = binary_op(*(result + i - 1), *(first + i - 1));
-    }
-  }
-}
-
 // alternative for cude thrust::identity
 template <typename T>
 DPCPP_DEVICE struct dpcpp_identity {

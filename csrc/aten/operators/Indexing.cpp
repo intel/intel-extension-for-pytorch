@@ -717,28 +717,16 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   int64_t rng, GRange, tileSize;
   parallel_for_setup(size, tileSize, rng, GRange);
 
-  // command group functions
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong_data = maskLong.data_ptr<int64_t>();
-    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
+  auto acc_maskLong_data = maskLong.data_ptr<int64_t>();
+  auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
 
-    // kernel function per work-item
-    auto kfn = DPCPP_Q_KFN() {
-      auto maskLong_ptr = acc_maskLong_data;
-      auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
-      dpcpp_exclusive_scan(
-          maskLong_ptr,
-          maskLong_ptr + size,
-          maskPrefixSum_ptr,
-          static_cast<int64_t>(0),
-          AddOp<int64_t>());
-    };
-    // kick off kernel
-    // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task(kfn);
-  };
-  // submit to DPCPP queue
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  auto maskLong_ptr = acc_maskLong_data;
+  auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
+  exclusive_scan(
+      maskLong_ptr,
+      maskLong_ptr + size,
+      maskPrefixSum_ptr,
+      static_cast<int64_t>(0));
 
   Tensor contigSrc = src.contiguous();
 
