@@ -27,19 +27,6 @@ DEFINE_DISPATCH(batch_norm_cpu_kernel_stub);
 DEFINE_DISPATCH(batch_norm_cpu_collect_stats_kernel_stub);
 DEFINE_DISPATCH(batch_norm_cpu_backward_kernel_stub);
 
-void check_dims_match_num_input_features(
-    const char* arg_name,
-    int64_t expected,
-    int64_t actual) {
-  TORCH_CHECK(
-      actual == expected,
-      arg_name,
-      " should contain ",
-      expected,
-      " elements not ",
-      actual);
-}
-
 static inline at::Tensor repeat_if_defined(
     const at::Tensor& t,
     int64_t repeat) {

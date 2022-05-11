@@ -191,6 +191,16 @@ class CPUOPsTester(TestCase):
                     self.assertTrue(y5.is_contiguous(memory_format=suggest_memory_format))
                     self.assertTrue(x5.grad.is_contiguous(memory_format=suggest_memory_format))
 
+            # test non-contiguous inputs
+            x6 = torch.transpose(x.clone().detach(), 2, 3).requires_grad_()
+            x_ref = x6.clone().detach().contiguous().requires_grad_()
+            y6 = m(x6)
+            y6.mean().backward()
+            y_ref = m(x_ref)
+            y_ref.mean().backward()
+            self.assertEqual(y6, y_ref)
+            self.assertEqual(x6.grad, x_ref.grad) 
+
     def test_adaptive_avg_pool2d(self):
         m = nn.AdaptiveAvgPool2d((5,7))
         x = torch.randn(3, 64, 8, 9)
@@ -334,6 +344,14 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
+                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
+                y5 = F.interpolate(x5, scale_factor = 2, mode='nearest')
+                y5.mean().backward()
+                self.assertTrue(y5.dtype == datatype)
+                self.assertTrue(x5.grad.dtype == datatype)
+                self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+
     def test_upsample_nearest3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -357,6 +375,14 @@ class CPUOPsTester(TestCase):
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
+
+                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last_3d).requires_grad_()
+                y5 = F.interpolate(x5, scale_factor = 2, mode='nearest')
+                y5.mean().backward()
+                self.assertTrue(y5.dtype == datatype)
+                self.assertTrue(x5.grad.dtype == datatype)
+                self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
+                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
 
     def test_upsample_linear1d(self):
         x = torch.randn(2, 2, 4)
@@ -415,6 +441,14 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
+                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
+                y5 = F.interpolate(x5, scale_factor = 2, mode='bilinear')
+                y5.mean().backward()
+                self.assertTrue(y5.dtype == datatype)
+                self.assertTrue(x5.grad.dtype == datatype)
+                self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+
     def test_upsample_trilinear3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -438,6 +472,14 @@ class CPUOPsTester(TestCase):
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
+
+                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last_3d).requires_grad_()
+                y5 = F.interpolate(x5, scale_factor = 2, mode='trilinear')
+                y5.mean().backward()
+                self.assertTrue(y5.dtype == datatype)
+                self.assertTrue(x5.grad.dtype == datatype)
+                self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
+                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
 
     def test_groupnorm_nhwc(self):
         def helper(self, size, groups, memory_format, dtype, prec=1e-5):
@@ -542,6 +584,14 @@ class CPUOPsTester(TestCase):
                 y4.mean().backward()
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
+
+                x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
+                y5 = m(x5)
+                y5.mean().backward()
+                self.assertTrue(y5.dtype == datatype)
+                self.assertTrue(x5.grad.dtype == datatype)
+                self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
+                self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
 
     def test_adaptive_max_pool2d(self):
         m = nn.AdaptiveMaxPool2d((5,7))
