@@ -13,7 +13,7 @@ namespace dpcpp {
 /*
  * All available launch options for IPEX
  *
- * IPEX_SHOW_OPTIONS:
+ * IPEX_SHOW_OPTION:
  *    Default = 0, Set 1 to show all launch option values
  * IPEX_VERBOSE:
  *    Default = 0, Set verbose level with synchronization execution mode
@@ -59,7 +59,7 @@ Settings::Settings() {
     return _##type;                               \
   }()
 
-  DPCPP_ENV_TYPE_DEF(show_option, SHOW_OPTIONS, 0, false);
+  DPCPP_ENV_TYPE_DEF(show_option, SHOW_OPTION, 0, false);
   bool show_opt =
       show_option.has_value() ? (show_option != 0 ? true : false) : false;
   if (show_opt) {

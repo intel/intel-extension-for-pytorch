@@ -218,7 +218,7 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 
 | **Launch Option** | **Description** |
 | ------ | ------ |
-| IPEX_SHOW_OPTIONS | Show all available launch option values. |
+| IPEX_SHOW_OPTION | Show all available launch option values. |
 | IPEX_VERBOSE | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU customized kernel. |
 | IPEX_XPU_SYNC_MODE | Enable synchronized execution mode. This mode will perform blocking <br> wait for the completion of submitted kernel. |
 | IPEX_TILE_AS_DEVICE | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
