@@ -793,32 +793,17 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
       maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
+  auto acc_maskLong_ptr = maskLong.data_ptr<int64_t>();
+  auto acc_maskPrefixSum_ptr = maskPrefixSum.data_ptr<int64_t>();
+  at::AtenIpexTypeXPU::inclusive_scan<int64_t>(
+      acc_maskLong_ptr,
+      acc_maskLong_ptr + size,
+      acc_maskPrefixSum_ptr,
+      (int64_t)0);
+
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(size, tileSize, rng, GRange);
-
-  // command group functions
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong_data = maskLong.data_ptr<int64_t>();
-    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
-
-    // kernel function per work-item
-    auto kfn = DPCPP_Q_KFN() {
-      auto maskLong_ptr = acc_maskLong_data;
-      auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
-      dpcpp_inclusive_scan(
-          maskLong_ptr,
-          maskLong_ptr + size,
-          maskPrefixSum_ptr,
-          AddOp<int64_t>());
-    };
-    // kick off kernel
-    // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task(kfn);
-  };
-
-  // submit to DPCPP queue
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 
   TensorInfo<scalar_t, uint64_t> src_info =
       getTensorInfo<scalar_t, uint64_t>(src);
