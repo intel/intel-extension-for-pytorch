@@ -72,11 +72,12 @@ void abs_kernel(TensorIterator& iter) {
 }
 
 void angle_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(iter.common_dtype(), "angle", [&]() {
-    dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-      return at::AtenIpexTypeXPU::angle_impl(a);
-    });
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      kBFloat16, kHalf, iter.common_dtype(), "angle", [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return at::AtenIpexTypeXPU::angle_impl(a);
+        });
+      });
 }
 
 void conj_physical_kernel(TensorIterator& iter) {

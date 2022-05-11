@@ -16,19 +16,19 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_UNARY_AND_ALL_OPS(
+IPEX_UNARY_AND_ALL_OPS_COMMON(
     expm1_out,
     Numerics<scalar_t>::expm1,
     unary_float_op,
     FLOATING_TYPES)
 
-IPEX_UNARY_AND_ALL_OPS(
+IPEX_UNARY_AND_ALL_OPS_COMMON(
     exp_out,
     Numerics<scalar_t>::exp,
     unary_float_op,
     FLOATING_AND_COMPLEX_TYPES)
 
-IPEX_UNARY_AND_ALL_OPS(
+IPEX_UNARY_AND_ALL_OPS_COMMON(
     exp2_out,
     Numerics<scalar_t>::exp2,
     unary_float_op,

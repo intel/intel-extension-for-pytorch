@@ -491,9 +491,7 @@ supported:
 #  - sigmoid_
 #  - sigmoid_backward
   - sigmoid_backward.grad_input
-  - sign
   - sign.out
-  - sign_
   - sin.out
   - sinh.out
 #  - slice.Tensor  # different schema
