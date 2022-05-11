@@ -7,7 +7,6 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
-#include "comm/Algorithm.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 

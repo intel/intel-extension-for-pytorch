@@ -9,7 +9,6 @@
 #include "BitonicMergeSort.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/Algorithm.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
 #include "comm/PSTLFunctions.h"

@@ -11,7 +11,6 @@
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include "comm/ATDispatch.h"
-#include "comm/Algorithm.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/MathReduce.h"

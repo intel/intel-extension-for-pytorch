@@ -8,7 +8,6 @@
 #include <utils/DPCPP.h>
 #include <cmath>
 
-#include "Algorithm.h"
 #include "Numerics.h"
 #include "Pointwise.h"
 #include "SimpleReduce.h"
