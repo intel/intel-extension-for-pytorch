@@ -40,6 +40,7 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
   void record(int* device, KernelEventStub* event, int64_t* cpu_ns)
       const override {
     // event has been marked by markKernel, so this record need do nothing
+    *device = -1;
   }
 
   float timeDiff(const KernelEventStub& event, const KernelEventStub& event2)
