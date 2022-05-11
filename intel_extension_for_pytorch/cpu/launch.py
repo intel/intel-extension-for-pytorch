@@ -582,7 +582,7 @@ class DistributedTrainingLauncher(Launcher):
         cores_per_rank = total_cores_per_node // ppn
 
         omp_num_threads = cores_per_rank - args.ccl_worker_count
-        self.set_env("OMP_NUM_THREADS", omp_num_threads)
+        self.set_env("OMP_NUM_THREADS", str(omp_num_threads))
         omp_num_threads = os.environ["OMP_NUM_THREADS"]
         self.set_multi_thread_and_allocator(omp_num_threads,
                                             args.disable_iomp,
