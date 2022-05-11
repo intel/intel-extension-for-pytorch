@@ -6,6 +6,7 @@
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
+#include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -90,6 +91,66 @@ Tensor chain_matmul_recursion(
     return at::mm(
         chain_matmul_recursion(matrices, order, i, order[i][j]),
         chain_matmul_recursion(matrices, order, order[i][j] + 1, j));
+}
+
+template <typename scalar_t>
+void addr_kernel_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& vec1,
+    const Tensor& vec2,
+    const int64_t vec1_numel,
+    const int64_t vec2_numel,
+    const Scalar& beta,
+    const Scalar& alpha,
+    const bool& self_ignore,
+    const int64_t& broadcast_dim) {
+  auto& queue = dpcppGetCurrentQueue();
+  using accscalar_t = acc_type<scalar_t>;
+  int64_t total_items = vec2_numel;
+
+  auto alpha_scalar = alpha.to<scalar_t>();
+  auto beta_scalar = beta.to<scalar_t>();
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto out_ptr = out.data_ptr<scalar_t>();
+    auto input_ptr = self.data_ptr<scalar_t>();
+    auto vec1_ptr = vec1.data_ptr<scalar_t>();
+    auto vec2_ptr = vec2.data_ptr<scalar_t>();
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+      auto item_id = item.get_id(0);
+      auto vec2_elem = static_cast<accscalar_t>(alpha_scalar) *
+          static_cast<accscalar_t>(vec2_ptr[item_id]);
+      for (auto id = 0; id < vec1_numel; ++id) {
+        // out = beta * self + alpha * (vec1 ⊗ vec2)
+        auto vec1_elem = static_cast<accscalar_t>(vec1_ptr[id]);
+        auto out_index = id * vec2_numel + item_id;
+        if (self_ignore) {
+          out_ptr[out_index] = static_cast<scalar_t>(vec1_elem * vec2_elem);
+        } else {
+          accscalar_t self_elem;
+          if (broadcast_dim == 0) {
+            self_elem = static_cast<accscalar_t>(beta_scalar) *
+                static_cast<accscalar_t>(input_ptr[id]);
+          } else if (broadcast_dim == 1) {
+            self_elem = static_cast<accscalar_t>(beta_scalar) *
+                static_cast<accscalar_t>(input_ptr[item_id]);
+          } else if (broadcast_dim == -1) {
+            self_elem = static_cast<accscalar_t>(beta_scalar) *
+                static_cast<accscalar_t>(input_ptr[0]);
+          } else {
+            // no broadcast
+            self_elem = static_cast<accscalar_t>(beta_scalar) *
+                static_cast<accscalar_t>(input_ptr[out_index]);
+          }
+          out_ptr[out_index] =
+              static_cast<scalar_t>(vec1_elem * vec2_elem + self_elem);
+        }
+      }
+    };
+    cgh.parallel_for(DPCPP::range<1>(total_items), kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 } // namespace impl
@@ -259,6 +320,17 @@ Tensor dot(const Tensor& self, const Tensor& other) {
 #endif
 }
 
+static void check_1d(const Tensor& t, const char* arg, const char* fn) {
+  TORCH_CHECK(
+      t.dim() == 1,
+      fn,
+      ": Expected 1-D argument ",
+      arg,
+      ", but got ",
+      t.dim(),
+      "-D");
+}
+
 static void check_addr_scalar(
     const ScalarType dtype,
     const Scalar& scalar,
@@ -286,42 +358,88 @@ Tensor addr(
   check_addr_scalar(self.scalar_type(), beta, "beta");
   check_addr_scalar(self.scalar_type(), alpha, "alpha");
 
-  Tensor result = at::ger(vec1, vec2) * alpha;
+  check_1d(vec1, "vec1", "addr");
+  check_1d(vec2, "vec2", "addr");
 
-  if (beta.to<double>() == 0.0) {
-    return result;
+  int64_t vec1_numel = vec1.numel();
+  int64_t vec2_numel = vec2.numel();
+
+  auto self_contiguous = self.contiguous();
+  auto vec1_contiguous = vec1.contiguous();
+  auto vec2_contiguous = vec2.contiguous();
+
+  // when beta is not zero, self is needed to add on vec1 * vec2, additionally
+  // it supports broadcast on dim0 or dim1
+  bool self_ignore = bool(0.0 == beta.to<float>());
+
+  // which dim needs to broadcast, -2 means no need broadcast, -1 means
+  // broadcast on all dims
+  int64_t broadcast_dim = -2;
+  if (!self_ignore) {
+    if ((self_contiguous.dim() == 2) &&
+        (self_contiguous.sizes()[0] == vec1_numel) &&
+        (self_contiguous.sizes()[1] == 1)) {
+      broadcast_dim = 0;
+    } else if (
+        (self_contiguous.dim() == 2) && (self_contiguous.sizes()[0] == 1) &&
+        (self_contiguous.sizes()[1] == vec2_numel)) {
+      broadcast_dim = 1;
+    } else if (
+        (self_contiguous.dim() == 1) &&
+        (self_contiguous.sizes()[0] == vec1_numel)) {
+      broadcast_dim = 0;
+    } else if (self_contiguous.numel() == 1) {
+      broadcast_dim = -1;
+    } else {
+      TORCH_CHECK(
+          (self_contiguous.dim() == 2) &&
+              (self_contiguous.sizes()[0] == vec1_numel) &&
+              (self_contiguous.sizes()[1] == vec2_numel),
+          "The expanded self size cannot match the out size");
+    }
   }
-  return result + (self * beta);
+
+  auto out = at::empty({vec1_numel, vec2_numel}, self_contiguous.options());
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      vec1_contiguous.scalar_type(),
+      "addr_kernel_out",
+      [&]() {
+        impl::addr_kernel_out<scalar_t>(
+            out,
+            self_contiguous,
+            vec1_contiguous,
+            vec2_contiguous,
+            vec1_numel,
+            vec2_numel,
+            beta,
+            alpha,
+            self_ignore,
+            broadcast_dim);
+      });
+  return out;
 }
 
 Tensor& addr_out(
-    Tensor& result,
-    Tensor& self,
+    const Tensor& self,
     const Tensor& vec1,
     const Tensor& vec2,
     const Scalar& beta,
-    const Scalar& alpha) {
+    const Scalar& alpha,
+    Tensor& out) {
   auto addr_result = at::AtenIpexTypeXPU::addr(self, vec1, vec2, beta, alpha);
   // Validates safe casting
   const auto result_dtype = addr_result.scalar_type();
   TORCH_CHECK(
-      canCast(result_dtype, result.scalar_type()),
-      "result type ",
+      canCast(result_dtype, out.scalar_type()),
+      "out type ",
       result_dtype,
       " can't be cast to the desired output type ",
-      result.scalar_type());
-  at::AtenIpexTypeXPU::resize_as_(result, addr_result, c10::nullopt);
-  result.copy_(addr_result);
-  return result;
-}
-
-Tensor& addr_(
-    Tensor& self,
-    const Tensor& vec1,
-    const Tensor& vec2,
-    const Scalar& beta,
-    const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::addr_out(self, self, vec1, vec2, beta, alpha);
+      out.scalar_type());
+  at::AtenIpexTypeXPU::resize_as_(out, addr_result, c10::nullopt);
+  out.copy_(addr_result);
+  return out;
 }
 
 static inline void squareCheckInputs(const Tensor& self) {

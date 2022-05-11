@@ -77,7 +77,7 @@ supported:
   - addmm.out  # newly added
   - addmv.out  # newly added
   - addr
-  - addr_
+  - addr.out
   - all
   - all.dim
   - all.out
