@@ -5,10 +5,18 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch as ipex
 import torch
 import itertools
+from functools import wraps
 
+def fpmath_mode_env(func):
+    @wraps(func)
+    def wrapTheFunction(*args):
+        func(*args)
+        # set the fp32_low_precision_mode back to FP32 after each UT
+        ipex.backends.cpu.set_fp32_low_precision_mode(ipex.LowPrecisionMode.FP32)
+    return wrapTheFunction
 
 class TestFPMathCases(TestCase):
-
+    @fpmath_mode_env
     def test_set_and_get_fpmath(self):
         fpmath_mode = [ipex.LowPrecisionMode.BF32, ipex.LowPrecisionMode.FP32]
         for mode in fpmath_mode:
@@ -17,8 +25,9 @@ class TestFPMathCases(TestCase):
             "The return value of get_fpmath_mode is different from the value passed to set_fpmath_mode."
         ipex.backends.cpu.set_fp32_low_precision_mode()
         assert ipex.backends.cpu.get_fp32_low_precision_mode() == ipex.LowPrecisionMode.BF32, \
-            "The default fp32_low_precision_mode is not LowPrecisionMode.FP32."
+            "The default fp32_low_precision_mode should be LowPrecisionMode.BF32."
 
+    @fpmath_mode_env
     def test_fpmath_bf16(self):
         modes = ["jit", "imperative"]
         bias = [True, False]
@@ -39,6 +48,7 @@ class TestFPMathCases(TestCase):
                         num3 = num3 + 1
             assert num1 > 0 and num2 > 0 and num3 > 0, 'The implicit FP32 to BF16 data type conversion failed to enable.'
 
+    @fpmath_mode_env
     def test_fpmath_strict(self):
         modes = ["jit", "imperative"]
         bias = [True, False]
@@ -53,6 +63,7 @@ class TestFPMathCases(TestCase):
                         num = num + 1
             assert num == 0, 'The implicit FP32 to BF16 data type conversion failed to disable.'
 
+    @fpmath_mode_env
     def test_env(self):
         os.environ["IPEX_FP32_LOW_PRECISION_MODE_CPU"] = "BF32"
         modes = ["jit", "imperative"]
