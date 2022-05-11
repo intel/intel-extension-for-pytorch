@@ -635,6 +635,7 @@ supported:
   - linalg_solve
   - linalg_solve.out
   - complex.out
+  - eig          # must register
 autograd:
   - cdist
   - lstm.input
