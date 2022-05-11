@@ -331,7 +331,9 @@ Tensor& arange_dpcpp_out(
             "invalid size, possible overflow?");
         int64_t size = static_cast<int64_t>(size_d);
 
-        if (result.numel() != size) {
+        if (size == 0) {
+          return;
+        } else if (result.numel() != size) {
           result.resize_({size});
         }
         auto& dpcpp_queue = dpcppGetCurrentQueue();
