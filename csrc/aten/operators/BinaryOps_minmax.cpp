@@ -19,14 +19,8 @@ void minimum_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_with_scalars(
         iter, [](bool a, bool b) -> bool { return a && b; });
-  } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "minimum_dpcpp", [&]() {
-      dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-        return std::min(a, b);
-      });
-    });
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         iter.dtype(),
@@ -34,13 +28,7 @@ void minimum_kernel(TensorIterator& iter) {
         [&]() {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                if (a != a) {
-                  return a;
-                } else if (b != b) {
-                  return b;
-                } else {
-                  return Numerics<scalar_t>::min(a, b);
-                }
+                return Numerics<scalar_t>::min(a, b);
               });
         });
   }
@@ -50,14 +38,8 @@ void maximum_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_with_scalars(
         iter, [](bool a, bool b) -> bool { return a || b; });
-  } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "maximum_dpcpp", [&]() {
-      dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-        return std::max(a, b);
-      });
-    });
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         iter.dtype(),
@@ -65,13 +47,7 @@ void maximum_kernel(TensorIterator& iter) {
         [&]() {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                if (a != a) {
-                  return a;
-                } else if (b != b) {
-                  return b;
-                } else {
-                  return Numerics<scalar_t>::max(a, b);
-                }
+                return Numerics<scalar_t>::max(a, b);
               });
         });
   }
@@ -119,6 +95,46 @@ Tensor maximum(const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::maximum_kernel(iter);
   return iter.output();
+}
+
+Tensor& fmax_out(const Tensor& self, const Tensor& other, Tensor& result) {
+  auto iter = TensorIterator::binary_op(result, self, other);
+  if (isFloatingType(iter.common_dtype())) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.common_dtype(),
+        "fmax",
+        [&]() {
+          dpcpp_kernel_with_scalars(
+              iter, [](scalar_t a, scalar_t b) -> scalar_t {
+                return Numerics<scalar_t>::fmax(a, b);
+              });
+        });
+  } else {
+    impl::maximum_kernel(iter);
+  }
+  return result;
+}
+
+Tensor& fmin_out(const Tensor& self, const Tensor& other, Tensor& result) {
+  auto iter = TensorIterator::binary_op(result, self, other);
+  if (isFloatingType(iter.common_dtype())) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        iter.common_dtype(),
+        "fmin",
+        [&]() {
+          dpcpp_kernel_with_scalars(
+              iter, [](scalar_t a, scalar_t b) -> scalar_t {
+                return Numerics<scalar_t>::fmin(a, b);
+              });
+        });
+  } else {
+    impl::minimum_kernel(iter);
+  }
+  return result;
 }
 
 } // namespace AtenIpexTypeXPU

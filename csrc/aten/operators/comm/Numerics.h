@@ -87,6 +87,12 @@ struct Numerics<uint8_t> {
   static inline bool isinf(uint8_t a) {
     return false;
   }
+  static inline uint8_t min(uint8_t a, uint8_t b) {
+    return DPCPP::min(a, b);
+  }
+  static inline uint8_t max(uint8_t a, uint8_t b) {
+    return DPCPP::max(a, b);
+  }
 };
 
 template <>
@@ -194,6 +200,12 @@ struct Numerics<int8_t> {
   static inline bool isinf(int8_t a) {
     return false;
   }
+  static inline int8_t min(int8_t a, int8_t b) {
+    return DPCPP::min(a, b);
+  }
+  static inline int8_t max(int8_t a, int8_t b) {
+    return DPCPP::max(a, b);
+  }
 };
 
 template <>
@@ -253,6 +265,12 @@ struct Numerics<int16_t> {
   }
   static inline int16_t sgn(int16_t a) {
     return sgni<int16_t>(a);
+  }
+  static inline int16_t min(int16_t a, int16_t b) {
+    return DPCPP::min(a, b);
+  }
+  static inline int16_t max(int16_t a, int16_t b) {
+    return DPCPP::max(a, b);
   }
 };
 
@@ -314,6 +332,12 @@ struct Numerics<int32_t> {
   static inline int32_t sgn(int32_t a) {
     return sgni<int32_t>(a);
   }
+  static inline int32_t min(int32_t a, int32_t b) {
+    return DPCPP::min(a, b);
+  }
+  static inline int32_t max(int32_t a, int32_t b) {
+    return DPCPP::max(a, b);
+  }
 };
 
 template <>
@@ -373,6 +397,12 @@ struct Numerics<int64_t> {
   }
   static inline int64_t sgn(int64_t a) {
     return sgni<int64_t>(a);
+  }
+  static inline int64_t min(int64_t a, int64_t b) {
+    return DPCPP::min(a, b);
+  }
+  static inline int64_t max(int64_t a, int64_t b) {
+    return DPCPP::max(a, b);
   }
 };
 
@@ -502,7 +532,13 @@ struct Numerics<at::Half> {
     return 1.0f / a;
   }
   static inline float min(at::Half a, at::Half b) {
-    return DPCPP::fmin(float(a), float(b));
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmin(float(a), float(b));
+    }
   }
   static inline at::Half add(at::Half a, at::Half b) {
     return a + b;
@@ -521,7 +557,19 @@ struct Numerics<at::Half> {
     return DPCPP::pow(float(a), float(b));
   }
   static inline at::Half max(at::Half a, at::Half b) {
-    return DPCPP::fmax(float(a), float(b));
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmax(float(a), float(b));
+    }
+  }
+  static inline float fmin(at::Half a, at::Half b) {
+    return DPCPP::fmin((float)a, (float)b);
+  }
+  static inline float fmax(at::Half a, at::Half b) {
+    return DPCPP::fmax((float)a, (float)b);
   }
   static inline at::Half abs(at::Half a) {
     return DPCPP::fabs(float(a));
@@ -660,10 +708,28 @@ struct Numerics<at::BFloat16> {
     return DPCPP::round(float(a));
   }
   static inline float min(at::BFloat16 a, at::BFloat16 b) {
-    return DPCPP::fmin(float(a), float(b));
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmin(float(a), float(b));
+    }
   }
   static inline float max(at::BFloat16 a, at::BFloat16 b) {
-    return DPCPP::fmax(float(a), float(b));
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmax(float(a), float(b));
+    }
+  }
+  static inline float fmin(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::fmin((float)a, (float)b);
+  }
+  static inline float fmax(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::fmax((float)a, (float)b);
   }
   static inline at::BFloat16 frac(at::BFloat16 a) {
     return a - DPCPP::trunc(float(a));
@@ -854,9 +920,27 @@ struct Numerics<float> {
     return DPCPP::atan2(a, b);
   }
   static inline float min(float a, float b) {
-    return DPCPP::fmin(a, b);
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmin(a, b);
+    }
   }
   static inline float max(float a, float b) {
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmax(a, b);
+    }
+  }
+  static inline float fmin(float a, float b) {
+    return DPCPP::fmin(a, b);
+  }
+  static inline float fmax(float a, float b) {
     return DPCPP::fmax(a, b);
   }
   static inline float abs(float a) {
@@ -1021,9 +1105,27 @@ struct Numerics<double> {
     return DPCPP::atan2(a, b);
   }
   static inline double min(double a, double b) {
-    return DPCPP::fmin(a, b);
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmin(a, b);
+    }
   }
   static inline double max(double a, double b) {
+    if (a != a) {
+      return a;
+    } else if (b != b) {
+      return b;
+    } else {
+      return DPCPP::fmax(a, b);
+    }
+  }
+  static inline double fmin(double a, double b) {
+    return DPCPP::fmin(a, b);
+  }
+  static inline double fmax(double a, double b) {
     return DPCPP::fmax(a, b);
   }
   static inline double abs(double a) {

@@ -206,6 +206,8 @@ supported:
   - floor_divide
   - floor_divide.out
   - floor_divide_.Tensor
+  - fmax.out
+  - fmin.out
   - fmod.Scalar
   - fmod.Scalar_out
   - fmod.Tensor
