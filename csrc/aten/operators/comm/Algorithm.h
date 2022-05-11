@@ -4,17 +4,6 @@
 #include <tuple>
 #include "Numerics.h"
 
-// alternative for thrust::tabulate
-template <typename ForwardIterator, typename UnaryOp>
-static inline void dpcpp_tabulate(
-    ForwardIterator begin,
-    ForwardIterator end,
-    UnaryOp unary_op) {
-  for (int i = 0; (begin + i) != end; ++i) {
-    *(begin + i) = unary_op(i);
-  }
-}
-
 // alternative for thrust::inclusive_scan
 template <
     typename InputIterator,
