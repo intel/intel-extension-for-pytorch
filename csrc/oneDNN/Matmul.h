@@ -69,7 +69,7 @@ static inline void matmul(
     Tensor& dst,
     const Tensor& m1,
     const Tensor& m2,
-    const Tensor& b,
+    const Tensor& b_raw,
     MatmulAttr attr) {
   size_t dims = dst.dim();
   TORCH_CHECK(
@@ -96,6 +96,53 @@ static inline void matmul(
         " m2 mb: ",
         m2.size(0));
   }
+
+  // validate bias and make it compatible with oneDNN implementation
+  Tensor b = b_raw;
+  bool with_bias = false;
+  if (b.defined()) {
+    with_bias = true;
+    if (b.dim() == 1) {
+      TORCH_CHECK(
+          b.size(0) == n || b.size(0) == 1,
+          "matmul supports [n] or [1] when bias dim is 1 ...");
+      if (b.size(0) == 0) {
+        with_bias = false;
+      } else if (m1.dim() == 3) {
+        b = b.expand({mb, m, n}).contiguous();
+      } else if (m1.dim() == 2) {
+        b = b.expand({1, n}).contiguous();
+      }
+    } else if (b.dim() == 2) {
+      TORCH_CHECK(
+          (b.size(0) == m && b.size(1) == n) ||
+              (b.size(0) == 1 && b.size(1) == n) ||
+              (b.size(0) == m && b.size(1) == 1) ||
+              (b.size(0) == 1 && b.size(1) == 1),
+          "matmul supports [m, n] or [1, n] or [m, 1] or [1, 1] when bias dim is 2 ...");
+      if (b.size(0) == 1 && b.size(1) == 1)
+        b = b.expand({1, n}).contiguous();
+    } else if (b.dim() == 3) {
+      TORCH_CHECK(
+          (b.size(0) == mb && b.size(1) == m && b.size(2) == n) ||
+              (b.size(0) == 1 && b.size(1) == 1 && b.size(2) == 1),
+          "matmul supports [mb, m, n] or [1, 1, 1] when bias dim is 3 ...");
+      if (b.size(0) == 1 && b.size(1) == 1 && b.size(2) == 1)
+        b = b.expand({mb, m, n}).contiguous();
+    } else if (b.dim() == 0) {
+      TORCH_CHECK(
+          b.numel() == 1, "matmul supports 1 numel when bias dim is [] ...");
+      if (m1.dim() == 3) {
+        b = b.expand({mb, m, n}).contiguous();
+      } else {
+        b = b.expand({1, n}).contiguous();
+      }
+    } else {
+      TORCH_CHECK(0, "unsupported bias dim in matmul ...");
+    }
+  }
+  b = b.contiguous(); // avoid reorder 2 times
+
   // ipex matmul support both ab/ba shape for m2 tensor, we don't check any more
 
   auto m1_usr_dt = get_onednn_dtype(m1);
@@ -234,23 +281,10 @@ static inline void matmul(
 
   auto matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
 
-  if (b.defined() && (!m1.is_quantized()) && (!m2.is_quantized())) {
-    auto b_dt = b.defined() ? get_onednn_dtype(b) : memory::data_type::f32;
-    if (b.sizes() != dst.sizes()) {
-      memory::dims b_dims(dst.sizes().size() - 1, 1);
-      b_dims.push_back(n);
-      b_md = memory::desc(
-          b_dims,
-          b_dt,
-          dst.sizes().size() == 2 ? memory::format_tag::ab
-                                  : memory::format_tag::abc);
-    } else {
-      if (dims == 2)
-        b_md = memory::desc({m, n}, b_dt, {b.stride(0), b.stride(1)});
-      else
-        b_md = memory::desc(
-            {mb, m, n}, b_dt, {b.stride(0), b.stride(1), b.stride(2)});
-    }
+  if (with_bias && (!m1.is_quantized()) && (!m2.is_quantized())) {
+    // ensure getting a valid oneDNN bias md here
+    b_md = memory::desc(
+        get_onednn_dims(b), get_onednn_dtype(b), get_onednn_strides(b));
 
     if (dims == 2 && Settings::I().is_layout_opt_enabled()) {
       // attr + blk
