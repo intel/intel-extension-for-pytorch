@@ -1,5 +1,6 @@
 #pragma once
 
+#include <c10/util/complex.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "Numerics.h"
@@ -152,6 +153,14 @@ static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<bool>& address,
     bool val) {
   *address = address && val;
+}
+
+template <typename T>
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_global_ptr_pt<c10::complex<T>>& address,
+    c10::complex<T> val) {
+  atomicAdd(&address->real_, val.real_);
+  atomicAdd(&address->imag_, val.imag_);
 }
 
 } // namespace AtenIpexTypeXPU

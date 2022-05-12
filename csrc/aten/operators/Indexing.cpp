@@ -918,7 +918,7 @@ void index(
     IntArrayRef index_stride,
     IntArrayRef non_index_size,
     IntArrayRef non_index_stride) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
@@ -944,7 +944,7 @@ void index_put(
     IntArrayRef index_stride,
     bool accumulate) {
   if (accumulate) {
-    IPEX_DISPATCH_ATOMIC_ALL_TYPES(iter.dtype(), "index_put", [&] {
+    IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(iter.dtype(), "index_put", [&] {
       dpcpp_index_kernel(
           iter,
           index_size,
@@ -959,7 +959,7 @@ void index_put(
           });
     });
   } else {
-    IPEX_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
         at::ScalarType::Bool,
@@ -1081,9 +1081,10 @@ Tensor& index_add_(
     const Tensor& index,
     const Tensor& source,
     const Scalar& alpha) {
-  IPEX_DISPATCH_ATOMIC_ALL_TYPES(self.scalar_type(), "index_add_", [&] {
-    impl::indexAdd<scalar_t>(self, dim, index, source, alpha);
-  });
+  IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
+      self.scalar_type(), "index_add_", [&] {
+        impl::indexAdd<scalar_t>(self, dim, index, source, alpha);
+      });
   return self;
 }
 
@@ -1150,7 +1151,7 @@ Tensor& index_copy_(
       source.size(dim),
       ")");
 
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
@@ -1176,7 +1177,7 @@ Tensor& index_fill_(
 
   TORCH_CHECK(index.dim() <= 1, "Index has to be a vector/scalar");
 
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
@@ -1229,7 +1230,7 @@ Tensor trace(const Tensor& self) {
 Tensor& masked_fill_(Tensor& self, const Tensor& mask_, const Scalar& value) {
   c10::MaybeOwned<Tensor> mask = expand_inplace(self, mask_, "masked_fill_");
   at::assert_no_partial_overlap(self, mask_);
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1253,7 +1254,7 @@ Tensor& masked_scatter_(
     Tensor& self,
     const Tensor& mask,
     const Tensor& source) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1278,7 +1279,7 @@ Tensor& masked_scatter_(
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
   c10::MaybeOwned<Tensor> b_self, b_mask;
   std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -1338,7 +1339,7 @@ Tensor& put_(
   }
 
   if (accumulate) {
-    IPEX_DISPATCH_ATOMIC_ALL_TYPES(self.scalar_type(), "put_", [&] {
+    IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(self.scalar_type(), "put_", [&] {
       impl::put<scalar_t>(
           self,
           index,
@@ -1351,7 +1352,7 @@ Tensor& put_(
           });
     });
   } else {
-    IPEX_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
         at::ScalarType::Bool,
@@ -1444,7 +1445,7 @@ Tensor& take_out(const Tensor& self, const Tensor& index, Tensor& out) {
   at::assert_no_overlap(out, index);
   at::assert_no_overlap(out, self);
 
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
