@@ -553,7 +553,7 @@ Tensor _convolution_out(
   auto weight = onednn_conv_use_channels_last(input_r, weight_r)
       ? weight_r.contiguous(mem_fmt)
       : weight_r.contiguous();
-  auto bias = bias_r;
+  auto bias = bias_r.contiguous();
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
     k = input.ndimension();
