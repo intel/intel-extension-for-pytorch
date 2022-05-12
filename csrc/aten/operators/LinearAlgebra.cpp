@@ -370,7 +370,7 @@ Tensor addr(
 
   // when beta is not zero, self is needed to add on vec1 * vec2, additionally
   // it supports broadcast on dim0 or dim1
-  bool self_ignore = bool(0.0 == beta.to<float>());
+  bool self_ignore = bool(0.0 == beta.toComplexDouble());
 
   // which dim needs to broadcast, -2 means no need broadcast, -1 means
   // broadcast on all dims
@@ -400,7 +400,7 @@ Tensor addr(
   }
 
   auto out = at::empty({vec1_numel, vec2_numel}, self_contiguous.options());
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       vec1_contiguous.scalar_type(),
