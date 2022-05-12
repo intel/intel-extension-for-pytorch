@@ -49,12 +49,18 @@ class TestTorchMethod(TestCase):
         # may produce different U and V tensors.
 
         a = torch.randn(5, 5)
-        a_xpu = a.to('xpu')
+        a_xpu = a.to('xpu').to(torch.cfloat)
 
         u, s, v = torch.svd(a)
         r_cpu = torch.mm(torch.mm(u, torch.diag(s)), v.t())
 
         u_xpu, s_xpu, v_xpu = torch.svd(a_xpu)
+
+        self.assertEqual(u, u_xpu.to(torch.float32).cpu())
+        self.assertEqual(s, s_xpu.cpu())
+        self.assertEqual(v, v_xpu.to(torch.float32).cpu())
+        u_xpu = u_xpu.to(torch.float32)
+        v_xpu = v_xpu.to(torch.float32)
         r_xpu = torch.mm(torch.mm(u_xpu, torch.diag(s_xpu)), v_xpu.t())
 
         self.assertEqual(r_cpu, r_xpu.cpu())
@@ -65,12 +71,18 @@ class TestTorchMethod(TestCase):
         # while the SVD result is still correct. Different platforms, like Numpy, or inputs on different device types,
         # may produce different U and V tensors.
         a = torch.randn(5, 5, 5)
-        a_xpu = a.to('xpu')
+        a_xpu = a.to('xpu').to(torch.cfloat)
 
         u, s, v = torch.svd(a)
         r_cpu = torch.matmul(torch.matmul(u, torch.diag_embed(s)), v.transpose(-2, -1))
 
         u_xpu, s_xpu, v_xpu = torch.svd(a_xpu)
+
+        self.assertEqual(u, u_xpu.to(torch.float32).cpu())
+        self.assertEqual(s, s_xpu.cpu())
+        self.assertEqual(v, v_xpu.to(torch.float32).cpu())
+        u_xpu = u_xpu.to(torch.float32)
+        v_xpu = v_xpu.to(torch.float32)
         r_xpu = torch.matmul(torch.matmul(u_xpu, torch.diag_embed(s_xpu)), v_xpu.transpose(-2, -1))
 
         self.assertEqual(r_cpu, r_xpu.cpu())

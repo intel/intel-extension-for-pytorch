@@ -844,7 +844,7 @@ static inline std::tuple<Tensor, Tensor, Tensor> _create_U_S_VT(
   return std::tuple<Tensor, Tensor, Tensor>(U_empty, S_empty, VT_empty);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename value_t>
 static void apply_svd(
     DPCPP::queue& dpcpp_queue,
     scalar_t* self_data,
@@ -857,7 +857,7 @@ static void apply_svd(
     scalar_t* U_data,
     int64_t ldu,
     int64_t U_stride,
-    scalar_t* S_data,
+    value_t* S_data,
     int64_t S_stride,
     scalar_t* VT_data,
     int64_t ldvt,
@@ -884,7 +884,7 @@ static void apply_svd(
   for (int64_t i = 0; i < batchsize; i++) {
     scalar_t* self_working_ptr = &self_data[i * self_stride];
     scalar_t* U_working_ptr = &U_data[i * U_stride];
-    scalar_t* S_working_ptr = &S_data[i * S_stride];
+    value_t* S_working_ptr = &S_data[i * S_stride];
     scalar_t* VT_working_ptr = &VT_data[i * VT_stride];
 
     DPCPP_ONEMKL_SUBMIT(
@@ -911,7 +911,7 @@ static void apply_svd(
 }
 
 template <>
-void apply_svd<c10::complex<double>>(
+void apply_svd<c10::complex<double>, double>(
     DPCPP::queue& dpcpp_queue,
     c10::complex<double>* self_data,
     int64_t lda,
@@ -923,7 +923,7 @@ void apply_svd<c10::complex<double>>(
     c10::complex<double>* U_data,
     int64_t ldu,
     int64_t U_stride,
-    c10::complex<double>* S_data,
+    double* S_data,
     int64_t S_stride,
     c10::complex<double>* VT_data,
     int64_t ldvt,
@@ -950,8 +950,7 @@ void apply_svd<c10::complex<double>>(
   for (int64_t i = 0; i < batchsize; i++) {
     c10::complex<double>* self_working_ptr = &self_data[i * self_stride];
     c10::complex<double>* U_working_ptr = &U_data[i * U_stride];
-    double S_working = S_data[i * S_stride].real();
-    double* S_working_ptr = &S_working;
+    double* S_working_ptr = &S_data[i * S_stride];
     c10::complex<double>* VT_working_ptr = &VT_data[i * VT_stride];
 
     DPCPP_ONEMKL_SUBMIT(
@@ -978,7 +977,7 @@ void apply_svd<c10::complex<double>>(
 }
 
 template <>
-void apply_svd<c10::complex<float>>(
+void apply_svd<c10::complex<float>, float>(
     DPCPP::queue& dpcpp_queue,
     c10::complex<float>* self_data,
     int64_t lda,
@@ -990,7 +989,7 @@ void apply_svd<c10::complex<float>>(
     c10::complex<float>* U_data,
     int64_t ldu,
     int64_t U_stride,
-    c10::complex<float>* S_data,
+    float* S_data,
     int64_t S_stride,
     c10::complex<float>* VT_data,
     int64_t ldvt,
@@ -1017,8 +1016,7 @@ void apply_svd<c10::complex<float>>(
   for (int64_t i = 0; i < batchsize; i++) {
     c10::complex<float>* self_working_ptr = &self_data[i * self_stride];
     c10::complex<float>* U_working_ptr = &U_data[i * U_stride];
-    float S_working = S_data[i * S_stride].real();
-    float* S_working_ptr = &S_working;
+    float* S_working_ptr = &S_data[i * S_stride];
     c10::complex<float>* VT_working_ptr = &VT_data[i * VT_stride];
 
     DPCPP_ONEMKL_SUBMIT(
@@ -2039,7 +2037,8 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
     std::int64_t ldvt = n;
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
         self.scalar_type(), "svd_xpu", [&] {
-          impl::apply_svd<scalar_t>(
+          using value_t = typename c10::scalar_value_type<scalar_t>::type;
+          impl::apply_svd<scalar_t, value_t>(
               dpcpp_queue,
               self_working_copy.data_ptr<scalar_t>(),
               lda,
@@ -2051,7 +2050,7 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
               U_working_copy.data_ptr<scalar_t>(),
               ldu,
               U_stride,
-              S_working_copy.data_ptr<scalar_t>(),
+              S_working_copy.data_ptr<value_t>(),
               S_stride,
               VT_working_copy.data_ptr<scalar_t>(),
               ldvt,
