@@ -61,16 +61,6 @@ Tensor& softshrink_out(const Tensor& self, const Scalar& lambd, Tensor& out) {
   return out;
 }
 
-Tensor softshrink(const Tensor& self, Scalar lambd) {
-  TORCH_CHECK(
-      lambd.to<double>() >= 0,
-      "lambda must be greater or equal to 0, but found to be ",
-      lambd.to<double>(),
-      ".");
-  Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::softshrink_out(self, lambd, out);
-}
-
 Tensor& softshrink_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
@@ -90,12 +80,5 @@ Tensor& softshrink_backward_out(
   return grad_input;
 }
 
-Tensor softshrink_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    Scalar lambd) {
-  Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::softshrink_backward_out(grad_input, grad_output, self, lambd);
-}
 } // namespace AtenIpexTypeXPU
 } // namespace at

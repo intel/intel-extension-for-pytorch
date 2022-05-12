@@ -1,4 +1,5 @@
 #include <ATen/Context.h>
+#include <ATen/NativeFunctions.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 #include <intrinsic/ipex_intrinsic.h>
@@ -146,33 +147,8 @@ Tensor& sub_out(
   return result;
 }
 
-Tensor sub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
-  impl::sub_check(self, other);
-  Tensor result;
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::alpha_check(iter, alpha);
-  impl::sub_kernel_dpcpp(iter, alpha);
-  return iter.output();
-}
-
-Tensor& sub_(Tensor& self, const Tensor& other, const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::sub_out(self, other, alpha, self);
-}
-
 Tensor rsub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::sub(other, self, alpha);
-}
-
-Tensor sub(const Tensor& self, const Scalar& other, const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::sub(self, wrapped_scalar_tensor(other), alpha);
-}
-
-Tensor& sub_(Tensor& self, const Scalar& other, const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::sub_(self, wrapped_scalar_tensor(other), alpha);
-}
-
-Tensor rsub(const Tensor& self, const Scalar& other, const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::rsub(self, wrapped_scalar_tensor(other), alpha);
+  return at::sub(other, self, alpha);
 }
 
 } // namespace AtenIpexTypeXPU

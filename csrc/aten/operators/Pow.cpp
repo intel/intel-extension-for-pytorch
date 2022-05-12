@@ -163,14 +163,6 @@ Tensor& pow_out(Tensor& result, const Scalar& base, const Tensor& exp) {
   return result;
 }
 
-Tensor& pow_(Tensor& base, const Tensor& other) {
-  return at::AtenIpexTypeXPU::pow_out(base, base, other);
-}
-
-Tensor& pow_(Tensor& base, Scalar alpha) {
-  return at::AtenIpexTypeXPU::pow_out(base, base, alpha);
-}
-
 Tensor pow(const Tensor& base, const Tensor& exp) {
   auto dtype = at::result_type(base, exp);
   Tensor result = at::empty({0}, base.options().dtype(dtype));
@@ -181,13 +173,6 @@ Tensor pow(const Tensor& base, Scalar exp) {
   auto dtype = at::result_type(base, exp);
   Tensor result =
       at::empty_like(base, base.options().dtype(dtype), MemoryFormat::Preserve);
-  return at::AtenIpexTypeXPU::pow_out(result, base, exp);
-}
-
-Tensor pow(Scalar base, const Tensor& exp) {
-  auto dtype = at::result_type(base, exp);
-  Tensor result =
-      at::empty_like(exp, exp.options().dtype(dtype), MemoryFormat::Preserve);
   return at::AtenIpexTypeXPU::pow_out(result, base, exp);
 }
 

@@ -511,26 +511,6 @@ Tensor rrelu_with_noise_backward(
   return grad_input;
 }
 
-Tensor rrelu(
-    const Tensor& self,
-    Scalar lower,
-    Scalar upper,
-    bool training,
-    c10::optional<Generator> generator) {
-  return at::rrelu_with_noise(
-      self, at::empty_like(self), lower, upper, training, generator);
-}
-
-Tensor& rrelu_(
-    Tensor& self,
-    Scalar lower,
-    Scalar upper,
-    bool training,
-    c10::optional<Generator> generator) {
-  return at::rrelu_with_noise_(
-      self, at::empty_like(self), lower, upper, training, generator);
-}
-
 Tensor prelu(const Tensor& self, const Tensor& weight) {
   auto result = at::empty_like(self);
   auto iter = TensorIterator::binary_op(result, self, weight);

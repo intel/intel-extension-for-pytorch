@@ -1240,19 +1240,6 @@ Tensor& renorm_out(
       out, self, norm.contiguous().view(sizes_));
 }
 
-Tensor renorm(const Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
-  TORCH_CHECK(!self.is_sparse(), "renorm(sycl_sparse) is not supported.");
-
-  Tensor result;
-  result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeXPU::renorm_out(self, p, dim, maxnorm, result);
-  return result;
-}
-
-Tensor& renorm_(Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
-  return at::AtenIpexTypeXPU::renorm_out(self, p, dim, maxnorm, self);
-}
-
 Tensor& std_var_out(
     Tensor& result,
     const Tensor& self,

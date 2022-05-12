@@ -473,22 +473,6 @@ Tensor& randperm_out(
   return result;
 }
 
-Tensor& randperm_out(Tensor& result, int64_t n) {
-  return at::AtenIpexTypeXPU::randperm_out(n, c10::nullopt, result);
-}
-
-Tensor randperm(
-    int64_t n,
-    c10::optional<Generator> generator,
-    const TensorOptions& options) {
-  auto tensor = at::empty(n, options);
-  return at::AtenIpexTypeXPU::randperm_out(n, generator, tensor);
-}
-
-Tensor randperm(int64_t n, const TensorOptions& options) {
-  return at::AtenIpexTypeXPU::randperm(n, c10::nullopt, options);
-}
-
 Tensor tril_indices(
     int64_t row,
     int64_t col,
@@ -517,12 +501,6 @@ Tensor triu_indices(
   return at::impl::triu_indices_dpcpp(row, col, offset, options);
 }
 
-Tensor var(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_out(
-      result, self, dim, unbiased, keepdim, false);
-}
-
 Tensor var(
     const Tensor& self,
     c10::optional<IntArrayRef> _dim,
@@ -541,38 +519,10 @@ Tensor _var(const Tensor& self, bool unbiased) {
       result, self, IntArrayRef{}, unbiased, false, false);
 }
 
-Tensor var(const Tensor& self, bool unbiased) {
-  auto trivial_return =
-      _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
-  return trivial_return.has_value() ? trivial_return.value()
-                                    : at::AtenIpexTypeXPU::_var(self, unbiased);
-}
-
 Tensor _std(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::std_var_out(
       result, self, IntArrayRef{}, unbiased, false, true);
-}
-
-Tensor std(const Tensor& self, bool unbiased) {
-  TORCH_CHECK(
-      self.layout() == Layout::Strided,
-      "std only supports strided layout, got: ",
-      self.layout());
-  TORCH_CHECK(
-      at::isFloatingType(self.scalar_type()) ||
-          at::isComplexType(self.scalar_type()),
-      "std only supports floating-point dtypes");
-  auto trivial_return =
-      _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
-  return trivial_return.has_value() ? trivial_return.value()
-                                    : at::AtenIpexTypeXPU::_std(self, unbiased);
-}
-
-Tensor std(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_out(
-      result, self, dim, unbiased, keepdim, true);
 }
 
 Tensor std(
@@ -588,16 +538,6 @@ Tensor std(
 }
 
 Tensor& std_out(
-    Tensor& out,
-    const Tensor& self,
-    IntArrayRef dim,
-    bool unbiased,
-    bool keepdim) {
-  return at::AtenIpexTypeXPU::std_var_out(
-      out, self, dim, unbiased, keepdim, true);
-}
-
-Tensor& std_out(
     const Tensor& self,
     c10::optional<IntArrayRef>(_dim),
     c10::optional<int64_t>(_correction),
@@ -607,17 +547,6 @@ Tensor& std_out(
   auto dim = _dim.value_or(IntArrayRef{});
   return at::AtenIpexTypeXPU::std_var_out(
       result, self, dim, correction, keepdim, true);
-}
-
-std::tuple<Tensor, Tensor> var_mean(
-    const Tensor& self,
-    IntArrayRef dim,
-    bool unbiased,
-    bool keepdim) {
-  Tensor result1 = at::empty({0}, self.options());
-  Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_mean_out(
-      "var_mean", result1, result2, self, dim, unbiased, keepdim, false);
 }
 
 std::tuple<Tensor, Tensor> var_mean(
@@ -635,24 +564,6 @@ std::tuple<Tensor, Tensor> var_mean(
 
 std::tuple<Tensor, Tensor> std_mean(
     const Tensor& self,
-    IntArrayRef dim,
-    bool unbiased,
-    bool keepdim) {
-  Tensor result1 = at::empty({0}, self.options());
-  Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_mean_out(
-      "std_mean", result1, result2, self, dim, unbiased, keepdim, true);
-}
-
-std::tuple<Tensor, Tensor> std_mean(const Tensor& self, bool unbiased) {
-  Tensor result1 = at::empty({0}, self.options());
-  Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_mean_out(
-      "std_mean", result1, result2, self, {}, unbiased, false, true);
-}
-
-std::tuple<Tensor, Tensor> std_mean(
-    const Tensor& self,
     c10::optional<IntArrayRef> _dim,
     c10::optional<int64_t> _correction,
     bool keepdim) {
@@ -662,13 +573,6 @@ std::tuple<Tensor, Tensor> std_mean(
   auto correction = _correction.value_or(1);
   return at::AtenIpexTypeXPU::std_var_mean_out(
       "std_mean", result1, result2, self, dim, correction, keepdim, true);
-}
-
-std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
-  Tensor result1 = at::empty({0}, self.options());
-  Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::std_var_mean_out(
-      "var_mean", result1, result2, self, {}, unbiased, false, false);
 }
 
 Tensor view_as_real(const at::Tensor& self) {

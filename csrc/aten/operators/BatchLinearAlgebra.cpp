@@ -1668,23 +1668,6 @@ std::tuple<Tensor, Tensor> _solve_helper(const Tensor& self, const Tensor& A) {
   return std::tuple<Tensor, Tensor>(self_working_copy, A_working_copy);
 }
 
-std::tuple<Tensor, Tensor> solve(const Tensor& self, const Tensor& A) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "B should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  TORCH_CHECK(
-      A.dim() >= 2,
-      "A should have at least 2 dimensions, but has ",
-      A.dim(),
-      " dimensions instead");
-  Tensor self_broadcasted, A_broadcasted;
-  std::tie(self_broadcasted, A_broadcasted) =
-      native::_linalg_broadcast_batch_dims(self, A, "solve_dpcpp");
-  return at::AtenIpexTypeXPU::_solve_helper(self_broadcasted, A_broadcasted);
-}
-
 std::tuple<Tensor&, Tensor&> solve_out(
     Tensor& solution,
     Tensor& lu,
@@ -1809,7 +1792,7 @@ std::tuple<Tensor&, Tensor&> geqrf_out(
   return std::tuple<Tensor&, Tensor&>(a, tau);
 }
 
-Tensor orgqr(const Tensor& self, const Tensor& input2) {
+Tensor linalg_householder_product(const Tensor& self, const Tensor& input2) {
   if (self.numel() == 0) {
     return at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
@@ -1824,12 +1807,15 @@ Tensor orgqr(const Tensor& self, const Tensor& input2) {
   return q_working_copy;
 }
 
-Tensor& orgqr_out(Tensor& out, const Tensor& self, const Tensor& input2) {
+Tensor& linalg_householder_product_out(
+    const Tensor& self,
+    const Tensor& input2,
+    Tensor& out) {
   if (self.size(-1) == 0) {
     out.resize_as_(self);
     return out;
   }
-  out.copy_(at::AtenIpexTypeXPU::orgqr(self, input2));
+  out.copy_(at::AtenIpexTypeXPU::linalg_householder_product(self, input2));
   return out;
 }
 
@@ -2091,38 +2077,6 @@ std::tuple<Tensor, Tensor, Tensor> _svd_helper(
     VT_working_copy.zero_();
   }
   return std::make_tuple(U_working_copy, S_working_copy, VT_working_copy);
-}
-
-std::tuple<Tensor, Tensor, Tensor> svd(
-    const Tensor& self,
-    bool some,
-    bool compute_uv) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "self should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  return at::_svd_helper(self, some, compute_uv);
-}
-
-std::tuple<Tensor&, Tensor&, Tensor&> svd_out(
-    Tensor& U,
-    Tensor& S,
-    Tensor& VT,
-    const Tensor& self,
-    bool some,
-    bool compute_uv) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "self should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  Tensor U_tmp, S_tmp, VT_tmp;
-  std::tie(U_tmp, S_tmp, VT_tmp) = at::_svd_helper(self, some, compute_uv);
-  U.resize_as_(U_tmp).copy_(U_tmp);
-  S.resize_as_(S_tmp).copy_(S_tmp);
-  VT.resize_as_(VT_tmp).copy_(VT_tmp);
-  return std::tuple<Tensor&, Tensor&, Tensor&>(U, S, VT);
 }
 
 std::tuple<Tensor, Tensor> _symeig_helper(
