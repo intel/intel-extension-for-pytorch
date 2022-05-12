@@ -14,7 +14,10 @@
 
 using namespace xpu::dpcpp;
 using namespace xpu::dpcpp::detail;
+
+#ifdef USE_ONEMKL
 using namespace oneapi::mkl::dft;
+#endif
 
 namespace at {
 namespace AtenIpexTypeXPU {
