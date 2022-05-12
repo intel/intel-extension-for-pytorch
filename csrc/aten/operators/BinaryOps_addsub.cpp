@@ -148,7 +148,10 @@ Tensor& sub_out(
 }
 
 Tensor rsub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
-  return at::sub(other, self, alpha);
+  Tensor out;
+  auto iter = TensorIterator::binary_op(out, other, self);
+  out = iter.output();
+  return AtenIpexTypeXPU::sub_out(other, self, alpha, out);
 }
 
 } // namespace AtenIpexTypeXPU
