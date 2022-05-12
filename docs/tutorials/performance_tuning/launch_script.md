@@ -31,6 +31,7 @@ Available knobs are listed below:
 | ```--node_id``` | int | -1 | Node id for multi-instance, by default all numa nodes will be used |
 | ```--use_logical_core``` | - | False | Whether only use physical cores |
 | ```--disable_numactl``` | - | False | Disable numactl |
+| ```--disable_taskset``` | - | False | Disable taskset |
 | ```--core_list``` | str | None | Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used. |
 | ```--log_path``` | str | '' | The log file path. Default path is '', which means disable logging to files. |
 | ```--log_file_prefix``` | str | 'run' | log file prefix |

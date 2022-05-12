@@ -268,6 +268,13 @@ class Launcher():
                     break
         return lib_set or lib_find
 
+    def is_numactl_available(self):
+        numactl_available = False 
+        cmd = ["numactl", "-C", "0", "-m", "0", "hostname"]
+        r = subprocess.run(cmd, env=os.environ)
+        if r.returncode == 0:
+            numactl_available = True 
+        return numactl_available
 
     def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
         '''
@@ -364,6 +371,7 @@ class MultiInstanceLauncher(Launcher):
         processes = []
         cores = []
         set_kmp_affinity = True
+        enable_taskset = False 
         if args.core_list:  # user specify what cores will be used by params
             cores = [int(x) for x in args.core_list.split(",")]
             if args.ncore_per_instance == -1:
@@ -405,19 +413,33 @@ class MultiInstanceLauncher(Launcher):
                     logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
                     exit(-1)
             if args.latency_mode:
-                logger.warning('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                logger.warning('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even if they are set explicitly.')
                 args.ncore_per_instance = 4
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ninstances = len(cores) // args.ncore_per_instance
 
             if args.throughput_mode:
-                logger.warning('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                logger.warning('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even if they are set explicitly.')
                 args.ninstances = self.cpuinfo.node_nums()
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
 
         if args.ninstances > 1 and args.instance_idx != -1:
             logger.info("assigning {} cores for instance {}".format(args.ncore_per_instance, args.instance_idx))
+        
+        if not args.disable_numactl:
+            numactl_available = self.is_numactl_available()
+            if not numactl_available:
+                if not args.disable_taskset:
+                    logger.warning("Core binding with numactl is not available. Disabling numactl and using taskset instead. This may affect performance in multi-socket system; please use numactl if memory binding is needed.")
+                    args.disable_numactl = True 
+                    enable_taskset = True 
+                else:
+                    logger.warning("Core binding with numactl is not available, and --disable_taskset is set. Please unset --disable_taskset to use taskset insetad of numactl.")
+                    exit(-1)
+                    
+        if not args.disable_taskset:
+            enable_taskset = True 
 
         self.set_multi_thread_and_allocator(args.ncore_per_instance,
                                             args.disable_iomp,
@@ -429,14 +451,20 @@ class MultiInstanceLauncher(Launcher):
         for i in range(args.ninstances):
             cmd = []
             cur_process_cores = ""
-            if not args.disable_numactl:
-                cmd = ["numactl"]
+            if not args.disable_numactl or enable_taskset:
+                if not args.disable_numactl:
+                    cmd = ["numactl"]
+                elif enable_taskset:
+                    cmd = ["taskset"]
+                    
                 cores = sorted(cores)
-                if args.instance_idx == -1: # sequentially assign ncores_per_instance to ninstances
-                    core_list = cores[i * args.ncore_per_instance : (i + 1) * args.ncore_per_instance]
-                else: # assign ncores_per_instance from instance_idx
-                    core_list = cores[args.instance_idx * args.ncore_per_instance : (args.instance_idx + 1) * args.ncore_per_instance]
-
+                if args.instance_idx == -1:  # sequentially assign ncores_per_instance to ninstances
+                    core_list = cores[i * args.ncore_per_instance: (
+                        i + 1) * args.ncore_per_instance]
+                else:  # assign ncores_per_instance from instance_idx
+                    core_list = cores[args.instance_idx * args.ncore_per_instance: (
+                        args.instance_idx + 1) * args.ncore_per_instance]
+                
                 core_ranges = []
                 for core in core_list:
                     if len(core_ranges) == 0:
@@ -451,9 +479,16 @@ class MultiInstanceLauncher(Launcher):
                 for r in core_ranges:
                     cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
                 cur_process_cores = cur_process_cores[:-1]
-                numa_params = "-C {} ".format(cur_process_cores)
-                numa_params += "-m {}".format(",".join([str(numa_id) for numa_id in self.cpuinfo.numa_aware_check(core_list)]))
-                cmd.extend(numa_params.split())
+                
+                if not args.disable_numactl:
+                    numa_params = "-C {} ".format(cur_process_cores)
+                    numa_params += "-m {}".format(",".join(
+                        [str(numa_id) for numa_id in self.cpuinfo.numa_aware_check(core_list)]))
+                    cmd.extend(numa_params.split())
+                elif enable_taskset:
+                    taskset_params = "-c {}".format(cur_process_cores)
+                    cmd.extend(taskset_params.split())
+            
             with_python = not args.no_python
             if with_python:
                 cmd.append(sys.executable)
@@ -469,7 +504,10 @@ class MultiInstanceLauncher(Launcher):
             if args.log_path:
                 cmd_s = "{} 2>&1 | tee {}".format(cmd_s, log_name)
             logger.info(cmd_s)
-            process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
+            if not args.disable_numactl:
+                process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
+            elif enable_taskset:
+                process = subprocess.Popen(cmd, env=os.environ)
             processes.append(process)
 
             if args.instance_idx != -1: # launches single instance, instance_idx, only
@@ -685,6 +723,8 @@ def add_multi_instance_params(parser):
                        help="Whether only use physical cores")
     group.add_argument("--disable_numactl", action='store_true', default=False,
                        help="Disable numactl")
+    group.add_argument("--disable_taskset", action='store_true', default=False,
+                       help="Disable taskset")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
                        help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,

@@ -5,6 +5,7 @@ import time, sys
 from intel_extension_for_pytorch.cpu.launch import *
 import os
 import glob
+import subprocess 
 
 class TestLauncher(TestCase):
     def del_env(self, env_name):
@@ -31,7 +32,6 @@ class TestLauncher(TestCase):
         return lib_find
 
     def test_iomp_memory_allocator_setup(self):
-       cpuinfo = CPUinfo()
        launcher = Launcher()
        self.del_env("OMP_NUM_THREADS")
        self.del_env("LD_PRELOAD")
@@ -65,9 +65,32 @@ class TestLauncher(TestCase):
        expect_pin_domain = "[0xffffff0,0xffffff00000000,]"
        self.assertEqual(pin_doamin, expect_pin_domain)
        ccl_worker_affinity = launcher.get_ccl_worker_affinity(proc_per_node, ccl_worker_count, total_cores)
-       expect_ccl_worker_affinity = "0,1,2,3,28,29,30,31"
-       self.assertEqual(ccl_worker_affinity, expect_ccl_worker_affinity)
-
+       expected_ccl_worker_affinity = "0,1,2,3,28,29,30,31"
+       self.assertEqual(ccl_worker_affinity, expected_ccl_worker_affinity)
+    
+    def test_numactl_core_affinity(self):
+        cpuinfo = CPUinfo()
+        num_physical_cores = cpuinfo.physical_core_nums()
+        
+        launcher = MultiInstanceLauncher()
+        numactl_available = launcher.is_numactl_available()
+        
+        if numactl_available:
+            expected_core_affinity = "numactl -C {}-{}".format(str(0), str(num_physical_cores-1))
+            cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--no_python", "hostname"]
+            r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_core_affinity in str(r.stdout, "utf-8")
+    
+    def test_taskset_core_affinity(self):
+        cpuinfo = CPUinfo()
+        num_physical_cores = cpuinfo.physical_core_nums()
+    
+        expected_core_affinity = "taskset -c {}-{}".format(str(0), str(num_physical_cores-1))
+        cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--disable_numactl", "--no_python", "hostname"]
+        r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        assert r.returncode == 0
+        assert expected_core_affinity in str(r.stdout, "utf-8")
 
 if __name__ == '__main__':
     test = unittest.main()
