@@ -4,13 +4,13 @@
 
 #include <ATen/record_function.h>
 #include <core/MemoryFormat.h>
-#include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <operators/Utils.h>
 #include <operators/comm/ATDispatch.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+#include <utils/LRUCache.h>
 
 #include "Reorder.h"
 #include "Utils.h"

@@ -3,17 +3,18 @@
 #include <ATen/ATen.h>
 
 #include <ATen/record_function.h>
-#include <oneDNN/LRUCache.h>
 #include <oneDNN/Reorder.h>
 #include <oneDNN/Runtime.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+#include <utils/LRUCache.h>
 #include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
+using namespace xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 using namespace at::AtenIpexTypeQuantizedXPU;
 

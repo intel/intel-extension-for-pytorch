@@ -6,13 +6,15 @@
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
+#include <utils/LRUCache.h>
 #include "Utils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
-using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
+using namespace xpu::dpcpp::detail;
+using namespace oneapi::mkl::dft;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -236,10 +238,153 @@ static DimVector _sort_dims(
 }
 
 #ifdef USE_ONEMKL
-template <
-    oneapi::mkl::dft::precision prec,
-    oneapi::mkl::dft::domain signal_type,
-    typename scalar_t>
+class dft_config_t {
+ public:
+  using config_int64_t = std::unordered_map<config_param, int64_t>;
+  using config_float_t = std::unordered_map<config_param, float>;
+  using config_double_t = std::unordered_map<config_param, double>;
+
+  dft_config_t() {
+    val_int64_.clear();
+    val_float_.clear();
+    val_double_.clear();
+    mkl_istrides_.clear();
+    mkl_ostrides_.clear();
+  }
+
+  void set_strides(
+      std::vector<int64_t>& istrides,
+      std::vector<int64_t>& ostrides) {
+    mkl_istrides_ = istrides;
+    mkl_ostrides_ = ostrides;
+  }
+
+  template <typename T>
+  void set_value(config_param key, T value) {
+    if (std::is_same<DFTI_CONFIG_VALUE, T>::value ||
+        std::is_same<int64_t, T>::value) {
+      val_int64_.insert({key, value});
+    } else if (std::is_same<T, float>::value) {
+      val_float_.insert({key, value});
+    } else if (std::is_same<T, double>::value) {
+      val_double_.insert({key, value});
+    } else {
+      TORCH_CHECK(0, "Unsupported value type in FFT config!");
+    }
+  }
+
+  template <precision prec, domain dom>
+  void commit_values(descriptor<prec, dom>& desc) {
+#define COMMIT_VAL(val_map)                    \
+  for (auto& value : (val_map)) {              \
+    desc.set_value(value.first, value.second); \
+  }
+
+    COMMIT_VAL(val_int64_);
+    COMMIT_VAL(val_float_);
+    COMMIT_VAL(val_double_);
+
+    if (!mkl_istrides_.empty()) {
+      desc.set_value(config_param::INPUT_STRIDES, mkl_istrides_.data());
+    }
+    if (!mkl_ostrides_.empty()) {
+      desc.set_value(config_param::OUTPUT_STRIDES, mkl_ostrides_.data());
+    }
+  }
+
+  void to_bytes(bytestring& bytes) {
+#define MAP_TO_BYTES(val_map)                  \
+  for (auto& value : (val_map)) {              \
+    xpu::dpcpp::to_bytes(bytes, value.first);  \
+    xpu::dpcpp::to_bytes(bytes, value.second); \
+  }
+
+    MAP_TO_BYTES(val_int64_);
+    MAP_TO_BYTES(val_float_);
+    MAP_TO_BYTES(val_double_);
+
+    xpu::dpcpp::to_bytes(bytes, mkl_istrides_);
+    xpu::dpcpp::to_bytes(bytes, mkl_ostrides_);
+  }
+
+ private:
+  config_int64_t val_int64_;
+  config_float_t val_float_;
+  config_double_t val_double_;
+  std::vector<int64_t> mkl_istrides_;
+  std::vector<int64_t> mkl_ostrides_;
+};
+
+template <precision prec, domain dom>
+class dft_desc_t {
+ public:
+  using mkl_desc_t = descriptor<prec, dom>;
+
+  dft_desc_t(
+      DPCPP::queue& q,
+      std::vector<std::int64_t>& dimensions,
+      std::shared_ptr<dft_config_t> configs)
+      : desc_(dimensions), configs_(configs) {
+    configs_->commit_values(desc_);
+    desc_.commit(q);
+  }
+
+  mkl_desc_t& raw() {
+    return desc_;
+  }
+
+  static DPCPP_STATUS dft_desc_destroy(dft_desc_t* dft_desc) {
+    if (dft_desc)
+      delete dft_desc;
+    return DPCPP_SUCCESS;
+  }
+
+ private:
+  mkl_desc_t desc_;
+  std::shared_ptr<dft_config_t> configs_;
+};
+#endif
+
+} // namespace impl
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+#ifdef USE_ONEMKL
+namespace xpu {
+namespace dpcpp {
+
+template <precision prec, domain dom>
+struct lru_traits<at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>*> {
+  static constexpr auto destructor =
+      &at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>::dft_desc_destroy;
+};
+
+template <precision prec, domain dom>
+class dft_desc_handle
+    : public lru_handle<at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>*> {
+ public:
+  dft_desc_handle(
+      DPCPP::queue& q,
+      std::vector<std::int64_t>& dimensions,
+      std::shared_ptr<at::AtenIpexTypeXPU::impl::dft_config_t> configs) {
+    at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>* dft_desc =
+        new at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>(
+            q, dimensions, configs);
+    lru_handle<at::AtenIpexTypeXPU::impl::dft_desc_t<prec, dom>*>::reset(
+        dft_desc);
+  }
+};
+
+} // namespace dpcpp
+} // namespace xpu
+#endif
+
+namespace at {
+namespace AtenIpexTypeXPU {
+namespace impl {
+
+#ifdef USE_ONEMKL
+template <precision prec, domain signal_type, typename scalar_t>
 void _mkl_dft(
     const Tensor& input,
     Tensor& output,
@@ -251,35 +396,32 @@ void _mkl_dft(
     int64_t normalization,
     bool onesided,
     int64_t batch) {
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto queue_id = dpcppGetCurrentQueueId();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   std::vector<int64_t> mkl_signal_sizes(
       checked_signal_sizes.begin() + 1, checked_signal_sizes.end());
 
-  // TODO: will do descriptor cache for performance improvement.
-  oneapi::mkl::dft::descriptor<prec, signal_type> desc(mkl_signal_sizes);
-  desc.set_value(oneapi::mkl::dft::config_param::PLACEMENT, DFTI_NOT_INPLACE);
-  desc.set_value(oneapi::mkl::dft::config_param::NUMBER_OF_TRANSFORMS, batch);
+  std::shared_ptr<dft_config_t> desc_config(new dft_config_t);
+  desc_config->set_value(config_param::PLACEMENT, DFTI_NOT_INPLACE);
+  desc_config->set_value(config_param::NUMBER_OF_TRANSFORMS, batch);
 
   auto istrides = input.strides();
   auto ostrides = output.strides();
   int64_t idist = istrides[0];
   int64_t odist = ostrides[0];
-  desc.set_value(oneapi::mkl::dft::config_param::FWD_DISTANCE, idist);
-  desc.set_value(oneapi::mkl::dft::config_param::BWD_DISTANCE, odist);
+  desc_config->set_value(config_param::FWD_DISTANCE, idist);
+  desc_config->set_value(config_param::BWD_DISTANCE, odist);
   std::vector<int64_t> mkl_istrides(1 + signal_ndim, 0),
       mkl_ostrides(1 + signal_ndim, 0);
   for (int64_t i = 1; i <= signal_ndim; i++) {
     mkl_istrides[i] = istrides[i];
     mkl_ostrides[i] = ostrides[i];
   }
-  desc.set_value(
-      oneapi::mkl::dft::config_param::INPUT_STRIDES, mkl_istrides.data());
-  desc.set_value(
-      oneapi::mkl::dft::config_param::OUTPUT_STRIDES, mkl_ostrides.data());
+  desc_config->set_strides(mkl_istrides, mkl_ostrides);
   if (!complex_input || !complex_output) {
-    desc.set_value(
-        oneapi::mkl::dft::config_param::CONJUGATE_EVEN_STORAGE,
-        DFTI_COMPLEX_COMPLEX);
+    desc_config->set_value(
+        config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
   }
 
   // rescale if requested
@@ -293,38 +435,32 @@ void _mkl_dft(
     } else {
       double_scale = 1.0 / static_cast<double>(signal_numel);
     }
-    desc.set_value(
-        inverse ? oneapi::mkl::dft::config_param::BACKWARD_SCALE
-                : oneapi::mkl::dft::config_param::FORWARD_SCALE,
-        prec == oneapi::mkl::dft::precision::DOUBLE
-            ? double_scale
-            : static_cast<float>(double_scale));
+
+    auto config_inverse =
+        inverse ? config_param::BACKWARD_SCALE : config_param::FORWARD_SCALE;
+    if (prec == precision::DOUBLE) {
+      desc_config->set_value(config_inverse, double_scale);
+    } else {
+      desc_config->set_value(config_inverse, static_cast<float>(double_scale));
+    }
   }
 
-  desc.commit(dpcpp_queue);
+  lru_key_t key;
+  // FIXME: Add queue_id and dev_id in search key to avoid conflict
+  // usage due to dft_desc owned workspace buffer inside so far.
+  create_key(key, queue_id, dev_id, prec, signal_type, *desc_config);
+  auto desc = fetch_or_create_m<dft_desc_handle<prec, signal_type>>(
+      key, dpcpp_queue, mkl_signal_sizes, desc_config);
 
   auto in_data = (scalar_t*)input.data_ptr();
   auto out_data = (scalar_t*)output.data_ptr();
   if (!inverse) {
     DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::dft::compute_forward,
-        desc,
-        in_data,
-        out_data);
+        dpcpp_queue, compute_forward, desc->raw(), in_data, out_data);
   } else {
     DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::dft::compute_backward,
-        desc,
-        in_data,
-        out_data);
+        dpcpp_queue, compute_backward, desc->raw(), in_data, out_data);
   }
-  // wait for the queue.  For MKL this is a must, as it can have allocated
-  // some USM internally, and that will be freed when the destructor is
-  // called.  So, before that is legal, anything submitted to the queue that
-  // is using this USM must have finished.
-  dpcpp_queue.wait();
 }
 #endif
 
@@ -365,10 +501,7 @@ void _fft_with_size(
   if (input.scalar_type() == ScalarType::Float ||
       input.scalar_type() == ScalarType::ComplexFloat) {
     if (complex_type) {
-      _mkl_dft<
-          oneapi::mkl::dft::precision::SINGLE,
-          oneapi::mkl::dft::domain::COMPLEX,
-          float>(
+      _mkl_dft<precision::SINGLE, domain::COMPLEX, float>(
           input,
           output,
           signal_ndim,
@@ -380,10 +513,7 @@ void _fft_with_size(
           onesided,
           batch);
     } else {
-      _mkl_dft<
-          oneapi::mkl::dft::precision::SINGLE,
-          oneapi::mkl::dft::domain::REAL,
-          float>(
+      _mkl_dft<precision::SINGLE, domain::REAL, float>(
           input,
           output,
           signal_ndim,
@@ -399,10 +529,7 @@ void _fft_with_size(
       input.scalar_type() == ScalarType::Double ||
       input.scalar_type() == ScalarType::ComplexDouble) {
     if (complex_type) {
-      _mkl_dft<
-          oneapi::mkl::dft::precision::DOUBLE,
-          oneapi::mkl::dft::domain::COMPLEX,
-          double>(
+      _mkl_dft<precision::DOUBLE, domain::COMPLEX, double>(
           input,
           output,
           signal_ndim,
@@ -414,10 +541,7 @@ void _fft_with_size(
           onesided,
           batch);
     } else {
-      _mkl_dft<
-          oneapi::mkl::dft::precision::DOUBLE,
-          oneapi::mkl::dft::domain::REAL,
-          double>(
+      _mkl_dft<precision::DOUBLE, domain::REAL, double>(
           input,
           output,
           signal_ndim,

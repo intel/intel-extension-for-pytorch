@@ -1,9 +1,9 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/Utils.h>
+#include <utils/LRUCache.h>
 
 #include "BatchNorm.h"
 #include "Binary.h"

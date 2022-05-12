@@ -6,11 +6,11 @@
 #include <core/MemoryFormat.h>
 #include <core/TensorImplUtils.h>
 
-#include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+#include <utils/LRUCache.h>
 #include "Reorder.h"
 #include "Utils.h"
 
@@ -55,11 +55,11 @@ struct ConvAttr {
 
 #ifdef USE_PRIMITIVE_CACHE
   void to_bytes(bytestring& bytes) {
-    xpu::oneDNN::to_bytes(bytes, scale_);
-    xpu::oneDNN::to_bytes(bytes, alpha_);
-    xpu::oneDNN::to_bytes(bytes, beta_);
-    xpu::oneDNN::to_bytes(bytes, oscale_);
-    xpu::oneDNN::to_bytes(bytes, attr_);
+    xpu::dpcpp::to_bytes(bytes, scale_);
+    xpu::dpcpp::to_bytes(bytes, alpha_);
+    xpu::dpcpp::to_bytes(bytes, beta_);
+    xpu::dpcpp::to_bytes(bytes, oscale_);
+    xpu::dpcpp::to_bytes(bytes, attr_);
   }
 #endif
 

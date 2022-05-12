@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef USE_PRIMITIVE_CACHE
-
 #include <oneapi/dnnl/dnnl.hpp>
 #include <list>
 #include <string>
@@ -9,10 +7,42 @@
 #include <vector>
 
 namespace xpu {
-namespace oneDNN {
+namespace dpcpp {
 
 using bytestring = std::string;
 using lru_key_t = bytestring;
+
+// A class that provides the destructor for LRU handler
+template <typename T>
+class lru_traits {};
+
+template <typename T, typename traits = lru_traits<T>>
+class lru_handle
+    : public std::shared_ptr<typename std::remove_pointer<T>::type> {
+  using super = std::shared_ptr<typename std::remove_pointer<T>::type>;
+
+ public:
+  /// Constructs a C handle wrapper.
+  /// @param t The C handle to wrap.
+  /// @param weak A flag to specify whether to construct a weak wrapper.
+  lru_handle(T t = nullptr, bool weak = false)
+      : super(t, [weak]() {
+          auto dummy = [](T) { return decltype(traits::destructor(0))(0); };
+          return weak ? dummy : traits::destructor;
+        }()) {}
+
+  using super::super;
+
+  /// Resets the value of a C handle.
+  /// @param t The new value of the C handle.
+  /// @param weak A flag to specify whether the wrapper should be weak.
+  void reset(T t, bool weak = false) {
+    auto dummy_destructor = [](T) {
+      return decltype(traits::destructor(0))(0);
+    };
+    super::reset(t, weak ? dummy_destructor : traits::destructor);
+  }
+};
 
 template <
     class key_t,
@@ -313,7 +343,5 @@ inline void create_key(bytestring& key_to_create, Ts&&... args) {
   to_bytes(key_to_create, std::forward<Ts>(args)...);
 }
 
-} // namespace oneDNN
+} // namespace dpcpp
 } // namespace xpu
-
-#endif // USE_PRIMITIVE_CACHE

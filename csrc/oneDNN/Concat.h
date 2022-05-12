@@ -1,13 +1,15 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <oneDNN/LRUCache.h>
 #include <oneDNN/Runtime.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
+#include <utils/LRUCache.h>
 #include "Utils.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
+
+using namespace xpu::dpcpp;
 
 namespace xpu {
 namespace oneDNN {

@@ -31,6 +31,10 @@ static inline DeviceId dpcppGetDeviceIdOfCurrentQueue() {
   return getDeviceIdOfCurrentQueue();
 }
 
+static inline QueueId dpcppGetCurrentQueueId() {
+  return getQueueId(getCurrentQueue());
+}
+
 static inline int64_t dpcppMaxWorkGroupSize(
     DeviceId dev_id = getDeviceIdOfCurrentQueue()) {
   auto* dev_prop = dpcppGetDeviceProperties(dev_id);
