@@ -15,6 +15,7 @@ class EnvSettings {
 
  public:
   bool get_settings_profile_op();
+  void set_settings_profile_op(bool b_enable);
 };
 
 } // namespace torch_ipex

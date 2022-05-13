@@ -72,6 +72,11 @@ void InitIpexModuleBindings(py::module m) {
     return get_highest_binary_support_isa_level();
   });
 
+  m.def("set_profile_op_enabled", [](bool b_enable) {
+    using namespace torch_ipex;
+    EnvSettings::get_instance().set_settings_profile_op(b_enable);
+  });
+
   m.def("mkldnn_set_verbose", &torch_ipex::verbose::_mkldnn_set_verbose);
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {

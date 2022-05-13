@@ -152,10 +152,9 @@ at::Tensor convolution_forward_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
-  if (torch_ipex::EnvSettings::get_instance().get_settings_profile_op()) {
-    IPEX_RECORD_FUNCTION(
-        "torch_ipex::convolution_forward_impl", std::vector<c10::IValue>({}));
-  }
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::convolution_forward_impl", std::vector<c10::IValue>({}));
+
   return op_context->run(input, ideep::attr_t());
 }
 
@@ -399,11 +398,7 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   at::Tensor grad_input, grad_weight, grad_bias;
   std::tie(grad_input, grad_weight, grad_bias) =
       op_context->run_backward(input, grad_outputs[0], output_mask);
-  return {
-      grad_input,
-      grad_weight,
-      grad_bias,
-      at::Tensor()};
+  return {grad_input, grad_weight, grad_bias, at::Tensor()};
 }
 
 at::Tensor convolution_forward(
