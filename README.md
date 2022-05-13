@@ -79,8 +79,6 @@ please update ${PATH_To_Your_Compiler} to where you install DPC++ compiler with 
 
 ```bash
 export MKL_DPCPP_ROOT=${PATH_To_Your_oneAPI_basekit}/intel/oneapi/mkl/latest
-export LD_LIBRARY_PATH=${MKL_DPCPP_ROOT}/lib:${MKL_DPCPP_ROOT}/lib64:${MKL_DPCPP_ROOT}/lib/intel64:${LD_LIBRARY_PATH}
-export LIBRARY_PATH=${MKL_DPCPP_ROOT}/lib:${MKL_DPCPP_ROOT}/lib64:${MKL_DPCPP_ROOT}/lib/intel64:${LIBRARY_PATH}
 ```
 
 **Note:**
