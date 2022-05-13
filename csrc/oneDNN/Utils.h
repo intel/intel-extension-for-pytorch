@@ -229,7 +229,7 @@ static inline bool is_onednn_matmul_strides(
   } else {
     // the src and weight must have at least one of the axes
     // m or k and n or k contiguous (i.e., stride=1) respectively.
-    if (strides[-1] != 1 && strides[-2] != 1)
+    if (strides[tensor_dim - 1] != 1 && strides[tensor_dim - 2] != 1)
       return false;
   }
 
