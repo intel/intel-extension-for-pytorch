@@ -81,8 +81,7 @@ void insertPrePackedConvOp(Block* b) {
         n->kind() == aten::conv3d) {
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
-      auto prepack_node = graph->create(
-          Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
+      Node* prepack_node;
       auto input_size_option = n->inputs()
                                    .at(0)
                                    ->type()
@@ -142,6 +141,11 @@ void insertPrePackedConvOp(Block* b) {
             graph->insertConstant(weight_is_channels_last_value);
         auto output_channel = graph->insertConstant(output_channel_value);
 
+        // Note that once creating this "convolution_prepack" node, make sure it
+        // is also inserted into the graph. Details ref to "linear_prepack"
+        // creation in "graph_rewrite_linear.cpp"
+        prepack_node = graph->create(
+            Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
         for (auto i = 1; i < n->inputs().size() - 1; ++i) {
           Value* v = n->inputs().at(i);
           prepack_node->addInput(v);
@@ -152,6 +156,8 @@ void insertPrePackedConvOp(Block* b) {
         prepack_node->addInput(output_channel);
         prepack_node->addInput(weight_is_channels_last);
       } else {
+        prepack_node = graph->create(
+            Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
         for (auto i = 1; i < n->inputs().size(); ++i) {
           Value* v = n->inputs().at(i);
           prepack_node->addInput(v);

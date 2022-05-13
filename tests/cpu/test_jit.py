@@ -55,7 +55,7 @@ import unittest
 from functools import reduce
 import warnings
 import itertools
-
+import contextlib
 import torch
 import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
@@ -88,7 +88,6 @@ skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 
 device = 'cpu:0'
 SIZE = 100
-
 
 conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
 convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
@@ -873,105 +872,120 @@ class EinsumAddInplaceV1(nn.Module):
         return bias.add_(torch.einsum(self.equation, input1, input2))
 
 class Tester(TestCase):
+    @contextlib.contextmanager
+    def _texpr_enable(self, strategy):
+        old_texpr_fuser_state = torch._C._jit_texpr_fuser_enabled()
+        torch._C._jit_set_texpr_fuser_enabled(strategy)
+        try:
+            yield
+        finally:
+            torch._C._jit_set_texpr_fuser_enabled(old_texpr_fuser_state)
 
-    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
+    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False], use_te=[False, True]):
         modelName = model.__class__.__name__
-        options = itertools.product(levels, use_channels_last)
-        for level, use_channels_last in options:
-            ipex.enable_onednn_fusion(False)
-            model = model.eval()
+        options = itertools.product(levels, use_channels_last, use_te)
+        origin_model = model
+        for level, use_channels_last, use_te in options:
+            with self._texpr_enable(use_te):
+                ipex.enable_onednn_fusion(False)
+                model = copy.deepcopy(origin_model).eval()
 #It will be removed after jit support conv_bn folding
-            if level == 'O0':
-                try:
-                    model = optimization.fuse(model)
-                except:
-                    warnings.warn("Conv BatchNorm folding failed.")
-            if x.dim() == 4 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last)
-                model = model.to(memory_format=torch.channels_last)
+                if level == 'O0':
+                    try:
+                        model = optimization.fuse(model)
+                    except:
+                        warnings.warn("Conv BatchNorm folding failed.")
+                if x.dim() == 4 and use_channels_last:
+                    print(model)
+                    x = x.to(memory_format=torch.channels_last)
+                    model = model.to(memory_format=torch.channels_last)
 
-            if x.dim() == 5 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last_3d)
-                model = model.to(memory_format=torch.channels_last_3d)
+                if x.dim() == 5 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last_3d)
+                    model = model.to(memory_format=torch.channels_last_3d)
 
-            oresult = model(x)
+                oresult = model(x)
 
-            model = ipex.optimize(model, dtype=torch.float32, level=level)
+                model = ipex.optimize(model, dtype=torch.float32, level=level)
 
-            with torch.no_grad():
-                result = model(x)
-                traced_model = torch.jit.trace(model, x).eval()
-                traced_model = torch.jit.freeze(traced_model)
-                tresult = traced_model(x)
+                with torch.no_grad():
+                    result = model(x)
+                    traced_model = torch.jit.trace(model, x).eval()
+                    traced_model = torch.jit.freeze(traced_model)
+                    tresult = traced_model(x)
 
-            self.assertEqual(oresult, result, prec=prec)
-            self.assertEqual(result, tresult, prec=prec)
+                self.assertEqual(oresult, result, prec=prec)
+                self.assertEqual(result, tresult, prec=prec)
 
-            ipex.enable_onednn_fusion(True)
-            with torch.no_grad():
-                trace_fused_model = torch.jit.trace(model, x)
-                trace_fused_model = torch.jit.freeze(trace_fused_model)
-                y = trace_fused_model(x)
+                ipex.enable_onednn_fusion(True)
+                with torch.no_grad():
+                    trace_fused_model = torch.jit.trace(model, x)
+                    trace_fused_model = torch.jit.freeze(trace_fused_model)
+                    y = trace_fused_model(x)
 
 #enable fusiong in ipex.
-                fused_tresult = trace_fused_model(x)
+                    fused_tresult = trace_fused_model(x)
 #conv relu fusion, conv sum fusion or conv sum relu fusion
-                trace_graph = trace_fused_model.graph_for(x)
-                fused_tresult = trace_fused_model(x)
-            self.assertEqual(result, fused_tresult, prec=prec)
+                    trace_graph = trace_fused_model.graph_for(x)
+                    fused_tresult = trace_fused_model(x)
+                self.assertEqual(result, fused_tresult, prec=prec)
 #check if the fused node exists in the graph
-            if kind_in_graph is not None:
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                if kind_in_graph is not None:
+                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
 #check if certain node does not exist in the graph
-            if kind_not_in_graph is not None:
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+                if kind_not_in_graph is not None:
+                    self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
 
-    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False]):
+
+    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
         modelName = model.__class__.__name__
-        options = itertools.product(levels, use_channels_last)
-        for level, use_channels_last in options:
-            ipex.enable_onednn_fusion(True)
-            model = model.eval()
+        options = itertools.product(levels, use_channels_last, use_te)
+        origin_model = model
+        for level, use_channels_last, use_te in options:
+            with self._texpr_enable(use_te):
+                ipex.enable_onednn_fusion(True)
+                model = copy.deepcopy(origin_model).eval()
 #It will be removed after jit support conv_bn folding
-            if level == 'O0':
-                try:
-                    model = optimization.fuse(model)
-                except:
-                    warnings.warn("Conv BatchNorm folding failed.")
-            if x.dim() == 4 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last)
-                model = model.to(memory_format=torch.channels_last)
-            if x.dim() == 5 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last_3d)
-                model = model.to(memory_format=torch.channels_last_3d)
+                if level == 'O0':
+                    try:
+                        model = optimization.fuse(model)
+                    except:
+                        warnings.warn("Conv BatchNorm folding failed.")
+                if x.dim() == 4 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last)
+                    model = model.to(memory_format=torch.channels_last)
+                if x.dim() == 5 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last_3d)
+                    model = model.to(memory_format=torch.channels_last_3d)
 
-            model = ipex.optimize(model, dtype=torch.bfloat16, level=level)
-            x2 = x.clone()
-            x3 = x.clone()
+                model = ipex.optimize(model, dtype=torch.bfloat16, level=level)
+                x2 = x.clone()
+                x3 = x.clone()
 
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+                with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
 #bf16, native path
-                result = model(x)
-                trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
-                trace_fused_model = torch.jit.freeze(trace_fused_model)
+                    result = model(x)
+                    trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
+                    trace_fused_model = torch.jit.freeze(trace_fused_model)
 #enable fusion path.
-                fused_tresult = trace_fused_model(x3)
+                    fused_tresult = trace_fused_model(x3)
 #bf16, jit trace path
-                trace_graph = trace_fused_model.graph_for(x3)
-                fused_tresult = trace_fused_model(x3)
+                    trace_graph = trace_fused_model.graph_for(x3)
+                    fused_tresult = trace_fused_model(x3)
 
-            self.assertEqual(fused_tresult, result, prec=prec)
-            self.assertEqual(fused_tresult.dtype, torch.bfloat16)
+                self.assertEqual(fused_tresult, result, prec=prec)
+                self.assertEqual(fused_tresult.dtype, torch.bfloat16)
 
 #check if the fused node exists in the graph
-            if kind_in_graph is not None:
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                if kind_in_graph is not None:
+                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
 #check if certain node does not exist in the graph
-            if kind_not_in_graph is not None:
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+                if kind_not_in_graph is not None:
+                    self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+
 
     def test_jit_freeze(self):
         model = ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1).eval()

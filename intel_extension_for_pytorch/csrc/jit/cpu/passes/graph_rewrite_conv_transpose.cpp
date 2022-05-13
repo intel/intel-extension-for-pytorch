@@ -20,8 +20,6 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
         n->kind() == aten::conv_transpose3d) {
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
-      auto prepack_node = graph->create(
-          Symbol::fromQualString("ipex_prepack::conv_transpose_prepack"), 1);
       auto input_size_option = n->inputs()
                                    .at(0)
                                    ->type()
@@ -102,6 +100,11 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
           graph->insertConstant(weight_is_channels_last_value);
       auto output_channel = graph->insertConstant(output_channel_value);
 
+      // Note that once creating this "conv_transpose_prepack" node, make sure
+      // it is also inserted into the graph. Details ref to "linear_prepack"
+      // creation in "graph_rewrite_linear.cpp"
+      auto prepack_node = graph->create(
+          Symbol::fromQualString("ipex_prepack::conv_transpose_prepack"), 1);
       for (auto i = 1; i < n->inputs().size(); ++i) {
         Value* v = n->inputs().at(i);
         prepack_node->addInput(v);

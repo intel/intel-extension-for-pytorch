@@ -19,8 +19,6 @@ void insertPrePackedLinearOpForAtenLinear(Block* b) {
       continue;
     WithInsertPoint guard(n);
     auto graph = n->owningGraph();
-    auto prepack_node = graph->create(
-        Symbol::fromQualString("ipex_prepack::linear_prepack"), 1);
     auto input_size_option =
         n->inputs().at(0)->type()->cast<TensorType>()->sizes().concrete_sizes();
     if (!(input_size_option.has_value() &&
@@ -53,6 +51,16 @@ void insertPrePackedLinearOpForAtenLinear(Block* b) {
     IValue output_channel_value(o_channel), input_channel_value(i_channel);
     auto output_channel = graph->insertConstant(output_channel_value);
     auto input_channel = graph->insertConstant(input_channel_value);
+
+    // Note that once creating a graph node, make sure it is also inserted into
+    // the graph, for: PyTorch (when disabled TE) has a check on the graph node,
+    // pointing out that every mutable value in the system has a corresponding
+    // element. So if creating a graph node but not inserted, it will not pass
+    // the check since its graph element is not initialized. Details please
+    // refer to
+    // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
+    auto prepack_node = graph->create(
+        Symbol::fromQualString("ipex_prepack::linear_prepack"), 1);
     for (auto i = 1; i < n->inputs().size(); ++i) {
       Value* v = n->inputs().at(i);
       prepack_node->addInput(v);
