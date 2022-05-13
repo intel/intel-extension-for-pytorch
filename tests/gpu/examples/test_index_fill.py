@@ -12,7 +12,7 @@ class TestTorchMethod(TestCase):
 
         x = torch.ones([5, 3], device=cpu_device)
         t = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=torch.float)
-        index = torch.tensor([0, 4, 2])
+        index = torch.tensor([0, -1, 2])
         x.index_fill_(0, index, -2)
         print("x = ", x)
 

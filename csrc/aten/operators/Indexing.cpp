@@ -419,13 +419,13 @@ void indexFill(
 
   auto val = val_scalar.to<scalar_t>();
   ptrdiff_t sliceSize = 1;
+  int64_t prb_dim_size = dst.size(dim);
   for (int d = 0; d < dstDims; d++) {
     if (d != dim) {
       sliceSize *= dst.dim() == 0 ? 1 : dst.size(d);
     }
   }
   ptrdiff_t dstTotalSize = dst.numel();
-  int64_t dstFillDimSize = dst.dim() == 0 ? 1 : dst.dim();
   ptrdiff_t numIndices = indices.numel();
 
   if (sliceSize == 0) {
@@ -463,6 +463,9 @@ void indexFill(
           auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
               src_slice_id, indices_info);
           auto dst_slice_id = idx_ptr[slice_off];
+          if (dst_slice_id < 0) {
+            dst_slice_id = prb_dim_size + dst_slice_id;
+          }
           auto g_dst_ptr =
               dst_ptr + dst_slice_id * dst_info.strides[dst_fill_dim];
 
@@ -512,7 +515,6 @@ void indexCopy(
     }
   }
   ptrdiff_t dstTotalSize = dst.numel();
-  int64_t dstFillDimSize = dst.dim() == 0 ? 1 : dst.dim();
   ptrdiff_t numIndices = indices.numel();
 
   if (sliceSize == 0) {
