@@ -25,23 +25,12 @@ namespace AtenIpexTypeXPU {
 constexpr int OVER_SUBSCRIBE_DSS_FACTOR = 16;
 
 template <int N, bool signed_strides = false>
-static OffsetCalculator<N, uint32_t, signed_strides> make_offset_calculator(
-    const TensorIterator& iter) {
-  TORCH_INTERNAL_ASSERT(N <= iter.ntensors());
-  std::array<const int64_t*, N> strides;
-  for (int i = 0; i < N; i++) {
-    strides[i] = iter.strides(i).data();
-  }
-  return OffsetCalculator<N, uint32_t, signed_strides>(
-      iter.ndim(), iter.shape().data(), strides.data());
-}
-
-template <int N, bool signed_strides = false>
 static OffsetCalculator<N, uint32_t, signed_strides>
-make_input_offset_calculator(const TensorIterator& iter) {
+make_input_offset_calculator(const TensorIteratorBase& iter) {
   // array size can not be 0, this happens when N == 0
   constexpr int array_size = std::max<int>(N, 1);
-  TORCH_INTERNAL_ASSERT(N <= iter.ntensors() - iter.noutputs());
+  TORCH_INTERNAL_ASSERT(
+      N <= iter.ntensors() - iter.noutputs()); // TODO: using N == ...
   std::array<const int64_t*, array_size> strides;
   int64_t element_sizes[array_size];
   for (int i = 0; i < N; i++) {
@@ -54,7 +43,7 @@ make_input_offset_calculator(const TensorIterator& iter) {
 
 template <int num_outputs = 1, bool signed_strides = false>
 static OffsetCalculator<num_outputs, uint32_t, signed_strides>
-make_output_offset_calculator(const TensorIterator& iter) {
+make_output_offset_calculator(const TensorIteratorBase& iter) {
   TORCH_INTERNAL_ASSERT(num_outputs == iter.noutputs());
   std::array<const int64_t*, num_outputs> strides;
   int64_t element_sizes[num_outputs];
@@ -337,7 +326,7 @@ static inline void launch_vectorized_kernel(
 }
 
 template <typename func_t, bool singed_strides = false>
-void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
+void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   using traits = function_traits<func_t>;
   constexpr int ntensors = traits::arity + 1;
 
@@ -412,7 +401,7 @@ void dpcpp_loops_kernel(TensorIterator& iter, const func_t f) {
 }
 
 template <typename func_t, bool sined_strides = false>
-void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
+void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(
         iter.device(arg).type() == at::kXPU,
@@ -489,7 +478,7 @@ template <
     typename arg2_t = arg1_t,
     typename return_t = arg1_t,
     typename func_t>
-void opmath_gpu_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
+void opmath_gpu_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   TORCH_INTERNAL_ASSERT(iter.ntensors() == 3);
 
   using traits = function_traits<func_t>;
@@ -522,7 +511,7 @@ void opmath_gpu_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
 }
 
 template <typename func_t>
-void dpcpp_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
+void dpcpp_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   using traits = function_traits<func_t>;
   static_assert(
       traits::arity == 2,

@@ -76,9 +76,38 @@ struct TrivialOffsetCalculator {
 
   C10_HOST_DEVICE offset_type get(index_t linear_idx) const {
     offset_type offsets;
+#pragma unroll
     for (int arg = 0; arg < NARGS; arg++) {
       offsets[arg] = linear_idx;
     }
     return offsets;
   }
 };
+
+// Make an OffsetCalculator with byte offsets
+template <int N, bool signed_strides = false>
+static OffsetCalculator<N, uint32_t, signed_strides> make_offset_calculator(
+    const at::TensorIteratorBase& iter) {
+  TORCH_INTERNAL_ASSERT(N <= iter.ntensors());
+  std::array<const int64_t*, N> strides;
+  for (int i = 0; i < N; i++) {
+    strides[i] = iter.strides(i).data();
+  }
+  return OffsetCalculator<N, uint32_t, signed_strides>(
+      iter.ndim(), iter.shape().data(), strides.data());
+}
+
+// Make an OffsetCalculator with element offsets
+template <int N, bool signed_strides = false>
+static OffsetCalculator<N, uint32_t, signed_strides>
+make_element_offset_calculator(const at::TensorIteratorBase& iter) {
+  TORCH_INTERNAL_ASSERT(N <= iter.ntensors());
+  std::array<const int64_t*, N> strides;
+  std::array<int64_t, N> element_sizes;
+  for (int i = 0; i < N; i++) {
+    strides[i] = iter.strides(i).data();
+    element_sizes[i] = iter.element_size(i);
+  }
+  return OffsetCalculator<N, uint32_t, signed_strides>(
+      iter.ndim(), iter.shape().data(), strides.data(), element_sizes.data());
+}
