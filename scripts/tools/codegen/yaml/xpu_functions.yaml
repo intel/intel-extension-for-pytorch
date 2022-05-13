@@ -190,9 +190,7 @@ supported:
   - equal
   - erf.out
   - erfc.out
-  - erfinv
   - erfinv.out
-  - erfinv_
   - exp.out
   - exp2.out
   - expm1.out
