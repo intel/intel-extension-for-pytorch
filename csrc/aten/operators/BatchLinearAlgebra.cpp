@@ -1755,14 +1755,18 @@ std::tuple<Tensor, Tensor> geqrf(const Tensor& self) {
       "input should have at least 2 dimensions. but has ",
       self.dim(),
       " dimensions instead");
-  TORCH_CHECK(self.numel() != 0, "input must not be empty");
-
-  std::vector<int64_t> infos(native::batchCount(self), 0);
   int64_t m = self.size(-2), n = self.size(-1);
-  Tensor self_working_copy = native::cloneBatchedColumnMajor(self);
   auto req_size = self.sizes().vec();
   req_size.pop_back();
   req_size[self.dim() - 2] = std::min(m, n);
+  if (self.numel() == 0) {
+    return std::tuple<Tensor, Tensor>(
+        at::empty(self.sizes().vec(), self.options()),
+        at::empty(req_size, self.options()));
+  }
+
+  std::vector<int64_t> infos(native::batchCount(self), 0);
+  Tensor self_working_copy = native::cloneBatchedColumnMajor(self);
   Tensor tau_working_copy = at::empty(req_size, self.options());
 
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "geqrf_dpcpp", [&] {
