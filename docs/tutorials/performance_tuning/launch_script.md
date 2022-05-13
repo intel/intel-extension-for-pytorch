@@ -26,6 +26,7 @@ Available knobs are listed below:
 | ```--ninstances``` | int | -1 | For multi-instance, you should give the cores number you used for per instance. |
 | ```--instance_idx``` | int | -1 | Specify instance_idx to run single instance among multiple instances. Useful when running each instance independently. |
 | ```--ncore_per_instance``` | int | -1 | Cores per instance |
+| ```--skip_cross_node_cores``` | - | False | When specifying --ncore_per_instance, set --skip_cross_node_cores to skip any cross-node cores. |
 | ```--latency_mode``` | - | False | By default 4 core per instance and use all physical cores |
 | ```--throughput_mode``` | - | False | By default one instance per numa node and use all physical cores |
 | ```--node_id``` | int | -1 | Node id for multi-instance, by default all numa nodes will be used |
@@ -41,6 +42,8 @@ Available knobs are listed below:
 | ```--use_default_allocator``` | - |  False | Use default memory allocator |
 
 **Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
+
+```--skip_cross_node_cores``` is exclusive knob to ```--ninstances```. I.e., setting ```--skip_cross_node_cores``` overwrites setting of ```--ninstances``` if it is explicitly set in command line. 
 
 The *launch* script respects existing environment variables when it get launched, expect for *LD_PRELOAD*. If you have your favorite values for certain environment variables, you can set them before running the *launch* script. A typical usage scenario is as the following. Intel OpenMP library uses an environment variable *KMP_AFFINITY* to control its behavior. Different settings result in different performance numbers. By default, if you enable Intel OpenMP library, the *launch* script will set *KMP_AFFINITY* to "granularity=fine,compact,1,0". If you want to try with other values, you can use *export* command on Linux to set *KMP_AFFINITY* before you run the *launch* script. In this case, the script will not set the default value but take the existing value of *KMP_AFFINITY*, and print a message to stdout.
 

@@ -407,7 +407,32 @@ class MultiInstanceLauncher(Launcher):
                 else:
                     args.ncore_per_instance = len(cores) // args.ninstances
             elif args.ncore_per_instance != -1 and args.ninstances == -1:
-                args.ninstances = len(cores) // args.ncore_per_instance
+                if not args.skip_cross_node_cores:
+                    args.ninstances = len(cores) // args.ncore_per_instance
+                else:
+                    ncore_per_node = len(self.cpuinfo.node_physical_cores[0])
+                    num_leftover_cores = ncore_per_node % args.ncore_per_instance
+                    if args.ncore_per_instance > ncore_per_node:
+                        # too many ncore_per_instance to skip cross-node cores 
+                        logger.warning("there are {} core(s) per socket, but you specify {} ncore_per_instance and skip_cross_node_cores. Please make sure --ncore_per_instance < core(s) per socket".format(ncore_per_node, args.ncore_per_instance))
+                        exit(-1)
+                    elif num_leftover_cores == 0:
+                        # aren't any cross-node cores 
+                        logger.info('--skip_cross_node_cores is set, but there are no cross-node cores.')
+                        args.ninstances = len(cores) // args.ncore_per_instance
+                    else:
+                        # skip cross-node cores 
+                        if args.ninstances != -1:
+                            logger.warning('--skip_cross_node_cores is exclusive to --ninstances. --ninstances won\'t take effect even if it is set explicitly.')
+                
+                        i = 1 
+                        leftover_cores = set()
+                        while ncore_per_node*i <= len(cores):
+                            leftover_cores.update(cores[ncore_per_node*i-num_leftover_cores : ncore_per_node*i])
+                            i += 1 
+                        cores = list(set(cores) - leftover_cores)
+                        assert len(cores) % args.ncore_per_instance == 0
+                        args.ninstances = len(cores) // args.ncore_per_instance
             else:
                 if args.ninstances * args.ncore_per_instance > len(cores):
                     logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
@@ -709,6 +734,8 @@ def add_multi_instance_params(parser):
     # multi-instance control
     group.add_argument("--ncore_per_instance", metavar='\b', default=-1, type=int,
                        help="Cores per instance")
+    group.add_argument("--skip_cross_node_cores", action='store_true', default=False,
+                       help="If specified --ncore_per_instance, skips cross-node cores.")
     group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
                        help="For multi-instance, you should give the cores number you used for per instance.")
     group.add_argument("--instance_idx", metavar='\b', default="-1", type=int,
