@@ -233,6 +233,35 @@ static TensorIterator make_reduction(
       viewed_result1, viewed_result2, self.to(dtype));
 }
 
+static void zero_numel_check_dims(
+    const Tensor& self,
+    const int64_t dim,
+    const char* fn_name) {
+  if (self.ndimension() == 0) {
+    TORCH_CHECK_INDEX(
+        dim == 0 || dim == -1,
+        fn_name,
+        ": Expected reduction dim -1 or 0 for scalar but got ",
+        dim);
+  } else {
+    TORCH_CHECK_INDEX(
+        self.size(dim) != 0,
+        fn_name,
+        ": Expected reduction dim ",
+        dim,
+        " to have non-zero size.");
+  }
+}
+
+static void zero_numel_check_dims(
+    const Tensor& self,
+    const IntArrayRef dim,
+    const char* fn_name) {
+  for (const int64_t d : dim) {
+    zero_numel_check_dims(self, d, fn_name);
+  }
+}
+
 static ScalarType get_dtype(
     Tensor& result,
     const Tensor& self,
@@ -965,7 +994,9 @@ Tensor& amin_out(
       result.scalar_type());
   auto iter = impl::make_reduction(
       "amin", result, self, dim, keepdim, self.scalar_type());
-  TORCH_CHECK(iter.numel() > 0, "operation does not have an identity");
+  if (iter.numel() == 0) {
+    zero_numel_check_dims(self, dim, "amin()");
+  }
   impl::min_kernel(iter);
   return result;
 }
@@ -1003,7 +1034,9 @@ Tensor& amax_out(
       result.scalar_type());
   auto iter = impl::make_reduction(
       "amax", result, self, dim, keepdim, self.scalar_type());
-  TORCH_CHECK(iter.numel() > 0, "operation does not have an identity");
+  if (iter.numel() == 0) {
+    zero_numel_check_dims(self, dim, "amax()");
+  }
   impl::max_kernel(iter);
   return result;
 }
