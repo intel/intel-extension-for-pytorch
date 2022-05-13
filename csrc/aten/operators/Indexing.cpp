@@ -701,8 +701,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
     TORCH_CHECK(false, "source nElements must be == mask `1` elements");
   }
 
-  Tensor maskLong = at::empty({0}, (*mask).options().dtype(kLong));
-  maskLong.resize_((*mask).sizes());
+  Tensor maskLong = at::empty((*mask).sizes(), (*mask).options().dtype(kLong));
   maskLong.copy_(*mask);
 
   // Use a prefix sum to determine the output locations of the masked elements
@@ -730,25 +729,23 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
       static_cast<int64_t>(0));
 
   Tensor contigSrc = src.contiguous();
+  Tensor contigMask = (*mask).contiguous();
 
   // command group function
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
-    auto acc_src_data = contigSrc.data_ptr<scalar_t>();
-    auto acc_mask_data = static_cast<mask_t*>((*mask).data_ptr());
-    auto acc_maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
-    auto acc_tensor_data = tensor.data_ptr<scalar_t>();
+    auto src_data = contigSrc.data_ptr<scalar_t>();
+    auto mask_data = static_cast<mask_t*>(contigMask.data_ptr());
+    auto maskPrefixSum_data = maskPrefixSum.data_ptr<int64_t>();
+    auto tensor_data = tensor.data_ptr<scalar_t>();
 
     // kernel function
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
-      auto src_ptr = acc_src_data;
-      auto mask_ptr = acc_mask_data;
-      auto maskPrefix_ptr = acc_maskPrefixSum_data;
-      auto tensor_ptr = acc_tensor_data;
       if (linear_index < size) {
-        if (mask_ptr[linear_index]) {
-          tensor_ptr[linear_index] = src_ptr[maskPrefix_ptr[linear_index]];
+        if (mask_data[linear_index]) {
+          tensor_data[linear_index] =
+              src_data[maskPrefixSum_data[linear_index]];
         }
       }
     };
