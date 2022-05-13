@@ -97,12 +97,13 @@ class TestIpexOps(JitLlgaTestCase):
                 return x
 
         m = M()
-        inputs = []
-        for i in range(0, 27):
-            inputs.append(torch.randn([128, 128]) * 0.1)
-        for qscheme in [torch.per_tensor_symmetric]:
-            graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, config_name="interaction", qscheme=qscheme)
-            self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
+        for ninputs in [2, 27]:
+            inputs = []
+            for i in range(0, ninputs):
+                inputs.append(torch.randn([128, 128]) * 0.1)
+            for qscheme in [torch.per_tensor_symmetric]:
+                graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, config_name="interaction", qscheme=qscheme)
+                self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
 
     def test_lstm(self):
         class M(nn.Module):

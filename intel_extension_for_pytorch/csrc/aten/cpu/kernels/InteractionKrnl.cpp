@@ -668,7 +668,7 @@ static inline void _interaction_s8s8_scale_s32s8_128(
   auto* a = (const __m512i*)&convert_to_s16_buf[0];
   auto* b = (const __m512i*)&convert_to_s16_buf[4];
   mul_and_sum_s16x128_to_s32x16(cat_buf[0], b, a);
-  size_t offset = 1;
+  int64_t offset = 1;
   for (int i = 2; i < M; i++) {
     auto* c = (const __m512i*)&convert_to_s16_buf[i * 4];
     int j = 0;
@@ -687,7 +687,7 @@ static inline void _interaction_s8s8_scale_s32s8_128(
   }
 
   // Do reduce add with scale
-  size_t off = 0;
+  int64_t off = 0;
   for (; off < offset - 15; off += 16) {
     __m512 scale_m512 = _mm512_load_ps((const void*)(scales + off));
     reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scale_m512);
