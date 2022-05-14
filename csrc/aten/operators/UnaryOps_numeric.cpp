@@ -57,6 +57,11 @@ static inline Tensor& unary_op_impl_with_complex_to_float_out(
   return result;
 }
 
+template <typename T>
+static T abs_impl(T v) {
+  return Numerics<T>::abs(v);
+}
+
 void abs_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       ScalarType::Half,
@@ -65,9 +70,8 @@ void abs_kernel(TensorIterator& iter) {
       iter.common_dtype(),
       "abs",
       [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::abs(a);
-        });
+        dpcpp_kernel_for_tensor_iter(
+            iter, [](scalar_t a) -> scalar_t { return abs_impl<scalar_t>(a); });
       });
 }
 

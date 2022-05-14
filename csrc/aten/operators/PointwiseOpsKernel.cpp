@@ -14,7 +14,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 static void addcmul_kernel(TensorIterator& iter, Scalar value) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -29,7 +29,7 @@ static void addcmul_kernel(TensorIterator& iter, Scalar value) {
 }
 
 static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),

@@ -1210,12 +1210,33 @@ struct Numerics<c10::complex<float>> {
     return c10::complex<float>(1.0, 0) / std::sqrt(a);
   }
 
-  static inline c10::complex<float> abs(c10::complex<float> a) {
+  static inline float abs(c10::complex<float> a) {
     return std::abs(a);
   }
 
   static inline c10::complex<float> exp(c10::complex<float> a) {
     return std::exp(a);
+  }
+
+  static inline c10::complex<float> add(
+      c10::complex<float> a,
+      c10::complex<float> b) {
+    return a + b;
+  }
+  static inline c10::complex<float> mul(
+      c10::complex<float> a,
+      c10::complex<float> b) {
+    return a * b;
+  }
+  static inline c10::complex<float> sub(
+      c10::complex<float> a,
+      c10::complex<float> b) {
+    return a - b;
+  }
+  static inline c10::complex<float> div(
+      c10::complex<float> a,
+      c10::complex<float> b) {
+    return a / b;
   }
 
   static inline c10::complex<float> pow(
@@ -1307,12 +1328,33 @@ struct Numerics<c10::complex<double>> {
     return c10::complex<double>(1.0, 0) / std::sqrt(a);
   }
 
-  static inline c10::complex<double> abs(c10::complex<double> a) {
+  static inline double abs(c10::complex<double> a) {
     return std::abs(a);
   }
 
   static inline c10::complex<double> exp(c10::complex<double> a) {
     return std::exp(a);
+  }
+
+  static inline c10::complex<double> add(
+      c10::complex<double> a,
+      c10::complex<double> b) {
+    return a + b;
+  }
+  static inline c10::complex<double> mul(
+      c10::complex<double> a,
+      c10::complex<double> b) {
+    return a * b;
+  }
+  static inline c10::complex<double> sub(
+      c10::complex<double> a,
+      c10::complex<double> b) {
+    return a - b;
+  }
+  static inline c10::complex<double> div(
+      c10::complex<double> a,
+      c10::complex<double> b) {
+    return a / b;
   }
 
   static inline c10::complex<double> pow(

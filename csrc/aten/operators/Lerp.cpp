@@ -28,15 +28,16 @@ void lerp(
                   .build();
   dpcpp_kernel_for_tensor_iter(
       iter, [=](scalar_t a, scalar_t b, scalar_t weight) -> scalar_t {
-        return (weight < 0.5) ? Numerics<scalar_t>::add(
-                                    a,
-                                    Numerics<scalar_t>::mul(
-                                        weight, Numerics<scalar_t>::sub(b, a)))
-                              : Numerics<scalar_t>::sub(
-                                    b,
-                                    Numerics<scalar_t>::mul(
-                                        Numerics<scalar_t>::sub(b, a),
-                                        Numerics<scalar_t>::sub(1, weight)));
+        return (Numerics<scalar_t>::abs(weight) < 0.5)
+            ? Numerics<scalar_t>::add(
+                  a,
+                  Numerics<scalar_t>::mul(
+                      weight, Numerics<scalar_t>::sub(b, a)))
+            : Numerics<scalar_t>::sub(
+                  b,
+                  Numerics<scalar_t>::mul(
+                      Numerics<scalar_t>::sub(b, a),
+                      Numerics<scalar_t>::sub(1, weight)));
       });
 }
 
@@ -54,7 +55,7 @@ Tensor& lerp_out(
   std::tie(b_self, b_end, b_weight) =
       expand_outplace(self, end, weight, "lerp_out");
   out.resize_as_(*b_self);
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_out", [&] {
     impl::lerp<scalar_t>(out, *b_self, *b_end, *b_weight);
   });
   return out;
@@ -68,7 +69,7 @@ Tensor& lerp_out(
   c10::MaybeOwned<Tensor> b_self, b_end;
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_out");
   out.resize_as_(*b_self);
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_out", [&] {
     impl::lerp<scalar_t>(
         out,
         *b_self,
@@ -91,7 +92,7 @@ Tensor& lerp_(Tensor& self, const Tensor& end, const Tensor& weight) {
   TORCH_CHECK(
       weight.dim() <= std::max(self.dim(), end.dim()),
       "weight should be of dimension max(self.dim(), end.dim()) or lesser");
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_", [&] {
     impl::lerp<scalar_t>(self, *b_self, *b_end, *b_weight);
   });
   return self;
@@ -106,7 +107,7 @@ Tensor& lerp_(Tensor& self, const Tensor& end, const Scalar& weight) {
       self.sizes(),
       " doesn't match the broadcast shape ",
       (*b_self).sizes());
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "lerp_", [&] {
     impl::lerp<scalar_t>(
         self,
         *b_self,
