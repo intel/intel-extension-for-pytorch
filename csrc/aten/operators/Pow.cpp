@@ -13,39 +13,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar);
-
-void pow_tensor_tensor_kernel(TensorIterator& iter) {
-  // TODO: support complex dtype for power
-  // if (isFloatingType(iter.dtype()) || isComplexType(iter.dtype())) {
-  //   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(iter.dtype(), "pow", [&]() {
-  //     dpcpp_kernel_for_tensor_iter(
-  //         iter, [](scalar_t base, scalar_t exp) -> scalar_t {
-  //           return Numerics<scalar_t>::pow(base, exp);
-  //         });
-  //   });
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
-      kHalf, kBFloat16, iter.common_dtype(), "pow_xpu", [&]() {
-        if (iter.is_cpu_scalar(1)) {
-          const auto base = iter.scalar_value<scalar_t>(1);
-          iter.remove_operand(1);
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t exp) -> scalar_t {
-            return Numerics<scalar_t>::pow(base, exp);
-          });
-        } else if (iter.is_cpu_scalar(2)) {
-          const auto exp = iter.scalar_value<scalar_t>(2);
-          iter.remove_operand(2);
-          pow_tensor_scalar_kernel(iter, exp);
-        } else {
-          dpcpp_kernel_for_tensor_iter(
-              iter, [](scalar_t base, scalar_t exp) -> scalar_t {
-                return Numerics<scalar_t>::pow(base, exp);
-              });
-        }
-      });
-}
-
 void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
   if (isFloatingType(iter.dtype())) {
     const auto exp = exp_scalar.to<double>();
@@ -113,6 +80,28 @@ void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
       }
     });
   }
+}
+
+void pow_tensor_tensor_kernel(TensorIterator& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+      kHalf, kBFloat16, iter.common_dtype(), "pow_xpu", [&]() {
+        if (iter.is_cpu_scalar(1)) {
+          const auto base = iter.scalar_value<scalar_t>(1);
+          iter.remove_operand(1);
+          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t exp) -> scalar_t {
+            return Numerics<scalar_t>::pow(base, exp);
+          });
+        } else if (iter.is_cpu_scalar(2)) {
+          const auto exp = iter.scalar_value<scalar_t>(2);
+          iter.remove_operand(2);
+          pow_tensor_scalar_kernel(iter, exp);
+        } else {
+          dpcpp_kernel_for_tensor_iter(
+              iter, [](scalar_t base, scalar_t exp) -> scalar_t {
+                return Numerics<scalar_t>::pow(base, exp);
+              });
+        }
+      });
 }
 
 } // namespace impl
