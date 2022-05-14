@@ -12,11 +12,6 @@
 namespace xpu {
 namespace dpcpp {
 
-void wait_for_queue_finish() {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  dpcpp_queue.wait();
-}
-
 void parallel_for_setup(
     int64_t n,
     int64_t& tileSize,

@@ -8,6 +8,7 @@
 #include <oneDNN/oneDNN.h>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
+#include <utils/SimpleTrace.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -187,6 +188,8 @@ class GRUFunction : public Function<GRUFunction> {
       bool has_biases,
       bool train,
       bool bidirectional) {
+    SimpleTrace trace(
+        "GRU forward -> at::AtenIpexTypeXPU::GRUFunction::forward");
     variable_list saved_v = {input, w1, w2, w3, w4, hx};
     ctx->saved_data["reverse"] = reverse;
     ctx->saved_data["hidden_size"] = hidden_size;
@@ -221,6 +224,8 @@ class GRUFunction : public Function<GRUFunction> {
   static variable_list backward(
       AutogradContext* ctx,
       variable_list grad_outputs) {
+    SimpleTrace trace(
+        "GRU backward -> at::AtenIpexTypeXPU::GRUFunction::backward");
     auto saved = ctx->get_saved_variables();
     auto input = saved[0];
     auto w1 = saved[1];
