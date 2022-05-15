@@ -11,14 +11,13 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-namespace impl {
 
 void sqrt_kernel_xpu(TensorIterator& iter);
 void rsqrt_kernel_xpu(TensorIterator& iter);
 void reciprocal_kernel_xpu(TensorIterator& iter);
 
 template <typename scalar_t>
-void pow_tensor_scalar_kernel_impl(TensorIterator& iter, Scalar exp) {
+void pow_tensor_scalar_kernel_impl(TensorIterator& iter, const Scalar& exp) {
   const auto double_exp = exp.to<double>();
   // 0.5 (sqrt), -0.5 (rsqrt) and -1 (reciprocal) specializations are handled
   // in pow_tensor_scalar_kernel
@@ -38,7 +37,7 @@ void pow_tensor_scalar_kernel_impl(TensorIterator& iter, Scalar exp) {
   }
 }
 
-void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
+void pow_tensor_scalar_kernel(TensorIterator& iter, const Scalar& exp_scalar) {
   // Dispatch to fast specialization for sqrt, rsqrt and reciprocal
   if (!exp_scalar.isComplex()) {
     if (exp_scalar.equal(0.5)) {
@@ -74,36 +73,6 @@ void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
   }
 }
 
-void pow_tensor_tensor_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
-      kHalf, kBFloat16, iter.common_dtype(), "pow_xpu", [&]() {
-        if (iter.is_cpu_scalar(1)) {
-          const auto base = iter.scalar_value<scalar_t>(1);
-          iter.remove_operand(1);
-          dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t exp) -> scalar_t {
-            return Numerics<scalar_t>::pow(base, exp);
-          });
-        } else if (iter.is_cpu_scalar(2)) {
-          const auto exp = iter.scalar_value<scalar_t>(2);
-          iter.remove_operand(2);
-          pow_tensor_scalar_kernel(iter, exp);
-        } else {
-          dpcpp_kernel_for_tensor_iter(
-              iter, [](scalar_t base, scalar_t exp) -> scalar_t {
-                return Numerics<scalar_t>::pow(base, exp);
-              });
-        }
-      });
-}
-
-} // namespace impl
-
-Tensor& pow_out(Tensor& result, const Tensor& base, const Tensor& exp) {
-  auto iter = TensorIterator::binary_op(result, base, exp);
-  impl::pow_tensor_tensor_kernel(iter);
-  return result;
-}
-
 Tensor& pow_out(Tensor& result, const Tensor& base, const Scalar& exp) {
   TORCH_CHECK(
       !(isIntegralType(base.scalar_type(), true) && exp.isIntegral(true) &&
@@ -128,26 +97,9 @@ Tensor& pow_out(Tensor& result, const Tensor& base, const Scalar& exp) {
     result.resize_as_(base).copy_(base);
   } else {
     auto iter = TensorIterator::unary_op(result, base.to(common_dtype));
-    impl::pow_tensor_scalar_kernel(iter, exp);
+    pow_tensor_scalar_kernel(iter, exp);
   }
   return result;
-}
-
-Tensor& pow_out(Tensor& result, const Scalar& base, const Tensor& exp) {
-  if (base.isComplex() && base.toComplexDouble() == 1.0) {
-    result.resize_as_(exp).fill_(1);
-  } else if (!base.isComplex() && base.toDouble() == 1.0) {
-    result.resize_as_(exp).fill_(1);
-  } else {
-    at::AtenIpexTypeXPU::pow_out(result, wrapped_scalar_tensor(base), exp);
-  }
-  return result;
-}
-
-Tensor pow(const Tensor& base, const Tensor& exp) {
-  auto dtype = at::result_type(base, exp);
-  Tensor result = at::empty({0}, base.options().dtype(dtype));
-  return at::AtenIpexTypeXPU::pow_out(result, base, exp);
 }
 
 Tensor pow(const Tensor& base, Scalar exp) {
