@@ -16,23 +16,7 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& rsqrt_out(const Tensor& self, Tensor& out) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.common_dtype(),
-      "rsqrt",
-      [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return Numerics<scalar_t>::rsqrt(a);
-        });
-      });
-  return out;
-}
-
-Tensor& sqrt_out(Tensor& result, const Tensor& self) {
-  auto iter = TensorIterator::unary_float_op(result, self);
+void sqrt_kernel_xpu(TensorIterator& iter) {
   IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -43,7 +27,31 @@ Tensor& sqrt_out(Tensor& result, const Tensor& self) {
           return Numerics<scalar_t>::sqrt(a);
         });
       });
+}
+
+Tensor& sqrt_out(Tensor& result, const Tensor& self) {
+  auto iter = TensorIterator::unary_float_op(result, self);
+  sqrt_kernel_xpu(iter);
   return result;
+}
+
+void rsqrt_kernel_xpu(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "rsqrt",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
+          return Numerics<scalar_t>::rsqrt(a);
+        });
+      });
+}
+
+Tensor& rsqrt_out(const Tensor& self, Tensor& out) {
+  auto iter = TensorIterator::unary_float_op(out, self);
+  rsqrt_kernel_xpu(iter);
+  return out;
 }
 
 } // namespace AtenIpexTypeXPU

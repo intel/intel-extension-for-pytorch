@@ -122,7 +122,7 @@ Tensor& clamp_out(
           dpcpp_kernel_for_tensor_iter(
               iter,
               [=](scalar_t in, scalar_t min_val, scalar_t max_val) -> scalar_t {
-                if (at::_isnan(in)) {
+                if (Numerics<scalar_t>::isnan(in)) {
                   return in;
                 } else {
                   return std::min(std::max(in, min_val), max_val);
@@ -165,7 +165,7 @@ Tensor& clamp_max_out(const Tensor& self, const Tensor& max, Tensor& result) {
       kHalf, kBFloat16, iter.common_dtype(), "clamp_max_dpcpp", [&] {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t in, scalar_t max_val) -> scalar_t {
-              if (at::_isnan(in)) {
+              if (Numerics<scalar_t>::isnan(in)) {
                 return in;
               } else {
                 return std::min(in, max_val);
@@ -185,7 +185,7 @@ Tensor& clamp_min_out(const Tensor& self, const Tensor& min, Tensor& result) {
       kHalf, kBFloat16, iter.common_dtype(), "clamp_min_dpcpp", [&] {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t in, scalar_t min_val) -> scalar_t {
-              if (at::_isnan(in)) {
+              if (Numerics<scalar_t>::isnan(in)) {
                 return in;
               } else {
                 return std::max(in, min_val);

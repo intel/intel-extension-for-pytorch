@@ -13,72 +13,64 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+void sqrt_kernel_xpu(TensorIterator& iter);
+void rsqrt_kernel_xpu(TensorIterator& iter);
+void reciprocal_kernel_xpu(TensorIterator& iter);
+
+template <typename scalar_t>
+void pow_tensor_scalar_kernel_impl(TensorIterator& iter, Scalar exp) {
+  const auto double_exp = exp.to<double>();
+  // 0.5 (sqrt), -0.5 (rsqrt) and -1 (reciprocal) specializations are handled
+  // in pow_tensor_scalar_kernel
+  if (double_exp == 2) {
+    dpcpp_kernel_for_tensor_iter(
+        iter, [](scalar_t base) -> scalar_t { return base * base; });
+  } else if (double_exp == 3) {
+    dpcpp_kernel_for_tensor_iter(
+        iter, [](scalar_t base) -> scalar_t { return base * base * base; });
+  } else if (double_exp == -2) {
+    dpcpp_kernel_for_tensor_iter(
+        iter, [](scalar_t base) -> scalar_t { return 1.0 / (base * base); });
+  } else {
+    dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
+      return Numerics<scalar_t>::pow(base, double_exp);
+    });
+  }
+}
+
 void pow_tensor_scalar_kernel(TensorIterator& iter, Scalar exp_scalar) {
-  if (isFloatingType(iter.dtype())) {
-    const auto exp = exp_scalar.to<double>();
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        iter.common_dtype(),
-        "pow",
-        [&]() {
-          if (exp == 0.5) {
-            dpcpp_kernel_for_tensor_iter(iter, [](scalar_t base) -> scalar_t {
-              return Numerics<scalar_t>::sqrt(base);
-            });
-          } else if (exp == 2) {
-            dpcpp_kernel_for_tensor_iter(
-                iter, [](scalar_t base) -> scalar_t { return base * base; });
-          } else if (exp == 3) {
-            dpcpp_kernel_for_tensor_iter(iter, [](scalar_t base) -> scalar_t {
-              return base * base * base;
-            });
-          } else if (exp == -0.5) {
-            dpcpp_kernel_for_tensor_iter(iter, [](scalar_t base) -> scalar_t {
-              return Numerics<scalar_t>::rsqrt(base);
-            });
-          } else if (exp == -1) {
-            dpcpp_kernel_for_tensor_iter(
-                iter, [](scalar_t base) -> scalar_t { return 1.0 / base; });
-          } else if (exp == -2) {
-            dpcpp_kernel_for_tensor_iter(iter, [](scalar_t base) -> scalar_t {
-              return 1.0 / (base * base);
-            });
-          } else {
-            dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
-              return Numerics<scalar_t>::pow(base, exp);
-            });
-          }
-        });
-  } else if (isComplexType(iter.dtype()) || exp_scalar.isComplex()) {
+  // Dispatch to fast specialization for sqrt, rsqrt and reciprocal
+  if (!exp_scalar.isComplex()) {
+    if (exp_scalar.equal(0.5)) {
+      return sqrt_kernel_xpu(iter);
+    } else if (exp_scalar.equal(-0.5)) {
+      return rsqrt_kernel_xpu(iter);
+    } else if (exp_scalar.equal(-1.0)) {
+      return reciprocal_kernel_xpu(iter);
+    }
+  }
+
+  if (isComplexType(iter.common_dtype()) || exp_scalar.isComplex()) {
     IPEX_DISPATCH_COMPLEX_TYPES(iter.common_dtype(), "pow", [&]() {
       const auto exp = exp_scalar.to<scalar_t>();
       dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
         return Numerics<scalar_t>::pow(base, exp);
       });
     });
+  } else if (
+      isFloatingType(iter.common_dtype()) || exp_scalar.isIntegral(false)) {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        kHalf, kBFloat16, iter.common_dtype(), "pow_xpu", [&]() {
+          // const auto exp = exp_scalar.to<scalar_t>();
+          pow_tensor_scalar_kernel_impl<scalar_t>(iter, exp_scalar);
+        });
   } else {
-    const auto exp = exp_scalar.to<long>();
-    IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "pow", [&]() {
-      if (exp == 2) {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t base) -> scalar_t { return base * base; });
-      } else if (exp == 3) {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t base) -> scalar_t { return base * base * base; });
-      } else if (exp == -1) {
-        dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t base) -> scalar_t { return 1.0 / base; });
-      } else if (exp == -2) {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t base) -> scalar_t {
-          return 1.0 / (base * base);
-        });
-      } else {
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t base) -> scalar_t {
-          return Numerics<scalar_t>::pow(base, exp);
-        });
-      }
-    });
+    TORCH_INTERNAL_ASSERT(
+        false,
+        "invalid combination of type in Pow function, common dtype:",
+        iter.common_dtype(),
+        "exp is integral?",
+        exp_scalar.isIntegral(false));
   }
 }
 
