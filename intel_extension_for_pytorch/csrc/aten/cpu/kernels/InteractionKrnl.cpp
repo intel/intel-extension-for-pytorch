@@ -2,8 +2,7 @@
 #include "csrc/aten/cpu/Interaction.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
-#include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/quantization/AutoCast.hpp"
 
@@ -22,6 +21,8 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+using namespace torch_ipex::cpu::kernel;
 
 template <typename T>
 static inline void cat(

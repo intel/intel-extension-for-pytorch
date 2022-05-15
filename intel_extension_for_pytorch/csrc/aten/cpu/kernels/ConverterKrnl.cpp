@@ -1,5 +1,5 @@
-#include <csrc/cpu/vec512/Converter.h>
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
+#include <csrc/aten/cpu/Converter.h>
+#include "csrc/cpu/vec/vec.h"
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>

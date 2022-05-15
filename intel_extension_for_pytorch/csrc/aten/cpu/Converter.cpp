@@ -1,7 +1,6 @@
 #include "Converter.h"
 #include <ATen/Parallel.h>
 #include <torch/extension.h>
-//#include "bf16/vec/vec_type_cvt.h"
 
 namespace torch_ipex {
 namespace cpu {

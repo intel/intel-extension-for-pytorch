@@ -12,10 +12,6 @@
 namespace torch_ipex {
 namespace cpu {
 namespace kernel {
-namespace vec {
-namespace vec512 {
-
-using Tensor = at::Tensor;
 
 template <typename T>
 std::pair<float, float> _add_and_compute_mean_var(
@@ -104,51 +100,6 @@ void _normalize_kernel(
   }
 }
 
-template <typename T, typename T1>
-void AddLayerNormKernelImpl(
-    const Tensor& a,
-    const at::Tensor& b,
-    int alpha,
-    const Tensor& gamma,
-    const Tensor& beta,
-    int64_t M,
-    int64_t N,
-    T eps,
-    Tensor& Y) {
-  DCHECK_EQ(a.numel(), M * N);
-  DCHECK(!gamma.defined() || gamma.numel() == N);
-  DCHECK(!beta.defined() || beta.numel() == N);
-  const T* a_data = a.data_ptr<T>();
-  const T* b_data = b.data_ptr<T>();
-  const T1* gamma_data = gamma.defined() ? gamma.data_ptr<T1>() : nullptr;
-  const T1* beta_data = beta.defined() ? beta.data_ptr<T1>() : nullptr;
-  T* Y_data = Y.data_ptr<T>();
-  const float c = float(1) / static_cast<float>(N);
-  const bool gamma_null = gamma_data == nullptr;
-  const bool beta_null = beta_data == nullptr;
-  at::parallel_for(0, M, 1, [&](int64_t start, int64_t end) {
-    for (const auto i : c10::irange(start, end)) {
-      at::Tensor tmp_out = at::empty({N});
-      float* tmp_out_ptr = tmp_out.data_ptr<float>();
-      const T* a_ptr = a_data + i * N;
-      const T* b_ptr = b_data + i * N;
-      T* Y_ptr = Y_data + i * N;
-      float mean_val;
-      float rstd_val;
-      std::tie(mean_val, rstd_val) =
-          _add_and_compute_mean_var<T>(a_ptr, b_ptr, N, tmp_out_ptr);
-      rstd_val = std::max(rstd_val * c - mean_val * mean_val, float(0));
-      rstd_val = float(1.0) / std::sqrt(rstd_val + eps);
-      float scale = rstd_val;
-      float bias = -rstd_val * mean_val;
-      _normalize_kernel<T, T1>(
-          Y_ptr, tmp_out_ptr, N, scale, bias, gamma_data, beta_data);
-    }
-  });
-}
-
-} // namespace vec512
-} // namespace vec
 } // namespace kernel
 } // namespace cpu
 } // namespace torch_ipex

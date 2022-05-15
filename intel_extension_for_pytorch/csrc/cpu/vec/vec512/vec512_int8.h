@@ -1,19 +1,15 @@
 #pragma once
 #include <cstdlib>
 
-#if defined(CPU_CAPABILITY_AVX512)
 #include <immintrin.h>
-#else
-#include "csrc/cpu/vec512/ref/add_ker.h"
-#include "csrc/cpu/vec512/ref/mov_ker.h"
-using namespace torch_ipex::cpu::kernel;
-#endif
 
-static inline __attribute__((always_inline)) void zero_ker(
-    int32_t* out,
-    int64_t len) {
+namespace torch_ipex {
+namespace cpu {
+namespace kernel {
+
+template <>
+inline __attribute__((always_inline)) void zero_ker(int32_t* out, int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -24,16 +20,11 @@ static inline __attribute__((always_inline)) void zero_ker(
     auto mask = ((1 << (len - i)) - 1);
     _mm512_mask_storeu_epi32(out + i, mask, zero_512);
   }
-#else
-  memset(out, 0, sizeof(int32_t) * len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void zero_ker(
-    int8_t* out,
-    int64_t len) {
+template <>
+inline __attribute__((always_inline)) void zero_ker(int8_t* out, int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
   for (i = 0; i < len - 63; i += 64) {
@@ -44,17 +35,14 @@ static inline __attribute__((always_inline)) void zero_ker(
     auto mask = ((1 << (len - i)) - 1);
     _mm512_mask_storeu_epi8(out + i, mask, zero_512);
   }
-#else
-  memset(out, 0, sizeof(int8_t) * len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     int64_t* out,
     const int64_t* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 7; i += 8) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -66,17 +54,14 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_epi64(mask, in + i);
     _mm512_mask_storeu_epi64(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     int16_t* out,
     const int16_t* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -88,17 +73,14 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
     _mm512_mask_storeu_epi16(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     unsigned char* out,
     const unsigned char* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -110,17 +92,14 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
     _mm512_mask_storeu_epi8(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     bool* out,
     const bool* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -132,17 +111,14 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
     _mm512_mask_storeu_epi8(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     int8_t* out,
     const int8_t* in,
     int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -154,14 +130,14 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_epi8(mask, in + i);
     _mm512_mask_storeu_epi8(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline void move_ker(int8_t* out, const int32_t* in, int64_t len) {
+template <>
+inline __attribute__((always_inline)) void move_ker(
+    int8_t* out,
+    const int32_t* in,
+    int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -175,29 +151,31 @@ static inline void move_ker(int8_t* out, const int32_t* in, int64_t len) {
     auto out0 = _mm512_cvtepi32_epi8(in0);
     _mm_mask_storeu_epi8(out + i, mask, out0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-#if defined(CPU_CAPABILITY_AVX512)
-static inline void move_ker(int8_t* out, const __m512i* in, int64_t len) {
+template <>
+inline __attribute__((always_inline)) void move_ker(
+    int8_t* out,
+    const __m512i* in,
+    int64_t len) {
   int64_t i;
 #pragma unroll(2)
   for (i = 0; i < len; i++) {
     _mm512_storeu_si512(out + i * 64, in[i]);
   }
 }
-#endif
 
-static inline void add_ker(int8_t* inout, int8_t* in, int64_t len) {
+template <>
+inline __attribute__((always_inline)) void add_ker(
+    int8_t* inout,
+    int8_t* in,
+    int64_t len) {
   /*
     for (int64_t i = 0; i < len; ++i) {
       inout[i] += in[i];
     }
   */
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(2)
   for (i = 0; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -213,15 +191,11 @@ static inline void add_ker(int8_t* inout, int8_t* in, int64_t len) {
     out = _mm512_adds_epi8(out, in0);
     _mm512_mask_storeu_epi8(inout + i, mask, out);
   }
-#else
-  ref::add_ker(inout, in, len);
-#endif
 }
 
-#if defined(CPU_CAPABILITY_AVX512)
 static inline __attribute__((always_inline)) void scale_and_store_int8_128(
-    void* out,
-    const void* in,
+    int8_t* out,
+    const int8_t* in,
     __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
@@ -290,8 +264,8 @@ static inline __attribute__((always_inline)) void scale_and_store_int8_128(
 }
 
 static inline void scale_and_store_int8_64(
-    void* out,
-    const void* in,
+    int8_t* out,
+    const int8_t* in,
     __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
@@ -328,8 +302,8 @@ static inline void scale_and_store_int8_64(
 }
 
 static inline void scale_and_store_int8_32(
-    void* out,
-    const void* in,
+    int8_t* out,
+    const int8_t* in,
     __m512& scale) {
   auto in0_0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_1_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(in + 16)));
@@ -350,8 +324,8 @@ static inline void scale_and_store_int8_32(
 }
 
 static inline void scale_and_store_int8_16(
-    void* out,
-    const void* in,
+    int8_t* out,
+    const int8_t* in,
     __m512& scale) {
   auto in0_32i = _mm512_cvtepi8_epi32(_mm_loadu_si128((__m128i*)in));
   auto in0_32f = _mm512_cvt_roundepi32_ps(
@@ -364,8 +338,8 @@ static inline void scale_and_store_int8_16(
 }
 
 static inline void scale_and_store_int8_maskz_16(
-    void* out,
-    const void* in,
+    int8_t* out,
+    const int8_t* in,
     __m512& scale,
     __mmask8 mask) {
   auto in0 = _mm_maskz_loadu_epi8(mask, in);
@@ -387,30 +361,9 @@ static inline __attribute__((always_inline)) void scale_and_move_ker_128(
     move_ker(out, in, 128);
   } else {
     __m512 scale_vec512 = _mm512_set1_ps(scale);
-    scale_and_store_int8_128((void*)out, (const void*)in, scale_vec512);
+    scale_and_store_int8_128(out, in, scale_vec512);
   }
 }
-#else
-static inline __attribute__((always_inline)) void scale_and_store_int8(
-    int8_t* out,
-    const int8_t* in,
-    float& scale,
-    int64_t len) {
-  for (int64_t i = 0; i < len; i++) {
-    int32_t i32_val = *(in + i);
-    float ps_val = (float)i32_val;
-    ps_val *= scale;
-    i32_val = int32_t(std::round(ps_val));
-    if (i32_val < INT8_MIN) {
-      *(out + i) = INT8_MIN;
-    } else if (i32_val > INT8_MAX) {
-      *(out + i) = INT8_MAX;
-    } else {
-      *(out + i) = (int8_t)i32_val;
-    }
-  }
-}
-#endif
 
 static inline void scale_and_move_ker(
     int8_t* out,
@@ -418,37 +371,28 @@ static inline void scale_and_move_ker(
     float scale,
     int64_t len) {
   int64_t i;
-#if defined(CPU_CAPABILITY_AVX512)
   __m512 scale_vec512 = _mm512_set1_ps(scale);
   for (i = 0; i < len - 127; i += 128) {
-    scale_and_store_int8_128(
-        (void*)(out + i), (const void*)(in + i), scale_vec512);
+    scale_and_store_int8_128((out + i), (in + i), scale_vec512);
   }
   if ((len - i) > 63) {
-    scale_and_store_int8_64(
-        (void*)(out + i), (const void*)(in + i), scale_vec512);
+    scale_and_store_int8_64((out + i), (in + i), scale_vec512);
     i += 64;
   }
   if ((len - i) > 31) {
-    scale_and_store_int8_32(
-        (void*)(out + i), (const void*)(in + i), scale_vec512);
+    scale_and_store_int8_32((out + i), (in + i), scale_vec512);
     i += 32;
   }
   if ((len - i) > 15) {
-    scale_and_store_int8_16(
-        (void*)(out + i), (const void*)(in + i), scale_vec512);
+    scale_and_store_int8_16((out + i), (in + i), scale_vec512);
     i += 16;
   }
   if (i < len) {
     auto mask = ((1 << (len - i)) - 1);
     scale_and_store_int8_maskz_16(out + i, in + i, scale_vec512, mask);
   }
-#else
-  scale_and_store_int8(out, in, scale, len);
-#endif
 }
 
-#if defined(CPU_CAPABILITY_AVX512)
 static inline __attribute__((always_inline)) void mul_and_sum_s8x128_to_s32x16(
     __m512i& out,
     const int8_t* a,
@@ -646,30 +590,6 @@ static inline int32_t reduce_add_s32x16(__m512i& acc_sum) {
   return _mm_cvtsi128_si32(ab_128_low);
 }
 
-#if 0
-static inline int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float& scale) {
-  auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
-  auto s_simd = _mm_set1_ps(scale);
-  auto ab_256_low = _mm512_castsi512_si256(acc_sum);
-  ab_256_low = _mm256_add_epi32(ab_256_low, ab_256_high);
-
-  auto ab_128_high = _mm256_extracti128_si256(ab_256_low, 1);
-  auto ab_128_low = _mm256_castsi256_si128(ab_256_low);
-  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
-
-  ab_128_high = _mm_unpackhi_epi64(ab_128_low, ab_128_low);
-  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
-  ab_128_high = _mm_shuffle_epi32(ab_128_low, 0xe1);
-  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
-
-  auto ab_128_low_f = _mm_cvtepi32_ps(ab_128_low);
-  ab_128_low_f = _mm_mul_round_ss(ab_128_low_f, s_simd, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
-  auto sum_vec = _mm_cvtps_epi32(ab_128_low_f);
-  sum_vec = _mm_cvtsepi32_epi8(sum_vec);
-  return (int8_t)_mm_cvtsi128_si32(sum_vec);
-}
-#endif
-
 static inline __attribute__((always_inline)) __m512i reduce_add_s32x16x16(
     __m512i* acc_sums) {
   auto l0 = _mm512_unpacklo_epi32(acc_sums[0], acc_sums[1]);
@@ -819,9 +739,7 @@ static inline __attribute__((always_inline)) int32_t mul_and_sum_int8_64(
   sum = _mm_cvtsi128_si32(ab_128_low);
   return sum;
 }
-#endif
 
-#if defined(CPU_CAPABILITY_AVX512)
 static inline __attribute__((always_inline)) int32_t _scale_int32(
     int32_t value,
     float scale) {
@@ -837,21 +755,7 @@ static inline __attribute__((always_inline)) int32_t _scale_int32(
   c = _mm_cvtsi128_si32(c_simd);
   return c;
 }
-#else
-static inline __attribute__((always_inline)) int32_t _scale_int32(
-    int32_t value,
-    float scale) {
-  float f_val = float(value) * scale;
-  int32_t i32_val = int32_t(std::round(f_val));
-  if (i32_val < INT8_MIN) {
-    i32_val = INT8_MIN;
-  } else if (i32_val > INT8_MAX) {
-    i32_val = INT8_MAX;
-  }
-  return i32_val;
-}
 
-#endif
 static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
     const int8_t* a,
     const int8_t* b,
@@ -859,7 +763,6 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
     float scale) {
   int32_t c = 0;
   size_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
   for (; i < len - 127; i += 128) {
     c += mul_and_sum_int8_128(a + i, b + i);
   }
@@ -867,10 +770,13 @@ static inline __attribute__((always_inline)) int8_t _dot_s8s8_scale_s32s8(
     c += mul_and_sum_int8_64(a + i, b + i);
     i += 64;
   }
-#endif
   for (; i < len; i++) {
     c += (int32_t)a[i] * (int32_t)b[i];
   }
   c = _scale_int32(c, scale);
   return (int8_t)c;
 }
+
+} // namespace kernel
+} // namespace cpu
+} // namespace torch_ipex

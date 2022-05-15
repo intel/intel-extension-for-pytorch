@@ -8,12 +8,14 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+using namespace torch_ipex::cpu::kernel;
 
 template <typename T>
 inline void rnnt_embedding_kernel_body(

@@ -1,21 +1,148 @@
-#include "vec_type_cvt.h"
+#pragma once
+#include <ATen/ATen.h>
+#include <ATen/cpu/vec/vec512/vec512.h>
+using namespace at::vec;
 
-#if defined(CPU_CAPABILITY_AVX512)
 #include <immintrin.h>
-#else
-#include "csrc/cpu/vec512/ref/add_ker.h"
-#include "csrc/cpu/vec512/ref/mov_ker.h"
-using namespace torch_ipex::cpu::kernel;
-#endif
+// Conversion from BF16 to FP32
+inline __m512 cvt_bf16_to_fp32(const __m256i src) {
+  auto y = _mm512_cvtepu16_epi32(src);
+  return _mm512_castsi512_ps(_mm512_bslli_epi128(y, 2));
+}
 
-#if defined(CPU_CAPABILITY_AVX512)
+inline void cvt_bf16_to_fp32(float* dst, const at::BFloat16* src, int len) {
+  int i = 0;
+  for (; i < len - 15; i += 16) {
+    auto f32 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(src + i)));
+    _mm512_storeu_ps(dst + i, f32);
+  }
+  if (i < len) {
+    auto mask = (1 << (len - i)) - 1;
+    auto f32 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, src + i));
+    _mm512_mask_storeu_ps(dst + i, mask, f32);
+  }
+}
+
+// Conversion from FP32 to BF16
+inline __m256i trunc_fp32_to_bf16(const __m512 src) {
+  auto y = _mm512_bsrli_epi128(_mm512_castps_si512(src), 2);
+  return _mm512_cvtepi32_epi16(y);
+}
+
+inline __m256i cvt_fp32_to_bf16(const __m512 src) {
+#if (defined CPU_CAPABILITY_AVX512_BF16)
+  return reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(src));
+#else
+  __m512i value = _mm512_castps_si512(src);
+  __m512i nan = _mm512_set1_epi32(0xffff);
+  auto mask_value = _mm512_cmp_ps_mask(src, src, _CMP_ORD_Q);
+  __m512i ones = _mm512_set1_epi32(0x1);
+  __m512i vec_bias = _mm512_set1_epi32(0x7fff);
+  // uint32_t lsb = (input >> 16) & 1;
+  auto t_value = _mm512_and_si512(_mm512_srli_epi32(value, 16), ones);
+  // uint32_t rounding_bias = 0x7fff + lsb;
+  t_value = _mm512_add_epi32(t_value, vec_bias);
+  // input += rounding_bias;
+  t_value = _mm512_add_epi32(t_value, value);
+  // input = input >> 16;
+  t_value = _mm512_srli_epi32(t_value, 16);
+  // Check NaN before converting back to bf16
+  t_value = _mm512_mask_blend_epi32(mask_value, nan, t_value);
+  return _mm512_cvtusepi32_epi16(t_value);
+#endif
+}
+
+inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
+  int i = 0;
+  for (; i < len - 15; i += 16) {
+    auto f32 = _mm512_loadu_ps(src + i);
+    _mm256_storeu_si256((__m256i*)(dst + i), cvt_fp32_to_bf16(f32));
+  }
+  if (i < len) {
+    auto mask = (1 << (len - i)) - 1;
+    auto f32 = _mm512_maskz_loadu_ps(mask, src + i);
+    _mm256_mask_storeu_epi16(dst + i, mask, cvt_fp32_to_bf16(f32));
+  }
+}
+
+/*
+  Following the namespace convention of PyTorch, we put ISA-specific kernels
+  under at::vec::[CPU_CAPABILITY] with [CPU_CAPABILITY] as the inline namespace.
+  Then, the signatures of kernel functions are declared and invoked the same way
+  regardless of ISAs. See Note [CPU_CAPABILITY namespace] in PyTorch.
+ */
+namespace at {
+namespace vec {
+// See Note [CPU_CAPABILITY namespace]
+inline namespace CPU_CAPABILITY {
+
+inline float pack_bfloat16_float(at::BFloat16 a, at::BFloat16 b) {
+  uint16_t* ap = reinterpret_cast<uint16_t*>(&a);
+  uint16_t* bp = reinterpret_cast<uint16_t*>(&b);
+  uint32_t hi = static_cast<uint32_t>(*ap);
+  uint32_t lo = static_cast<uint32_t>(*bp);
+  uint32_t out = (hi << 16) + lo;
+  float* outp = reinterpret_cast<float*>(&out);
+  return *outp;
+}
+
+inline std::tuple<at::BFloat16, at::BFloat16> unpack_float_bfloat16(float a) {
+  uint32_t* ap = reinterpret_cast<uint32_t*>(&a);
+  uint16_t hi = static_cast<uint16_t>((*ap) >> 16);
+  uint16_t lo = static_cast<uint16_t>((*ap));
+  at::BFloat16* hip = reinterpret_cast<at::BFloat16*>(&hi);
+  at::BFloat16* lop = reinterpret_cast<at::BFloat16*>(&lo);
+  return std::make_tuple(*hip, *lop);
+}
+
+inline std::tuple<Vectorized<float>, Vectorized<float>> pack_bfloat16_float(
+    const Vectorized<at::BFloat16>& a,
+    const Vectorized<at::BFloat16>& b) {
+  __m512i a0 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(a), 0));
+  __m512i a1 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(a), 1));
+  __m512i b0 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(b), 0));
+  __m512i b1 = _mm512_cvtepu16_epi32(_mm512_extracti32x8_epi32(__m512i(b), 1));
+  __m512 y0 =
+      _mm512_castsi512_ps(_mm512_add_epi32(_mm512_slli_epi32(a0, 16), b0));
+  __m512 y1 =
+      _mm512_castsi512_ps(_mm512_add_epi32(_mm512_slli_epi32(a1, 16), b1));
+  return std::make_tuple(y0, y1);
+}
+
+inline std::tuple<Vectorized<at::BFloat16>, Vectorized<at::BFloat16>>
+unpack_float_bfloat16(const Vectorized<float>& a, const Vectorized<float>& b) {
+  __m512i x0 = _mm512_castps_si512(__m512(a));
+  __m512i x1 = _mm512_castps_si512(__m512(b));
+  __m512i x0_hi = _mm512_srli_epi32(x0, 16);
+  __m512i x1_hi = _mm512_srli_epi32(x1, 16);
+
+  __m512i zeros = _mm512_set1_epi32(0xffff);
+  __m512i x0_lo = _mm512_and_si512(x0, zeros);
+  __m512i x1_lo = _mm512_and_si512(x1, zeros);
+
+  __m512i idx = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
+  __m512i y0 = _mm512_packus_epi32(x0_hi, x1_hi);
+  y0 = _mm512_permutexvar_epi64(idx, y0);
+  __m512i y1 = _mm512_packus_epi32(x0_lo, x1_lo);
+  y1 = _mm512_permutexvar_epi64(idx, y1);
+  return std::make_tuple(y0, y1);
+}
+} // namespace CPU_CAPABILITY
+} // namespace vec
+} // namespace at
+
+#include <immintrin.h>
+
+namespace torch_ipex {
+namespace cpu {
+namespace kernel {
+
 inline __m512 pack_bf16_to_fp32(const __m256i top, const __m256i bot) {
   auto x1 = _mm512_cvtepu16_epi32(top);
   auto x2 = _mm512_cvtepu16_epi32(bot);
   auto y = _mm512_add_epi32(_mm512_bslli_epi128(x1, 2), x2);
   return _mm512_castsi512_ps(y);
 }
-#endif
 
 // Only support AVX512 impl at current stage. Will expand this impl to cover
 // AVX2 and other cases.
@@ -25,7 +152,6 @@ inline void packed_bf16_add_ker(
     at::BFloat16* b,
     int len,
     float alpha) {
-#if defined(CPU_CAPABILITY_AVX512)
   auto vAlpha = _mm512_set1_ps(alpha);
   int i = 0;
   for (; i < len - 31; i += 32) {
@@ -80,23 +206,14 @@ inline void packed_bf16_add_ker(
     _mm256_mask_storeu_epi16(
         a2 + i, mask, _mm512_cvtepi32_epi16(_mm512_castps_si512(z1)));
   }
-#else
-  for (int i = 0; i < len; i++) {
-    uint32_t hi = (a1 + i)->x;
-    uint32_t lo = (a2 + i)->x;
-    uint32_t merge = hi << 16 | lo;
-    float a_val = *((float*)&merge);
-    float b_val = *(b + i);
-    float res = a_val + b_val * alpha;
-    (a1 + i)->x = (uint16_t)((*((uint32_t*)(&res))) >> 16);
-    (a2 + i)->x = *((uint16_t*)(&res));
-  }
-#endif
 }
 
-inline void add_ker(at::BFloat16* inout, at::BFloat16* in, int len) {
-  int i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
+template <>
+inline __attribute__((always_inline)) void add_ker(
+    at::BFloat16* inout,
+    at::BFloat16* in,
+    int64_t len) {
+  int64_t i = 0;
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
@@ -125,14 +242,14 @@ inline void add_ker(at::BFloat16* inout, at::BFloat16* in, int len) {
     inout1 = _mm512_add_ps(inout1, in1);
     _mm256_mask_storeu_epi16(inout + i, mask, cvt_fp32_to_bf16(inout1));
   }
-#else
-  ref::add_ker(inout, in, len);
-#endif
 }
 
-static inline void add_ker(float* inout, float* in, int len) {
-  int i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
+template <>
+inline __attribute__((always_inline)) void add_ker(
+    float* inout,
+    float* in,
+    int64_t len) {
+  int64_t i = 0;
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto out1 = _mm512_loadu_ps(inout + i);
@@ -158,14 +275,14 @@ static inline void add_ker(float* inout, float* in, int len) {
     auto in1 = _mm512_maskz_loadu_ps(mask, in + i);
     _mm512_mask_storeu_ps(inout + i, mask, _mm512_add_ps(out1, in1));
   }
-#else
-  ref::add_ker(inout, in, len);
-#endif
 }
 
-static inline void add_ker(float* inout, at::BFloat16* in, int len) {
-  int i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
+template <>
+inline __attribute__((always_inline)) void add_ker(
+    float* inout,
+    at::BFloat16* in,
+    int64_t len) {
+  int64_t i = 0;
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
     auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
@@ -193,27 +310,14 @@ static inline void add_ker(float* inout, at::BFloat16* in, int len) {
     inout1 = _mm512_add_ps(inout1, in1);
     _mm512_mask_storeu_ps(inout + i, mask, inout1);
   }
-#else
-  ref::add_ker(inout, in, len);
-#endif
 }
 
-inline void add_ker(double* inout, double* in, int len) {
-#pragma omp simd
-  for (int i = 0; i < len; i++) {
-    *(inout + i) += *(in + i);
-  }
-}
-
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     at::BFloat16* out,
     const float* in,
     int64_t len) {
-#if defined(CPU_CAPABILITY_AVX512)
   cvt_fp32_to_bf16(out, in, len);
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
 static inline __attribute__((always_inline)) void move_ker_load_aligned(
@@ -221,7 +325,6 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     float* in,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = cvt_fp32_to_bf16(_mm512_load_ps(in + i));
@@ -241,17 +344,14 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     auto in0 = cvt_fp32_to_bf16(_mm512_maskz_load_ps(mask, in + i));
     _mm256_mask_storeu_epi16((__m256i*)(out + i), mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     float* out,
     const float* in,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_loadu_ps(in + i);
@@ -263,34 +363,6 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_ps(mask, in + i);
     _mm512_mask_storeu_ps(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
-}
-
-static inline __attribute__((always_inline)) void move_ker_128(
-    float* out,
-    const float* in) {
-#if defined(CPU_CAPABILITY_AVX512)
-  auto in0 = _mm512_loadu_ps(in + 0);
-  auto in1 = _mm512_loadu_ps(in + 16);
-  auto in2 = _mm512_loadu_ps(in + 32);
-  auto in3 = _mm512_loadu_ps(in + 48);
-  auto in4 = _mm512_loadu_ps(in + 64);
-  auto in5 = _mm512_loadu_ps(in + 80);
-  auto in6 = _mm512_loadu_ps(in + 96);
-  auto in7 = _mm512_loadu_ps(in + 112);
-  _mm512_storeu_ps(out + 0, in0);
-  _mm512_storeu_ps(out + 16, in1);
-  _mm512_storeu_ps(out + 32, in2);
-  _mm512_storeu_ps(out + 48, in3);
-  _mm512_storeu_ps(out + 64, in0);
-  _mm512_storeu_ps(out + 80, in1);
-  _mm512_storeu_ps(out + 96, in2);
-  _mm512_storeu_ps(out + 112, in3);
-#else
-  ref::mov_ker(out, in, 128);
-#endif
 }
 
 static inline __attribute__((always_inline)) void move_ker_load_aligned(
@@ -298,7 +370,6 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     const float* in,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_load_ps(in + i);
@@ -310,17 +381,14 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     auto in0 = _mm512_maskz_load_ps(mask, in + i);
     _mm512_mask_storeu_ps(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker(
+template <>
+inline __attribute__((always_inline)) void move_ker(
     at::BFloat16* out,
     const at::BFloat16* in,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = _mm512_loadu_si512(in + i);
@@ -332,9 +400,6 @@ static inline __attribute__((always_inline)) void move_ker(
     auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
     _mm512_mask_storeu_epi16(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
 static inline __attribute__((always_inline)) void move_ker_load_aligned(
@@ -342,7 +407,6 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     const at::BFloat16* in,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
     auto in0 = _mm512_load_si512(in + i);
@@ -354,31 +418,14 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
     _mm512_mask_storeu_epi16(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline __attribute__((always_inline)) void move_ker_128(
-    at::BFloat16* out,
-    const at::BFloat16* in) {
-#if defined(CPU_CAPABILITY_AVX512)
-  auto in0 = _mm512_loadu_si512(in + 0);
-  auto in1 = _mm512_loadu_si512(in + 32);
-  auto in2 = _mm512_loadu_si512(in + 64);
-  auto in3 = _mm512_loadu_si512(in + 96);
-  _mm512_storeu_si512(out + 0, in0);
-  _mm512_storeu_si512(out + 32, in1);
-  _mm512_storeu_si512(out + 64, in2);
-  _mm512_storeu_si512(out + 96, in3);
-#else
-  ref::mov_ker(out, in, 128);
-#endif
-}
-
-static inline void move_ker(int64_t* out, int64_t* in, int64_t len) {
+template <>
+inline __attribute__((always_inline)) void move_ker(
+    int64_t* out,
+    int64_t* in,
+    int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 7; i += 8) {
     auto in0 = _mm512_loadu_pd(in + i);
@@ -390,14 +437,14 @@ static inline void move_ker(int64_t* out, int64_t* in, int64_t len) {
     auto in0 = _mm512_maskz_loadu_pd(mask, in + i);
     _mm512_mask_storeu_pd(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
 }
 
-static inline void move_ker(int32_t* out, const int32_t* in, int64_t len) {
+template <>
+inline __attribute__((always_inline)) void move_ker(
+    int32_t* out,
+    const int32_t* in,
+    int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
     auto in0 = _mm512_loadu_ps(in + i);
@@ -409,39 +456,12 @@ static inline void move_ker(int32_t* out, const int32_t* in, int64_t len) {
     auto in0 = _mm512_maskz_loadu_ps(mask, in + i);
     _mm512_mask_storeu_ps(out + i, mask, in0);
   }
-#else
-  ref::mov_ker(out, in, len);
-#endif
-}
-
-static inline void move_ker(double* out, double* in, int len) {
-#pragma omp simd
-  for (int i = 0; i < len; i++) {
-    *(out + i) = *(in + i);
-  }
-}
-
-static inline void move_ker_128(double* out, double* in) {
-#pragma omp simd
-  for (int i = 0; i < 128; i++) {
-    *(out + i) = *(in + i);
-  }
-}
-
-static inline __attribute__((always_inline)) void zero_ker(
-    double* out,
-    int len) {
-#pragma omp simd
-  for (int i = 0; i < len; i++) {
-    *(out + i) = 0;
-  }
 }
 
 static inline __attribute__((always_inline)) void zero_ker(
     float* out,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
   __m512 zero_512 = _mm512_setzero_ps();
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -452,16 +472,12 @@ static inline __attribute__((always_inline)) void zero_ker(
     auto mask = ((1 << (len - i)) - 1);
     _mm512_mask_storeu_ps(out + i, mask, zero_512);
   }
-#else
-  memset(out, 0, len * sizeof(float));
-#endif
 }
 
 static inline __attribute__((always_inline)) void zero_ker(
     at::BFloat16* out,
     int64_t len) {
   int64_t i = 0;
-#if defined(CPU_CAPABILITY_AVX512)
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)
   for (i = 0; i < len - 31; i += 32) {
@@ -472,17 +488,12 @@ static inline __attribute__((always_inline)) void zero_ker(
     auto mask = ((1 << (len - i)) - 1);
     _mm512_mask_storeu_epi16(out + i, mask, zero_512);
   }
-#else
-  memset(out, 0, len * sizeof(at::BFloat16));
-#endif
 }
 
-#if defined(CPU_CAPABILITY_AVX512)
 inline __m512 convert_bf16_to_fp32(const __m256i src) {
   __m512i y = _mm512_cvtepu16_epi32(src);
   return _mm512_castsi512_ps(_mm512_bslli_epi128(y, 2));
 }
-#endif
 
 template <typename T>
 inline float toFloat(T val) {
@@ -498,7 +509,6 @@ inline void madd_ker(T1* inout, T2* in, int len, float alpha) {
   }
 }
 
-#if defined(CPU_CAPABILITY_AVX512)
 template <>
 inline void madd_ker(float* inout, at::BFloat16* in, int len, float alpha) {
   __m512 vAlpha = _mm512_set1_ps(alpha);
@@ -518,4 +528,7 @@ inline void madd_ker(float* inout, at::BFloat16* in, int len, float alpha) {
     _mm512_mask_storeu_ps(inout + i, mask, y1);
   }
 }
-#endif
+
+} // namespace kernel
+} // namespace cpu
+} // namespace torch_ipex

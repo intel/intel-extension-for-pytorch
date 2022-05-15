@@ -1,7 +1,5 @@
 #pragma once
 
-#include "bf16/vec/vec_type_cvt.h"
-
 // below is for aligned data load
 inline __m512 _load_f32_data(const float* data_base) {
   return _mm512_load_ps(data_base);

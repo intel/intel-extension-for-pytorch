@@ -4,12 +4,9 @@
 
 #include <ATen/ATen.h>
 
-#include "bf16/vec/bf16_vec_kernel.h"
-
 namespace torch_ipex {
+namespace cpu {
 namespace kernel {
-namespace vec {
-namespace vec512 {
 
 #if defined(CPU_CAPABILITY_AVX512)
 
@@ -234,59 +231,6 @@ inline void update_batch_kernel(
   }
 }
 
-template <typename T>
-inline void update_hidden_kernel(
-    std::vector<int64_t> idx,
-    at::Tensor hidden,
-    at::Tensor hidden_prime) {
-  auto* hidden_ptr = hidden.data_ptr<T>();
-  auto* hidden_prime_ptr = hidden_prime.data_ptr<T>();
-
-  int64_t idx_len = idx.size();
-  int64_t ld = hidden.size(0);
-  int64_t bs = hidden.size(1);
-  int64_t feature_size = hidden.size(2);
-  // TODO: at::parallel_for
-  for (int64_t i = 0; i < ld; i++) {
-    for (int64_t j = 0; j < idx_len; j++) {
-      auto pos = i * bs * feature_size + idx[j] * feature_size;
-      move_ker(&hidden_ptr[pos], &hidden_prime_ptr[pos], feature_size);
-    }
-  }
-}
-
-template <typename T>
-inline void update_feature_kernel(
-    at::Tensor x,
-    at::Tensor f,
-    const at::Tensor& time_idxs,
-    int batch_size,
-    int max_len) {
-  auto* x_ptr = x.data_ptr<T>();
-  auto* f_ptr = f.data_ptr<T>();
-  int32_t* time_idxs_ptr = static_cast<int32_t*>(time_idxs.data_ptr());
-
-  int64_t time_step = x.size(1);
-  int64_t feature_size = x.size(2);
-
-  at::parallel_for(0, batch_size, 16, [&](int64_t start, int64_t end) {
-    for (int i = start; i < end; i++) {
-      int fetch_time_idx = std::min(time_idxs_ptr[i], max_len - 1);
-
-      // f is a view of x: f = x[:, 0, :].unsqueeze(1), f.data_ptr() ==
-      // x.data_ptr() x has been transposed: x.transpose(0, 1) shape of x: [64,
-      // 545, 1024] (bs * t * feature) stride of x: [1024, 65536, 1]
-
-      // shape of f: [64, 1, 1024]
-      // stride of f: [1024, 1024, 1]
-      auto x_pos =
-          fetch_time_idx * batch_size * feature_size + i * feature_size;
-      auto f_pos = i * feature_size;
-      move_ker(&f_ptr[f_pos], &x_ptr[x_pos], feature_size);
-    }
-  });
-}
-
 inline bool should_update_feature(const at::Tensor& blankness_out, int len) {
   // if blankness_out.nonzero().size(0) > 0, return true; else return false
   void* blankness_out_ptr = static_cast<int32_t*>(blankness_out.data_ptr());
@@ -335,99 +279,8 @@ inline bool all_time_idxs_processed_kernel(
   return (sum == len);
 }
 
-inline void label_index_put_kernel(
-    at::Tensor label_tensor_out,
-    at::Tensor label_to_put_out,
-    const at::Tensor& label_col,
-    at::Tensor label_for_next_loop_out,
-    int64_t max_symbols,
-    int64_t batch_size,
-    int64_t max_len) {
-  // label_tensor.index_put_([label_row, label_col.to(torch.int64)],
-  // label_to_put, accumulate=True)
-  int64_t* label_tensor_out_ptr =
-      static_cast<int64_t*>(label_tensor_out.data_ptr());
-  int64_t* label_to_put_out_ptr =
-      static_cast<int64_t*>(label_to_put_out.data_ptr());
-
-  int32_t* label_col_ptr = static_cast<int32_t*>(label_col.data_ptr());
-
-  at::parallel_for(0, batch_size, 16, [&](int64_t start, int64_t end) {
-    for (int64_t i = start; i < end; i++) {
-      label_tensor_out_ptr[i * max_len * max_symbols + label_col_ptr[i]] +=
-          label_to_put_out_ptr[i];
-    }
-  });
-
-  // label_tensor.gather(1, label_col.to(torch.int64).unsqueeze(1))
-  // TODO: merge with label_tensor_out_ptr
-  int64_t* label_for_next_loop_out_ptr =
-      static_cast<int64_t*>(label_for_next_loop_out.data_ptr());
-  at::parallel_for(0, batch_size, 16, [&](int64_t start, int64_t end) {
-    for (int64_t i = start; i < end; i++) {
-      label_for_next_loop_out_ptr[i] =
-          label_tensor_out_ptr[i * max_len * max_symbols + label_col_ptr[i]];
-    }
-  });
-}
-
-inline void update_hidden_idx_kernel(
-    at::Tensor not_blank_out,
-    at::Tensor hidden_0,
-    at::Tensor hidden_1,
-    const at::Tensor& hidden_prime_0,
-    const at::Tensor& hidden_prime_1,
-    int64_t batch_size) {
-  std::vector<int64_t> idx;
-  int32_t* not_blank_out_ptr = static_cast<int32_t*>(not_blank_out.data_ptr());
-  // TODO: merge idx into update_hidden_kernel
-  // Have data dependency here, shouldn't be parallelled
-  for (int64_t i = 0; i < batch_size; i++) {
-    if (not_blank_out_ptr[i] != 0)
-      idx.push_back(i);
-  }
-
-  AT_ASSERTM(
-      hidden_0.scalar_type() == hidden_1.scalar_type(),
-      "hidden_0 and hidden_1 should be in same dtype.");
-  AT_ASSERTM(
-      (hidden_0.scalar_type() == at::kBFloat16 ||
-       hidden_0.scalar_type() == at::kFloat),
-      "only support hidden_0 to be float or bf16 tensor");
-
-  if (hidden_0.scalar_type() == at::kBFloat16) {
-    update_hidden_kernel<at::BFloat16>(idx, hidden_0, hidden_prime_0);
-    update_hidden_kernel<at::BFloat16>(idx, hidden_1, hidden_prime_1);
-  } else {
-    update_hidden_kernel<float>(idx, hidden_0, hidden_prime_0);
-    update_hidden_kernel<float>(idx, hidden_1, hidden_prime_1);
-  }
-}
-
-inline void update_feature_idx_kernel(
-    const at::Tensor& blankness_out,
-    at::Tensor x,
-    at::Tensor f,
-    const at::Tensor& time_idxs,
-    int64_t batch_size,
-    int64_t max_len) {
-  if (should_update_feature(blankness_out, (int32_t)batch_size)) {
-    AT_ASSERTM(
-        (x.scalar_type() == at::kBFloat16 || x.scalar_type() == at::kFloat),
-        "only support x to be float or bf16 tensor");
-    if (x.scalar_type() == at::kBFloat16) {
-      update_feature_kernel<at::BFloat16>(
-          x, f, time_idxs, (int32_t)batch_size, (int32_t)max_len);
-    } else {
-      update_feature_kernel<float>(
-          x, f, time_idxs, (int32_t)batch_size, (int32_t)max_len);
-    }
-  }
-}
-
 #endif
 
-} // namespace vec512
-} // namespace vec
 } // namespace kernel
+} // namespace cpu
 } // namespace torch_ipex
