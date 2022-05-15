@@ -2,18 +2,13 @@ FILE(GLOB aten_ops_src "operators/*.cpp" "operators/sparse/*.cpp")
 
 # Reset the order of src files to compile slow files first
 list(APPEND slow_patterns
-  Copy
+  Pow
+  MathCompare
+  Activation
   UnaryOps
   BinaryOps
   TopK
-  Reduce
-  Unique
   Sort
-  Indexing
-  Pow
-  Loss
-  Activation
-  MathCompare
   )
 
 set(slow_srcs)
