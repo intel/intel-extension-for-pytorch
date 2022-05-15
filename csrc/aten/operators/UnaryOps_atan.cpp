@@ -16,12 +16,12 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    cos_out,
-    Numerics<scalar_t>::cos,
+    atan_out,
+    Numerics<scalar_t>::atan,
     unary_float_op);
 IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    cosh_out,
-    Numerics<scalar_t>::cosh,
+    atanh_out,
+    Numerics<scalar_t>::atanh,
     unary_float_op);
 
 } // namespace AtenIpexTypeXPU

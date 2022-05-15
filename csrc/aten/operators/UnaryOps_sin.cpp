@@ -20,16 +20,8 @@ IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
     Numerics<scalar_t>::sin,
     unary_float_op);
 IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    asin_out,
-    Numerics<scalar_t>::asin,
-    unary_float_op);
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
     sinh_out,
     Numerics<scalar_t>::sinh,
-    unary_float_op);
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    asinh_out,
-    Numerics<scalar_t>::asinh,
     unary_float_op);
 
 } // namespace AtenIpexTypeXPU

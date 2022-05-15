@@ -20,16 +20,8 @@ IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
     Numerics<scalar_t>::tan,
     unary_float_op);
 IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    atan_out,
-    Numerics<scalar_t>::atan,
-    unary_float_op);
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
     tanh_out,
     Numerics<scalar_t>::tanh,
-    unary_float_op);
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX(
-    atanh_out,
-    Numerics<scalar_t>::atanh,
     unary_float_op);
 
 } // namespace AtenIpexTypeXPU
