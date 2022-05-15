@@ -35,6 +35,8 @@ static auto trans_matmul_scale_add_sym =
 static auto mul_add_sym = Symbol::fromQualString("xpu::mul_add");
 static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_sum_relu");
+static auto q_conv2d_leaky_relu_sym =
+    Symbol::fromQualString("xpu::q_conv2d_leaky_relu");
 static auto t_addmm_sym = Symbol::fromQualString("xpu::t_addmm");
 static auto t_addmm_dropout_sym =
     Symbol::fromQualString("xpu::t_addmm_dropout");

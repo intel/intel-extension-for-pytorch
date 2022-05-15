@@ -399,6 +399,10 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("quantized::add_relu")},
      xpu::q_conv2d_sum_relu_sym},
+    // SSD-MobileNet INT8: conv + leaky_relu_
+    {{Symbol::fromQualString("quantized::conv2d"),
+      Symbol::fromQualString("aten::leaky_relu_")},
+     xpu::q_conv2d_leaky_relu_sym},
     // DLRM: linear with bias + relu/sigmoid
     {{aten::t, aten::addmm}, xpu::t_addmm_sym},
     {{xpu::t_addmm_sym, aten::relu}, xpu::t_addmm_relu_sym},

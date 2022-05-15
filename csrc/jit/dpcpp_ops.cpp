@@ -651,6 +651,18 @@ at::Tensor q_conv2d_sum_relu(
       sum_zpoint);
 }
 
+at::Tensor q_conv2d_leaky_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zpoint,
+    Scalar negative_slope) {
+  RECORD_FUNCTION(
+      "q_conv2d_leaky_relu", std::vector<c10::IValue>({input, packed_weight}));
+  return at::AtenIpexTypeXPU::q_conv2d_leaky_relu(
+      input, packed_weight, output_scale, output_zpoint, negative_slope);
+}
+
 at::Tensor batch_norm(
     const at::Tensor& input,
     const at::Tensor& weight,

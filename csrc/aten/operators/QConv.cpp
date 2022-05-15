@@ -71,53 +71,8 @@ at::Tensor q_conv2d_relu(
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double output_scale,
     int64_t output_zero_point) {
-  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
-
-  at::Tensor weight = pack_ptr->weight;
-  at::Tensor bias;
-  if (pack_ptr->bias.has_value())
-    bias = pack_ptr->bias.value();
-  auto padding = pack_ptr->padding();
-  auto stride = pack_ptr->stride();
-  auto groups = pack_ptr->groups();
-  auto dilation = pack_ptr->dilation();
-
-  ConvAttr attr = {
-      1.f,
-      0.f,
-      0.f,
-      static_cast<float>(output_scale),
-      ConvAttr::kind_with_relu};
-
-  auto mfmt = onednn_conv_use_channels_last(input, weight)
-      ? at::MemoryFormat::ChannelsLast
-      : at::MemoryFormat::Contiguous;
-
-  Tensor output = _empty_affine_quantized(
-      conv_dst_tz(
-          input.ndimension(),
-          input.sizes(),
-          weight.sizes(),
-          padding.vec(),
-          stride.vec(),
-          dilation.vec()),
-      device(kXPU).dtype(kQUInt8),
-      output_scale,
-      output_zero_point,
-      mfmt);
-
-  output = convolution(
-      output,
-      input,
-      weight,
-      bias,
-      padding.vec(),
-      stride.vec(),
-      dilation.vec(),
-      groups,
-      attr);
-
-  return output;
+  return at::AtenIpexTypeXPU::q_conv2d_leaky_relu(
+      input, packed_weight, output_scale, output_zero_point, Scalar(0.0));
 }
 
 at::Tensor q_conv3d(
@@ -278,6 +233,62 @@ at::Tensor q_conv2d_sum_relu(
           sum_scale, sum_zero_point, accumu.scalar_type()));
 
   return accumu;
+}
+
+at::Tensor q_conv2d_leaky_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar negative_slope) {
+  auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
+
+  at::Tensor weight = pack_ptr->weight;
+  at::Tensor bias;
+  if (pack_ptr->bias.has_value())
+    bias = pack_ptr->bias.value();
+  auto padding = pack_ptr->padding();
+  auto stride = pack_ptr->stride();
+  auto groups = pack_ptr->groups();
+  auto dilation = pack_ptr->dilation();
+
+  float alpha = negative_slope.to<float>();
+  ConvAttr attr = {
+      1.f,
+      alpha,
+      0.f,
+      static_cast<float>(output_scale),
+      ConvAttr::kind_with_relu};
+
+  auto mfmt = onednn_conv_use_channels_last(input, weight)
+      ? at::MemoryFormat::ChannelsLast
+      : at::MemoryFormat::Contiguous;
+
+  Tensor output = _empty_affine_quantized(
+      conv_dst_tz(
+          input.ndimension(),
+          input.sizes(),
+          weight.sizes(),
+          padding.vec(),
+          stride.vec(),
+          dilation.vec()),
+      device(kXPU).dtype(kQUInt8),
+      output_scale,
+      output_zero_point,
+      mfmt);
+
+  output = convolution(
+      output,
+      input,
+      weight,
+      bias,
+      padding.vec(),
+      stride.vec(),
+      dilation.vec(),
+      groups,
+      attr);
+
+  return output;
 }
 
 } // namespace AtenIpexTypeXPU

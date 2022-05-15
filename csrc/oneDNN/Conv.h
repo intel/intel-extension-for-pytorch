@@ -201,8 +201,9 @@ static at::Tensor convolution(
   if (!Settings::I().is_layout_opt_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
-      dst_opt = attr.with_relu() ? device(kXPU).dtype(kQUInt8)
-                                 : device(kXPU).dtype(kQInt8);
+      dst_opt = attr.with_relu() && attr.alpha_ <= 0.0
+          ? device(kXPU).dtype(kQUInt8)
+          : device(kXPU).dtype(kQInt8);
     }
     if (onednn_conv_use_channels_last(src, wgh)) {
       TORCH_CHECK(

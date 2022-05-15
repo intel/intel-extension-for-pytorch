@@ -138,6 +138,13 @@ at::Tensor q_conv2d_sum_relu(
     double sum_scale,
     int64_t sum_zpoint);
 
+at::Tensor q_conv2d_leaky_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double out_scale,
+    int64_t out_zpoint,
+    Scalar negative_scope);
+
 at::Tensor trans_addmm(
     const at::Tensor& weight,
     const at::Tensor& bias,

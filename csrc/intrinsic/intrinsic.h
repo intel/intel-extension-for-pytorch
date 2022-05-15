@@ -229,6 +229,13 @@ at::Tensor q_conv2d_sum_relu(
     double sum_scale,
     int64_t sum_zero_point);
 
+at::Tensor q_conv2d_leaky_relu(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    Scalar negative_slope);
+
 at::Tensor quantize_tensor_per_tensor_affine(
     at::Tensor& qtensor,
     const at::Tensor& rtensor,

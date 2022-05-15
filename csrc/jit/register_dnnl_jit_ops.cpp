@@ -409,6 +409,22 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "xpu::q_conv2d_leaky_relu(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float output_scale, int output_zpoint, Scalar negative_slope) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result = torch::jit::xpu::q_conv2d_leaky_relu(
+                (std::move(peek(stack, 0, 5))).toTensor(),
+                (std::move(peek(stack, 1, 5)))
+                    .toCustomClass<ConvPackedParamsBase<2>>(),
+                (std::move(peek(stack, 2, 5))).toDouble(),
+                (std::move(peek(stack, 3, 5))).toInt(),
+                (std::move(peek(stack, 4, 5))).toScalar());
+            drop(stack, 5);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "xpu::t_addmm(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack& stack) {
