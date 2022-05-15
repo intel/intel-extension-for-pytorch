@@ -25,9 +25,10 @@ SimpleTrace::SimpleTrace(const char* name)
     ps << "[" << std::setfill(' ') << std::setw(13)
        << std::to_string(getpid()) + "." + std::to_string(gettid()) << "] "
        << std::setw(gindent * 2 + 1) << " ";
-    pre_str = ps.str();
+    _pre_str = ps.str();
 
-    std::cout << pre_str << "Call  into  OP: " << _name << " (#" << gindex
+    _index = gindex;
+    std::cout << _pre_str << "Call  into  OP: " << _name << " (#" << _index
               << ")" << std::endl;
     fflush(stdout);
   }
@@ -39,7 +40,7 @@ SimpleTrace::~SimpleTrace() {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       dpcpp_queue.wait();
     }
-    std::cout << pre_str << "Step out of OP: " << _name << " (#" << gindex
+    std::cout << _pre_str << "Step out of OP: " << _name << " (#" << _index
               << ")" << std::endl;
     fflush(stdout);
     gindent--;

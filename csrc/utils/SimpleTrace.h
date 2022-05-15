@@ -17,7 +17,8 @@ class SimpleTrace {
   static thread_local int gindent;
   static thread_local int gindex;
 
-  std::string pre_str;
+  int _index;
+  std::string _pre_str;
   const char* _name;
   const bool _enabled;
 };
