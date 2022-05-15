@@ -13,6 +13,11 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+IPEX_UNARY_LOOPS_FUNC_ALL_ALL_COMPLEX(
+    neg_out,
+    Numerics<scalar_t>::neg,
+    unary_op);
+
 IPEX_UNARY_LOOPS_FUNC_COMPLEX(sgn_xpu, at::AtenIpexTypeXPU::sgn_impl, unary_op);
 
 Tensor& sgn_out(const Tensor& self, Tensor& out) {

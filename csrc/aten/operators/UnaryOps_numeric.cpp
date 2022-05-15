@@ -8,7 +8,6 @@
 #include "comm/Pairwise.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
-#include "comm/zmath.h"
 
 #include "Loops.h"
 
@@ -84,124 +83,11 @@ void angle_kernel(TensorIterator& iter) {
       });
 }
 
-void conj_physical_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      ScalarType::Bool,
-      ScalarType::BFloat16,
-      ScalarType::Half,
-      iter.common_dtype(),
-      "conj",
-      [&]() {
-        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
-          return at::AtenIpexTypeXPU::conj_impl(a);
-        });
-      });
-}
-
 } // namespace impl
-
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
-
-IPEX_UNARY_LOOPS_FUNC_FLOAT_ALL(
-    round_out,
-    [](scalar_t a) -> scalar_t { return ::nearbyintf(static_cast<float>(a)); },
-    unary_op);
-
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
-
-IPEX_UNARY_LOOPS_FUNC_ALL_ALL_COMPLEX(
-    neg_out,
-    Numerics<scalar_t>::neg,
-    unary_op);
-
-Tensor remainder(const Tensor& self, const Scalar& other) {
-  auto out = at::empty_like(self);
-  return at::AtenIpexTypeXPU::remainder_out(out, self, other);
-}
-
-Tensor& remainder_(Tensor& self, const Scalar& other) {
-  return at::AtenIpexTypeXPU::remainder_out(self, self, other);
-}
-
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp);
-
-Tensor fmod(const Tensor& self, const Scalar& other) {
-  auto out = at::empty_like(self);
-  return at::AtenIpexTypeXPU::fmod_out(out, self, other);
-}
-
-Tensor& fmod_(Tensor& self, const Scalar& other) {
-  return at::AtenIpexTypeXPU::fmod_out(self, self, other);
-}
-
-template <typename T>
-static inline T reciprocal_wrapper(T a) {
-  return static_cast<T>(1) / a;
-}
-
-template <typename T>
-static inline c10::complex<T> reciprocal_wrapper(c10::complex<T> v) {
-  // Handle extreme cases for numpy compatibility
-  auto both_inf = [](T real, T imag) {
-    return (Numerics<T>::isinf(real) && Numerics<T>::isinf(imag));
-  };
-
-  auto either_inf = [](T real, T imag) {
-    return Numerics<T>::isinf(real) || Numerics<T>::isinf(imag);
-  };
-
-  auto either_nan = [](T real, T imag) {
-    return Numerics<T>::isnan(real) || Numerics<T>::isnan(imag);
-  };
-
-  if (either_nan(v.real(), v.imag()) || both_inf(v.real(), v.imag())) {
-    // If either is Nan or both are infinite, return {nan, nan}
-    return {
-        std::numeric_limits<T>::quiet_NaN(),
-        std::numeric_limits<T>::quiet_NaN()};
-  } else if (either_inf(v.real(), v.imag())) {
-    // If either is Inf, return {0, 0}
-    return {0, 0};
-  }
-  const c10::complex<T> one = c10::complex<T>(1.0, 0);
-  return one / v;
-}
-
-void reciprocal_kernel_xpu(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.common_dtype(),
-      "reciprocal_xpu",
-      [&] {
-        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t a) -> scalar_t {
-          return reciprocal_wrapper(a);
-        });
-      });
-}
-
-Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  reciprocal_kernel_xpu(iter);
-  return out;
-}
 
 Tensor& abs_out(const Tensor& self, Tensor& result) {
   return impl::unary_op_impl_with_complex_to_float_out(
       result, self, impl::abs_kernel, /*promotes_integer_to_float=*/false);
-}
-
-Tensor& conj_physical_out(const Tensor& self, Tensor& result) {
-  auto iter = TensorIterator::unary_op(result, self);
-  impl::conj_physical_kernel(iter);
-  return result;
-}
-
-Tensor& conj_physical_(Tensor& self) {
-  if (!self.is_complex())
-    return self;
-  return at::AtenIpexTypeXPU::conj_physical_out(self, self);
 }
 
 Tensor& angle_out(const Tensor& self, Tensor& result) {
