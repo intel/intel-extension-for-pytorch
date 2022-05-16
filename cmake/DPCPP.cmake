@@ -113,7 +113,7 @@ elseif(USE_AOT_DEVLIST)
     set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${BACKEND_TARGET}")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST} -options -cl-poison-unsupported-fp64-kernels'")
 else()
     # Use auto mode of device code split
     set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")
