@@ -244,6 +244,8 @@ with torch.no_grad():
 
 #### TorchScript Mode
 
+It is highly recommended for users to take advantage of Intel® Extension for PyTorch* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
+
 ##### Resnet50
 
 ```
@@ -349,6 +351,8 @@ with torch.no_grad():
 ```
 
 #### TorchScript Mode
+
+It is highly recommended for users to take advantage of Intel® Extension for PyTorch* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
 ##### Resnet50
 

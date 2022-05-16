@@ -100,20 +100,3 @@ These ops don't require a particular dtype for stability, but take multiple inpu
 `cat`, `stack`, `index_copy`
 
 Some ops not listed here (e.g., binary ops like `add`) natively promote inputs without autocasting's intervention.  If inputs are a mixture of `bfloat16` and `float32`, these ops run in `float32` and produce `float32` output, regardless of whether autocast is enabled.
-
-## Design Details
-
-### Frontend API Design
-
-`torch.cpu.amp` is designed to be context managers that allow scopes of your script to run in mixed precision. It takes input parameter `dtype`, which is `torch.bfloat16` by default.
-
-### Dedicated Dispatch Key
-
-`torch.cpu.amp` extends the design of the original pytorch `Auto Mixed Precision` using the dedicated dispatch key of `AutocastCPU`. Each tensor during creation will have an `Autocast` Dispatchkey corresponding to the device (`CUDA` or `CPU`). Thus, for every tensor on CPU, `AutocastCPU` exists along with the tensor. During the dispatch phase, operators with input tensors of `AutocastCPU` are dispatched to the `Autocast` layers. The `Autocast` layer decides what precision to chooses for each operator. `AutocastCPU` has higher dispatch priority comparing to `Autograd` which makes sure the `Autocast` layer runs before `Autograd`.
-
-### Operations category
-
-The operations are generally divided into 3 major categories and registered under Dispatch Key `AutocastCPU`:
-* `lower_precision_fp` category: Computation bound operators that could get performance boost with BFloat16 data type through acceleration by Intel CPU BFloat16 instruction set. Inputs of them are casted into `torch.bfloat16` before execution. `convolutions` and `linear` are examples of this category.
-* `fallthrough` category: Operators that support running with both Float32 and BFloat16 data types, but could not get performance boost with BFloat16 data type. `relu` and `max_pool2d` are examples of this category.
-* `fp32` category: Operators that are not enabled with BFloat16 support yet. Inputs of them are casted into `float32` before execution. `max_pool3d` and `group_norm` are examples of this category.

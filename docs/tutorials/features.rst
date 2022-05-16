@@ -57,6 +57,8 @@ Graph Optimization
 
 To optimize performance further with torchscript, Intel® Extension for PyTorch\* supports fusion of frequently used operator patterns, like Conv2D+ReLU, Linear+ReLU, etc.  The benefit of the fusions are delivered to users in a transparant fashion.
 
+Comparing to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies like operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. It is highly recommended for users to take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_. Users may wish to run with `torch.jit.trace()` function first, since it works with Intel® Extension for PyTorch* better than `torch.jit.script()` function in general. More detailed information can be found at `pytorch.org website <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules>`_.
+
 Check more detailed information for `Graph Optimization <features/graph_optimization.html>`_.
 
 .. toctree::
@@ -118,8 +120,6 @@ INT8 Quantization (Experimental)
 Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. The quantized model is then optimized with the `oneDNN graph <https://spec.oneapi.io/onednn-graph/latest/introduction.html>`_ fusion pass to deliver good performance.
 
 Check more detailed information for `INT8 <features/int8.html>`_.
-
-oneDNN provides an evaluation feature called `oneDNN Graph Compiler <https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler>`_. Please refer to `oneDNN build instruction <https://github.com/oneapi-src/oneDNN/blob/dev-graph-preview4/doc/build/build_options.md#build-graph-compiler>`_ to try this feature.
 
 .. toctree::
    :hidden:

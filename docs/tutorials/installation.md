@@ -85,6 +85,36 @@ git submodule update --init --recursive
 python setup.py install
 ```
 
+## Install via Docker container
+
+### Build Docker container from Dockerfile
+
+Run the following commands to build the `pip` based deployment container:
+
+```console
+$ cd docker
+$ DOCKER_BUILDKIT=1 docker build -f Dockerfile.pip -t intel-extension-for-pytorch:pip .
+$ docker run --rm intel-extension-for-pytorch:pip python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+```
+
+Run the following commands to build the `conda` based development container:
+
+```console
+$ cd docker
+$ DOCKER_BUILDKIT=1 docker build -f Dockerfile.conda -t intel-extension-for-pytorch:conda .
+$ docker run --rm intel-extension-for-pytorch:conda python -c "import torch; import intel_extension_for_pytorch as ipex; print('torch:', torch.__version__,' ipex:',ipex.__version__)"
+```
+
+### Get docker container from dockerhub
+
+Pre-built docker images are available at [DockerHub](https://hub.docker.com/r/intel/intel-optimized-pytorch/tags).
+
+Please run the following command to pull the image to your local machine.
+
+```console
+docker pull intel/intel-optimized-pytorch:latest
+```
+
 ## Install C++ SDK
 
 |Version|Pre-cxx11 ABI|cxx11 ABI|
