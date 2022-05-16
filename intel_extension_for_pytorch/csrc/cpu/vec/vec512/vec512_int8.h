@@ -168,7 +168,7 @@ inline __attribute__((always_inline)) void move_ker(
 template <>
 inline __attribute__((always_inline)) void add_ker(
     int8_t* inout,
-    int8_t* in,
+    const int8_t* in,
     int64_t len) {
   /*
     for (int64_t i = 0; i < len; ++i) {

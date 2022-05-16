@@ -105,7 +105,7 @@ inline void packed_bf16_add_ker(
 
 static inline __attribute__((always_inline)) void move_ker_load_aligned(
     at::BFloat16* out,
-    float* in,
+    const float* in,
     int64_t len) {
   move_ker(out, in, len);
 }

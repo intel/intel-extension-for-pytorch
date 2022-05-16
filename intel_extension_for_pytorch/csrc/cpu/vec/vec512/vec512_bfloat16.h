@@ -211,7 +211,7 @@ inline void packed_bf16_add_ker(
 template <>
 inline __attribute__((always_inline)) void add_ker(
     at::BFloat16* inout,
-    at::BFloat16* in,
+    const at::BFloat16* in,
     int64_t len) {
   int64_t i = 0;
 #pragma unroll(2)
@@ -247,7 +247,7 @@ inline __attribute__((always_inline)) void add_ker(
 template <>
 inline __attribute__((always_inline)) void add_ker(
     float* inout,
-    float* in,
+    const float* in,
     int64_t len) {
   int64_t i = 0;
 #pragma unroll(2)
@@ -280,7 +280,7 @@ inline __attribute__((always_inline)) void add_ker(
 template <>
 inline __attribute__((always_inline)) void add_ker(
     float* inout,
-    at::BFloat16* in,
+    const at::BFloat16* in,
     int64_t len) {
   int64_t i = 0;
 #pragma unroll(2)
@@ -322,7 +322,7 @@ inline __attribute__((always_inline)) void move_ker(
 
 static inline __attribute__((always_inline)) void move_ker_load_aligned(
     at::BFloat16* out,
-    float* in,
+    const float* in,
     int64_t len) {
   int64_t i = 0;
 #pragma unroll(4)
@@ -417,25 +417,6 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
     auto mask = (1 << (len - i)) - 1;
     auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
     _mm512_mask_storeu_epi16(out + i, mask, in0);
-  }
-}
-
-template <>
-inline __attribute__((always_inline)) void move_ker(
-    int64_t* out,
-    int64_t* in,
-    int64_t len) {
-  int64_t i = 0;
-#pragma unroll(4)
-  for (i = 0; i < len - 7; i += 8) {
-    auto in0 = _mm512_loadu_pd(in + i);
-    _mm512_storeu_pd(out + i, in0);
-  }
-
-  if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
-    auto in0 = _mm512_maskz_loadu_pd(mask, in + i);
-    _mm512_mask_storeu_pd(out + i, mask, in0);
   }
 }
 

@@ -7,7 +7,7 @@ namespace kernel {
 template <typename dst_type, typename src_type>
 inline __attribute__((always_inline)) void add_ker(
     dst_type* inout,
-    src_type* in,
+    const src_type* in,
     int64_t len) {
 #pragma omp simd
   for (int64_t i = 0; i < len; i++) {
