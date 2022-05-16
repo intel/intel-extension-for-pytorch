@@ -56,7 +56,8 @@ void ClassNLLCriterion_updateOutput(
 
   const Tensor weights_val = weights.value();
   TORCH_CHECK(
-      !weights_val.defined() || weights_val.numel() == n_classes,
+      !weights_val.defined() ||
+          (weights_val.dim() == 1 && weights_val.numel() == n_classes),
       "weight tensor should be defined either for all ",
       n_classes,
       " classes or no classes"
@@ -242,8 +243,26 @@ void ClassNLLCriterion_updateGradInput(
     const Tensor& total_weight,
     int64_t ignore_index) {
   TORCH_CHECK(
-      target.dim() == 1,
-      "1D target tensor expected, multi-target not supported");
+      input.dim() > 0 && input.dim() <= 2, "input tensor should be 1D or 2D");
+  TORCH_CHECK(
+      target.dim() <= 1,
+      "0D or 1D target tensor expected, multi-target not supported");
+
+  auto no_batch_dim = input.dim() == 1 && target.dim() == 0;
+  TORCH_CHECK(
+      no_batch_dim || (input.size(0) == target.size(0)),
+      "size mismatch (got input: ",
+      input.sizes(),
+      ", target: ",
+      target.sizes(),
+      ")");
+  TORCH_CHECK(
+      total_weight.numel() == 1,
+      "expected total_weight to be a  single element tensor, got: ",
+      total_weight.sizes(),
+      " (",
+      total_weight.numel(),
+      " elements)");
 
   int n_dims = input.dim();
   int n_classes = input.size(-1);
@@ -431,17 +450,15 @@ void spatial_class_nll_criterion_shape_check(
       "but got input of size: ",
       self.sizes());
   TORCH_CHECK(
+      !weights_val.defined() || weights_val.numel() == self.size(1),
+      "weight tensor should be defined either for all or no classes");
+  TORCH_CHECK(
       self.size(0) == target.size(0) && self.size(2) == target.size(1) &&
           self.size(3) == target.size(2),
       "input and target batch or spatial sizes don't match: target ",
       target.sizes(),
       ", input ",
       self.sizes());
-  if (weights_val.defined()) {
-    TORCH_CHECK(
-        weights_val.numel() == self.size(1),
-        "weight tensor should be defined either for all or no classes");
-  }
 }
 
 void spatial_class_nll_criterion_grad_output_no_reduce_shape_check(
@@ -836,8 +853,8 @@ std::tuple<at::Tensor, at::Tensor> nll_loss_forward(
     const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index) {
-  auto output = at::empty({0}, self.options());
-  auto total_weight = at::empty({0}, self.options());
+  auto output = at::empty({}, self.options());
+  auto total_weight = at::empty({}, self.options());
 
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
@@ -1093,8 +1110,11 @@ std::tuple<Tensor, Tensor> nll_loss2d_forward(
     const optional<Tensor>& weight,
     int64_t reduction,
     int64_t ignore_index) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor total_weight = at::empty({0}, self.options());
+  // NOTE: at::empty({},...) is different from at::empty({0},...);
+  // Tensor A = at::empty({}, self.options()); then A.numel() ==1
+  // Tensor A = at::empty({0}, self.options()); then A.numel() ==0
+  Tensor output = at::empty({}, self.options());
+  Tensor total_weight = at::empty({}, self.options());
   at::AtenIpexTypeXPU::nll_loss2d_forward_out(
       self, target, weight, reduction, ignore_index, output, total_weight);
   return std::tuple<Tensor, Tensor>{output, total_weight};
