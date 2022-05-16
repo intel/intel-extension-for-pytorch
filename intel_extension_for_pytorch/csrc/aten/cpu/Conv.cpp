@@ -148,14 +148,16 @@ at::Tensor convolution_kernel(
 
 at::Tensor convolution_forward_impl(
     const at::Tensor& input,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+    const at::Tensor& op_context) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
   IPEX_RECORD_FUNCTION(
       "torch_ipex::convolution_forward_impl", std::vector<c10::IValue>({}));
 
-  return op_context->run(input, ideep::attr_t());
+  return reinterpret_cast<IpexConvolutionOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run(input, ideep::attr_t());
 }
 
 at::Tensor convolution_backward_input(
@@ -165,7 +167,6 @@ at::Tensor convolution_backward_input(
     at::IntArrayRef padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     int64_t groups,
     bool bias_defined,
     bool weight_use_channels_last) {
@@ -223,7 +224,6 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     at::IntArrayRef padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     int64_t groups,
     bool bias_defined) {
   TORCH_CHECK(
@@ -247,19 +247,13 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
         packed_weight_desc, grad_weight.template data_ptr<c10::BFloat16>());
   }
 
-  std::vector<int64_t> real_weight_size = {
-      grad_output.size(1), input.size(1) / groups};
-  for (auto& k : kernel_size) {
-    real_weight_size.push_back(k);
-  }
-
   if (bias_defined) {
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
     mkldnn_grad_bias = itensor_view_from_dense(grad_bias);
     ideep::convolution_backward_weights::compute(
         mkldnn_input,
         mkldnn_grad_output,
-        {real_weight_size.begin(), real_weight_size.end()},
+        packed_weight_desc.get_dims(),
         mkldnn_grad_weight,
         mkldnn_grad_bias,
         stride.vec(),
@@ -271,7 +265,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     ideep::convolution_backward_weights::compute(
         mkldnn_input,
         mkldnn_grad_output,
-        {real_weight_size.begin(), real_weight_size.end()},
+        packed_weight_desc.get_dims(),
         mkldnn_grad_weight,
         stride.vec(),
         dilation.vec(),
@@ -291,7 +285,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     int64_t groups,
     const bool weight_channels_last,
     std::array<bool, 3> output_mask) {
@@ -329,7 +322,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
         padding,
         stride,
         dilation,
-        kernel_size,
         groups,
         output_mask[2],
         weight_channels_last);
@@ -344,7 +336,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
         padding,
         stride,
         dilation,
-        kernel_size,
         groups,
         output_mask[2]);
   }
@@ -355,7 +346,7 @@ at::Tensor IPEXConvolutionOp::_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+    const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION(
       "IPEXConvolutionOp::_forward", std::vector<c10::IValue>({}));
 
@@ -367,7 +358,7 @@ at::Tensor IPEXConvolutionOp::forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+    const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION(
       "IPEXConvolutionOp::forward", std::vector<c10::IValue>({}));
 
@@ -387,8 +378,7 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   IPEX_RECORD_FUNCTION(
       "IPEXConvolutionOp::backward", std::vector<c10::IValue>({}));
 
-  auto op_context =
-      ctx->saved_data["op_context"].toCustomClass<ConvolutionOpContext>();
+  auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
@@ -397,7 +387,9 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
   at::Tensor input = saved[0];
   at::Tensor grad_input, grad_weight, grad_bias;
   std::tie(grad_input, grad_weight, grad_bias) =
-      op_context->run_backward(input, grad_outputs[0], output_mask);
+      reinterpret_cast<IpexConvolutionOpContext*>(
+          op_context.data_ptr<int64_t>()[0])
+          ->run_backward(input, grad_outputs[0], output_mask);
   return {grad_input, grad_weight, grad_bias, at::Tensor()};
 }
 
@@ -405,7 +397,7 @@ at::Tensor convolution_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+    const at::Tensor& op_context) {
   if (at::GradMode::is_enabled()) {
     return IPEXConvolutionOp::apply(input, weight, bias_opt, op_context);
   }
@@ -420,7 +412,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "convolution_forward(Tensor input, Tensor weight, Tensor? bias, "
-      "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext W_prepack) -> Tensor",
+      "Tensor W_prepack) -> Tensor",
       torch_ipex::cpu::convolution_forward);
 }
 
@@ -433,8 +425,7 @@ at::Tensor convolution_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<torch_ipex::cpu::ConvolutionOpContext>&
-        op_context) {
+    const at::Tensor& op_context) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::convolution_forward", "")

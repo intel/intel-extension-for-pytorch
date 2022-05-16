@@ -1,5 +1,5 @@
-#include "csrc/jit/cpu/kernels/OpContext.h"
 #include "graph_rewrite.h"
+#include "graph_rewrite_utils.h"
 
 #include <ATen/code_template.h>
 
@@ -89,16 +89,9 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
             weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
             weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d);
       }
-      int64_t o_channel = weight_size[1];
-      IValue kernel_size_value(k_size), weight_is_prepacked_value(false),
-          weight_is_channels_last_value(w_is_channels_last),
-          output_channel_value(o_channel);
-      auto kernel_size = graph->insertConstant(kernel_size_value);
-      auto weight_is_prepacked =
-          graph->insertConstant(weight_is_prepacked_value);
+      IValue weight_is_channels_last_value(w_is_channels_last);
       auto weight_is_channels_last =
           graph->insertConstant(weight_is_channels_last_value);
-      auto output_channel = graph->insertConstant(output_channel_value);
 
       // Note that once creating this "conv_transpose_prepack" node, make sure
       // it is also inserted into the graph. Details ref to "linear_prepack"
@@ -109,8 +102,6 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
         Value* v = n->inputs().at(i);
         prepack_node->addInput(v);
       }
-      prepack_node->addInput(kernel_size);
-      prepack_node->addInput(output_channel);
       prepack_node->addInput(weight_is_channels_last);
 
       auto input_size = graph->insertConstant(input_size_value);
@@ -156,7 +147,7 @@ void mayRePackConvTransposeOpForIpex(Block* b) {
         continue;
       }
       IValue input_size_value(input_size_option.value());
-      auto prepack_node = n->inputs().at(3);
+      auto prepack_node = n->inputs().at(3)->node()->inputs().at(0);
       // For graph before "freeze", cannot get custom class to repack
       if (!toIValue(prepack_node).has_value())
         continue;

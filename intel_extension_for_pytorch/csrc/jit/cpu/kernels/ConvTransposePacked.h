@@ -19,8 +19,6 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     std::vector<int64_t>&& output_padding,
     int64_t groups,
     std::vector<int64_t>&& dilation,
-    std::vector<int64_t>&& kernel_size,
-    int64_t output_channel,
     bool weight_is_channels_last,
     std::vector<int64_t>&& input_size);
 
@@ -35,9 +33,7 @@ ContextConvTranspose create(
     const at::IntArrayRef padding,
     const at::IntArrayRef output_padding,
     const at::IntArrayRef dilation,
-    const at::IntArrayRef kerel_size,
     const int64_t groups,
-    const int64_t output_channel,
     const bool weight_is_channels_last,
     const at::IntArrayRef input_size);
 

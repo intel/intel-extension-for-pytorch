@@ -131,15 +131,17 @@ at::Tensor conv_transpose_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  return op_context->run(input, ideep::attr_t());
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexConvTransposeOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run(input, ideep::attr_t());
 }
 
 at::Tensor IPEXConvTransposeOp::_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+    const at::Tensor& op_context) {
   at::AutoNonVariableTypeMode g;
   IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", std::vector<c10::IValue>({}));
@@ -155,7 +157,7 @@ at::Tensor IPEXConvTransposeOp::forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+    const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::forward", std::vector<c10::IValue>({}));
 
@@ -222,11 +224,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
     at::IntArrayRef output_padding,
     int64_t groups,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     bool bias_defined) {
-  bool is_channels_last =
-      grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
-      grad_output.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d;
 
   auto grad_y = itensor_from_tensor(grad_output);
   auto x = itensor_from_tensor(input);
@@ -244,10 +242,11 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
 
   std::vector<int64_t> real_weight_size = {
       input.size(1), grad_output.size(1) / groups};
-  for (auto& k : kernel_size) {
-    real_weight_size.push_back(k);
+  real_weight_size.emplace_back(packed_weight_desc.get_dim(2));
+  real_weight_size.emplace_back(packed_weight_desc.get_dim(3));
+  if (input.dim() == 5) {
+    real_weight_size.emplace_back(packed_weight_desc.get_dim(4));
   }
-
 
   if (bias_defined) {
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
@@ -255,7 +254,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
     ideep::convolution_transpose_backward_weights::compute(
         x,
         grad_y,
-        {real_weight_size.begin(), real_weight_size.end()},
+        real_weight_size,
         mkldnn_grad_weight,
         mkldnn_grad_bias,
         stride.vec(),
@@ -267,7 +266,7 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
     ideep::convolution_transpose_backward_weights::compute(
         x,
         grad_y,
-        {real_weight_size.begin(), real_weight_size.end()},
+        real_weight_size,
         mkldnn_grad_weight,
         stride.vec(),
         padding.vec(),
@@ -282,8 +281,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> conv_transpose_backward(
     const at::Tensor& input,
     const at::Tensor& grad_output_t,
     std::array<bool, 3> output_mask,
-    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  return op_context->run_backward(input, grad_output_t, output_mask);
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexConvTransposeOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_backward(input, grad_output_t, output_mask);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
@@ -297,7 +298,6 @@ conv_transpose_backward_kernel_impl(
     at::IntArrayRef output_padding,
     int64_t groups,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     std::array<bool, 3> output_mask,
     bool weight_channels_last) {
 #if defined(IPEX_DISP_OP)
@@ -332,7 +332,6 @@ conv_transpose_backward_kernel_impl(
         output_padding,
         groups,
         dilation,
-        kernel_size,
         output_mask[2]);
   }
   return std::make_tuple(grad_input, grad_weight, grad_bias);
@@ -344,8 +343,7 @@ torch::autograd::variable_list IPEXConvTransposeOp::backward(
   IPEX_RECORD_FUNCTION(
       "IPEXConvTransposeOp::backward", std::vector<c10::IValue>({}));
 
-  auto op_context =
-      ctx->saved_data["op_context"].toCustomClass<ConvTransposeOpContext>();
+  auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
@@ -366,7 +364,7 @@ at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+    const at::Tensor& op_context) {
   if (at::GradMode::is_enabled()) {
     return IPEXConvTransposeOp::apply(input, weight, bias_opt, op_context);
   }
@@ -383,8 +381,7 @@ at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<torch_ipex::cpu::ConvTransposeOpContext>&
-        op_context) {
+    const at::Tensor& op_context) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose", "")
@@ -404,7 +401,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "conv_transpose(Tensor input, Tensor weight, Tensor? bias_opt, "
-      "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext W_prepack) -> Tensor");
+      "Tensor W_prepack) -> Tensor");
   m.impl(
       "conv_transpose",
       c10::DispatchKey::Autograd,
@@ -419,7 +416,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       torch_ipex::autocast::conv_transpose);
   m.def(
       "conv_transpose_backward(Tensor input, Tensor grad_out, bool[3] output_mask, "
-      "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext W_prepack) "
+      "Tensor W_prepack) "
       " -> (Tensor, Tensor, Tensor)");
   m.impl(
       "conv_transpose_backward",

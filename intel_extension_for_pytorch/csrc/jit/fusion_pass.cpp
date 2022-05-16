@@ -345,12 +345,23 @@ void RemoveBailoutTemplateNodes(Block* b) {
   }
 }
 
+class ATenLinearRecorder {
+ public:
+  ATenLinearRecorder(std::shared_ptr<Graph> graph) {
+    graph_rewrite::RecordAtenLinearNodes(graph, aten_linear_nodes_);
+  }
+
+  std::unordered_set<Node*>& get_records() {
+    return aten_linear_nodes_;
+  }
+
+ private:
+  std::unordered_set<Node*> aten_linear_nodes_;
+};
+
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // remove dropout;
   torch::jit::removeDropout(graph);
-
-  // concat multi-linear with same input
-  FrozenConcatLinear(graph);
 
   // ipex einsum
   graph_rewrite::FusedEinsumPost(graph);
@@ -381,11 +392,20 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseConvAddRelu(graph);
   graph_rewrite::fuseBottleneck(graph);
 
+  // TODO: Record original aten nodes, while convert aten linear-> ipex linear,
+  // will ignore these aten linear (if they are fp32 dtype). For BF16 dtype,
+  // always use ipex linear. This is a temporay solution, for next PR to clean
+  // up fusion pass, will further abstract this as a class method.
+  auto aten_linear_recorder = ATenLinearRecorder(graph);
   // linear folding
+  graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(graph);
+  // concat multi-linear with same input
+  torch::jit::FrozenConcatLinear(graph, aten_linear_recorder.get_records());
   graph_rewrite::FrozenLinearFolding(graph);
 
   // linear fusion
-  graph_rewrite::insertPrePackedLinearOp(graph);
+  graph_rewrite::insertPrePackedLinearOp(
+      graph, aten_linear_recorder.get_records());
   graph_rewrite::fuseLinearWithEltwise(graph);
   graph_rewrite::fuseLinearAddRelu(graph);
 

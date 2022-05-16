@@ -11,6 +11,7 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
 #include "csrc/jit/cpu/kernels/OpContext.h"
+#include "folding_common_utils.h"
 
 namespace torch {
 namespace jit {
@@ -24,8 +25,8 @@ class ConcatLinearLayers {
   explicit ConcatLinearLayers(std::shared_ptr<Graph> graph)
       : graph_(std::move(graph)) {}
 
-  bool run() {
-    handleBlockAndSubblocks(graph_->block());
+  bool run(std::unordered_set<Node*>& aten_linear) {
+    handleBlockAndSubblocks(graph_->block(), aten_linear);
     return graph_modified;
   }
 
@@ -34,20 +35,6 @@ class ConcatLinearLayers {
       aliasDb_ = std::make_unique<AliasDb>(graph_);
     }
     return aliasDb_.get();
-  }
-
-  // torch/csrc/jit/passes/utils/optimization_utils.h is not in the current
-  // torch, so add "nonConstantParameters" here ToDo will remove it when there
-  // optimization_utils.h for torch
-  bool nonConstantParameters(Node* n) {
-    // Checks if the parameters, not including the
-    // first param are all constants.
-    for (size_t i = 1; i < n->inputs().size(); i++) {
-      if (n->inputs().at(i)->node()->kind() != prim::Constant) {
-        return true;
-      }
-    }
-    return false;
   }
 
   void collectConstantLinearLayers(
@@ -60,8 +47,7 @@ class ConcatLinearLayers {
 
     for (Node* n : b->nodes()) {
       // Grouping together all linear layers that use the same Tensor for input
-      if (n->kind() != aten::linear &&
-          n->kind() != Symbol::fromQualString("torch_ipex::ipex_linear")) {
+      if (n->kind() != aten::linear) {
         continue;
       }
 
@@ -86,7 +72,9 @@ class ConcatLinearLayers {
     }
   }
 
-  void mergeLinearLayers(std::vector<Node*>& compatible_layers) {
+  void mergeLinearLayers(
+      std::vector<Node*>& compatible_layers,
+      std::unordered_set<Node*>& aten_linear) {
     graph_modified = true;
     assert(!compatible_layers.empty());
     Node* base_node = compatible_layers[0];
@@ -97,22 +85,9 @@ class ConcatLinearLayers {
     {
       WithInsertPoint guard(base_node);
       std::vector<Tensor> weight_list;
-      if (base_node->kind() == aten::linear) {
-        weight_list = c10::fmap(compatible_layers, [](Node* n) {
-          return constant_as<Tensor>(n->namedInput("weight")).value();
-        });
-      } else {
-        // always unpack to contiguous tensor with no transposed, and the origin
-        // weight dtype is same as packed weight.
-        weight_list = c10::fmap(compatible_layers, [](Node* n) {
-          auto linear_op_ctx = toIValue(n->inputs().at(3))
-                                   .value()
-                                   .toCustomClass<LinearOpContext>();
-          auto weight_tensor = linear_op_ctx->to_public(
-              constant_as<Tensor>(n->namedInput("weight")).value());
-          return weight_tensor.contiguous();
-        });
-      }
+      weight_list = c10::fmap(compatible_layers, [](Node* n) {
+        return constant_as<Tensor>(n->namedInput("weight")).value();
+      });
 
       Tensor cat_weight = at::cat(weight_list, /*dim=*/0);
 
@@ -123,39 +98,19 @@ class ConcatLinearLayers {
       Value* cat_bias_value = graph_->insertConstant(cat_bias);
 
       auto tensor_input = base_node->inputs().at(0);
-      if (base_node->kind() == aten::linear) {
-        Value* cat_weight_value = graph_->insertConstant(cat_weight);
-        std::vector<Value*> linear_in = {
-            tensor_input, cat_weight_value, cat_bias_value};
-        linear_node = graph_->create(aten::linear, linear_in);
-      } else {
-        auto linear_op_ctx = toIValue(base_node->inputs().at(3))
-                                 .value()
-                                 .toCustomClass<LinearOpContext>();
-        auto batch_size = linear_op_ctx->get_batchsize();
-        auto cat_out_feature = cat_weight.size(0);
-        auto cat_in_feature = cat_weight.size(1);
-        c10::intrusive_ptr<LinearOpContext> cat_linear_ctx =
-            torch_ipex::cpu::detail::linear::createLinearPrePackOpContext(
-                std::move(cat_weight),
-                std::move(cat_bias),
-                cat_out_feature,
-                cat_in_feature,
-                batch_size);
-        Node* n = graph_->create(prim::Constant);
-        n->ival_(attr::value, IValue(cat_linear_ctx));
-        n->output()->setType(getCustomClass(
-            "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
-        Value* cat_linear_ctx_value = graph_->insertNode(n)->output();
-        auto packed_cat_weight = linear_op_ctx->get_at_packed_weight();
-        Value* cat_weight_value = graph_->insertConstant(packed_cat_weight);
-        std::vector<Value*> linear_in = {
-            tensor_input,
-            cat_weight_value,
-            cat_bias_value,
-            cat_linear_ctx_value};
-        linear_node = graph_->create(
-            Symbol::fromQualString("torch_ipex::ipex_linear"), linear_in);
+      Value* cat_weight_value = graph_->insertConstant(cat_weight);
+      std::vector<Value*> linear_in = {
+          tensor_input, cat_weight_value, cat_bias_value};
+      linear_node = graph_->create(aten::linear, linear_in);
+      for (int i = 1; i < compatible_layers.size(); i++) {
+        TORCH_CHECK(
+            (aten_linear.find(base_node) != aten_linear.end()) ==
+                (aten_linear.find(compatible_layers[i]) != aten_linear.end()),
+            "one of the layer is replaced by ipex linear while one of the other layer is original aten linear, it is ambiguity to know whether we shoudl create ipex linear or aten linear for concated linear")
+      }
+      // Create concated aten linear
+      if (aten_linear.find(base_node) != aten_linear.end()) {
+        aten_linear.insert(linear_node);
       }
       auto input_size_option = base_node->inputs()
                                    .at(0)
@@ -188,17 +143,9 @@ class ConcatLinearLayers {
       // and use it instead of the output of the original node
 
       int64_t slice_end;
-      if (orig_node->kind() == aten::linear) {
-        Tensor weight_tensor =
-            constant_as<Tensor>(orig_node->namedInput("weight")).value();
-        slice_end = slice_start + weight_tensor.size(0);
-      } else {
-        auto linear_op_ctx = toIValue(orig_node->inputs().at(3))
-                                 .value()
-                                 .toCustomClass<LinearOpContext>();
-        int64_t out_features = linear_op_ctx->get_out_features();
-        slice_end = slice_start + out_features;
-      }
+      Tensor weight_tensor =
+          constant_as<Tensor>(orig_node->namedInput("weight")).value();
+      slice_end = slice_start + weight_tensor.size(0);
 
       Value* slice_end_val = graph_->insertConstant(slice_end);
 
@@ -230,7 +177,9 @@ class ConcatLinearLayers {
 
   // Check the linear_layer_group of a tensor to find ones that can be
   // combined
-  void collectAndMergeLinearLayers(std::vector<Node*>& linear_layer_group) {
+  void collectAndMergeLinearLayers(
+      std::vector<Node*>& linear_layer_group,
+      std::unordered_set<Node*>& aten_linear) {
     std::unordered_set<Node*> checked_nodes;
 
     for (size_t i = 0; i < linear_layer_group.size(); i++) {
@@ -270,25 +219,9 @@ class ConcatLinearLayers {
           continue;
         }
 
-        if (node->kind() == aten::linear) {
-          if (!isNonZeroDimEqual(base_weight, weight) ||
-              !isNonZeroDimEqual(base_bias, bias)) {
-            continue;
-          }
-        } else {
-          // for torch_ipex::ipex_linear, we only need to check the in_features
-          // are same size between two nodes and bias size.
-          auto base_linear_op_ctx = toIValue(base_node->inputs().at(3))
-                                        .value()
-                                        .toCustomClass<LinearOpContext>();
-          auto linear_op_ctx = toIValue(node->inputs().at(3))
-                                   .value()
-                                   .toCustomClass<LinearOpContext>();
-          if (base_linear_op_ctx->get_in_features() !=
-                  linear_op_ctx->get_in_features() ||
-              !isNonZeroDimEqual(base_bias, bias)) {
-            continue;
-          }
+        if (!isNonZeroDimEqual(base_weight, weight) ||
+            !isNonZeroDimEqual(base_bias, bias)) {
+          continue;
         }
         bool can_move_before_all = true;
         for (auto n : compatible_layers) {
@@ -306,14 +239,16 @@ class ConcatLinearLayers {
       if (compatible_layers.size() == 1) {
         continue; // No other layers to merge
       }
-      mergeLinearLayers(compatible_layers);
+      mergeLinearLayers(compatible_layers, aten_linear);
     }
   }
 
-  void handleBlockAndSubblocks(Block* block) {
+  void handleBlockAndSubblocks(
+      Block* block,
+      std::unordered_set<Node*>& aten_linear) {
     for (auto node : block->nodes()) {
       for (Block* subblock : node->blocks()) {
-        handleBlockAndSubblocks(subblock);
+        handleBlockAndSubblocks(subblock, aten_linear);
       }
     }
 
@@ -328,7 +263,8 @@ class ConcatLinearLayers {
     for (auto tensor_it = ordered_tensor_inputs.rbegin();
          tensor_it != ordered_tensor_inputs.rend();
          ++tensor_it) {
-      collectAndMergeLinearLayers(grouped_linear_layers.at(*tensor_it));
+      collectAndMergeLinearLayers(
+          grouped_linear_layers.at(*tensor_it), aten_linear);
     }
   }
 
@@ -339,10 +275,12 @@ class ConcatLinearLayers {
 };
 } // namespace
 
-TORCH_API bool FrozenConcatLinear(std::shared_ptr<Graph>& graph) {
+TORCH_API bool FrozenConcatLinear(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear) {
   ConcatLinearLayers concatLayers(graph);
   GRAPH_DUMP("Before FrozenConcatLinear", graph);
-  bool changed = concatLayers.run();
+  bool changed = concatLayers.run(aten_linear);
   if (changed) {
     GRAPH_DUMP("After FrozenConcatLinear", graph);
   }

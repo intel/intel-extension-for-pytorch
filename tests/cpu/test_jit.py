@@ -881,14 +881,13 @@ class Tester(TestCase):
         finally:
             torch._C._jit_set_texpr_fuser_enabled(old_texpr_fuser_state)
 
-    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False], use_te=[False, True]):
-        modelName = model.__class__.__name__
+    def _test_output(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False], use_te=[False, True]):
+        modelName = base_model.__class__.__name__
         options = itertools.product(levels, use_channels_last, use_te)
-        origin_model = model
         for level, use_channels_last, use_te in options:
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(False)
-                model = copy.deepcopy(origin_model).eval()
+                model = copy.deepcopy(base_model).eval()
 #It will be removed after jit support conv_bn folding
                 if level == 'O0':
                     try:
@@ -939,14 +938,13 @@ class Tester(TestCase):
 
 
 
-    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
-        modelName = model.__class__.__name__
+    def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
+        modelName = base_model.__class__.__name__
         options = itertools.product(levels, use_channels_last, use_te)
-        origin_model = model
         for level, use_channels_last, use_te in options:
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(True)
-                model = copy.deepcopy(origin_model).eval()
+                model = copy.deepcopy(base_model).eval()
 #It will be removed after jit support conv_bn folding
                 if level == 'O0':
                     try:
@@ -2258,10 +2256,10 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 if auto_select_kernel and level == 'O1':
-#for 'O1' and auto_select_kernel is True, we will use ipex linear
+# for auto_select_kernel is True and level is O1, we will use ipex linear
                     self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
                 else:
-#for 'O1' and auto_select_kernel is false or 'O0', we will use mkl linear
+# auto_select_kernel is false, we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
 
     def test_linear_auto_kernel_selection_bf16(self):

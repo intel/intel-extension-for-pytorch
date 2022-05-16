@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "csrc/jit/cpu/passes/utils.h"
 
 // Check if the memory format of the tensor is ChannelsLast(3d)
 bool is_channelslast(c10::TensorType tensor) {

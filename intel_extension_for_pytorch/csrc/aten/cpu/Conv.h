@@ -39,7 +39,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     int64_t groups,
     const bool weight_channels_last,
     std::array<bool, 3> output_mask);
@@ -60,14 +59,14 @@ class IPEXConvolutionOp : public torch::autograd::Function<IPEXConvolutionOp> {
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+      const at::Tensor& op_context);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+      const at::Tensor& op_context);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,

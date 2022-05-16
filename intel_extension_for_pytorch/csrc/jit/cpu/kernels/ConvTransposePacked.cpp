@@ -19,14 +19,11 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     std::vector<int64_t>&& output_padding,
     int64_t groups,
     std::vector<int64_t>&& dilation,
-    std::vector<int64_t>&& kernel_size,
-    int64_t output_channel,
     bool weight_is_channels_last,
     std::vector<int64_t>&& input_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvTransposePrePackOpContext",
       std::vector<c10::IValue>({}));
-
   return IpexConvTransposeOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -34,9 +31,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
       std::move(padding),
       std::move(output_padding),
       std::move(dilation),
-      std::move(kernel_size),
       groups,
-      output_channel,
       weight_is_channels_last,
       std::move(input_size));
 }
@@ -57,9 +52,7 @@ ContextConvTranspose create(
     const at::IntArrayRef padding,
     const at::IntArrayRef output_padding,
     const at::IntArrayRef dilation,
-    const at::IntArrayRef kernel_size,
     const int64_t groups,
-    const int64_t output_channel,
     const bool weight_is_channels_last,
     const at::IntArrayRef input_size) {
   auto dim = weight.dim() - 2;
@@ -95,7 +88,6 @@ ContextConvTranspose create(
       ideep::algorithm::deconvolution_direct,
       dtype,
       input_size.vec());
-
   auto weight_dtype = w.get_data_type();
   expected_desc = expected_desc.to_type(weight_dtype);
   auto at_weight = empty_aten_tensor_from_desc(expected_desc, weight.options());
@@ -119,7 +111,6 @@ ContextConvTranspose create(
       output_padding_expanded,
       stride_expanded,
       dilation_expanded,
-      kernel_size.vec(),
       groups,
       input_size.vec(),
       weight.sizes().vec(),
@@ -172,7 +163,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       context.output_padding_,
       context.groups_,
       context.dilation_,
-      context.kernel_size_,
       output_mask,
       context.weight_is_channels_last_);
 }

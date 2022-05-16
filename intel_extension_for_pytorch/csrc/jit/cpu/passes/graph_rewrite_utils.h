@@ -2,6 +2,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/irparser.h>
+#include "csrc/jit/cpu/kernels/OpContext.h"
 
 namespace torch {
 namespace jit {

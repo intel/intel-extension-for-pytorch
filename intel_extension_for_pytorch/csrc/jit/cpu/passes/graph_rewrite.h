@@ -39,12 +39,18 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
 void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph);
 
 void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph);
+void replaceFrozenIPEXLinearWithAtenLinear(std::shared_ptr<Graph>& graph);
 void insertPrePackedConvOp(std::shared_ptr<Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
 void fuseBottleneck(std::shared_ptr<Graph>& graph);
 
-void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph);
+void RecordAtenLinearNodes(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear);
+void insertPrePackedLinearOp(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear);
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
 

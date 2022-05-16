@@ -18,8 +18,6 @@ using SerializationTypeConvolutionPrePack = std::tuple<
     std::vector<int64_t>,
     std::vector<int64_t>,
     std::vector<int64_t>,
-    std::vector<int64_t>,
-    int64_t,
     int64_t,
     bool,
     std::vector<int64_t>>;
@@ -27,28 +25,25 @@ using SerializationTypeConvolutionPrePack = std::tuple<
 class ConvolutionOpContext : public torch::jit::CustomClassHolder {
  protected:
   // these origin parameters are used for serialization
-  at::Tensor orig_weight_;
-  c10::optional<at::Tensor> orig_bias_;
   std::vector<int64_t> stride_;
   std::vector<int64_t> padding_;
   std::vector<int64_t> dilation_;
-  std::vector<int64_t> kernel_size_;
-  int64_t groups_;
-  int64_t output_channel_;
-  bool weight_is_channels_last_;
   std::vector<int64_t> input_size_;
 
  public:
   SerializationTypeConvolutionPrePack unpack() {
+    auto orig_weight_ = this->to_public(this->get_at_packed_weight());
+    auto orig_bias_ = this->get_context().at_bias_;
+    auto groups_ = this->get_context().groups_;
+    auto weight_is_channels_last_ =
+        this->get_context().weight_is_channels_last_;
     return std::make_tuple(
         orig_weight_,
         orig_bias_,
         stride_,
         padding_,
         dilation_,
-        kernel_size_,
         groups_,
-        output_channel_,
         weight_is_channels_last_,
         input_size_);
   }
@@ -86,7 +81,9 @@ class ConvolutionOpContext : public torch::jit::CustomClassHolder {
 
   int64_t get_groups();
 
-  virtual detail::ContextConvolution& get_conetxt() = 0;
+  virtual detail::ContextConvolution& get_context() = 0;
+
+  virtual at::Tensor get_data_handle() = 0;
 };
 
 class IpexConvolutionOpContext final : public ConvolutionOpContext {
@@ -95,28 +92,16 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 
  public:
   IpexConvolutionOpContext(
-      at::Tensor&& weight,
-      c10::optional<at::Tensor>&& bias,
       std::vector<int64_t>&& stride,
       std::vector<int64_t>&& padding,
       std::vector<int64_t>&& dilation,
-      std::vector<int64_t>&& kernel_size,
-      int64_t groups,
-      int64_t output_channel,
-      bool weight_is_channels_last,
       std::vector<int64_t>&& input_size,
       detail::ContextConvolution&& op_context)
       : op_context_(std::move(op_context)) {
-    orig_weight_ = std::move(weight);
-    orig_bias_ = std::move(bias);
     stride_ = std::move(stride);
     padding_ = std::move(padding);
     dilation_ = std::move(dilation);
-    kernel_size_ = std::move(kernel_size);
     input_size_ = std::move(input_size);
-    groups_ = groups;
-    output_channel_ = output_channel;
-    weight_is_channels_last_ = weight_is_channels_last;
   }
 
   virtual at::Tensor run(const at::Tensor& input, const ideep::attr_t& attr)
@@ -138,7 +123,9 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
 
-  virtual detail::ContextConvolution& get_conetxt() override;
+  virtual detail::ContextConvolution& get_context() override;
+
+  virtual at::Tensor get_data_handle() override;
 
   static c10::intrusive_ptr<ConvolutionOpContext> create_context(
       at::Tensor&& weight,
@@ -146,9 +133,7 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
       std::vector<int64_t>&& stride,
       std::vector<int64_t>&& padding,
       std::vector<int64_t>&& dilation,
-      std::vector<int64_t>&& kernel_size,
       int64_t groups,
-      int64_t output_channel,
       bool weight_is_channels_last,
       std::vector<int64_t>&& input_size,
       const ideep::attr_t& attr);
@@ -158,25 +143,20 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 using SerializationTypeLinearPrePack = std::tuple<
     at::Tensor,
     c10::optional<at::Tensor>,
-    int64_t,
-    int64_t,
     c10::optional<int64_t>>;
 
 class LinearOpContext : public torch::jit::CustomClassHolder {
  protected:
-  // these origin parameters are used for serialization
-  at::Tensor orig_weight_;
-  c10::optional<at::Tensor> orig_bias_;
-  // these shapes related args are used for calculate shapes in concat linear
-  int64_t out_features_;
-  int64_t in_features_;
   c10::optional<int64_t> batch_size_;
 
  public:
   SerializationTypeLinearPrePack unpack() {
-    return std::make_tuple(
-        orig_weight_, orig_bias_, out_features_, in_features_, batch_size_);
+    auto orig_weight_ = this->to_public(this->get_at_packed_weight());
+    auto orig_bias_ = this->get_context().bias_;
+    return std::make_tuple(orig_weight_, orig_bias_, batch_size_);
   }
+
+  virtual at::Tensor get_data_handle() = 0;
 
   virtual at::Tensor run(
       const at::Tensor& input,
@@ -215,9 +195,11 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
   // to newly queried format
   virtual void may_repack(int64_t batch_size) = 0;
 
-  int64_t get_out_features();
+  virtual int64_t get_out_features() = 0;
 
-  int64_t get_in_features();
+  virtual int64_t get_in_features() = 0;
+
+  virtual detail::ContextLinear& get_context() = 0;
 
   c10::optional<int64_t> get_batchsize();
 };
@@ -228,22 +210,16 @@ class IpexLinearOpContext final : public LinearOpContext {
 
  public:
   IpexLinearOpContext(
-      at::Tensor&& weight,
-      c10::optional<at::Tensor>&& bias,
-      int64_t out_features,
-      int64_t in_features,
       c10::optional<int64_t> batch_size,
       detail::ContextLinear&& op_context)
       : op_context_(std::move(op_context)) {
-    orig_weight_ = std::move(weight);
-    orig_bias_ = std::move(bias);
-    out_features_ = out_features;
-    in_features_ = in_features;
     batch_size_ = batch_size;
   }
 
   virtual at::Tensor run(const at::Tensor& input, const ideep::attr_t& attr)
       override;
+
+  virtual at::Tensor get_data_handle() override;
 
   virtual at::Tensor& run(
       const at::Tensor& input,
@@ -267,11 +243,15 @@ class IpexLinearOpContext final : public LinearOpContext {
 
   virtual void may_repack(int64_t batch_size) override;
 
+  virtual int64_t get_out_features() override;
+
+  virtual int64_t get_in_features() override;
+
+  virtual detail::ContextLinear& get_context() override;
+
   static c10::intrusive_ptr<LinearOpContext> create_context(
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
-      int64_t out_features,
-      int64_t in_features,
       c10::optional<int64_t> batch_size);
 };
 
@@ -284,28 +264,25 @@ using SerializationTypeConvTransposePrePack = std::tuple<
     std::vector<int64_t>,
     int64_t,
     std::vector<int64_t>,
-    std::vector<int64_t>,
-    int64_t,
     bool,
     std::vector<int64_t>>;
 
 class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
  protected:
   // these origin parameters are used for serialization
-  at::Tensor orig_weight_;
-  c10::optional<at::Tensor> orig_bias_;
   std::vector<int64_t> stride_;
   std::vector<int64_t> padding_;
   std::vector<int64_t> output_padding_;
   std::vector<int64_t> dilation_;
-  std::vector<int64_t> kernel_size_;
   std::vector<int64_t> input_size_;
-  int64_t groups_;
-  int64_t output_channel_;
-  bool weight_is_channels_last_;
 
  public:
   SerializationTypeConvTransposePrePack unpack() {
+    auto orig_weight_ = this->to_public(this->get_at_packed_weight());
+    auto orig_bias_ = this->get_context().bias_;
+    auto groups_ = this->get_context().groups_;
+    auto weight_is_channels_last_ =
+        this->get_context().weight_is_channels_last_;
     return std::make_tuple(
         orig_weight_,
         orig_bias_,
@@ -314,8 +291,6 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
         output_padding_,
         groups_,
         dilation_,
-        kernel_size_,
-        output_channel_,
         weight_is_channels_last_,
         input_size_);
   }
@@ -344,6 +319,10 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
   // query best weight format by given input size, and re-pack the mkldnn weight
   // to newly queried format
   virtual void may_repack(std::vector<int64_t> input_size) = 0;
+
+  virtual at::Tensor get_data_handle() = 0;
+
+  virtual detail::ContextConvTranspose& get_context() = 0;
 };
 
 class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
@@ -352,30 +331,18 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
 
  public:
   IpexConvTransposeOpContext(
-      at::Tensor&& weight,
-      c10::optional<at::Tensor>&& bias,
       std::vector<int64_t>&& stride,
       std::vector<int64_t>&& padding,
       std::vector<int64_t>&& output_padding,
       std::vector<int64_t>&& dilation,
-      std::vector<int64_t>&& kernel_size,
       std::vector<int64_t>&& input_size,
-      int64_t groups,
-      int64_t output_channel,
-      bool weight_is_channels_last,
       detail::ContextConvTranspose&& op_context)
       : op_context_(std::move(op_context)) {
-    orig_weight_ = std::move(weight);
-    orig_bias_ = std::move(bias);
     stride_ = std::move(stride);
     padding_ = std::move(padding);
     output_padding_ = std::move(output_padding);
     dilation_ = std::move(dilation);
-    kernel_size_ = std::move(kernel_size);
     input_size_ = std::move(input_size);
-    groups_ = groups;
-    output_channel_ = output_channel;
-    weight_is_channels_last_ = weight_is_channels_last;
   }
 
   virtual at::Tensor run(const at::Tensor& input, const ideep::attr_t& attr)
@@ -394,6 +361,10 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
 
   virtual void may_repack(std::vector<int64_t> input_size) override;
 
+  virtual detail::ContextConvTranspose& get_context() override;
+
+  virtual at::Tensor get_data_handle() override;
+
   static c10::intrusive_ptr<ConvTransposeOpContext> create_context(
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
@@ -401,9 +372,7 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
       std::vector<int64_t>&& padding,
       std::vector<int64_t>&& output_padding,
       std::vector<int64_t>&& dilation,
-      std::vector<int64_t>&& kernel_size,
       int64_t groups,
-      int64_t output_channel,
       bool weight_is_channels_last,
       std::vector<int64_t>&& input_size);
 };

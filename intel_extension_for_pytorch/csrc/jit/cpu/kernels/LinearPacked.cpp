@@ -13,8 +13,6 @@ namespace linear {
 c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
-    int64_t out_features,
-    int64_t in_features,
     c10::optional<int64_t> batch_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createLinearPrePackOpContext",
@@ -23,8 +21,6 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
   return IpexLinearOpContext::create_context(
       std::move(weight),
       std::move(bias),
-      out_features,
-      in_features,
       batch_size);
 }
 
@@ -111,9 +107,9 @@ at::Tensor linear_add_run(
 ContextLinear create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
-    const int64_t out_features,
-    const int64_t in_features,
     const c10::optional<int64_t> batch_size) {
+  auto out_features = weight.size(0);
+  auto in_features = weight.size(1);
   ideep::tensor packed_weight;
   auto w = itensor_view_from_dense(weight);
   ideep::dims input_size;
@@ -179,18 +175,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       output_mask,
       context.weight_packed_,
       context.bias_);
-}
-
-at::Tensor get_at_packed_weight(ContextLinear& context) {
-  return context.at_weight_;
-}
-
-void set_bias(ContextLinear& context, at::Tensor& bias) {
-  context.bias_ = c10::make_optional<at::Tensor>(std::move(bias));
-}
-
-void set_weight(ContextLinear& context, at::Tensor& weight) {
-  context.at_weight_.copy_(weight);
 }
 
 at::Tensor pack(ContextLinear& context, const at::Tensor& tensor) {

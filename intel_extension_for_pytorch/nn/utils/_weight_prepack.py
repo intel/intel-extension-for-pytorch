@@ -36,7 +36,7 @@ class _IPEXConvNd(nn.Module):
         # create conv op context
         self.ctx = torch.ops.ipex_prepack.convolution_prepack(
             dense_module.weight, self.bias, self.stride, self.padding,
-            self.dilation, self.kernel_size, self.groups, self.out_channels,
+            self.dilation, self.groups,
             self.weight_channels_last, self.prepack_input_shape
         )
 
@@ -75,7 +75,7 @@ class _IPEXConvNd(nn.Module):
         assert False, "_IPEXConvNd does not support _load_from_state_dict method"
 
     def forward(self, x):
-        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx)
+        return torch.ops.torch_ipex.convolution_forward(x, self.weight, self.bias, self.ctx.get_data_handle())
 
 class _IPEXConv1d(_IPEXConvNd):
     def __init__(self, dense_module):
@@ -115,9 +115,7 @@ class _IPEXLinear(torch.nn.Module):
 
         # create linear op context
         self.ctx = torch.ops.ipex_prepack.linear_prepack(
-            dense_module.weight, self.bias,
-            dense_module.out_features, dense_module.in_features,
-            self.batch_size_collapsed
+            dense_module.weight, self.bias, self.batch_size_collapsed
         )
 
         self.weight = nn.Parameter(self.ctx.get_weight(), requires_grad = dense_module.weight.requires_grad)
@@ -132,10 +130,9 @@ class _IPEXLinear(torch.nn.Module):
                 dense_module.weight_trail.detach().clone(),
             )
 
-
     def forward(self, x):
         return torch.ops.torch_ipex.ipex_linear(
-            x, self.weight, self.bias, self.ctx
+            x, self.weight, self.bias, self.ctx.get_data_handle()
         )
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
@@ -172,8 +169,8 @@ class _IPEXConvTransposeNd(nn.Module):
         self.kernel_size = dense_module.kernel_size
         self.stride = dense_module.stride
         self.padding = dense_module.padding
-        self.dilation = dense_module.dilation
         self.groups = dense_module.groups
+        self.dilation = dense_module.dilation
         self.output_padding = dense_module.output_padding
         self.prepack_input_shape = dense_module.input_shape if hasattr(dense_module, "input_shape") else []
         self.weight_channels_last = dense_module.weight.is_contiguous(memory_format=torch.channels_last) \
@@ -193,7 +190,6 @@ class _IPEXConvTransposeNd(nn.Module):
         self.ctx = torch.ops.ipex_prepack.conv_transpose_prepack(
             dense_module.weight, self.bias, self.stride, self.padding,
             self.output_padding, self.groups, self.dilation,
-            self.kernel_size, self.out_channels,
             self.weight_channels_last, self.prepack_input_shape
         )
 
@@ -235,7 +231,7 @@ class _IPEXConvTransposeNd(nn.Module):
             x,
             self.weight,
             self.bias,
-            self.ctx)
+            self.ctx.get_data_handle())
 
 class _IPEXConvTranspose2d(_IPEXConvTransposeNd):
     def __init__(self, dense_module):

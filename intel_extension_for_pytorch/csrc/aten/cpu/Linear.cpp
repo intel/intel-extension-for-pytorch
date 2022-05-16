@@ -142,8 +142,10 @@ at::Tensor linear_forward(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  return op_context->run(input, ideep::attr_t());
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run(input, ideep::attr_t());
 }
 
 at::Tensor linear_eltwise_forward(
@@ -151,21 +153,25 @@ at::Tensor linear_eltwise_forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   auto attr = ideep::attr_t();
   if (eltwise == ReLU)
     attr = ideep::attr_t::fuse_relu();
   else
     attr = ideep::attr_t::fuse_sigmoid();
-  return op_context->run(input, attr);
+  return reinterpret_cast<IpexLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run(input, attr);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward(
     const at::Tensor& input,
     const at::Tensor& grad_output,
     std::array<bool, 3> output_mask,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  return op_context->run_backward(input, grad_output, output_mask);
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_backward(input, grad_output, output_mask);
 }
 
 at::Tensor IPEXLinearOp::_forward(
@@ -173,7 +179,7 @@ at::Tensor IPEXLinearOp::_forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   at::AutoNonVariableTypeMode g;
   IPEX_RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({}));
 
@@ -197,7 +203,7 @@ at::Tensor IPEXLinearOp::forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({}));
 
   at::AutoNonVariableTypeMode g;
@@ -222,8 +228,7 @@ torch::autograd::tensor_list IPEXLinearOp::backward(
 
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
-  auto op_context =
-      ctx->saved_data["op_context"].toCustomClass<LinearOpContext>();
+  auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;
   output_mask[0] = ctx->saved_data["input_requires_grad"].toBool();
   output_mask[1] = ctx->saved_data["weight_requires_grad"].toBool();
@@ -254,7 +259,7 @@ at::Tensor ipex_linear(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   if (at::GradMode::is_enabled())
     return IPEXLinearOp::apply(input, weight, bias, NotFused, op_context);
   return IPEXLinearOp::_forward(input, weight, bias, NotFused, op_context);
@@ -265,7 +270,7 @@ at::Tensor ipex_linear_eltwise(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   return IPEXLinearOp::apply(input, weight, bias, eltwise, op_context);
 }
 
@@ -279,7 +284,7 @@ at::Tensor ipex_linear(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
-    const c10::intrusive_ptr<torch_ipex::cpu::LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ipex_linear", "")
@@ -299,7 +304,7 @@ at::Tensor ipex_linear_eltwise(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
-    const c10::intrusive_ptr<torch_ipex::cpu::LinearOpContext>& op_context) {
+    const at::Tensor& op_context) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::ipex_linear_eltwise", "")
@@ -323,7 +328,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "ipex_linear(Tensor input, Tensor weight, Tensor? bias, "
-      "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) -> Tensor");
+      "Tensor W_prepack) -> Tensor");
   m.impl(
       "ipex_linear", c10::DispatchKey::Autograd, torch_ipex::cpu::ipex_linear);
   m.impl(
@@ -334,7 +339,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   // fuse eltwise
   m.def(
       "ipex_linear_eltwise(Tensor input, Tensor weight, Tensor? bias, int eltwise, "
-      "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) -> Tensor");
+      "Tensor W_prepack) -> Tensor");
   m.impl(
       "ipex_linear_eltwise",
       c10::DispatchKey::Autograd,
@@ -350,7 +355,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   // bw
   m.def(
       "linear_backward(Tensor input, Tensor grad_output, bool[3] out_mask, "
-      "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) -> (Tensor, Tensor, Tensor)");
+      "Tensor W_prepack) -> (Tensor, Tensor, Tensor)");
   m.impl(
       "linear_backward",
       c10::DispatchKey::CPU,

@@ -20,9 +20,7 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     std::vector<int64_t>&& stride,
     std::vector<int64_t>&& padding,
     std::vector<int64_t>&& dilation,
-    std::vector<int64_t>&& kernel_size,
     int64_t groups,
-    int64_t output_channel,
     bool weight_is_channels_last,
     std::vector<int64_t>&& input_size) {
   IPEX_RECORD_FUNCTION(
@@ -34,9 +32,7 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
       std::move(stride),
       std::move(padding),
       std::move(dilation),
-      std::move(kernel_size),
       groups,
-      output_channel,
       weight_is_channels_last,
       std::move(input_size),
       ideep::attr_t());
@@ -171,9 +167,9 @@ at::Tensor& convolution_bottleneck_run(
                                         : at::MemoryFormat::ChannelsLast3d;
   input = input.contiguous(memory_format);
 
-  auto& context1 = op_context1->get_conetxt();
-  auto& context2 = op_context2->get_conetxt();
-  auto& context3 = op_context3->get_conetxt();
+  auto& context1 = op_context1->get_context();
+  auto& context2 = op_context2->get_context();
+  auto& context3 = op_context3->get_context();
   if (input.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
       omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
     auto mkldnn_input = dnnl::memory(
@@ -240,10 +236,10 @@ at::Tensor convolution_bottleneck_run(
                                         : at::MemoryFormat::ChannelsLast3d;
   auto input_ = input.contiguous(memory_format);
 
-  auto& context1 = op_context1->get_conetxt();
-  auto& context2 = op_context2->get_conetxt();
-  auto& context4 = op_context4->get_conetxt();
-  auto& context3 = op_context3->get_conetxt();
+  auto& context1 = op_context1->get_context();
+  auto& context2 = op_context2->get_context();
+  auto& context4 = op_context4->get_context();
+  auto& context3 = op_context3->get_context();
 
   if (input_.sizes().vec() == context1.conv_params_.pd.src_desc().dims() &&
       omp_get_max_threads() == context1.conv_params_.pd_use_threads) {
@@ -323,9 +319,7 @@ ContextConvolution create(
     const at::IntArrayRef stride,
     const at::IntArrayRef padding,
     const at::IntArrayRef dilation,
-    const at::IntArrayRef kernel_size,
     const int64_t groups,
-    const int64_t output_channel,
     const bool weight_is_channels_last,
     const std::vector<int64_t>& input_size_,
     const ideep::attr_t& attr) {
@@ -362,14 +356,6 @@ ContextConvolution create(
   auto weight_ = weight;
   weight_ = weight.contiguous(memory_format);
 
-  // get original weight dims.
-  std::vector<int64_t> origin_weight_dims;
-  origin_weight_dims.push_back(output_channel);
-  origin_weight_dims.push_back(input_size[1] / groups);
-  for (auto& s : kernel_size) {
-    origin_weight_dims.push_back(s);
-  }
-
   auto w = itensor_view_from_dense(weight_);
   ideep::tensor::desc ori_desc(w.get_desc());
   ideep::data_type dtype = w.get_data_type();
@@ -398,7 +384,7 @@ ContextConvolution create(
   ideep::convolution_forward_params conv_params;
   std::vector<int64_t> output_sizes = calc_conv_output_size(
       input_size,
-      origin_weight_dims,
+      weight.sizes().vec(),
       padding_expanded,
       stride_expanded,
       dilation_expanded);
@@ -460,7 +446,6 @@ ContextConvolution create(
       padding_expanded,
       stride_expanded,
       dilation_expanded,
-      kernel_size.vec(),
       groups,
       weight_is_channels_last_,
       conv_params,
@@ -606,7 +591,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       context.stride_,
       context.padding_,
       context.dilation_,
-      context.kernel_size_,
       context.groups_,
       context.weight_is_channels_last_,
       output_mask);

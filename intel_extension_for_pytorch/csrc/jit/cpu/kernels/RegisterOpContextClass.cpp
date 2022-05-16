@@ -29,15 +29,16 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<4>(state)),
                 std::move(std::get<5>(state)),
                 std::move(std::get<6>(state)),
-                std::move(std::get<7>(state)),
-                std::move(std::get<8>(state)),
-                std::move(std::get<9>(state)));
+                std::move(std::get<7>(state)));
           })
       .def(
           "get_weight",
           &torch_ipex::cpu::ConvolutionOpContext::get_at_packed_weight)
       .def("pack", &torch_ipex::cpu::ConvolutionOpContext::pack)
-      .def("to_public", &torch_ipex::cpu::ConvolutionOpContext::to_public);
+      .def("to_public", &torch_ipex::cpu::ConvolutionOpContext::to_public)
+      .def(
+          "get_data_handle",
+          &torch_ipex::cpu::ConvolutionOpContext::get_data_handle);
   m.class_<LinearOpContext>("LinearOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<LinearOpContext>& op_context)
@@ -49,14 +50,15 @@ TORCH_LIBRARY(ipex_prepack, m) {
             return createLinearPrePackOpContext(
                 std::move(std::get<0>(state)),
                 std::move(std::get<1>(state)),
-                std::move(std::get<2>(state)),
-                std::move(std::get<3>(state)),
-                std::move(std::get<4>(state)));
+                std::move(std::get<2>(state)));
           })
       .def(
           "get_weight", &torch_ipex::cpu::LinearOpContext::get_at_packed_weight)
       .def("pack", &torch_ipex::cpu::LinearOpContext::pack)
-      .def("to_public", &torch_ipex::cpu::LinearOpContext::to_public);
+      .def("to_public", &torch_ipex::cpu::LinearOpContext::to_public)
+      .def(
+          "get_data_handle",
+          &torch_ipex::cpu::LinearOpContext::get_data_handle);
   m.class_<ConvTransposeOpContext>("ConvTransposeOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<ConvTransposeOpContext>& op_context)
@@ -74,29 +76,27 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<5>(state)),
                 std::move(std::get<6>(state)),
                 std::move(std::get<7>(state)),
-                std::move(std::get<8>(state)),
-                std::move(std::get<9>(state)),
-                std::move(std::get<10>(state)));
+                std::move(std::get<8>(state)));
           })
       .def(
           "get_weight",
           &torch_ipex::cpu::ConvTransposeOpContext::get_at_packed_weight)
       .def("pack", &torch_ipex::cpu::ConvTransposeOpContext::pack)
-      .def("to_public", &torch_ipex::cpu::ConvTransposeOpContext::to_public);
+      .def("to_public", &torch_ipex::cpu::ConvTransposeOpContext::to_public)
+      .def(
+          "get_data_handle",
+          &torch_ipex::cpu::ConvTransposeOpContext::get_data_handle);
   m.def(
       "convolution_prepack(Tensor W, Tensor? B, int[] stride, "
-      "int[] padding, int[] dilation, int[] kernel_size, int groups, int "
-      "output_channel, "
+      "int[] padding, int[] dilation, int groups, "
       "bool input_is_channels_last, int[] input_sizes) "
       "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext");
   m.def(
-      "linear_prepack(Tensor W, Tensor? B, "
-      "int out_features, int int_features, int? batch_size) "
+      "linear_prepack(Tensor W, Tensor? B, int? batch_size) "
       "-> __torch__.torch.classes.ipex_prepack.LinearOpContext");
   m.def(
       "conv_transpose_prepack(Tensor W, Tensor? B, int[] stride, "
       "int[] padding, int[] output_padding, int groups, int[] dilation, "
-      "int[] kernel_size,  int output_channel, "
       "bool input_is_channels_last, int[] input_sizes) "
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 }

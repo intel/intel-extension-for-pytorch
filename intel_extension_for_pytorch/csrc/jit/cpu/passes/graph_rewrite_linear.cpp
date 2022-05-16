@@ -1,5 +1,4 @@
 #include <ATen/code_template.h>
-#include "csrc/jit/cpu/kernels/OpContext.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -10,10 +9,66 @@ namespace graph_rewrite {
 using namespace at::jit;
 using namespace torch_ipex::cpu;
 
-void insertPrePackedLinearOpForAtenLinear(Block* b) {
+void replaceFrozenIPEXLinearWithAtenLinear(
+    Block* b,
+    std::vector<Node*>& get_data_handle_nodes) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      insertPrePackedLinearOpForAtenLinear(block);
+      replaceFrozenIPEXLinearWithAtenLinear(block, get_data_handle_nodes);
+    }
+    if (n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear")) {
+      if (!(constant_as<at::Tensor>(n->namedInput("weight")).has_value())) {
+        continue;
+      }
+
+      auto input_size_option = n->inputs()
+                                   .at(0)
+                                   ->type()
+                                   ->cast<TensorType>()
+                                   ->sizes()
+                                   .concrete_sizes();
+      if (!(input_size_option.has_value() &&
+            input_size_option.value().size() >= 2)) {
+        continue;
+      }
+      auto prepack_node = n->inputs().at(3)->node()->inputs().at(0);
+      // For graph before "freeze", cannot get custom class to repack
+      if (!toIValue(prepack_node).has_value())
+        continue;
+      auto linear_op_ctx =
+          toIValue(prepack_node).value().toCustomClass<LinearOpContext>();
+      at::Tensor weight_tensor = linear_op_ctx->to_public(
+          constant_as<at::Tensor>(n->namedInput("weight")).value());
+      WithInsertPoint guard(n);
+      auto graph = n->owningGraph();
+
+      auto aten_linear = graph->insertNode(graph->create(aten::linear));
+      aten_linear->addInput(n->inputs().at(0));
+      IValue weight_value(weight_tensor);
+      auto weight = graph->insertConstant(weight_value);
+      aten_linear->addInput(weight);
+      aten_linear->addInput(n->inputs().at(2));
+      aten_linear->output()->setType(n->output()->type()->cast<TensorType>());
+      n->output()->replaceAllUsesWith(aten_linear->output());
+      get_data_handle_nodes.emplace_back(n->inputs().at(3)->node());
+    }
+  }
+  EliminateDeadCode(b);
+}
+
+void replaceFrozenIPEXLinearWithAtenLinear(std::shared_ptr<Graph>& graph) {
+  std::vector<Node*> get_data_handle_nodes;
+  replaceFrozenIPEXLinearWithAtenLinear(graph->block(), get_data_handle_nodes);
+  for (auto& n : get_data_handle_nodes) {
+    n->destroy();
+  }
+  EliminateDeadCode(graph);
+}
+
+void insertPrePackedLinearOp(Block* b, std::unordered_set<Node*>& aten_linear) {
+  for (Node* n : b->nodes()) {
+    for (Block* block : n->blocks()) {
+      insertPrePackedLinearOp(block, aten_linear);
     }
     if (n->kind() != aten::linear)
       continue;
@@ -42,15 +97,11 @@ void insertPrePackedLinearOpForAtenLinear(Block* b) {
     }
     auto weight_dtype_option = tt->scalarType();
     if (!(weight_dtype_option.has_value() &&
-          weight_dtype_option.value() == at::ScalarType::BFloat16)) {
+              (weight_dtype_option.value() == at::ScalarType::BFloat16) ||
+          aten_linear.find(n) == aten_linear.end())) {
       continue;
     }
     auto weight_size = weight_size_option.value();
-    int64_t o_channel = weight_size[0];
-    int64_t i_channel = weight_size[1];
-    IValue output_channel_value(o_channel), input_channel_value(i_channel);
-    auto output_channel = graph->insertConstant(output_channel_value);
-    auto input_channel = graph->insertConstant(input_channel_value);
 
     // Note that once creating a graph node, make sure it is also inserted into
     // the graph, for: PyTorch (when disabled TE) has a check on the graph node,
@@ -65,8 +116,6 @@ void insertPrePackedLinearOpForAtenLinear(Block* b) {
       Value* v = n->inputs().at(i);
       prepack_node->addInput(v);
     }
-    prepack_node->addInput(output_channel);
-    prepack_node->addInput(input_channel);
     prepack_node->addInput(batch_size);
     prepack_node->output()->setType(
         getCustomClass("__torch__.torch.classes.ipex_prepack.LinearOpContext"));
@@ -82,53 +131,29 @@ void insertPrePackedLinearOpForAtenLinear(Block* b) {
   EliminateDeadCode(b);
 }
 
-// For ipex linear, we can re-pack the packed weight in the op-context if we
-// get an different batch size here
-void mayRePackLinearOpForIpexLinear(Block* b) {
+void insertPrePackedLinearOp(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear) {
+  insertPrePackedLinearOp(graph->block(), aten_linear);
+}
+
+void RecordAtenLinearNodes(Block* b, std::unordered_set<Node*>& aten_linear) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      mayRePackLinearOpForIpexLinear(block);
+      RecordAtenLinearNodes(block, aten_linear);
     }
-    if (n->kind() != Symbol::fromQualString("torch_ipex::ipex_linear"))
-      continue;
-
-    WithInsertPoint guard(n);
-    auto graph = n->owningGraph();
-    auto input_size_option =
-        n->inputs().at(0)->type()->cast<TensorType>()->sizes().concrete_sizes();
-    if (!(input_size_option.has_value() &&
-          input_size_option.value().size() >= 2)) {
-      continue;
+    if (n->kind() == aten::linear) {
+      aten_linear.insert(n);
     }
-    auto input_size = input_size_option.value();
-    int64_t b_size = std::accumulate(
-                         input_size.begin(),
-                         input_size.end(),
-                         1,
-                         std::multiplies<double>()) /
-        input_size[input_size.size() - 1];
-
-    auto prepack_node = n->inputs().at(3);
-    // For graph before "freeze", cannot get custom class to repack
-    if (!toIValue(prepack_node).has_value())
-      continue;
-    auto linear_op_ctx =
-        toIValue(prepack_node).value().toCustomClass<LinearOpContext>();
-    linear_op_ctx->may_repack(b_size);
-    auto prepack_linear = graph->insertNode(
-        graph->create(Symbol::fromQualString("ipex_prepack::linear_run"), 1));
-    prepack_linear->addInput(n->inputs().at(0));
-    prepack_linear->addInput(prepack_node);
-    prepack_linear->output()->setType(n->output()->type()->cast<TensorType>());
-    auto v = n->outputs().at(0);
-    n->output()->replaceAllUsesWith(prepack_linear->output());
   }
   EliminateDeadCode(b);
 }
 
-void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph) {
-  insertPrePackedLinearOpForAtenLinear(graph->block());
-  mayRePackLinearOpForIpexLinear(graph->block());
+void RecordAtenLinearNodes(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear) {
+  RecordAtenLinearNodes(graph->block(), aten_linear);
+  EliminateDeadCode(graph);
 }
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {

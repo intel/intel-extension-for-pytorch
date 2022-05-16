@@ -16,14 +16,13 @@ struct ContextConvolution final {
   // at_weight/at_bias_ is used for autograd and optimizer update
   at::Tensor at_weight_;
   c10::optional<at::Tensor> at_bias_;
-  // paddings_, strided_, dilation_, kernel_size_ here are expanded and
+  // paddings_, strided_, dilation_, here are expanded and
   // might different with those stored on ConvolutionOpContext.
   // For example, aten conv2d can accept padding = 2, but onednn conv2d need
   // expand padding to {2, 2}
   std::vector<int64_t> padding_;
   std::vector<int64_t> stride_;
   std::vector<int64_t> dilation_;
-  std::vector<int64_t> kernel_size_;
   int64_t groups_;
   bool weight_is_channels_last_;
   ideep::convolution_forward_params conv_params_;
@@ -40,7 +39,6 @@ struct ContextConvolution final {
       std::vector<int64_t> padding,
       std::vector<int64_t> stride,
       std::vector<int64_t> dilation,
-      std::vector<int64_t> kernel_size,
       int64_t groups,
       bool weight_is_channels_last,
       ideep::convolution_forward_params conv_params,
@@ -53,7 +51,6 @@ struct ContextConvolution final {
         padding_(padding),
         stride_(stride),
         dilation_(dilation),
-        kernel_size_(kernel_size),
         groups_(groups),
         weight_is_channels_last_(weight_is_channels_last),
         conv_params_(conv_params),
