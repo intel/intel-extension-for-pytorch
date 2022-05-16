@@ -96,6 +96,26 @@
     }                                                                        \
   }()
 
+#define IPEX_DISPATCH_ATOMIC_FLOATING_AND_COMPLEX_TYPES(TYPE, NAME, ...)     \
+  [&] {                                                                      \
+    const auto& the_type = TYPE;                                             \
+    /* don't use TYPE again in case it is an expensive or side-effect op  */ \
+    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    switch (_st) {                                                           \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)      \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)    \
+      IPEX_PRIVATE_CASE_TYPE(                                                \
+          at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
+      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(                                                \
+          at::ScalarType::ComplexFloat, c10::complex<float>, __VA_ARGS__)    \
+      IPEX_PRIVATE_CASE_TYPE(                                                \
+          at::ScalarType::ComplexDouble, c10::complex<double>, __VA_ARGS__)  \
+      default:                                                               \
+        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
+    }                                                                        \
+  }()
+
 #define IPEX_DISPATCH_BYTE_ALL_TYPES_AND(SCALARTYPE, TYPE, NAME, ...)        \
   [&] {                                                                      \
     const auto& the_type = TYPE;                                             \

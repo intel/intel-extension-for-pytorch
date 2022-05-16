@@ -177,10 +177,10 @@ void reflection_pad1d_out_template(
   int64_t nbatch = 1;
 
   TORCH_CHECK(
-      input_.numel() > 0 &&
-          (input_.ndimension() == 2 || input_.ndimension() == 3),
-      "non-empty 2D "
-      "or 3D (batch mode) tensor expected for input, but got: ",
+      (input_.ndimension() == 2 && input_.size(1) != 0) ||
+          (input_.ndimension() == 3 && input_.size(1) != 0 &&
+           input_.size(2) != 0),
+      "2D or 3D (batch mode) tensor expected for input, but got: ",
       input_);
 
   if (input_.ndimension() == 3) {
@@ -221,10 +221,12 @@ void reflection_pad1d_out_template(
     output.resize_({nbatch, nplane, output_w});
   }
 
+  if (output.numel() == 0)
+    return;
   Tensor input = input_.contiguous();
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "reflection_pad1d_out_template", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND1(
+      kHalf, input.scalar_type(), "reflection_pad1d_out_template", [&] {
         reflection_pad1d_out_kernel<scalar_t>(
             input.data_ptr<scalar_t>(),
             output.data_ptr<scalar_t>(),
@@ -319,8 +321,8 @@ void reflection_pad2d_out_template(
 
   Tensor input = input_.contiguous();
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "reflection_pad2d_out_template", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND1(
+      kHalf, input.scalar_type(), "reflection_pad2d_out_template", [&] {
         reflection_pad2d_out_kernel<scalar_t>(
             input.data_ptr<scalar_t>(),
             output.data_ptr<scalar_t>(),
@@ -465,7 +467,7 @@ void reflection_pad1d_backward_out_template(
       output_w,
       ", Got: ",
       grad_output.size(dim_w));
-  IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(
+  IPEX_DISPATCH_ATOMIC_FLOATING_AND_COMPLEX_TYPES(
       grad_input.scalar_type(), "reflection_pad1d_backward_out_template", [&] {
         reflection_pad1d_backward_out_kernel<scalar_t>(
             grad_input.data_ptr<scalar_t>(),
@@ -538,7 +540,7 @@ void reflection_pad2d_backward_out_template(
       output_w,
       ", Got: ",
       grad_output.size(dim_w));
-  IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(
+  IPEX_DISPATCH_ATOMIC_FLOATING_AND_COMPLEX_TYPES(
       grad_input.scalar_type(), "reflection_pad2d_backward_out_template", [&] {
         reflection_pad2d_backward_out_kernel<scalar_t>(
             grad_input.data_ptr<scalar_t>(),
