@@ -1203,7 +1203,7 @@ Tensor& index_fill_(
 }
 
 Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
-  IPEX_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,

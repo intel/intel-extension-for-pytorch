@@ -501,29 +501,18 @@ Tensor& cumsum_out(
     int64_t dim,
     c10::optional<at::ScalarType> dtype,
     Tensor& out) {
-  if (self.dtype() == at::ScalarType::Bool) {
-    IPEX_DISPATCH_ALL_TYPES_AND(
-        at::ScalarType::Bool, out.scalar_type(), "cumsum", [&]() {
-          impl::scanDim<bool, scalar_t>(
-              out,
-              self,
-              dim,
-              ScalarConvert<float, bool>::to(0.0),
-              SCAN_BIN_ADD,
-              AddOp<bool>());
-        });
-  } else {
-    IPEX_DISPATCH_ALL_TYPES_AND(
-        at::ScalarType::Half, self.scalar_type(), "cumsum", [&]() {
-          impl::scanDim<scalar_t, scalar_t>(
-              out,
-              self,
-              dim,
-              ScalarConvert<float, scalar_t>::to(0.0),
-              SCAN_BIN_ADD,
-              AddOp<scalar_t>());
-        });
-  }
+  const Tensor self_tmp = self.to(out.scalar_type());
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(
+      at::ScalarType::Half, self_tmp.scalar_type(), "cumsum", [&]() {
+        impl::scanDim<scalar_t, scalar_t>(
+            out,
+            self_tmp,
+            dim,
+            ScalarConvert<float, scalar_t>::to(0.0),
+            SCAN_BIN_ADD,
+            std::plus<scalar_t>());
+      });
+
   return out;
 }
 
@@ -532,15 +521,16 @@ Tensor& cumprod_out(
     int64_t dim,
     c10::optional<at::ScalarType> dtype,
     Tensor& out) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "cumprod", [&]() {
+  const Tensor self_tmp = self.to(out.scalar_type());
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(
+      at::ScalarType::Half, self_tmp.scalar_type(), "cumprod", [&]() {
         impl::scanDim<scalar_t, scalar_t>(
             out,
-            self,
+            self_tmp,
             dim,
             ScalarConvert<float, scalar_t>::to(1.0),
             SCAN_BIN_PROD,
-            MulOp<scalar_t>());
+            std::multiplies<scalar_t>());
       });
   return out;
 }

@@ -40,6 +40,16 @@ DPCPP_DEVICE static inline TensorOptions map_options() {
   else if (std::is_same<T, bool>::value)
     return at::TensorOptions().dtype(kBool).device(kXPU).memory_format(
         LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  else if (std::is_same<T, c10::complex<float>>::value)
+    return at::TensorOptions()
+        .dtype(kComplexFloat)
+        .device(kXPU)
+        .memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  else if (std::is_same<T, c10::complex<double>>::value)
+    return at::TensorOptions()
+        .dtype(kComplexDouble)
+        .device(kXPU)
+        .memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   else {
     AT_ERROR("PSTLFunctions: data type cannot be mapped to tensor's dtype.");
   }

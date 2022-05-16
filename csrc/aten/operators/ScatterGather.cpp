@@ -572,7 +572,7 @@ Tensor& gather_out(
     at::assert_no_overlap(out, self);
     at::assert_no_partial_overlap(out, index);
   }
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
