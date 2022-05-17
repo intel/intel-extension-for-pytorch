@@ -138,39 +138,24 @@ class CPUinfo():
                 regex_out = re.search(pattern, line)
                 if regex_out:
                     self.cpuinfo.append(regex_out.group(1).strip().split(","))
+            assert len(self.cpuinfo) > 0, "cpuinfo is empty"
             self.get_socket_info()
 
     def get_socket_info(self):
-        self.sockets = int(max([line[2] for line in self.cpuinfo])) + 1
-        self.socket_physical_cores = []  # socket_id is index
-        self.socket_logical_cores = []   # socket_id is index
-        self.physical_core_socket_map = {}  # phyical core to numa node id
-        self.logical_core_socket_map = {}   # logical core to numa node id
-
-        self.nodes = int(max([line[3] for line in self.cpuinfo])) + 1
+        idx_active = 3
+        if self.cpuinfo[0][idx_active] == '':
+            idx_active = 2
+        self.nodes = int(max([line[idx_active] for line in self.cpuinfo])) + 1
         self.node_physical_cores = []  # node_id is index
         self.node_logical_cores = []   # node_id is index
         self.physical_core_node_map = {}  # phyical core to numa node id
         self.logical_core_node_map = {}   # logical core to numa node id
 
-        for socket_id in range(self.sockets):
-            cur_socket_physical_core = []
-            cur_socket_logical_core = []
-            for line in self.cpuinfo:
-                if socket_id == int(line[2]):
-                    if int(line[1]) not in cur_socket_physical_core:
-                        cur_socket_physical_core.append(int(line[1]))
-                        self.physical_core_socket_map[int(line[1])] = int(socket_id)
-                    cur_socket_logical_core.append(int(line[0]))
-                    self.logical_core_socket_map[int(line[0])] = int(socket_id)
-            self.socket_physical_cores.append(cur_socket_physical_core)
-            self.socket_logical_cores.append(cur_socket_logical_core)
-
         for node_id in range(self.nodes):
             cur_node_physical_core = []
             cur_node_logical_core = []
             for line in self.cpuinfo:
-                nid = line[3] if line[3] != '' else '0'
+                nid = line[idx_active] if line[idx_active] != '' else '0'
                 if node_id == int(nid):
                     if int(line[1]) not in cur_node_physical_core:
                         cur_node_physical_core.append(int(line[1]))
@@ -179,9 +164,6 @@ class CPUinfo():
                     self.logical_core_node_map[int(line[0])] = int(node_id)
             self.node_physical_cores.append(cur_node_physical_core)
             self.node_logical_cores.append(cur_node_logical_core)
-
-    def socket_nums(self):
-        return self.sockets
 
     def node_nums(self):
         return self.nodes
