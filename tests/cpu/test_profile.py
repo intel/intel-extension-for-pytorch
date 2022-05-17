@@ -13,7 +13,7 @@ class TestProfiler(TestCase):
                 line = str(line, 'utf-8').strip()
                 if line.__contains__("dil_softmax_"):
                     num = num + 1
-        assert num > 0, 'IPEX op profiling info not found.'
+        assert num == 2 , 'IPEX op profiling info not found.'
 
 
 if __name__ == '__main__':
