@@ -33,7 +33,9 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   bool training = src.scalar_type() == ScalarType::Half ? false : true;
   auto prop =
       training ? prop_kind::forward_training : prop_kind::forward_inference;
-  normalization_flags flags = normalization_flags::use_scale_shift;
+  normalization_flags flags = wgh.defined() && bia.defined()
+      ? normalization_flags::use_scale_shift
+      : normalization_flags::none;
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
 
   int32_t n, ic, ih;
@@ -86,12 +88,12 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     auto stats_usr_md = memory::desc(stats_tz, stats_dt, stats_fmt);
     if (!src_ctx.is_plain() && stats_exp_md != stats_usr_md) {
       mean = empty_opaque_tensor(
-          stats_exp_md, wgh.options().dtype(at::kFloat), c10::nullopt);
+          stats_exp_md, src.options().dtype(at::kFloat), c10::nullopt);
       rstd = empty_opaque_tensor(
-          stats_exp_md, wgh.options().dtype(at::kFloat), c10::nullopt);
+          stats_exp_md, src.options().dtype(at::kFloat), c10::nullopt);
     } else {
-      mean = at::empty(stats_tz, wgh.options().dtype(at::kFloat));
-      rstd = at::empty(stats_tz, wgh.options().dtype(at::kFloat));
+      mean = at::empty(stats_tz, src.options().dtype(at::kFloat));
+      rstd = at::empty(stats_tz, src.options().dtype(at::kFloat));
     }
 
     auto mean_memory =
@@ -153,7 +155,9 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
       GpuEngineManager::Instance().get_engine(Device(kXPU, current_device()));
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto flags = normalization_flags::use_scale_shift;
+  normalization_flags flags = wgh.defined()
+      ? normalization_flags::use_scale_shift
+      : normalization_flags::none;
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
 
   int32_t n, ic, ih;
@@ -311,9 +315,11 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
 
   DPCPP_ONEDNN_EXEC(ln_backward, strm, args);
 
-  Tensor diff_wgh = at::empty_like(wgh);
-  Tensor diff_bia = at::empty_like(wgh);
+  Tensor diff_wgh;
+  Tensor diff_bia;
   if (useScaleShift) {
+    diff_wgh = at::empty_like(wgh);
+    diff_bia = at::empty_like(wgh);
     if (wgh.scalar_type() == ScalarType::BFloat16) {
       dtype_convert_by_scalar(
           diff_wgh.data_ptr<at::BFloat16>(),

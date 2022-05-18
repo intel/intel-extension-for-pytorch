@@ -195,6 +195,14 @@ inline bool onednn_strides_check(const Tensor& src) {
   return true;
 }
 
+static inline bool is_broadcast(const at::Tensor& t) {
+  for (int i = 0; i < t.dim(); i++) {
+    if (t.stride(i) == 0)
+      return true;
+  }
+  return false;
+}
+
 static inline bool is_onednn_matmul_strides(
     const at::Tensor& tensor,
     bool is_dst = false) {
@@ -216,9 +224,8 @@ static inline bool is_onednn_matmul_strides(
     return false;
 
   // the broadcast cases are not supported
-  for (int i = 0; i < tensor_dim; i++) {
-    if (strides[i] == 0)
-      return false;
+  if (is_broadcast(tensor)) {
+    return false;
   }
 
   if (is_dst) {

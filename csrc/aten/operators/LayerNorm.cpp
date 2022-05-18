@@ -76,15 +76,42 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   auto M = M_N.first;
   auto N = M_N.second;
 
-  if (!(input.size(0) == M && input.size(1) == N)) {
-    Tensor output, mean, rstd;
-    std::tie(output, mean, rstd) = xpu::oneDNN::layer_norm(
-        input.reshape({1, M, N}), weight, bias, epsilon);
-    return std::make_tuple(output.reshape(input.sizes()), mean, rstd);
+  Tensor output, mean, rstd;
+  if (input.numel() == 0) {
+    output = at::empty({M, N}, input.options());
+    mean = at::empty({M}, input.options());
+    rstd = at::empty({M}, input.options());
   } else {
-    // by pass reshape (reorder)
-    return xpu::oneDNN::layer_norm(input, weight, bias, epsilon);
+    Tensor input_compatible =
+        xpu::oneDNN::is_broadcast(input) ? input.contiguous() : input;
+    Tensor weight_compatible =
+        weight.defined() && xpu::oneDNN::is_broadcast(weight)
+        ? weight.contiguous()
+        : weight;
+    Tensor bias_compatible = bias.defined() && xpu::oneDNN::is_broadcast(bias)
+        ? bias.contiguous()
+        : bias;
+    if (input.dim() == 1)
+      input_compatible = input_compatible.reshape({M, N});
+    if (weight.defined() && weight.dim() == 1)
+      weight_compatible = weight_compatible.reshape({N});
+    if (bias.defined() && bias.dim() == 1)
+      bias_compatible = bias_compatible.reshape({N});
+
+    // inteprete memory as {1, M, N} due to same physical layout
+    if (!(input_compatible.size(0) == M && input_compatible.size(1) == N)) {
+      std::tie(output, mean, rstd) = xpu::oneDNN::layer_norm(
+          input_compatible.reshape({1, M, N}),
+          weight_compatible,
+          bias_compatible,
+          epsilon);
+    } else {
+      // by pass reshape (reorder)
+      std::tie(output, mean, rstd) = xpu::oneDNN::layer_norm(
+          input_compatible, weight_compatible, bias_compatible, epsilon);
+    }
   }
+  return std::make_tuple(output.reshape(input.sizes()), mean, rstd);
 }
 
 std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
@@ -108,21 +135,57 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   auto N = M_N.second;
 
   Tensor grad_input, grad_weight, grad_bias;
-  if (!(input.size(0) == M && input.size(1) == N)) {
-    std::tie(grad_input, grad_weight, grad_bias) =
-        xpu::oneDNN::layer_norm_backward(
-            grad_output.reshape({{1, M, N}}),
-            input.reshape({1, M, N}),
-            mean,
-            rstd,
-            weight,
-            1e-5);
-    return std::make_tuple(
-        grad_input.reshape(input.sizes()), grad_weight, grad_bias);
+  if (input.numel() == 0 || grad_output.numel() == 0) {
+    grad_input = at::empty(input.sizes(), input.options());
+    if (weight.numel() != 0) {
+      grad_weight = at::zeros(weight.sizes(), weight.options());
+      grad_bias = at::zeros(bias.sizes(), bias.options());
+    } else {
+      grad_weight = at::empty(weight.sizes(), weight.options());
+      grad_bias = at::empty(bias.sizes(), bias.options());
+    }
   } else {
-    return xpu::oneDNN::layer_norm_backward(
-        grad_output, input, mean, rstd, weight, 1e-5);
+    Tensor input_compatible =
+        xpu::oneDNN::is_broadcast(input) ? input.contiguous() : input;
+    Tensor grad_output_compatible = xpu::oneDNN::is_broadcast(grad_output)
+        ? grad_output.contiguous()
+        : grad_output;
+    Tensor weight_compatible =
+        weight.defined() && xpu::oneDNN::is_broadcast(weight)
+        ? weight.contiguous()
+        : weight;
+    if (input.dim() == 1)
+      input_compatible = input_compatible.reshape({M, N});
+    if (grad_output.dim() == 1)
+      grad_output_compatible = grad_output_compatible.reshape({M, N});
+    if (weight.defined() && weight.dim() == 1)
+      weight_compatible = weight_compatible.reshape({N});
+
+    // inteprete memory as {1, M, N} due to same physical layout
+    if (!(input_compatible.size(0) == M && input_compatible.size(1) == N)) {
+      std::tie(grad_input, grad_weight, grad_bias) =
+          xpu::oneDNN::layer_norm_backward(
+              grad_output_compatible.reshape({{1, M, N}}),
+              input_compatible.reshape({1, M, N}),
+              mean,
+              rstd,
+              weight_compatible,
+              1e-5);
+    } else {
+      std::tie(grad_input, grad_weight, grad_bias) =
+          xpu::oneDNN::layer_norm_backward(
+              grad_output_compatible,
+              input_compatible,
+              mean,
+              rstd,
+              weight_compatible,
+              1e-5);
+    }
   }
+  return std::make_tuple(
+      grad_input.reshape(input.sizes()),
+      weight.defined() ? grad_weight.reshape(weight.sizes()) : grad_weight,
+      bias.defined() ? grad_bias.reshape(bias.sizes()) : grad_bias);
 }
 
 } // namespace AtenIpexTypeXPU
