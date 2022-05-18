@@ -90,11 +90,11 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
 }
 
 void setLlgaWeightCacheEnabled(bool enabled) {
-  dnnl::graph::set_constant_cache(enabled);
+  dnnl::graph::set_constant_tensor_cache(enabled);
 }
 
 bool getLlgaWeightCacheEnabled() {
-  return dnnl::graph::get_constant_cache();
+  return dnnl::graph::get_constant_tensor_cache();
 }
 
 } // namespace onednn
