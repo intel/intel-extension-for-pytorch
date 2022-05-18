@@ -145,6 +145,39 @@ int64_t mkl_getrs_scratchpad<c10::complex<float>>(
 }
 
 template <typename scalar_t>
+int64_t mkl_getri_scratchpad(
+    DPCPP::queue& queue,
+    int64_t* n,
+    int64_t* lda,
+    int64_t group_count,
+    int64_t* group_sizes) {
+  return oneapi::mkl::lapack::getri_batch_scratchpad_size<scalar_t>(
+      queue, n, lda, group_count, group_sizes);
+}
+
+template <>
+int64_t mkl_getri_scratchpad<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t* n,
+    int64_t* lda,
+    int64_t group_count,
+    int64_t* group_sizes) {
+  return oneapi::mkl::lapack::getri_batch_scratchpad_size<std::complex<double>>(
+      queue, n, lda, group_count, group_sizes);
+}
+
+template <>
+int64_t mkl_getri_scratchpad<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t* n,
+    int64_t* lda,
+    int64_t group_count,
+    int64_t* group_sizes) {
+  return oneapi::mkl::lapack::getri_batch_scratchpad_size<std::complex<float>>(
+      queue, n, lda, group_count, group_sizes);
+}
+
+template <typename scalar_t>
 void mkl_getrf(
     DPCPP::queue& queue,
     int64_t m,
@@ -329,6 +362,82 @@ void mkl_getrs<c10::complex<float>>(
       reinterpret_cast<std::complex<float>*>(scratchpad),
       scratchpad_size);
 }
+
+template <typename scalar_t>
+void mkl_getri(
+    DPCPP::queue& queue,
+    int64_t* n,
+    scalar_t** a,
+    int64_t* lda,
+    int64_t** ipiv,
+    int64_t group_count,
+    int64_t* group_sizes,
+    scalar_t* scratchpad,
+    int64_t scratchpad_size) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getri_batch,
+      queue,
+      n,
+      a,
+      lda,
+      ipiv,
+      group_count,
+      group_sizes,
+      scratchpad,
+      scratchpad_size);
+}
+
+template <>
+void mkl_getri<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t* n,
+    c10::complex<double>** a,
+    int64_t* lda,
+    int64_t** ipiv,
+    int64_t group_count,
+    int64_t* group_sizes,
+    c10::complex<double>* scratchpad,
+    int64_t scratchpad_size) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getri_batch,
+      queue,
+      n,
+      reinterpret_cast<std::complex<double>**>(a),
+      lda,
+      ipiv,
+      group_count,
+      group_sizes,
+      reinterpret_cast<std::complex<double>*>(scratchpad),
+      scratchpad_size);
+}
+
+template <>
+void mkl_getri<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t* n,
+    c10::complex<float>** a,
+    int64_t* lda,
+    int64_t** ipiv,
+    int64_t group_count,
+    int64_t* group_sizes,
+    c10::complex<float>* scratchpad,
+    int64_t scratchpad_size) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::getri_batch,
+      queue,
+      n,
+      reinterpret_cast<std::complex<float>**>(a),
+      lda,
+      ipiv,
+      group_count,
+      group_sizes,
+      reinterpret_cast<std::complex<float>*>(scratchpad),
+      scratchpad_size);
+}
+
 #endif
 
 #ifdef USE_ONEMKL
@@ -598,14 +707,11 @@ static void apply_inverse_dpcpp_(Tensor& self_, std::vector<int64_t>& infos_) {
     ipiv.push_back(&ipiv_ptr[i * stride_ipiv]);
   }
 
-  int64_t scratchpadsize =
-      oneapi::mkl::lapack::getri_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue, n.data(), lda.data(), group_count, group_sizes);
+  int64_t scratchpadsize = mkl_getri_scratchpad<scalar_t>(
+      dpcpp_queue, n.data(), lda.data(), group_count, group_sizes);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::lapack::getri_batch,
+    mkl_getri<scalar_t>(
         dpcpp_queue,
         n.data(),
         a.data(),
@@ -1686,9 +1792,10 @@ std::tuple<Tensor&, Tensor&> solve_out(
 Tensor _inverse_helper(const Tensor& self) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "inverse_dpcpp", [&] {
-    impl::apply_inverse_dpcpp_<scalar_t>(self_working_copy, infos);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      self.scalar_type(), "inverse_dpcpp", [&] {
+        impl::apply_inverse_dpcpp_<scalar_t>(self_working_copy, infos);
+      });
   if (self.dim() > 2) {
     native::batchCheckErrors(infos, "inverse_dpcpp");
   } else {
