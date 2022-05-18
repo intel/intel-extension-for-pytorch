@@ -10,6 +10,7 @@
 #include "cpu/passes/frozen_conv_folding.h"
 #include "cpu/passes/frozen_linear_folding.h"
 #include "cpu/passes/graph_rewrite_helper.h"
+#include "cpu/passes/remove_redundant_aliases.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -481,6 +482,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
       graph);
   if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+    RemoveRedundantAliases(graph);
     fuser::onednn::fuseGraph(graph);
   }
   GRAPH_DUMP("After LLGA fusion pass. Before IPEXFusionPass", graph);

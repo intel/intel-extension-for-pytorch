@@ -5,7 +5,6 @@ import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
 import time, sys
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 import torch.fx.experimental.optimization as optimization
 
 class SimpleNet(torch.nn.Module):

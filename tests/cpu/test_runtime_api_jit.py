@@ -5,7 +5,7 @@ import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
 import time, sys
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_ao_jit_llga_utils import JitLlgaTestCase
 import torch.fx.experimental.optimization as optimization
 from test_runtime_api import TestInputOutputModule, TestInputOutputModule2
 
@@ -333,7 +333,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
 
             # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
+            graph, m_llga, m_cpu = self.prepareModel(model, [x])
             y = m_llga(x)
 
             # Create task
@@ -353,7 +353,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             x = torch.rand(2, 3, 224, 224).contiguous(memory_format=torch.channels_last)
 
             # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
+            graph, m_llga, m_cpu = self.prepareModel(model, [x])
             y = m_llga(x)
 
             # Create task
@@ -377,7 +377,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             x = torch.rand(batch_size, 3, 16, 16).contiguous(memory_format=torch.channels_last)
 
             # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
+            graph, m_llga, m_cpu = self.prepareModel(model, [x])
             y = m_llga(x)
 
             # Create MultiStreamModule
@@ -402,7 +402,7 @@ class TestLLGARuntimeAPI(JitLlgaTestCase):
             x = torch.rand(batch_size, 3, 16, 16).contiguous(memory_format=torch.channels_last)
 
             # Calculate the reference result
-            graph, m_llga, m_cpu = self.prepareModel(model, [x], folding=True, qscheme=torch.per_tensor_symmetric)
+            graph, m_llga, m_cpu = self.prepareModel(model, [x])
             y = m_llga(x)
 
             # Create MultiStreamModule

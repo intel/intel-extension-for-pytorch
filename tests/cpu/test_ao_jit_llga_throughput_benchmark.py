@@ -7,7 +7,8 @@ from torch.testing._internal.common_utils import run_tests, TestCase
 
 import intel_extension_for_pytorch as ipex
 import intel_extension_for_pytorch._C as core
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+
 
 class LinearEltwise(torch.nn.Module):
     def __init__(self, D_in, H, D_out):

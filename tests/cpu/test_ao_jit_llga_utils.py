@@ -3,7 +3,7 @@ import copy
 import tempfile
 import torch
 import torch.fx.experimental.optimization as optimization
-
+from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
 from functools import wraps
 from torch.testing._internal.jit_utils import JitTestCase, warmup_backward, \
     get_execution_plan
@@ -15,6 +15,10 @@ from torch.jit._recursive import wrap_cpp_module
 import intel_extension_for_pytorch as ipex
 
 LLGA_FUSION_GROUP = 'ipex::LlgaFusionGroup'
+
+default_static_qconfig = QConfig(
+        activation= MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
+        weight= PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
 
 # For fp32 and bf16 LLGA UT only
 def llga_fp32_bf16_test_env(func):
@@ -98,8 +102,8 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name="", x_var=None, qscheme=torch.per_tensor_affine, int8_bf16=False):
-        graph, traced_model, fp32_model = self.prepareModel(model, x, folding, remove_dropout, config_name, qscheme, int8_bf16)
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, remove_dropout=False, x_var=None, qconfig=default_static_qconfig, int8_bf16=False):
+        graph, traced_model, fp32_model = self.prepareModel(model, x, remove_dropout, qconfig, int8_bf16)
         with torch.no_grad():
             y = fp32_model(*x)
             y = y.to(torch.bfloat16) if int8_bf16 else y
@@ -115,43 +119,27 @@ class JitLlgaTestCase(JitTestCase):
 
             return graph
 
-    def prepareModel(self, model, x, folding=False, remove_dropout=False, config_name="", qscheme=torch.per_tensor_affine, int8_bf16=False, inplace=False):
+    def prepareModel(self, model, x, remove_dropout=False, qconfig=default_static_qconfig, int8_bf16=False, inplace=False):
         model.eval()
+        fp32_model = copy.deepcopy(model)
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
-            conf = ipex.quantization.QuantConf(qscheme=qscheme)
             # fold conv bn
-            if folding:
-                model = optimization.fuse(model)
-
             if remove_dropout:
                 ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
-
+            model = ipex.quantization.prepare(model, qconfig, x, inplace=inplace)
             # do calibration
-            with ipex.quantization.calibrate(conf):
-                y = model(*x)
-
-            with tempfile.TemporaryDirectory() as tmp:
-                path = os.path.join(tmp, 'configure_%s.json' % config_name)
-
-                # TODO: remove the serialization and test it in another separate UT once IPEX supported
-                # directly using the conf for int8 path
-                conf.save(path)
-                conf = ipex.quantization.QuantConf(path)
-
-                # jit trace to insert quant/dequant
-                if int8_bf16:
-                    with torch.cpu.amp.autocast():
-                        traced_model = ipex.quantization.convert(model, conf, x, inplace=inplace)
-                else:
-                    traced_model = ipex.quantization.convert(model, conf, x, inplace=inplace)
-
+            y = model(*x)
+            # jit trace to insert quant/dequant
+            if int8_bf16:
+                with torch.cpu.amp.autocast():
+                    traced_model = ipex.quantization.convert(model, x)
+            else:
+                traced_model = ipex.quantization.convert(model, x)
             # warm up run
             y0 = traced_model(*x)
-
             # get the graph at the second run after freezing
             graph = traced_model.graph_for(*x)
-
-            return graph, traced_model, model
+            return graph, traced_model, fp32_model
 
     def checkPatterns(self, graph, patterns):
         fusion_groups = findFusionGroups(graph)
