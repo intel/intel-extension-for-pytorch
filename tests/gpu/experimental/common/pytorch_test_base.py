@@ -246,10 +246,10 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     "TestJitXPU": {
         "test_variant_consistency_jit", # hang in fft
     },
-    "TestMathBitsXPU": {
+    # "TestMathBitsXPU": {
         # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
-        "test_neg_view",  # core dumped ... Segmentation fault (crashed at linalg_qr)
-    },
+        # "test_neg_view",  # core dumped ... Segmentation fault (crashed at linalg_qr)  # johnlu segment fault
+    # },
     "TestSparseCSRXPU": {
         # "test_add",     # core dumped ... Floating point exception
         "test_coo_to_csr_convert",     # core dumped ... Segmentation fault

@@ -572,6 +572,9 @@ static void apply_lu_dpcpp_(
     Tensor& pivots_,
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
+  // do nothing if empty input.
+  if (self_.numel() == 0)
+    return;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
   int64_t m = self_.size(-2);
@@ -613,6 +616,9 @@ static void apply_lu_solve_dpcpp_(
     std::vector<int64_t>& infos_,
     TransposeType t) {
 #ifdef USE_ONEMKL
+  // do nothing if empty input
+  if (lu_.numel() == 0)
+    return;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
