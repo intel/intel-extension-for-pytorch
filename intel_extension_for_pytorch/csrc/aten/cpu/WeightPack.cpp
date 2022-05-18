@@ -1,7 +1,6 @@
 #include <torch/extension.h>
 
 #include "WeightPack.h"
-#include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/rw_lock.h"
 #include "utils/utils.h"
 
@@ -89,6 +88,158 @@ bool is_packed(const at::Tensor& weight) {
   return !cached_weight.is_empty();
 }
 
+#define LSTM_PACKED_WEIGHT(TYPE)                     \
+  lstm_packed_weight<LstmInferenceWeightDesc<TYPE>>( \
+      weight_ih,                                     \
+      weight_hh,                                     \
+      input_size,                                    \
+      num_gates,                                     \
+      hidden_size,                                   \
+      output_sizes,                                  \
+      src_layer,                                     \
+      src_iter,                                      \
+      src_iter_c,                                    \
+      bias,                                          \
+      reverse,                                       \
+      quantizedLstmParams);
+
+std::tuple<ideep::tensor, ideep::tensor> CommonLstmWeightDesc::
+    get_and_save_lstm_packed_weight() {
+  ideep::tensor cached_weight_ih, cached_weight_hh;
+  // Don't pack when the weight is of rnn_packed format
+  // When the weight is of rnn_packed format, if the seq_lens of
+  // the input changes, the format of weight also changes.
+  // oneDNN does not support reorder from rnn_packed back to public
+  // format. LSTM based on BRGEMM kernel (on AVX512 and newest ISAs) will
+  // use blocked format for weight of LSTM, which won't change when the
+  // input seq_lens changes.
+  if (packed_desc_ih_.is_rnn_packed() || packed_desc_hh_.is_rnn_packed()) {
+    return std::make_tuple(w1_src_, w2_src_);
+  }
+
+  cached_weight_ih = w1_src_.reorder_if_differ_in(packed_desc_ih_, op_attr_);
+  cached_weight_hh = w2_src_.reorder_if_differ_in(packed_desc_hh_, op_attr_);
+  write_cached_weights(weight_ih_, cached_weight_ih);
+  write_cached_weights(weight_hh_, cached_weight_hh);
+  return std::make_tuple(cached_weight_ih, cached_weight_hh);
+}
+
+void LstmInferenceWeightDesc<LstmDtype::Float>::set_expected_weights_desc() {
+  std::tie(packed_desc_ih_, packed_desc_hh_) =
+      ideep::lstm_forward_inference::expected_weights_desc(
+          output_sizes_,
+          src_layer_,
+          src_iter_,
+          src_iter_c_,
+          w1_src_,
+          w2_src_,
+          bias_,
+          reverse_);
+}
+
+void LstmInferenceWeightDesc<LstmDtype::Quantized>::initialize_weight_src() {
+  auto w1 = itensor_view_from_dense(
+      weight_ih_,
+      {{1, 1, input_size_, num_gates_, hidden_size_},
+       get_mkldnn_dtype(weight_ih_.scalar_type()),
+       ideep::format_tag::ldgoi});
+  auto w2 = itensor_view_from_dense(
+      weight_hh_,
+      {{1, 1, hidden_size_, num_gates_, hidden_size_},
+       get_mkldnn_dtype(weight_hh_.scalar_type()),
+       ideep::format_tag::ldgoi});
+
+  // The ideep tensor w1 and w2 which is a view of the input weight is in
+  // ldgoi format. When querying the format of oneDNN:
+  // - for int8, w1_src and w2_src should be in abcde (ldigo) format
+  // - for fp32 and bf16, w1_src and w2_src could be in abdec (ldgoi) format
+  ideep::tensor w1_src;
+  ideep::tensor w2_src;
+
+  ideep::tensor::desc w1_src_desc = {
+      {1, 1, input_size_, num_gates_, hidden_size_},
+      get_mkldnn_dtype(weight_ih_.scalar_type()),
+      ideep::format_tag::ldigo};
+  ideep::tensor::desc w2_src_desc = {
+      {1, 1, hidden_size_, num_gates_, hidden_size_},
+      get_mkldnn_dtype(weight_hh_.scalar_type()),
+      ideep::format_tag::ldigo};
+
+  w1_src = ideep::tensor({w1_src_desc});
+  w2_src = ideep::tensor({w2_src_desc});
+
+  w1.reorder_to(w1_src);
+  w2.reorder_to(w2_src);
+
+  w1_src_ = w1_src;
+  w2_src_ = w2_src;
+}
+
+void LstmInferenceWeightDesc<
+    LstmDtype::Quantized>::set_expected_weights_desc() {
+  std::tie(packed_desc_ih_, packed_desc_hh_) =
+      ideep::lstm_forward_inference::expected_weights_desc(
+          output_sizes_,
+          src_layer_,
+          src_iter_,
+          src_iter_c_,
+          w1_src_,
+          w2_src_,
+          bias_,
+          reverse_,
+          scale_,
+          zp_,
+          weights_scale_mask_,
+          weights_scales_);
+}
+
+template <typename lstm_param>
+std::tuple<ideep::tensor, ideep::tensor> lstm_packed_weight(
+    const at::Tensor& weight_ih,
+    const at::Tensor& weight_hh,
+    int64_t input_size,
+    int64_t num_gates,
+    int64_t hidden_size,
+    const ideep::dims& output_sizes,
+    const ideep::tensor& src_layer,
+    const ideep::tensor& src_iter,
+    const ideep::tensor& src_iter_c,
+    const ideep::tensor& bias,
+    const bool reverse,
+    const QuantizedLstmParams& quantizedLstmParams) {
+  auto cached_weight_ih = read_cached_weights(weight_ih);
+  auto cached_weight_hh = read_cached_weights(weight_hh);
+  bool all_in_cache =
+      !cached_weight_ih.is_empty() && !cached_weight_hh.is_empty();
+  bool all_miss = cached_weight_ih.is_empty() && cached_weight_hh.is_empty();
+  TORCH_CHECK(
+      all_in_cache || all_miss,
+      "both of the weights of LSTM should be "
+      "cached or neither should be cached");
+
+  if (!cached_weight_ih.is_empty()) {
+    return std::make_tuple(cached_weight_ih, cached_weight_hh);
+  }
+
+  lstm_param inference_weight_desc(
+      {weight_ih,
+       weight_hh,
+       input_size,
+       num_gates,
+       hidden_size,
+       output_sizes,
+       src_layer,
+       src_iter,
+       src_iter_c,
+       bias,
+       reverse,
+       quantizedLstmParams});
+  inference_weight_desc.initialize_weight_src();
+  inference_weight_desc.initialize_attribute();
+  inference_weight_desc.set_expected_weights_desc();
+  return inference_weight_desc.get_and_save_lstm_packed_weight();
+}
+
 std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
     const at::Tensor& weight_ih,
     const at::Tensor& weight_hh,
@@ -101,89 +252,43 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
     const ideep::tensor& src_iter_c,
     const ideep::tensor& bias,
     const bool reverse,
-    const bool train) {
+    const bool train,
+    const QuantizedLstmParams& quantizedLstmParams) {
+  TORCH_CHECK(
+      weight_ih.scalar_type() == weight_hh.scalar_type(),
+      "Expected weight_ih and weight_hh to be the same scalar type");
   // TODO: This is a workaround. In training, weight prepack is not enabled
   // Will remove this when weight prepack is enabled.
   if (train) {
-    auto w1 = itensor_view_from_dense(
-        weight_ih,
-        {{1, 1, input_size, num_gates, hidden_size},
-         get_mkldnn_dtype(weight_ih.scalar_type()),
-         ideep::format_tag::ldgoi});
-    auto w2 = itensor_view_from_dense(
-        weight_hh,
-        {{1, 1, hidden_size, num_gates, hidden_size},
-         get_mkldnn_dtype(weight_hh.scalar_type()),
-         ideep::format_tag::ldgoi});
-    return std::make_tuple(w1, w2);
+    CommonLstmWeightDesc train_weight_desc(
+        {weight_ih,
+         weight_hh,
+         input_size,
+         num_gates,
+         hidden_size,
+         output_sizes,
+         src_layer,
+         src_iter,
+         src_iter_c,
+         bias,
+         reverse,
+         quantizedLstmParams});
+    train_weight_desc.initialize_weight_src();
+    train_weight_desc.initialize_attribute();
+    return train_weight_desc.get_lstm_public_weight();
   }
-  auto cached_weight_ih = read_cached_weights(weight_ih);
-  auto cached_weight_hh = read_cached_weights(weight_hh);
-  bool all_in_cache =
-      !cached_weight_ih.is_empty() && !cached_weight_hh.is_empty();
-  bool all_miss = cached_weight_ih.is_empty() && cached_weight_hh.is_empty();
-  TORCH_CHECK(
-      all_in_cache || all_miss,
-      "both of the weights of LSTM should be "
-      "cached or neither should be cached");
 
-  if (cached_weight_ih.is_empty()) {
-    auto w1 = itensor_view_from_dense(
-        weight_ih,
-        {{1, 1, input_size, num_gates, hidden_size},
-         get_mkldnn_dtype(weight_ih.scalar_type()),
-         ideep::format_tag::ldgoi});
-    auto w2 = itensor_view_from_dense(
-        weight_hh,
-        {{1, 1, hidden_size, num_gates, hidden_size},
-         get_mkldnn_dtype(weight_hh.scalar_type()),
-         ideep::format_tag::ldgoi});
-
-    ideep::tensor::desc packed_desc_ih, packed_desc_hh;
-    if (train) {
-      std::tie(packed_desc_ih, packed_desc_hh) =
-          ideep::lstm_forward_training::expected_weights_desc(
-              output_sizes,
-              src_layer,
-              src_iter,
-              src_iter_c,
-              w1,
-              w2,
-              bias,
-              reverse);
-    } else {
-      std::tie(packed_desc_ih, packed_desc_hh) =
-          ideep::lstm_forward_inference::expected_weights_desc(
-              output_sizes,
-              src_layer,
-              src_iter,
-              src_iter_c,
-              w1,
-              w2,
-              bias,
-              reverse);
-    }
-
-    // Don't pack when the weight is of rnn_packed format
-    // When the weight is of rnn_packed format, if the seq_lens of
-    // the input changes, the format of weight also changes.
-    // oneDNN does not support reorder from rnn_packed back to public format.
-    // LSTM based on BRGEMM kernel (on AVX512 and newest ISAs) will use blocked
-    // format for weight of LSTM, which won't change when the input seq_lens
-    // changes.
-    if (packed_desc_ih.is_rnn_packed() || packed_desc_hh.is_rnn_packed()) {
-      return std::make_tuple(w1, w2);
-    }
-    cached_weight_ih.init(packed_desc_ih);
-    cached_weight_hh.init(packed_desc_hh);
-
-    cached_weight_ih.feed_from(w1);
-    cached_weight_hh.feed_from(w2);
-
-    write_cached_weights(weight_ih, cached_weight_ih);
-    write_cached_weights(weight_hh, cached_weight_hh);
+  auto dtype = weight_ih.scalar_type();
+  switch (dtype) {
+    case at::ScalarType::Float:
+    case at::ScalarType::BFloat16:
+      return LSTM_PACKED_WEIGHT(LstmDtype::Float);
+    case at::ScalarType::QInt8:
+    case at::ScalarType::QUInt8:
+      return LSTM_PACKED_WEIGHT(LstmDtype::Quantized);
+    default:
+      TORCH_CHECK(false, "Invalid data type ", dtype);
   }
-  return std::make_tuple(cached_weight_ih, cached_weight_hh);
 }
 
 ideep::tensor::desc get_conv_transpose_expected_weights_desc(
