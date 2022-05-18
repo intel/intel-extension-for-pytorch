@@ -55,14 +55,14 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     #     "test_pointwise_op_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     #     "test_unary_slowpath",  # core dumped ... munmap_chunk(): invalid pointer -> torch.profiler.ProfilerActivity.XPU
     # },
-    "TestAutogradDeviceTypeXPU": {
+    # "TestAutogradDeviceTypeXPU": {
     #     "test_cdist_same_inputs",   # too slow    -> no slow in AOT
     #     "test_cdist",   # too slow   -> no slow in AOT
-        "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op?
-    },
-    "TestTensorCreationXPU": {
-        "test_tensor_ctor_device_inference",    # core dumped ... Segmentation fault
-    },
+    #     "test_sparse_backward",     # core dumped ... Segmentation fault -> no sparse tensor math op?
+    # },
+    # "TestTensorCreationXPU": {
+    #     "test_tensor_ctor_device_inference",    # core dumped ... Segmentation fault
+    # },
     "TestTorchDeviceTypeXPU": {
         # We need implemented index_put (used by index_add and index_copy)
         # with deterministic algorithm, otherwise the UT may meet failures.
@@ -97,9 +97,9 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_large_cumprod",   # too slow  -> OOM on my gen9 host
         # "test_large_cumsum",   # too slow -> OOM on my gen9 host
     },
-    "TestLinalgXPU": {
-        "test_qr",  # core dumped ... Segmetation fault
-    },
+    # "TestLinalgXPU": {
+    #     "test_qr",  # core dumped ... Segmetation fault
+    # },
     "TestReductionsXPU": {
         "test_mode_xpu",    # too slow
         "test_nansum_out_dtype",    # too slow
@@ -229,20 +229,20 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
     #     "test_frexp_out",    # core dumped ... free(): invalid size  -> OOM ../neo/opencl/source/os_interface/linux/drm_command_stream.inl
     #     "test_out_arg_all_dtypes",   # core dumped ... Segmentation fault
     },
-    "TestCommonXPU": {
-        "test_dtypes",  # core dumped ... Segmentation fault (crashed at linalg_qr)
+    # "TestCommonXPU": {
+    #     "test_dtypes",  # core dumped ... Segmentation fault (crashed at linalg_qr)
         # "test_out",     # core dumped ... free(): invalid size  -> oneDNN assert
-        "test_variant_consistency_eager",   # core dumped ... Segmentation fault (crashed at linalg_qr)
+        # "test_variant_consistency_eager",   # core dumped ... Segmentation fault (crashed at linalg_qr)
         # "test_multiple_devices",    # multi device not ready   -> issue in test scripts
-    },
-    "TestGradientsXPU": {
-        "test_fn_grad", # core dumped ... Segmentation fault (crash at linalg_qr)
-        "test_fn_gradgrad", # core dumped ... Segmentation fault (crash at linalg_qr)
-        "test_forward_mode_AD", # core dumped ... Segmentation fault (crash at linalg_qr)
+    # },
+    # "TestGradientsXPU": {
+    #     "test_fn_grad", # core dumped ... Segmentation fault (crash at linalg_qr)
+    #     "test_fn_gradgrad", # core dumped ... Segmentation fault (crash at linalg_qr)
+    #     "test_forward_mode_AD", # core dumped ... Segmentation fault (crash at linalg_qr)
         # "test_inplace_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
         # "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
         # "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-    },
+    # },
     "TestJitXPU": {
         "test_variant_consistency_jit", # hang in fft
     },
@@ -250,15 +250,15 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
         # "test_neg_view",  # core dumped ... Segmentation fault (crashed at linalg_qr)  # johnlu segment fault
     # },
-    "TestSparseCSRXPU": {
+    # "TestSparseCSRXPU": {
         # "test_add",     # core dumped ... Floating point exception
-        "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
+        # "test_coo_to_csr_convert",     # core dumped ... Segmentation fault
         # "test_csr_matvec",     # core dumped ... Floating point exception
-        "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
+        # "test_matmul_device_mismatch",  # core dumped ... Segmentation fault
         # "test_mm",      # core dumped ... Floating point exception
         # "test_sparse_addmm",    # core dumped ... Floating point exception
         # "test_sparse_mm",   # core dumped ... Floating point exception
-    },
+    # },
     "TestNNDeviceTypeXPU": {
         # oneDNN Pooling not support double will cause runtime error:
         # "could not construct a memory descriptor using a format tag".
