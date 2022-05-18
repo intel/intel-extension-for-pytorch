@@ -31,16 +31,22 @@ Tensor& bernoulli_(
     self_float = self;
   at::AtenIpexTypeXPU::uniform_(self_float, 0.0, 1.0, gen_);
   auto p = p_.to(kXPU);
-  auto iter = TensorIterator::binary_op(self, self_float, p);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
+  auto iter = TensorIteratorConfig()
+                  .add_output(self)
+                  .add_input(self_float)
+                  .add_input(p)
+                  .check_all_same_dtype(false)
+                  .build();
+
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
-      iter.dtype(),
+      iter.common_dtype(),
       "bernoulli_tensor_dpcpp_",
       [&] {
         dpcpp_kernel_for_tensor_iter(
-            iter, [](scalar_t self, scalar_t p) -> scalar_t {
-              return static_cast<scalar_t>(self < p);
+            iter, [](scalar_t self_float, scalar_t p) -> scalar_t {
+              return static_cast<scalar_t>(self_float < p);
             });
       });
   return self;
@@ -103,11 +109,16 @@ Tensor& bernoulli_out(
   else
     out_float = out;
   at::AtenIpexTypeXPU::uniform_(out_float, 0.0, 1.0, generator);
-  auto iter = TensorIterator::binary_op(out_float, out_float, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+  auto iter = TensorIteratorConfig()
+                  .add_output(out)
+                  .add_input(out_float)
+                  .add_input(self)
+                  .check_all_same_dtype(false)
+                  .build();
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
-      iter.dtype(),
+      iter.common_dtype(),
       "bernoulli_tensor_dpcpp_",
       [&] {
         dpcpp_kernel_for_tensor_iter(
@@ -115,7 +126,6 @@ Tensor& bernoulli_out(
               return static_cast<scalar_t>(out < p);
             });
       });
-  out = out_float;
   return out;
 }
 
