@@ -1159,25 +1159,33 @@ static void apply_symeig(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto n = self.size(-1);
   auto batch_size = native::batchCount(self);
+
+  auto a_stride = native::matrixStride(self);
+  auto w_stride = eigvals.size(-1);
+
   auto jobz = eigenvectors ? oneapi::mkl::job::vec : oneapi::mkl::job::novec;
   auto uplo = upper ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
   std::int64_t scratchpadsize =
       oneapi::mkl::lapack::syevd_scratchpad_size<scalar_t>(
           dpcpp_queue, jobz, uplo, n, n);
 
-  Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
-  DPCPP_ONEMKL_SUBMIT(
-      dpcpp_queue,
-      oneapi::mkl::lapack::syevd,
-      dpcpp_queue,
-      jobz,
-      uplo,
-      n,
-      (scalar_t*)(self.data_ptr()),
-      n,
-      (scalar_t*)(eigvals.data_ptr()),
-      (scalar_t*)(scratchpad_at.data_ptr()),
-      scratchpadsize);
+  for (const auto i : c10::irange(batch_size)) {
+    Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
+    scalar_t* a = &(self.data_ptr<scalar_t>()[i * a_stride]);
+    scalar_t* w = &(eigvals.data_ptr<scalar_t>()[i * w_stride]);
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::syevd,
+        dpcpp_queue,
+        jobz,
+        uplo,
+        n,
+        a,
+        n,
+        w,
+        (scalar_t*)(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  }
 #else
   AT_ERROR("symeig: oneMKL library not found in compilation");
 #endif
