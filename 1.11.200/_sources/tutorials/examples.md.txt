@@ -453,7 +453,7 @@ model.save('quantization_model.pt')
 
 #### Deployment
 
-oneDNN provides an prototype feature called [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) which could help to raise performance. No code change is required. Please install a binary with this feature enabled. Topologies like BERT could get performance boost.
+oneDNN provides an prototype feature called [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) which could help to raise performance. No code change is required. Please install [a binary](https://intel.github.io/intel-extension-for-pytorch/1.11.200/tutorials/installation.html#installation_onednn_graph_compiler) with this feature enabled. Topologies like BERT could get performance boost.
 
 
 ##### Imperative Mode
