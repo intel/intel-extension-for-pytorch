@@ -9,7 +9,8 @@ from ._utils import ParentNode, check_node_in_give_op
 
 add_inplace_op = [str(torch.Tensor.add_)]
 add_op = [str(torch.add), str(torch.Tensor.add)]
-elt_wise = [str(torch.relu), str(F.relu), str(nn.ReLU), str(torch.sigmoid), str(F.sigmoid), str(nn.Sigmoid), str(F.gelu), str(nn.GELU)]
+elt_wise = [str(torch.Tensor.relu), str(torch.relu), str(F.relu), str(nn.ReLU),\
+     str(torch.Tensor.sigmoid), str(torch.sigmoid), str(F.sigmoid), str(nn.Sigmoid), str(F.gelu), str(nn.GELU)]
 gemm_op = [str(F.conv2d), str(nn.Conv2d), str(F.conv3d), str(nn.Conv3d), str(torch.conv2d), str(torch.conv3d), \
     str(F.conv_transpose2d), str(torch.nn.ConvTranspose2d), str(F.conv_transpose3d), str(torch.nn.ConvTranspose3d),
     str(torch.conv_transpose2d), str(torch.conv_transpose2d), str(F.linear), str(nn.Linear), str(torch.matmul)]
