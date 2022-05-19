@@ -11,6 +11,7 @@
 #include "prepare_binary.h"
 #include "prepare_dequant.h"
 #include "quantization_patterns.h"
+#include "remove_mutation.h"
 
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/common_subexpression_elimination.h>
@@ -45,7 +46,7 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
         "Before mutation removal. Beginning of INT8 "
         "optimization pass",
         g);
-    RemoveTensorMutation(g);
+    IPEXRemoveTensorMutation(g);
     RemoveListMutation(g);
     GRAPH_DUMP("After mutation removal. Before DecomposeOps", g);
     DecomposeOps(g);

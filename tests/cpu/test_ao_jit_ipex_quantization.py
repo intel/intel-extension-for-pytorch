@@ -269,6 +269,43 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
                 y_after = convert_model(x)
                 self.assertEqual(y_before, y_after)
 
+class TestRemoveMutate(JitLlgaTestCase):
+    def test_mutated_value_alive_after_inplace_op(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv = torch.nn.Conv2d(3, 16, 3, 224)
+
+            def forward(self, x):
+                a = self.conv(x)
+                b = torch.sigmoid(a)
+                c = a[0]
+                a.mul_(b)
+                c += 2
+                return c
+
+        m = M()
+        x = torch.randn(1, 3, 224, 224)
+        graph, _, _ = self.prepareModel(m, [x])
+        FileCheck().check_not("aten::mul").check("aten::mul_").run(graph)
+
+    def test_mutated_value_inalive_after_inplace_op(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv = torch.nn.Conv2d(3, 16, 3, 224)
+
+            def forward(self, x):
+                a = self.conv(x)
+                b = torch.sigmoid(a)
+                res = a.mul_(b)
+                return res
+
+        m = M()
+        x = torch.randn(1, 3, 224, 224)
+        graph, _, _ = self.prepareModel(m, [x])
+        FileCheck().check_not("aten::mul_").check("aten::mul").run(graph)
+
 
 if __name__ == '__main__':
     run_tests()
