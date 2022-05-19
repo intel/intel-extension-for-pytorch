@@ -10,7 +10,7 @@ Releases
 - Support [`torch.einsum`](https://pytorch.org/docs/stable/generated/torch.einsum.html) and fuse it with `add` ([#684](https://github.com/intel/intel-extension-for-pytorch/commit/b66d6d8d0c743db21e534d13be3ee75951a3771d))
 - Fuse `Linear` and `Tanh` ([#685](https://github.com/intel/intel-extension-for-pytorch/commit/f0f2bae96162747ed2a0002b274fe7226a8eb200))
 - In addition to the original installation methods, this release provides Docker installation from [DockerHub](https://hub.docker.com/).
-- Provided the [evaluation wheel packages](https://intel.github.io/intel-extension-for-pytorch/1.11.200/tutorials/installation.html#installation_onednn_graph_compiler) that could boost performance for selective topologies on top of oneDNN graph compiler prototype feature.
+- Provided the <a class="reference external" href="installation.html#installation_onednn_graph_compiler">evaluation wheel packages</a> that could boost performance for selective topologies on top of oneDNN graph compiler prototype feature.
 ***NOTE***: This is still at an early development stage and not fully mature yet, but feel free to reach out through GitHub tickets if you have any suggestions.
 
 **[Full Changelog](https://github.com/intel/intel-extension-for-pytorch/compare/v1.11.0...v1.11.200)**
