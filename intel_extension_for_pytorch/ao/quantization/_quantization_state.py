@@ -334,7 +334,7 @@ class AutoQuantizationState(torch.nn.Module):
             quant_info = arg_quant_infos[tensor_arg_idx]
             if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
                 scale, zp, dtype = quant_info
-                weight = op.weight.data
+                weight = op.weight
                 ch_axis = 0
                 if type(op) in [torch.nn.ConvTranspose2d, torch.nn.ConvTranspose3d]:
                     ch_axis = 1
@@ -356,13 +356,13 @@ class AutoQuantizationState(torch.nn.Module):
                     arg = arg.dequantize()
                 new_args.append(arg)
             else:
-                new_args.append(op.weight.data)
+                new_args.append(op.weight)
         elif isinstance(op, torch.nn.EmbeddingBag):
             tensor_arg_idx = 0
             quant_info = arg_quant_infos[tensor_arg_idx]
             if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
                 scale, zp, dtype = quant_info
-                weight = op.weight.data
+                weight = op.weight
                 if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
                     if weight.dtype == torch.float32:
                         weight = weight.to(torch.bfloat16)
@@ -371,7 +371,7 @@ class AutoQuantizationState(torch.nn.Module):
                     arg = arg.dequantize()
                     arg = arg.to(torch.bfloat16)
                 else:
-                    arg = torch.quantize_per_tensor(op.weight.data, scale.item(), zp.item(), dtype)
+                    arg = torch.quantize_per_tensor(op.weight, scale.item(), zp.item(), dtype)
                     arg = arg.dequantize()
                 new_args.append(arg)
             else:
@@ -382,8 +382,8 @@ class AutoQuantizationState(torch.nn.Module):
             for tensor_arg_idx in range(0, len(arg_quant_infos), step):
                 quant_info = arg_quant_infos[tensor_arg_idx]
                 if quant_info is not None and any_arg_quant_or_dequant_needed[tensor_arg_idx]:
-                    w_ih =  weights[tensor_arg_idx].data
-                    w_hh =  weights[tensor_arg_idx + 1].data
+                    w_ih =  weights[tensor_arg_idx]
+                    w_hh =  weights[tensor_arg_idx + 1]
                     w_ih_scale, w_ih_zp, w_ih_dtype = quant_info
                     w_hh_scale, w_hh_zp, w_hh_dtype = arg_quant_infos[tensor_arg_idx + 1]
                     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
@@ -414,8 +414,8 @@ class AutoQuantizationState(torch.nn.Module):
                     new_args.append(w_ih)
                     new_args.append(w_hh)
                     if op.bias:
-                        new_args.append(weights[tensor_arg_idx + 2].data)
-                        new_args.append(weights[tensor_arg_idx + 3].data)
+                        new_args.append(weights[tensor_arg_idx + 2])
+                        new_args.append(weights[tensor_arg_idx + 3])
         return new_args
    
     def op_convert_after_hook(

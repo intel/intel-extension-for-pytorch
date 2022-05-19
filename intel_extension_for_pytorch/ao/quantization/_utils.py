@@ -292,6 +292,18 @@ dtype_dict = {
     str(torch.quint8): torch.quint8,
     str(torch.qint8): torch.qint8,
     str(torch.float32): torch.float32,
+    str(torch.float64): torch.float64,
+    str(torch.float16): torch.float16,
+    str(torch.bfloat16): torch.bfloat16,
+    str(torch.complex64): torch.complex64,
+    str(torch.complex128): torch.complex128,
+    str(torch.int16): torch.int16,
+    str(torch.int32): torch.int32,
+    str(torch.int64): torch.int64,
+    str(torch.bool): torch.bool,
+    str(torch.uint8): torch.uint8,
+    str(torch.int8): torch.int8,
+    str(torch.quint4x2): torch.quint4x2,
 }
 
 def _get_observer_setting(observer):
@@ -346,7 +358,7 @@ def save_quant_state(quant_state_map, configure_file):
                 info = OrderedDict()
                 info["op_type"] = op_info.type
                 info["op_type_is_module"] = op_info.type_is_module
-                info["fqn"] = str(op_info.fqn)
+                info["fqn"] = op_info.fqn
                 input_tensor_infos = []
                 for tensor_info in op_info.input_tensor_infos:
                     cur_tensor_infos = {}
@@ -397,7 +409,7 @@ def save_quant_state(quant_state_map, configure_file):
             for non_q_k, op_info in enumerate(v.seen_nonq_op_infos):
                 info = OrderedDict()
                 info["op_type"] = op_info.type
-                info["fqn"] = str(op_info.fqn)
+                info["fqn"] = op_info.fqn
                 input_tensor_infos = []
                 for tensor_info in op_info.input_tensor_infos:
                      cur_tensor_infos = {}
@@ -447,14 +459,10 @@ def load_qconf_summary_to_model(model, qconf_summary):
         layer_info = quant_state_dict[k]
         user_q_op_infos = layer_info["q_op_infos"]
         for i, q_op_info in user_q_op_infos.items():
-            op_type = q_op_info["op_type"]
             fqn = q_op_info["fqn"]
-            cur_op_type = v.idx_to_seen_q_op_infos[int(i)].type
             cur_fqn = v.idx_to_seen_q_op_infos[int(i)].fqn
             assert int(i) in v.idx_to_seen_q_op_infos and \
-                    (cur_op_type == op_type or (op_type.startswith("<built-in method") and \
-                    cur_op_type.split()[:-1] == op_type.split()[:-1])) and \
-                    cur_fqn == fqn, "Loded op info doesn't match the model's info"
+                    cur_fqn == fqn, "Loaded quantizable op info doesn't match the current model quantizable op info"
             input_tensor_infos = []
             for tensor_info in q_op_info["input_tensor_infos"]:
                 if len(tensor_info) > 0:
@@ -500,14 +508,9 @@ def load_qconf_summary_to_model(model, qconf_summary):
         #v.seen_nonq_op_infos.clear()
         idx = 0
         for _, nonq_op_info in user_nonq_op_infos.items():
-           
-            op_type = nonq_op_info["op_type"]
             fqn = nonq_op_info["fqn"]
-            cur_op_type = v.seen_nonq_op_infos[idx].type
             cur_fqn = v.seen_nonq_op_infos[idx].fqn
-            assert (cur_op_type == op_type or (op_type.startswith("<built-in method") and \
-                    cur_op_type.split()[:-1] == op_type.split()[:-1])) and \
-                    cur_fqn == fqn, "Loded nonp info doesn't match the model's info"
+            assert cur_fqn == fqn, "Loaded none-quantizable op info doesn't match the current model none-quantizable op info"
             input_tensor_infos = []
             for tensor_info in nonq_op_info["input_tensor_infos"]:
                 if len(tensor_info) > 0:

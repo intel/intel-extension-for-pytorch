@@ -132,9 +132,13 @@ class JitLlgaTestCase(JitTestCase):
             # jit trace to insert quant/dequant
             if int8_bf16:
                 with torch.cpu.amp.autocast():
-                    traced_model = ipex.quantization.convert(model, x)
+                    convert_model = ipex.quantization.convert(model)
+                    traced_model = torch.jit.trace(convert_model, x)
             else:
-                traced_model = ipex.quantization.convert(model, x)
+                convert_model = ipex.quantization.convert(model)
+                traced_model = torch.jit.trace(convert_model, x)
+            traced_model = torch.jit.freeze(traced_model)
+
             # warm up run
             y0 = traced_model(*x)
             # get the graph at the second run after freezing

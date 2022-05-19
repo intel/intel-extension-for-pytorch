@@ -50,13 +50,16 @@ for data in calibration_data_set:
 
 ```python
 # make sure the example_inputs's size is same as the real input's size 
-convert_model = convert(prepared_model, example_inputs=example_inputs)
+convert_model = convert(prepared_model)
+with torch.no_grad():
+    traced_model = torch.jit.trace(convert_model, example_input)
+    traced_model = torch.jit.freeze(traced_model)
 # for inference 
-y = convert_model(x)
+y = traced_model(x)
 
 # or save the model to deploy
 
-# convert_model.save("quantized_model.pt")
+# traced_model.save("quantized_model.pt")
 # quantized_model = torch.jit.load("quantized_model.pt")
 # quantized_model = torch.jit.freeze(quantized_model.eval())
 # ...

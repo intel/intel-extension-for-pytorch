@@ -250,7 +250,8 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
 
             def forward(self, x):
                 x = self.linear(x)
-                x = torch.relu(x)
+                y = torch.relu(x)
+                x = torch.add(x, y)
                 return x
 
         m = M()
@@ -260,13 +261,17 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
         with tempfile.TemporaryDirectory() as tmp:
                 path = os.path.join(tmp, "configure.json")
                 prepared_model.save_qconf_summary(path)
-                convert_model = ipex.quantization.convert(prepared_model, example_inputs=x)
-                y_before = convert_model(x)
+                convert_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(convert_model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                y_before = traced_model(x)
                 # load the saved qconf
                 prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
                 prepared_model.load_qconf_summary(path)
-                convert_model = ipex.quantization.convert(prepared_model, example_inputs=x)
-                y_after = convert_model(x)
+                convert_model = ipex.quantization.convert(prepared_model)
+                traced_model = torch.jit.trace(convert_model, x).eval()
+                traced_model = torch.jit.freeze(traced_model)
+                y_after = traced_model(x)
                 self.assertEqual(y_before, y_after)
 
 class TestRemoveMutate(JitLlgaTestCase):

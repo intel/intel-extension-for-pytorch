@@ -43,29 +43,20 @@ def prepare(
         example_inputs = tuple(example_inputs)
     return auto_prepare(prepare_model, configure, example_inputs)
 
-def convert(
-    model,
-    example_inputs):
+def convert(model):
     r"""
-    Convert an FP32 torch.nn.Module model to a quantized JIT ScriptModule.
-    The function will conduct a JIT trace. It will fail if the given model
-    doesn't support JIT trace.
+    Convert an FP32 prepared model to a model which will automatically insert fake quant
+    before a quantizable module or operator.
     Args:
         model (torch.nn.Module): The FP32 model to be convert.
-        example_input: (tuple or torch.Tensor):  A tuple of example inputs that
-            will be passed to the function while tracing to a script module. 
     Returns:
-        torch.jit.ScriptModule
+        torch.torch.nn.Module
     """
 
     assert isinstance(model, torch.nn.Module), "Only support nn.Module convert for quantization path"
+    # Vonvert linear and weight's dtype when use autocast, which will reduce the dtype conversion.
+    # TODO: check whether can be removed or not?
     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
         model = nn.utils._model_convert.convert_module_data_type(model, torch.bfloat16)
     convert_model = auto_convert(model)
-    try:
-        with torch.no_grad():
-            traced_model = torch.jit.trace(convert_model, example_inputs, check_trace=False).eval()
-        traced_model = torch.jit.freeze(traced_model)
-    except:
-        assert False, "Only support a traceable model to convert a quantized model now"
-    return traced_model
+    return convert_model
