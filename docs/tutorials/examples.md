@@ -7,12 +7,20 @@ Examples
 
 #### Code Changes Highlight
 
+There are only a few lines code change required to use Intel® Extension for PyTorch\* on training.
+
+Recommended code changes involve:
+1. `torch.channels_last` is recommended to be applied to both of the model object and data to raise CPU resource usage efficiency.
+2. `ipex.optimize` function applies optimizations against the model object, as well as an optimizer object.
+
+
 ```
 ...
 import torch
 import intel_extension_for_pytorch as ipex
 ...
 model = Model()
+model = model.to(memory_format=torch.channels_last)
 criterion = ...
 optimizer = ...
 model.train()
@@ -56,6 +64,7 @@ train_loader = torch.utils.data.DataLoader(
 )
 
 model = torchvision.models.resnet50()
+model = model.to(memory_format=torch.channels_last)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
@@ -104,6 +113,7 @@ train_loader = torch.utils.data.DataLoader(
 )
 
 model = torchvision.models.resnet50()
+model = model.to(memory_format=torch.channels_last)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr = LR, momentum=0.9)
 model.train()
@@ -116,7 +126,7 @@ for batch_idx, (data, target) in enumerate(train_loader):
         data = data.to(memory_format=torch.channels_last)
         output = model(data)
         loss = criterion(output, target)
-    loss.backward()
+        loss.backward()
     optimizer.step()
     print(batch_idx)
 torch.save({
@@ -193,6 +203,10 @@ torch.save({
 
 ## Inference
 
+Channels last is a memory layout format that is more friendly to Intel Architecture. It is recommended for users to utilize this memory layout format for computer vision workloads. It is as simple as invoking `to(memory_format=torch.channels_last)` function against the model object and input data.
+
+Moreover, `optimize` function of Intel® Extension for PyTorch\* applies optimizations to the model, and could bring performance boosts. For both computer vision workloads and NLP workloads, it is recommended to apply the `optimize` function against the model object.
+
 ### Float32
 
 #### Imperative Mode
@@ -244,7 +258,7 @@ with torch.no_grad():
 
 #### TorchScript Mode
 
-It is highly recommended for users to take advantage of Intel® Extension for PyTorch* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
+It is highly recommended for users to take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
 ##### Resnet50
 
@@ -301,6 +315,10 @@ with torch.no_grad():
 
 ### BFloat16
 
+Similar to running with FP32, the `optimize` function also works for BFloat16 data type. The only difference is setting `dtype` parameter to `torch.bfloat16`.
+
+Auto Mixed Precision (AMP) is recommended to be working with BFloat16 data type.
+
 #### Imperative Mode
 
 ##### Resnet50
@@ -352,7 +370,7 @@ with torch.no_grad():
 
 #### TorchScript Mode
 
-It is highly recommended for users to take advantage of Intel® Extension for PyTorch* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
+It is highly recommended for users to take advantage of Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
 ##### Resnet50
 
@@ -412,6 +430,18 @@ with torch.no_grad():
 
 #### Calibration
 
+For calibrating a model with INT8 data type, code changes are highlighted in the code snippet below.
+
+Please follow the steps below:
+
+1. Utilize `torch.fx.experimental.optimization.fuse` function to perform op folding for better performance.
+2. Import `intel_extension_for_pytorch` as `ipex`.
+3. Instantiate a config object with `ipex.quantization.QuantConf` function to save configuration data during calibration.
+4. Iterate through calibration dataset under `ipex.quantization.calibrate` scope to perform the calibration.
+5. Save the calibration data into a `json` file.
+6. Invoke `ipex.quantization.convert` function to apply the calibration configure object to the fp32 model object to get an INT8 model.
+7. Save the INT8 model into a `pt` file.
+
 ```
 import os
 import torch
@@ -420,30 +450,41 @@ model = Model()
 model.eval()
 data = torch.rand(<shape>)
 
-# Applying torch.fx.experimental.optimization.fuse against model performs 
+# Applying torch.fx.experimental.optimization.fuse against model performs
 # conv-batchnorm folding for better performance.
 import torch.fx.experimental.optimization as optimization
 model = optimization.fuse(model, inplace=True)
 
 #################### code changes ####################
 import intel_extension_for_pytorch as ipex
-conf = ipex.quantization.QuantConf(qscheme=torch.per_tensor_affine) 
-######################################################
+conf = ipex.quantization.QuantConf(qscheme=torch.per_tensor_affine)
 
-for d in calibration_data_loader(): 
-  # conf will be updated with observed statistics during calibrating with the dataset 
+for d in calibration_data_loader():
+  # conf will be updated with observed statistics during calibrating with the dataset
   with ipex.quantization.calibrate(conf):
-    model(d) 
+    model(d)
 
 conf.save('int8_conf.json', default_recipe=True)
 with torch.no_grad():
-  model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
-  model.save('quantization_model.pt')
+  model = ipex.quantization.convert(model, conf, torch.rand(<shape>))
+######################################################
+
+model.save('quantization_model.pt')
 ```
 
 #### Deployment
 
 ##### Imperative Mode
+
+In imperative mode, the INT8 model conversion is done on-the-fly.
+
+Please follow the steps below:
+
+1. Utilize `torch.fx.experimental.optimization.fuse` function to perform op folding for better performance.
+2. Import `intel_extension_for_pytorch` as `ipex`.
+3. Load the calibration configuration object from the saved file.
+4. Invoke `ipex.quantization.convert` function to apply the calibration configure object to the fp32 model object to get an INT8 model.
+5. Run inference.
 
 ```
 import torch
@@ -452,7 +493,7 @@ model = Model()
 model.eval()
 data = torch.rand(<shape>)
 
-# Applying torch.fx.experimental.optimization.fuse against model performs 
+# Applying torch.fx.experimental.optimization.fuse against model performs
 # conv-batchnorm folding for better performance.
 import torch.fx.experimental.optimization as optimization
 model = optimization.fuse(model, inplace=True)
@@ -463,15 +504,25 @@ conf = ipex.quantization.QuantConf('int8_conf.json')
 ######################################################
 
 with torch.no_grad():
-  model = ipex.quantization.convert(model, conf, torch.rand(<shape>)) 
+  model = ipex.quantization.convert(model, conf, torch.rand(<shape>))
   model(data)
 ```
 
 ##### Graph Mode
 
+In graph mode, the INT8 model is loaded from the local file and can be used directly on the inference.
+
+Please follow the steps below:
+
+1. Import `intel_extension_for_pytorch` as `ipex`.
+2. Load the INT8 model from the saved file.
+3. Run inference.
+
 ```
 import torch
+#################### code changes ####################
 import intel_extension_for_pytorch as ipex
+######################################################
 
 model = torch.jit.load('quantization_model.pt')
 model.eval()
@@ -480,6 +531,8 @@ data = torch.rand(<shape>)
 with torch.no_grad():
   model(data)
 ```
+
+oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) as a prototype feature which could boost performance for selective topologies. No code change is required. Please install [a binary](https://intel.github.io/intel-extension-for-pytorch/1.11.200/tutorials/installation.html#installation_onednn_graph_compiler) with this feature enabled. We verified this feature with `Bert-large`, `bert-base-cased`, `roberta-base`, `xlm-roberta-base`, `google-electra-base-generator` and `google-electra-base-discriminator`.
 
 ## C++
 
@@ -582,4 +635,4 @@ $ ldd example-app
 
 ## Model Zoo
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.10-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r1.10-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.11-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r1.11-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
