@@ -12,6 +12,7 @@
 #include "MemoryAccess.h"
 
 #define UNROLLED_ELEM_PER_WORK_ITEM 4
+#define LOOPS_UNROLL_WORK_SIZE 16
 
 using namespace xpu::dpcpp;
 
@@ -55,122 +56,21 @@ make_output_offset_calculator(const TensorIteratorBase& iter) {
       iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
-template <typename traits, typename ptr_t, std::size_t... INDEX>
-typename traits::ArgsTuple dereference_impl(
-    ptr_t data[],
-    const int64_t* strides,
-    int64_t i,
-    std::index_sequence<INDEX...>) {
-  return std::make_tuple(*(typename traits::template arg<
-                           INDEX>::type*)(data[INDEX] + i * strides[INDEX])...);
-}
-
-template <typename traits, typename ptr_t>
-typename traits::ArgsTuple dereference(
-    ptr_t data[],
-    const int64_t* strides,
-    int64_t i) {
-  using Indices = std::make_index_sequence<traits::arity>;
-  return dereference_impl<traits>(data, strides, i, Indices{});
-}
-
-template <int vec_size, typename T>
-struct vectorized_args_tuple {};
-
-template <int vec_size, typename... Args>
-struct vectorized_args_tuple<vec_size, std::tuple<Args...>> {
-  using vec_args_t =
-      std::tuple<native::Memory::aligned_vector_loop<Args, vec_size>...>;
-};
-
-template <int vec_size, typename T>
-struct vectorized_return_type {
-  using vec_ret_t = native::Memory::aligned_vector_loop<T, vec_size>;
-};
-
-template <
-    int unroll_index,
-    typename Result,
-    class F,
-    class TupleVector,
-    typename policy_t,
-    std::size_t... I>
-constexpr void apply_fun_impl(
-    Result&& results,
-    F& f,
-    TupleVector& t,
-    const policy_t& policy,
-    std::index_sequence<I...>) {
-  using traits = function_traits<F>;
-  using result_t = std::decay_t<decltype(results[unroll_index])>;
-  if (policy.check_inbounds(unroll_index)) {
-    results[unroll_index] = std::__invoke(
-        std::forward<F>(f),
-        std::get<I>(std::forward<TupleVector>(t))[unroll_index]...);
-  }
-}
-
-template <int unroll_index>
-struct apply_func_helper {
-  template <
-      typename Result,
-      typename F,
-      typename TupleVector,
-      typename policy_t>
-  static void apply(
-      Result&& results,
-      F&& f,
-      TupleVector&& t,
-      policy_t&& policy) {
-    using Indices = std::make_index_sequence<
-        std::tuple_size<std::decay_t<TupleVector>>::value>;
-    apply_fun_impl<unroll_index>(
-        std::forward<Result>(results),
-        std::forward<F>(f),
-        std::forward<TupleVector>(t),
-        std::forward<policy_t>(policy),
-        Indices{});
-  }
-};
-
-template <int vec_size, typename func_t, typename policy_t>
-inline void vec_elementwise_kernel_helper(func_t f, policy_t& policy) {
-  using traits = function_traits<func_t>;
-  using args_t = typename traits::ArgsTuple;
-  using vectorized_args_t =
-      typename vectorized_args_tuple<vec_size, args_t>::vec_args_t;
-  using return_t = typename traits::result_type;
-  using vectorized_ret_t =
-      typename vectorized_return_type<vec_size, return_t>::vec_ret_t;
-
-  vectorized_ret_t results;
-  vectorized_args_t args;
-
-  // load
-  policy.template load<args_t>(args);
-
-  // unroll the compute multiple times
-  native::Memory::detail::static_unroll<apply_func_helper, vec_size>::with_args(
-      results, f, args, policy);
-
-  // store
-  policy.template store<return_t>(results);
-}
-
-template <typename func_t, typename policy_t>
+template <int WORK_SIZE, typename func_t, typename policy_t>
 inline void elementwise_kernel_helper(func_t f, policy_t policy) {
   using traits = function_traits<func_t>;
   using return_t = typename traits::result_type;
   using args_t = typename traits::ArgsTuple;
 
-  return_t results[THREAD_WORK_SIZE];
-  args_t args[THREAD_WORK_SIZE];
+  return_t results[WORK_SIZE];
+  args_t args[WORK_SIZE];
 
   // load
   policy.load(args);
 
   // compute
-  for (int i = 0; i < THREAD_WORK_SIZE; i++) {
+#pragma unroll
+  for (int i = 0; i < WORK_SIZE; i++) {
     if (policy.check_inbounds(i)) {
       results[i] = c10::guts::apply(f, args[i]);
     }
@@ -201,9 +101,9 @@ static inline void unrolled_elementwise_kernel(
 
   int remaining = numel - thread_idx * vec_size;
   auto policy = at::native::Memory::policies::
-      vec_unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
+      unroll<vec_size, array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(
           data, remaining, ic, oc, l, s, thread_idx);
-  vec_elementwise_kernel_helper<vec_size>(f, policy);
+  elementwise_kernel_helper<vec_size>(f, policy);
 }
 
 template <
@@ -263,12 +163,12 @@ void vectorized_elementwise_kernel(
         at::native::Memory::LoadWithoutCast,
         at::native::Memory::StoreWithoutCast>(
         data, remaining, input_calc, output_calc, loader, storer, thread_idx);
-    elementwise_kernel_helper(fn, policy);
+    elementwise_kernel_helper<LOOPS_UNROLL_WORK_SIZE>(fn, policy);
   } else { // if this block has a full `block_work_size` data to handle, use
     // vectorized memory access
     auto policy = at::native::Memory::policies::vectorized<vec_size, array_t>(
         data, thread_idx);
-    vec_elementwise_kernel_helper<vec_size>(fn, policy);
+    elementwise_kernel_helper<vec_size>(fn, policy);
   }
 }
 
