@@ -75,11 +75,6 @@ if(BUILD_SEPARATE_OPS)
       set(op_lib intel-ext-pt-gpu-op-${obj})
       add_library(${op_lib} SHARED ${op_src})
       append_target_property(${op_lib} LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
-      # need to fix the following OPs with -O0
-      if(NOT obj MATCHES "Gamma$" AND NOT obj MATCHES "Reduce$"
-		      AND NOT obj MATCHES "ReduceDimIndex$")
-          append_target_property(${op_lib} LINK_FLAGS ${OPT_LEVEL})
-      endif()
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
       target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
       target_link_libraries(${op_lib} PUBLIC ${TORCH_LIBRARIES})
