@@ -329,10 +329,22 @@ Tensor& arange_dpcpp_out(
                     static_cast<double>(std::numeric_limits<int64_t>::max()),
             "invalid size, possible overflow?");
         int64_t size = static_cast<int64_t>(size_d);
+        int64_t numel = result.numel();
 
         if (size == 0) {
           return;
-        } else if (result.numel() != size) {
+        } else if (numel != size) {
+          TORCH_WARN(
+              "The number of elements in the out tensor of shape ",
+              result.sizes(),
+              " is ",
+              numel,
+              " which does not match the computed number of elements ",
+              size,
+              ". Note that this may occur as a result of rounding error. "
+              "The out tensor will be resized to a tensor of shape (",
+              size,
+              ",).");
           result.resize_({size});
         }
         auto& dpcpp_queue = dpcppGetCurrentQueue();
