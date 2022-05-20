@@ -1155,8 +1155,12 @@ void THPStorage_postInit(PyObject* module) {
 
   at::Backend backend = at::Backend::XPU;
 
-  //  torch::registerStoragePyTypeObject(
-  //      (PyTypeObject*)THPStorageClass, backend, scalarType);
+  if (scalarType == at::ScalarType::QInt8 ||
+      scalarType == at::ScalarType::QUInt8)
+    backend = at::Backend::QuantizedXPU;
+
+  torch::registerStoragePyTypeObject(
+      (PyTypeObject*)THPStorageClass, backend, scalarType);
 }
 
 template <>
