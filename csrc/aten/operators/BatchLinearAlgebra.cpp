@@ -2810,7 +2810,7 @@ Tensor _det_lu_based_helper_backward_helper(
     const Tensor& self,
     const Tensor& lu,
     const Tensor& pivs) {
-  auto eps = at::native::_get_epsilon(c10::toValueType(self.scalar_type()));
+  auto eps = at::native::_get_epsilon(c10::toRealValueType(self.scalar_type()));
   auto n = self.size(-1);
   auto eps_tensor = at::tensor(eps, self.options());
   auto condition_diagonal = [&](const Tensor& x) {
