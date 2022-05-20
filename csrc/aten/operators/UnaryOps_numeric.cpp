@@ -26,7 +26,7 @@ static inline Tensor& unary_op_impl_with_complex_to_float_out(
     bool promotes_integer_to_float) {
   if (self.is_complex() && !result.is_complex()) {
     // Checks if the corresponding float type can be cast to the desired dtype
-    const auto float_type = c10::toValueType(self.scalar_type());
+    const auto float_type = c10::toRealValueType(self.scalar_type());
     TORCH_CHECK(
         canCast(float_type, result.scalar_type()),
         "result type ",
@@ -124,7 +124,7 @@ Tensor& angle_out(const Tensor& self, Tensor& result) {
 
 Tensor angle(const Tensor& self) {
   if (self.is_complex()) {
-    const auto float_type = c10::toValueType(self.scalar_type());
+    const auto float_type = c10::toRealValueType(self.scalar_type());
     Tensor result = at::empty({0}, self.options().dtype(float_type));
     return at::angle_out(result, self);
   }

@@ -116,11 +116,11 @@ class THXPStorage_Bridge {
       at::IntArrayRef size_,
       at::IntArrayRef stride_) {
     c10::raw::intrusive_ptr::incref(storage_);
-    THTensor_wrap(self).set_(
-        at::Storage(c10::intrusive_ptr<at::StorageImpl>::reclaim(storage_)),
-        storageOffset_,
-        size_,
-        stride_);
+    //    THTensor_wrap(self).set_(
+    //        at::Storage(c10::intrusive_ptr<at::StorageImpl>::reclaim(storage_)),
+    //        storageOffset_,
+    //        size_,
+    //        stride_);
   }
 
   template <at::ScalarType T>
@@ -132,7 +132,7 @@ class THXPStorage_Bridge {
       at::DispatchKey key) {
     using scalar_t = typename c10::impl::ScalarTypeToCPPType<T>::type;
     c10::raw::intrusive_ptr::incref(storage);
-    THTensor* self =
+    at::TensorImpl* self =
         c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
             c10::intrusive_ptr<at::StorageImpl>::reclaim(storage),
             key,
@@ -173,7 +173,8 @@ class THXPStorage_Bridge {
   static void Storage_copyFromCPU<scalarType>(
       at::StorageImpl* xpu,
       at::StorageImpl* cpu_src) {
-    THArgCheck(xpu->nbytes() == cpu_src->nbytes(), 2, "size does not match");
+    //    THArgCheck(xpu->nbytes() == cpu_src->nbytes(), 2, "size does not
+    //    match");
     xpu::dpcpp::dpcppMemcpy(
         xpu->data(),
         cpu_src->data(),
@@ -203,7 +204,8 @@ class THXPStorage_Bridge {
   static void Storage_copyFromXPU<scalarType>(
       at::StorageImpl* xpu,
       at::StorageImpl* xpu_src) {
-    THArgCheck(xpu->nbytes() == xpu_src->nbytes(), 2, "size does not match");
+    //    THArgCheck(xpu->nbytes() == xpu_src->nbytes(), 2, "size does not
+    //    match");
     xpu::dpcpp::dpcppMemcpy(
         xpu->data(),
         xpu_src->data(),
@@ -374,7 +376,7 @@ class THXPStorage_Bridge {
       const char* fileName,
       ptrdiff_t size,
       int isShared) {
-    THError("not available yet for THCStorage");
+    //    THError("not available yet for THCStorage");
     return NULL;
   }
 
@@ -407,8 +409,8 @@ class THXPStorage_Bridge {
     // TODO: add current device
     // xpu::dpcpp::getCurrentDevice
 
-    if (!self->resizable())
-      THError("Trying to resize storage that is not resizable");
+    //    if (!self->resizable())
+    //      THError("Trying to resize storage that is not resizable");
 
     if (size_bytes == 0) {
       self->set_data_ptr(
@@ -421,7 +423,7 @@ class THXPStorage_Bridge {
         xpu::dpcpp::dpcppMemcpyAsync(
             data.get(),
             self->data(),
-            THMin(self->nbytes(), size_bytes),
+            std::min(self->nbytes(), (size_t)size_bytes),
             xpu::dpcpp::dpcppMemcpyKind::DeviceToDevice);
       }
 
@@ -441,10 +443,10 @@ class THXPStorage_Bridge {
       at::StorageImpl* self,
       ptrdiff_t index,
       scalar_t value) {
-    THArgCheck(
-        (index >= 0) && (index < (self->nbytes() / sizeof(scalar_t))),
-        2,
-        "index out of bounds");
+    //    THArgCheck(
+    //        (index >= 0) && (index < (self->nbytes() / sizeof(scalar_t))),
+    //        2,
+    //        "index out of bounds");
     dpcppMemcpy(
         self->data<scalar_t>() + index,
         &value,
@@ -512,8 +514,9 @@ class THXPStorage_Bridge {
       PyObject* args,
       PyObject* kwargs) {
     HANDLE_TH_ERRORS
-    return THPStorageCopyMethod(
-        THXPStorage_copy_functions, (PyObject*)self, args, kwargs);
+    return NULL;
+    //    return THPStorageCopyMethod(
+    //        THXPStorage_copy_functions, (PyObject*)self, args, kwargs);
     END_HANDLE_TH_ERRORS
   }
 
@@ -545,7 +548,7 @@ class THXPStorage_Bridge {
         THPUtils_checkReal<scalar_t>(number_arg),
         "fill_ expects %s, "
         "but got %s",
-        THPUtils_typeTraits<scalar_t>::python_type_str,
+        //        THPUtils_typeTraits<scalar_t>::python_type_str,
         THPUtils_typename(number_arg));
     Storage_fill(self->cdata, THPUtils_unpackReal<scalar_t>(number_arg));
     Py_INCREF(self);
@@ -649,7 +652,7 @@ class THXPStorage_Bridge {
       THPUtils_setError(
           "can only set storage content with a %s, but got "
           "%s instead",
-          THPUtils_typeTraits<scalar_t>::python_type_str,
+          //          THPUtils_typeTraits<scalar_t>::python_type_str,
           THPUtils_typename(value));
       return -1;
     }
@@ -933,9 +936,9 @@ class THXPStorage_Bridge {
             "tried to construct a storage from a sequence (%s), "
             "but one of the items was of type %s instead of %s",
             THPUtils_typename(first_arg),
-            THPUtils_typename(item.get()),
-            THPUtils_typeTraits<typename c10::impl::ScalarTypeToCPPType<
-                scalarType>::type>::python_type_str);
+            THPUtils_typename(item.get())/*,*/
+            /*THPUtils_typeTraits<typename c10::impl::ScalarTypeToCPPType<
+                scalarType>::type>::python_type_str*/);
         return nullptr;
       }
       return (PyObject*)self.release();
@@ -956,66 +959,7 @@ class THXPStorage_Bridge {
     END_HANDLE_TH_ERRORS
   }
 
-  static void THXPStorage_initCopyMethods() {
-    // from CPU storage to this one.
-#define THXP_STORAGE_COPY_FROM_CPU(TYPE)                \
-  THPInsertStorageCopyFunction<THPStorage, THPStorage>( \
-      &THP##TYPE##StorageType,                          \
-      THXPStorage_copy_functions,                       \
-      &Storage_copyFromCPU<at::k##TYPE>);
-    THXP_STORAGE_COPY_FROM_CPU(Byte);
-    THXP_STORAGE_COPY_FROM_CPU(Char);
-    THXP_STORAGE_COPY_FROM_CPU(Short);
-    THXP_STORAGE_COPY_FROM_CPU(Int);
-    THXP_STORAGE_COPY_FROM_CPU(Long);
-    THXP_STORAGE_COPY_FROM_CPU(Half);
-    THXP_STORAGE_COPY_FROM_CPU(Float);
-    THXP_STORAGE_COPY_FROM_CPU(Double);
-    THXP_STORAGE_COPY_FROM_CPU(Bool);
-    THXP_STORAGE_COPY_FROM_CPU(BFloat16);
-    THXP_STORAGE_COPY_FROM_CPU(QUInt8);
-    THXP_STORAGE_COPY_FROM_CPU(QInt8);
-#undef THXP_STORAGE_COPY_FROM_CPU
-
-    // from this storage to XPU.
-#define THXP_STORAGE_COPY_FROM_XPU(TYPE)                 \
-  THPInsertStorageCopyFunction<THPStorage, THPStorage>(  \
-      THXPStorage_Bridge<at::k##TYPE>::THXPStorage_Type, \
-      THXPStorage_copy_functions,                        \
-      &Storage_copyFromXPU<at::k##TYPE>);
-    THXP_STORAGE_COPY_FROM_XPU(Byte);
-    THXP_STORAGE_COPY_FROM_XPU(Char);
-    THXP_STORAGE_COPY_FROM_XPU(Short);
-    THXP_STORAGE_COPY_FROM_XPU(Int);
-    THXP_STORAGE_COPY_FROM_XPU(Long);
-    THXP_STORAGE_COPY_FROM_XPU(Half);
-    THXP_STORAGE_COPY_FROM_XPU(Float);
-    THXP_STORAGE_COPY_FROM_XPU(Double);
-    THXP_STORAGE_COPY_FROM_XPU(Bool);
-    THXP_STORAGE_COPY_FROM_XPU(BFloat16);
-    THXP_STORAGE_COPY_FROM_XPU(QUInt8);
-    THXP_STORAGE_COPY_FROM_XPU(QInt8);
-
-    // from this storage to CPU.
-#define THXP_STORAGE_COPY_TO_CPU(TYPE)                  \
-  extern THPCopyList TH##TYPE##Storage_copy_functions;  \
-  THPInsertStorageCopyFunction<THPStorage, THPStorage>( \
-      THXPStorage_Type,                                 \
-      TH##TYPE##Storage_copy_functions,                 \
-      &Storage_copyToCPU<at::k##TYPE>);
-    THXP_STORAGE_COPY_TO_CPU(Byte);
-    THXP_STORAGE_COPY_TO_CPU(Char);
-    THXP_STORAGE_COPY_TO_CPU(Short);
-    THXP_STORAGE_COPY_TO_CPU(Int);
-    THXP_STORAGE_COPY_TO_CPU(Long);
-    THXP_STORAGE_COPY_TO_CPU(Half);
-    THXP_STORAGE_COPY_TO_CPU(Float);
-    THXP_STORAGE_COPY_TO_CPU(Double);
-    THXP_STORAGE_COPY_TO_CPU(Bool);
-    THXP_STORAGE_COPY_TO_CPU(BFloat16);
-    THXP_STORAGE_COPY_TO_CPU(QUInt8);
-    THXP_STORAGE_COPY_TO_CPU(QInt8);
-  }
+  static void THXPStorage_initCopyMethods() {}
   static PyTypeObject* THXPStorage_Type;
   static PyObject* THXPStorage_Class;
   static THPCopyList THXPStorage_copy_functions;
@@ -1203,16 +1147,15 @@ bool THXPStorage_init(PyObject* module) {
   return true;
 }
 
-template <at::ScalarType scalarType>
-void THXPStorage_postInit(PyObject* module) {
-  // Initialize the copy method.
-  THXPStorage_Bridge<scalarType>::THXPStorage_initCopyMethods();
+PyObject* THPStorageClass = nullptr;
 
-  std::string module_name(toString(scalarType));
-  module_name.append("Storage");
-  THXPStorage_Bridge<scalarType>::THXPStorage_Class =
-      PyObject_GetAttrString(module, (char*)module_name.c_str());
-  if (!THXPStorage_Bridge<scalarType>::THXPStorage_Class)
+template <at::ScalarType scalarType>
+void THPStorage_postInit(PyObject* module) {
+  // Initialize the copy method.
+  //  THXPStorage_Bridge<scalarType>::THXPStorage_initCopyMethods();
+
+  THPStorageClass = PyObject_GetAttrString(module, "_UntypedStorage");
+  if (!THPStorageClass)
     throw python_error();
 
   at::Backend backend = at::Backend::XPU;
@@ -1222,15 +1165,13 @@ void THXPStorage_postInit(PyObject* module) {
     backend = at::Backend::QuantizedXPU;
 
   torch::registerStoragePyTypeObject(
-      (PyTypeObject*)THXPStorage_Bridge<scalarType>::THXPStorage_Class,
-      backend,
-      scalarType);
+      (PyTypeObject*)THPStorageClass, backend, scalarType);
 }
 
 template <>
 void THPPointer<at::StorageImpl>::free() {
   if (ptr) {
-    THStorage_free(ptr);
+    //    THStorage_free(ptr);
   }
 }
 
@@ -1300,17 +1241,15 @@ PyObject* THDPStorage_postInitExtension(PyObject* module) {
   HANDLE_TH_ERRORS
 
   // Register Storage Python objects with DynamicTypes.cpp
-  THXPStorage_postInit<at::kBool>(module);
-  THXPStorage_postInit<at::kChar>(module);
-  THXPStorage_postInit<at::kHalf>(module);
-  THXPStorage_postInit<at::kShort>(module);
-  THXPStorage_postInit<at::kInt>(module);
-  THXPStorage_postInit<at::kLong>(module);
-  THXPStorage_postInit<at::kFloat>(module);
-  THXPStorage_postInit<at::kDouble>(module);
-  THXPStorage_postInit<at::kBFloat16>(module);
-  THXPStorage_postInit<at::kQInt8>(module);
-  THXPStorage_postInit<at::kQUInt8>(module);
+  //  THPStorage_postInit<at::kBool>(module);
+  THPStorage_postInit<at::kByte>(module);
+  //  THPStorage_postInit<at::kHalf>(module);
+  //  THPStorage_postInit<at::kShort>(module);
+  //  THPStorage_postInit<at::kInt>(module);
+  //  THPStorage_postInit<at::kLong>(module);
+  //  THPStorage_postInit<at::kFloat>(module);
+  //  THPStorage_postInit<at::kDouble>(module);
+  //  THPStorage_postInit<at::kBFloat16>(module);
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -1322,18 +1261,7 @@ PyObject* THDPStorage_postInitExtension(PyObject* module) {
 
 PyObject* THDPStorage_init(PyObject* module) {
   HANDLE_TH_ERRORS
-  ASSERT_TRUE(THXPStorage_init<at::kBool>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kChar>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kHalf>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kShort>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kInt>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kLong>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kBFloat16>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kQInt8>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kQUInt8>(module));
-
+  ASSERT_TRUE(THXPStorage_init<at::kByte>(module));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
