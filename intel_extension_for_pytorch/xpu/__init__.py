@@ -16,6 +16,7 @@ from .amp import *
 from .utils import *
 from .random import *
 from .memory import *
+from .overrides import set_default_tensor_type as set_default_tensor_type
 
 from torch._utils import _get_device_index
 import intel_extension_for_pytorch.optim as optim
@@ -456,3 +457,12 @@ torch._register_device_module('xpu', current_module)
 
 # post initial
 intel_extension_for_pytorch._C._postInitExtension()
+
+class FloatTensor:
+    def __new__(self, e):
+        return torch.tensor(e, device='xpu', dtype=torch.float)
+
+
+class DoubleTensor:
+    def __new__(self, e):
+        return torch.tensor(e, device='xpu', dtype=torch.float64)
