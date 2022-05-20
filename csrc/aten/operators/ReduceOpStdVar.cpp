@@ -155,7 +155,7 @@ Tensor& std_var_out(
           at::isComplexType(self.scalar_type()),
       "std and var only support floating-point dtypes");
   if (at::isComplexType(self.scalar_type())) {
-    ScalarType dtype = c10::toValueType(get_dtype(result, self, {}, true));
+    ScalarType dtype = c10::toRealValueType(get_dtype(result, self, {}, true));
     Tensor real_in = at::real(self).to(dtype);
     Tensor real_out = at::empty({0}, self.options().dtype(dtype));
     auto iter =
@@ -210,7 +210,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
       toString(result2.scalar_type()),
       ".");
   if (at::isComplexType(self.scalar_type())) {
-    ScalarType dtype = c10::toValueType(get_dtype(result1, self, {}, true));
+    ScalarType dtype = c10::toRealValueType(get_dtype(result1, self, {}, true));
     Tensor real_in = at::real(self).to(dtype);
     Tensor real_out_var = at::empty({0}, self.options().dtype(dtype));
     Tensor real_out_mean = at::empty({0}, self.options().dtype(dtype));
