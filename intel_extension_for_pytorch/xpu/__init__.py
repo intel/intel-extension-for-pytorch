@@ -280,6 +280,8 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
 
 from torch.storage import _StorageBase
 
+from torch.storage import _TypedStorage, _LegacyStorage
+
 @staticmethod  # type: ignore[misc]
 def _lazy_new(cls, *args, **kwargs):
     _lazy_init()
@@ -304,58 +306,71 @@ class _XPUBase(object):
 class ShortStorage(_XPUBase, intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
     pass
 
+class _UntypedStorage(intel_extension_for_pytorch._C.ByteStorageBase, _StorageBase):
+    @classmethod
+    def from_buffer(cls, *args, **kwargs):
+        raise RuntimeError('from_buffer: Not available for XPU storage')
 
-class CharStorage(_XPUBase, intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
-    pass
+    @classmethod
+    def _new_with_weak_ptr(cls, *args, **kwargs):
+        raise RuntimeError('_new_with_weak_ptr: Not available for XPU storage')
 
-
-class IntStorage(_XPUBase, intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
-    pass
-
-
-class LongStorage(_XPUBase, intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
-    pass
-
-
-class BoolStorage(_XPUBase, intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
-    pass
+    @classmethod
+    def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
+        raise RuntimeError('_new_shared_filename: Not available for XPU storage')
 
 
-class HalfStorage(_XPUBase, intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
-    pass
+class ByteStorage(_LegacyStorage):
+    @classproperty
+    def dtype(self):
+        return torch.uint8
 
-
-class DoubleStorage(_XPUBase, intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
-    pass
-
-
-class FloatStorage(_XPUBase, intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
-    pass
-
-
-class BFloat16Storage(_XPUBase, intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
-    pass
-
-
-class QUInt8Storage(_XPUBase, intel_extension_for_pytorch._C.QUInt8StorageBase, _StorageBase):
-    pass
-
-
-class QInt8Storage(_XPUBase, intel_extension_for_pytorch._C.QInt8StorageBase, _StorageBase):
-    pass
-
-
-torch._storage_classes.add(ShortStorage)
-torch._storage_classes.add(CharStorage)
-torch._storage_classes.add(IntStorage)
-torch._storage_classes.add(LongStorage)
-torch._storage_classes.add(BoolStorage)
-torch._storage_classes.add(HalfStorage)
-torch._storage_classes.add(DoubleStorage)
-torch._storage_classes.add(FloatStorage)
-torch._storage_classes.add(BFloat16Storage)
-torch._storage_classes.add(QUInt8Storage)
-torch._storage_classes.add(QInt8Storage)
+# class ShortStorage(intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
+#     pass
+#
+#
+# class CharStorage(intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
+#     pass
+#
+#
+# class IntStorage(intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
+#     pass
+#
+#
+# class LongStorage(intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
+#     pass
+#
+#
+# class BoolStorage(intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
+#     pass
+#
+#
+# class HalfStorage(intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
+#     pass
+#
+#
+# class DoubleStorage(intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
+#     pass
+#
+#
+# class FloatStorage(intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
+#     pass
+#
+#
+# class BFloat16Storage(intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
+#     pass
+#
+#
+# torch._storage_classes.add(ShortStorage)
+# torch._storage_classes.add(CharStorage)
+# torch._storage_classes.add(IntStorage)
+# torch._storage_classes.add(LongStorage)
+# torch._storage_classes.add(BoolStorage)
+# torch._storage_classes.add(HalfStorage)
+# torch._storage_classes.add(DoubleStorage)
+# torch._storage_classes.add(FloatStorage)
+# torch._storage_classes.add(BFloat16Storage)
+intel_extension_for_pytorch._C._initExtension()
 
 
 def _xpu_tag(obj):
