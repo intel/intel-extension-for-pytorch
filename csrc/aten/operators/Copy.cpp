@@ -327,7 +327,8 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
       xpu::oneDNN::onednn_strides_check(src) &&
       xpu::oneDNN::is_supported_onednn_dtype(self) &&
       xpu::oneDNN::is_supported_onednn_dtype(src) &&
-      src.dim() <= MAX_ONEDNN_SUPPORTED_DIMS) {
+      src.dim() <= MAX_ONEDNN_SUPPORTED_DIMS &&
+      !xpu::oneDNN::is_broadcast(self) && !xpu::oneDNN::is_broadcast(src)) {
     xpu::oneDNN::reorder_copy(src, self);
   } else {
     impl::copy_kernel_dpcpp(iter, non_blocking);
