@@ -30,8 +30,7 @@ def _default_recipe_init(nodes):
             continue
         if node.qconfig is not None:
             # others, we will add q+dq before the quantizable op firstly.
-            idx = 0
-            for tensor_info in node.input_tensor_infos:
+            for idx, tensor_info in enumerate(node.input_tensor_infos):
                 # only support fp32 tensor->int8 tensor
                 if tensor_info is not None and (tensor_info.orig_dtype == torch.float32) and tensor_info.id in node.input_scale_zero:
                     # gemm's weight
@@ -39,7 +38,7 @@ def _default_recipe_init(nodes):
                         tensor_info.inf_dtype = node.qconfig.weight().dtype
                     else:
                         tensor_info.inf_dtype = node.qconfig.activation().dtype
-                idx = idx + 1
+                    node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
             # ipex customer op, check the qconfig's setting, if not meet the requiresments, reset the inputs'(weight) inf dtype
             for tensor_info in node.weight_tensor_infos:
                 # nn.EmbeddingBag use activation observer and only support torch.qint8 and torch.per_tensor_symmetric
@@ -51,8 +50,10 @@ def _default_recipe_init(nodes):
             # reset the input's inf dtype.
             if check_node_in_give_op(node, ipex_customer_op):
                 if not(node.qconfig.activation().dtype == torch.qint8 and node.qconfig.activation().qscheme == torch.per_tensor_symmetric):
-                    for tensor_info in node.input_tensor_infos and tensor_info is not None:
-                        tensor_info.inf_dtype = tensor_info.orig_dtype
+                    for idx, tensor_info in enumerate(node.input_tensor_infos):
+                        if tensor_info is not None:
+                            tensor_info.inf_dtype = tensor_info.orig_dtype
+                            node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
 
 def _find_gemm_node_before_given_node(node):
     r"""
@@ -89,9 +90,10 @@ def _set_node_input_inf_dtype_to_orig_dtype(node):
     This is function is about set the node's input inf dtype to orig_dtype, which can be used to
     avoid inserting fake quant befoe current node. 
     """
-    for tensor_info in node.input_tensor_infos:
+    for idx, tensor_info in enumerate(node.input_tensor_infos):
         if tensor_info is not None:
             tensor_info.inf_dtype = tensor_info.orig_dtype
+            node.input_tensor_force_inf_dtype[idx] = tensor_info.inf_dtype
 
 def _check_has_quantized_node_before_node(node):
     r"""
@@ -132,8 +134,8 @@ def _check_has_quantized_node_before_node(node):
         else:
             if check_node_in_give_op(node, ipex_customer_op):
                 if check_node_in_give_op(node, [str(interaction), str(torch.ops.torch_ipex.interaction_forward)]):
-                    for tensor_info in node.input_tensor_infos:
-                        if tensor_info.inf_dtype  == torch.qint8:
+                    for force_inf_dtype in next.input_tensor_force_inf_dtype:
+                        if force_inf_dtype  == torch.qint8:
                             return True
                     return False
                 else:
@@ -167,8 +169,9 @@ def _check_has_quantized_node_after_node(node):
             else:
                 if check_node_in_give_op(next, ipex_customer_op):
                     if check_node_in_give_op(next, [str(interaction), str(torch.ops.torch_ipex.interaction_forward)]):
-                        for tensor_info in next.input_tensor_infos:
-                            if tensor_info.inf_dtype != torch.qint8:
+                        # node.input_tensor_infos may be set, we can use force_inf_dtype to check whether this op is quantizabled.
+                        for force_inf_dtype in next.input_tensor_force_inf_dtype:
+                            if force_inf_dtype != torch.qint8:
                                 return False
                     else:
                         # embeddingBag
@@ -256,6 +259,7 @@ def _add_recipe(node):
         # add can fused with gemm.
         if node.input_tensor_infos[0] is not None and node.input_tensor_infos[0] in gemm_node.output_tensor_infos:
             node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
+            node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
             # set another input's dtype, if another's input is form fp32 op, we can remove the fake quant.
             if node.input_tensor_infos[1] is not None:
                 if node.input_tensor_infos[1] in node.pre_nodes[0].output_tensor_infos:
@@ -264,8 +268,11 @@ def _add_recipe(node):
                     pre_node = node.pre_nodes[1]
                 if not _check_has_quantized_node_before_node(pre_node):
                     node.input_tensor_infos[1].inf_dtype = node.input_tensor_infos[1].orig_dtype
+                    node.input_tensor_force_inf_dtype[1] = node.input_tensor_infos[1].inf_dtype
+
         elif node.input_tensor_infos[1] is not None and node.input_tensor_infos[1] in gemm_node.output_tensor_infos:
             node.input_tensor_infos[1].inf_dtype = node.input_tensor_infos[1].orig_dtype
+            node.input_tensor_force_inf_dtype[1] = node.input_tensor_infos[1].inf_dtype
             # set another input's dtype, if another's input is form fp32 op, we can remove the fake quant.
             if node.input_tensor_infos[0] is not None:
                 if node.input_tensor_infos[0] in node.pre_nodes[0].output_tensor_infos:
@@ -274,6 +281,7 @@ def _add_recipe(node):
                     pre_node = node.pre_nodes[1]
                 if not _check_has_quantized_node_before_node(pre_node):
                     node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
+                    node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
 
 # get a default recipe
 def get_defaut_recipe(nodes):
@@ -299,15 +307,18 @@ def get_defaut_recipe(nodes):
                 if len(node.pre_nodes) == 0:
                     if not has_post_quantized_op:
                         node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
+                        node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
                 else:
                     # has gemm(add) pre_op
                     if _find_node_fused_with_elt_wise(node) is not None:
                         node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
+                        node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
                     else:
                         has_pre_quantized_node = _check_has_quantized_node_before_node(node.pre_nodes[0])
                         # if it's pre and post nodes are fp32 nodes, set input inf_dtype to orig_dtype.
                         if not (has_pre_quantized_node or has_post_quantized_op):
                              node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
+                             node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
             else:
                 # For none-quantizabled gemm and elt_wise, we don't need quantize it if it's prr and post ops
                 # are all fp32 op, which can get a better performance.
@@ -323,3 +334,19 @@ def get_defaut_recipe(nodes):
                 # the node's pre and post node are all fp32 node.
                 if not (has_pre_quantized_node or has_post_quantized_node):
                     node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
+                    node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
+
+    # For some operators, we only support INT8->INT8, so we should make sure the cur op's output has a fake quant.
+    for node in nodes:
+        if isinstance(node, ParentNode):
+            continue
+        if node.qconfig is not None and check_node_in_give_op(node, ipex_customer_op):
+            if node.type in str(torch.nn.EmbeddingBag) and node.weight_tensor_infos[0].inf_dtype == torch.qint8 and \
+                node.output_tensor_infos[0].inf_dtype != torch.qint8:
+                node.output_tensor_infos[0].inf_dtype = torch.qint8
+            elif node.type  == str(F.embedding_bag) and node.input_tensor_force_inf_dtype[1] == torch.qint8 and node.output_tensor_infos[0].inf_dtype:
+                node.output_tensor_infos[0].inf_dtype= node.input_tensor_force_inf_dtype[1] 
+            else:
+                # for interation, we only need to check the fist input(all input should has same input dtype)
+                if node.input_tensor_force_inf_dtype[0] == torch.qint8 and node.output_tensor_infos[0].inf_dtype:
+                   node.output_tensor_infos[0].inf_dtype = node.input_tensor_force_inf_dtype[0] 

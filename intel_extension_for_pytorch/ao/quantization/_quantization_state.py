@@ -427,7 +427,7 @@ class AutoQuantizationState(torch.nn.Module):
         This function is called after an op call in a converted model.
         """
         # we always add fakeQuant before the quantized op, but if one op doesn't support INT8->FP32,
-        # and it's post op is FP32 op, we need add fakeQuant here to make the quantized op call in 
+        # we need add fakeQuant here to make the quantized op call in
         # INT8 path. It can be removed after all op support INT8->fp32
         seen_q_op_info = self._get_cur_seen_q_op_info()
         int8_to_int8_ops = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.nn.EmbeddingBag), \
@@ -436,9 +436,8 @@ class AutoQuantizationState(torch.nn.Module):
             if isinstance(outputs, torch.Tensor):
                 tensor_info = seen_q_op_info.output_tensor_infos[0]
                 tensor_id, orig_dtype, inf_dtype = tensor_info.id, tensor_info.orig_dtype, tensor_info.inf_dtype
-                # only support fp32->int8, so if orig_dtype == inf_dtype, we can think the post ops is fp32 op,
-                # we need add fake quant here.
-                if tensor_id in self.tensor_id_to_scale_zp and orig_dtype == inf_dtype:
+                # so if inf_dtype is torch.qint8, we need add fake quant here.
+                if tensor_id in self.tensor_id_to_scale_zp and inf_dtype == torch.qint8:
                     scale, zp = self.tensor_id_to_scale_zp[tensor_id]
                     output_is_bfloat16 = False
                     if outputs.dtype == torch.bfloat16:
@@ -457,7 +456,7 @@ class AutoQuantizationState(torch.nn.Module):
                     if isinstance(output, torch.Tensor):
                         tensor_info = seen_q_op_info.output_tensor_infos[idex]
                         tensor_id, orig_dtype, inf_dtype = tensor_info.id, tensor_info.orig_dtype, tensor_info.inf_dtype
-                        if tensor_id in self.tensor_id_to_scale_zp and orig_dtype == inf_dtype:
+                        if tensor_id in self.tensor_id_to_scale_zp and inf_dtype == torch.qint8:
                             scale, zp = self.tensor_id_to_scale_zp[tensor_id]
                             output_is_bfloat16
                             if outputs.dtype == torch.bfloat16:
@@ -591,6 +590,7 @@ class AutoQuantizationState(torch.nn.Module):
         op: Callable,
         arg: Any,
         arg_tensor_infos: List[Optional[QTensorInfo]],
+        arg_tensor_force_inf_dtype: List[Optional[torch.dtype]],
         qtensor_id: List[int]
     ) -> None:
         """
@@ -603,6 +603,7 @@ class AutoQuantizationState(torch.nn.Module):
         # TODO(next): fix this for torch.cat
         if not isinstance(arg, torch.Tensor):
             arg_tensor_infos.append(None)
+            arg_tensor_force_inf_dtype.append(None)
             return
 
         # If a tensor does not have an ID, add it. This allows
@@ -610,8 +611,10 @@ class AutoQuantizationState(torch.nn.Module):
         if not hasattr(arg, '_qtensor_info'):
             arg._qtensor_info = QTensorInfo(  # type: ignore[attr-defined]
                 qtensor_id[0], arg.dtype, arg.dtype)
+            
             qtensor_id[0] += 1
         arg_tensor_infos.append(arg._qtensor_info)  # type: ignore[attr-defined]
+        arg_tensor_force_inf_dtype.append(arg.dtype)
 
     def _first_call_op_prepare_before_hook_create_subgraphs(
         self,
@@ -628,14 +631,15 @@ class AutoQuantizationState(torch.nn.Module):
         of this op in `self`.
         """
         arg_tensor_infos: List[Optional[QTensorInfo]] = []
+        arg_tensor_force_inf_dtype: List[Optional[torch.dtype]] = []
         for arg in args:
             if isinstance(arg, (list, tuple)):
                 for inner_arg in arg:
                     self._first_call_op_prepare_before_hook_create_subgraphs_tensor(
-                        op, inner_arg, arg_tensor_infos, qtensor_id)
+                        op, inner_arg, arg_tensor_infos, arg_tensor_force_inf_dtype, qtensor_id)
             else:
                 self._first_call_op_prepare_before_hook_create_subgraphs_tensor(
-                    op, arg, arg_tensor_infos, qtensor_id)
+                    op, arg, arg_tensor_infos, arg_tensor_force_inf_dtype, qtensor_id)
 
         if op_quantizeability_type is OpQuantizeabilityType.NOT_QUANTIZEABLE:
             op_type_is_module = isinstance(op, torch.nn.Module)
@@ -658,7 +662,7 @@ class AutoQuantizationState(torch.nn.Module):
                         weight_tensor_infos.append(QTensorInfo(weight_idx, weights[weight_idx].dtype, weights[weight_idx].dtype))
                         weight_idx += 1
             self.idx_to_seen_q_op_infos[self.idx] = SeenQOpInfo(
-                self.idx, str(op_type), op_type_is_module, fqn, arg_tensor_infos, [], weight_tensor_infos, self.qconfig)
+                self.idx, str(op_type), op_type_is_module, fqn, arg_tensor_infos, arg_tensor_force_inf_dtype, [], weight_tensor_infos, self.qconfig)
         return args, kwargs
 
     def _first_call_op_prepare_after_hook_adjust_subgraphs(
@@ -738,7 +742,7 @@ class AutoQuantizationState(torch.nn.Module):
                         obs = qconfig.weight.with_args(ch_axis=1)()
                     else:
                         obs = qconfig.weight()
-                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
+                self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
         # LSTM, we don't know whether has bais or not, so we add observer for all them, but will not use them at convert step.
         # w_ih, w_hh share same observe, and b_ih, b_hh also share same observer
         if seen_q_op_info.type == str(torch.nn.LSTM):

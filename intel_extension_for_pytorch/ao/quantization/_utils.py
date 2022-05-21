@@ -188,6 +188,7 @@ class Node:
         self.type = op_infos.type
         self.fqn = op_infos.fqn
         self.input_tensor_infos = op_infos.input_tensor_infos
+        self.input_tensor_force_inf_dtype = [] if qconfig is None else op_infos.input_tensor_force_inf_dtype
         self.output_tensor_infos = op_infos.output_tensor_infos
         self.weight_tensor_infos = [] if qconfig is None else op_infos.weight_tensor_infos
         self.qconfig = qconfig
@@ -360,12 +361,14 @@ def save_quant_state(quant_state_map, configure_file):
                 info["op_type_is_module"] = op_info.type_is_module
                 info["fqn"] = op_info.fqn
                 input_tensor_infos = []
-                for tensor_info in op_info.input_tensor_infos:
+                for tensor_info, force_dtype in zip(op_info.input_tensor_infos, op_info.input_tensor_force_inf_dtype):
                     cur_tensor_infos = {}
+
                     if tensor_info is not None:
                         cur_tensor_infos["id"] = tensor_info.id
                         cur_tensor_infos["orig_dtype"] = str(tensor_info.orig_dtype)
                         cur_tensor_infos["inf_dtype"] = str(tensor_info.inf_dtype)
+                        cur_tensor_infos["force_dtype"] = str(force_dtype)
                         if tensor_info.id in v.tensor_id_to_scale_zp:
                             cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[tensor_info.id][0].tolist()
                             cur_tensor_infos["zero_point"] = v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
@@ -464,9 +467,11 @@ def load_qconf_summary_to_model(model, qconf_summary):
             assert int(i) in v.idx_to_seen_q_op_infos and \
                     cur_fqn == fqn, "Loaded quantizable op info doesn't match the current model quantizable op info"
             input_tensor_infos = []
+            input_force_dtype_infos = []
             for tensor_info in q_op_info["input_tensor_infos"]:
                 if len(tensor_info) > 0:
                     input_tensor_infos.append(QTensorInfo(tensor_info["id"], dtype_dict[tensor_info["orig_dtype"]], dtype_dict[tensor_info["inf_dtype"]]))
+                    input_force_dtype_infos.append(dtype_dict[tensor_info["force_dtype"]])
                     if "scale" in tensor_info: 
                         scale = torch.FloatTensor(tensor_info["scale"])
                         zp = torch.LongTensor(tensor_info["zero_point"])
@@ -500,6 +505,7 @@ def load_qconf_summary_to_model(model, qconf_summary):
             qconfig = QConfig(activation=_create_observer(activation_observer), weight = _create_observer(weight_observer))
             # overide the cur model's info 
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_infos = input_tensor_infos
+            v.idx_to_seen_q_op_infos[int(i)].input_tensor_force_inf_dtype = input_force_dtype_infos
             v.idx_to_seen_q_op_infos[int(i)].output_tensor_infos = output_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].weight_tensor_infos = weight_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].qconfig = qconfig

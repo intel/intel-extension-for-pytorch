@@ -1,5 +1,4 @@
 import dataclasses
-import enum
 from typing import Callable, Tuple, Any, List, Optional, Dict
 import torch
 import torch.nn as nn
@@ -20,7 +19,6 @@ functions_supported_by_quantization =set([
     F.avg_pool3d,
     F.max_pool2d,
     F.max_pool3d,
-    torch.flatten,
     F.conv2d,
     F.conv3d,
     torch.conv2d,
@@ -161,6 +159,14 @@ class SeenQOpInfo:
     # Information about the input tensors
     # Non-tensor inputs are represented with None.
     input_tensor_infos: List[Optional[QTensorInfo]]
+    # We use input_tensor_infos's inf_dtype to check whether we need add fake quant
+    # at convert step, but sometimes, the QTensorInfo's infor may used by many 
+    # operators, and one operator may set QTensorInfo' inf dtype to fp32, which hope
+    # use fp32 kernel, but the cur op hope use low-precison op, so we introduce this flag
+    # to fix the multi-use case: if input_tensor_force_inf_dtype has low-precison, we will
+    # ignore the related QTensorInfo's inf dtype even QTensorInfo's inf dtype is fp32 dtype.
+    # Note: the inint value of the QTensorInfo's  is orig dtype.
+    input_tensor_force_inf_dtype: List[Optional[torch.dtype]]
     # Information about the output tensors
     # Non-tensor outputs are represented with None.
     output_tensor_infos: List[QTensorInfo]
@@ -171,6 +177,7 @@ class SeenQOpInfo:
         s = f"(type): {self.type}\n"
         s += f"     (fqn): {self.fqn}\n"
         s += f"     (input_tensor_infos): {self.input_tensor_infos}\n"
+        s += f"     (input_tensor_force_inf_dtype): {self.input_tensor_force_inf_dtype}\n"
         s += f"     (output_tensor_infos): {self.output_tensor_infos}\n"
         s += f"     (weight_tensor_infos): {self.weight_tensor_infos}\n"
         s += f"     (qconfig): {self.qconfig}"
@@ -353,18 +360,27 @@ def get_input_args_quant_dequant_info(
     * if the tensor input does not need a quant, the list will contain None
     """
     quant_infos: List[Optional[Tuple[float, int, torch.dtype]]] = []
+    quantized_dtype = [torch.quint8, torch.qint8]
     any_arg_quant_or_dequant_needed = []
     if len(seen_q_op_info.input_tensor_infos) > 0:
-        for _, input_arg in enumerate(seen_q_op_info.input_tensor_infos):
+        for i, input_arg in enumerate(seen_q_op_info.input_tensor_infos):
             if input_arg is not None:
                 if input_arg.id in tensor_id_to_scale_zp:
                     tensor_id = input_arg.id
-                    output_dtype = input_arg.inf_dtype
+                    inf_dtype = input_arg.inf_dtype
+                    # force_inf_dtype always should be same as input_arg.inf_dtype, but some time,
+                    # the input arg may be used by many other operators, and it may have be been
+                    # changed by other operators, so for cur op, twe check whether input_arg.inf_dtype
+                    # is same as the origin force_inf_dtype, if not same use force_inf_dtype as new
+                    # inf dtype, if same, we can say the input_arg.inf_dtype is not changed or the cur op
+                    # changed input_arg.inf_dtype and force_inf_dtype at get default recipe step.
+                    if seen_q_op_info.input_tensor_force_inf_dtype[i] != input_arg.inf_dtype:
+                        inf_dtype = seen_q_op_info.input_tensor_force_inf_dtype[i]
                 
                     scale, zp = tensor_id_to_scale_zp[tensor_id]
-                    quant_infos.append((scale, zp, output_dtype))  # type: ignore[arg-type]
+                    quant_infos.append((scale, zp, inf_dtype))  # type: ignore[arg-type]
                     # only support float to int8.
-                    if input_arg.orig_dtype == torch.float32 and input_arg.inf_dtype in [torch.quint8, torch.qint8]:
+                    if input_arg.orig_dtype == torch.float32 and inf_dtype in quantized_dtype:
                         any_arg_quant_or_dequant_needed.append(True)
                     else:
                         any_arg_quant_or_dequant_needed.append(False)

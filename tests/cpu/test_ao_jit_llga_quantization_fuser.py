@@ -561,6 +561,33 @@ class TestFusionPattern(JitLlgaTestCase):
                     self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
                     self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
                     self.checkPatterns(graph, patterns)
+ 
+    def test_add_quantization(self):
+        class M(nn.Module):
+            def __init__(self, bias=False):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(16, 16, 1)
+                self.conv2 = nn.Conv2d(16, 16, 1)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                y = self.conv2(x)
+                y = y.mul(10)
+                z = torch.add(x, y)
+                return z
+
+        m = M().eval()
+        x = torch.rand(1, 16, 16, 16, requires_grad=False)
+        x2 = torch.rand(1, 16, 16, 16, requires_grad=False)
+
+        patterns = [
+            ["aten::dequantize", "aten::_convolution"],
+            ["aten::dequantize", "aten::_convolution"]
+        ]
+        graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel'])
+        self.checkPatterns(graph, patterns)
 
     def test_conv2d_sigmoid_mul_(self):
         class M(nn.Module):
