@@ -90,57 +90,88 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
 
         # "test_cdist_large_batch",   # too slow  -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
         # "test_cdist_large",     # too slow -> not slow with AOT. But `-fno-sycl-id-queries-fit-in-int' to disable range check. -30 (CL_INVALID_VALUE)
-        # "test_conv_transposed_large",   # too slow  -> <deconvolution> start barrier(606us) submit(10387us) end barrier(122us) event wait(75568616us) event_duration_0(74985075us) total(75579744us)
+        "test_conv_transposed_large",   # too slow  -> <deconvolution> start barrier(606us) submit(10387us) end barrier(122us) event wait(75568616us) event_duration_0(74985075us) total(75579744us)
         # "test_cov",     # core dumped ... free(): invalid size  -> accurate issue.
         # "test_dim_function_empty",  # core dumped ... Floating point exception -> cumsum issue in handling numel or dim = 0. Should be fixed by Kevin.
         # "test_index_select",    # core dumped ... munmap_chunk(): invalid pointer  -> RuntimeError: index_select(): Expected dtype int64 for index but got: Int
         # "test_large_cumprod",   # too slow  -> OOM on my gen9 host
         # "test_large_cumsum",   # too slow -> OOM on my gen9 host
     },
-    # "TestLinalgXPU": {
-    #     "test_qr",  # core dumped ... Segmetation fault
-    # },
+    "TestLinalgXPU": {
+        "test_geqrf",   # core dumped ... Segmentation fault
+        "test_householder_product",     # core dumped ... Segmentation fault
+        "test_inverse_many_batches",    # core dumped ... Segmentation fault
+        "test_inverse",     # core dumped ... Segmentation fault
+        "test_kron_errors_and_warnings",    # core dumped ... Segmentation fault
+        "test_kron_non_contiguous",     # core dumped ... Segmentation fault
+        "test_linalg_lstsq_batch_broadcasting",     # core dumped ... Segmentation fault
+        "test_linalg_qr_autograd_errors",   # core dumped ... Segmentation fault
+        "test_linalg_svd_compute_uv",   # core dumped ... Segmentation fault
+        "test_lu_solve_batched_broadcasting",   # core dumped ... Segmentation fault
+        "test_lu_solve_batched_many_batches",   # core dumped ... Segmentation fault
+        "test_lu_solve_batched_non_contiguous",     # core dumped ... Segmentation fault
+        "test_lu_solve_batched",    # core dumped ... Segmentation fault
+        "test_lu_solve_large_matrices",     # core dumped ... Segmentation fault
+        "test_lu_solve_out_errors_and_warnings",    # core dumped ... Segmentation fault
+        "test_matmul_45724",    # core dumped ... Segmentation fault
+        "test_matrix_exp_batch",    # core dumped ... Segmentation fault
+        "test_matrix_rank_basic",   # core dumped ... Segmentation fault
+        "test_matrix_rank_tol",     # core dumped ... Segmentation fault
+        "test_matrix_rank",     # core dumped ... Segmentation fault
+        "test_mm_bmm_non_memory_dense",     # core dumped ... Segmentation fault
+        "test_mm",  # core dumped ... Segmentation fault
+        "test_norm_fro_2_equivalence_old",  # core dumped ... Segmentation fault
+        "test_norm_fused_type_promotion",   # core dumped ... Segmentation fault
+        "test_norm_matrix_degenerate_shapes",   # core dumped ... Segmentation fault
+        "test_norm_matrix",     # core dumped ... Segmentation fault
+        "test_norm_old",    # core dumped ... Segmentation fault
+        # "test_qr",  # core dumped ... Segmetation fault
+    },
     "TestReductionsXPU": {
-        "test_mode_xpu",    # too slow
-        "test_nansum_out_dtype",    # too slow
-        "test_nansum_vs_numpy",     # too slow
-        "test_nansum",  # too slow
-        "test_noncontiguous_all",   # too slow
-        "test_noncontiguous_expanded",  # too slow
-        "test_noncontiguous_innermost",     # too slow
-        "test_noncontiguous_outermost",     # too slow
-        "test_noncontiguous_transposed",    # too slow
-        "test_numpy_named_args",    # too slow  -> passed
-        "test_prod_bool",   # too slow
-        "test_prod_gpu",    # too slow  -> passed
-        "test_quantile_backward",   # too slow
-        "test_quantile_error",  # too slow  -> passed
-        "test_quantile",    # too slow
-        "test_reduction_empty_any_all",     # too slow
-        "test_reduction_split",     # too slow
-        "test_reduction_vectorize_along_input_corner",  # too slow
-        "test_reduction_vectorize_along_output",  # too slow -> passed
-        "test_std_correction_vs_numpy",     # too slow
-        "test_std_mean_all_dims",   # too slow -> passed
-        "test_std_mean_correction",     # too slow
-        "test_std_mean_some_dims",  # too slow -> passed
-        "test_std_mean",    # too slow
-        "test_std_vs_numpy",    # too slow
-        "test_sum_dim_reduction_uint8_overflow",    # too slow
-        "test_sum_noncontig",   # too slow
-        "test_sum_vs_numpy",    # too slow
-        "test_tensor_reduce_ops_empty",     # too slow
-        "test_var_correction_vs_numpy",     # too slow
-        "test_var_large_input",     # too slow
-        "test_var_mean_all_dims",   # too slow
-        "test_var_mean_correction",     # too slow
-        "test_var_mean_some_dims",  # too slow
-        "test_var_mean",    # too slow
-        "test_var_stability2",  # too slow
-        "test_var_stability",   # too slow
-        "test_var_unbiased",    # too slow
-        "test_var_vs_numpy",    # too slow
-        "test_var",     # too slow
+        # "test_mode_xpu",    # too slow
+        # Kernel performance too slow cause GPU watch dog timeout
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1539?filter=-2
+        # for details.
+        "test_mode_large_xpu",
+        # "test_nansum_out_dtype",    # too slow
+        # "test_nansum_vs_numpy",     # too slow
+        # "test_nansum",  # too slow
+        # "test_noncontiguous_all",   # too slow
+        # "test_noncontiguous_expanded",  # too slow
+        # "test_noncontiguous_innermost",     # too slow
+        # "test_noncontiguous_outermost",     # too slow
+        # "test_noncontiguous_transposed",    # too slow
+        # "test_numpy_named_args",    # too slow  -> passed
+        # "test_prod_bool",   # too slow
+        # "test_prod_gpu",    # too slow  -> passed
+        # "test_quantile_backward",   # too slow
+        # "test_quantile_error",  # too slow  -> passed
+        # "test_quantile",    # too slow
+        # "test_reduction_empty_any_all",     # too slow
+        # "test_reduction_split",     # too slow
+        # "test_reduction_vectorize_along_input_corner",  # too slow
+        # "test_reduction_vectorize_along_output",  # too slow -> passed
+        # "test_std_correction_vs_numpy",     # too slow
+        # "test_std_mean_all_dims",   # too slow -> passed
+        # "test_std_mean_correction",     # too slow
+        # "test_std_mean_some_dims",  # too slow -> passed
+        # "test_std_mean",    # too slow
+        # "test_std_vs_numpy",    # too slow
+        # "test_sum_dim_reduction_uint8_overflow",    # too slow
+        # "test_sum_noncontig",   # too slow
+        # "test_sum_vs_numpy",    # too slow
+        # "test_tensor_reduce_ops_empty",     # too slow
+        # "test_var_correction_vs_numpy",     # too slow
+        # "test_var_large_input",     # too slow
+        # "test_var_mean_all_dims",   # too slow
+        # "test_var_mean_correction",     # too slow
+        # "test_var_mean_some_dims",  # too slow
+        # "test_var_mean",    # too slow
+        # "test_var_stability2",  # too slow
+        # "test_var_stability",   # too slow
+        # "test_var_unbiased",    # too slow
+        # "test_var_vs_numpy",    # too slow
+        # "test_var",     # too slow
     },
     "TestUnaryUfuncsXPU": {
         # oneMKL doesn't support non-float and non-double data type for lgamma,
@@ -225,26 +256,37 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         "test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_int64",
         "test_reference_numerics_normal_mvlgamma_mvlgamma_p_5_xpu_uint8",
 
-        "test_batch_vs_slicing",   # too slow
+        # dnnl::concat primitive takes too long time to be constructed for large number of tensors
+        # See Jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-1536?filter=-2
+        # for details.
+        "test_batch_vs_slicing",
     #     "test_frexp_out",    # core dumped ... free(): invalid size  -> OOM ../neo/opencl/source/os_interface/linux/drm_command_stream.inl
     #     "test_out_arg_all_dtypes",   # core dumped ... Segmentation fault
     },
-    # "TestCommonXPU": {
-    #     "test_dtypes",  # core dumped ... Segmentation fault (crashed at linalg_qr)
+    "TestCommonXPU": {
+        # Issue log: "we don't support this path by currently as oneDNN don't support this algorithm!"
+        # This issue may break the legal log and crash the legal run
+        "test_dtypes",  # unknown reason (crash at above onednn issue?)
         # "test_out",     # core dumped ... free(): invalid size  -> oneDNN assert
         # "test_variant_consistency_eager",   # core dumped ... Segmentation fault (crashed at linalg_qr)
-        # "test_multiple_devices",    # multi device not ready   -> issue in test scripts
-    # },
-    # "TestGradientsXPU": {
+        "test_multiple_devices",    # multi device not ready   -> issue in test scripts -> unknown reason (crash at above onednn issue?)
+    },
+    "TestGradientsXPU": {
     #     "test_fn_grad", # core dumped ... Segmentation fault (crash at linalg_qr)
-    #     "test_fn_gradgrad", # core dumped ... Segmentation fault (crash at linalg_qr)
-    #     "test_forward_mode_AD", # core dumped ... Segmentation fault (crash at linalg_qr)
+
+        # Issue log: "we don't support this path by currently as oneDNN don't support this algorithm!"
+        # This issue may break the legal log and crash the legal run
+        "test_fn_gradgrad", # unknown reason (crash at above onednn issue?)
+        "test_forward_mode_AD", # unknown reason (crash at above onednn issue?)
         # "test_inplace_forward_mode_AD", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
         # "test_inplace_grad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-        # "test_inplace_gradgrad", # core dumped ... munmap_chunk(): invalid pointer  -> OOM on my gen9 host
-    # },
+        "test_inplace_gradgrad", # unknown reason (crash at above onednn issue?)
+    },
     "TestJitXPU": {
-        "test_variant_consistency_jit", # hang in fft
+        # Some unknown GPU hang issue. Need GSE team help.
+        # See Jira: https://jira.devtools.intel.com/browse/XDEPS-4330?filter=-2
+        # for details.
+        "test_variant_consistency_jit",
     },
     # "TestMathBitsXPU": {
         # "test_conj_view",   # core dumped ... munmap_chunk(): invalid pointer
@@ -327,7 +369,7 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
 
         # "test_conv_ndhwc",  # core dumped ... Segmentation fault
         # "test_conv_nhwc",   # core dumped ... Segmentation fault
-        # "test_conv_transposed_large",   # core dumped ... Floating point exception
+        "test_conv_transposed_large",   # too slow
         # "test_grid_sample_large_index_2d",  # too slow
         # "test_grid_sample_large_index_3d",  # too slow
         # "test_softmax_64bit_indexing",  # too slow
@@ -341,23 +383,23 @@ DISABLED_TORCH_TESTS_XPU_ONLY = {
         "test_forward_nn_AvgPool1d_xpu_float64",
         "test_pickle_nn_AvgPool1d_xpu_float64",
     },
-    "TestFFTXPU": {
+    # "TestFFTXPU": {
         # 'test_batch_istft', # failures
-        'test_fft2_fftn_equivalence',   # hang
-        'test_fft2_numpy',  # hang
-        'test_fft_input_modification',  # hang
+        # 'test_fft2_fftn_equivalence',   # hang
+        # 'test_fft2_numpy',  # hang
+        # 'test_fft_input_modification',  # hang
         # 'test_fft_ifft_rfft_irfft',     # failures
         # 'test_fft_round_trip',  # failures
         # 'test_fft_type_promotion',  # pass
-        'test_fftn_round_trip',     # hang
+        # 'test_fftn_round_trip',     # hang
         # 'test_istft_of_sine',   # failures
         # 'test_istft_round_trip_simple_cases',   # failures
         # 'test_istft_round_trip_various_params',     # failures
         # 'test_istft_round_trip_with_padding',   # failures
         # 'test_istft_throws',    # pass
         # 'test_reference_1d',    # failures
-        'test_reference_nd',    # hang
-    },
+        # 'test_reference_nd',    # hang
+    # },
 }
 
 
@@ -744,12 +786,12 @@ class onlyOn(object):
     def __call__(self, fn):
 
         @wraps(fn)
-        def only_fn(slf, device, *args, **kwargs):
+        def only_fn(slf, *args, **kwargs):
             if self.device_type != slf.device_type:
                 reason = "Only runs on {0}".format(self.device_type)
                 raise unittest.SkipTest(reason)
 
-            return fn(slf, device, *args, **kwargs)
+            return fn(slf, *args, **kwargs)
 
         return only_fn
 

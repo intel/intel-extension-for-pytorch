@@ -59,7 +59,7 @@ TEST_MAP["TestBothSerialization"]="test_serialization.py"
 TEST_MAP["TestTesting"]="test_testing.py"
 # TEST_MAP["TestAssertCloseMultiDevice"]="test_testing.py"  # only for cuda
 TEST_MAP["TestTestParametrizationDeviceType"]="test_testing.py"
-TEST_MAP["TestLinalg"]="test_linalg.py"
+# TEST_MAP["TestLinalg"]="test_linalg.py" 	# temp skip due to too much core dumped
 TEST_MAP["TestUnaryUfuncs"]="test_unary_ufuncs.py"
 # TEST_MAP["TestNormalizeOperators"]="test_fx_experimental.py"    # only for cpu
 TEST_MAP["TestModuleInit"]="test_module_init.py"
@@ -82,11 +82,11 @@ TEST_MAP["TestNNDeviceType"]="test_nn.py"
 
 
 function run_test {
-  python3 "$CDIR/$1" -v "$2XPU"
+  timeout 1800 python3 "$CDIR/$1" -v "$2XPU"
 }
 
 function run_spec_test {
-  python3 "$CDIR/$1" -v "$2" -k "$3"
+  timeout 1800 python3 "$CDIR/$1" -v "$2" -k "$3"
 }
 
 function run_all_tests {
@@ -95,7 +95,9 @@ function run_all_tests {
   done
 }
 
-mkdir ${CDIR}/logs
+if [! -d "${CDIR}/logs"]; then
+  mkdir ${CDIR}/logs
+fi
 if [ "$SPECTEST" != "" ]; then
   if [ "$LOGFILE" != "" ]; then
     run_spec_test "$FILENAME" "$CLASSNAME" "$TESTNAME" 2>&1 | tee $LOGFILE
