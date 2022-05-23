@@ -455,7 +455,9 @@ bool checkQuantization(Block* block) {
 
     if (node->kind() == Symbol::aten("quantize_per_tensor") ||
         node->kind() == Symbol::aten("dequantize") ||
-        node->kind() == Symbol::aten("quantize_per_channel")) {
+        node->kind() == Symbol::aten("quantize_per_channel") ||
+        node->kind() == Symbol::aten("quantized_lstm") ||
+        node->kind() == Symbol::fromQualString("quantized::linear_dynamic")) {
       return true;
     }
   }
@@ -476,11 +478,11 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // remove BailOut and BailoutTemplate
   RemoveBailOutNodesAndSpecializeTypes(graph->block());
   RemoveBailoutTemplateNodes(graph->block());
-
   // LLGA fusion pass for int8
   GRAPH_DUMP(
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
       graph);
+
   if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
     RemoveRedundantAliases(graph);
     fuser::onednn::fuseGraph(graph);

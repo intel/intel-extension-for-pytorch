@@ -10,7 +10,7 @@ from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type
         sync_pool_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, load_qconf_summary_to_model
 from ._quantization_state import AutoQuantizationState, AutoQuantizationStateModuleDict, init_model_quant_state
 from ._recipe import get_defaut_recipe
-
+from ._module_swap_utils import swap_child_modules
 
 # AutoQuantizationState lives in parent module's _modules.
 # Currently, `torch.nn.Sequential`'s forward iterates over all
@@ -540,7 +540,8 @@ def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
         for _, v in module._fqn_to_auto_quant_state_map.items():
             v.tensor_id_to_observer.clear()
             v.weight_tensor_id_to_observer.clear()
-    # Attach quan_info to parent each module
+    # Attach quant_info to parent each module
     attach_op_convert_info_to_model(module)
+    swap_child_modules(module)
     module.__class__ = QuantizationDispatchModule
     return module

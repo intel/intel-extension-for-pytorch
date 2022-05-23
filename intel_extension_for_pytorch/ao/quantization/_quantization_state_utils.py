@@ -3,6 +3,7 @@ from typing import Callable, Tuple, Any, List, Optional, Dict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.quantized.dynamic as nnqd
 from intel_extension_for_pytorch.nn.functional import interaction
 import intel_extension_for_pytorch._C as core
 
@@ -63,14 +64,23 @@ module_types_supported_by_quantization = set([
     torch.nn.EmbeddingBag,
     torch.nn.Flatten,
     torch.nn.LSTM,
+    # dynamic quantization module
+    nnqd.Linear,
+    nnqd.LSTM,
     ])
 
 may_inplace_module = set([
     torch.nn.ReLU,
     ])
 
-binary_related_ops = (
+
+a_related_to_b = (
     (str(torch.add), str(torch.Tensor.add)),
+    (str(torch.Tensor.add), str(torch.add)),
+    (str(torch.nn.Linear), str(nnqd.Linear)),
+    (str(nnqd.Linear), str(torch.nn.Linear)),
+    (str(torch.nn.LSTM), str(nnqd.LSTM)),
+    (str(nnqd.LSTM), str(torch.nn.LSTM)),
 )
 
 conv_linear_ops = [
@@ -123,7 +133,7 @@ def ops_are_related(
     if type_is_module:
         cur_op = type(cur_op)
     return str(cur_op) == expected_op_type or \
-        (str(cur_op), expected_op_type) in binary_related_ops
+        (str(cur_op), expected_op_type) in a_related_to_b
 
 def _raise_obs_not_found_error(func):
     raise RuntimeError(

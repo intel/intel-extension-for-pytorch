@@ -15,7 +15,8 @@ from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 from torch.testing._internal.common_utils import TEST_SCIPY, TemporaryFileName
 
 import intel_extension_for_pytorch as ipex
-from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver, QConfig
+from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver, \
+        QConfig, PlaceholderObserver
 
 default_weight_observer = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
 
@@ -34,6 +35,9 @@ static_qconfig = [
             weight = default_weight_observer),
         ]
 
+dynamic_qconfig = QConfig(
+        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
+        weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric))
 
 class TestIpexOps(JitLlgaTestCase):
     def test_adaptive_avg_pool2d(self):
@@ -303,6 +307,39 @@ class TestRemoveMutate(JitLlgaTestCase):
         x = torch.randn(1, 3, 224, 224)
         graph, _, _ = self.prepareModel(m, [x])
         FileCheck().check_not("aten::mul_").check("aten::mul").run(graph)
+
+class TestDynamicQuantization(JitLlgaTestCase):
+    def test_linear_dynamic(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(3, 3)
+
+            def forward(self, x):
+                x = self.linear(x)
+                return x
+
+        m = M().eval()
+        x = torch.randn(1, 3)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=dynamic_qconfig)
+        FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
+    
+    def test_lstm_dynamic(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.lstm =  torch.nn.LSTM(10, 20, 2)
+
+            def forward(self, x, hx, cx):
+                x, h_xs = self.lstm(x, (hx, cx))
+                return x, h_xs 
+
+        m = M().eval()
+        x = torch.randn(5, 3, 10)
+        h = torch.randn(2, 3, 20)
+        c = torch.randn(2, 3, 20)
+        graph = self.checkQuantizeTrace(m, [x, h, c], atol=2e-1, qconfig=dynamic_qconfig)
+        FileCheck().check_not("aten:lstm").check("aten::quantized_lstm").run(graph)
 
 
 if __name__ == '__main__':

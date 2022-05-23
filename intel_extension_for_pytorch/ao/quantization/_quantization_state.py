@@ -416,6 +416,10 @@ class AutoQuantizationState(torch.nn.Module):
                     if op.bias:
                         new_args.append(weights[tensor_arg_idx + 2])
                         new_args.append(weights[tensor_arg_idx + 3])
+                else:
+                    for s in range(step):
+                        new_args.append(weights[tensor_arg_idx + s])
+
         return new_args
    
     def op_convert_after_hook(
@@ -713,7 +717,8 @@ class AutoQuantizationState(torch.nn.Module):
                 # always add observer if the op can be quantized.
                 tensor_id = tensor_info.id  # type: ignore[attr-defined]
                 weight_arg_idx = get_weight_arg_idx(seen_q_op_info.type)
-                if idx == weight_arg_idx:
+                # avoid add weight observer for dynamic quantization.
+                if idx == weight_arg_idx and not isinstance(qconfig.activation(), torch.ao.quantization.PlaceholderObserver):
                     # conv_transpose weight is iohw or iodhw, so we change the observer axis to 1.
                     if seen_q_op_info.type in [str(F.conv_transpose2d), str(F.conv_transpose3d)] and \
                         isinstance(qconfig.weight(), torch.ao.quantization.PerChannelMinMaxObserver):
@@ -736,17 +741,18 @@ class AutoQuantizationState(torch.nn.Module):
                 tensor_id = tensor_info.id  # type: ignore[attr-defined]
                 if seen_q_op_info.type == str(torch.nn.EmbeddingBag):
                     obs = qconfig.activation()
-                else:
+                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
+                elif not isinstance(qconfig.activation(), torch.ao.quantization.PlaceholderObserver):
                     if seen_q_op_info.type in [str(torch.nn.ConvTranspose2d), str(torch.nn.ConvTranspose3d)] and \
                         isinstance(qconfig.weight(), torch.ao.quantization.PerChannelMinMaxObserver):
                         obs = qconfig.weight.with_args(ch_axis=1)()
                     else:
                         obs = qconfig.weight()
-                self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
+                    self.weight_tensor_id_to_observer[str(seen_q_op_info.idx) + "_" + str(tensor_id)] = obs
         # LSTM, we don't know whether has bais or not, so we add observer for all them, but will not use them at convert step.
         # w_ih, w_hh share same observe, and b_ih, b_hh also share same observer
         if seen_q_op_info.type == str(torch.nn.LSTM):
-            if qconfig is not None:
+            if qconfig is not None and not isinstance(qconfig.activation(), torch.ao.quantization.PlaceholderObserver):
                 for i in range(0, len(seen_q_op_info.weight_tensor_infos), 2):
                     tensor_id = seen_q_op_info.weight_tensor_infos[i].id
                     obs = qconfig.weight()
