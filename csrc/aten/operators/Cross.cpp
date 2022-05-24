@@ -1,5 +1,8 @@
 #include <ATen/ATen.h>
+#include <ATen/native/TensorIterator.h>
+#include <core/detail/OffsetCalculator.h>
 
+#include "Loops.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -9,20 +12,89 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename scalar_t>
-void cross(Tensor& self_, const Tensor& x, const Tensor& y, int dimension) {
-  int64_t sx = x.stride(dimension);
-  int64_t sy = y.stride(dimension);
-  int64_t so = self_.stride(dimension);
+void launch_cross_kernel(
+    const TensorIteratorBase& iter,
+    int64_t ostride,
+    int64_t xstride,
+    int64_t ystride) {
+  const auto N = iter.numel();
+  auto offset_calculator = make_element_offset_calculator<3>(iter);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+      N > 0 && N <= std::numeric_limits<int32_t>::max());
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t work_group_size = dpcppMaxWorkGroupSize(dev_id);
+  int64_t work_group_num = (N + work_group_size - 1) / work_group_size;
 
-  auto nx = x.narrow(dimension, 0, 1);
-  auto ny = y.narrow(dimension, 0, 1);
-  auto nself = at::empty_like(self_);
-  TensorImpl_set(TensorImpl_Unwrap(nself), TensorImpl_Unwrap(self_));
-  nself = nself.narrow(dimension, 0, 1);
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(
+      kHalf, iter.common_dtype(), "cross_xpu", [&]() {
+        auto cgf = DPCPP_Q_CGF(cgh) {
+          auto out = static_cast<scalar_t*>(iter.data_ptr(0));
+          auto x = static_cast<const scalar_t*>(iter.data_ptr(1));
+          auto y = static_cast<const scalar_t*>(iter.data_ptr(2));
 
-  DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-      nself, nx, ny, TensorCrossOp<scalar_t>(sx, sy, so));
+          auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+            int64_t linear_index = item_id.get_global_id(0);
+            for (int64_t i = linear_index; i < N;
+                 i += work_group_num * work_group_size) {
+              const auto offsets = offset_calculator.get(i);
+              auto* out_row = out + offsets[0];
+              const auto* x_row = x + offsets[1];
+              const auto* y_row = y + offsets[2];
+
+              const scalar_t val0 =
+                  (x_row[1 * xstride] * y_row[2 * ystride] -
+                   x_row[2 * xstride] * y_row[1 * ystride]);
+
+              const scalar_t val1 =
+                  (x_row[2 * xstride] * y_row[0 * ystride] -
+                   x_row[0 * xstride] * y_row[2 * ystride]);
+
+              const scalar_t val2 =
+                  (x_row[0 * xstride] * y_row[1 * ystride] -
+                   x_row[1 * xstride] * y_row[0 * ystride]);
+
+              out_row[0 * ostride] = val0;
+              out_row[1 * ostride] = val1;
+              out_row[2 * ostride] = val2;
+            }
+          };
+          cgh.parallel_for(
+              DPCPP::nd_range<1>(
+                  DPCPP::range<1>(work_group_num * work_group_size),
+                  DPCPP::range<1>(work_group_size)),
+              kfn);
+        };
+
+        DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+      });
+}
+
+void cross(Tensor& result, const Tensor& x, const Tensor& y, int dimension) {
+  const int64_t ostride = result.stride(dimension);
+  const int64_t xstride = x.stride(dimension);
+  const int64_t ystride = y.stride(dimension);
+
+  auto iter =
+      TensorIteratorConfig()
+          .add_output(result)
+          .add_input(x)
+          .add_input(y)
+          .resize_outputs(false)
+          .declare_static_shape(result.sizes(), /*squash_dims=*/dimension)
+          .build();
+
+  if (iter.numel() == 0) {
+    return;
+  }
+
+  if (iter.can_use_32bit_indexing()) {
+    launch_cross_kernel(iter, ostride, xstride, ystride);
+  } else {
+    for (auto&& sub_iter : iter.with_32bit_indexing()) {
+      launch_cross_kernel(sub_iter, ostride, xstride, ystride);
+    }
+  }
 }
 
 } // namespace impl
@@ -67,9 +139,9 @@ Tensor& cross_out(
     out.resize_as_(input);
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(
       at::ScalarType::Half, input.scalar_type(), "cross", [&]() {
-        impl::cross<scalar_t>(out, input, other, dim);
+        impl::cross(out, input, other, dim);
       });
 
   return out;
