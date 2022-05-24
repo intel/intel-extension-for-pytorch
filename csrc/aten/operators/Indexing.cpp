@@ -650,34 +650,6 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
   }
 }
 
-template <typename T, typename MaskT>
-struct TensorMaskedFillOp {
-  TensorMaskedFillOp(T v) : value(v) {}
-  inline void operator()(T& t, MaskT& mask) const {
-    if (mask) {
-      t = value;
-    }
-  }
-
-  T value;
-};
-
-template <typename scalar_t>
-void MaskedFillBool(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
-  auto value = value_scalar.to<scalar_t>();
-  TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  DPCPP_tensor_apply2<scalar_t, bool>(
-      tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
-}
-
-template <typename scalar_t>
-void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
-  auto value = value_scalar.to<scalar_t>();
-  TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  DPCPP_tensor_apply2<scalar_t, uint8_t>(
-      tensor, mask, TensorMaskedFillOp<scalar_t, unsigned char>(value));
-}
-
 template <typename scalar_t, typename mask_t>
 void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   c10::MaybeOwned<Tensor> mask =
@@ -1226,22 +1198,65 @@ Tensor trace(const Tensor& self) {
   return out;
 }
 
-Tensor& masked_fill_(Tensor& self, const Tensor& mask_, const Scalar& value) {
-  c10::MaybeOwned<Tensor> mask = expand_inplace(self, mask_, "masked_fill_");
-  at::assert_no_partial_overlap(self, mask_);
+template <typename mask_t>
+void masked_fill_kernel(TensorIterator& iter, const Scalar& value) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
-      self.scalar_type(),
-      "MaskedFill",
-      [&]() {
-        if ((*mask).dtype() == at::ScalarType::Byte) {
-          impl::MaskedFill<scalar_t>(self, *mask, value);
-        } else {
-          impl::MaskedFillBool<scalar_t>(self, *mask, value);
-        }
+      at::ScalarType::Bool,
+      iter.dtype(),
+      "masked_fill_",
+      [&] {
+        const auto value_ = value.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter(
+            iter, [=](scalar_t self, mask_t mask) -> scalar_t {
+              if (mask) {
+                return value_;
+              }
+              return self;
+            });
       });
+}
+
+Tensor& masked_fill_(Tensor& self, const Tensor& mask, const Scalar& value) {
+  TORCH_CHECK(
+      self.device() == mask.device(),
+      "expected self and mask to be on the same device, but got mask on ",
+      mask.device(),
+      " and self on ",
+      self.device());
+  TORCH_CHECK(
+      mask.scalar_type() == kByte || mask.scalar_type() == kBool,
+      "expected mask dtype to be Bool but got ",
+      mask.scalar_type());
+  auto maybe_outnames =
+      namedinference::broadcast_to_outnames(self, mask, "masked_fill_");
+  if (at::has_internal_overlap(self) == MemOverlap::YES) {
+    TORCH_WARN(
+        "Use of masked_fill_ on expanded tensors is deprecated. "
+        "Please clone() the tensor before performing this operation. "
+        "This also applies to advanced indexing e.g. tensor[mask] = scalar");
+  }
+  at::assert_no_partial_overlap(self, mask);
+  c10::MaybeOwned<Tensor> b_mask = expand_inplace(self, mask, "masked_fill_");
+
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(false)
+                  .check_all_same_dtype(false)
+                  .resize_outputs(false)
+                  .add_output(self)
+                  .add_input(self)
+                  .add_input(*b_mask)
+                  .build();
+
+  if (mask.dtype() == at::ScalarType::Byte) {
+    TORCH_WARN(
+        "masked_fill_ received a mask with dtype torch.uint8, this behavior is now deprecated,"
+        "please use a mask with dtype torch.bool instead.");
+    masked_fill_kernel<uint8_t>(iter, value);
+  } else {
+    masked_fill_kernel<bool>(iter, value);
+  }
   return self;
 }
 
