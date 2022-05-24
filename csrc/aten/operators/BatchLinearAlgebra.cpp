@@ -438,6 +438,122 @@ void mkl_getri<c10::complex<float>>(
       scratchpad_size);
 }
 
+template <typename scalar_t>
+int64_t mkl_geqrf_batch_scratchpad_size(
+    DPCPP::queue& queue,
+    int64_t* m,
+    int64_t* n,
+    int64_t* lda,
+    int64_t group_count,
+    int64_t* batch_size) {
+  return oneapi::mkl::lapack::geqrf_batch_scratchpad_size<scalar_t>(
+      queue, m, n, lda, group_count, batch_size);
+}
+
+template <>
+int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t* m,
+    int64_t* n,
+    int64_t* lda,
+    int64_t group_count,
+    int64_t* batch_size) {
+  return oneapi::mkl::lapack::geqrf_batch_scratchpad_size<std::complex<float>>(
+      queue, m, n, lda, group_count, batch_size);
+}
+
+template <>
+int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t* m,
+    int64_t* n,
+    int64_t* lda,
+    int64_t group_count,
+    int64_t* batch_size) {
+  return oneapi::mkl::lapack::geqrf_batch_scratchpad_size<std::complex<double>>(
+      queue, m, n, lda, group_count, batch_size);
+}
+
+template <typename scalar_t>
+void mkl_geqrf_batch(
+    DPCPP::queue& queue,
+    int64_t* m,
+    int64_t* n,
+    scalar_t** a,
+    int64_t* lda,
+    scalar_t** tau,
+    int64_t group_count,
+    int64_t* group_sizes,
+    scalar_t* scratchpad,
+    int64_t scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::geqrf_batch,
+      queue,
+      m,
+      n,
+      a,
+      lda,
+      tau,
+      group_count,
+      group_sizes,
+      (scalar_t*)scratchpad,
+      scratchpadsize);
+}
+
+template <>
+void mkl_geqrf_batch<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t* m,
+    int64_t* n,
+    c10::complex<float>** a,
+    int64_t* lda,
+    c10::complex<float>** tau,
+    int64_t group_count,
+    int64_t* group_sizes,
+    c10::complex<float>* scratchpad,
+    int64_t scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::geqrf_batch,
+      queue,
+      m,
+      n,
+      reinterpret_cast<std::complex<float>**>(a),
+      lda,
+      reinterpret_cast<std::complex<float>**>(tau),
+      group_count,
+      group_sizes,
+      reinterpret_cast<std::complex<float>*>(scratchpad),
+      scratchpadsize);
+}
+
+template <>
+void mkl_geqrf_batch<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t* m,
+    int64_t* n,
+    c10::complex<double>** a,
+    int64_t* lda,
+    c10::complex<double>** tau,
+    int64_t group_count,
+    int64_t* group_sizes,
+    c10::complex<double>* scratchpad,
+    int64_t scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::geqrf_batch,
+      queue,
+      m,
+      n,
+      reinterpret_cast<std::complex<double>**>(a),
+      lda,
+      reinterpret_cast<std::complex<double>**>(tau),
+      group_count,
+      group_sizes,
+      reinterpret_cast<std::complex<double>*>(scratchpad),
+      scratchpadsize);
+}
 #endif
 
 #ifdef USE_ONEMKL
@@ -767,19 +883,11 @@ static void apply_geqrf_dpcpp_(
     tau.push_back(&tau_ptr[i * stride_tau]);
   }
 
-  int64_t scratchpadsize =
-      oneapi::mkl::lapack::geqrf_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue,
-          m.data(),
-          n.data(),
-          lda.data(),
-          group_count,
-          group_sizes);
+  int64_t scratchpadsize = mkl_geqrf_batch_scratchpad_size<scalar_t>(
+      dpcpp_queue, m.data(), n.data(), lda.data(), group_count, group_sizes);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::lapack::geqrf_batch,
+    mkl_geqrf_batch<scalar_t>(
         dpcpp_queue,
         m.data(),
         n.data(),
@@ -1362,6 +1470,11 @@ void apply_linalg_qr_out_dpcpp(
   TORCH_INTERNAL_ASSERT(input.scalar_type() == R.scalar_type());
   TORCH_INTERNAL_ASSERT(input.device() == R.device());
 
+  TORCH_CHECK(
+      input.scalar_type() != at::ScalarType::ComplexDouble &&
+          input.scalar_type() != at::ScalarType::ComplexFloat,
+      "MKL GPU does not support linalg_qr with complex inputs currently.")
+
   auto m = input.size(-2);
   auto n = input.size(-1);
   auto mn = std::min(m, n);
@@ -1412,9 +1525,10 @@ void apply_linalg_qr_out_dpcpp(
   // of input
   QR.copy_(input);
   std::vector<int64_t> infos(native::batchCount(input), 0);
-  IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
-    impl::apply_geqrf_dpcpp_<scalar_t>(QR, tau, m, n, infos);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      input.scalar_type(), "qr_dpcpp", [&] {
+        impl::apply_geqrf_dpcpp_<scalar_t>(QR, tau, m, n, infos);
+      });
 
   // this is for mode='r'
   if (!compute_q) {
