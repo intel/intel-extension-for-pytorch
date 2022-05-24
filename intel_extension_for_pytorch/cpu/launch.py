@@ -251,11 +251,11 @@ class Launcher():
         return lib_set or lib_find
 
     def is_numactl_available(self):
-        numactl_available = False 
+        numactl_available = False
         cmd = ["numactl", "-C", "0", "-m", "0", "hostname"]
         r = subprocess.run(cmd, env=os.environ)
         if r.returncode == 0:
-            numactl_available = True 
+            numactl_available = True
         return numactl_available
 
     def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
@@ -353,7 +353,7 @@ class MultiInstanceLauncher(Launcher):
         processes = []
         cores = []
         set_kmp_affinity = True
-        enable_taskset = False 
+        enable_taskset = False
         if args.core_list:  # user specify what cores will be used by params
             cores = [int(x) for x in args.core_list.split(",")]
             if args.ncore_per_instance == -1:
@@ -395,23 +395,23 @@ class MultiInstanceLauncher(Launcher):
                     ncore_per_node = len(self.cpuinfo.node_physical_cores[0])
                     num_leftover_cores = ncore_per_node % args.ncore_per_instance
                     if args.ncore_per_instance > ncore_per_node:
-                        # too many ncore_per_instance to skip cross-node cores 
+                        # too many ncore_per_instance to skip cross-node cores
                         logger.warning("there are {} core(s) per socket, but you specify {} ncore_per_instance and skip_cross_node_cores. Please make sure --ncore_per_instance < core(s) per socket".format(ncore_per_node, args.ncore_per_instance))
                         exit(-1)
                     elif num_leftover_cores == 0:
-                        # aren't any cross-node cores 
+                        # aren't any cross-node cores
                         logger.info('--skip_cross_node_cores is set, but there are no cross-node cores.')
                         args.ninstances = len(cores) // args.ncore_per_instance
                     else:
-                        # skip cross-node cores 
+                        # skip cross-node cores
                         if args.ninstances != -1:
                             logger.warning('--skip_cross_node_cores is exclusive to --ninstances. --ninstances won\'t take effect even if it is set explicitly.')
-                
-                        i = 1 
+
+                        i = 1
                         leftover_cores = set()
                         while ncore_per_node*i <= len(cores):
                             leftover_cores.update(cores[ncore_per_node*i-num_leftover_cores : ncore_per_node*i])
-                            i += 1 
+                            i += 1
                         cores = list(set(cores) - leftover_cores)
                         assert len(cores) % args.ncore_per_instance == 0
                         args.ninstances = len(cores) // args.ncore_per_instance
@@ -433,20 +433,20 @@ class MultiInstanceLauncher(Launcher):
 
         if args.ninstances > 1 and args.instance_idx != -1:
             logger.info("assigning {} cores for instance {}".format(args.ncore_per_instance, args.instance_idx))
-        
+
         if not args.disable_numactl:
             numactl_available = self.is_numactl_available()
             if not numactl_available:
                 if not args.disable_taskset:
                     logger.warning("Core binding with numactl is not available. Disabling numactl and using taskset instead. This may affect performance in multi-socket system; please use numactl if memory binding is needed.")
-                    args.disable_numactl = True 
-                    enable_taskset = True 
+                    args.disable_numactl = True
+                    enable_taskset = True
                 else:
                     logger.warning("Core binding with numactl is not available, and --disable_taskset is set. Please unset --disable_taskset to use taskset insetad of numactl.")
                     exit(-1)
-                    
+
         if not args.disable_taskset:
-            enable_taskset = True 
+            enable_taskset = True
 
         self.set_multi_thread_and_allocator(args.ncore_per_instance,
                                             args.disable_iomp,
@@ -463,7 +463,7 @@ class MultiInstanceLauncher(Launcher):
                     cmd = ["numactl"]
                 elif enable_taskset:
                     cmd = ["taskset"]
-                    
+
                 cores = sorted(cores)
                 if args.instance_idx == -1:  # sequentially assign ncores_per_instance to ninstances
                     core_list = cores[i * args.ncore_per_instance: (
@@ -471,7 +471,7 @@ class MultiInstanceLauncher(Launcher):
                 else:  # assign ncores_per_instance from instance_idx
                     core_list = cores[args.instance_idx * args.ncore_per_instance: (
                         args.instance_idx + 1) * args.ncore_per_instance]
-                
+
                 core_ranges = []
                 for core in core_list:
                     if len(core_ranges) == 0:
@@ -486,7 +486,7 @@ class MultiInstanceLauncher(Launcher):
                 for r in core_ranges:
                     cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
                 cur_process_cores = cur_process_cores[:-1]
-                
+
                 if not args.disable_numactl:
                     numa_params = "-C {} ".format(cur_process_cores)
                     numa_params += "-m {}".format(",".join(
@@ -495,7 +495,7 @@ class MultiInstanceLauncher(Launcher):
                 elif enable_taskset:
                     taskset_params = "-c {}".format(cur_process_cores)
                     cmd.extend(taskset_params.split())
-            
+
             with_python = not args.no_python
             if with_python:
                 cmd.append(sys.executable)
@@ -839,11 +839,12 @@ def main():
         lst_valid = []
         tmp_ldpreload = os.environ["LD_PRELOAD"]
         for item in tmp_ldpreload.split(":"):
-            matches = glob.glob(item)
-            if len(matches) > 0:
-                lst_valid.append(item)
-            else:
-                logger.warning("{} doesn't exist. Removing it from LD_PRELOAD.".format(item))
+            if item != "":
+                matches = glob.glob(item)
+                if len(matches) > 0:
+                    lst_valid.append(item)
+                else:
+                    logger.warning("{} doesn't exist. Removing it from LD_PRELOAD.".format(item))
         if len(lst_valid) > 0:
             os.environ["LD_PRELOAD"] = ":".join(lst_valid)
         else:
