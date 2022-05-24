@@ -142,6 +142,31 @@ namespace AtenIpexTypeXPU {
     return out;                                                               \
   }
 
+// Binary
+#define IPEX_BINARY_SCALAR_AND_ALL_OPS(op, func, creator, types)              \
+  Tensor& op(const Tensor& self, const Tensor& other, Tensor& out) {          \
+    /* to handle op(tensor, scalar) redispatch path. */                       \
+    /* by default, scalar will be wrapped as a CPU tensor in default */       \
+    /* catchall implememtation. here convert to XPU lazily. */                \
+    Tensor other_maybe_scalar = other;                                        \
+    if (other.device().type() == at::kCPU && other.numel() == 1) {            \
+      other_maybe_scalar = other.to("xpu");                                   \
+    }                                                                         \
+                                                                              \
+    auto iter = TensorIterator::creator(out, self, other_maybe_scalar);       \
+    IPEX_DISPATCH_##types##_AND2(                                             \
+        at::ScalarType::Half,                                                 \
+        at::ScalarType::BFloat16,                                             \
+        iter.dtype(),                                                         \
+        #op,                                                                  \
+        [&]() {                                                               \
+          dpcpp_kernel_with_scalars(                                          \
+              iter,                                                           \
+              [](scalar_t a, scalar_t b) -> scalar_t { return func(a, b); }); \
+        });                                                                   \
+    return out;                                                               \
+  }
+
 #define IPEX_BINARY_BASE_OPS(op, func, creator, types)                    \
   Tensor& op(const Tensor& self, const Tensor& other, Tensor& out) {      \
     /* to handle op(tensor, scalar) redispatch path. */                   \
@@ -172,6 +197,18 @@ namespace AtenIpexTypeXPU {
 
 #define IPEX_BINARY_LOOPS_FUNC_ALL_ALL_COMPLEX(op, func, creator) \
   IPEX_BINARY_AND_ALL_OPS(op, func, creator, ALL_TYPES_AND_COMPLEX)
+
+#define IPEX_BINARY_LOOPS_FUNC_FLOAT_ALL_SCALAR(op, func, creator) \
+  IPEX_BINARY_SCALAR_AND_ALL_OPS(op, func, creator, FLOATING_TYPES)
+
+#define IPEX_BINARY_LOOPS_FUNC_ALL_ALL_SCALAR(op, func, creator) \
+  IPEX_BINARY_SCALAR_AND_ALL_OPS(op, func, creator, ALL_TYPES)
+
+#define IPEX_BINARY_LOOPS_FUNC_FLOAT_ALL_COMPLEX_SCALAR(op, func, creator) \
+  IPEX_BINARY_SCALAR_AND_ALL_OPS(op, func, creator, FLOATING_AND_COMPLEX_TYPES)
+
+#define IPEX_BINARY_LOOPS_FUNC_ALL_ALL_COMPLEX_SCALAR(op, func, creator) \
+  IPEX_BINARY_SCALAR_AND_ALL_OPS(op, func, creator, ALL_TYPES_AND_COMPLEX)
 
 #define IPEX_BINARY_LOOPS_FUNC_FLOAT_BASE(op, func, creator) \
   IPEX_BINARY_BASE_OPS(op, func, creator, FLOATING_TYPES)

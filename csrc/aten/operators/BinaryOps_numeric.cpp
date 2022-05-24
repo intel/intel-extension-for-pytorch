@@ -37,7 +37,7 @@ Tensor& fmod_(Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::fmod_out(self, self, other);
 }
 
-IPEX_BINARY_LOOPS_FUNC_FLOAT_ALL(
+IPEX_BINARY_LOOPS_FUNC_FLOAT_ALL_SCALAR(
     copysign_out,
     Numerics<scalar_t>::copysign,
     binary_float_op)
