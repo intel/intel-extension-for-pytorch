@@ -250,37 +250,41 @@ def check_node_in_give_op(node, given_ops):
     else:
         return False
 
-def sync_pool_input_output_scale_zp(quant_state_map, nodes):
+def sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes):
     pool_op = [str(F.adaptive_avg_pool2d), str(F.adaptive_avg_pool3d), str(F.avg_pool2d), str(F.avg_pool3d), \
         str(F.max_pool2d), str(F.max_pool3d), str(nn.MaxPool2d), str(nn.MaxPool3d), str(nn.AvgPool2d), str(nn.AvgPool3d), \
         str(nn.AdaptiveAvgPool2d), str(nn.AdaptiveAvgPool3d)]
-    shape_op =[str(torch.flatten), str(torch.nn.Flatten)]
-    def sync_scale_zp_given_id(quant_state_map, id, scale_zp):
+    shape_op = [str(torch.flatten), str(torch.nn.Flatten)]
+    lstm_op = [str(torch.nn.LSTM)]
+    def _sync_scale_zp_given_id(quant_state_map, id, scale_zp):
         for _, v in quant_state_map.items():
             if id in v.tensor_id_to_scale_zp:
                 v.tensor_id_to_scale_zp[id] = scale_zp
-    def find_shape_op_from_given_node(cur_node, ids):
+
+    def _find_sync_op_from_given_node(cur_node, ids):
         for next in cur_node.post_nodes:
-            if check_node_in_give_op(next, pool_op + shape_op):
+            if check_node_in_give_op(next, pool_op + shape_op + lstm_op):
                 ids.append(next.output_tensor_infos[0].id)
-                find_shape_op_from_given_node(next, ids)
+                _find_sync_op_from_given_node(next, ids)
 
     for node in nodes:
         if isinstance(node, ParentNode):
             continue
-        if node.qconfig is not None and check_node_in_give_op(node, pool_op):
+        if node.qconfig is not None and check_node_in_give_op(node, pool_op + lstm_op):
             if node.input_scale_zero == node.output_scale_zero:
                 continue
             sync_node_begin = node
-            # fist, find the fist sync op before the cur pooling op
+            # fistly, find the fist sync op before the cur pooling(lstm) op.
+            # like: pooling->pool->shape->cur_node,
             while len(sync_node_begin.pre_nodes) == 1 and \
-                (check_node_in_give_op(sync_node_begin.pre_nodes[0], pool_op) or check_node_in_give_op(sync_node_begin.pre_nodes[0], shape_op)):
+                (check_node_in_give_op(sync_node_begin.pre_nodes[0], pool_op + shape_op + lstm_op)):
                 sync_node_begin = sync_node_begin.pre_nodes[0]
             tensor_ids = [sync_node_begin.output_tensor_infos[0].id]
             scale_zp = sync_node_begin.input_scale_zero[sync_node_begin.input_tensor_infos[0].id]
-            find_shape_op_from_given_node(sync_node_begin, tensor_ids)
+            # find all need sync op from sync_node_begin.
+            _find_sync_op_from_given_node(sync_node_begin, tensor_ids)
             for id in tensor_ids:
-                sync_scale_zp_given_id(quant_state_map, id, scale_zp)
+                _sync_scale_zp_given_id(quant_state_map, id, scale_zp)
 
 qscheme_dict = {
     str(torch.per_tensor_affine): torch.per_tensor_affine,
@@ -338,7 +342,7 @@ def _create_observer(setting):
         setting["qscheme"] = qscheme_dict[setting["qscheme"]]
     if "dtype" in setting:
         setting["dtype"] = dtype_dict[setting["dtype"]]
-    
+
     if hasattr(torch.quantization.observer, setting["name"]):
         observer = getattr(torch.quantization.observer, setting["name"])
         setting.pop("name", None)
@@ -453,7 +457,7 @@ def save_quant_state(quant_state_map, configure_file):
 
 def load_qconf_summary_to_model(model, qconf_summary):
     """
-    This function is about load the user given configure to origin model. 
+    This function is about load the user given configure to origin model.
     """
     with open(qconf_summary, 'r') as f:
         quant_state_dict = json.load(f)
@@ -472,7 +476,7 @@ def load_qconf_summary_to_model(model, qconf_summary):
                 if len(tensor_info) > 0:
                     input_tensor_infos.append(QTensorInfo(tensor_info["id"], dtype_dict[tensor_info["orig_dtype"]], dtype_dict[tensor_info["inf_dtype"]]))
                     input_force_dtype_infos.append(dtype_dict[tensor_info["force_dtype"]])
-                    if "scale" in tensor_info: 
+                    if "scale" in tensor_info:
                         scale = torch.FloatTensor(tensor_info["scale"])
                         zp = torch.LongTensor(tensor_info["zero_point"])
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
@@ -503,13 +507,13 @@ def load_qconf_summary_to_model(model, qconf_summary):
             activation_observer = q_op_info["activation_observer"]
             weight_observer = q_op_info["weight_observer"]
             qconfig = QConfig(activation=_create_observer(activation_observer), weight = _create_observer(weight_observer))
-            # overide the cur model's info 
+            # overide the cur model's info
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_infos = input_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_force_inf_dtype = input_force_dtype_infos
             v.idx_to_seen_q_op_infos[int(i)].output_tensor_infos = output_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].weight_tensor_infos = weight_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].qconfig = qconfig
-        
+
         user_nonq_op_infos = layer_info["nonq_op_infos"]
         #v.seen_nonq_op_infos.clear()
         idx = 0

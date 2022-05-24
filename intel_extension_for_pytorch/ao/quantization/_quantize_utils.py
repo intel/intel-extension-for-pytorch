@@ -7,7 +7,7 @@ from torch.quantization.qconfig import QConfig
 
 from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type, OpQuantizeabilityType, \
     attach_op_convert_info_to_model, save_quant_state, attach_scale_zp_values_to_model, convert_quant_state_map_to_nodes, \
-        sync_pool_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, load_qconf_summary_to_model
+        sync_pool_and_lstm_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, load_qconf_summary_to_model
 from ._quantization_state import AutoQuantizationState, AutoQuantizationStateModuleDict, init_model_quant_state
 from ._recipe import get_defaut_recipe
 from ._module_swap_utils import swap_child_modules
@@ -316,8 +316,8 @@ def auto_prepare(
                 # compute scales and zero_point.
                 attach_scale_zp_values_to_model(model)
                 nodes = convert_quant_state_map_to_nodes(quant_state_map)
-                # pooling's input and output should have same scale_zp.
-                sync_pool_input_output_scale_zp(quant_state_map, nodes)
+                # pooling and lstm's input and output should have same scale_zp.
+                sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
                 get_defaut_recipe(nodes)
             # Setting model qconf_summary attr which can be easily to check the whether the scale/zp has been computed.
             self._qconf_summary = qconf_summary
@@ -532,8 +532,8 @@ def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
         # compute scales and zero_point.
         attach_scale_zp_values_to_model(module)
         nodes = convert_quant_state_map_to_nodes(quant_state_map)
-        # pooling's input and output should have same scale_zp.
-        sync_pool_input_output_scale_zp(quant_state_map, nodes)
+        # pooling and lstm's input and output should have same scale_zp.
+        sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
         get_defaut_recipe(nodes)
     else:
         # Clear observer if module have, this will works when the user's json setting is loaded.
