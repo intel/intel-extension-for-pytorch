@@ -18,7 +18,7 @@
 #===============================================================================
 
 if(DPCPP_cmake_included)
-    return()
+  return()
 endif()
 set(DPCPP_cmake_included true)
 
@@ -105,19 +105,22 @@ ProcessorCount(proc_cnt)
 set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-max-parallel-link-jobs=${proc_cnt}")
 set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${SYCL_FLAGS}")
 if(BUILD_BY_PER_KERNEL)
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
 elseif(USE_AOT_DEVLIST)
-    set(BACKEND_TARGET "spir64_gen")
-    set(SPIRV_TARGET "${BACKEND_TARGET},spir64")
-    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${BACKEND_TARGET}")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST} -options -cl-poison-unsupported-fp64-kernels'")
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/custom-linker-script.ld")
+  set(BACKEND_TARGET "spir64_gen")
+  set(SPIRV_TARGET "${BACKEND_TARGET},spir64")
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${BACKEND_TARGET}")
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST} -options -cl-poison-unsupported-fp64-kernels'")
+  if(NOT BUILD_SEPARATE_OPS)
+    # Use customized link script to workaround huge binary issue for multi-target AOT build
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/single_aot.ld")
+  endif()
 else()
-    # Use auto mode of device code split
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")
+  # Use auto mode of device code split
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")
 endif()
 
 message(STATUS "DPCPP found. Compiling with SYCL support")
