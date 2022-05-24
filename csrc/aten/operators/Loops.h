@@ -19,8 +19,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-#define MAX_INPUT_TENSOR_NUM 3
-#define MAX_TOTAL_TENSOR_NUM 4
 // DPCPP suggest: it’s possible (and even desirable) to oversubscribe tasks to
 // device;
 constexpr int OVER_SUBSCRIBE_DSS_FACTOR = 16;
@@ -172,18 +170,38 @@ void vectorized_elementwise_kernel(
   }
 }
 
+template <
+    int vec_size,
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename loader_t>
+void vectorized_broadcast_elementwise_kernel(
+    DPCPP::item<1> item_id,
+    int numel,
+    const func_t& fn,
+    array_t data,
+    inp_calc_t input_calc,
+    loader_t loader) {
+  using traits = function_traits<func_t>;
+  int thread_idx = item_id.get_linear_id();
+  auto policy = at::native::Memory::policies::
+      vectorized_broadcast<vec_size, array_t, inp_calc_t, loader_t>(
+          data, input_calc, loader, thread_idx);
+  elementwise_kernel_helper<vec_size>(fn, policy);
+}
+
 // Assumption:
 // this function assume trivial 1d and no dynamic casting
 template <typename func_t, typename array_t>
 static inline void launch_vectorized_kernel(
     int64_t N,
     const func_t& fn,
-    array_t data) {
+    array_t data,
+    int vec_size) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
-      getDeviceIdOfCurrentQueue(), data);
   auto thread_num = (N + vec_size - 1) / vec_size;
 
 #define VEC_LOOPS_KERNEL(vec_size)                                        \
@@ -225,6 +243,91 @@ static inline void launch_vectorized_kernel(
 #undef VEC_LOOPS_KERNEL
 }
 
+// Assumption:
+// this function assume trivial 1d and no dynamic casting
+template <
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename loader_t>
+static inline void launch_broadcast_vectorized_kernel(
+    int64_t N,
+    const func_t& fn,
+    array_t data,
+    inp_calc_t ic,
+    loader_t loader,
+    int vec_size) {
+  using traits = function_traits<func_t>;
+  TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto thread_num = (N + vec_size - 1) / vec_size;
+
+#define VEC_LOOPS_KERNEL(vec_size)                                  \
+  {                                                                 \
+    auto cgf = DPCPP_Q_CGF(cgh) {                                   \
+      cgh.parallel_for(                                             \
+          DPCPP::range<1>(thread_num), [=](DPCPP::item<1> itemId) { \
+            vectorized_broadcast_elementwise_kernel<vec_size>(      \
+                itemId, N, fn, data, ic, loader);                   \
+          });                                                       \
+    };                                                              \
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);                               \
+  }
+
+  switch (vec_size) {
+    case 16: {
+      VEC_LOOPS_KERNEL(16);
+      break;
+    }
+    case 8: {
+      VEC_LOOPS_KERNEL(8);
+      break;
+    }
+    case 4: {
+      VEC_LOOPS_KERNEL(4);
+      break;
+    }
+    case 2: {
+      VEC_LOOPS_KERNEL(2);
+      break;
+    }
+    case 1: {
+      VEC_LOOPS_KERNEL(1);
+      break;
+    }
+    default:
+      TORCH_INTERNAL_ASSERT(false, "Unexpected vectorization size", vec_size);
+  }
+
+#undef VEC_LOOPS_KERNEL
+}
+
+static inline bool is_contiguous_broadcast(TensorIteratorBase& iter) {
+  bool flag = !iter.is_contiguous();
+  for (int i = 0; i < iter.ntensors(); i++) {
+    flag &= iter.tensor(i).is_contiguous();
+  }
+  return flag;
+}
+
+static inline bool can_use_broadcast_vectorize(
+    TensorIteratorBase& iter,
+    int vec_size) {
+  if (!is_contiguous_broadcast(iter) || (vec_size <= 1))
+    return false;
+  int ref_element_bytes = iter.strides(0)[0];
+  int vectorize_bytes = vec_size * ref_element_bytes;
+  for (int i = 0; i < iter.ntensors(); i++) {
+    int element_bytes = iter.strides(i)[0];
+    if (element_bytes != ref_element_bytes)
+      return false;
+    int fast_dim_bytes = iter.tensor(i).size(-1) * element_bytes;
+    if (fast_dim_bytes % vectorize_bytes)
+      return false;
+  }
+  return true;
+}
+
 template <typename func_t, bool singed_strides = false>
 void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   using traits = function_traits<func_t>;
@@ -245,8 +348,10 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   bool dynamic_casting = at::native::needs_dynamic_casting<func_t>::check(iter);
 
   if (!dynamic_casting) {
+    int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(
+        getDeviceIdOfCurrentQueue(), data);
     if (contiguous) {
-      launch_vectorized_kernel(numel, f, data);
+      launch_vectorized_kernel(numel, f, data, vec_size);
     } else {
       auto input_offset_calculator =
           make_input_offset_calculator<traits::arity, singed_strides>(iter);
@@ -254,14 +359,19 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
           make_output_offset_calculator<1, singed_strides>(iter);
       auto loader = at::native::Memory::LoadWithoutCast();
       auto storer = at::native::Memory::StoreWithoutCast();
-      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
-          numel,
-          f,
-          data,
-          input_offset_calculator,
-          output_offset_calculator,
-          loader,
-          storer);
+      if (can_use_broadcast_vectorize(iter, vec_size)) {
+        launch_broadcast_vectorized_kernel(
+            numel, f, data, input_offset_calculator, loader, vec_size);
+      } else {
+        launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
+            numel,
+            f,
+            data,
+            input_offset_calculator,
+            output_offset_calculator,
+            loader,
+            storer);
+      }
     }
   } else {
     at::detail::Array<ScalarType, traits::arity> dtypes;

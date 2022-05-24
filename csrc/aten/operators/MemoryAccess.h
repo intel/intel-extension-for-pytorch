@@ -71,6 +71,24 @@ struct vectorized_load_helper {
 };
 
 template <int arg_index>
+struct vectorized_broadcast_load_helper {
+  template <typename args_t, typename policy_t, typename offset_t>
+  static void apply(
+      policy_t& self,
+      args_t* args,
+      offset_t offset,
+      int num_outputs) {
+    using arg_t = std::tuple_element_t<arg_index, args_t>;
+    auto ptr = reinterpret_cast<arg_t*>(self.data[arg_index + num_outputs]) +
+        offset[arg_index];
+    auto args_accessor = [&args](int thread_unroll_idx) -> arg_t& {
+      return std::get<arg_index>(args[thread_unroll_idx]);
+    };
+    self.load_single_arg(args_accessor, ptr);
+  }
+};
+
+template <int arg_index>
 struct unroll_load_helper {
   template <
       typename args_t,
@@ -309,6 +327,64 @@ struct vectorized {
     constexpr int arity = std::tuple_size<args_t>::value;
     detail::static_unroll<detail::vectorized_load_helper, arity>::with_args(
         *this, args);
+  }
+
+  template <typename scalar_t>
+  inline void store(scalar_t* from) {
+    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
+    vec_t* to = reinterpret_cast<vec_t*>(data[0]);
+    vec_t v;
+#pragma unroll
+    for (int j = 0; j < vec_size; j++) {
+      v.val[j] = from[j];
+    }
+    to[thread_idx] = v;
+  }
+};
+
+template <
+    int vec_size,
+    typename data_t,
+    typename input_offset_calc,
+    typename loader_t,
+    int num_outputs = 1>
+struct vectorized_broadcast {
+  data_t data;
+  input_offset_calc& input_offset_calculator;
+  const loader_t& loader;
+  int thread_idx;
+
+  vectorized_broadcast(
+      data_t data,
+      input_offset_calc& ic,
+      const loader_t& l,
+      int thread_idx)
+      : data(data),
+        input_offset_calculator(ic),
+        loader(l),
+        thread_idx(thread_idx) {}
+
+  inline constexpr bool check_inbounds(int thread_work_elem) const {
+    return true;
+  }
+
+  template <typename accessor_t, typename scalar_t>
+  inline void load_single_arg(accessor_t to, scalar_t* from) {
+    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
+    vec_t v = reinterpret_cast<vec_t*>(from)[0];
+#pragma unroll
+    for (int i = 0; i < vec_size; i++) {
+      to(i) = v.val[i];
+    }
+  }
+
+  template <typename args_t>
+  inline void load(args_t* args) {
+    constexpr int arity = std::tuple_size<args_t>::value;
+    auto vec_index = thread_idx * vec_size;
+    auto offset = input_offset_calculator.get(vec_index);
+    detail::static_unroll<detail::vectorized_broadcast_load_helper, arity>::
+        with_args(*this, args, offset, num_outputs);
   }
 
   template <typename scalar_t>
