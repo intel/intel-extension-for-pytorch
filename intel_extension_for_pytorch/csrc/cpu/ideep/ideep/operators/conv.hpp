@@ -872,7 +872,8 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
             padding_l,
             padding_r);
 
-    auto op_attr = dnnl::primitive_attr();
+    auto op_attr = ideep::attr_t();
+    op_attr.set_fpmath_mode();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
     auto pd = primitive_desc(
@@ -1040,7 +1041,8 @@ struct convolution_backward_weights
             prop_kind::forward,
             aengine);
 
-    auto op_attr = dnnl::primitive_attr();
+    auto op_attr = ideep::attr_t();
+    op_attr.set_fpmath_mode();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
     auto pd = with_diff_bias ? primitive_desc(

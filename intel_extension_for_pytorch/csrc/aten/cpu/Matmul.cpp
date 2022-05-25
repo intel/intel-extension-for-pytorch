@@ -8,6 +8,70 @@
 #include "csrc/utils/fpmath_mode.h"
 #include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
+namespace torch {
+namespace autograd {
+namespace generated {
+namespace ipex {
+void copy_range(variable_list& out, IndexRange range, const Tensor& t) {
+  AT_ASSERT(range.second <= out.size());
+  AT_ASSERTM(
+      range.second - range.first == 1, "inconsistent range for Tensor output");
+  out[range.first] = t;
+}
+
+bool any_variable_defined(const variable_list& variables) {
+  for (const auto& variable : variables) {
+    if (variable.defined()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+variable_list BmmBackward0::apply(variable_list&& grads) {
+  bool useOneDNN =
+      (torch_ipex::getFP32LowPrecisionModeCpu() ==
+       torch_ipex::IPEXLowPrecisionMode::BF32);
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  IndexRangeGenerator gen;
+  auto self_ix = gen.range(1);
+  auto mat2_ix = gen.range(1);
+  variable_list grad_inputs(gen.size());
+  const auto& grad = grads[0];
+  auto self = self_.unpack();
+  auto mat2 = mat2_.unpack();
+  bool any_grad_defined = any_variable_defined(grads);
+  if (should_compute_output({mat2_ix})) {
+    at::Tensor grad_result = Tensor();
+    if (any_grad_defined) {
+      if (useOneDNN) {
+        grad_result =
+            torch_ipex::cpu::matmul_onednn(self.transpose(1, 2).conj(), grad);
+      } else {
+        grad_result = self.transpose(1, 2).conj().bmm(grad);
+      }
+    }
+    copy_range(grad_inputs, mat2_ix, grad_result);
+  }
+  if (should_compute_output({self_ix})) {
+    at::Tensor grad_result = Tensor();
+    if (any_grad_defined) {
+      if (useOneDNN) {
+        grad_result =
+            torch_ipex::cpu::matmul_onednn(grad, mat2.transpose(1, 2).conj());
+      } else {
+        grad_result = grad.bmm(mat2.transpose(1, 2).conj());
+      }
+    }
+    copy_range(grad_inputs, self_ix, grad_result);
+  }
+  return grad_inputs;
+}
+} // namespace ipex
+} // namespace generated
+} // namespace autograd
+} // namespace torch
 
 namespace torch_ipex {
 namespace cpu {
@@ -59,9 +123,9 @@ void handle_grad(
     auto dim_tensor2 = mat2.dim();
     if ((dim_tensor1 >= 1 && dim_tensor2 >= 1) &&
         (dim_tensor1 >= 3 || dim_tensor2 >= 3)) {
-      std::shared_ptr<torch::autograd::generated::BmmBackward0> grad_fn =
-          std::shared_ptr<torch::autograd::generated::BmmBackward0>(
-              new torch::autograd::generated::BmmBackward0(),
+      std::shared_ptr<torch::autograd::generated::ipex::BmmBackward0> grad_fn =
+          std::shared_ptr<torch::autograd::generated::ipex::BmmBackward0>(
+              new torch::autograd::generated::ipex::BmmBackward0(),
               torch::autograd::deleteNode);
       grad_fn->set_next_edges(torch::autograd::collect_next_edges(self, mat2));
       if (grad_fn->should_compute_output(1)) {

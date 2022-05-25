@@ -21,14 +21,14 @@ def run_model(args):
     fpmath_mode = ipex.LowPrecisionMode.BF32 if args.fpmath == "BF32" else ipex.LowPrecisionMode.FP32
     if not args.env:
         ipex.backends.cpu.set_fp32_low_precision_mode(mode=fpmath_mode)
-    inputs = torch.randn(1, 3, 224, 224)
+    inputs = torch.randn(1, 3, 224, 224).requires_grad_()
     model = TestModel(112, 10, args.bias).eval()
-    with torch.no_grad():
-        model = ipex.optimize(model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
-        if mode == "jit":
-            model = torch.jit.trace(model, inputs).eval()
-            model = torch.jit.freeze(model)
-        model(inputs)
+    model = ipex.optimize(model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
+    if mode == "jit":
+        model = torch.jit.trace(model, inputs).eval()
+        model = torch.jit.freeze(model)
+    output = model(inputs)
+    output.sum().backward()
 
 
 if __name__ == "__main__":
