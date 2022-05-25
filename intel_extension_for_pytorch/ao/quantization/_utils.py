@@ -9,10 +9,11 @@ import torch
 import torch.nn as nn
 from torch import _VF
 import torch.nn.functional as F
-from torch.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver
 from torch.quantization.qconfig import QConfig
+from intel_extension_for_pytorch.nn.functional import interaction
 
-from ._quantization_state_utils import SeenQOpInfo, SeenNonQOpInfo, QTensorInfo
+from ._quantization_state_utils import QTensorInfo
+
 
 add_and_mul_ops = set([
     torch.add,
@@ -29,6 +30,38 @@ quantized_modules_has_weights = set([
     torch.nn.ConvTranspose3d,
     torch.nn.LSTM,
     ])
+
+# those ops only support int8->int8, not int8->fp32/bf16
+int8_int8_op = set([
+    str(F.adaptive_avg_pool2d),
+    str(F.adaptive_avg_pool3d),
+    str(F.avg_pool2d),
+    str(F.avg_pool3d),
+    str(F.max_pool2d),
+    str(F.max_pool3d),
+    str(nn.MaxPool2d),
+    str(nn.MaxPool3d),
+    str(nn.AvgPool2d),
+    str(nn.AvgPool3d),
+    str(nn.AdaptiveAvgPool2d),
+    str(nn.AdaptiveAvgPool3d),
+    str(torch.Tensor.relu),
+    str(torch.relu),
+    str(F.relu),
+    str(nn.ReLU),
+    str(torch.Tensor.sigmoid),
+    str(torch.sigmoid),
+    str(F.sigmoid),
+    str(nn.Sigmoid),
+    str(F.gelu),
+    str(nn.GELU),
+    # ipex customer op
+    str(interaction),
+    str(torch.ops.torch_ipex.interaction_forward),
+    str(torch.embedding_bag),
+    str(F.embedding_bag),
+    str(torch.nn.EmbeddingBag)
+])
 
 class OpQuantizeabilityType(enum.Enum):
     QUANTIZEABLE = 0
@@ -190,6 +223,7 @@ class Node:
         self.input_tensor_infos = op_infos.input_tensor_infos
         self.input_tensor_force_inf_dtype = [] if qconfig is None else op_infos.input_tensor_force_inf_dtype
         self.output_tensor_infos = op_infos.output_tensor_infos
+        self.insert_fake_quant_after_outputs = [] if qconfig is None else op_infos.insert_fake_quant_after_outputs
         self.weight_tensor_infos = [] if qconfig is None else op_infos.weight_tensor_infos
         self.qconfig = qconfig
         self.input_scale_zero = input_scale_zero
@@ -285,6 +319,85 @@ def sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes):
             _find_sync_op_from_given_node(sync_node_begin, tensor_ids)
             for id in tensor_ids:
                 _sync_scale_zp_given_id(quant_state_map, id, scale_zp)
+
+
+def _check_after_nodes_all_quantized_give_node(node):
+    r"""
+    This function is about check whether given node's post nodes are all quantized,
+    """
+    if len(node.post_nodes) == 0:
+        return False
+    else:
+        # make sure all post nodes are quantizabled. 
+        for next in node.post_nodes:
+            if next.qconfig is None:
+                if check_node_in_give_op(next, [str(nn.Identity)]):
+                    return _check_after_nodes_all_quantized_give_node(next)
+                else:
+                    return False
+            else:
+                ipex_customer_op = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.embedding_bag), \
+                    str(F.embedding_bag), str(torch.nn.EmbeddingBag)]
+                if check_node_in_give_op(next, ipex_customer_op):
+                    if check_node_in_give_op(next, [str(interaction), str(torch.ops.torch_ipex.interaction_forward)]):
+                        # node.input_tensor_infos may be set, we can use force_inf_dtype to check whether this op is quantizabled.
+                        for force_inf_dtype in next.input_tensor_force_inf_dtype:
+                            if force_inf_dtype != torch.qint8:
+                                return False
+                    else:
+                        # embeddingBag
+                        if next.weight_tensor_infos[0].inf_dtype != torch.qint8:
+                            return False
+                else:
+                    for force_inf_dtype in next.input_tensor_force_inf_dtype:
+                        if force_inf_dtype not in [torch.qint8, torch.quint8]:
+                            return False
+        # all post nodes are quantizabled.
+        return True
+
+def set_node_output_quantized(nodes):
+    r"""
+    # For ipex_customer_op, pooling and elt_wise, we only support INT8->INT*, if those op has quantized their input,
+    # we need make sure their output also have falk quant to make them call in INT8 kernel.
+    # this function will check whether the output inf dtype is int8 dtype if its' input is set to quantized, if the
+    # output's infe dtype is not int8, set it and also set insert_fake_quant_after_output to True.
+    """
+    def _reset_post_node_input_infos(node):
+        # make sure the post node will node insert fake quant if we add fake quant by cur node' output
+        if len(node.post_nodes) > 0:
+            for post_node in node.post_nodes:
+                if post_node.qconfig is not None:
+                    for idx, tensor_info in enumerate(post_node.input_tensor_infos):
+                        if tensor_info in node.output_tensor_infos:
+                            post_node.input_tensor_force_inf_dtype[idx] = tensor_info.orig_dtype
+                elif check_node_in_give_op(post_node, [str(nn.Identity)]):
+                    _reset_post_node_input_infos(post_node)
+
+    for node in nodes:
+        if isinstance(node, ParentNode):
+            continue
+        if node.qconfig is not None and check_node_in_give_op(node, int8_int8_op):
+            post_node_are_quantized = _check_after_nodes_all_quantized_give_node(node)
+            if node.type in str(torch.nn.EmbeddingBag):
+                if node.weight_tensor_infos[0].inf_dtype == torch.qint8 and not post_node_are_quantized():
+                    node.output_tensor_infos[0].inf_dtype = torch.qint8
+                    node.insert_fake_quant_after_outputs[0] = True
+                    _reset_post_node_input_infos(node)
+            elif node.type  == str(F.embedding_bag):
+                if node.input_tensor_force_inf_dtype[1] == torch.qint8 and not post_node_are_quantized:
+                    node.output_tensor_infos[0].inf_dtype = torch.qint8
+                    node.insert_fake_quant_after_outputs[0] = True
+                    _reset_post_node_input_infos(node)
+            elif node.type in [str(interaction), str(torch.ops.torch_ipex.interaction_forward)]:
+                if node.input_tensor_force_inf_dtype[0] == torch.qint8 and not post_node_are_quantized:
+                    node.output_tensor_infos[0].inf_dtype = torch.qint8
+                    node.insert_fake_quant_after_outputs[0] = True
+                    _reset_post_node_input_infos(node)
+            else:
+                if node.input_tensor_force_inf_dtype[0] in [torch.qint8, torch.quint8] and not post_node_are_quantized:
+                   node.output_tensor_infos[0].inf_dtype = node.input_tensor_force_inf_dtype[0]
+                   node.insert_fake_quant_after_outputs[0] = True
+                   _reset_post_node_input_infos(node)
 
 qscheme_dict = {
     str(torch.per_tensor_affine): torch.per_tensor_affine,
@@ -391,7 +504,7 @@ def save_quant_state(quant_state_map, configure_file):
                             cur_tensor_infos["zero_point"] = v.weight_tensor_id_to_scale_zp[weight_idx][1].tolist()
                     weight_tensor_infos.append(cur_tensor_infos)
                 info["weight_tensor_infos"] = weight_tensor_infos
-                # output  infos
+                # output infos
                 output_tensor_infos = []
                 for tensor_info in op_info.output_tensor_infos:
                     cur_tensor_infos = {}
@@ -495,9 +608,11 @@ def load_qconf_summary_to_model(model, qconf_summary):
                 else:
                     weight_tensor_infos.append(None)
             output_tensor_infos = []
+            insert_fake_quant_after_outputs = []
             for tensor_info in q_op_info["output_tensor_infos"]:
                 if len(tensor_info) > 0:
                     output_tensor_infos.append(QTensorInfo(tensor_info["id"], dtype_dict[tensor_info["orig_dtype"]], dtype_dict[tensor_info["inf_dtype"]]))
+                    insert_fake_quant_after_outputs.append(False)
                     if "scale" in tensor_info:
                         scale = torch.FloatTensor(tensor_info["scale"])
                         zp = torch.LongTensor(tensor_info["zero_point"])
@@ -511,6 +626,7 @@ def load_qconf_summary_to_model(model, qconf_summary):
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_infos = input_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_force_inf_dtype = input_force_dtype_infos
             v.idx_to_seen_q_op_infos[int(i)].output_tensor_infos = output_tensor_infos
+            v.idx_to_seen_q_op_infos[int(i)].insert_fake_quant_after_outputs = insert_fake_quant_after_outputs
             v.idx_to_seen_q_op_infos[int(i)].weight_tensor_infos = weight_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].qconfig = qconfig
 
@@ -554,6 +670,10 @@ def load_qconf_summary_to_model(model, qconf_summary):
             v._auto_quant_state.tensor_id_to_observer.clear()
             v._auto_quant_state.weight_tensor_id_to_observer.clear()
             v._auto_quant_state.insert_observers(v)
+    
+    # update insert_fake_quant_after_output after load user setting, which for avoiding redundant fake quant.
+    nodes = convert_quant_state_map_to_nodes(quant_state_map)
+    set_node_output_quantized(nodes)
 
 def _lstm_forward(module, input, hx, weights):
     r"""

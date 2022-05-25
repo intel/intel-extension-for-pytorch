@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from intel_extension_for_pytorch.nn.functional import interaction
 import intel_extension_for_pytorch._C as core
 
-from ._utils import OpQuantizeabilityType, is_leaf, get_fqn_valid_for_module_dict_key, quantized_modules_has_weights
+from ._utils import OpQuantizeabilityType, is_leaf, get_fqn_valid_for_module_dict_key, quantized_modules_has_weights, int8_int8_op
 from ._quantization_state_utils import SeenQOpInfo, SeenNonQOpInfo, QTensorInfo, op_needs_quantization, get_input_observed_arg_idxs, \
     get_weight_arg_idx, iterate_and_apply, get_input_args_quant_dequant_info, _raise_obs_not_found_error, get_weight_args_quant_dequant_info, \
     _raise_obs_op_mismatch, ops_are_related, iterate_and_apply_convert
@@ -287,13 +287,11 @@ class AutoQuantizationState(torch.nn.Module):
         TODO: remove this after all ops support INT8->FP32.
         """
         seen_q_op_info = self._get_cur_seen_q_op_info()
-        ipex_customer_op = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.embedding_bag), str(F.embedding_bag), str(torch.nn.EmbeddingBag)]
-        if seen_q_op_info.type in ipex_customer_op:
-            for tensor_info in seen_q_op_info.output_tensor_infos:
-                tensor_id = tensor_info.id
-                if str(tensor_id) in self.tensor_id_to_observer:
-                    obs = self.tensor_id_to_observer[str(tensor_id)]
-                    obs(output)
+        for tensor_info in seen_q_op_info.output_tensor_infos:
+            tensor_id = tensor_info.id
+            if str(tensor_id) in self.tensor_id_to_observer:
+                obs = self.tensor_id_to_observer[str(tensor_id)]
+                obs(output)
         return output
 
     def op_convert_before_hook(
@@ -434,54 +432,47 @@ class AutoQuantizationState(torch.nn.Module):
         # we need add fakeQuant here to make the quantized op call in
         # INT8 path. It can be removed after all op support INT8->fp32
         seen_q_op_info = self._get_cur_seen_q_op_info()
-        int8_to_int8_ops = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.nn.EmbeddingBag), \
-            str(F.embedding_bag,), str( torch.embedding_bag)]
-        if seen_q_op_info.type in int8_to_int8_ops:
-            if isinstance(outputs, torch.Tensor):
-                tensor_info = seen_q_op_info.output_tensor_infos[0]
-                tensor_id, orig_dtype, inf_dtype = tensor_info.id, tensor_info.orig_dtype, tensor_info.inf_dtype
-                # so if inf_dtype is torch.qint8, we need add fake quant here.
-                if tensor_id in self.tensor_id_to_scale_zp and inf_dtype == torch.qint8:
-                    scale, zp = self.tensor_id_to_scale_zp[tensor_id]
-                    output_is_bfloat16 = False
-                    if outputs.dtype == torch.bfloat16:
-                        output_is_bfloat16 = True
-                        outputs = outputs.to(torch.float32)
-                    outputs = torch.quantize_per_tensor(
-                        outputs, scale.item(), zp.item(), torch.qint8)
-                    outputs= outputs.dequantize()
-                    if output_is_bfloat16:
-                        outputs = outputs.to(torch.bfloat16)
-            elif isinstance(output, tuple):
-                # TODO: handle other tuple subclasses more generically
-                new_outputs = []
-                for output in outputs:
-                    idex = 0
-                    if isinstance(output, torch.Tensor):
-                        tensor_info = seen_q_op_info.output_tensor_infos[idex]
-                        tensor_id, orig_dtype, inf_dtype = tensor_info.id, tensor_info.orig_dtype, tensor_info.inf_dtype
-                        if tensor_id in self.tensor_id_to_scale_zp and inf_dtype == torch.qint8:
-                            scale, zp = self.tensor_id_to_scale_zp[tensor_id]
-                            output_is_bfloat16
-                            if outputs.dtype == torch.bfloat16:
-                                output_is_bfloat16 = True
-                                outputs = outputs.to(torch.float32)
-                            output = torch.quantize_per_tensor(output, scale.item(), zp.item(), torch.qint8)
-                            output= output.dequantize()
-                            if output_is_bfloat16:
-                                outputs = outputs.to(torch.bfloat16)
-                            new_outputs.append(output)
-                    else:
-                        new_outputs.append(output)
-                    idex += 1
-                # hacky check for collections.namedtuple, TODO improve this
-                # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
-                if hasattr(outputs, '_fields'):
-                    outputs = outputs.__class__(*new_outputs)
+        def _convert_output(output, tensor_info, insert_fake_quant, tensor_id_to_scale_zp):
+            tensor_id, inf_dtype = tensor_info.id, tensor_info.inf_dtype
+            # so if inf_dtype is torch.qint8, we need add fake quant here.
+            if tensor_id in tensor_id_to_scale_zp and inf_dtype in [torch.qint8, torch.quint8] and insert_fake_quant:
+                scale, zp = tensor_id_to_scale_zp[tensor_id]
+                output_is_bfloat16 = False
+                if output.dtype == torch.bfloat16:
+                    output_is_bfloat16 = True
+                    output = output.to(torch.float32)
+                output = torch.quantize_per_tensor(
+                    output, scale.item(), zp.item(), inf_dtype)
+                output = output.dequantize()
+                if output_is_bfloat16:
+                    output = output.to(torch.bfloat16)
+            return output
+
+        if isinstance(outputs, torch.Tensor):
+            tensor_info = seen_q_op_info.output_tensor_infos[0]
+            insert_fake_quant = seen_q_op_info.insert_fake_quant_after_outputs[0]
+            outputs = _convert_output(outputs, tensor_info, insert_fake_quant, self.tensor_id_to_scale_zp)
+        elif isinstance(outputs, tuple):
+            # TODO: handle other tuple subclasses more generically
+            new_outputs = []
+            for output in outputs:
+                idx = 0
+                if isinstance(output, torch.Tensor):
+                    tensor_info = seen_q_op_info.output_tensor_infos[idx]
+                    insert_fake_quant = seen_q_op_info.insert_fake_quant_after_outputs[idx]
+                    output = _convert_output(output, tensor_info, insert_fake_quant, self.tensor_id_to_scale_zp)
+                    new_outputs.append(output)
                 else:
-                    outputs = tuple(new_outputs)
+                    new_outputs.append(output)
+                idx += 1
+            # hacky check for collections.namedtuple, TODO improve this
+            # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
+            if hasattr(outputs, '_fields'):
+                outputs = outputs.__class__(*new_outputs)
             else:
-                pass
+                outputs = tuple(new_outputs)
+        else:
+            pass
         return outputs
 
     def get_op_convert_info(
@@ -666,7 +657,7 @@ class AutoQuantizationState(torch.nn.Module):
                         weight_tensor_infos.append(QTensorInfo(weight_idx, weights[weight_idx].dtype, weights[weight_idx].dtype))
                         weight_idx += 1
             self.idx_to_seen_q_op_infos[self.idx] = SeenQOpInfo(
-                self.idx, str(op_type), op_type_is_module, fqn, arg_tensor_infos, arg_tensor_force_inf_dtype, [], weight_tensor_infos, self.qconfig)
+                self.idx, str(op_type), op_type_is_module, fqn, arg_tensor_infos, arg_tensor_force_inf_dtype, [], [], weight_tensor_infos, self.qconfig)
         return args, kwargs
 
     def _first_call_op_prepare_after_hook_adjust_subgraphs(
@@ -693,6 +684,7 @@ class AutoQuantizationState(torch.nn.Module):
                     qtensor_id[0], output.dtype, output.dtype)  # type: ignore[arg-type]
                 if op_quantizeability_type is OpQuantizeabilityType.QUANTIZEABLE:
                     target = self.idx_to_seen_q_op_infos[self.idx].output_tensor_infos
+                    self.idx_to_seen_q_op_infos[self.idx].insert_fake_quant_after_outputs.append(False)
                 else:
                     target = self.seen_nonq_op_infos[-1].output_tensor_infos
                 target.append(output._qtensor_info)
@@ -764,10 +756,10 @@ class AutoQuantizationState(torch.nn.Module):
         seen_q_op_info: SeenQOpInfo,
         root_module: torch.nn.Module,
     ):
-        # only add  observer for some op's output which doesn't support INT8->FP32
-        qconfig = seen_q_op_info.qconfig
-        ipex_customer_op = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.embedding_bag), str(F.embedding_bag), str(torch.nn.EmbeddingBag)]
-        if seen_q_op_info.type in ipex_customer_op:
+        # always add output observer for int8_int8_op
+        op_type = seen_q_op_info.type
+        if op_type in int8_int8_op:
+            qconfig = seen_q_op_info.qconfig
             for _, tensor_info in enumerate(seen_q_op_info.output_tensor_infos):
                 if tensor_info is None:
                     continue

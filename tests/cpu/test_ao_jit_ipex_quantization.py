@@ -50,7 +50,6 @@ class TestIpexOps(JitLlgaTestCase):
             def forward(self, x):
                 x = self.conv(x)
                 x = self.adaptive_avg_pool2d(x)
-                x = x.relu()
                 return x
 
         m = M()

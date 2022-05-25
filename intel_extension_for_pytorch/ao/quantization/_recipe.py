@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from intel_extension_for_pytorch.nn.functional import interaction
 
-from ._utils import ParentNode, check_node_in_give_op
+from ._utils import ParentNode, check_node_in_give_op, set_node_output_quantized
 
 add_inplace_op = [str(torch.Tensor.add_)]
 add_op = [str(torch.add), str(torch.Tensor.add)]
@@ -336,17 +336,4 @@ def get_defaut_recipe(nodes):
                     node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[0].orig_dtype
                     node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[0].inf_dtype
 
-    # For some operators, we only support INT8->INT8, so we should make sure the cur op's output has a fake quant.
-    for node in nodes:
-        if isinstance(node, ParentNode):
-            continue
-        if node.qconfig is not None and check_node_in_give_op(node, ipex_customer_op):
-            if node.type in str(torch.nn.EmbeddingBag) and node.weight_tensor_infos[0].inf_dtype == torch.qint8 and \
-                node.output_tensor_infos[0].inf_dtype != torch.qint8:
-                node.output_tensor_infos[0].inf_dtype = torch.qint8
-            elif node.type  == str(F.embedding_bag) and node.input_tensor_force_inf_dtype[1] == torch.qint8 and node.output_tensor_infos[0].inf_dtype:
-                node.output_tensor_infos[0].inf_dtype= node.input_tensor_force_inf_dtype[1] 
-            else:
-                # for interation, we only need to check the fist input(all input should has same input dtype)
-                if node.input_tensor_force_inf_dtype[0] == torch.qint8 and node.output_tensor_infos[0].inf_dtype:
-                   node.output_tensor_infos[0].inf_dtype = node.input_tensor_force_inf_dtype[0] 
+    set_node_output_quantized(nodes)

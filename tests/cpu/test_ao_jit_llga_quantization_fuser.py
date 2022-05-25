@@ -199,11 +199,12 @@ class TestOp(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self, **kargs):
                 super(M, self).__init__()
+                self.conv = nn.Conv2d(3, 3, 1, 1)
                 self.max_pool= nn.MaxPool2d(**kargs)
 
             def forward(self, x):
+                x = self.conv(x)
                 x = self.max_pool(x)
-                x = x.relu()
                 return x
         for [
                 spatial,
@@ -230,11 +231,12 @@ class TestOp(JitLlgaTestCase):
             x = torch.rand(1, 3, spatial, spatial).to(memory_format=memory_format)
 
             patterns = [
+                ["aten::dequantize", "aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
                 ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
             ]
             for qconfig in static_qconfig:
                 graph = self.checkQuantizeTrace(m, [x], atol=1e-1, qconfig=qconfig)
-                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
                 self.assertFused(graph, ['aten::max_pool2d'])
                 self.checkPatterns(graph, patterns)
 

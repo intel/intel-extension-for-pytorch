@@ -180,6 +180,19 @@ class SeenQOpInfo:
     # Information about the output tensors
     # Non-tensor outputs are represented with None.
     output_tensor_infos: List[QTensorInfo]
+    # Some operator only support INT8->INT8, if post operator is non-quantized op,
+    # the output_tensor_infos's inf dtype always same as orig dtype, we can set the output_tensor_infos's
+    # inf dtype to int8, and do a check whether add fake quant after output accoreding to the inf dtype,
+    # but if the post operator is quantized op, we will add two fake quant if we only check the inf dtype.
+    # so we introduce insert_fake_quant_after_output to fix this issue: if insert_fake_quant_after_output is true,
+    # and the the inf dtype is int8, we will add fake quant after the output, otherwise, we will not insert fake quant
+    # after the output(if inf dtype is int8, but insert_fake_quant_after_output is False, the post op will insert
+    # fake quant, if inf dtype is not int8, the output hopes a orig dtype, we don't need to add fake quant).
+    # Note: the init value of the insert_fake_quant_after_output's is False.
+    # Our Quant param binding algorithm (binding info used to decide whether to add q/dq at runtime) is that:
+    # 1. Bind input tensors by default for all quantized ops.
+    # 2. Bind output tensor if any of downstream ops is not quantized.
+    insert_fake_quant_after_outputs: List[Optional[bool]]
     weight_tensor_infos: List[Optional[QTensorInfo]]
     qconfig:  torch.ao.quantization.QConfig
 
@@ -189,6 +202,7 @@ class SeenQOpInfo:
         s += f"     (input_tensor_infos): {self.input_tensor_infos}\n"
         s += f"     (input_tensor_force_inf_dtype): {self.input_tensor_force_inf_dtype}\n"
         s += f"     (output_tensor_infos): {self.output_tensor_infos}\n"
+        s += f"     (insert_fake_quant_after_outputs): {self.insert_fake_quant_after_outputs}\n"
         s += f"     (weight_tensor_infos): {self.weight_tensor_infos}\n"
         s += f"     (qconfig): {self.qconfig}"
         return s
@@ -300,11 +314,12 @@ def iterate_and_apply_convert(
             new_args.append(new_arg)
         return tuple(new_args)
     elif isinstance(args, list):
-        for idx in range(len(args)):
+        new_args = []
+        for arg in args:
             new_arg = iterate_and_apply_convert(
-                args[idx], quant_infos, quant_or_dequant_needed, op, flattened_tensor_infos_idx)
-            args[idx] = new_arg
-        return args
+                arg, quant_infos, quant_or_dequant_needed, op, flattened_tensor_infos_idx)
+            new_args.append(new_arg)
+        return new_args
     else:
         # individual element
         cur_quant_infos = \
@@ -379,7 +394,7 @@ def get_input_args_quant_dequant_info(
                     tensor_id = input_arg.id
                     inf_dtype = input_arg.inf_dtype
                     # force_inf_dtype always should be same as input_arg.inf_dtype, but some time,
-                    # the input arg may be used by many other operators, and it may have be been
+                    # the input arg may be used by many other operators, and it may have been
                     # changed by other operators, so for cur op, twe check whether input_arg.inf_dtype
                     # is same as the origin force_inf_dtype, if not same use force_inf_dtype as new
                     # inf dtype, if same, we can say the input_arg.inf_dtype is not changed or the cur op
