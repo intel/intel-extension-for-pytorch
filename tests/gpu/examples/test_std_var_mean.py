@@ -18,12 +18,6 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.var_mean(input_dpcpp)
 
-        if not torch.xpu.has_double_dtype():
-            print(output_cpu[0])
-            print(output_dpcpp[0])
-            print(output_cpu[1])
-            print(output_dpcpp[1])
-
         self.assertEqual(output_cpu[0], output_dpcpp[0].cpu())
         self.assertEqual(output_cpu[1], output_dpcpp[1].cpu())
 
@@ -33,12 +27,6 @@ class TestNNMethod(TestCase):
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.var_mean(input_dpcpp, 1)
 
-        if not torch.xpu.has_double_dtype():
-            print(output_cpu[0])
-            print(output_dpcpp[0])
-            print(output_cpu[1])
-            print(output_dpcpp[1])
-
         self.assertEqual(output_cpu[0], output_dpcpp[0].cpu())
         self.assertEqual(output_cpu[1], output_dpcpp[1].cpu())
 
@@ -47,12 +35,6 @@ class TestNNMethod(TestCase):
         output_cpu = torch.std_mean(input_cpu)
         input_dpcpp = input_cpu.to("xpu")
         output_dpcpp = torch.std_mean(input_dpcpp)
-
-        if not torch.xpu.has_double_dtype():
-            print(output_cpu[0])
-            print(output_dpcpp[0])
-            print(output_cpu[1])
-            print(output_dpcpp[1])
 
         self.assertEqual(output_cpu[0], output_dpcpp[0].cpu())
         self.assertEqual(output_cpu[1], output_dpcpp[1].cpu())
