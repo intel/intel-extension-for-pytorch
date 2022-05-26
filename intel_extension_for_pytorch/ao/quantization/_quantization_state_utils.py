@@ -12,8 +12,9 @@ functions_supported_by_quantization =set([
     torch.Tensor.add,
     torch.add,
     torch.Tensor.relu,
-    torch.Tensor.sigmoid,
+    #torch.Tensor.sigmoid,  # TODO
     torch.flatten,
+    torch.Tensor.flatten,
     F.adaptive_avg_pool2d,
     F.adaptive_avg_pool3d,
     F.avg_pool2d,
@@ -30,9 +31,9 @@ functions_supported_by_quantization =set([
     torch.conv_transpose3d,
     torch.relu,
     F.relu,
-    torch.sigmoid,
-    F.sigmoid,
-    F.gelu,
+    #torch.sigmoid,  # TODO
+    #F.sigmoid,  # TODO
+    #F.gelu, # TODO
     F.linear,
     torch._C._nn.linear,
     torch.matmul,
@@ -59,8 +60,8 @@ module_types_supported_by_quantization = set([
     torch.nn.AdaptiveAvgPool2d,
     torch.nn.AdaptiveAvgPool3d,
     torch.nn.ReLU,
-    torch.nn.Sigmoid,
-    torch.nn.GELU,
+    #torch.nn.Sigmoid,  # TODO
+    #torch.nn.GELU,     # TODO
     torch.nn.EmbeddingBag,
     torch.nn.Flatten,
     torch.nn.LSTM,

@@ -32,7 +32,7 @@ quantized_modules_has_weights = set([
     ])
 
 # those ops only support int8->int8, not int8->fp32/bf16
-int8_int8_op = set([
+int8_int8_ops = set([
     str(F.adaptive_avg_pool2d),
     str(F.adaptive_avg_pool3d),
     str(F.avg_pool2d),
@@ -49,12 +49,16 @@ int8_int8_op = set([
     str(torch.relu),
     str(F.relu),
     str(nn.ReLU),
-    str(torch.Tensor.sigmoid),
-    str(torch.sigmoid),
-    str(F.sigmoid),
-    str(nn.Sigmoid),
-    str(F.gelu),
-    str(nn.GELU),
+    str(torch.flatten),
+    str(torch.Tensor.flatten),
+    str(torch.nn.Flatten),
+    # the following op will be supported at next step.
+    #str(torch.Tensor.sigmoid),
+    #str(torch.sigmoid),
+    #str(F.sigmoid),
+    #str(nn.Sigmoid),
+    #str(F.gelu),
+    #str(nn.GELU),
     # ipex customer op
     str(interaction),
     str(torch.ops.torch_ipex.interaction_forward),
@@ -278,18 +282,12 @@ def convert_quant_state_map_to_nodes(quant_state_map):
                     cur.post_nodes.append(n)
     return nodes
 
-def check_node_in_give_op(node, given_ops):
-    if node.type in given_ops:
-        return True
-    else:
-        return False
-
 def sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes):
-    pool_op = [str(F.adaptive_avg_pool2d), str(F.adaptive_avg_pool3d), str(F.avg_pool2d), str(F.avg_pool3d), \
+    pool_ops = [str(F.adaptive_avg_pool2d), str(F.adaptive_avg_pool3d), str(F.avg_pool2d), str(F.avg_pool3d), \
         str(F.max_pool2d), str(F.max_pool3d), str(nn.MaxPool2d), str(nn.MaxPool3d), str(nn.AvgPool2d), str(nn.AvgPool3d), \
         str(nn.AdaptiveAvgPool2d), str(nn.AdaptiveAvgPool3d)]
-    shape_op = [str(torch.flatten), str(torch.nn.Flatten)]
-    lstm_op = [str(torch.nn.LSTM)]
+    shape_ops = [str(torch.flatten), str(torch.nn.Flatten), str(torch.Tensor.flatten)]
+    rnn_ops = [str(torch.nn.LSTM)]
     def _sync_scale_zp_given_id(quant_state_map, id, scale_zp):
         for _, v in quant_state_map.items():
             if id in v.tensor_id_to_scale_zp:
@@ -297,21 +295,21 @@ def sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes):
 
     def _find_sync_op_from_given_node(cur_node, ids):
         for next in cur_node.post_nodes:
-            if check_node_in_give_op(next, pool_op + shape_op + lstm_op):
+            if next.type in (pool_ops + shape_ops + rnn_ops):
                 ids.append(next.output_tensor_infos[0].id)
                 _find_sync_op_from_given_node(next, ids)
 
     for node in nodes:
         if isinstance(node, ParentNode):
             continue
-        if node.qconfig is not None and check_node_in_give_op(node, pool_op + lstm_op):
+        if node.qconfig is not None and node.type in (pool_ops + rnn_ops):
             if node.input_scale_zero == node.output_scale_zero:
                 continue
             sync_node_begin = node
             # fistly, find the fist sync op before the cur pooling(lstm) op.
             # like: pooling->pool->shape->cur_node,
             while len(sync_node_begin.pre_nodes) == 1 and \
-                (check_node_in_give_op(sync_node_begin.pre_nodes[0], pool_op + shape_op + lstm_op)):
+                sync_node_begin.pre_nodes[0].type in (pool_ops + shape_ops + rnn_ops):
                 sync_node_begin = sync_node_begin.pre_nodes[0]
             tensor_ids = [sync_node_begin.output_tensor_infos[0].id]
             scale_zp = sync_node_begin.input_scale_zero[sync_node_begin.input_tensor_infos[0].id]
@@ -331,15 +329,15 @@ def _check_after_nodes_all_quantized_give_node(node):
         # make sure all post nodes are quantizabled. 
         for next in node.post_nodes:
             if next.qconfig is None:
-                if check_node_in_give_op(next, [str(nn.Identity)]):
+                if next.type == str(nn.Identity):
                     return _check_after_nodes_all_quantized_give_node(next)
                 else:
                     return False
             else:
-                ipex_customer_op = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.embedding_bag), \
+                int8_int8_symmetric_ops = [str(interaction), str(torch.ops.torch_ipex.interaction_forward), str(torch.embedding_bag), \
                     str(F.embedding_bag), str(torch.nn.EmbeddingBag)]
-                if check_node_in_give_op(next, ipex_customer_op):
-                    if check_node_in_give_op(next, [str(interaction), str(torch.ops.torch_ipex.interaction_forward)]):
+                if next.type in int8_int8_symmetric_ops:
+                    if next.type in [str(interaction), str(torch.ops.torch_ipex.interaction_forward)]:
                         # node.input_tensor_infos may be set, we can use force_inf_dtype to check whether this op is quantizabled.
                         for force_inf_dtype in next.input_tensor_force_inf_dtype:
                             if force_inf_dtype != torch.qint8:
@@ -357,7 +355,7 @@ def _check_after_nodes_all_quantized_give_node(node):
 
 def set_node_output_quantized(nodes):
     r"""
-    # For ipex_customer_op, pooling and elt_wise, we only support INT8->INT*, if those op has quantized their input,
+    # For interation EmbeddingBag, pooling and elt_wise, we only support INT8->INT*, if those ops have quantized their inputs,
     # we need make sure their output also have falk quant to make them call in INT8 kernel.
     # this function will check whether the output inf dtype is int8 dtype if its' input is set to quantized, if the
     # output's infe dtype is not int8, set it and also set insert_fake_quant_after_output to True.
@@ -370,16 +368,16 @@ def set_node_output_quantized(nodes):
                     for idx, tensor_info in enumerate(post_node.input_tensor_infos):
                         if tensor_info in node.output_tensor_infos:
                             post_node.input_tensor_force_inf_dtype[idx] = tensor_info.orig_dtype
-                elif check_node_in_give_op(post_node, [str(nn.Identity)]):
+                elif post_node.type == str(nn.Identity):
                     _reset_post_node_input_infos(post_node)
 
     for node in nodes:
         if isinstance(node, ParentNode):
             continue
-        if node.qconfig is not None and check_node_in_give_op(node, int8_int8_op):
+        if node.qconfig is not None and node.type in int8_int8_ops:
             post_node_are_quantized = _check_after_nodes_all_quantized_give_node(node)
             if node.type in str(torch.nn.EmbeddingBag):
-                if node.weight_tensor_infos[0].inf_dtype == torch.qint8 and not post_node_are_quantized():
+                if node.weight_tensor_infos[0].inf_dtype == torch.qint8 and not post_node_are_quantized:
                     node.output_tensor_infos[0].inf_dtype = torch.qint8
                     node.insert_fake_quant_after_outputs[0] = True
                     _reset_post_node_input_infos(node)

@@ -1,10 +1,9 @@
 from typing import Callable, List, Tuple, Any, Optional, Dict
 import torch
 import torch.nn.functional as F
-from intel_extension_for_pytorch.nn.functional import interaction
 import intel_extension_for_pytorch._C as core
 
-from ._utils import OpQuantizeabilityType, is_leaf, get_fqn_valid_for_module_dict_key, quantized_modules_has_weights, int8_int8_op
+from ._utils import OpQuantizeabilityType, is_leaf, get_fqn_valid_for_module_dict_key, quantized_modules_has_weights, int8_int8_ops
 from ._quantization_state_utils import SeenQOpInfo, SeenNonQOpInfo, QTensorInfo, op_needs_quantization, get_input_observed_arg_idxs, \
     get_weight_arg_idx, iterate_and_apply, get_input_args_quant_dequant_info, _raise_obs_not_found_error, get_weight_args_quant_dequant_info, \
     _raise_obs_op_mismatch, ops_are_related, iterate_and_apply_convert
@@ -756,9 +755,9 @@ class AutoQuantizationState(torch.nn.Module):
         seen_q_op_info: SeenQOpInfo,
         root_module: torch.nn.Module,
     ):
-        # always add output observer for int8_int8_op
+        # always add output observer for int8_int8_ops
         op_type = seen_q_op_info.type
-        if op_type in int8_int8_op:
+        if op_type in int8_int8_ops:
             qconfig = seen_q_op_info.qconfig
             for _, tensor_info in enumerate(seen_q_op_info.output_tensor_infos):
                 if tensor_info is None:

@@ -76,9 +76,6 @@ class TestIpexOps(JitLlgaTestCase):
 
         m = M()
         x = torch.rand(1, 3, 28, 28)
-        patterns = [
-            ["aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
-        ]
         for qconfig in static_qconfig:
             graph = self.checkQuantizeTrace(m, [x], qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
@@ -103,17 +100,33 @@ class TestIpexOps(JitLlgaTestCase):
                 x = self.linear(x)
                 return x
 
+        class M2(nn.Module):
+            def __init__(self):
+                super(M2, self).__init__()
+                self.conv1 = nn.Conv2d(3, 3, 2, padding=1, bias=True)
+                self.pool = nn.MaxPool2d(2)
+                self.linear = nn.Linear(147, 32)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.pool(x)
+                x = x.flatten(1)
+                x = self.linear(x)
+                return x
+
         m = M()
-        x = torch.rand(1, 3, 14, 14)
-        patterns = [
-            ["aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
-            ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
-            ["aten::dequantize", "aten::linear"],
-        ]
-        for qconfig in static_qconfig:
-            graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
-            self.checkPatterns(graph, patterns)
+        m2 = M2()
+        for test_m in [m, m2]:
+            x = torch.rand(1, 3, 14, 14)
+            patterns = [
+                ["aten::dequantize", "aten::_convolution", "aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::linear"],
+            ]
+            for qconfig in static_qconfig:
+                graph = self.checkQuantizeTrace(test_m, [x], atol=2e-1, qconfig=qconfig)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+                self.checkPatterns(graph, patterns)
 
     
     # single none gemm ops will not be quantized if pre and post don't has
@@ -139,7 +152,24 @@ class TestIpexOps(JitLlgaTestCase):
                 .run(graph)
 
     def test_embeddingbag_int8(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.m = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
+
+            def forward(self, input, offset):
+                x = self.m(input, offset)
+                return x
+
+        # This will call in F.embeddingbag
         m = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
+        input = torch.LongTensor([1,2,4,5,4,3,2,9])
+        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+
+        graph = self.checkQuantizeTrace(m, [input, offsets], atol=1e-2, qconfig=static_qconfig[1])
+        self.assertGraphContainsExactly(graph, 'ipex::qembedding_bag', 1)
+        # test nn.EmbeddingBag
+        m = M().eval()
         input = torch.LongTensor([1,2,4,5,4,3,2,9])
         offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
 
@@ -152,13 +182,13 @@ class TestIpexOps(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.f = ipex.nn.functional.interaction
 
-            def forward(self, *x):
-                x = self.f(*x)
+            def forward(self, x1, x2, x3): 
+                x = self.f(x1.relu(), x2.relu(), x3.relu())
                 return x
 
         m = M()
         inputs = []
-        for i in range(0, 27):
+        for i in range(0, 3):
             inputs.append(torch.randn([128, 128]) * 0.1)
         graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, qconfig=static_qconfig[1])
         self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)

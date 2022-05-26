@@ -9,7 +9,7 @@ from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type
     attach_op_convert_info_to_model, save_quant_state, attach_scale_zp_values_to_model, convert_quant_state_map_to_nodes, \
         sync_pool_and_lstm_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, load_qconf_summary_to_model
 from ._quantization_state import AutoQuantizationState, AutoQuantizationStateModuleDict, init_model_quant_state
-from ._recipe import get_defaut_recipe
+from ._recipe import get_default_recipe
 from ._module_swap_utils import swap_child_modules
 
 # AutoQuantizationState lives in parent module's _modules.
@@ -311,14 +311,14 @@ def auto_prepare(
             assert qconf_summary is not None, "A configure file name should be given to save the qconf_summary"
             quant_state_map = self._fqn_to_auto_quant_state_map
             # If user have given a json file, we will save the qconf_summary according to the user's setting,
-            # otherwise,  we will first get a defaut_recipe, and then save the defaut_recipe's setting.
+            # otherwise,  we will first get a default_recipe, and then save the default_recipe's setting.
             if not hasattr(self, '_qconf_summary'):
                 # compute scales and zero_point.
                 attach_scale_zp_values_to_model(model)
                 nodes = convert_quant_state_map_to_nodes(quant_state_map)
                 # pooling and lstm's input and output should have same scale_zp.
                 sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
-                get_defaut_recipe(nodes)
+                get_default_recipe(nodes)
             # Setting model qconf_summary attr which can be easily to check the whether the scale/zp has been computed.
             self._qconf_summary = qconf_summary
             save_quant_state(quant_state_map, qconf_summary)
@@ -534,7 +534,7 @@ def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
         nodes = convert_quant_state_map_to_nodes(quant_state_map)
         # pooling and lstm's input and output should have same scale_zp.
         sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
-        get_defaut_recipe(nodes)
+        get_default_recipe(nodes)
     else:
         # Clear observer if module have, this will works when the user's json setting is loaded.
         for _, v in module._fqn_to_auto_quant_state_map.items():
