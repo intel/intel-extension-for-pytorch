@@ -276,22 +276,33 @@ class AutoQuantizationState(torch.nn.Module):
     def op_prepare_after_hook(
         self,
         op: Callable,
-        output: Any,
+        outputs: Any,
         args: Tuple[Any, ...],
         global_op_idx: List[int],
     ) -> Any:
         """
         This function is called after an op call on a prepared model.
-        * observe the output, if needed.
+        * observe the output, if needed, which only works for OpQuantizeabilityType.QUANTIZEABLE.
         TODO: remove this after all ops support INT8->FP32.
         """
         seen_q_op_info = self._get_cur_seen_q_op_info()
-        for tensor_info in seen_q_op_info.output_tensor_infos:
+        def _observer_output(output, tensor_info):
             tensor_id = tensor_info.id
             if str(tensor_id) in self.tensor_id_to_observer:
                 obs = self.tensor_id_to_observer[str(tensor_id)]
                 obs(output)
-        return output
+        if isinstance(outputs, torch.Tensor):
+            tensor_info = seen_q_op_info.output_tensor_infos[0]
+            _observer_output(outputs, tensor_info)
+        elif isinstance(outputs, tuple):
+            idx = 0
+            for element in outputs:
+                # only do observer for tensor type.
+                if isinstance(element, torch.Tensor):
+                    tensor_info = seen_q_op_info.output_tensor_infos[idx]
+                    _observer_output(element, tensor_info)
+                    idx += 1
+        return outputs
 
     def op_convert_before_hook(
         self,
@@ -454,16 +465,16 @@ class AutoQuantizationState(torch.nn.Module):
         elif isinstance(outputs, tuple):
             # TODO: handle other tuple subclasses more generically
             new_outputs = []
+            idx = 0
             for output in outputs:
-                idx = 0
                 if isinstance(output, torch.Tensor):
                     tensor_info = seen_q_op_info.output_tensor_infos[idx]
                     insert_fake_quant = seen_q_op_info.insert_fake_quant_after_outputs[idx]
                     output = _convert_output(output, tensor_info, insert_fake_quant, self.tensor_id_to_scale_zp)
                     new_outputs.append(output)
+                    idx += 1
                 else:
                     new_outputs.append(output)
-                idx += 1
             # hacky check for collections.namedtuple, TODO improve this
             # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
             if hasattr(outputs, '_fields'):
@@ -662,7 +673,7 @@ class AutoQuantizationState(torch.nn.Module):
     def _first_call_op_prepare_after_hook_adjust_subgraphs(
         self,
         op: Callable,
-        output: Any,
+        outputs: Any,
         args: Tuple[Any, ...],
         qtensor_id: List[int],
         op_quantizeability_type: OpQuantizeabilityType
@@ -675,20 +686,21 @@ class AutoQuantizationState(torch.nn.Module):
         """
         # TODO(future PR): handle non-tensor outputs
         def _add_output_qtensor_info(output):
-            if isinstance(output, (list, tuple)):
-                for element in output:
+            output._qtensor_info = QTensorInfo(
+                qtensor_id[0], output.dtype, output.dtype)  # type: ignore[arg-type]
+            if op_quantizeability_type is OpQuantizeabilityType.QUANTIZEABLE:
+                target = self.idx_to_seen_q_op_infos[self.idx].output_tensor_infos
+                self.idx_to_seen_q_op_infos[self.idx].insert_fake_quant_after_outputs.append(False)
+            else:
+                target = self.seen_nonq_op_infos[-1].output_tensor_infos
+            target.append(output._qtensor_info)
+            qtensor_id[0] += 1
+        if isinstance(outputs, torch.Tensor):
+            _add_output_qtensor_info(outputs)
+        elif isinstance(outputs, tuple):
+            for element in outputs:
+                if isinstance(element, torch.Tensor):
                     _add_output_qtensor_info(element)
-            elif isinstance(output, torch.Tensor):
-                output._qtensor_info = QTensorInfo(
-                    qtensor_id[0], output.dtype, output.dtype)  # type: ignore[arg-type]
-                if op_quantizeability_type is OpQuantizeabilityType.QUANTIZEABLE:
-                    target = self.idx_to_seen_q_op_infos[self.idx].output_tensor_infos
-                    self.idx_to_seen_q_op_infos[self.idx].insert_fake_quant_after_outputs.append(False)
-                else:
-                    target = self.seen_nonq_op_infos[-1].output_tensor_infos
-                target.append(output._qtensor_info)
-                qtensor_id[0] += 1
-        _add_output_qtensor_info(output)
 
     def _maybe_insert_input_observers(self, seen_q_op_info: SeenQOpInfo):
         input_observed_arg_idxs = get_input_observed_arg_idxs(

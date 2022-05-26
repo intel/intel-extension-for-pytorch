@@ -193,7 +193,6 @@ class TestIpexOps(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, qconfig=static_qconfig[1])
         self.assertGraphContainsExactly(graph, 'ipex::qinteraction', 1)
 
-    '''
     # This test case will be enabled after LSTM int8->fp32 works
     def test_lstm(self):
         class M(nn.Module):
@@ -238,8 +237,12 @@ class TestIpexOps(JitLlgaTestCase):
             c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
             m = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
             graph = self.checkQuantizeTrace(m, [x], atol=3e-2, rtol=1e-1)
-            self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
-    '''
+            weights_number = len(m.lstm._flat_weights)
+            quantizer_number = weights_number / 2 if m.lstm.bias else weights_number
+            self.assertGraphContainsExactly(graph, 'aten::dequantize', quantizer_number + 2)
+            # it will be enabled after lstm int8 support
+            #self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
+
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_convert(self):
         class M(nn.Module):

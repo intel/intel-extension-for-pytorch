@@ -64,7 +64,8 @@ int8_int8_ops = set([
     str(torch.ops.torch_ipex.interaction_forward),
     str(torch.embedding_bag),
     str(F.embedding_bag),
-    str(torch.nn.EmbeddingBag)
+    str(torch.nn.EmbeddingBag),
+    str(torch.nn.LSTM),
 ])
 
 class OpQuantizeabilityType(enum.Enum):
