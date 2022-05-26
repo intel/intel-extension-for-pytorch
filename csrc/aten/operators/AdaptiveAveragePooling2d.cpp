@@ -292,8 +292,9 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
       self.q_scale(),
       self.q_zero_point(),
       MemoryFormat::Contiguous);
-  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
+  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(
       output, self, output_size);
+  return output;
 }
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
@@ -304,8 +305,9 @@ Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
       self.q_scale(),
       self.q_zero_point(),
       MemoryFormat::Contiguous);
-  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
+  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(
       output, self, output_size);
+  return output;
 }
 
 } // namespace AtenIpexTypeQuantizedXPU
