@@ -16,7 +16,7 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     c10::optional<int64_t> batch_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createLinearPrePackOpContext",
-      std::vector<c10::IValue>({}));
+      c10::ArrayRef<c10::IValue>({}));
 
   return IpexLinearOpContext::create_context(
       std::move(weight),
@@ -28,7 +28,7 @@ at::Tensor linear_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t());
 }
@@ -37,7 +37,7 @@ at::Tensor linear_relu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_relu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_relu_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t::fuse_relu());
 }
@@ -47,7 +47,7 @@ at::Tensor linear_gelu_run(
     const c10::intrusive_ptr<LinearOpContext>& op_context,
     const c10::string_view approximate) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_gelu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_gelu_run", c10::ArrayRef<c10::IValue>({}));
   // https://github.com/pytorch/pytorch/pull/61439
   // at::gelu can support tanh approximate now and OneDNN also support it
   // by changing algorithm If there is other type of approximate are added to
@@ -69,7 +69,7 @@ at::Tensor linear_tanh_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_tanh_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_tanh_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t::fuse_tanh());
 }
@@ -78,7 +78,7 @@ at::Tensor linear_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_sigmoid_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_sigmoid_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t::fuse_sigmoid());
 }
@@ -87,7 +87,7 @@ at::Tensor linear_swish_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_swish_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_swish_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t::fuse_swish());
 }
@@ -98,7 +98,7 @@ at::Tensor linear_add_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_add_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_add_run", c10::ArrayRef<c10::IValue>({}));
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));

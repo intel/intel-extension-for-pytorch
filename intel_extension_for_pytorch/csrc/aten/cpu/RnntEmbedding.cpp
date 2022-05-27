@@ -44,7 +44,7 @@ static void rnnt_embedding(
 #if defined(IPEX_DISP_OP)
   printf("IPEX::rnnt_embedding\n");
 #endif
-  IPEX_RECORD_FUNCTION("IPEX::rnnt_embedding", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IPEX::rnnt_embedding", c10::ArrayRef<c10::IValue>({}));
 
   /*
   pointer to torch_ipex::cpu::rnnt_embedding_kernel_impl(

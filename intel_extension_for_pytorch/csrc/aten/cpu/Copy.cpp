@@ -32,7 +32,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::copy_\n");
 #endif
-  IPEX_RECORD_FUNCTION("torch_ipex::copy_", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("torch_ipex::copy_", c10::ArrayRef<c10::IValue>({}));
 
   auto maybe_outnames =
       at::namedinference::compute_broadcast_outnames(self, src);

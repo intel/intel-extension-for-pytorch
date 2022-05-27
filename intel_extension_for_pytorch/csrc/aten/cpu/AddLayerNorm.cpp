@@ -38,7 +38,7 @@ at::Tensor dil_add_layernorm(
     const c10::optional<at::Tensor>& bias_opt,
     float eps,
     bool cuda_enable) {
-  IPEX_RECORD_FUNCTION("dil_add_layernorm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("dil_add_layernorm", c10::ArrayRef<c10::IValue>({}));
 
   // no broadcast
   bool no_broadcast = true;

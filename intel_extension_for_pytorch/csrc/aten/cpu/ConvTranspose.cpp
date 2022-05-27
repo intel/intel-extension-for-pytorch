@@ -144,7 +144,7 @@ at::Tensor IPEXConvTransposeOp::_forward(
     const at::Tensor& op_context) {
   at::AutoNonVariableTypeMode g;
   IPEX_RECORD_FUNCTION(
-      "IPEXConvTransposeOp::_forward", std::vector<c10::IValue>({}));
+      "IPEXConvTransposeOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::conv_transpose", "")
@@ -159,7 +159,7 @@ at::Tensor IPEXConvTransposeOp::forward(
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION(
-      "IPEXConvTransposeOp::forward", std::vector<c10::IValue>({}));
+      "IPEXConvTransposeOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["op_context"] = op_context;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
@@ -304,7 +304,7 @@ conv_transpose_backward_kernel_impl(
   printf("torch_ipex::conv_transpose_backward\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::conv_transpose_backward", std::vector<c10::IValue>({}));
+      "torch_ipex::conv_transpose_backward", c10::ArrayRef<c10::IValue>({}));
 
   auto memory_format = input.suggest_memory_format();
   at::Tensor grad_output = grad_output_t.contiguous(memory_format);
@@ -341,7 +341,7 @@ torch::autograd::variable_list IPEXConvTransposeOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
   IPEX_RECORD_FUNCTION(
-      "IPEXConvTransposeOp::backward", std::vector<c10::IValue>({}));
+      "IPEXConvTransposeOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;

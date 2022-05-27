@@ -31,7 +31,7 @@ at::Tensor ConcatBnRelu(
     double bn_eps,
     bool bn_cudnn_enabled,
     int dim) {
-  IPEX_RECORD_FUNCTION("ipex::concat_bn_relu", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("ipex::concat_bn_relu", c10::ArrayRef<c10::IValue>({}));
 
   /*
   pointer to concat_bn_relu_kernel_impl(

@@ -23,7 +23,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     std::vector<int64_t>&& input_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvTransposePrePackOpContext",
-      std::vector<c10::IValue>({}));
+      c10::ArrayRef<c10::IValue>({}));
   return IpexConvTransposeOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -40,7 +40,7 @@ at::Tensor conv_transpose_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::conv_transpose_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::conv_transpose_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t());
 }

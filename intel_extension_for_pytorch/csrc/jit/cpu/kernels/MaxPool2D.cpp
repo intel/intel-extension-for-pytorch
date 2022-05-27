@@ -165,7 +165,7 @@ at::Tensor dil_max_pool2d(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     bool ceil_mode) {
-  IPEX_RECORD_FUNCTION("dil_max_pool2d", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("dil_max_pool2d", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
       std::all_of(

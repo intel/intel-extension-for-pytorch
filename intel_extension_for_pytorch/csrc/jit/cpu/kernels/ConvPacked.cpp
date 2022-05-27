@@ -25,7 +25,7 @@ c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     std::vector<int64_t>&& input_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createConvolutionPrePackOpContext",
-      std::vector<c10::IValue>({}));
+      c10::ArrayRef<c10::IValue>({}));
   return IpexConvolutionOpContext::create_context(
       std::move(weight),
       std::move(bias),
@@ -42,7 +42,7 @@ at::Tensor convolution_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_run", c10::ArrayRef<c10::IValue>({}));
   return op_context->run(input, ideep::attr_t());
 }
 
@@ -50,7 +50,7 @@ at::Tensor convolution_relu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_relu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_relu_run", c10::ArrayRef<c10::IValue>({}));
   return op_context->run(input, ideep::attr_t::fuse_relu());
 }
 
@@ -59,7 +59,8 @@ at::Tensor convolution_leaky_relu_run(
     at::Scalar alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_leaky_relu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_leaky_relu_run",
+      c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
   return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
 }
@@ -68,7 +69,7 @@ at::Tensor convolution_sigmoid_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_sigmoid_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_sigmoid_run", c10::ArrayRef<c10::IValue>({}));
   return op_context->run(input, ideep::attr_t::fuse_sigmoid());
 }
 
@@ -78,7 +79,7 @@ at::Tensor convolution_hardtanh_run(
     at::Scalar upper_bound,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_hardtanh_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_hardtanh_run", c10::ArrayRef<c10::IValue>({}));
   auto lower_bound_value = lower_bound.to<float>();
   auto upper_bound_value = upper_bound.to<float>();
   return op_context->run(
@@ -92,7 +93,7 @@ at::Tensor convolution_elu_run(
     at::Scalar input_scale,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_elu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_elu_run", c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
   auto scale_value = scale.to<float>();
   auto input_scale_value = input_scale.to<float>();
@@ -105,7 +106,7 @@ at::Tensor convolution_swish_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_swish_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_swish_run", c10::ArrayRef<c10::IValue>({}));
   return op_context->run(input, ideep::attr_t::fuse_swish());
 }
 
@@ -114,7 +115,7 @@ at::Tensor convolution_gelu_run(
     const c10::string_view approximate,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_gelu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_gelu_run", c10::ArrayRef<c10::IValue>({}));
   // https://github.com/pytorch/pytorch/pull/61439
   // at::gelu can support tanh approximate now and OneDNN also support it
   // by changing algorithm If there is other type of approximate are added to
@@ -138,7 +139,7 @@ at::Tensor convolution_add_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_add_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_add_run", c10::ArrayRef<c10::IValue>({}));
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
 }
@@ -149,7 +150,7 @@ at::Tensor convolution_add_relu_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_add_relu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::convolution_add_relu_run", c10::ArrayRef<c10::IValue>({}));
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::residual(scale));
 }
@@ -161,7 +162,7 @@ at::Tensor& convolution_bottleneck_run(
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context3) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_bottleneck_runi_v1",
-      std::vector<c10::IValue>({}));
+      c10::ArrayRef<c10::IValue>({}));
 
   auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
                                         : at::MemoryFormat::ChannelsLast3d;
@@ -230,7 +231,7 @@ at::Tensor convolution_bottleneck_run(
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context4) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::convolution_bottleneck_run_v2",
-      std::vector<c10::IValue>({}));
+      c10::ArrayRef<c10::IValue>({}));
 
   auto memory_format = input.dim() == 4 ? at::MemoryFormat::ChannelsLast
                                         : at::MemoryFormat::ChannelsLast3d;

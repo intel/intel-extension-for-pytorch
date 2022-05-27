@@ -105,7 +105,7 @@ static inline void transpose_add(
 
 template <typename T>
 inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
-  IPEX_RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("_interaction_forward", c10::ArrayRef<c10::IValue>({}));
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -184,7 +184,7 @@ inline std::vector<at::Tensor> _interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
-  IPEX_RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("_interaction_backward", c10::ArrayRef<c10::IValue>({}));
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -339,7 +339,7 @@ template <>
 inline at::Tensor _interaction_forward<at::BFloat16>(
     const std::vector<at::Tensor>& input) {
   IPEX_RECORD_FUNCTION(
-      "_interaction_forward_bfloat16", std::vector<c10::IValue>({}));
+      "_interaction_forward_bfloat16", c10::ArrayRef<c10::IValue>({}));
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   int32_t vector_size = input[0].sizes()[1];
@@ -468,7 +468,7 @@ inline std::vector<at::Tensor> _interaction_backward<at::BFloat16>(
     const std::vector<at::Tensor>& input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
   IPEX_RECORD_FUNCTION(
-      "_interaction_backward_bfloat16", std::vector<c10::IValue>({}));
+      "_interaction_backward_bfloat16", c10::ArrayRef<c10::IValue>({}));
   int32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   int32_t vector_size = input[0].sizes()[1];

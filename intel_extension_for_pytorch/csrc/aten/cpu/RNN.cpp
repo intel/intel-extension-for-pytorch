@@ -502,7 +502,7 @@ std::vector<at::Tensor> IPEXLSTMOp::forward(
     double scale,
     int64_t zp,
     int64_t dtype) {
-  IPEX_RECORD_FUNCTION("IPEXLSTMOp::forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IPEXLSTMOp::forward", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::forward\n");
@@ -556,7 +556,7 @@ std::vector<at::Tensor> IPEXLSTMOp::forward(
 torch::autograd::tensor_list IPEXLSTMOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-  IPEX_RECORD_FUNCTION("IPEXLSTMOp::backward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IPEXLSTMOp::backward", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::backward\n");
@@ -655,7 +655,7 @@ std::vector<at::Tensor> ipex_lstm_layer(
     int64_t zp,
     int64_t dtype) {
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::cpu::ipex_lstm_layer", std::vector<c10::IValue>({}));
+      "torch_ipex::cpu::ipex_lstm_layer", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::cpu::ipex_lstm_layer\n");
@@ -1052,7 +1052,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> quantized_lstm(
     int64_t zp,
     int64_t dtype) {
 #if defined(IPEX_PROFILE_OP)
-  IPEX_RECORD_FUNCTION("ipex::quantized_lstm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("ipex::quantized_lstm", c10::ArrayRef<c10::IValue>({}));
 #endif
 
   auto hx_ = hx.vec();
@@ -1093,7 +1093,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
     bool train,
     bool bidirectional,
     bool batch_first) {
-  IPEX_RECORD_FUNCTION("ipex_lstm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("ipex_lstm", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("ipex_lstm\n");

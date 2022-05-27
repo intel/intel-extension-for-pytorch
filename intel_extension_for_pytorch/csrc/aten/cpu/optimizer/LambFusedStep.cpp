@@ -22,7 +22,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
     double weight_decay,
     double eps) {
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::lamb_fused_step", std::vector<c10::IValue>({}));
+      "torch_ipex::lamb_fused_step", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
       learning_rate >= 0, "Expect learning rate >= 0.0, got ", learning_rate);

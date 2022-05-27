@@ -895,7 +895,6 @@ class Tester(TestCase):
                     except:
                         warnings.warn("Conv BatchNorm folding failed.")
                 if x.dim() == 4 and use_channels_last:
-                    print(model)
                     x = x.to(memory_format=torch.channels_last)
                     model = model.to(memory_format=torch.channels_last)
 

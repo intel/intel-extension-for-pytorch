@@ -159,7 +159,7 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
     const TensorArgs& inputs,
     TensorArgs& outputs) const {
   IPEX_RECORD_FUNCTION(
-      "LLGA_bridge::prepareRunArgs", std::vector<c10::IValue>({}));
+      "LLGA_bridge::prepareRunArgs", c10::ArrayRef<c10::IValue>({}));
 
   RunArgs runInputs, runOutputs;
   for (size_t i = 0; i < runArgsIdx_.size(); i++) {

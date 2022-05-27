@@ -30,7 +30,7 @@ at::Tensor nms(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::nms\n");
 #endif
-  IPEX_RECORD_FUNCTION("IpexExternal::nms", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IpexExternal::nms", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
@@ -52,7 +52,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> batch_score_nms(
   printf("IpexExternal::batch_score_nms\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "IpexExternal::batch_score_nms", std::vector<c10::IValue>({}));
+      "IpexExternal::batch_score_nms", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
@@ -78,7 +78,7 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::rpn_nms\n");
 #endif
-  IPEX_RECORD_FUNCTION("IpexExternal::rpn_nms", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IpexExternal::rpn_nms", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch_scores.layout() == c10::kStrided);
@@ -116,7 +116,7 @@ box_head_nms(
   printf("IpexExternal::box_head_nms\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "IpexExternal::box_head_nms", std::vector<c10::IValue>({}));
+      "IpexExternal::box_head_nms", c10::ArrayRef<c10::IValue>({}));
 
   /*
   pointer to cpu::box_head_nms_cpu_kernel_impl(
@@ -238,7 +238,8 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
   printf("IpexExternal::parallel_scale_back_batch\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "IpexExternal::parallel_scale_back_batch", std::vector<c10::IValue>({}));
+      "IpexExternal::parallel_scale_back_batch",
+      c10::ArrayRef<c10::IValue>({}));
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bboxes_in.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dboxes_xywh.layout() == c10::kStrided);

@@ -20,7 +20,7 @@ at::Tensor nms_kernel(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::nms\n");
 #endif
-  IPEX_RECORD_FUNCTION("torch_ipex::nms", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("torch_ipex::nms", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
       dets.dim() == 2, "boxes should be a 2d tensor, got ", dets.dim(), "D");

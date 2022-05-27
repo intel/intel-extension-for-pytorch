@@ -186,7 +186,7 @@ at::Tensor matmul_onednn(const at::Tensor& self, const at::Tensor& mat2) {
 #endif
 
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::matmul_onednn", std::vector<c10::IValue>({}));
+      "torch_ipex::matmul_onednn", c10::ArrayRef<c10::IValue>({}));
   auto tensor1_ = self.is_contiguous() ? self : self.contiguous();
   auto tensor2_ = mat2.is_contiguous() ? mat2 : mat2.contiguous();
   const int64_t dim = self.dim();
@@ -225,7 +225,7 @@ at::Tensor& matmul_onednn(
 #endif
 
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::matmul_onednn_out", std::vector<c10::IValue>({}));
+      "torch_ipex::matmul_onednn_out", c10::ArrayRef<c10::IValue>({}));
   auto tensor1_ = self.is_contiguous() ? self : self.contiguous();
   auto tensor2_ = mat2.is_contiguous() ? mat2 : mat2.contiguous();
   const int64_t dim = self.dim();

@@ -176,7 +176,7 @@ at::Tensor IPEXBatchNormOp::forward(
     double momentum,
     double eps) {
   IPEX_RECORD_FUNCTION(
-      "IPEXBatchNormOp::forward", std::vector<c10::IValue>({}));
+      "IPEXBatchNormOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["train"] = train;
   ctx->saved_data["eps"] = eps;
@@ -204,7 +204,7 @@ torch::autograd::variable_list IPEXBatchNormOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
   IPEX_RECORD_FUNCTION(
-      "IPEXBatchNormOp::backward", std::vector<c10::IValue>({}));
+      "IPEXBatchNormOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto train = ctx->saved_data["train"].toBool();
   auto eps = ctx->saved_data["eps"].toDouble();
@@ -252,7 +252,8 @@ at::Tensor batch_norm(
     double momentum,
     double eps,
     bool cudnn_enabled) {
-  IPEX_RECORD_FUNCTION("torch_ipex::batch_norm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::batch_norm", c10::ArrayRef<c10::IValue>({}));
 
   // Only 2d bfloat16 training calling onednn path, and this path will be
   // discarded after aten batchnorm optimized well.
@@ -292,7 +293,7 @@ at::Tensor frozen_batch_norm(
     const at::Tensor& running_var,
     double eps) {
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::frozen_batch_norm", std::vector<c10::IValue>({}));
+      "torch_ipex::frozen_batch_norm", c10::ArrayRef<c10::IValue>({}));
 
   return IPEXBatchNormOp::apply(
       input, weight, bias, running_mean, running_var, false, 0, eps);

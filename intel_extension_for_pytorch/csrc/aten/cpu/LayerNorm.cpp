@@ -166,7 +166,8 @@ at::Tensor layer_norm(
     const c10::optional<at::Tensor>& bias_opt,
     double eps,
     bool cudnn_enable) {
-  IPEX_RECORD_FUNCTION("torch_ipex::layer_norm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::layer_norm", c10::ArrayRef<c10::IValue>({}));
 
   // onednn path for inference.
   // TODO: enable training path ??

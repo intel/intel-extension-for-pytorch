@@ -36,7 +36,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm(
   printf("torch_ipex::native_group_norm\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::native_group_norm", std::vector<c10::IValue>({}));
+      "torch_ipex::native_group_norm", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> gamma_maybe_owned =
@@ -83,7 +83,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward(
   printf("torch_ipex::native_group_norm_backward\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::native_group_norm_backward", std::vector<c10::IValue>({}));
+      "torch_ipex::native_group_norm_backward", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> gamma_maybe_owned =
@@ -147,7 +147,8 @@ at::Tensor group_norm(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::group_norm\n");
 #endif
-  IPEX_RECORD_FUNCTION("torch_ipex::group_norm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "torch_ipex::group_norm", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =
@@ -217,7 +218,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> math_group_norm(
   printf("torch_ipex::math_group_norm\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::math_group_norm", std::vector<c10::IValue>({}));
+      "torch_ipex::math_group_norm", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =

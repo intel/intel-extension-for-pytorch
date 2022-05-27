@@ -153,7 +153,7 @@ at::Tensor convolution_forward_impl(
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::convolution_forward_impl", std::vector<c10::IValue>({}));
+      "torch_ipex::convolution_forward_impl", c10::ArrayRef<c10::IValue>({}));
 
   return reinterpret_cast<IpexConvolutionOpContext*>(
              op_context.data_ptr<int64_t>()[0])
@@ -292,7 +292,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
   printf("torch_ipeIPEX_RECORD_FUNCTIONx::convolution_backward\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::convolution_backward", std::vector<c10::IValue>({}));
+      "torch_ipex::convolution_backward", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
       input.dim() == 4 || input.dim() == 5,
@@ -348,7 +348,7 @@ at::Tensor IPEXConvolutionOp::_forward(
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION(
-      "IPEXConvolutionOp::_forward", std::vector<c10::IValue>({}));
+      "IPEXConvolutionOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   return convolution_forward_impl(input, op_context);
 }
@@ -360,7 +360,7 @@ at::Tensor IPEXConvolutionOp::forward(
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
   IPEX_RECORD_FUNCTION(
-      "IPEXConvolutionOp::forward", std::vector<c10::IValue>({}));
+      "IPEXConvolutionOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["op_context"] = op_context;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
@@ -376,7 +376,7 @@ torch::autograd::variable_list IPEXConvolutionOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
   IPEX_RECORD_FUNCTION(
-      "IPEXConvolutionOp::backward", std::vector<c10::IValue>({}));
+      "IPEXConvolutionOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto op_context = ctx->saved_data["op_context"].toTensor();
   std::array<bool, 3> output_mask;

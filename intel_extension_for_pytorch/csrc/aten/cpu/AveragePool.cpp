@@ -32,7 +32,7 @@ at::Tensor avg_pool2d_out_cpu(
   printf("torch_ipex::avg_pool2d_out_cpu\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::avg_pool2d_out_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::avg_pool2d_out_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
@@ -141,7 +141,8 @@ at::Tensor avg_pool2d_backward_out_cpu(
   printf("torch_ipex::avg_pool2d_backward_out_cpu\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::avg_pool2d_backward_out_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::avg_pool2d_backward_out_cpu",
+      c10::ArrayRef<c10::IValue>({}));
 
   // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
@@ -260,7 +261,7 @@ at::Tensor avg_pool3d_out_cpu(
 #endif
 
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::avg_pool3d_out_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::avg_pool3d_out_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
@@ -410,7 +411,8 @@ at::Tensor avg_pool3d_backward_out_cpu(
   printf("torch_ipex::avg_pool3d_backward_out_cpu\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::avg_pool3d_backward_out_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::avg_pool3d_backward_out_cpu",
+      c10::ArrayRef<c10::IValue>({}));
 
   // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(

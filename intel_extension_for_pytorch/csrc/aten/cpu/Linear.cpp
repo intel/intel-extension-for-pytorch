@@ -181,7 +181,8 @@ at::Tensor IPEXLinearOp::_forward(
     const int64_t eltwise,
     const at::Tensor& op_context) {
   at::AutoNonVariableTypeMode g;
-  IPEX_RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "IPEXLinearOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   if (eltwise == NotFused) {
     static auto op = torch::Dispatcher::singleton()
@@ -204,7 +205,7 @@ at::Tensor IPEXLinearOp::forward(
     const c10::optional<at::Tensor>& bias,
     const int64_t eltwise,
     const at::Tensor& op_context) {
-  IPEX_RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IPEXLinearOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   at::AutoNonVariableTypeMode g;
   ctx->saved_data["op_context"] = op_context;
@@ -224,7 +225,8 @@ at::Tensor IPEXLinearOp::forward(
 torch::autograd::tensor_list IPEXLinearOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-  IPEX_RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "IPEXLinearOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto saved = ctx->get_saved_variables();
   at::Tensor input = saved[0];
