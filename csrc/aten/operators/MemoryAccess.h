@@ -57,21 +57,6 @@ struct static_unroll<func, end, end> {
 // one by one
 template <int arg_index>
 struct vectorized_load_helper {
-  template <typename args_t, typename policy_t>
-  static void apply(policy_t& self, args_t* args) {
-    using arg_t = std::tuple_element_t<arg_index, args_t>;
-    // `data` hold the data_ptr for tensors [output, input0, input1, ...], so we
-    // need a +1 offset to get the input
-    auto ptr = reinterpret_cast<arg_t*>(self.data[arg_index + 1]);
-    auto args_accessor = [&args](int thread_unroll_idx) -> arg_t& {
-      return std::get<arg_index>(args[thread_unroll_idx]);
-    };
-    self.load_single_arg(args_accessor, ptr);
-  }
-};
-
-template <int arg_index>
-struct vectorized_broadcast_load_helper {
   template <typename args_t, typename policy_t, typename offset_t>
   static void apply(
       policy_t& self,
@@ -295,74 +280,29 @@ struct unroll {
 // whole block has its job to do. So the reminders should be handled by the the
 // caller manually.
 // all tensors are contiguous, that is: stride == sizeof(type) for all tensors
-template <int vec_size, typename data_t>
-struct vectorized {
-  //  static_assert(
-  //          THREAD_WORK_SIZE % vec_size == 0,
-  //          "The workload per thread must be a multiple of vec_size");
-  //  static constexpr int loop_size = THREAD_WORK_SIZE / vec_size;
-
-  data_t data;
-  int thread_idx;
-
-  vectorized(data_t data, int thread_idx)
-      : data(data), thread_idx(thread_idx) {}
-
-  inline constexpr bool check_inbounds(int thread_work_elem) const {
-    return true;
-  }
-
-  template <typename accessor_t, typename scalar_t>
-  inline void load_single_arg(accessor_t to, scalar_t* from) {
-    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
-    vec_t v = reinterpret_cast<vec_t*>(from)[thread_idx];
-#pragma unroll
-    for (int j = 0; j < vec_size; j++) {
-      to(j) = v.val[j];
-    }
-  }
-
-  template <typename args_t>
-  inline void load(args_t* args) {
-    constexpr int arity = std::tuple_size<args_t>::value;
-    detail::static_unroll<detail::vectorized_load_helper, arity>::with_args(
-        *this, args);
-  }
-
-  template <typename scalar_t>
-  inline void store(scalar_t* from) {
-    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
-    vec_t* to = reinterpret_cast<vec_t*>(data[0]);
-    vec_t v;
-#pragma unroll
-    for (int j = 0; j < vec_size; j++) {
-      v.val[j] = from[j];
-    }
-    to[thread_idx] = v;
-  }
-};
-
 template <
     int vec_size,
     typename data_t,
     typename input_offset_calc,
-    typename loader_t,
+    typename output_offset_calc,
     int num_outputs = 1>
-struct vectorized_broadcast {
+struct vectorized {
   data_t data;
   input_offset_calc& input_offset_calculator;
-  const loader_t& loader;
+  output_offset_calc& output_offset_calculator;
   int thread_idx;
+  int vec_idx;
 
-  vectorized_broadcast(
+  vectorized(
       data_t data,
       input_offset_calc& ic,
-      const loader_t& l,
+      output_offset_calc& oc,
       int thread_idx)
       : data(data),
         input_offset_calculator(ic),
-        loader(l),
-        thread_idx(thread_idx) {}
+        output_offset_calculator(oc),
+        thread_idx(thread_idx),
+        vec_idx(thread_idx * vec_size) {}
 
   inline constexpr bool check_inbounds(int thread_work_elem) const {
     return true;
@@ -381,22 +321,23 @@ struct vectorized_broadcast {
   template <typename args_t>
   inline void load(args_t* args) {
     constexpr int arity = std::tuple_size<args_t>::value;
-    auto vec_index = thread_idx * vec_size;
-    auto offset = input_offset_calculator.get(vec_index);
-    detail::static_unroll<detail::vectorized_broadcast_load_helper, arity>::
-        with_args(*this, args, offset, num_outputs);
+    auto offset = input_offset_calculator.get(vec_idx);
+    detail::static_unroll<detail::vectorized_load_helper, arity>::with_args(
+        *this, args, offset, num_outputs);
   }
 
   template <typename scalar_t>
   inline void store(scalar_t* from) {
     using vec_t = aligned_vector_loop<scalar_t, vec_size>;
-    vec_t* to = reinterpret_cast<vec_t*>(data[0]);
+    auto offset = output_offset_calculator.get(vec_idx);
+    auto ptr = reinterpret_cast<scalar_t*>(data[0]) + offset[0];
+    vec_t* to = reinterpret_cast<vec_t*>(ptr);
     vec_t v;
 #pragma unroll
     for (int j = 0; j < vec_size; j++) {
       v.val[j] = from[j];
     }
-    to[thread_idx] = v;
+    *to = v;
   }
 };
 
