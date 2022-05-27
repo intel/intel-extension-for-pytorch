@@ -183,6 +183,7 @@ def inner_vector(v1, v2):
     return inner
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(True, reason="oneDNN issue in reorder")
     def test_inner_vector(self, dtype=torch.float):
         max_size = 50000
         for i in range(0,3):
