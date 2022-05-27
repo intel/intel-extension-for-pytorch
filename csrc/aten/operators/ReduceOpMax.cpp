@@ -61,12 +61,14 @@ Tensor& amax_out(
       "Illegal dtype for self, and out:",
       self.scalar_type(),
       result.scalar_type());
-  auto iter = meta::make_reduction(
-      "amax", result, self, dim, keepdim, self.scalar_type());
-  if (iter.numel() == 0) {
+  if (self.numel() == 0) {
     zero_numel_check_dims(self, dim, "amax()");
   }
-  max_kernel(iter);
+  auto iter = meta::make_reduction(
+      "amax", result, self, dim, keepdim, self.scalar_type());
+  if (iter.numel() != 0) {
+    max_kernel(iter);
+  }
   return result;
 }
 

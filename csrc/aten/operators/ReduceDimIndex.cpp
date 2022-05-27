@@ -89,17 +89,31 @@ std::tuple<Tensor&, Tensor&> _min_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  at::TensorIterator iter = make_reduction(
-      "min", min, min_indices, self, dim, keepdim, self.scalar_type(), kLong);
-  IPEX_DISPATCH_ALL_TYPES_AND3(
-      kBFloat16, kHalf, kBool, iter.dtype(2), "min_xpu", [&]() {
-        dpcpp_reduce_kernel<scalar_t, scalar_t>(
-            iter,
-            MinOps<scalar_t>{},
-            std::pair<scalar_t, int64_t>(Numerics<scalar_t>::upper_bound(), 0));
-      });
+  dim = maybe_wrap_dim(dim, self.dim());
+  if (self.numel() == 0) {
+    at::native::zero_numel_tensor_resize(
+        min, min_indices, self, dim, keepdim, "min()");
+    return std::tie(min, min_indices);
+  } else if (at::native::_dimreduce_return_trivial_no_ident(
+                 min, self, dim, keepdim, "min")) {
+    TORCH_CHECK(!self.is_complex(), "min does not support complex inputs.");
+    AT_ASSERT(min.dim() == 0);
+    min_indices.resize_({}).fill_(0);
+    return std::forward_as_tuple(min, min_indices);
+  } else {
+    at::TensorIterator iter = make_reduction(
+        "min", min, min_indices, self, dim, keepdim, self.scalar_type(), kLong);
+    IPEX_DISPATCH_ALL_TYPES_AND3(
+        kBFloat16, kHalf, kBool, iter.dtype(2), "min_xpu", [&]() {
+          dpcpp_reduce_kernel<scalar_t, scalar_t>(
+              iter,
+              MinOps<scalar_t>{},
+              std::pair<scalar_t, int64_t>(
+                  Numerics<scalar_t>::upper_bound(), 0));
+        });
 
-  return {min, min_indices};
+    return {min, min_indices};
+  }
 }
 
 std::tuple<Tensor, Tensor> _min(const Tensor& self, int64_t dim, bool keepdim) {
@@ -127,17 +141,33 @@ std::tuple<Tensor&, Tensor&> _max_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  at::TensorIterator iter = make_reduction(
-      "max", max, max_indices, self, dim, keepdim, self.scalar_type(), kLong);
-  IPEX_DISPATCH_ALL_TYPES_AND3(
-      kBFloat16, kHalf, kBool, iter.dtype(2), "max_xpu", [&]() {
-        dpcpp_reduce_kernel<scalar_t, scalar_t>(
-            iter,
-            MaxOps<scalar_t>{},
-            std::pair<scalar_t, int64_t>(Numerics<scalar_t>::lower_bound(), 0));
-      });
+  dim = maybe_wrap_dim(dim, self.dim());
+  if (self.numel() == 0) {
+    at::native::zero_numel_tensor_resize(
+        max, max_indices, self, dim, keepdim, "max()");
+    return std::tie(max, max_indices);
+  } else if (at::native::_dimreduce_return_trivial_no_ident(
+                 max, self, dim, keepdim, "max")) {
+    // case where self.numel() == 1. The result does not need to be reshaped
+    // as a case of reduction in this case.
+    TORCH_CHECK(!self.is_complex(), "max does not support complex inputs.");
+    AT_ASSERT(max.dim() == 0);
+    max_indices.resize_({}).fill_(0);
+    return std::forward_as_tuple(max, max_indices);
+  } else {
+    at::TensorIterator iter = make_reduction(
+        "max", max, max_indices, self, dim, keepdim, self.scalar_type(), kLong);
+    IPEX_DISPATCH_ALL_TYPES_AND3(
+        kBFloat16, kHalf, kBool, iter.dtype(2), "max_xpu", [&]() {
+          dpcpp_reduce_kernel<scalar_t, scalar_t>(
+              iter,
+              MaxOps<scalar_t>{},
+              std::pair<scalar_t, int64_t>(
+                  Numerics<scalar_t>::lower_bound(), 0));
+        });
 
-  return {max, max_indices};
+    return {max, max_indices};
+  }
 }
 
 std::tuple<Tensor, Tensor> _max(const Tensor& self, int64_t dim, bool keepdim) {

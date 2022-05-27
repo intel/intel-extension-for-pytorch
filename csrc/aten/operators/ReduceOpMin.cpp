@@ -61,12 +61,14 @@ Tensor& amin_out(
       "Illegal dtype for self, and out:",
       self.scalar_type(),
       result.scalar_type());
-  auto iter = meta::make_reduction(
-      "amin", result, self, dim, keepdim, self.scalar_type());
-  if (iter.numel() == 0) {
+  if (self.numel() == 0) {
     zero_numel_check_dims(self, dim, "amin()");
   }
-  min_kernel(iter);
+  auto iter = meta::make_reduction(
+      "amin", result, self, dim, keepdim, self.scalar_type());
+  if (iter.numel() != 0) {
+    min_kernel(iter);
+  }
   return result;
 }
 
