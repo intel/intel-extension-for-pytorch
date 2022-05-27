@@ -312,27 +312,8 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
     return self;
   }
 
-  at::Device src_device = src.device();
-  at::Device dst_device = self.device();
+  impl::copy_kernel_dpcpp(iter, non_blocking);
 
-  bool same_device =
-      src_device.type() == c10::DeviceType::XPU && src_device == dst_device;
-  bool has_sz_st = src.sizes().size() != 0 && src.strides().size() != 0 &&
-      self.sizes().size() != 0 && self.strides().size() != 0;
-  // oneDNN reorder supports maximun dimension is 6,
-  // so we call copy_kernel_dpcpp when dimension larger than 6.
-  // TODO: All the plain format D2D copy will call copy_kernel_dpcpp
-  // once our loops kernel is ready.
-  if (same_device && has_sz_st && xpu::oneDNN::onednn_strides_check(self) &&
-      xpu::oneDNN::onednn_strides_check(src) &&
-      xpu::oneDNN::is_supported_onednn_dtype(self) &&
-      xpu::oneDNN::is_supported_onednn_dtype(src) &&
-      src.dim() <= MAX_ONEDNN_SUPPORTED_DIMS &&
-      !xpu::oneDNN::is_broadcast(self) && !xpu::oneDNN::is_broadcast(src)) {
-    xpu::oneDNN::reorder_copy(src, self);
-  } else {
-    impl::copy_kernel_dpcpp(iter, non_blocking);
-  }
   return self;
 }
 } // namespace impl
