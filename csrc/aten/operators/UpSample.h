@@ -87,6 +87,33 @@ static inline scalar_t area_pixel_compute_scale(
   }
 }
 
+template <typename accscalar_t>
+static inline accscalar_t compute_scales_value(
+    const c10::optional<double> scale,
+    int64_t src_size,
+    int64_t dst_size) {
+  return (scale.has_value() && scale.value() > 0.)
+      ? (accscalar_t)scale.value()
+      : (accscalar_t)src_size / dst_size;
+}
+
+template <typename accscalar_t>
+static inline accscalar_t area_pixel_compute_scale(
+    int input_size,
+    int output_size,
+    bool align_corners,
+    const c10::optional<double> scale) {
+  if (align_corners) {
+    if (output_size > 1) {
+      return (accscalar_t)(input_size - 1) / (output_size - 1);
+    } else {
+      return static_cast<accscalar_t>(0);
+    }
+  } else {
+    return compute_scales_value<accscalar_t>(scale, input_size, output_size);
+  }
+}
+
 template <typename scalar_t>
 static inline scalar_t area_pixel_compute_source_index(
     scalar_t scale,
