@@ -1348,6 +1348,92 @@ static void apply_triangular_solve(
 #endif
 }
 
+template <>
+static void apply_triangular_solve<c10::complex<float>>(
+    Tensor& b,
+    Tensor& A,
+    bool upper,
+    bool transpose,
+    bool unitriangular) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
+  oneapi::mkl::diag diag =
+      unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+
+  auto n = A.size(-2);
+  auto nrhs = b.size(-1);
+  std::int64_t lda = A.size(-2);
+  std::int64_t ldb = b.size(-2);
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::trtrs_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, uplo, trans, diag, n, nrhs, lda, ldb);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, A.options());
+  DPCPP_ONEMKL_SUBMIT(
+      dpcpp_queue,
+      oneapi::mkl::lapack::trtrs,
+      dpcpp_queue,
+      uplo,
+      trans,
+      diag,
+      n,
+      nrhs,
+      reinterpret_cast<std::complex<float>*>(A.data_ptr()),
+      lda,
+      reinterpret_cast<std::complex<float>*>(b.data_ptr()),
+      ldb,
+      reinterpret_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
+      scratchpadsize);
+#else
+  AT_ERROR("triangular_solve: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+static void apply_triangular_solve<c10::complex<double>>(
+    Tensor& b,
+    Tensor& A,
+    bool upper,
+    bool transpose,
+    bool unitriangular) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
+  oneapi::mkl::diag diag =
+      unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+
+  auto n = A.size(-2);
+  auto nrhs = b.size(-1);
+  std::int64_t lda = A.size(-2);
+  std::int64_t ldb = b.size(-2);
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::trtrs_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, uplo, trans, diag, n, nrhs, lda, ldb);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, A.options());
+  DPCPP_ONEMKL_SUBMIT(
+      dpcpp_queue,
+      oneapi::mkl::lapack::trtrs,
+      dpcpp_queue,
+      uplo,
+      trans,
+      diag,
+      n,
+      nrhs,
+      reinterpret_cast<std::complex<double>*>(A.data_ptr()),
+      lda,
+      reinterpret_cast<std::complex<double>*>(b.data_ptr()),
+      ldb,
+      reinterpret_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
+      scratchpadsize);
+#else
+  AT_ERROR("triangular_solve: oneMKL library not found in compilation");
+#endif
+}
+
 template <typename scalar_t>
 static void apply_cholesky_solve_dpcpp_(
     const Tensor& b_,
@@ -1447,6 +1533,84 @@ static void apply_cholesky_dpcpp(
         a,
         lda,
         (scalar_t*)(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  } catch (oneapi::mkl::lapack::batch_error be) {
+    error_handle(infos_, be);
+  }
+#else
+  AT_ERROR("cholesky: LAPACK library not found in compilation");
+#endif
+}
+
+template <>
+static void apply_cholesky_dpcpp<c10::complex<float>>(
+    Tensor& self_,
+    bool upper_,
+    std::vector<int64_t>& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo =
+      upper_ ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
+
+  auto n = self_.size(-1);
+
+  std::int64_t lda = self_.size(-2);
+
+  std::complex<float>* a = (std::complex<float>*)(self_.data_ptr());
+
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::potrf_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, uplo, n, lda);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::potrf,
+        dpcpp_queue,
+        uplo,
+        n,
+        a,
+        lda,
+        reinterpret_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  } catch (oneapi::mkl::lapack::batch_error be) {
+    error_handle(infos_, be);
+  }
+#else
+  AT_ERROR("cholesky: LAPACK library not found in compilation");
+#endif
+}
+
+template <>
+static void apply_cholesky_dpcpp<c10::complex<double>>(
+    Tensor& self_,
+    bool upper_,
+    std::vector<int64_t>& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  oneapi::mkl::uplo uplo =
+      upper_ ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
+
+  auto n = self_.size(-1);
+
+  std::int64_t lda = self_.size(-2);
+
+  std::complex<double>* a = (std::complex<double>*)(self_.data_ptr());
+
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::potrf_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, uplo, n, lda);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::potrf,
+        dpcpp_queue,
+        uplo,
+        n,
+        a,
+        lda,
+        reinterpret_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
     error_handle(infos_, be);
@@ -2358,10 +2522,11 @@ std::tuple<Tensor, Tensor> _triangular_solve_helper(
     bool unitriangular) {
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
   auto A_working_copy = native::cloneBatchedColumnMajor(A);
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "triangular_solve_cpu", [&] {
-    impl::apply_triangular_solve<scalar_t>(
-        self_working_copy, A_working_copy, upper, transpose, unitriangular);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      self.scalar_type(), "triangular_solve_xpu", [&] {
+        impl::apply_triangular_solve<scalar_t>(
+            self_working_copy, A_working_copy, upper, transpose, unitriangular);
+      });
   return std::tuple<Tensor, Tensor>(self_working_copy, A_working_copy);
 }
 
@@ -2428,9 +2593,10 @@ Tensor _cholesky_solve_helper(
 Tensor _cholesky_helper(const Tensor& self, bool upper) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_dpcpp", [&] {
-    impl::apply_cholesky_dpcpp<scalar_t>(self_working_copy, upper, infos);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      self.scalar_type(), "cholesky_dpcpp", [&] {
+        impl::apply_cholesky_dpcpp<scalar_t>(self_working_copy, upper, infos);
+      });
   if (self.dim() > 2) {
     native::batchCheckErrors(infos, "cholesky_dpcpp");
   } else {

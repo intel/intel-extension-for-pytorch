@@ -39,3 +39,9 @@
 #define IS_INT64(scalar_t) (std::is_same<scalar_t, int64_t>::value)
 
 #define IS_BOOL(scalar_t) (std::is_same<scalar_t, bool>::value)
+
+#define IS_CFLOAT32(scalar_t) \
+  (std::is_same<scalar_t, c10::complex<float>>::value)
+
+#define IS_CDOUBLE(scalar_t) \
+  (std::is_same<scalar_t, c10::complex<double>>::value)
