@@ -1349,7 +1349,7 @@ static void apply_triangular_solve(
 }
 
 template <>
-static void apply_triangular_solve<c10::complex<float>>(
+void apply_triangular_solve<c10::complex<float>>(
     Tensor& b,
     Tensor& A,
     bool upper,
@@ -1392,7 +1392,7 @@ static void apply_triangular_solve<c10::complex<float>>(
 }
 
 template <>
-static void apply_triangular_solve<c10::complex<double>>(
+void apply_triangular_solve<c10::complex<double>>(
     Tensor& b,
     Tensor& A,
     bool upper,
@@ -1543,7 +1543,7 @@ static void apply_cholesky_dpcpp(
 }
 
 template <>
-static void apply_cholesky_dpcpp<c10::complex<float>>(
+void apply_cholesky_dpcpp<c10::complex<float>>(
     Tensor& self_,
     bool upper_,
     std::vector<int64_t>& infos_) {
@@ -1582,7 +1582,7 @@ static void apply_cholesky_dpcpp<c10::complex<float>>(
 }
 
 template <>
-static void apply_cholesky_dpcpp<c10::complex<double>>(
+void apply_cholesky_dpcpp<c10::complex<double>>(
     Tensor& self_,
     bool upper_,
     std::vector<int64_t>& infos_) {
