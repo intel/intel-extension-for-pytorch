@@ -33,7 +33,7 @@ Tensor& sign_out(Tensor& out, const Tensor& self) {
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_for_tensor_iter(iter, [](bool a) { return a; });
   } else {
-    AT_DISPATCH_ALL_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND2(
         ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "sign_xpu", [&] {
           dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> scalar_t {
             scalar_t zero = scalar_t(0);

@@ -161,7 +161,7 @@ Tensor& clamp_max_out(const Tensor& self, const Tensor& max, Tensor& result) {
       "torch.clamp only supports strided layout, got: ",
       self.layout());
   auto iter = TensorIterator::borrowing_binary_op(result, self, max);
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       kHalf, kBFloat16, iter.common_dtype(), "clamp_max_dpcpp", [&] {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t in, scalar_t max_val) -> scalar_t {
@@ -181,7 +181,7 @@ Tensor& clamp_min_out(const Tensor& self, const Tensor& min, Tensor& result) {
       "torch.clamp only supports strided layout, got: ",
       self.layout());
   auto iter = TensorIterator::borrowing_binary_op(result, self, min);
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       kHalf, kBFloat16, iter.common_dtype(), "clamp_min_dpcpp", [&] {
         dpcpp_kernel_for_tensor_iter(
             iter, [](scalar_t in, scalar_t min_val) -> scalar_t {

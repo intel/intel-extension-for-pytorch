@@ -23,6 +23,121 @@ const Tensor& resize_as_(
 
 namespace impl {
 
+// mkl dot: Computes the dot product of two real vectors.
+#ifdef USE_ONEMKL
+template <typename scalar_t>
+void mkl_dot(
+    DPCPP::queue& queue,
+    int64_t n,
+    scalar_t* x,
+    int64_t incx,
+    scalar_t* y,
+    int64_t incy,
+    scalar_t* result) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue, oneapi::mkl::blas::dot, queue, n, x, incx, y, incy, result);
+}
+
+// mkl dotu: Computes the dot product of two complex vectors.
+template <>
+void mkl_dot<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t n,
+    c10::complex<double>* x,
+    int64_t incx,
+    c10::complex<double>* y,
+    int64_t incy,
+    c10::complex<double>* result) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::blas::dotu,
+      queue,
+      n,
+      reinterpret_cast<std::complex<double>*>(x),
+      incx,
+      reinterpret_cast<std::complex<double>*>(y),
+      incy,
+      reinterpret_cast<std::complex<double>*>(result));
+}
+
+template <>
+void mkl_dot<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t n,
+    c10::complex<float>* x,
+    int64_t incx,
+    c10::complex<float>* y,
+    int64_t incy,
+    c10::complex<float>* result) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::blas::dotu,
+      queue,
+      n,
+      reinterpret_cast<std::complex<float>*>(x),
+      incx,
+      reinterpret_cast<std::complex<float>*>(y),
+      incy,
+      reinterpret_cast<std::complex<float>*>(result));
+}
+
+template <typename scalar_t>
+void mkl_vdot(
+    DPCPP::queue& queue,
+    int64_t n,
+    scalar_t* x,
+    int64_t incx,
+    scalar_t* y,
+    int64_t incy,
+    scalar_t* result) {
+  AT_ERROR("mkl::dotc: not implemented for ", typeid(scalar_t).name());
+}
+
+// mkl dotc: Computes the dot product of two complex vectors, conjugating the
+// first vector.
+template <>
+void mkl_vdot<c10::complex<double>>(
+    DPCPP::queue& queue,
+    int64_t n,
+    c10::complex<double>* x,
+    int64_t incx,
+    c10::complex<double>* y,
+    int64_t incy,
+    c10::complex<double>* result) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::blas::dotc,
+      queue,
+      n,
+      reinterpret_cast<std::complex<double>*>(x),
+      incx,
+      reinterpret_cast<std::complex<double>*>(y),
+      incy,
+      reinterpret_cast<std::complex<double>*>(result));
+}
+
+template <>
+void mkl_vdot<c10::complex<float>>(
+    DPCPP::queue& queue,
+    int64_t n,
+    c10::complex<float>* x,
+    int64_t incx,
+    c10::complex<float>* y,
+    int64_t incy,
+    c10::complex<float>* result) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::blas::dotc,
+      queue,
+      n,
+      reinterpret_cast<std::complex<float>*>(x),
+      incx,
+      reinterpret_cast<std::complex<float>*>(y),
+      incy,
+      reinterpret_cast<std::complex<float>*>(result));
+}
+#endif
+
 template <typename scalar_t>
 void copy_triangle_symmetric_template(Tensor& self, bool upper) {
   auto& dpcpp_queue = dpcppGetCurrentQueue();
@@ -296,16 +411,26 @@ inline void dot_check(const Tensor& self, const Tensor& other) {
 }
 
 Tensor dot(const Tensor& self, const Tensor& other) {
+  // if self and other are both complex,
+  // dot computes self*other, without conjugating.
+  if (self.is_complex()) {
+    if (self.is_conj()) {
+      if (other.is_conj()) {
+        return (at::AtenIpexTypeXPU::dot(self.conj(), other.conj())).conj();
+      } else {
+        return at::AtenIpexTypeXPU::vdot(self.conj(), other);
+      }
+    } else if (other.is_conj()) {
+      return at::AtenIpexTypeXPU::vdot(other.conj(), self);
+    }
+  }
 #ifdef USE_ONEMKL
   dot_check(self, other);
   Tensor result = at::empty({}, self.options());
-  // torch.dot supports all types and complex datatype, but oneapi::mkl::blas
-  // only supports float/double
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "dot", [&] {
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "dot", [&] {
     auto& dpcpp_queue = dpcppGetCurrentQueue();
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::blas::dot,
+    impl::mkl_dot<scalar_t>(
         dpcpp_queue,
         self.numel(),
         (scalar_t*)self.data_ptr(),
@@ -317,6 +442,44 @@ Tensor dot(const Tensor& self, const Tensor& other) {
   return result;
 #else
   AT_ERROR("dot: oneMKL library not found in compilation");
+#endif
+}
+
+Tensor vdot(const Tensor& self, const Tensor& other) {
+  // Dispatch to `dot` for real dtypes.
+  if (!self.is_complex()) {
+    return at::dot(self, other);
+  }
+
+  // vdot computes dot product uses the complex conjugate of self
+  if (self.is_conj()) {
+    if (other.is_conj()) {
+      return at::AtenIpexTypeXPU::vdot(other.conj(), self.conj());
+    } else {
+      return at::AtenIpexTypeXPU::dot(self.conj(), other);
+    }
+  } else if (other.is_conj()) {
+    return (at::AtenIpexTypeXPU::dot(self, other.conj())).conj();
+  }
+
+#ifdef USE_ONEMKL
+  dot_check(self, other);
+  Tensor result = at::empty({}, self.options());
+
+  IPEX_DISPATCH_COMPLEX_TYPES(self.scalar_type(), "vdot", [&] {
+    auto& dpcpp_queue = dpcppGetCurrentQueue();
+    impl::mkl_vdot<scalar_t>(
+        dpcpp_queue,
+        self.numel(),
+        (scalar_t*)self.data_ptr(),
+        self.stride(0),
+        (scalar_t*)other.data_ptr(),
+        other.stride(0),
+        (scalar_t*)result.data_ptr());
+  });
+  return result;
+#else
+  AT_ERROR("vdot: oneMKL library not found in compilation");
 #endif
 }
 

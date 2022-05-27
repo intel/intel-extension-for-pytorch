@@ -91,7 +91,7 @@ std::tuple<Tensor&, Tensor&> _min_out(
     bool keepdim) {
   at::TensorIterator iter = make_reduction(
       "min", min, min_indices, self, dim, keepdim, self.scalar_type(), kLong);
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       kBFloat16, kHalf, kBool, iter.dtype(2), "min_xpu", [&]() {
         dpcpp_reduce_kernel<scalar_t, scalar_t>(
             iter,
@@ -129,7 +129,7 @@ std::tuple<Tensor&, Tensor&> _max_out(
     bool keepdim) {
   at::TensorIterator iter = make_reduction(
       "max", max, max_indices, self, dim, keepdim, self.scalar_type(), kLong);
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       kBFloat16, kHalf, kBool, iter.dtype(2), "max_xpu", [&]() {
         dpcpp_reduce_kernel<scalar_t, scalar_t>(
             iter,

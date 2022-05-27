@@ -591,6 +591,7 @@ supported:
   - linalg_householder_product.out
   - complex.out
   - eig          # must register
+  - vdot
 autograd:
   - cdist
   - lstm.input

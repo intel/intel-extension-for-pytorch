@@ -1758,7 +1758,7 @@ static Tensor& linalg_solve_out_info(
           .vec(); // input_broadcasted.shape[:-2]
   pivots_shape.push_back(std::min(input.size(-2), input.size(-1)));
   Tensor pivots = at::empty(pivots_shape, input.options().dtype(kInt));
-  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       input_working_copy.scalar_type(), "linalg_solve_dpcpp", [&] {
         impl::apply_lu_dpcpp_<scalar_t>(
             input_working_copy, pivots, infos_vec_1);
@@ -2576,7 +2576,7 @@ Tensor _det_lu_based_helper_backward_helper(
   std::vector<int64_t> infos(native::batchCount(d), 0);
 
   // d is modified in-place and will contain the result
-  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
       d.scalar_type(), "_det_lu_based_helper_backward_helper", [&] {
         impl::apply_lu_solve_dpcpp_<scalar_t>(d, lu_clone, pivs, infos, trans);
       });

@@ -17,7 +17,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 void where_kernel(TensorIterator& iter, ScalarType condition_type) {
-  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       kHalf, kBFloat16, kBool, iter.dtype(), "where_dpcpp", [&] {
         if (condition_type == at::ScalarType::Byte) {
           dpcpp_kernel_for_tensor_iter(
