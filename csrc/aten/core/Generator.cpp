@@ -100,13 +100,65 @@ DPCPPGeneratorImpl* DPCPPGeneratorImpl::clone_impl() const {
   return gen;
 }
 
+/**
+ * DPCPPGeneratorImplState is a POD class containing
+ * the state in the DPCPPGeneratorImpl.
+ */
+struct DPCPPGeneratorImplState {
+  uint64_t seed;
+  uint64_t philox_offset_per_thread;
+};
+
+/**
+ * Sets the internal state of DPCPPGeneratorImpl. The new internal state
+ * must be a strided CPU byte tensor and have appropriate size. See
+ * comments of DPCPPGeneratorImplState for the layout.
+ */
 void DPCPPGeneratorImpl::set_state(const c10::TensorImpl& new_state) {
-  AT_ERROR("set_state, not implemented ...");
-  return;
+  static_assert(
+      std::is_pod<DPCPPGeneratorImplState>::value,
+      "DPCPPGeneratorImplState is not a PODType");
+  static const size_t size_current = sizeof(DPCPPGeneratorImplState);
+
+  at::detail::check_rng_state(new_state);
+
+  auto new_state_size = new_state.numel();
+
+  if (new_state_size == size_current) {
+    auto rng_state = (DPCPPGeneratorImplState*)new_state.data();
+    this->set_current_seed(rng_state->seed);
+    this->set_philox_offset_per_thread(rng_state->philox_offset_per_thread);
+  } else {
+    AT_ERROR(
+        "Expected a DPCPPGeneratorImplState of size ",
+        size_current,
+        " but found the input RNG state size to be ",
+        new_state_size);
+  }
 }
 
 c10::intrusive_ptr<c10::TensorImpl> DPCPPGeneratorImpl::get_state() const {
-  AT_ERROR("get_state, not implemented ...");
+  static const size_t size = sizeof(DPCPPGeneratorImplState);
+  static_assert(
+      std::is_pod<DPCPPGeneratorImplState>::value,
+      "DPCPPGeneratorImplState is not a PODType");
+
+  auto state_tensor = at::detail::empty_cpu(
+      {(int64_t)size},
+      ScalarType::Byte,
+      c10::nullopt,
+      c10::nullopt,
+      c10::nullopt,
+      c10::nullopt);
+  auto rng_state = state_tensor.data_ptr();
+
+  // accumulate generator data to be copied into byte tensor
+  auto accum_state = std::make_unique<DPCPPGeneratorImplState>();
+  accum_state->seed = this->seed_;
+  accum_state->philox_offset_per_thread = this->philox_offset_per_thread_;
+
+  memcpy(rng_state, accum_state.get(), size);
+  return state_tensor.getIntrusivePtr();
 }
 
 } // namespace dpcpp
