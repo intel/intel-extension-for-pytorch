@@ -35,6 +35,7 @@ supported:
   - record_stream
   - resize_
 #  - set_quantizer_	# different schema
+  - set_.source_Storage_storage_offset
   - upsample_nearest2d
   - upsample_nearest2d.vec
   - view

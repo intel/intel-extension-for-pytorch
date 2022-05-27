@@ -242,6 +242,14 @@ class BFloat16Storage(intel_extension_for_pytorch._C.BFloat16StorageBase, _Stora
     pass
 
 
+class QUInt8Storage(intel_extension_for_pytorch._C.QUInt8StorageBase, _StorageBase):
+    pass
+
+
+class QInt8Storage(intel_extension_for_pytorch._C.QInt8StorageBase, _StorageBase):
+    pass
+
+
 torch._storage_classes.add(ShortStorage)
 torch._storage_classes.add(CharStorage)
 torch._storage_classes.add(IntStorage)
@@ -251,6 +259,8 @@ torch._storage_classes.add(HalfStorage)
 torch._storage_classes.add(DoubleStorage)
 torch._storage_classes.add(FloatStorage)
 torch._storage_classes.add(BFloat16Storage)
+torch._storage_classes.add(QUInt8Storage)
+torch._storage_classes.add(QInt8Storage)
 intel_extension_for_pytorch._C._initExtension()
 
 
