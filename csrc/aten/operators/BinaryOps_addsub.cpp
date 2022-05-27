@@ -72,9 +72,7 @@ Tensor& add_out(
     const Scalar& alpha,
     Tensor& result) {
   if (1.0 == alpha.to<float>() && xpu::oneDNN::binary_valid(_self, _other) &&
-      (IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)
-       // FIXME: [4,16,16,512] + [4,1,1,512] are in poor efficiency
-       || xpu::oneDNN::is_broadcast_from_other_to_self(_self, _other))) {
+      IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
@@ -100,8 +98,7 @@ Tensor& add_out(
 Tensor add(const Tensor& _self, const Tensor& _other, const Scalar& alpha) {
   Tensor result;
   if (1.0 == alpha.to<float>() && xpu::oneDNN::binary_valid(_self, _other) &&
-      (IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other) ||
-       xpu::oneDNN::is_broadcast_from_other_to_self(_self, _other))) {
+      IPEX_ANY(xpu::oneDNN::is_onednn_layout, _self, _other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
