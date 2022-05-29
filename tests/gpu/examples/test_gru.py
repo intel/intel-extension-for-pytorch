@@ -51,7 +51,6 @@ class TestNNMethod(TestCase):
         for i in range(len(param_grad)):
             self.assertEqual(param_grad[i], param_grad_xpu[i].cpu())
 
-    @pytest.mark.skip(reason="oneDNN causes failure")
     def test_gru_bf16(self, dtype=torch.bfloat16):
         rnn = nn.GRU(379, 681, num_layers=3, batch_first=True)
         rnn_xpu = copy.deepcopy(rnn).to("xpu").to(torch.bfloat16)
