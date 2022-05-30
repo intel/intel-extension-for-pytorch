@@ -125,8 +125,8 @@ class TestPrepackCases(TestCase):
             origin_model2 = copy.deepcopy(model).train()
             origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
             if feed_sample_input:
-                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1', sample_input=x)
-                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True, sample_input=x)
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
             else:
                 ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
                 ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
@@ -212,8 +212,8 @@ class TestPrepackCases(TestCase):
             origin_model2 = copy.deepcopy(model).train()
             origin_optimizer2 = SGD(origin_model2.parameters(), lr=0.01, momentum=0.9)
             if feed_sample_input:
-                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1', sample_input=x)
-                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True, sample_input=x)
+                ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
+                ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
             else:
                 ipex_model1, ipex_optimizer1 = ipex.optimize(origin_model1, dtype=dtype, optimizer=origin_optimizer1, level='O1')
                 ipex_model2, ipex_optimizer2 = ipex.optimize(origin_model2, dtype=dtype, optimizer=origin_optimizer2, level='O1', inplace=True)
@@ -284,7 +284,7 @@ class TestPrepackCases(TestCase):
             lr = 1e-2
             origin_optimizer = optimizer(origin_model.parameters(), lr=lr)
             if feed_sample_input:
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             else:
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # train one step for origin.
@@ -335,7 +335,7 @@ class TestPrepackCases(TestCase):
             origin_ipex_model.load_state_dict(ipex_checkpoint['model_state_dict'])
             origin_ipex_optimizer.load_state_dict(ipex_checkpoint['optimizer_state_dict'])
             if feed_sample_input:
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             else:
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # train second step for origin.
@@ -374,7 +374,7 @@ class TestPrepackCases(TestCase):
             x = torch.randn(1, 3, 224, 224).to(dtype=dtype).float().to(memory_format=torch.channels_last)
             # inference case, will do conv+bn folding 'O1'. do nothing for 'O0'.
             if feed_sample_input:
-                ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1', sample_input=x)
+                ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1')
             else:
                 ipex_model2 = ipex.optimize(model.eval(), dtype=dtype, level='O1')
             y1 = model(x)
@@ -387,7 +387,7 @@ class TestPrepackCases(TestCase):
             origin_optimizer = ASGD(origin_model.parameters(), lr=0.01)
             # do weight prepack for 'O1'
             if feed_sample_input:
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             else:
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             # run two iterations, and then compare the results.
@@ -443,7 +443,7 @@ class TestPrepackCases(TestCase):
                 x2 = x.clone().requires_grad_(False)
                 origin_model = copy.deepcopy(model).eval()
                 if feed_sample_input:
-                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
+                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
                 else:
                     ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
@@ -472,7 +472,7 @@ class TestPrepackCases(TestCase):
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
             if feed_sample_input:
-                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             else:
                 ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
             self.assertTrue(ipex_model.weight.dtype == dtype)
@@ -623,7 +623,7 @@ class TestPrepackCases(TestCase):
                         model.eval()
                         origin_model = copy.deepcopy(model).eval()
                         if feed_sample_input:
-                            ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
+                            ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
                         else:
                             ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
@@ -644,7 +644,7 @@ class TestPrepackCases(TestCase):
                         origin_model = copy.deepcopy(model).train()
                         origin_optimizer = SGD(origin_model.parameters(), lr=0.01, momentum=0.9)
                         if feed_sample_input:
-                            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1', sample_input=x)
+                            ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                         else:
                             ipex_model, ipex_optimizer = ipex.optimize(origin_model, dtype=dtype, optimizer=origin_optimizer, level='O1')
                         
