@@ -94,14 +94,17 @@ convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
 
 PyTorch_op_to_IPEX_op_map = {
-    torch.relu: "relu",
-    torch.relu_: "relu",
-    torch.sigmoid: "sigmoid",
-    torch.sigmoid_: "sigmoid",
-    nn.SiLU(inplace=True): "swish",
-    nn.SiLU(inplace=False): "swish",
-    torch.tanh: "tanh",
-    torch.tanh_: "tanh",    
+    # PyTorch_op_name: [ipex_op_name, BF16_supported]
+    torch.relu: ["relu", True],
+    torch.relu_: ["relu", True],
+    torch.sigmoid: ["sigmoid", True],
+    torch.sigmoid_: ["sigmoid", True],
+    nn.SiLU(inplace=True): ["swish", True],
+    nn.SiLU(inplace=False): ["swish", True],
+    torch.tanh: ["tanh", True],
+    torch.tanh_: ["tanh", True],
+    nn.Mish(inplace=True): ["mish", False], # TODO: support bf16 mish_ in stock PyTorch
+    nn.Mish(inplace=False): ["mish", False], # TODO: support bf16 mish in stock PyTorch
 }
 
 class ConvBatchNorm_Fixed(nn.Module):
@@ -1329,19 +1332,20 @@ class Tester(TestCase):
                 x = torch.randn(input_size)
                 m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
 
-                ipex_eltwise_op = PyTorch_op_to_IPEX_op_map[eltwise]
+                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
 
                 self._test_output(
                     m,
                     x,
                     kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
                     kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op)
-                self._test_output_bf16(
-                    m,
-                    x,
-                    kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
-                    kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
-                    prec=0.02)
+                if bf16_supported:
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
+                        prec=0.02)
 
     def test_conv_non_unary_fusion(self):
         batch_size = 8
@@ -2336,7 +2340,7 @@ class Tester(TestCase):
                 x = torch.randn(input_size)
                 m = LinearEltwise(eltwise, in_channels, out_channels, bias=bias)
                 
-                ipex_eltwise_op = PyTorch_op_to_IPEX_op_map[eltwise]
+                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
                 
                 self._test_output(
                     m,
@@ -2347,12 +2351,13 @@ class Tester(TestCase):
                     x,
                     kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
                     kind_not_in_graph="ipex_prepack::linear_prepack")                
-                self._test_output_bf16(
-                    m,
-                    x,
-                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
-                    kind_not_in_graph="ipex_prepack::linear_prepack",
-                    prec=0.02)                
+                if bf16_supported:
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::linear_prepack",
+                        prec=0.02)
 
     def test_output_linear_add(self):
         self._test_output(

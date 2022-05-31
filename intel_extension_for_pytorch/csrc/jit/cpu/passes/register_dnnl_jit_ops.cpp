@@ -159,11 +159,13 @@ RegisterOperators op({
     CreateConvUnaryPostOpPrepack(sigmoid),
     CreateConvUnaryPostOpPrepack(swish),
     CreateConvUnaryPostOpPrepack(tanh),
+    CreateConvUnaryPostOpPrepack(mish),
     CreateConvUnaryPostOpRun(run),
     CreateConvUnaryPostOpRun(relu_run),
     CreateConvUnaryPostOpRun(sigmoid_run),
     CreateConvUnaryPostOpRun(swish_run),
     CreateConvUnaryPostOpRun(tanh_run),
+    CreateConvUnaryPostOpRun(mish_run),
     CreateConvBinaryPostOpPrepack(add, fuse_sum),
     CreateConvBinaryPostOpPrepack(add_relu, residual),
     CreateConvBinaryPostOpRun(add_run),
@@ -422,6 +424,7 @@ RegisterOperators op({
     CreateLinearUnaryPostOpRun(sigmoid_run),
     CreateLinearUnaryPostOpRun(swish_run),
     CreateLinearUnaryPostOpRun(tanh_run),
+    CreateLinearUnaryPostOpRun(mish_run),
     Operator(
         "ipex_prepack::linear_gelu_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack, "

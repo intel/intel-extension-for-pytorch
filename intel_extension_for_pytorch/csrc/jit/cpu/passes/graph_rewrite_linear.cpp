@@ -158,13 +158,9 @@ void RecordAtenLinearNodes(
 }
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_gelu, rewriter_silu,
-      rewriter_sigmoid, rewriter_swish, rewriter_tanh;
-  std::array<std::string, 2> relu_operators = {"relu", "relu_"};
+  SubgraphRewriter rewriter_gelu, rewriter_swish;
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
-  std::array<std::string, 2> silu_operators = {"silu", "silu_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
-  std::array<std::string, 2> tanh_operators = {"tanh", "tanh_"};
 
   // For unary post OPs:
   auto linear_op_rstring = at::jit::CodeTemplate(R"(

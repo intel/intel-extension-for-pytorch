@@ -21,6 +21,8 @@ const std::map<std::string, PostOp>& supported_unary_post_op_fusion_set() {
       {"aten::silu_", {"swish"}},
       {"aten::tanh", {"tanh"}},
       {"aten::tanh_", {"tanh"}},
+      {"aten::mish", {"mish"}},
+      {"aten::mish_", {"mish"}},
   };
   return fusion_attr_map;
 }
