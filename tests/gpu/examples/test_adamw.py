@@ -154,7 +154,7 @@ class CPUReferenceAdamMasterWeight(Optimizer):
         return loss
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="AdamW optimizer does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="AdamW optimizer does not support onednn block format")
     def create_model(self, transformer, correct_bias, amsgrad):
         # create model
         global ModelCPU

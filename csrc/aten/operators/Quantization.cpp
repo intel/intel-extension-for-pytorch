@@ -96,7 +96,7 @@ Tensor quantize_tensor_per_tensor_affine(
     double scale,
     int64_t zero_point) {
   auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(rtensor);
-  if (Settings::I().is_layout_opt_enabled()) {
+  if (Settings::I().is_onednn_layout_enabled()) {
     // this is a temporary implementation for forcing linear to fp32 path
     // and get better performance,due to oneDNN int8 kernel slower than fp32
     // kernel by currently.

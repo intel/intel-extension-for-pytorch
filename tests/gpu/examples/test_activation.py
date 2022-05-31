@@ -41,7 +41,7 @@ class TestNNMethod(TestCase):
         to_block_cpu = torch.nn.Conv2d(4, 4, kernel_size=3, padding=1)
         to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
         test_shape = [1, 4, 3, 3]
-        with torch.xpu.layout_opt():
+        with torch.xpu.onednn_layout():
             relu_ = torch.nn.functional.relu_
             relu = torch.nn.functional.relu
             x_cpu = torch.randn(test_shape)
@@ -160,7 +160,7 @@ class TestNNMethod(TestCase):
         to_block_cpu = torch.nn.Conv2d(4, 4, kernel_size=3, padding=1)
         to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
         test_shape = [1, 4, 3, 3]
-        with torch.xpu.layout_opt():
+        with torch.xpu.onednn_layout():
             GELU = torch.nn.GELU()
             GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
             x_cpu = torch.randn(test_shape)

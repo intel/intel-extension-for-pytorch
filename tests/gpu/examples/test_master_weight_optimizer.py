@@ -85,7 +85,7 @@ def base_optimizer(model_real, model_ref, mem_format, is_sgd):
     print(list(model_real.cpu().float().parameters()))
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="test_SGDMasterWeight does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="test_SGDMasterWeight does not support onednn block format")
     def test_MasterWeight(self, dtype=torch.float):
         model_real = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
         model_ref = Conv2dRelu(2, 2, kernel_size=3, stride=1, padding=1, bias=True)

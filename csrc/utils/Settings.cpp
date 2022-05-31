@@ -23,7 +23,7 @@ namespace dpcpp {
  *    Default = 0, Set 1 to enforce synchronization execution mode
  * IPEX_TILE_AS_DEVICE:
  *    Default = 1, Set 0 to disable tile partition and map per root device
- * IPEX_LAYOUT_OPT:
+ * IPEX_XPU_ONEDNN_LAYOUT:
  *    Default = 0, Set 1 to enable onednn specific layouts
  * IPEX_TF32_MODE:
  *    Default = 0, Set 1 to enable TF32 mode execution
@@ -88,11 +88,10 @@ Settings::Settings() {
   }
   */
 
-  xpu_sync_mode_enabled = false;
-  DPCPP_ENV_TYPE_DEF(
-      env_xpu_sync_mode, XPU_SYNC_MODE, xpu_sync_mode_enabled, show_opt);
-  if (env_xpu_sync_mode.has_value() && (env_xpu_sync_mode.value() != 0)) {
-    xpu_sync_mode_enabled = true;
+  sync_mode_enabled = false;
+  DPCPP_ENV_TYPE_DEF(env_sync_mode, XPU_SYNC_MODE, sync_mode_enabled, show_opt);
+  if (env_sync_mode.has_value() && (env_sync_mode.value() != 0)) {
+    sync_mode_enabled = true;
   }
 
   tile_as_device_enabled = true;
@@ -102,10 +101,11 @@ Settings::Settings() {
     tile_as_device_enabled = false;
   }
 
-  layout_opt_enabled = false;
-  DPCPP_ENV_TYPE_DEF(env_layout_opt, LAYOUT_OPT, layout_opt_enabled, show_opt);
-  if (env_layout_opt.has_value() && (env_layout_opt.value() != 0)) {
-    layout_opt_enabled = true;
+  onednn_layout_enabled = false;
+  DPCPP_ENV_TYPE_DEF(
+      env_onednn_layout, XPU_ONEDNN_LAYOUT, onednn_layout_enabled, show_opt);
+  if (env_onednn_layout.has_value() && (env_onednn_layout.value() != 0)) {
+    onednn_layout_enabled = true;
   }
 
   /* Not ready so far.
@@ -151,19 +151,19 @@ void Settings::set_xpu_backend(XPU_BACKEND backend) {
   xpu_backend = backend;
 }
 
-bool Settings::is_xpu_sync_mode_enabled() const {
+bool Settings::is_sync_mode_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return xpu_sync_mode_enabled;
+  return sync_mode_enabled;
 }
 
-void Settings::enable_xpu_sync_mode() {
+void Settings::enable_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  xpu_sync_mode_enabled = true;
+  sync_mode_enabled = true;
 }
 
-void Settings::disable_xpu_sync_mode() {
+void Settings::disable_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  xpu_sync_mode_enabled = false;
+  sync_mode_enabled = false;
 }
 
 bool Settings::is_tile_as_device_enabled() const {
@@ -171,19 +171,19 @@ bool Settings::is_tile_as_device_enabled() const {
   return tile_as_device_enabled;
 }
 
-bool Settings::is_layout_opt_enabled() const {
+bool Settings::is_onednn_layout_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return layout_opt_enabled;
+  return onednn_layout_enabled;
 }
 
-void Settings::enable_layout_opt() {
+void Settings::enable_onednn_layout() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  layout_opt_enabled = true;
+  onednn_layout_enabled = true;
 }
 
-void Settings::disable_layout_opt() {
+void Settings::disable_onednn_layout() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  layout_opt_enabled = false;
+  onednn_layout_enabled = false;
 }
 
 bool Settings::is_tf32_mode_enabled() const {

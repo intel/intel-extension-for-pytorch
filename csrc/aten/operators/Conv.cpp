@@ -78,14 +78,14 @@ Tensor dpcpp_convolution_backward_input(
     bias_t = dnnl::memory::data_type::bf16;
   }
 
-  auto input_md = Settings::I().is_layout_opt_enabled()
+  auto input_md = Settings::I().is_onednn_layout_enabled()
       ? memory::desc(input_tz, data_grad, format_any)
       : memory::desc(input_tz, data_grad, format_input);
   auto weight_md = (onednn_conv_use_channels_last(grad_output, weight) ||
-                    Settings::I().is_layout_opt_enabled())
+                    Settings::I().is_onednn_layout_enabled())
       ? memory::desc(weight_tz, weight_t, format_any)
       : memory::desc(weight_tz, weight_t, format_weight);
-  auto output_md = Settings::I().is_layout_opt_enabled()
+  auto output_md = Settings::I().is_onednn_layout_enabled()
       ? memory::desc(output_tz, data_grad, format_any)
       : memory::desc(output_tz, data_grad, format_input);
   auto bias_md =
@@ -127,7 +127,7 @@ Tensor dpcpp_convolution_backward_input(
 #endif
 
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
-  if (!Settings::I().is_layout_opt_enabled()) {
+  if (!Settings::I().is_onednn_layout_enabled()) {
     grad_output_usr_memory = dpcpp_onednn_memory(
         {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
@@ -222,11 +222,11 @@ Tensor dpcpp_convolution_backward_input(
 #endif
       });
 
-  if (!Settings::I().is_layout_opt_enabled() &&
+  if (!Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     xpu::oneDNN::reorder(grad_input_, grad_input);
   } else if (
-      Settings::I().is_layout_opt_enabled() &&
+      Settings::I().is_onednn_layout_enabled() &&
       grad_input_memory != grad_input_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));

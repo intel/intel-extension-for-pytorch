@@ -45,7 +45,7 @@ class TestNNMethod(TestCase):
         xpu_result = xpu_module(xpu_result)
         self.assertEqual(cpu_result, xpu_result.to("cpu"))
 
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_instance_norm2d_channels_last(self, dtype=torch.float):
         shapes = [(1, 3, 7, 7), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 2), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 2, 1)]
@@ -81,7 +81,7 @@ class TestNNMethod(TestCase):
             ch_xpu_result = ch_xpu_module(ch_xpu_result)
             self.assertEqual(ch_cpu_result, ch_xpu_result.to("cpu"))
 
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_instance_norm3d_channels_last(self, dtype=torch.float):
         shapes = [(1, 3, 7, 7, 5), (3, 3, 7, 7, 5)]
         for shape in shapes:

@@ -284,9 +284,9 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 | ------ | ------ | ------ |
 | IPEX_SHOW_OPTION | 0 | Show all available launch option values. |
 | IPEX_VERBOSE | 0 | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU <br> customized kernel. |
-| IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking <br> wait for the completion of submitted kernel. |
 | IPEX_TILE_AS_DEVICE | 1 | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
-| IPEX_LAYOUT_OPT | 0 | Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use <br> blocked layouts querying from oneDNN.  |
+| IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking <br> wait for the completion of submitted kernel. |
+| IPEX_XPU_ONEDNN_LAYOUT | 0 | [EXPERIMENTAL] Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use <br> blocked layouts querying from oneDNN.  |
 
 Examples to config the launch options:</br>
 

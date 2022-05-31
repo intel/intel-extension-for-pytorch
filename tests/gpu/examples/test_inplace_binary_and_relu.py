@@ -17,7 +17,7 @@ cpu_device = torch.device("cpu")
 
 class TestTorchMethod(TestCase):
 
-    @pytest.mark.skipif("not torch.xpu.using_layout_opt()", reason="only for block format")
+    @pytest.mark.skipif("not torch.xpu.using_onednn_layout()", reason="only for block format")
     def test_inplace_binary_and_relu(self, dtype=torch.float):
         input_cpu = torch.randn([32, 64, 300, 300])
 

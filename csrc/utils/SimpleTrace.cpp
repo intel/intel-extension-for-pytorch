@@ -36,7 +36,7 @@ SimpleTrace::SimpleTrace(const char* name)
 
 SimpleTrace::~SimpleTrace() {
   if (_enabled) {
-    if (Settings::I().is_xpu_sync_mode_enabled()) {
+    if (Settings::I().is_sync_mode_enabled()) {
       auto& dpcpp_queue = dpcppGetCurrentQueue();
       dpcpp_queue.wait();
     }

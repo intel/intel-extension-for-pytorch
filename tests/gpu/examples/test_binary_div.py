@@ -10,7 +10,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_layout_opt(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_binary_div_channels_last_1d(self, dtype=torch.float):
         shapes = [(1, 2, 4), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
@@ -149,7 +149,7 @@ class TestTorchMethod(TestCase):
                 self.assertEqual(a_xpu.is_contiguous(memory_format=torch.channels_last_1d), False)
             print("passed")
 
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_binary_div_channels_last(self, dtype=torch.float):
         shapes = [(1, 2, 3, 4), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]

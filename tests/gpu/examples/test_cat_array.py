@@ -38,7 +38,7 @@ class TestTorchMethod(TestCase):
         x_xpu2 = x_cpu2.to(dpcpp_device)
         x_xpu3 = x_cpu3.to(dpcpp_device)
         conv_xpu = conv_cpu.to(dpcpp_device)
-        with torch.xpu.layout_opt():
+        with torch.xpu.onednn_layout():
             y_xpu1 = conv_xpu(x_xpu1)
             y_xpu2 = x_xpu2
             y_xpu3 = x_xpu3
@@ -62,7 +62,7 @@ class TestTorchMethod(TestCase):
         x_xpu2 = x_cpu2.to(dpcpp_device)
         x_xpu3 = x_cpu3.to(dpcpp_device)
         conv_xpu = conv_cpu.to(dpcpp_device)
-        with torch.xpu.layout_opt():
+        with torch.xpu.onednn_layout():
             y_xpu1 = x_xpu1
             y_xpu2 = conv_xpu(x_xpu2)
             y_xpu3 = conv_xpu(x_xpu3)
@@ -86,7 +86,7 @@ class TestTorchMethod(TestCase):
         x_xpu2 = x_cpu2.to(dpcpp_device)
         x_xpu3 = x_cpu3.to(dpcpp_device)
         conv_xpu = conv_cpu.to(dpcpp_device)
-        with torch.xpu.layout_opt():
+        with torch.xpu.onednn_layout():
             y_xpu1 = x_xpu1.to(memory_format=torch.channels_last)
             y_xpu2 = conv_xpu(x_xpu2)
             y_xpu3 = x_xpu3
@@ -110,7 +110,7 @@ class TestTorchMethod(TestCase):
         x_xpu2 = x_cpu2.to(dpcpp_device)
         x_xpu3 = x_cpu3.to(dpcpp_device)
         conv_xpu = conv_cpu.to(dpcpp_device)
-        with torch.xpu.layout_opt():
+        with torch.xpu.onednn_layout():
             y_xpu1 = x_xpu1
             y_xpu2 = conv_xpu(x_xpu2)
             y_xpu3 = x_xpu3.to(memory_format=torch.channels_last)

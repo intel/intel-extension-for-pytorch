@@ -36,12 +36,12 @@ namespace DPCPP = sycl;
 // Command group function implementation
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
 
-#define DPCPP_E_SYNC_FOR_DEBUG(e)                                      \
-  {                                                                    \
-    static auto force_sync = Settings::I().is_xpu_sync_mode_enabled(); \
-    if (force_sync) {                                                  \
-      (e).wait_and_throw();                                            \
-    }                                                                  \
+#define DPCPP_E_SYNC_FOR_DEBUG(e)                                  \
+  {                                                                \
+    static auto force_sync = Settings::I().is_sync_mode_enabled(); \
+    if (force_sync) {                                              \
+      (e).wait_and_throw();                                        \
+    }                                                              \
   }
 
 #define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                  \

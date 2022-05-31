@@ -116,33 +116,33 @@ class ONOFF():
 
 
 # Sync Execution Mode
-def using_xpu_sync_mode():
-    return _C._is_xpu_sync_mode()
+def using_sync_mode():
+    return _C._is_sync_mode()
 
-def enable_xpu_sync_mode():
-    _C._enable_xpu_sync_mode()
+def enable_sync_mode():
+    _C._enable_sync_mode()
 
-def disable_xpu_sync_mode():
-    _C._disable_xpu_sync_mode()
+def disable_sync_mode():
+    _C._disable_sync_mode()
 
-class xpu_sync_mode(ONOFF):
+class sync_mode(ONOFF):
     def __init__(self):
-        super().__init__(using_xpu_sync_mode, enable_xpu_sync_mode, disable_xpu_sync_mode)
+        super().__init__(using_sync_mode, enable_sync_mode, disable_sync_mode)
 
 
 # oneDNN Layout
-def using_layout_opt():
-    return _C._is_layout_opt_enabled()
+def using_onednn_layout():
+    return _C._is_onednn_layout_enabled()
 
-def enable_layout_opt():
-    _C._enable_layout_opt()
+def enable_onednn_layout():
+    _C._enable_onednn_layout()
 
-def disable_layout_opt():
-    _C._disable_layout_opt()
+def disable_onednn_layout():
+    _C._disable_onednn_layout()
 
-class layout_opt(ONOFF):
+class onednn_layout(ONOFF):
     def __init__(self):
-        super().__init__(using_layout_opt, enable_layout_opt, disable_layout_opt)
+        super().__init__(using_onednn_layout, enable_onednn_layout, disable_onednn_layout)
 
 
 # Simple Trace

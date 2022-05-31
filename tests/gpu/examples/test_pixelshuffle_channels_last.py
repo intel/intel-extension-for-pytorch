@@ -20,7 +20,7 @@ class PixelShuffle(torch.nn.Module):
         return res
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_dequant_pixelshuffle(self, dtype=torch.float):
         src_cpu = torch.randn(1, 64, 64, 64)
         src_xpu = src_cpu.to(memory_format=torch.channels_last).to("xpu")

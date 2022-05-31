@@ -43,7 +43,7 @@ static inline void eltwise(
   auto src_md = memory::desc({src_tz}, data_t, format_data);
 
   memory src_memory;
-  if (!Settings::I().is_layout_opt_enabled() ||
+  if (!Settings::I().is_onednn_layout_enabled() ||
       src.is_contiguous(at::MemoryFormat::ChannelsLast) ||
       src.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     src_memory = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
@@ -72,7 +72,7 @@ static inline void eltwise(
 #endif
 
   memory dst_memory;
-  if (!Settings::I().is_layout_opt_enabled()) {
+  if (!Settings::I().is_onednn_layout_enabled()) {
     if (!dst.defined()) {
       dst = src.is_contiguous(at::MemoryFormat::ChannelsLast)
           ? at::empty_like(src, at::MemoryFormat::ChannelsLast)
@@ -173,7 +173,7 @@ static inline void eltwise_backward(
   }
 
   memory src_dst_usr_memory, diff_dst_usr_memory;
-  if (!Settings::I().is_layout_opt_enabled() ||
+  if (!Settings::I().is_onednn_layout_enabled() ||
       src_dst.is_contiguous(at::MemoryFormat::ChannelsLast) ||
       src_dst.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
     src_dst_usr_memory =
@@ -208,7 +208,7 @@ static inline void eltwise_backward(
 
   Tensor diff_dst__;
   auto expected_dst_md = eltwise_forward_pd.dst_desc();
-  if (Settings::I().is_layout_opt_enabled()) {
+  if (Settings::I().is_onednn_layout_enabled()) {
     auto src_dst_ctx =
         at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src_dst);
     auto diff_dst_ctx =
@@ -237,7 +237,7 @@ static inline void eltwise_backward(
 #endif
 
   memory diff_src_memory;
-  if (!Settings::I().is_layout_opt_enabled()) {
+  if (!Settings::I().is_onednn_layout_enabled()) {
     if (!diff_src.defined()) {
       if (src_dst.is_contiguous(MemoryFormat::ChannelsLast)) {
         diff_src = at::empty_like(src_dst, MemoryFormat::ChannelsLast);

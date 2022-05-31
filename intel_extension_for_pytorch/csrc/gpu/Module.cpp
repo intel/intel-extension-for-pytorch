@@ -547,28 +547,26 @@ void init_module(pybind11::module& m) {
     Settings::I().set_xpu_backend(static_cast<XPU_BACKEND>(backend));
   });
 
-  m.def("_is_xpu_sync_mode", []() {
-    return Settings::I().is_xpu_sync_mode_enabled();
-  });
+  m.def("_is_sync_mode", []() { return Settings::I().is_sync_mode_enabled(); });
 
-  m.def(
-      "_enable_xpu_sync_mode", []() { Settings::I().enable_xpu_sync_mode(); });
+  m.def("_enable_sync_mode", []() { Settings::I().enable_sync_mode(); });
 
-  m.def("_disable_xpu_sync_mode", []() {
-    Settings::I().disable_xpu_sync_mode();
-  });
+  m.def("_disable_sync_mode", []() { Settings::I().disable_sync_mode(); });
 
   m.def("_is_tile_as_device_enabled", []() {
     return Settings::I().is_tile_as_device_enabled();
   });
 
-  m.def("_is_layout_opt_enabled", []() {
-    return Settings::I().is_layout_opt_enabled();
+  m.def("_is_onednn_layout_enabled", []() {
+    return Settings::I().is_onednn_layout_enabled();
   });
 
-  m.def("_enable_layout_opt", []() { Settings::I().enable_layout_opt(); });
+  m.def(
+      "_enable_onednn_layout", []() { Settings::I().enable_onednn_layout(); });
 
-  m.def("_disable_layout_opt", []() { Settings::I().disable_layout_opt(); });
+  m.def("_disable_onednn_layout", []() {
+    Settings::I().disable_onednn_layout();
+  });
 
   m.def("_is_tf32_mode_enabled", []() {
     return Settings::I().is_tf32_mode_enabled();

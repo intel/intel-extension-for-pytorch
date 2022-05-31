@@ -19,15 +19,15 @@ class IPEX_API Settings final {
   XPU_BACKEND get_xpu_backend() const;
   void set_xpu_backend(XPU_BACKEND backend);
 
-  bool is_xpu_sync_mode_enabled() const;
-  void enable_xpu_sync_mode();
-  void disable_xpu_sync_mode();
+  bool is_sync_mode_enabled() const;
+  void enable_sync_mode();
+  void disable_sync_mode();
 
   bool is_tile_as_device_enabled() const;
 
-  bool is_layout_opt_enabled() const;
-  void enable_layout_opt();
-  void disable_layout_opt();
+  bool is_onednn_layout_enabled() const;
+  void enable_onednn_layout();
+  void disable_onednn_layout();
 
   bool is_tf32_mode_enabled() const;
   void enable_tf32_mode();
@@ -52,9 +52,9 @@ class IPEX_API Settings final {
   int verbose_level;
   XPU_BACKEND xpu_backend;
 
-  bool xpu_sync_mode_enabled;
+  bool sync_mode_enabled;
   bool tile_as_device_enabled;
-  bool layout_opt_enabled;
+  bool onednn_layout_enabled;
   bool tf32_mode_enabled;
 
 #ifdef BUILD_SIMPLE_TRACE

@@ -292,7 +292,7 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(real.cpu(), ref)
 
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_layout_opt(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_channels_last_1d_fwd(self, dtype=torch.float):
         shapes = [(2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
@@ -350,7 +350,7 @@ class TestNNMethod(TestCase):
 
                 self.assertEqual(real.contiguous().cpu(), ref)
 
-    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_layout_opt(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
+    @pytest.mark.skipif(not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(), reason="doesn't enable channels last 1d or channels last does not support onednn block format")
     def test_channels_last_1d_bwd(self, dtype=torch.float):
         shapes = [(1, 7, 15000), (2, 2, 3), (4, 4, 4), (4, 4, 1), (4, 1, 4),
                   (4, 1, 1), (1, 4, 4), (1, 4, 1)]
@@ -415,7 +415,7 @@ class TestNNMethod(TestCase):
                 self.assertEqual(y_cpu, y_dpcpp.cpu(), atol=5 * 1e-5, rtol=0)
                 self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
 
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_channels_last_fwd(self, dtype=torch.float):
         shapes = [(2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
@@ -462,7 +462,7 @@ class TestNNMethod(TestCase):
 
                 self.assertEqual(real.contiguous().cpu(), ref)
 
-    @pytest.mark.skipif(torch.xpu.using_layout_opt(), reason="channels last does not support onednn block format")
+    @pytest.mark.skipif(torch.xpu.using_onednn_layout(), reason="channels last does not support onednn block format")
     def test_channels_last_bwd(self, dtype=torch.float):
         shapes = [(1, 7, 1, 15000), (2, 2, 3, 3), (4, 4, 4, 4), (4, 4, 1, 1), (4, 1, 4, 4),
                   (4, 1, 4, 1), (4, 1, 1, 4), (1, 4, 1, 4), (1, 4, 4, 1), (4, 1, 1, 1)]
