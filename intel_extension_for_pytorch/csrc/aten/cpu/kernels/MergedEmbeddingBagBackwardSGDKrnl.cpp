@@ -1,7 +1,7 @@
 #include <c10/core/CPUAllocator.h>
 #include <csrc/aten/cpu/MergedEmbeddingBag.h>
 #include <omp.h>
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 #include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
@@ -10,6 +10,7 @@ namespace cpu {
 namespace {
 
 using namespace at;
+using namespace torch_ipex::cpu::kernel;
 
 template <typename param_t, typename acc_t>
 inline void sgd_update(
@@ -138,7 +139,7 @@ void merged_embeddingbag_backward_cpu_kernel(
       indices_with_row_offset,
       pooling_modes,
       max_embeddings);
-  IPEX_RECORD_FUNCTION(__FUNCTION__, std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
 
   auto get_table_id = [&](int index) {
     int table_id = 0;

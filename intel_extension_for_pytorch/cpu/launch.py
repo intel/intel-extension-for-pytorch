@@ -138,39 +138,24 @@ class CPUinfo():
                 regex_out = re.search(pattern, line)
                 if regex_out:
                     self.cpuinfo.append(regex_out.group(1).strip().split(","))
+            assert len(self.cpuinfo) > 0, "cpuinfo is empty"
             self.get_socket_info()
 
     def get_socket_info(self):
-        self.sockets = int(max([line[2] for line in self.cpuinfo])) + 1
-        self.socket_physical_cores = []  # socket_id is index
-        self.socket_logical_cores = []   # socket_id is index
-        self.physical_core_socket_map = {}  # phyical core to numa node id
-        self.logical_core_socket_map = {}   # logical core to numa node id
-
-        self.nodes = int(max([line[3] for line in self.cpuinfo])) + 1
+        idx_active = 3
+        if self.cpuinfo[0][idx_active] == '':
+            idx_active = 2
+        self.nodes = int(max([line[idx_active] for line in self.cpuinfo])) + 1
         self.node_physical_cores = []  # node_id is index
         self.node_logical_cores = []   # node_id is index
         self.physical_core_node_map = {}  # phyical core to numa node id
         self.logical_core_node_map = {}   # logical core to numa node id
 
-        for socket_id in range(self.sockets):
-            cur_socket_physical_core = []
-            cur_socket_logical_core = []
-            for line in self.cpuinfo:
-                if socket_id == int(line[2]):
-                    if int(line[1]) not in cur_socket_physical_core:
-                        cur_socket_physical_core.append(int(line[1]))
-                        self.physical_core_socket_map[int(line[1])] = int(socket_id)
-                    cur_socket_logical_core.append(int(line[0]))
-                    self.logical_core_socket_map[int(line[0])] = int(socket_id)
-            self.socket_physical_cores.append(cur_socket_physical_core)
-            self.socket_logical_cores.append(cur_socket_logical_core)
-
         for node_id in range(self.nodes):
             cur_node_physical_core = []
             cur_node_logical_core = []
             for line in self.cpuinfo:
-                nid = line[3] if line[3] != '' else '0'
+                nid = line[idx_active] if line[idx_active] != '' else '0'
                 if node_id == int(nid):
                     if int(line[1]) not in cur_node_physical_core:
                         cur_node_physical_core.append(int(line[1]))
@@ -179,9 +164,6 @@ class CPUinfo():
                     self.logical_core_node_map[int(line[0])] = int(node_id)
             self.node_physical_cores.append(cur_node_physical_core)
             self.node_logical_cores.append(cur_node_logical_core)
-
-    def socket_nums(self):
-        return self.sockets
 
     def node_nums(self):
         return self.nodes
@@ -268,6 +250,13 @@ class Launcher():
                     break
         return lib_set or lib_find
 
+    def is_numactl_available(self):
+        numactl_available = False
+        cmd = ["numactl", "-C", "0", "-m", "0", "hostname"]
+        r = subprocess.run(cmd, env=os.environ)
+        if r.returncode == 0:
+            numactl_available = True
+        return numactl_available
 
     def set_memory_allocator(self, enable_tcmalloc=True, enable_jemalloc=False, use_default_allocator=False):
         '''
@@ -364,6 +353,7 @@ class MultiInstanceLauncher(Launcher):
         processes = []
         cores = []
         set_kmp_affinity = True
+        enable_taskset = False
         if args.core_list:  # user specify what cores will be used by params
             cores = [int(x) for x in args.core_list.split(",")]
             if args.ncore_per_instance == -1:
@@ -399,25 +389,64 @@ class MultiInstanceLauncher(Launcher):
                 else:
                     args.ncore_per_instance = len(cores) // args.ninstances
             elif args.ncore_per_instance != -1 and args.ninstances == -1:
-                args.ninstances = len(cores) // args.ncore_per_instance
+                if not args.skip_cross_node_cores:
+                    args.ninstances = len(cores) // args.ncore_per_instance
+                else:
+                    ncore_per_node = len(self.cpuinfo.node_physical_cores[0])
+                    num_leftover_cores = ncore_per_node % args.ncore_per_instance
+                    if args.ncore_per_instance > ncore_per_node:
+                        # too many ncore_per_instance to skip cross-node cores
+                        logger.warning("there are {} core(s) per socket, but you specify {} ncore_per_instance and skip_cross_node_cores. Please make sure --ncore_per_instance < core(s) per socket".format(ncore_per_node, args.ncore_per_instance))
+                        exit(-1)
+                    elif num_leftover_cores == 0:
+                        # aren't any cross-node cores
+                        logger.info('--skip_cross_node_cores is set, but there are no cross-node cores.')
+                        args.ninstances = len(cores) // args.ncore_per_instance
+                    else:
+                        # skip cross-node cores
+                        if args.ninstances != -1:
+                            logger.warning('--skip_cross_node_cores is exclusive to --ninstances. --ninstances won\'t take effect even if it is set explicitly.')
+
+                        i = 1
+                        leftover_cores = set()
+                        while ncore_per_node*i <= len(cores):
+                            leftover_cores.update(cores[ncore_per_node*i-num_leftover_cores : ncore_per_node*i])
+                            i += 1
+                        cores = list(set(cores) - leftover_cores)
+                        assert len(cores) % args.ncore_per_instance == 0
+                        args.ninstances = len(cores) // args.ncore_per_instance
             else:
                 if args.ninstances * args.ncore_per_instance > len(cores):
                     logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
                     exit(-1)
             if args.latency_mode:
-                logger.warning('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                logger.warning('--latency_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even if they are set explicitly.')
                 args.ncore_per_instance = 4
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ninstances = len(cores) // args.ncore_per_instance
 
             if args.throughput_mode:
-                logger.warning('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even they are set explicitly.')
+                logger.warning('--throughput_mode is exclusive to --ninstances, --ncore_per_instance, --node_id and --use_logical_core. They won\'t take effect even if they are set explicitly.')
                 args.ninstances = self.cpuinfo.node_nums()
                 cores = self.cpuinfo.get_all_physical_cores()
                 args.ncore_per_instance = len(cores) // args.ninstances
 
         if args.ninstances > 1 and args.instance_idx != -1:
             logger.info("assigning {} cores for instance {}".format(args.ncore_per_instance, args.instance_idx))
+
+        if not args.disable_numactl:
+            numactl_available = self.is_numactl_available()
+            if not numactl_available:
+                if not args.disable_taskset:
+                    logger.warning("Core binding with numactl is not available. Disabling numactl and using taskset instead. This may affect performance in multi-socket system; please use numactl if memory binding is needed.")
+                    args.disable_numactl = True
+                    enable_taskset = True
+                else:
+                    logger.warning("Core binding with numactl is not available, and --disable_taskset is set. Please unset --disable_taskset to use taskset insetad of numactl.")
+                    exit(-1)
+
+        if not args.disable_taskset:
+            enable_taskset = True
 
         self.set_multi_thread_and_allocator(args.ncore_per_instance,
                                             args.disable_iomp,
@@ -429,13 +458,19 @@ class MultiInstanceLauncher(Launcher):
         for i in range(args.ninstances):
             cmd = []
             cur_process_cores = ""
-            if not args.disable_numactl:
-                cmd = ["numactl"]
+            if not args.disable_numactl or enable_taskset:
+                if not args.disable_numactl:
+                    cmd = ["numactl"]
+                elif enable_taskset:
+                    cmd = ["taskset"]
+
                 cores = sorted(cores)
-                if args.instance_idx == -1: # sequentially assign ncores_per_instance to ninstances
-                    core_list = cores[i * args.ncore_per_instance : (i + 1) * args.ncore_per_instance]
-                else: # assign ncores_per_instance from instance_idx
-                    core_list = cores[args.instance_idx * args.ncore_per_instance : (args.instance_idx + 1) * args.ncore_per_instance]
+                if args.instance_idx == -1:  # sequentially assign ncores_per_instance to ninstances
+                    core_list = cores[i * args.ncore_per_instance: (
+                        i + 1) * args.ncore_per_instance]
+                else:  # assign ncores_per_instance from instance_idx
+                    core_list = cores[args.instance_idx * args.ncore_per_instance: (
+                        args.instance_idx + 1) * args.ncore_per_instance]
 
                 core_ranges = []
                 for core in core_list:
@@ -451,9 +486,16 @@ class MultiInstanceLauncher(Launcher):
                 for r in core_ranges:
                     cur_process_cores = cur_process_cores + "{}-{},".format(r['start'], r['end'])
                 cur_process_cores = cur_process_cores[:-1]
-                numa_params = "-C {} ".format(cur_process_cores)
-                numa_params += "-m {}".format(",".join([str(numa_id) for numa_id in self.cpuinfo.numa_aware_check(core_list)]))
-                cmd.extend(numa_params.split())
+
+                if not args.disable_numactl:
+                    numa_params = "-C {} ".format(cur_process_cores)
+                    numa_params += "-m {}".format(",".join(
+                        [str(numa_id) for numa_id in self.cpuinfo.numa_aware_check(core_list)]))
+                    cmd.extend(numa_params.split())
+                elif enable_taskset:
+                    taskset_params = "-c {}".format(cur_process_cores)
+                    cmd.extend(taskset_params.split())
+
             with_python = not args.no_python
             if with_python:
                 cmd.append(sys.executable)
@@ -469,7 +511,10 @@ class MultiInstanceLauncher(Launcher):
             if args.log_path:
                 cmd_s = "{} 2>&1 | tee {}".format(cmd_s, log_name)
             logger.info(cmd_s)
-            process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
+            if not args.disable_numactl:
+                process = subprocess.Popen(cmd_s, env=os.environ, shell=True)
+            elif enable_taskset:
+                process = subprocess.Popen(cmd, env=os.environ)
             processes.append(process)
 
             if args.instance_idx != -1: # launches single instance, instance_idx, only
@@ -576,12 +621,15 @@ class DistributedTrainingLauncher(Launcher):
         self.set_env("MASTER_PORT", str(args.master_port))
         mpi_pin_domain = self.get_mpi_pin_domain(args.nproc_per_node, args.ccl_worker_count, total_cores_per_node)
         self.set_env("I_MPI_PIN_DOMAIN", mpi_pin_domain)
+        mpi_pin_domain = os.environ["I_MPI_PIN_DOMAIN"]
 
         ppn = args.nproc_per_node
         cores_per_rank = total_cores_per_node // ppn
 
-        opm_num_threads = cores_per_rank - args.ccl_worker_count
-        self.set_multi_thread_and_allocator(opm_num_threads,
+        omp_num_threads = cores_per_rank - args.ccl_worker_count
+        self.set_env("OMP_NUM_THREADS", str(omp_num_threads))
+        omp_num_threads = os.environ["OMP_NUM_THREADS"]
+        self.set_multi_thread_and_allocator(omp_num_threads,
                                             args.disable_iomp,
                                             True,
                                             args.enable_tcmalloc,
@@ -594,7 +642,7 @@ class DistributedTrainingLauncher(Launcher):
 
         os.environ["LAUNCH_CMD"] = "#"
         cmd = ['mpiexec.hydra']
-        mpi_config = "-l -np {} -ppn {} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node)
+        mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes * args.nproc_per_node, args.nproc_per_node, mpi_pin_domain, omp_num_threads)
         mpi_config += args.more_mpi_params
         if args.nnodes > 1:
             mpi_config += " -hostfile {}".format(args.hostfile)
@@ -668,6 +716,8 @@ def add_multi_instance_params(parser):
     # multi-instance control
     group.add_argument("--ncore_per_instance", metavar='\b', default=-1, type=int,
                        help="Cores per instance")
+    group.add_argument("--skip_cross_node_cores", action='store_true', default=False,
+                       help="If specified --ncore_per_instance, skips cross-node cores.")
     group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
                        help="For multi-instance, you should give the cores number you used for per instance.")
     group.add_argument("--instance_idx", metavar='\b', default="-1", type=int,
@@ -682,6 +732,8 @@ def add_multi_instance_params(parser):
                        help="Whether only use physical cores")
     group.add_argument("--disable_numactl", action='store_true', default=False,
                        help="Disable numactl")
+    group.add_argument("--disable_taskset", action='store_true', default=False,
+                       help="Disable taskset")
     group.add_argument("--core_list", metavar='\b', default=None, type=str,
                        help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
     group.add_argument("--log_path", metavar='\b', default="", type=str,
@@ -787,11 +839,12 @@ def main():
         lst_valid = []
         tmp_ldpreload = os.environ["LD_PRELOAD"]
         for item in tmp_ldpreload.split(":"):
-            matches = glob.glob(item)
-            if len(matches) > 0:
-                lst_valid.append(item)
-            else:
-                logger.warning("{} doesn't exist. Removing it from LD_PRELOAD.".format(item))
+            if item != "":
+                matches = glob.glob(item)
+                if len(matches) > 0:
+                    lst_valid.append(item)
+                else:
+                    logger.warning("{} doesn't exist. Removing it from LD_PRELOAD.".format(item))
         if len(lst_valid) > 0:
             os.environ["LD_PRELOAD"] = ":".join(lst_valid)
         else:

@@ -24,7 +24,6 @@ struct ContextConvTranspose final {
   std::vector<int64_t> stride_;
   std::vector<int64_t> dilation_;
   std::vector<int64_t> input_size_;
-  std::vector<int64_t> kernel_size_;
   int64_t groups_;
   // The originin weight != weight_packed_.get_dims() since there is a tranpose
   // for weight, We directly store origin_weight_dims_ here to avoid compute it.
@@ -42,7 +41,6 @@ struct ContextConvTranspose final {
       std::vector<int64_t> output_padding,
       std::vector<int64_t> stride,
       std::vector<int64_t> dilation,
-      std::vector<int64_t> kernel_size,
       int64_t groups,
       std::vector<int64_t> input_size,
       std::vector<int64_t> origin_weight_dims,
@@ -55,7 +53,6 @@ struct ContextConvTranspose final {
         output_padding_(output_padding),
         stride_(stride),
         dilation_(dilation),
-        kernel_size_(kernel_size),
         input_size_(input_size),
         groups_(groups),
         origin_weight_dims_(origin_weight_dims),

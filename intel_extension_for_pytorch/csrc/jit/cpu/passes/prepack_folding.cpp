@@ -14,6 +14,8 @@ void PrePackingOpsFolder(Block* b) {
         n->kind() ==
             Symbol::fromQualString("ipex_prepack::convolution_relu_prepack") ||
         n->kind() ==
+            Symbol::fromQualString("ipex_prepack::convolution_tanh_prepack") ||
+        n->kind() ==
             Symbol::fromQualString(
                 "ipex_prepack::convolution_sigmoid_prepack") ||
         n->kind() ==
@@ -31,12 +33,14 @@ void PrePackingOpsFolder(Block* b) {
 
         n->kind() == Symbol::fromQualString("ipex_prepack::linear_prepack") ||
         n->kind() ==
-            Symbol::fromQualString("ipex_prepack::conv_transpose2d_prepack") ||
+            Symbol::fromQualString("ipex_prepack::conv_transpose_prepack") ||
         n->kind() ==
             Symbol::fromQualString(
                 "ipex_prepack::convolution_leaky_relu_prepack") ||
         n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_gelu_prepack"));
+            Symbol::fromQualString("ipex_prepack::convolution_gelu_prepack") ||
+        n->kind() ==
+            Symbol::fromQualString("ipex_prepack::convolution_mish_prepack"));
   };
 
   std::unordered_set<Node*> nodes_to_delete;

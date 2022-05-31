@@ -219,47 +219,6 @@ at::ScalarType get_bias_dtype(
   return bias_dtype;
 }
 
-//! function: pack_qlstm_weight
-/*!
- *
- * Pack INT8 aten LSTM weight tensors in 2D of shape [l*d*g*o*, i]
- * to INT8 ideep tensors in 5D of shape [l, d, i, g, o] to align with the
- * format requirement of oneDNN LSTM primitive
- * \param weight_ih: the input-hidden INT8 aten weight tensor
- * \param weight_hh: the hidden-hidden INT8 aten weight tensor
- * \param input_size: the size of the input
- * \param rnn: the RNNParams struct
- * \return: a tuple of ideep tensors: (input-hidden INT8 ideep tensor,
- * hidden-hidden INT8 ideep tensor)
- */
-std::tuple<ideep::tensor, ideep::tensor> pack_qlstm_weight(
-    const at::Tensor& weight_ih,
-    const at::Tensor& weight_hh,
-    int64_t input_size,
-    const RNNParams& rnn) {
-  // TODO: weight prepack for INT8
-  auto w1_ldgoi = itensor_view_from_dense(
-      weight_ih,
-      rnn.weights_layer_desc(
-          input_size, get_mkldnn_dtype(weight_ih.scalar_type())));
-  auto w2_ldgoi = itensor_view_from_dense(
-      weight_hh,
-      rnn.weights_iter_desc(get_mkldnn_dtype(weight_hh.scalar_type())));
-
-  ideep::tensor::desc w1_ldigo_desc = rnn.weights_layer_ldigo_desc(
-      input_size, get_mkldnn_dtype(weight_ih.scalar_type()));
-  ideep::tensor::desc w2_ldigo_desc =
-      rnn.weights_iter_ldigo_desc(get_mkldnn_dtype(weight_hh.scalar_type()));
-
-  ideep::tensor w1{w1_ldigo_desc};
-  ideep::tensor w2{w2_ldigo_desc};
-
-  w1_ldgoi.reorder_to(w1);
-  w2_ldgoi.reorder_to(w2);
-
-  return std::make_tuple(w1, w2);
-}
-
 std::vector<float> get_mkldnn_weight_scales_of_lstm(
     const at::Tensor& weight_ih,
     const at::Tensor& weight_hh) {
@@ -352,12 +311,8 @@ std::vector<at::Tensor> lstm_kernel(
   double scale = -1.;
   int64_t zp = -1;
   if (input_dt == at::ScalarType::QUInt8) {
-    // TODO: weight prepack for INT8
-    std::tie(w1_, w2_) =
-        pack_qlstm_weight(weight_ih, weight_hh, input_size, rnn);
     std::tie(scale, zp) = int8::utils::get_mkldnn_input_scale_zp(input);
     weight_scales = get_mkldnn_weight_scales_of_lstm(weight_ih, weight_hh);
-
     auto quantizer = at::make_per_tensor_affine_quantizer(
         output_scale, output_zp, static_cast<at::ScalarType>(output_dtype));
     output = at::new_qtensor(output_size, input.options(), quantizer);
@@ -367,22 +322,25 @@ std::vector<at::Tensor> lstm_kernel(
             input_dt == at::ScalarType::BFloat16,
         "Expected input to be Float or BFloat16 but got ",
         input_dt);
-    std::tie(w1_, w2_) = torch_ipex::cpu::get_lstm_packed_weight(
-        weight_ih,
-        weight_hh,
-        input_size,
-        rnn.num_gates,
-        rnn.hidden_size,
-        {output_size.cbegin(), output_size.cend()},
-        x,
-        hx,
-        cx,
-        b,
-        reverse,
-        train);
-
     output = at::empty(output_size, input.options());
   }
+
+  QuantizedLstmParams quantizedLstmParams(
+      {scale, zp, weights_scale_mask, weight_scales});
+  std::tie(w1_, w2_) = torch_ipex::cpu::get_lstm_packed_weight(
+      weight_ih,
+      weight_hh,
+      input_size,
+      rnn.num_gates,
+      rnn.hidden_size,
+      {output_size.cbegin(), output_size.cend()},
+      x,
+      hx,
+      cx,
+      b,
+      reverse,
+      train,
+      quantizedLstmParams);
 
   auto y = torch_ipex::cpu::itensor_view_from_dense(
       output, rnn.dst_layer_desc(get_mkldnn_dtype(output.scalar_type())));
@@ -544,7 +502,7 @@ std::vector<at::Tensor> IPEXLSTMOp::forward(
     double scale,
     int64_t zp,
     int64_t dtype) {
-  IPEX_RECORD_FUNCTION("IPEXLSTMOp::forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IPEXLSTMOp::forward", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::forward\n");
@@ -598,7 +556,7 @@ std::vector<at::Tensor> IPEXLSTMOp::forward(
 torch::autograd::tensor_list IPEXLSTMOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::tensor_list grad_outputs) {
-  IPEX_RECORD_FUNCTION("IPEXLSTMOp::backward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("IPEXLSTMOp::backward", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("IPEXLSTMOp::backward\n");
@@ -697,7 +655,7 @@ std::vector<at::Tensor> ipex_lstm_layer(
     int64_t zp,
     int64_t dtype) {
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::cpu::ipex_lstm_layer", std::vector<c10::IValue>({}));
+      "torch_ipex::cpu::ipex_lstm_layer", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::cpu::ipex_lstm_layer\n");
@@ -1094,7 +1052,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> quantized_lstm(
     int64_t zp,
     int64_t dtype) {
 #if defined(IPEX_PROFILE_OP)
-  IPEX_RECORD_FUNCTION("ipex::quantized_lstm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("ipex::quantized_lstm", c10::ArrayRef<c10::IValue>({}));
 #endif
 
   auto hx_ = hx.vec();
@@ -1135,7 +1093,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
     bool train,
     bool bidirectional,
     bool batch_first) {
-  IPEX_RECORD_FUNCTION("ipex_lstm", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("ipex_lstm", c10::ArrayRef<c10::IValue>({}));
 
 #if defined(IPEX_DISP_OP)
   printf("ipex_lstm\n");

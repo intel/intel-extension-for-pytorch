@@ -23,7 +23,7 @@ at::Tensor IPEXROIAlignOp::_forward(
     int64_t sampling_ratio,
     bool aligned) {
   IPEX_RECORD_FUNCTION(
-      "IPEXROIAlignOp::_forward", std::vector<c10::IValue>({}));
+      "IPEXROIAlignOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   /*
   pointer to roi_align_forward_kernel_impl(
@@ -55,7 +55,8 @@ at::Tensor IPEXROIAlignOp::forward(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-  IPEX_RECORD_FUNCTION("IPEXROIAlignOp::forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "IPEXROIAlignOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["input_shape"] = input.sizes();
   ctx->saved_data["spatial_scale"] = spatial_scale;
@@ -92,7 +93,7 @@ torch::autograd::variable_list IPEXROIAlignOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
   IPEX_RECORD_FUNCTION(
-      "IPEXROIAlignOp::backward", std::vector<c10::IValue>({}));
+      "IPEXROIAlignOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto input_shape = ctx->saved_data["input_shape"].toIntVector();
   auto spatial_scale = ctx->saved_data["spatial_scale"].toDouble();

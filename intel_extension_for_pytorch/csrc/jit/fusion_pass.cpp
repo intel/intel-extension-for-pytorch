@@ -9,6 +9,8 @@
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
 #include "cpu/passes/frozen_linear_folding.h"
+#include "cpu/passes/graph_rewrite_helper.h"
+#include "cpu/passes/remove_redundant_aliases.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/frontend/error_report.h>
@@ -17,7 +19,6 @@
 #include <torch/csrc/jit/passes/batch_mm.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/frozen_conv_folding.h>
-#include <torch/csrc/jit/passes/graph_rewrite_helper.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/remove_dropout.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
@@ -345,12 +346,23 @@ void RemoveBailoutTemplateNodes(Block* b) {
   }
 }
 
+class ATenLinearRecorder {
+ public:
+  ATenLinearRecorder(std::shared_ptr<Graph> graph) {
+    graph_rewrite::RecordAtenLinearNodes(graph, aten_linear_nodes_);
+  }
+
+  std::unordered_set<Node*>& get_records() {
+    return aten_linear_nodes_;
+  }
+
+ private:
+  std::unordered_set<Node*> aten_linear_nodes_;
+};
+
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // remove dropout;
   torch::jit::removeDropout(graph);
-
-  // concat multi-linear with same input
-  FrozenConcatLinear(graph);
 
   // ipex einsum
   graph_rewrite::FusedEinsumPost(graph);
@@ -374,26 +386,45 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Insert ipex_prepack::convolution_prepack.
   // Conv weights will be re-prepacked in this step.
+  GRAPH_DUMP("After FrozenConvFolding.Before insertPrePackedConvOp", graph);
   graph_rewrite::insertPrePackedConvOp(graph);
 
   // convolution fusion
+  GRAPH_DUMP("After insertPrePackedConvOp.Before fuseConvWithEltwise", graph);
   graph_rewrite::fuseConvWithEltwise(graph);
+  GRAPH_DUMP("After fuseConvWithEltwise.Before fuseConvAddRelu", graph);
   graph_rewrite::fuseConvAddRelu(graph);
+  GRAPH_DUMP("After fuseConvAddRelu.Before fuseBottleneck", graph);
   graph_rewrite::fuseBottleneck(graph);
+  GRAPH_DUMP("After fuseBottleneck.", graph);
 
+  // TODO: Record original aten nodes, while convert aten linear-> ipex linear,
+  // will ignore these aten linear (if they are fp32 dtype). For BF16 dtype,
+  // always use ipex linear. This is a temporay solution, for next PR to clean
+  // up fusion pass, will further abstract this as a class method.
+  auto aten_linear_recorder = ATenLinearRecorder(graph);
   // linear folding
+  graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(graph);
+  // concat multi-linear with same input
+  torch::jit::FrozenConcatLinear(graph, aten_linear_recorder.get_records());
   graph_rewrite::FrozenLinearFolding(graph);
 
   // linear fusion
-  graph_rewrite::insertPrePackedLinearOp(graph);
+  GRAPH_DUMP("After FrozenLinearFolding.Before insertPrePackedLinearOp", graph);
+  graph_rewrite::insertPrePackedLinearOp(
+      graph, aten_linear_recorder.get_records());
+  GRAPH_DUMP(
+      "After insertPrePackedLinearOp.Before fuseLinearWithEltwise", graph);
   graph_rewrite::fuseLinearWithEltwise(graph);
+  GRAPH_DUMP("After fuseLinearWithEltwise.Before fuseLinearAddRelu", graph);
   graph_rewrite::fuseLinearAddRelu(graph);
+  GRAPH_DUMP("After fuseLinearAddRelu.", graph);
 
   graph_rewrite::FuseLinearSwishCustomized(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
   // deconvolution fusion
-  graph_rewrite::insertPrePackedConvTranspose2dOp(graph);
+  graph_rewrite::insertPrePackedConvTransposeOp(graph);
 
   // fuse concat+bn+relu for the input float tensors with the same sizes
   // and channelslast format
@@ -422,8 +453,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
+  GRAPH_DUMP("Before PrePackingOpsFolder", graph);
   // folding prepacking ops.
   PrePackingOpsFolder(graph);
+  GRAPH_DUMP("After PrePackingOpsFolder", graph);
 }
 
 bool checkQuantization(Block* block) {
@@ -434,7 +467,9 @@ bool checkQuantization(Block* block) {
 
     if (node->kind() == Symbol::aten("quantize_per_tensor") ||
         node->kind() == Symbol::aten("dequantize") ||
-        node->kind() == Symbol::aten("quantize_per_channel")) {
+        node->kind() == Symbol::aten("quantize_per_channel") ||
+        node->kind() == Symbol::aten("quantized_lstm") ||
+        node->kind() == Symbol::fromQualString("quantized::linear_dynamic")) {
       return true;
     }
   }
@@ -455,12 +490,13 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // remove BailOut and BailoutTemplate
   RemoveBailOutNodesAndSpecializeTypes(graph->block());
   RemoveBailoutTemplateNodes(graph->block());
-
   // LLGA fusion pass for int8
   GRAPH_DUMP(
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
       graph);
+
   if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+    RemoveRedundantAliases(graph);
     fuser::onednn::fuseGraph(graph);
   }
   GRAPH_DUMP("After LLGA fusion pass. Before IPEXFusionPass", graph);

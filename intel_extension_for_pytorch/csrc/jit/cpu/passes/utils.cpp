@@ -1,4 +1,31 @@
-#include "utils.h"
+#include "csrc/jit/cpu/passes/utils.h"
+
+namespace torch {
+namespace jit {
+namespace graph_rewrite {
+namespace utils {
+
+const std::map<std::string, PostOp>& supported_unary_post_op_fusion_set() {
+  // The key of the map is the aten op name to be fused with conv/linear.
+  // The value of the map is a struct containing the ideep post op attr key name
+  // and the filter of the graph rewriter if any. Example: for an OP aten::xxx,
+  // when fusing with conv/linear, the ideep attr is ideep::attr_t::fuse_yyy(),
+  // and no filter is required during graph rewrite, thus we need to add
+  // {"aten::xxx", {"yyy"}} into the below map table.
+  static const std::map<std::string, PostOp> fusion_attr_map{
+      {"aten::relu_", {"relu"}},
+      {"aten::relu", {"relu"}},
+      {"aten::sigmoid", {"sigmoid"}},
+      {"aten::sigmoid_", {"sigmoid"}},
+      {"aten::silu", {"swish"}},
+      {"aten::silu_", {"swish"}},
+      {"aten::tanh", {"tanh"}},
+      {"aten::tanh_", {"tanh"}},
+      {"aten::mish", {"mish"}},
+      {"aten::mish_", {"mish"}},
+  };
+  return fusion_attr_map;
+}
 
 // Check if the memory format of the tensor is ChannelsLast(3d)
 bool is_channelslast(c10::TensorType tensor) {
@@ -23,3 +50,8 @@ bool is_contiguous(c10::TensorTypePtr tensor) {
   bool is_contiguous = tensor_contiguous->strides() == tensor->strides();
   return is_contiguous;
 }
+
+} // namespace utils
+} // namespace graph_rewrite
+} // namespace jit
+} // namespace torch

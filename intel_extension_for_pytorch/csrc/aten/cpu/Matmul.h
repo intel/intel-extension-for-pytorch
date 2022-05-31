@@ -1,31 +1,29 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <torch/csrc/autograd/FunctionsManual.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <vector>
 
 namespace torch {
 namespace autograd {
 namespace generated {
-struct TORCH_API MmBackward0 : public torch::autograd::TraceableFunction {
-  using TraceableFunction::TraceableFunction;
-  torch::autograd::variable_list apply(
-      torch::autograd::variable_list&& grads) override;
-  std::string name() const override {
-    return "MmBackward0";
+
+namespace ipex {
+using IndexRange = std::pair<size_t, size_t>;
+// A simple way to imperatively compute index ranges for slots
+// that have been flattened
+struct IndexRangeGenerator {
+  IndexRange range(size_t range_size) {
+    i += range_size;
+    return {i - range_size, i};
   }
-  void release_variables() override {
-    std::lock_guard<std::mutex> lock(mutex_);
-    self_.reset_data();
-    mat2_.reset_data();
+  size_t size() {
+    return i;
   }
 
-  torch::autograd::SavedVariable self_;
-  std::vector<int64_t> mat2_sizes;
-  std::vector<int64_t> mat2_strides;
-  std::vector<int64_t> self_sizes;
-  std::vector<int64_t> self_strides;
-  torch::autograd::SavedVariable mat2_;
+ private:
+  size_t i = 0;
 };
 
 struct TORCH_API BmmBackward0 : public TraceableFunction {
@@ -44,6 +42,7 @@ struct TORCH_API BmmBackward0 : public TraceableFunction {
   SavedVariable mat2_;
 };
 
+} // namespace ipex
 } // namespace generated
 } // namespace autograd
 } // namespace torch

@@ -10,21 +10,27 @@ namespace cpu {
 namespace detail {
 namespace linear {
 
+#define DEFINE_LINEAR_UNARY_ELTWISE_RUN(FUSED_OP)                    \
+  at::Tensor linear_##FUSED_OP##_run(                                \
+      const at::Tensor& input,                                       \
+      const c10::intrusive_ptr<LinearOpContext>& op_context) {       \
+    IPEX_RECORD_FUNCTION(                                            \
+        "ipex_prepack::linear_" #FUSED_OP "_run",                    \
+        c10::ArrayRef<c10::IValue>({}));                             \
+    return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP()); \
+  }
+
 c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
-    int64_t out_features,
-    int64_t in_features,
     c10::optional<int64_t> batch_size) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::createLinearPrePackOpContext",
-      std::vector<c10::IValue>({}));
+      c10::ArrayRef<c10::IValue>({}));
 
   return IpexLinearOpContext::create_context(
       std::move(weight),
       std::move(bias),
-      out_features,
-      in_features,
       batch_size);
 }
 
@@ -32,26 +38,23 @@ at::Tensor linear_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t());
 }
 
-at::Tensor linear_relu_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_relu_run", std::vector<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_relu());
-}
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(relu);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(sigmoid);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(swish);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(tanh);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(mish);
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context,
     const c10::string_view approximate) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_gelu_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_gelu_run", c10::ArrayRef<c10::IValue>({}));
   // https://github.com/pytorch/pytorch/pull/61439
   // at::gelu can support tanh approximate now and OneDNN also support it
   // by changing algorithm If there is other type of approximate are added to
@@ -69,31 +72,13 @@ at::Tensor linear_gelu_run(
       input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
 }
 
-at::Tensor linear_sigmoid_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_sigmoid_run", std::vector<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_sigmoid());
-}
-
-at::Tensor linear_swish_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_swish_run", std::vector<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_swish());
-}
-
 at::Tensor linear_add_run(
     const at::Tensor& input,
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_add_run", std::vector<c10::IValue>({}));
+      "ipex_prepack::linear_add_run", c10::ArrayRef<c10::IValue>({}));
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
@@ -102,9 +87,9 @@ at::Tensor linear_add_run(
 ContextLinear create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
-    const int64_t out_features,
-    const int64_t in_features,
     const c10::optional<int64_t> batch_size) {
+  auto out_features = weight.size(0);
+  auto in_features = weight.size(1);
   ideep::tensor packed_weight;
   auto w = itensor_view_from_dense(weight);
   ideep::dims input_size;
@@ -170,18 +155,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       output_mask,
       context.weight_packed_,
       context.bias_);
-}
-
-at::Tensor get_at_packed_weight(ContextLinear& context) {
-  return context.at_weight_;
-}
-
-void set_bias(ContextLinear& context, at::Tensor& bias) {
-  context.bias_ = c10::make_optional<at::Tensor>(std::move(bias));
-}
-
-void set_weight(ContextLinear& context, at::Tensor& weight) {
-  context.at_weight_.copy_(weight);
 }
 
 at::Tensor pack(ContextLinear& context, const at::Tensor& tensor) {

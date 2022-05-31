@@ -25,6 +25,8 @@ from . import cpu
 from . import quantization
 from . import nn
 from . import jit
+from . import profiler
+from . import ao
 
 from .utils.verbose import verbose
 from .frontend import optimize, enable_onednn_fusion

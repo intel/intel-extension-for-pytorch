@@ -24,6 +24,7 @@ CPU Runtime
 .. autofunction:: is_runtime_ext_enabled
 .. autoclass:: CPUPool
 .. autoclass:: pin
+.. autoclass:: MultiStreamModuleHint
 .. autoclass:: MultiStreamModule
 .. autoclass:: Task
 .. autofunction:: get_core_list_of_node_id

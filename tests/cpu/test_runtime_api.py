@@ -5,7 +5,6 @@ import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
 import time, sys
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 import torch.fx.experimental.optimization as optimization
 
 class SimpleNet(torch.nn.Module):
@@ -29,6 +28,20 @@ class SimpleNet_v2(torch.nn.Module):
         x1 = self.conv2(x1)
         y = torch.flatten(x1, start_dim=1)
         return y
+
+class TestInputOutputModule(torch.nn.Module):
+    def __init__(self):
+        super(TestInputOutputModule, self).__init__()
+
+    def forward(self, *args, **kwargs):
+        return args
+
+class TestInputOutputModule2(torch.nn.Module):
+    def __init__(self):
+        super(TestInputOutputModule2, self).__init__()
+
+    def forward(self, param1):
+        return param1
 
 class TestCoreBinding(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
@@ -250,6 +263,140 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y_runtime2[0].size(0), 2)
         self.assertEqual(y_runtime2[1].size(0), 1)
         self.assertEqual(y_runtime2[2].size(0), 1)
+
+class TestModuleMultiStreamModuleHint(TestCase):
+    # For the inputs format which can't be jit.trace
+    def init_set_up(self):
+        # Create Multi Stream Module without concat output
+        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        num_streams = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
+        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        return batch_size, num_streams, cpu_pool
+
+    def create_multi_stream_module(self,
+                                traced_model,
+                                num_streams,
+                                cpu_pool,
+                                multi_stream_input_hint,
+                                multi_stream_output_hint = None,
+                                concat_output = True):
+        if not concat_output:
+            return ipex.cpu.runtime.MultiStreamModule(traced_model,
+                                                    num_streams=num_streams,
+                                                    cpu_pool=cpu_pool,
+                                                    concat_output = False,
+                                                    input_split_hint = multi_stream_input_hint)
+        else:
+            return ipex.cpu.runtime.MultiStreamModule(traced_model,
+                                                    num_streams=num_streams,
+                                                    cpu_pool=cpu_pool,
+                                                    input_split_hint = multi_stream_input_hint,
+                                                    output_concat_hint = multi_stream_output_hint)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_mix_tensor_bool_input_output_hint(self):
+        # This module:
+        #   * Accept 2 tensors + 1 scalar as input
+        #   * Return 2 tensors + 1 scalar as output
+        # Since Type 'Tuple[Tensor, bool, Tensor]' cannot be traced, we put this test input type in imperative mode.
+        model = TestInputOutputModule().eval()
+        batch_size, num_streams, cpu_pool = self.init_set_up()
+
+        input_tensor1 = torch.rand(batch_size, 1)
+        input_tensor2 = torch.rand(batch_size, 3)
+
+        # Calculate the reference result
+        y_ref = model(input_tensor1, False, input_tensor2)
+
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(0, None, 0)
+        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, None, 0))
+
+        multi_stream_model = self.create_multi_stream_module(model,
+                                                            num_streams,
+                                                            cpu_pool,
+                                                            multi_stream_input_hint,
+                                                            multi_stream_output_hint,
+                                                            concat_output=True)
+        y_runtime_res = multi_stream_model(input_tensor1, False, input_tensor2)
+        self.assertEqual(y_ref, y_runtime_res)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_tuple_input_output_hint(self):
+        # This module:
+        #   * Accept 1 tuple(3 tensors) as input
+        #   * Return 1 tuple(3 tensors) as output
+        model = TestInputOutputModule2().eval()
+        batch_size, num_streams, cpu_pool = self.init_set_up()
+
+        input_tensor1 = torch.rand(batch_size, 1)
+        input_tensor2 = torch.rand(batch_size, 2)
+        input_tensor3 = torch.rand(batch_size, 3)
+        input = (input_tensor1, input_tensor2, input_tensor3)
+        y_ref = model(input)
+
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, 0, 0))
+        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, 0, 0))
+
+        multi_stream_model = self.create_multi_stream_module(model,
+                                                            num_streams,
+                                                            cpu_pool,
+                                                            multi_stream_input_hint,
+                                                            multi_stream_output_hint,
+                                                            concat_output=True)
+        y_runtime_res = multi_stream_model(input)
+        self.assertEqual(y_ref, y_runtime_res)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_dict_input_output_hint(self):
+        # This module:
+        #   * Accept 1 dict(3 tensors) as input
+        #   * Return 1 dict(3 tensors) as output
+        model = TestInputOutputModule2().eval()
+        batch_size, num_streams, cpu_pool = self.init_set_up()
+
+        input_tensor1 = torch.rand(batch_size, 1)
+        input_tensor2 = torch.rand(batch_size, 2)
+        input_tensor3 = torch.rand(batch_size, 3)
+        input = {"key1":input_tensor1, "key2":input_tensor2, "key3":input_tensor3}
+        y_ref = model(input)
+
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint({"key1":0, "key2":0, "key3":0})
+        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint({"key1":0, "key2":0, "key3":0})
+
+        multi_stream_model = self.create_multi_stream_module(model,
+                                                            num_streams,
+                                                            cpu_pool,
+                                                            multi_stream_input_hint,
+                                                            multi_stream_output_hint,
+                                                            concat_output=True)
+        y_runtime_res = multi_stream_model(input)
+        self.assertEqual(y_ref, y_runtime_res)
+
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_nested_tuple_input_output_hint(self):
+        # This module:
+        #   * Accept nested tuple ((tensor1, tensor2), tensor3) as input
+        #   * Return nested tuple ((tensor1, tensor2), tensor3) as output
+        model = TestInputOutputModule2().eval()
+        batch_size, num_streams, cpu_pool = self.init_set_up()
+
+        input_tensor1 = torch.rand(batch_size, 1)
+        input_tensor2 = torch.rand(batch_size, 2)
+        input_tensor3 = torch.rand(batch_size, 3)
+        input = ((input_tensor1, input_tensor2), input_tensor3)
+        y_ref = model(input)
+
+        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(((0, 0), 0))
+        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint(((0, 0), 0))
+
+        multi_stream_model = self.create_multi_stream_module(model,
+                                                            num_streams,
+                                                            cpu_pool,
+                                                            multi_stream_input_hint,
+                                                            multi_stream_output_hint,
+                                                            concat_output=True)
+        y_runtime_res = multi_stream_model(input)
+        self.assertEqual(y_ref, y_runtime_res)
 
 if __name__ == '__main__':
     test = unittest.main()

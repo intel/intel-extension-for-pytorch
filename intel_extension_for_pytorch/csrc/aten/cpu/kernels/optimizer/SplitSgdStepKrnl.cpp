@@ -1,5 +1,5 @@
 #include <csrc/aten/cpu/optimizer/optimizer.h>
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
@@ -9,6 +9,8 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+using namespace torch_ipex::cpu::kernel;
 
 void packed_add_kernel_impl(
     at::Tensor& top_half_,
@@ -27,7 +29,7 @@ void packed_add_kernel_impl(
   at::Tensor bot_half = bot_half_.contiguous();
   at::Tensor grad = grad_.is_sparse() ? grad_ : grad_.contiguous();
 
-  IPEX_RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("packed_add", c10::ArrayRef<c10::IValue>({}));
 
   float alpha_ = static_cast<float>(alpha);
   if (grad.is_sparse()) {

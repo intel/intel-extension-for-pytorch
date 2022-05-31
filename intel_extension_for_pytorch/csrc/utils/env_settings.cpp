@@ -28,4 +28,8 @@ bool EnvSettings::get_settings_profile_op() {
   return m_b_profile_op_;
 }
 
+void EnvSettings::set_settings_profile_op(bool b_enable) {
+  m_b_profile_op_ = b_enable;
+}
+
 } // namespace torch_ipex

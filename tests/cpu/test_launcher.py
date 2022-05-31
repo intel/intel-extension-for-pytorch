@@ -5,6 +5,7 @@ import time, sys
 from intel_extension_for_pytorch.cpu.launch import *
 import os
 import glob
+import subprocess 
 
 class TestLauncher(TestCase):
     def del_env(self, env_name):
@@ -31,7 +32,6 @@ class TestLauncher(TestCase):
         return lib_find
 
     def test_iomp_memory_allocator_setup(self):
-       cpuinfo = CPUinfo()
        launcher = Launcher()
        self.del_env("OMP_NUM_THREADS")
        self.del_env("LD_PRELOAD")
@@ -65,9 +65,127 @@ class TestLauncher(TestCase):
        expect_pin_domain = "[0xffffff0,0xffffff00000000,]"
        self.assertEqual(pin_doamin, expect_pin_domain)
        ccl_worker_affinity = launcher.get_ccl_worker_affinity(proc_per_node, ccl_worker_count, total_cores)
-       expect_ccl_worker_affinity = "0,1,2,3,28,29,30,31"
-       self.assertEqual(ccl_worker_affinity, expect_ccl_worker_affinity)
+       expected_ccl_worker_affinity = "0,1,2,3,28,29,30,31"
+       self.assertEqual(ccl_worker_affinity, expected_ccl_worker_affinity)
+    
+    def test_numactl_core_affinity(self):
+        cpuinfo = CPUinfo()
+        num_physical_cores = cpuinfo.physical_core_nums()
+        
+        launcher = MultiInstanceLauncher()
+        numactl_available = launcher.is_numactl_available()
+        
+        if numactl_available:
+            expected_core_affinity = "numactl -C {}-{}".format(str(0), str(num_physical_cores-1))
+            cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--no_python", "hostname"]
+            r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_core_affinity in str(r.stdout, "utf-8")
+    
+    def test_taskset_core_affinity(self):
+        cpuinfo = CPUinfo()
+        num_physical_cores = cpuinfo.physical_core_nums()
+    
+        expected_core_affinity = "taskset -c {}-{}".format(str(0), str(num_physical_cores-1))
+        cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--disable_numactl", "--no_python", "hostname"]
+        r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        assert r.returncode == 0
+        assert expected_core_affinity in str(r.stdout, "utf-8")
 
+    def test_core_affinity_with_skip_cross_node_cores(self):
+        cpuinfo = CPUinfo()
+        num_nodes = cpuinfo.node_nums()
+        num_cores_per_node = len(cpuinfo.node_physical_cores[0])
+        
+        if num_nodes > 1:
+            # ncore_per_instance that guarantees cross-node cores binding without --skip_cross_node_cores
+            ncore_per_instance = num_cores_per_node -1
+            
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            
+            for i in range(num_nodes):
+                node_i_start_core = i*num_cores_per_node
+                expected_node_i_core_affinity = "-c {}-{}".format(str(node_i_start_core), str(node_i_start_core + ncore_per_instance -1))
+                assert expected_node_i_core_affinity in str(r.stdout, "utf-8").lower()
+    
+    def test_core_affinity_with_skip_cross_node_cores_and_use_logical_core(self):
+        cpuinfo = CPUinfo()
+        num_nodes = cpuinfo.node_nums()
+        num_cores_per_node = len(cpuinfo.node_physical_cores[0])
+        num_threads_per_core = int(cpuinfo.logical_core_nums()/cpuinfo.physical_core_nums())
+
+        if num_nodes > 1 and num_threads_per_core > 1:
+            # ncore_per_instance that guarantees cross-node cores binding without --skip_cross_node_cores
+            ncore_per_instance = num_cores_per_node -1
+            
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --use_logical_core --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            
+            for i in range(num_nodes):
+                node_i_physical_start_core = i*num_cores_per_node
+                node_i_logical_start_core = (i+num_nodes)*num_cores_per_node
+                expected_node_i_physical_core_affinity = "-c {}-{}".format(str(node_i_physical_start_core), str(node_i_physical_start_core + ncore_per_instance -1))
+                expected_node_i_logical_core_affinity = "-c {}-{}".format(str(node_i_logical_start_core), str(node_i_logical_start_core + ncore_per_instance -1))
+                assert expected_node_i_physical_core_affinity in str(r.stdout, "utf-8").lower()
+                assert expected_node_i_logical_core_affinity in str(r.stdout, "utf-8").lower()
+    
+    def test_core_affinity_with_skip_cross_node_cores_and_node_id_use_logical_core(self):
+        cpuinfo = CPUinfo()
+        num_nodes = cpuinfo.node_nums()
+        num_cores_per_node = len(cpuinfo.node_physical_cores[0])
+        num_threads_per_core = int(cpuinfo.logical_core_nums()/cpuinfo.physical_core_nums())
+        
+        if num_nodes > 1 and num_threads_per_core > 1:
+            # ncore_per_instance that guarantees cross-node cores binding without --skip_cross_node_cores
+            ncore_per_instance = num_cores_per_node -1
+            
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --node_id 0 --use_logical_core --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            
+            node_0_physical_start_core = 0*num_cores_per_node 
+            node_0_logical_start_core = (0+num_nodes)*num_cores_per_node
+            
+            expected_node_0_physical_core_affinity = "-c {}-{}".format(str(node_0_physical_start_core), str(node_0_physical_start_core + ncore_per_instance -1))
+            expected_node_0_logical_core_affinity = "-c {}-{}".format(str(node_0_logical_start_core), str(node_0_logical_start_core + ncore_per_instance -1))
+            
+            assert expected_node_0_physical_core_affinity in str(r.stdout, "utf-8").lower()
+            assert expected_node_0_logical_core_affinity in str(r.stdout, "utf-8").lower()
+    
+    def test_skip_cross_node_cores_with_too_many_ncore_per_instance(self):
+        cpuinfo = CPUinfo()
+        num_nodes = cpuinfo.node_nums()
+        num_cores_per_node = len(cpuinfo.node_physical_cores[0])
+        
+        if num_nodes > 1:
+            # ncore_per_instance that is too many to skip cross-node cores 
+            ncore_per_instance = num_cores_per_node +1
+            
+            expected_msg = "Please make sure --ncore_per_instance < core(s) per socket"
+            
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode != 0
+            assert expected_msg in str(r.stdout, "utf-8")
+    
+    def test_skip_cross_node_cores_with_divisible_ncore_per_instance(self):
+        cpuinfo = CPUinfo()
+        num_nodes = cpuinfo.node_nums()
+        num_cores_per_node = len(cpuinfo.node_physical_cores[0])
+        
+        if num_nodes > 1:
+            # ncore_per_instance that guarantees no cross-node cores binding 
+            ncore_per_instance = num_cores_per_node
+            
+            expected_msg = "--skip_cross_node_cores is set, but there are no cross-node cores"
+            
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            assert r.returncode == 0
+            assert expected_msg in str(r.stdout, "utf-8")
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -335,7 +335,8 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
         diff_src_desc, weights_desc, diff_dst_desc);
 
     // Use user mode scratchpad
-    auto op_attr = dnnl::primitive_attr();
+    auto op_attr = ideep::attr_t();
+    op_attr.set_fpmath_mode();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
     auto pd = primitive_desc(
@@ -421,7 +422,8 @@ struct inner_product_backward_weights
         src_desc, weights_desc, diff_dst_desc, diff_bias_desc, with_diff_bias);
 
     // Use user mode scratchpad
-    auto op_attr = dnnl::primitive_attr();
+    auto op_attr = ideep::attr_t();
+    op_attr.set_fpmath_mode();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 
     auto pd = with_diff_bias

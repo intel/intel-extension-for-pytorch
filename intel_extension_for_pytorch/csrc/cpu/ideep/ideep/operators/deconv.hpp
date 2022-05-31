@@ -112,13 +112,21 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
       x_dims.push_back(ic);
       y_dims.push_back(1);
       y_dims.push_back(oc);
+      auto valid_x_dim = [=](int idx) {
+        return std::max(
+            (padding_l[idx] + padding_r[idx] -
+             (1 + (kernel_size[idx] - 1) * dilates[idx])) /
+                    strides[idx] +
+                2,
+            2 * kernel_size[idx]);
+      };
       if (4 == src_size) {
-        x_dims.push_back(2 * kernel_size[0]);
-        x_dims.push_back(4 * kernel_size[1]);
+        x_dims.push_back(valid_x_dim(0));
+        x_dims.push_back(valid_x_dim(1));
       } else {
-        x_dims.push_back(2 * kernel_size[0]);
-        x_dims.push_back(4 * kernel_size[1]);
-        x_dims.push_back(8 * kernel_size[2]);
+        x_dims.push_back(valid_x_dim(0));
+        x_dims.push_back(valid_x_dim(1));
+        x_dims.push_back(valid_x_dim(2));
       }
     } else {
       // Use the real data
@@ -185,7 +193,8 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
     // For nhwc path, weight uses format_tag::any,
     // while activation uses format_tag::nhwc
     bool is_nhwc = src_desc.is_nhwc() || weights_desc.is_nhwc();
-    auto format_tag = is_nhwc ? tag::nhwc : tag::any;
+    bool is_ndhwc = src_desc.is_ndhwc() || weights_desc.is_ndhwc();
+    auto format_tag = is_nhwc ? tag::nhwc : (is_ndhwc ? tag::ndhwc : tag::any);
     auto src_desc_query = src_desc.to_format(format_tag);
     auto weights_desc_query = weights_desc.to_format_any();
     auto bias_desc_query =
@@ -309,7 +318,8 @@ struct convolution_transpose_backward_data
     auto dilates_ = utils::get_compatible_dilates(dilates);
 
     bool is_nhwc = diff_dst.get_desc().is_nhwc();
-    auto format_tag = is_nhwc ? tag::nhwc : tag::any;
+    bool is_ndhwc = diff_dst.get_desc().is_ndhwc();
+    auto format_tag = is_nhwc ? tag::nhwc : (is_ndhwc ? tag::ndhwc : tag::any);
     auto diff_dst_desc = diff_dst.get_desc().to_format(format_tag);
     auto weights_desc = weights_.get_desc().to_format_any();
 
@@ -449,7 +459,8 @@ struct convolution_transpose_backward_weights
     }
 
     bool is_nhwc = diff_dst.get_desc().is_nhwc();
-    auto format_tag = is_nhwc ? tag::nhwc : tag::any;
+    bool is_ndhwc = diff_dst.get_desc().is_ndhwc();
+    auto format_tag = is_nhwc ? tag::nhwc : (is_ndhwc ? tag::ndhwc : tag::any);
     auto diff_dst_desc = diff_dst.get_desc().to_format(format_tag);
     auto src_desc = src.get_desc().to_format(format_tag);
 

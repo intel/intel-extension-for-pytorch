@@ -3,7 +3,7 @@ import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
+from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
 from torch.testing._internal.common_utils import TEST_SCIPY
 
 try:
@@ -259,7 +259,7 @@ class TestOp(JitLlgaTestCase):
             def forward(self, x):
                 # The value of normalized_shape is dependent on the input
                 return F.layer_norm(x, x.shape)        
-        
+
         x = torch.randn(2, 5, 10, 10)
         m = M()
 
@@ -715,3 +715,4 @@ for model_name, enabled in [
 
 if __name__ == '__main__':
     run_tests()
+

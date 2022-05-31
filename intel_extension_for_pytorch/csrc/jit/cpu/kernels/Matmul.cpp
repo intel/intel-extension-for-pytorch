@@ -79,7 +79,8 @@ at::Tensor dil_matmul_div(
     const at::Tensor& tensor2,
     at::Tensor out,
     const at::Tensor& div_input) {
-  IPEX_RECORD_FUNCTION("dil_matmul_div_fallback", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION(
+      "dil_matmul_div_fallback", c10::ArrayRef<c10::IValue>({}));
 
   if (out.defined()) {
     at::matmul_out(out, tensor1, tensor2);
@@ -108,7 +109,7 @@ at::Tensor dil_matmul_div(
     const at::Tensor& tensor2,
     at::Tensor out,
     const c10::Scalar& div_input) {
-  IPEX_RECORD_FUNCTION("dil_matmul_div_scalar", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("dil_matmul_div_scalar", c10::ArrayRef<c10::IValue>({}));
 
   auto dim_tensor1 = tensor1.dim();
   auto dim_tensor2 = tensor2.dim();
@@ -127,7 +128,7 @@ at::Tensor dil_bmm_add(
     const at::Tensor& batch2,
     const c10::Scalar& alpha) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_bmm_add", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("dil_bmm_add", c10::ArrayRef<c10::IValue>({}));
 #endif
   auto batch1_dim = batch1.dim();
   auto batch2_dim = batch2.dim();

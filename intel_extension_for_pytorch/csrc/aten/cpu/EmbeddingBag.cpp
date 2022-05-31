@@ -32,7 +32,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       bool sparse,
       bool include_last_offset) {
     IPEX_RECORD_FUNCTION(
-        "IPEXEmbeddingBagOp::_forward", std::vector<c10::IValue>({}));
+        "IPEXEmbeddingBagOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
     /*
     pointer to embedding_bag_kernel_impl(
@@ -52,7 +52,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       bool sparse,
       bool include_last_offset) {
     IPEX_RECORD_FUNCTION(
-        "IPEXEmbeddingBagOp::forward", std::vector<c10::IValue>({}));
+        "IPEXEmbeddingBagOp::forward", c10::ArrayRef<c10::IValue>({}));
 
     at::AutoNonVariableTypeMode g;
     ctx->saved_data["sparse"] = sparse;
@@ -65,7 +65,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs) {
     IPEX_RECORD_FUNCTION(
-        "IPEXEmbeddingBagOp::backward", std::vector<c10::IValue>({}));
+        "IPEXEmbeddingBagOp::backward", c10::ArrayRef<c10::IValue>({}));
 
     at::AutoNonVariableTypeMode g;
     auto saved = ctx->get_saved_variables();

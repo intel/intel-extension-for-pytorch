@@ -95,6 +95,10 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
       const tensor& weights_iter,
       const tensor& bias,
       const bool reverse = false,
+      const float scale = -1.,
+      const int32_t zp = -1,
+      const int weights_scale_mask = -1,
+      const std::vector<float>& weights_scales = scale_t(),
       prop_kind aprop = prop_kind::forward_inference,
       const engine& aengine = engine::cpu_engine()) {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
@@ -106,6 +110,15 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
 
     auto weights_layer_desc = weights_layer.get_desc().to_format_any();
     auto weights_iter_desc = weights_iter.get_desc().to_format_any();
+
+    attr_t op_attr;
+    if (src_layer.get_data_type() == data_type::u8) {
+      weights_layer_desc = weights_layer_desc.to_type(data_type::s8);
+      weights_iter_desc = weights_iter_desc.to_type(data_type::s8);
+
+      op_attr.set_rnn_data_qparams(scale, zp);
+      op_attr.set_rnn_weights_qparams(weights_scale_mask, weights_scales);
+    }
 
     auto bias_desc = bias.get_desc();
     tensor::desc dst_layer_desc(
@@ -123,6 +136,7 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
          dst_layer_desc,
          src_iter_desc,
          src_iter_c_desc},
+        op_attr,
         aengine);
 
     auto expected_weights_layer = pd.weights_layer_desc();

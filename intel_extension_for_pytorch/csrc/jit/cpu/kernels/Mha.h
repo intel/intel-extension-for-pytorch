@@ -27,9 +27,12 @@ at::Tensor dil_distil_mha_scores_calc(
     const int64_t& transpose_dim_a,
     const int64_t& transpose_dim_b,
     const at::Scalar& fill,
-    const at::Scalar& dim_per_head,
-    const int64_t& softmax_dim,
-    const at::IValue& dtype);
+    const at::Scalar& dim_per_head);
 
+at::Tensor dil_maskedfill_softmax(
+    at::Tensor& qk,
+    const at::Tensor& mask_qk,
+    const at::IntArrayRef& mask_qk_reshp,
+    const at::Scalar& fill);
 } // namespace cpu
 } // namespace torch_ipex

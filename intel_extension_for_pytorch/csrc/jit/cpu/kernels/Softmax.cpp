@@ -47,7 +47,7 @@ at::Tensor dil_softmax(
     const at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-  IPEX_RECORD_FUNCTION("dil_softmax", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("dil_softmax", c10::ArrayRef<c10::IValue>({}));
 
   auto half_to_float = false;
 
@@ -68,7 +68,7 @@ at::Tensor& dil_softmax_(
     at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-  IPEX_RECORD_FUNCTION("dil_softmax_", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("dil_softmax_", c10::ArrayRef<c10::IValue>({}));
 
   auto half_to_float = false;
   if (!dtype.isNone()) {

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <ATen/Tensor.h>
 #include <torch/csrc/autograd/custom_function.h>
 
@@ -19,6 +21,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ipex_lstm(
     bool batch_first);
 
 namespace cpu {
+
+struct QuantizedLstmParams {
+  const float scale;
+  const int32_t zp;
+  const int weights_scale_mask;
+  const std::vector<float>& weights_scales;
+};
 
 class IPEXLSTMOp : public torch::autograd::Function<IPEXLSTMOp> {
  public:

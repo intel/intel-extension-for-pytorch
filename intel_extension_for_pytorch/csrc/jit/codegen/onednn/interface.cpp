@@ -11,6 +11,7 @@
 #include "prepare_binary.h"
 #include "prepare_dequant.h"
 #include "quantization_patterns.h"
+#include "remove_mutation.h"
 
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/common_subexpression_elimination.h>
@@ -45,7 +46,7 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
         "Before mutation removal. Beginning of INT8 "
         "optimization pass",
         g);
-    RemoveTensorMutation(g);
+    IPEXRemoveTensorMutation(g);
     RemoveListMutation(g);
     GRAPH_DUMP("After mutation removal. Before DecomposeOps", g);
     DecomposeOps(g);
@@ -90,11 +91,11 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
 }
 
 void setLlgaWeightCacheEnabled(bool enabled) {
-  dnnl::graph::set_constant_cache(enabled);
+  dnnl::graph::set_constant_tensor_cache(enabled);
 }
 
 bool getLlgaWeightCacheEnabled() {
-  return dnnl::graph::get_constant_cache();
+  return dnnl::graph::get_constant_tensor_cache();
 }
 
 } // namespace onednn
@@ -103,7 +104,7 @@ bool getLlgaWeightCacheEnabled() {
 Operation createLlgaKernel(const Node* node) {
   auto kernel = std::make_shared<fuser::onednn::LlgaKernel>(node);
   return [kernel](Stack* stack) {
-    IPEX_RECORD_FUNCTION(kernel->profileName(), std::vector<c10::IValue>());
+    IPEX_RECORD_FUNCTION(kernel->profileName(), c10::ArrayRef<c10::IValue>());
 
     kernel->run(*stack);
     return 0;
@@ -120,7 +121,7 @@ RegisterOperators LLGAFusionGroupOp({
 Operation createLlgaGuardKernel(const Node* node) {
   return [node](Stack* stack) {
     IPEX_RECORD_FUNCTION(
-        fuser::onednn::LlgaGuardName(), std::vector<c10::IValue>());
+        fuser::onednn::LlgaGuardName(), c10::ArrayRef<c10::IValue>());
 
     GRAPH_DEBUG("Guarding node: ", node->kind().toQualString());
     std::vector<TypePtr> types = node->tys(attr::types);

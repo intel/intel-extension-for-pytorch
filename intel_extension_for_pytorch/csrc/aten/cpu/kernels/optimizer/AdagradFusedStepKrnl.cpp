@@ -1,5 +1,5 @@
 #include <csrc/aten/cpu/optimizer/optimizer.h>
-#include "csrc/cpu/vec512/bf16/vec/vec_type_cvt.h"
+#include "csrc/cpu/vec/vec.h"
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>

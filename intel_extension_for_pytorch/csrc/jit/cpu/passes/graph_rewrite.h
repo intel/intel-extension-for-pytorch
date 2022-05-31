@@ -39,19 +39,25 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
 void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph);
 
 void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph);
+void replaceFrozenIPEXLinearWithAtenLinear(std::shared_ptr<Graph>& graph);
 void insertPrePackedConvOp(std::shared_ptr<Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
 void fuseBottleneck(std::shared_ptr<Graph>& graph);
 
-void insertPrePackedLinearOp(std::shared_ptr<Graph>& graph);
+void RecordAtenLinearNodes(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear);
+void insertPrePackedLinearOp(
+    std::shared_ptr<Graph>& graph,
+    std::unordered_set<Node*>& aten_linear);
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
-void insertPrePackedConvTranspose2dOp(std::shared_ptr<Graph>& graph);
+void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite

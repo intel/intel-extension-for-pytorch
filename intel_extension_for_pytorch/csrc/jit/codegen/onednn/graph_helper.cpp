@@ -214,6 +214,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setAttr("keep_stats", false);
   } else if (nodeKind == Symbol::aten("add")) {
     return makeBinaryOp(node, opkind::Add);
+  } else if (nodeKind == Symbol::aten("mul")) {
+    return makeBinaryOp(node, opkind::Multiply);
   } else if (nodeKind == Symbol::aten("div")) {
     return makeBinaryOp(node, opkind::Divide);
   } else if (nodeKind == Symbol::aten("tanh")) {

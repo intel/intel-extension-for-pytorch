@@ -27,19 +27,6 @@ DEFINE_DISPATCH(batch_norm_cpu_kernel_stub);
 DEFINE_DISPATCH(batch_norm_cpu_collect_stats_kernel_stub);
 DEFINE_DISPATCH(batch_norm_cpu_backward_kernel_stub);
 
-void check_dims_match_num_input_features(
-    const char* arg_name,
-    int64_t expected,
-    int64_t actual) {
-  TORCH_CHECK(
-      actual == expected,
-      arg_name,
-      " should contain ",
-      expected,
-      " elements not ",
-      actual);
-}
-
 static inline at::Tensor repeat_if_defined(
     const at::Tensor& t,
     int64_t repeat) {
@@ -525,7 +512,8 @@ std::tuple<at::Tensor, at::Tensor> batch_norm_update_stats_cpu(
   printf("torch_ipex::batch_norm_update_stats_cpu\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::batch_norm_update_stats_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::batch_norm_update_stats_cpu",
+      c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> running_mean_maybe_owned =
@@ -564,7 +552,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_cpu(
   printf("torch_ipex::batch_norm_cpu\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::batch_norm_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::batch_norm_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =
@@ -667,7 +655,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward_cpu(
   printf("torch_ipex::batch_norm_backward_cpu\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::batch_norm_backward_cpu", std::vector<c10::IValue>({}));
+      "torch_ipex::batch_norm_backward_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =

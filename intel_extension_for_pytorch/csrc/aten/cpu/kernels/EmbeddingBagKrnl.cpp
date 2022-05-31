@@ -1,7 +1,6 @@
 #include <csrc/aten/cpu/EmbeddingBag.h>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
-#include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/quantization/AutoCast.hpp"
 #include "csrc/utils/rw_lock.h"
@@ -21,6 +20,8 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+using namespace torch_ipex::cpu::kernel;
 
 static inline void make_offset2bag(
     const at::Tensor& offsets,

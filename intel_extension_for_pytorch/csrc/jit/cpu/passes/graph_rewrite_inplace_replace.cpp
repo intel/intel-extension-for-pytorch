@@ -126,7 +126,7 @@ void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph) {
 
         // check if the input is contiguous, and skip if it is not
         auto input_value = node->input(0)->type()->cast<TensorType>();
-        if (!is_contiguous(input_value)) {
+        if (!utils::is_contiguous(input_value)) {
           return false;
         }
 

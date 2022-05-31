@@ -1,4 +1,4 @@
-FILE(GLOB _CPU_SRCS *.cpp vec512/*.cpp ideep/*.cpp runtime/*.cpp isa/*.cpp)
+FILE(GLOB _CPU_SRCS *.cpp ideep/*.cpp runtime/*.cpp isa/*.cpp)
 LIST(APPEND DPCPP_CPU_SRCS ${_CPU_SRCS})
 
 # Pass to parent

@@ -11,7 +11,6 @@
 #include <torch/csrc/jit/tensorexpr/types.h>
 
 #include "csrc/aten/cpu/WeightPack.h"
-#include "csrc/jit/cpu/kernels/OpContext.h"
 #include "folding_common_utils.h"
 #include "frozen_linear_folding.h"
 
@@ -54,15 +53,8 @@ bool checkLinearAndBroadcastingOpPreConditions(Node* linear, Node* op) {
     auto op_tensor = constant_as<Tensor>(op->inputs().at(1)).value();
 
     int64_t output_channel;
-    if (linear->kind() == aten::linear) {
-      output_channel =
-          constant_as<Tensor>(linear->namedInput("weight")).value().size(0);
-    } else {
-      auto linear_op_ctx = toIValue(linear->inputs().at(3))
-                               .value()
-                               .toCustomClass<LinearOpContext>();
-      output_channel = linear_op_ctx->get_out_features();
-    }
+    output_channel =
+        constant_as<Tensor>(linear->namedInput("weight")).value().size(0);
     if (op_tensor.sizes() != at::IntArrayRef({1, output_channel}) &&
         op_tensor.sizes() != at::IntArrayRef({output_channel})) {
       return false;
@@ -99,20 +91,10 @@ bool FoldFrozenLinearAddOrSub(Block* b) {
           constant_as<Tensor>(linear->namedInput("weight")).value();
 
       Tensor add_or_sub_tensor;
-      if (linear->kind() == aten::linear) {
-        add_or_sub_tensor = resizeConstantScalarOrTensorToShape(
-            add_or_sub->inputs().at(1),
-            {weight_tensor.size(0)},
-            weight_tensor.options());
-      } else {
-        auto linear_op_ctx = toIValue(linear->inputs().at(3))
-                                 .value()
-                                 .toCustomClass<LinearOpContext>();
-        add_or_sub_tensor = resizeConstantScalarOrTensorToShape(
-            add_or_sub->inputs().at(1),
-            {linear_op_ctx->get_out_features()},
-            weight_tensor.options());
-      }
+      add_or_sub_tensor = resizeConstantScalarOrTensorToShape(
+          add_or_sub->inputs().at(1),
+          {weight_tensor.size(0)},
+          weight_tensor.options());
       Tensor bias;
       if (linear->namedInput("bias")->type() == NoneType::get()) {
         bias = at::zeros_like(add_or_sub_tensor, weight_tensor.dtype());
@@ -130,20 +112,13 @@ bool FoldFrozenLinearAddOrSub(Block* b) {
       auto stack_out = runNodeIfInputsAreConstant(add_or_sub);
       TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
       Tensor fuse_bias = (*stack_out)[0].toTensor().to(bias.dtype());
-      if (linear->kind() == aten::linear) {
-        auto fused_linear_b = b->owningGraph()->insertConstant(fuse_bias);
-        auto linear_b_value = linear->namedInput("bias");
+      auto fused_linear_b = b->owningGraph()->insertConstant(fuse_bias);
+      auto linear_b_value = linear->namedInput("bias");
 
-        fused_linear_b->setDebugName(
-            linear_b_value->debugName() + "_fused_" +
-            add_or_sub->kind().toUnqualString());
-        linear->replaceInputWith(linear_b_value, fused_linear_b);
-      } else {
-        auto linear_op_ctx = toIValue(linear->inputs().at(3))
-                                 .value()
-                                 .toCustomClass<LinearOpContext>();
-        linear_op_ctx->set_bias(fuse_bias);
-      }
+      fused_linear_b->setDebugName(
+          linear_b_value->debugName() + "_fused_" +
+          add_or_sub->kind().toUnqualString());
+      linear->replaceInputWith(linear_b_value, fused_linear_b);
       add_or_sub->output()->replaceAllUsesWith(linear->output());
       graph_modified = true;
       // DCE run after cleans up nodes
@@ -169,20 +144,9 @@ bool FoldFrozenLinearMulOrDiv(Block* b) {
       }
 
       c10::intrusive_ptr<LinearOpContext> linear_op_ctx;
-      if (linear->kind() != aten::linear) {
-        linear_op_ctx = toIValue(linear->inputs().at(3))
-                            .value()
-                            .toCustomClass<LinearOpContext>();
-      }
 
       Tensor weight_tensor;
-      if (linear->kind() == aten::linear) {
-        weight_tensor =
-            constant_as<Tensor>(linear->namedInput("weight")).value();
-      } else {
-        weight_tensor =
-            linear_op_ctx->to_public(linear_op_ctx->get_at_packed_weight());
-      }
+      weight_tensor = constant_as<Tensor>(linear->namedInput("weight")).value();
 
       int64_t out_channels = weight_tensor.size(0);
 
@@ -211,19 +175,13 @@ bool FoldFrozenLinearMulOrDiv(Block* b) {
       TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
 
       Tensor fuse_weight = (*stack_out)[0].toTensor().to(weight_tensor.dtype());
-      if (linear->kind() == aten::linear) {
-        auto fused_linear_weight =
-            b->owningGraph()->insertConstant(fuse_weight);
-        auto linear_weight_value = linear->namedInput("weight");
+      auto fused_linear_weight = b->owningGraph()->insertConstant(fuse_weight);
+      auto linear_weight_value = linear->namedInput("weight");
 
-        fused_linear_weight->setDebugName(
-            linear_weight_value->debugName() + "_fused_" +
-            mul_or_div->kind().toUnqualString());
-        linear->replaceInputWith(linear_weight_value, fused_linear_weight);
-      } else {
-        fuse_weight = linear_op_ctx->pack(fuse_weight);
-        linear_op_ctx->set_weight(fuse_weight);
-      }
+      fused_linear_weight->setDebugName(
+          linear_weight_value->debugName() + "_fused_" +
+          mul_or_div->kind().toUnqualString());
+      linear->replaceInputWith(linear_weight_value, fused_linear_weight);
 
       mul_or_div->output()->replaceAllUsesWith(linear->output());
 
@@ -241,13 +199,9 @@ bool FoldFrozenLinearMulOrDiv(Block* b) {
         auto stack_out = runNodeIfInputsAreConstant(mul_or_div);
         TORCH_INTERNAL_ASSERT(stack_out && stack_out->size() == 1);
         Tensor fuse_bias = (*stack_out)[0].toTensor().to(bias.dtype());
-        if (linear->kind() == aten::linear) {
-          auto fused_linear_bias = b->owningGraph()->insertConstant(fuse_bias);
-          auto linear_b_value = linear->namedInput("bias");
-          linear->replaceInputWith(linear_b_value, fused_linear_bias);
-        } else {
-          linear_op_ctx->set_bias(fuse_bias);
-        }
+        auto fused_linear_bias = b->owningGraph()->insertConstant(fuse_bias);
+        auto linear_b_value = linear->namedInput("bias");
+        linear->replaceInputWith(linear_b_value, fused_linear_bias);
       }
       graph_modified = true;
       // DCE run after cleans up nodes

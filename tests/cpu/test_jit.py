@@ -55,7 +55,7 @@ import unittest
 from functools import reduce
 import warnings
 import itertools
-
+import contextlib
 import torch
 import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
@@ -89,9 +89,23 @@ skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 device = 'cpu:0'
 SIZE = 100
 
-
 conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
+convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
+
+PyTorch_op_to_IPEX_op_map = {
+    # PyTorch_op_name: [ipex_op_name, BF16_supported]
+    torch.relu: ["relu", True],
+    torch.relu_: ["relu", True],
+    torch.sigmoid: ["sigmoid", True],
+    torch.sigmoid_: ["sigmoid", True],
+    nn.SiLU(inplace=True): ["swish", True],
+    nn.SiLU(inplace=False): ["swish", True],
+    torch.tanh: ["tanh", True],
+    torch.tanh_: ["tanh", True],
+    nn.Mish(inplace=True): ["mish", False], # TODO: support bf16 mish_ in stock PyTorch
+    nn.Mish(inplace=False): ["mish", False], # TODO: support bf16 mish in stock PyTorch
+}
 
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -379,30 +393,9 @@ class LinearGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.linear(x), approximate=self.approximate)
 
-class LinearSigmoid(nn.Module):
+class LinearSigmoidMul(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSigmoid, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        return F.sigmoid(self.linear(x))
-
-class LinearSwish(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSwish, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        linear_res = self.linear(x)
-        return F.silu(linear_res)
-
-class LinearSwish_v1(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSwish_v1, self).__init__()
+        super(LinearSigmoidMul, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
         self.linear = nn.Linear(in_channels, out_channels, **kwargs)
@@ -433,16 +426,6 @@ class Linear_Reshape_Relu(nn.Module):
 
     def forward(self, x):
         return F.relu(torch.reshape(self.linear(x),self.dest_shape), inplace=True)
-
-class LinearSigmoid(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSigmoid, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        return torch.sigmoid(self.linear(x))
 
 class LinearBn(nn.Module):
     def __init__(self,dim,in_channels, out_channels, **kwargs):
@@ -508,50 +491,6 @@ class ConvSwishInplace(nn.Module):
         res = a.mul_(b)
         return res
 
-class ConvSiluOutplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSiluOutplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.silu = nn.SiLU()
-
-    def forward(self, x):
-        a1 = self.conv(x)
-        b1 = self.silu(a1)
-        return b1
-
-class ConvSiluInplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSiluInplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.silu = nn.SiLU(inplace=True)
-
-    def forward(self, x):
-        a1 = self.conv(x)
-        b1 = self.silu(a1)
-        return b1
-
-class ConvSigmoidOutplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSigmoidOutplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = torch.sigmoid(a)
-        c = torch.add(b, b)
-        return c
-
-class ConvSigmoidInplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSigmoidInplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = torch.sigmoid_(a)
-        c = torch.add(b, b)
-        return c
-
 class ConvHardtanh(nn.Module):
     def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, inplace=False):
         super(ConvHardtanh, self).__init__()
@@ -585,18 +524,18 @@ class ConvGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.conv(x), approximate=self.approximate)
 
-class ConvTranspose2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
-        super(ConvTranspose2d, self).__init__()
-        self.conv_transpose2d = nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride, padding, output_padding, groups, bias, dilation)
+class ConvTranspose(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
+        super(ConvTranspose, self).__init__()
+        self.conv_transpose = convtranspose_module[dim](in_channels, out_channels, kernel_size, stride, padding, output_padding, groups, bias, dilation)
 
     def forward(self, x):
-        x = self.conv_transpose2d(x)
+        x = self.conv_transpose(x)
         return x
 
-class ChannelShuffle(nn.Module):
+class ChannelShuffle_with_Static_Shape(nn.Module):
     def __init__(self, batchsize, num_channels, height, width, groups):
-        super(ChannelShuffle, self).__init__()
+        super(ChannelShuffle_with_Static_Shape, self).__init__()
         self.batchsize = batchsize
         self.num_channels = num_channels
         self.height = height
@@ -608,6 +547,32 @@ class ChannelShuffle(nn.Module):
         x = x.view(self.batchsize, self.groups, channels_per_group, self.height, self.width)
         x = torch.transpose(x, 1, 2).contiguous()
         x = x.view(self.batchsize, -1, self.height, self.width)
+        return x
+
+class ChannelShuffle_with_Dynamic_Shape(nn.Module):
+    def __init__(self, groups):
+        super(ChannelShuffle_with_Dynamic_Shape, self).__init__()
+        self.groups = groups
+
+    def forward(self, x):
+        batchsize, num_channels, height, width = x.size()
+        channels_per_group = num_channels // self.groups
+        x = x.view(batchsize, self.groups, channels_per_group, height, width)
+        x = torch.transpose(x, 1, 2).contiguous()
+        x = x.view(batchsize, -1, height, width)
+        return x
+
+class NotChannelShuffle(nn.Module):
+    def __init__(self, groups):
+        super(NotChannelShuffle, self).__init__()
+        self.groups = groups
+
+    def forward(self, x):
+        batchsize, num_channels, height, width = x.size()
+        channels_per_group = num_channels // self.groups
+        x = x.view(batchsize, self.groups, channels_per_group, width, height)
+        x = torch.transpose(x, 1, 2).contiguous()
+        x = x.view(batchsize, -1, width, height)
         return x
 
 class MatmulDiv(nn.Module):
@@ -674,6 +639,27 @@ class DistilMHAScoresCalculation_v2(nn.Module):
         mask_shape=[mat1.shape[0],1,1,mat1.shape[3]]
         mat1 = mat1 / math.sqrt(self.dim_per_head)
         qk = torch.matmul(mat1, mat2.transpose(2, 3))
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk = qk.masked_fill(mask, -float("inf"))
+        return nn.functional.softmax(qk, dim=-1)
+
+class Maskedfill__softmax(nn.Module):
+    def __init__(self, softmax_dim=-1):
+        super(Maskedfill__softmax, self).__init__()
+        self.softmax = nn.Softmax(dim=softmax_dim)
+
+    def forward(self, qk, mask):
+        mask_shape=[qk.shape[0],1,1,qk.shape[3]]
+        mask = (mask == 0).view(mask_shape).expand_as(qk)
+        qk.masked_fill_(mask, -float("inf"))
+        return self.softmax(qk)
+
+class Maskedfill_softmax(nn.Module):
+    def __init__(self):
+        super(Maskedfill_softmax, self).__init__()
+
+    def forward(self, qk, mask):
+        mask_shape=[qk.shape[0],1,1,qk.shape[3]]
         mask = (mask == 0).view(mask_shape).expand_as(qk)
         qk = qk.masked_fill(mask, -float("inf"))
         return nn.functional.softmax(qk, dim=-1)
@@ -793,6 +779,13 @@ class EinsumAdd(nn.Module):
     def forward(self, input1, input2, bias):
         return torch.einsum(self.equation, input1, input2) + bias
 
+class EinsumAddScalar(nn.Module):
+    def __init__(self, equation):
+        super(EinsumAddScalar, self).__init__()
+        self.equation = equation
+    def forward(self, input1, input2):
+        return torch.einsum(self.equation, input1, input2) + 12.0
+
 class EinsumAddInplace(nn.Module):
     def __init__(self, equation):
         super(EinsumAddInplace, self).__init__()
@@ -808,102 +801,134 @@ class EinsumAddInplaceV1(nn.Module):
         return bias.add_(torch.einsum(self.equation, input1, input2))
 
 class Tester(TestCase):
+    @contextlib.contextmanager
+    def _texpr_enable(self, strategy):
+        old_texpr_fuser_state = torch._C._jit_texpr_fuser_enabled()
+        torch._C._jit_set_texpr_fuser_enabled(strategy)
+        try:
+            yield
+        finally:
+            torch._C._jit_set_texpr_fuser_enabled(old_texpr_fuser_state)
 
-    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False]):
-        modelName = model.__class__.__name__
-        options = itertools.product(levels, use_channels_last)
-        for level, use_channels_last in options:
-            ipex.enable_onednn_fusion(False)
-            model = model.eval()
+    def _test_output(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0','O1'], use_channels_last=[True, False], use_te=[False, True]):
+        modelName = base_model.__class__.__name__
+        options = itertools.product(levels, use_channels_last, use_te)
+        for level, use_channels_last, use_te in options:
+            with self._texpr_enable(use_te):
+                ipex.enable_onednn_fusion(False)
+                model = copy.deepcopy(base_model).eval()
 #It will be removed after jit support conv_bn folding
-            if level == 'O0':
-                try:
-                    model = optimization.fuse(model)
-                except:
-                    warnings.warn("Conv BatchNorm folding failed.")
-            if x.dim() == 4 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last)
-                model = model.to(memory_format=torch.channels_last)
+                if level == 'O0':
+                    try:
+                        model = optimization.fuse(model)
+                    except:
+                        warnings.warn("Conv BatchNorm folding failed.")
+                if x.dim() == 4 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last)
+                    model = model.to(memory_format=torch.channels_last)
 
-            if x.dim() == 5 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last_3d)
-                model = model.to(memory_format=torch.channels_last_3d)
+                if x.dim() == 5 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last_3d)
+                    model = model.to(memory_format=torch.channels_last_3d)
 
-            model = ipex.optimize(model, dtype=torch.float32, level=level)
+                oresult = model(x)
 
-            with torch.no_grad():
-                result = model(x)
-                traced_model = torch.jit.trace(model, x).eval()
-                traced_model = torch.jit.freeze(traced_model)
-                tresult = traced_model(x)
+                model = ipex.optimize(model, dtype=torch.float32, level=level)
 
-            self.assertEqual(result, tresult, prec=prec)
+                with torch.no_grad():
+                    result = model(x)
+                    traced_model = torch.jit.trace(model, x).eval()
+                    traced_model = torch.jit.freeze(traced_model)
+                    tresult = traced_model(x)
 
-            ipex.enable_onednn_fusion(True)
-            with torch.no_grad():
-                trace_fused_model = torch.jit.trace(model, x)
-                trace_fused_model = torch.jit.freeze(trace_fused_model)
-                y = trace_fused_model(x)
+                self.assertEqual(oresult, result, prec=prec)
+                self.assertEqual(result, tresult, prec=prec)
+
+                ipex.enable_onednn_fusion(True)
+                with torch.no_grad():
+                    trace_fused_model = torch.jit.trace(model, x)
+                    trace_fused_model = torch.jit.freeze(trace_fused_model)
+                    y = trace_fused_model(x)
 
 #enable fusiong in ipex.
-                fused_tresult = trace_fused_model(x)
+                    fused_tresult = trace_fused_model(x)
 #conv relu fusion, conv sum fusion or conv sum relu fusion
-                trace_graph = trace_fused_model.graph_for(x)
-                fused_tresult = trace_fused_model(x)
-            self.assertEqual(result, fused_tresult, prec=prec)
+                    trace_graph = trace_fused_model.graph_for(x)
+                    fused_tresult = trace_fused_model(x)
+                self.assertEqual(result, fused_tresult, prec=prec)
 #check if the fused node exists in the graph
-            if kind_in_graph is not None:
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                if kind_in_graph is not None:
+                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
 #check if certain node does not exist in the graph
+                if kind_not_in_graph is not None:
+                    self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+
+    def _test_onednn_fp32(self, model, input, kind_in_graph=None, kind_not_in_graph=None, prec=5e-3):
+        model = model.eval()
+        model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
+        with torch.no_grad():
+            res_ref = model(input)
+            tr_model = torch.jit.trace(model, (input))
+            tr_model = torch.jit.freeze(tr_model)
+            tr_model(input)
+            trace_graph = tr_model.graph_for(input)
+            res_jit = tr_model(input)
+            self.assertEqual(res_ref, res_jit)
+            
+            if kind_in_graph is not None:
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+            
             if kind_not_in_graph is not None:
                 self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
 
-    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False]):
-        modelName = model.__class__.__name__
-        options = itertools.product(levels, use_channels_last)
-        for level, use_channels_last in options:
-            ipex.enable_onednn_fusion(True)
-            model = model.eval()
+    def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
+        modelName = base_model.__class__.__name__
+        options = itertools.product(levels, use_channels_last, use_te)
+        for level, use_channels_last, use_te in options:
+            with self._texpr_enable(use_te):
+                ipex.enable_onednn_fusion(True)
+                model = copy.deepcopy(base_model).eval()
 #It will be removed after jit support conv_bn folding
-            if level == 'O0':
-                try:
-                    model = optimization.fuse(model)
-                except:
-                    warnings.warn("Conv BatchNorm folding failed.")
-            if x.dim() == 4 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last)
-                model = model.to(memory_format=torch.channels_last)
-            if x.dim() == 5 and use_channels_last:
-                x = x.to(memory_format=torch.channels_last_3d)
-                model = model.to(memory_format=torch.channels_last_3d)
+                if level == 'O0':
+                    try:
+                        model = optimization.fuse(model)
+                    except:
+                        warnings.warn("Conv BatchNorm folding failed.")
+                if x.dim() == 4 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last)
+                    model = model.to(memory_format=torch.channels_last)
+                if x.dim() == 5 and use_channels_last:
+                    x = x.to(memory_format=torch.channels_last_3d)
+                    model = model.to(memory_format=torch.channels_last_3d)
 
-            model = ipex.optimize(model, dtype=torch.bfloat16, level=level)
-            x2 = x.clone()
-            x3 = x.clone()
+                model = ipex.optimize(model, dtype=torch.bfloat16, level=level)
+                x2 = x.clone()
+                x3 = x.clone()
 
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+                with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
 #bf16, native path
-                result = model(x)
-                trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
-                trace_fused_model = torch.jit.freeze(trace_fused_model)
+                    result = model(x)
+                    trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
+                    trace_fused_model = torch.jit.freeze(trace_fused_model)
 #enable fusion path.
-                fused_tresult = trace_fused_model(x3)
+                    fused_tresult = trace_fused_model(x3)
 #bf16, jit trace path
-                trace_graph = trace_fused_model.graph_for(x3)
-                fused_tresult = trace_fused_model(x3)
+                    trace_graph = trace_fused_model.graph_for(x3)
+                    fused_tresult = trace_fused_model(x3)
 
-            self.assertEqual(fused_tresult, result, prec=prec)
-            self.assertEqual(fused_tresult.dtype, torch.bfloat16)
+                self.assertEqual(fused_tresult, result, prec=prec)
+                self.assertEqual(fused_tresult.dtype, torch.bfloat16)
 
 #check if the fused node exists in the graph
-            if kind_in_graph is not None:
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+                if kind_in_graph is not None:
+                    self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
 #check if certain node does not exist in the graph
-            if kind_not_in_graph is not None:
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+                if kind_not_in_graph is not None:
+                    self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+
 
     def test_jit_freeze(self):
         model = ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1).eval()
@@ -995,6 +1020,8 @@ class Tester(TestCase):
         a = torch.randn(bs, seq_len, dim)
         b = torch.randn(bs, seq_len, dim)
         model = AddLayerNorm(dim)
+        pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
+        torch._C._jit_set_texpr_fuser_enabled(False)
         jit_model = torch.jit.trace(model,(a, b))
         trace_graph = jit_model.graph_for(a, b)
         jit_res = jit_model(a, b)
@@ -1022,6 +1049,7 @@ class Tester(TestCase):
         ori_res = model(a, b, c)
         self.assertEqual(jit_res, ori_res)
         node = "ipex::add_layernorm"
+        torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
     def test_concat_bn_relu(self):
@@ -1200,24 +1228,36 @@ class Tester(TestCase):
             _test_pure_bf16(pattern_1, pattern1_jit, mat1)
             _test_pure_bf16(pattern_2, pattern2_jit, mat2)
 
-    @unittest.skipIf(True, 'distil mha is will be supported later')
     def test_distil_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
             graph = trace_model.graph_for((mat1, mat2, mask))
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
+        def _check_match_mha_parts(trace_model, qk, mask, node = "ipex::maskedfill_softmax"):
+            graph = trace_model.graph_for((qk, mask))
+            self.assertTrue(any(n.kind() == node for n in graph.nodes()))
+
         def _test_pure_bf16(model, trace_model, mat1, mat2, mask, prec=3e-2):
             mat1_bf16 = mat1.to(torch.bfloat16)
             mat2_bf16 = mat2.to(torch.bfloat16)
-            bias_bf16 = mask.to(torch.bfloat16)
-            res_ref = model(mat1_bf16, mat2_bf16, bias_bf16)
-            res_jit = trace_model(mat1_bf16, mat2_bf16, bias_bf16)
+            mask_bf16 = mask.to(torch.bfloat16)
+            res_ref = model(mat1_bf16, mat2_bf16, mask_bf16)
+            res_jit = trace_model(mat1_bf16, mat2_bf16, mask_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha(trace_model, mat1, mat2, mask)
+
+        def _test_pure_bf16_parts(model, trace_model, qk, mask, prec=3e-2):
+            qk_bf16 = qk.to(torch.bfloat16)
+            mask_bf16 = mask.to(torch.bfloat16)
+            res_ref = model(qk_bf16, mask_bf16)
+            res_jit = trace_model(qk_bf16, mask_bf16)
+            self.assertEqual(res_ref, res_jit, prec=prec)
+            _check_match_mha_parts(trace_model, qk_bf16, mask)
 
         mat1 = torch.randn(56, 12, 384, 384)
         mat2 = torch.randn(56, 12, 384, 384)
         mask = torch.randn(56, 384)
+        qk = torch.matmul(mat1,mat2)
         mask = (mask > 0.5)
 
         mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
@@ -1242,8 +1282,72 @@ class Tester(TestCase):
             _check_match_mha(mha_jit, mat1, mat2, mask)
             _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
 
+        mha_v3 = Maskedfill__softmax()
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v3, (qk, mask))
+            mha_jit.eval()
 
-    def test_conv_fusion(self):
+            res_ref = mha_v3(qk, mask)
+            res_jit = mha_jit(qk, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha_parts(mha_jit, qk, mask)
+            _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
+
+        mha_v4 = Maskedfill_softmax()
+        with torch.no_grad():
+            mha_jit = torch.jit.trace(mha_v4, (qk, mask))
+            mha_jit.eval()
+
+            res_ref = mha_v4(qk, mask)
+            res_jit = mha_jit(qk, mask)
+            self.assertEqual(res_ref, res_jit)
+            _check_match_mha_parts(mha_jit, qk, mask)
+            _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
+
+    def test_conv_unary_fusion(self):
+        class ConvEltwise(nn.Module):
+            def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size):
+                super(ConvEltwise, self).__init__()
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+                self.eltwise = eltwise_fn
+
+            def forward(self, x):
+                a = self.conv(x)
+                b = self.eltwise(a)
+                c = torch.add(b, b)
+                return c
+
+        batch_size = 8
+        out_channels = 16
+        in_channels = 3
+        kernel_size = 3
+        image_size = 16
+
+        for dim in [2, 3]:
+            for eltwise in PyTorch_op_to_IPEX_op_map:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+
+                x = torch.randn(input_size)
+                m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
+
+                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
+
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op)
+                if bf16_supported:
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
+                        prec=0.02)
+
+    def test_conv_non_unary_fusion(self):
         batch_size = 8
         out_channels = 16
         in_channels = 3
@@ -1276,50 +1380,6 @@ class Tester(TestCase):
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvSiluOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
-            self._test_output(
-                ConvSiluInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
-            self._test_output_bf16(
-                ConvSiluOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
-                prec=0.02)
-            self._test_output_bf16(
-                ConvSiluInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvSigmoidOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack")
-            self._test_output_bf16(
-                ConvSigmoidOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvSigmoidInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack")
-            self._test_output_bf16(
-                ConvSigmoidInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack",
                 prec=0.02)
             self._test_output(
                 ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size, True),
@@ -1831,7 +1891,7 @@ class Tester(TestCase):
             kind_in_graph="ipex_prepack::convolution_run",
             kind_not_in_graph="ipex_prepack::convolution_add_run")
 
-    def test_output_conv_relu(self):
+    def test_output_conv_leaky_relu(self):
         batch_size = 8
         out_channels = 32
         in_channels = 3
@@ -1843,17 +1903,6 @@ class Tester(TestCase):
                 input_size.append(image_size)
             x = torch.randn(input_size)
 
-            self._test_output(
-                ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="ipex_prepack::convolution_relu_prepack")
-            self._test_output_bf16(
-                ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="ipex_prepack::convolution_relu_prepack",
-                prec=0.02)
             self._test_output(
                 ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
@@ -2037,7 +2086,7 @@ class Tester(TestCase):
                 x,
                 kind_not_in_graph="ipex_prepack::convolution_add_run")
 
-    def test_output_conv_transpose2d(self):
+    def test_output_conv_transpose(self):
         def _deconv_params_list():
             params_dict = {
                 "input_height": [12],
@@ -2093,35 +2142,39 @@ class Tester(TestCase):
                 ic = input_channel_per_group * groups
                 oc = output_channel_per_group * groups
 
-                x = torch.randn(2, ic, input_height, input_width)
-                model = ConvTranspose2d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation)
+                for dim in [2, 3]:
+                    if dim == 2:
+                        x = torch.randn(2, ic, input_height, input_width)
+                    else:
+                        x = torch.randn(2, ic, input_depth, input_height, input_width)
+                    model = ConvTranspose(dim, ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation)
 
-                self._test_output(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O0"])
-                self._test_output_bf16(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O0"],
-                    prec=0.02)
-                self._test_output(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O1"])
-                self._test_output_bf16(
-                    model,
-                    x,
-                    kind_in_graph="ipex_prepack::conv_transpose2d_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose2d_prepack",
-                    levels=["O1"],
-                    prec=0.02)
+                    self._test_output(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O0"])
+                    self._test_output_bf16(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O0"],
+                        prec=0.02)
+                    self._test_output(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O1"])
+                    self._test_output_bf16(
+                        model,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_run",
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        levels=["O1"],
+                        prec=0.02)
 
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
@@ -2136,10 +2189,10 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 if auto_select_kernel and level == 'O1':
-#for 'O1' and auto_select_kernel is True, we will use ipex linear
+# for auto_select_kernel is True and level is O1, we will use ipex linear
                     self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
                 else:
-#for 'O1' and auto_select_kernel is false or 'O0', we will use mkl linear
+# auto_select_kernel is false, we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
 
     def test_linear_auto_kernel_selection_bf16(self):
@@ -2265,27 +2318,46 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::div",
                 prec=0.2)
 
-    def test_output_linear_relu(self):
-        self._test_output(
-            LinearRelu(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearRelu(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_relu_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=0.02)
-        self._test_output(
-            LinearRelu(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearRelu(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_relu_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=0.02)
+    def test_linear_unary_fusion(self):
+        class LinearEltwise(nn.Module):
+            def __init__(self, eltwise_fn, in_channels, out_channels, **kwargs):
+                super(LinearEltwise, self).__init__()
+                self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+                self.eltwise = eltwise_fn
+
+            def forward(self, x):
+                a = self.linear(x)
+                b = self.eltwise(a)
+                return b
+        
+        batch_size = 3
+        out_channels = 32
+        in_channels = 3
+        for bias in [True, False]:
+            for eltwise in PyTorch_op_to_IPEX_op_map:
+                input_size = [batch_size, in_channels]
+                
+                x = torch.randn(input_size)
+                m = LinearEltwise(eltwise, in_channels, out_channels, bias=bias)
+                
+                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
+                
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="aten::linear")
+                self._test_onednn_fp32(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::linear_prepack")                
+                if bf16_supported:
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::linear_prepack",
+                        prec=0.02)
 
     def test_output_linear_add(self):
         self._test_output(
@@ -2298,18 +2370,6 @@ class Tester(TestCase):
             Linear_Reshape_Relu(3, 32,(64,16),bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
-
-    def test_output_linear_sigmoid(self):
-        self._test_output(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=0.02)
 
     def test_output_linear_bn(self):
         self._test_output(
@@ -2338,81 +2398,40 @@ class Tester(TestCase):
                 prec=1e-2)
 
     def test_output_linear_swish(self):
-        def _test_onednn_fp32(model, input, kind_in_graph, prec=5e-3):
-            model = model.eval()
-            model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
-            with torch.no_grad():
-                res_ref = model(input)
-                tr_model = torch.jit.trace(model, (input))
-                tr_model = torch.jit.freeze(tr_model)
-                tr_model(input)
-                trace_graph = tr_model.graph_for(input)
-                res_jit = tr_model(input)
-                self.assertEqual(res_ref, res_jit)
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-
-        _test_onednn_fp32(
-            LinearSwish_v1(3, 32, bias=True),
+        self._test_onednn_fp32(
+            LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run")
 
         self._test_output_bf16(
-            LinearSwish_v1(3, 32, bias=True),
+            LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
             prec=5e-3)
-        _test_onednn_fp32(
-            LinearSwish_v1(3, 32, bias=False),
+        self._test_onednn_fp32(
+            LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run")
         self._test_output_bf16(
-            LinearSwish_v1(3, 32, bias=False),
+            LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
-            prec=5e-3)
-        _test_onednn_fp32(
-            LinearSwish(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-        self._test_output_bf16(
-            LinearSwish(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run",
-            prec=5e-3)
-        _test_onednn_fp32(
-            LinearSwish(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-        self._test_output_bf16(
-            LinearSwish(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run", prec=5e-3)
-
-    def test_output_linear_sigmoid(self):
-        self._test_output(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_sigmoid_run",
-            prec=5e-3)
-        self._test_output(
-            LinearSigmoid(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearSigmoid(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_sigmoid_run",
             prec=5e-3)
 
     def test_channel_shuffle(self):
         self._test_output(
-            ChannelShuffle(10, 16, 50, 50, 4),
+            ChannelShuffle_with_Static_Shape(10, 16, 50, 50, 4),
             torch.rand(10, 16, 50, 50),
             kind_in_graph="ipex::shuffle_2d")
+        self._test_output(
+            ChannelShuffle_with_Dynamic_Shape(4),
+            torch.rand(10, 16, 50, 50),
+            kind_in_graph="ipex::shuffle_2d")
+        self._test_output(
+            NotChannelShuffle(4),
+            torch.rand(10, 16, 50, 60),
+            kind_not_in_graph="ipex::shuffle_2d")
+
 
     def test_jit_function(self):
 #test hool trace and script can works for function
@@ -2488,7 +2507,7 @@ class Tester(TestCase):
         self.assertTrue(torch.allclose(out, expected))
 
     def test_einsum_add(self):
-        def _test_fp32(model_test, input1, input2, bias, kind_in_graph='ipex::einsum_binary', prec=1e-3):
+        def _test_fp32(model_test, input1, input2, bias=None, kind_in_graph='ipex::einsum_binary', prec=1e-3):
             model = copy.deepcopy(model_test)
             model = model.eval()
             model = ipex.optimize(model, dtype=torch.float32)
@@ -2503,25 +2522,44 @@ class Tester(TestCase):
                 self.assertEqual(res_ref, res_jit, prec)
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
-        bias = torch.randn(3,2304)
+        bias = torch.randn(2, 3, 2304)
         input1 = torch.randn(2, 3, 768)
         input2 = torch.randn(768, 2304)
         model_v1 = EinsumAdd('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias)
-        
+       
+        bias = torch.randn(1, 1, 1, 4)
+        input1 = torch.randn(12, 1, 4, 16)
+        input2 = torch.randn(12, 4, 4, 16)
+        model_v1 = EinsumAdd('bqhc,bkhc->bhqk')
+        _test_fp32(model_v1, input1, input2, bias)
+
         bias = torch.randn(2304)
         input1 = torch.randn(4, 3, 768)
         input2 = torch.randn(768, 2304)
         model_v1 = EinsumAddInplace('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias)
         
+        input1 = torch.randn(8, 3, 768)
+        input2 = torch.randn(768, 2304)
+        model = EinsumAddScalar('bsh,ho->bso').eval()
+        res_ref = model(input1, input2)
+        tr_model = torch.jit.trace(model, (input1, input2))
+        tr_model = torch.jit.freeze(tr_model)
+        tr_model(input1, input2)
+        tr_model(input1, input2)
+        trace_graph = tr_model.graph_for(input1, input2)
+        res_jit = tr_model(input1, input2)
+        self.assertEqual(res_ref, res_jit, prec=1e-3)
+        self.assertTrue(any(n.kind() == "ipex::einsum_binary" for n in trace_graph.nodes()))
+
         bias = torch.randn(4, 3, 2304)
         input1 = torch.randn(4, 3, 768)
         input2 = torch.randn(768, 2304)
         model_v1 = EinsumAddInplaceV1('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias, kind_in_graph='aten::einsum')
 
-        bias1 = torch.randn(2, 1, 128, 128)
+        bias1 = torch.randn(2, 4, 128, 128)
         input3 = torch.randn(2, 4, 128, 768)
         input4 = torch.randn(2, 4, 128, 768)
         model_v2 = EinsumAdd("bnqd,bnkd->bnqk")

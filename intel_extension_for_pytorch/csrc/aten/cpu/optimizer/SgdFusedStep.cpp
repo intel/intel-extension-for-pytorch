@@ -35,7 +35,7 @@ c10::optional<at::Tensor> sgd_fused_step(
     double dampening,
     bool nesterov) {
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::sgd_fused_step", std::vector<c10::IValue>({}));
+      "torch_ipex::sgd_fused_step", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
       learning_rate >= 0, "Expect learning rate >= 0.0, got ", learning_rate);

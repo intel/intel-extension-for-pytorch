@@ -24,8 +24,13 @@ c10::optional<IValue> getIValue(
   return toIValue(getValue(name, match_vmap, vmap));
 }
 
+// FuseShuffle is matching the channelshuffle pattern, where:
+// (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
+// (2) the tranpose is for groups => [n, c // groups, grpups, h, w]
+// (3) the output view shape should be the same as the input tensor shape
 void FuseShuffle(std::shared_ptr<Graph>& graph) {
-  std::string shuffle = R"(
+  // below is channelshuffle for staic view shape pattern
+  std::string channelshuffle_with_static_shape = R"(
       graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
         %r1 = aten::view(%input, %view_shape)
         %r2 = aten::transpose(%r1, %trans_dim0, %trans_dim1)
@@ -33,16 +38,41 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
         %r4 = aten::view(%r3, %flattern_shape)
         return (%r4) )";
 
-  std::string shuffle_2d_fusion = R"(
+  std::string shuffle_2d_fusion_with_static_shape = R"(
       graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
         %r = ipex::shuffle_2d(%input, %view_shape, %trans_dim0, %trans_dim1)
         return (%r) )";
 
-  // this filter passes only for the following conditions:
-  // (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
-  // (2) the tranpose is for groups => [n, c // groups, grpups, h, w]
-  // (3) the output view shape should be the same as the input tensor shape
-  auto filter_shuffle_2d_fusion =
+  // below is channelshuffle for dynamic view shape pattern
+  std::string dynamic_shape_input = R"(
+      graph(%input, %idx_0:int, %idx_1:int, %idx_2:int, %idx_3:int, %div_g, %g:int, %type, %flattern_c):
+        %n_ = aten::size(%input, %idx_0)
+        %c_ = aten::size(%input, %idx_1)
+        %tensor_c_ = prim::NumToTensor(%c_)
+        %h_ = aten::size(%input, %idx_2)
+        %w_ = aten::size(%input, %idx_3)
+        %c_div_g_ = aten::div(%tensor_c_, %div_g, %type)
+        %int_c_div_g_ = aten::Int(%c_div_g_)
+        %view_shape:int[] = prim::ListConstruct(%n_, %g, %int_c_div_g_, %h_, %w_) )";
+
+  std::string channelshuffle_for_dynamic_shape = R"(
+        %r1 = aten::view(%input, %view_shape)
+        %r2 = aten::transpose(%r1, %idx_1, %idx_2)
+        %r3 = aten::contiguous(%r2, %idx_0)
+        %flattern_shape:int[] = prim::ListConstruct(%n_, %flattern_c, %h_, %w_)
+        %r4 = aten::view(%r3, %flattern_shape)
+        return (%r4) )";
+
+  std::string shuffle_2d_fusion_for_dynamic_shape = R"(
+        %r = ipex::shuffle_2d(%input, %view_shape, %idx_1, %idx_2)
+        return (%r) )";
+
+  std::string channelshuffle_with_dynamic_shape =
+      dynamic_shape_input + channelshuffle_for_dynamic_shape;
+  std::string shuffle_2d_fusion_with_dynamic_shape =
+      dynamic_shape_input + shuffle_2d_fusion_for_dynamic_shape;
+
+  auto filter_shuffle_2d_static_fusion =
       [](const Match& match,
          const std::unordered_map<std::string, Value*>& vmap) {
         const auto& match_vmap = match.values_map;
@@ -86,11 +116,12 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
           return false;
         }
 
-        // if the view shape and flattern shape is not set
+        // if the view shape or flattern shape is not set
         if (!toIValue(view_shape_).has_value() ||
             !toIValue(flattern_shape_).has_value()) {
           return false;
         }
+
         auto view_shape_list = toIValue(view_shape_).value().toIntVector();
         auto flattern_shape_list =
             toIValue(flattern_shape_).value().toIntVector();
@@ -134,10 +165,43 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
         return true;
       };
 
-  SubgraphRewriter rewriter_shuffle_2d;
-  rewriter_shuffle_2d.RegisterRewritePattern(shuffle, shuffle_2d_fusion);
-  rewriter_shuffle_2d.runOnGraph(graph, filter_shuffle_2d_fusion);
-}
+  auto filter_shuffle_2d_dynamic_fusion =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        const auto& match_vmap = match.values_map;
+
+        auto n_idx = getIValue("idx_0", match_vmap, vmap);
+        auto c_idx = getIValue("idx_1", match_vmap, vmap);
+        auto h_idx = getIValue("idx_2", match_vmap, vmap);
+        auto w_idx = getIValue("idx_3", match_vmap, vmap);
+        if (!n_idx.has_value() || !c_idx.has_value() || !h_idx.has_value() ||
+            !w_idx.has_value()) {
+          return false;
+        }
+
+        auto n_idx_ = n_idx.value().toInt();
+        auto c_idx_ = c_idx.value().toInt();
+        auto h_idx_ = h_idx.value().toInt();
+        auto w_idx_ = w_idx.value().toInt();
+
+        if ((n_idx_ != 0) || (c_idx_ != 1) || (h_idx_ != 2) || (w_idx_ != 3)) {
+          return false;
+        }
+
+        return true;
+      };
+
+  SubgraphRewriter rewriter_shuffle_2d_dynamic;
+  rewriter_shuffle_2d_dynamic.RegisterRewritePattern(
+      channelshuffle_with_dynamic_shape, shuffle_2d_fusion_with_dynamic_shape);
+  rewriter_shuffle_2d_dynamic.runOnGraph(
+      graph, filter_shuffle_2d_dynamic_fusion);
+  SubgraphRewriter rewriter_shuffle_2d_static;
+  rewriter_shuffle_2d_static.RegisterRewritePattern(
+      channelshuffle_with_static_shape, shuffle_2d_fusion_with_static_shape);
+  rewriter_shuffle_2d_static.runOnGraph(graph, filter_shuffle_2d_static_fusion);
+
+} // namespace graph_rewrite
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   std::string aten_add_layernorm = R"(
@@ -161,26 +225,34 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
 // (3) Current ipex::softmax/softmax_ is from the replacement of aten::softmax,
 //     it is safe to make MHA cover ipex::softmax/softmax_.
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
-  // below are basic patterns for MHA matching
+  // below are basic patterns string for MHA matching
+  std::string args_div_matmul_add_softmax = R"(
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype): )";
+
+  std::string args_expand_maskedfill_softmax = R"(
+      graph(%qk: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float, %softmax_dim:int, %dtype): )";
+
+  std::string args_div_matmul_expand_maskedfill_softmax = R"(
+      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype): )";
+
   std::string div_matmul_add = R"(
-      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %_q = aten::div(%q, %dim_per_head)
         %qk = aten::matmul(%_q, %k)
         %_scores = aten::add(%qk, %relative_qk, %alpha) )";
 
   std::string matmul_div_add = R"(
-      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
         %qk = aten::matmul(%q, %k)
         %_qk = aten::div(%qk, %dim_per_head)
         %_scores = aten::add(%_qk, %relative_qk, %alpha) )";
 
-  std::string div_matmul_expand = R"(
-      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
+  std::string div_transpose_matmul = R"(
         %_q = aten::div(%q, %dim_per_head)
         %_k = aten::transpose(%k, %transpose_dim_a, %transpose_dim_b)
-        %qk = aten::matmul(%_q, %_k)
+        %qk = aten::matmul(%_q, %_k) )";
+
+  std::string expand = R"(
         %_mask_qk_view = aten::view(%mask_qk, %mask_qk_reshp)
-        %_mask_qk_shape = aten::expand_as(%_mask_qk_view, %qk) )";
+        %_mask_qk_shape = aten::expand_as(%_mask_qk_view, %qk)  )";
 
   std::string aten_masked_fill = R"(
         %_scores = aten::masked_fill(%qk, %_mask_qk_shape, %fill) )";
@@ -192,6 +264,44 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         %scores = aten::softmax(%_scores, %softmax_dim, %dtype) )";
 
   std::string set_return = R"(
+        return (%scores) )";
+
+  // below are MHA score combinations from Bert Model (div+matmul+add+softmax)
+  std::string div_matmul_add_softmax =
+      args_div_matmul_add_softmax + div_matmul_add + aten_softmax + set_return;
+  std::string matmul_div_add_softmax =
+      args_div_matmul_add_softmax + matmul_div_add + aten_softmax + set_return;
+
+  // below are MHA score combinations from DistilBert Model
+  // (div+matmul+expand+masked_fill+softmax)
+  std::string div_matmul_maskedfill__softmax =
+      args_div_matmul_expand_maskedfill_softmax + div_transpose_matmul +
+      expand + aten_masked_fill_ + aten_softmax + set_return;
+  std::string div_matmul_maskedfill_softmax =
+      args_div_matmul_expand_maskedfill_softmax + div_transpose_matmul +
+      expand + aten_masked_fill + aten_softmax + set_return;
+
+  // below are parts of MHA score combinations from DistilBert Model (for int8
+  // path) (expand+masked_fill+softmax)
+  std::string expand_maskedfill__softmax = args_expand_maskedfill_softmax +
+      expand + aten_masked_fill_ + aten_softmax + set_return;
+  std::string expand_maskedfill_softmax = args_expand_maskedfill_softmax +
+      expand + aten_masked_fill + aten_softmax + set_return;
+
+  // below are fusion patterns
+  std::string div_matmul_add_softmax_fusion = R"(
+      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
+        %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
+        return (%scores) )";
+
+  std::string div_matmul_maskedfill_softmax_fusion = R"(
+      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
+        %scores = ipex::distil_mha_scores_calc(%q, %k, %mask_qk, %mask_qk_reshp, %transpose_dim_a, %transpose_dim_b, %fill, %dim_per_head)
+        return (%scores) )";
+
+  std::string expand_maskedfill_softmax_fusion = R"(
+      graph(%qk: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %fill:float,  %softmax_dim:int, %dtype):
+        %scores = ipex::maskedfill_softmax(%qk, %mask_qk, %mask_qk_reshp, %fill)
         return (%scores) )";
 
   auto filter_distil_mha =
@@ -265,41 +375,28 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         return true;
       };
 
-  std::string div_matmul_add_softmax_fusion = R"(
-      graph(%q: Tensor, %k: Tensor, %relative_qk: Tensor, %alpha:int, %dim_per_head:int, %softmax_dim:int, %dtype):
-        %scores = ipex::mha_scores_calc(%q, %k, %relative_qk, %alpha, %dim_per_head, %softmax_dim, %dtype)
-        return (%scores) )";
-
-  std::string div_matmul_maskedfill_softmax_fusion = R"(
-      graph(%q: Tensor, %k: Tensor, %mask_qk: Tensor, %mask_qk_reshp: int[], %transpose_dim_a:int, %transpose_dim_b:int, %fill:float, %dim_per_head:float, %softmax_dim:int, %dtype):
-        %scores = ipex::distil_mha_scores_calc(%q, %k, %mask_qk, %mask_qk_reshp, %transpose_dim_a, %transpose_dim_b, %fill, %dim_per_head, %softmax_dim, %dtype)
-        return (%scores) )";
-
   SubgraphRewriter mha_fusion;
   SubgraphRewriter distil_mha_fusion;
+  SubgraphRewriter maskedfill_softmax_fusion;
 
-  // below are MHA combinations for Bert Model (div+matmul+add+softmax)
-  std::string div_matmul_add_softmax =
-      div_matmul_add + aten_softmax + set_return;
-  std::string matmul_div_add_softmax =
-      matmul_div_add + aten_softmax + set_return;
   mha_fusion.RegisterRewritePattern(
       div_matmul_add_softmax, div_matmul_add_softmax_fusion);
   mha_fusion.RegisterRewritePattern(
       matmul_div_add_softmax, div_matmul_add_softmax_fusion);
-  // below are MHA combinations for DistilBert Model
-  // (div+matmul+masked_fill+softmax)
-  std::string div_matmul_maskfill__softmax =
-      div_matmul_expand + aten_masked_fill_ + aten_softmax + set_return;
-  std::string div_matmul_maskfill_softmax =
-      div_matmul_expand + aten_masked_fill + aten_softmax + set_return;
+
   distil_mha_fusion.RegisterRewritePattern(
-      div_matmul_maskfill__softmax, div_matmul_maskedfill_softmax_fusion);
+      div_matmul_maskedfill__softmax, div_matmul_maskedfill_softmax_fusion);
   distil_mha_fusion.RegisterRewritePattern(
-      div_matmul_maskfill_softmax, div_matmul_maskedfill_softmax_fusion);
+      div_matmul_maskedfill_softmax, div_matmul_maskedfill_softmax_fusion);
+
+  maskedfill_softmax_fusion.RegisterRewritePattern(
+      expand_maskedfill__softmax, expand_maskedfill_softmax_fusion);
+  maskedfill_softmax_fusion.RegisterRewritePattern(
+      expand_maskedfill_softmax, expand_maskedfill_softmax_fusion);
 
   mha_fusion.runOnGraph(graph);
   distil_mha_fusion.runOnGraph(graph, filter_distil_mha);
+  maskedfill_softmax_fusion.runOnGraph(graph, filter_distil_mha);
 }
 
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
@@ -337,7 +434,7 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
         Node* node = match.anchor;
         // check if the input is contiguous, and skip if it is not
         auto input_value = node->input(0)->type()->cast<TensorType>();
-        if (!is_contiguous(input_value)) {
+        if (!utils::is_contiguous(input_value)) {
           return false;
         }
 
@@ -610,7 +707,8 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
       return (
           (tensor.scalarType().value() == at::kFloat ||
            tensor.scalarType().value() == at::kBFloat16) &&
-          tensor.sizes()[1].value() % 16 == 0 && is_channelslast(tensor));
+          tensor.sizes()[1].value() % 16 == 0 &&
+          utils::is_channelslast(tensor));
     };
     // Check if the dimension of the first tensor is either 4 or 5.
     // Check if the data type, the size of Channels, and the memory format are

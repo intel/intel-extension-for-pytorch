@@ -261,6 +261,7 @@ MAKE_REGISTER_FUNC(
     "linalg_matrix_rank.atol_rtol_float",
     Tensor(const Tensor&, c10::optional<double>, c10::optional<double>, bool),
     fp32)
+MAKE_REGISTER_FUNC(ADD_NS(mish), "mish", Tensor(const Tensor&), fp32)
 
 MAKE_REGISTER_FUNC(
     ADD_NS(group_norm),

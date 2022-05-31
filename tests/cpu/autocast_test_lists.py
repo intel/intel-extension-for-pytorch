@@ -96,6 +96,7 @@ class AutocastCPUTestLists(object):
             ("linalg_matrix_rank", dummy_bf16[2]),
         ]
         self.nn_fp32 = [
+            ("mish", mat0_bf16),
         ]
         self.torch_need_autocast_promote = [
             ("cat", (pointwise0_bf16 + pointwise1_fp32,)),

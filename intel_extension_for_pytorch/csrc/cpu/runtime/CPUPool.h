@@ -1,6 +1,7 @@
 #pragma once
 #include <dlfcn.h>
 #include <omp.h>
+#include <atomic>
 #include <mutex>
 #include <vector>
 
@@ -44,6 +45,7 @@ class CPUPool {
   CPUPool& operator=(CPUPool&& source_cpu_pool) = delete;
 };
 
+bool do_load_iomp_symbol();
 bool is_runtime_ext_enabled();
 void init_runtime_ext();
 void _pin_cpu_cores(const std::vector<int32_t>& cpu_core_list);

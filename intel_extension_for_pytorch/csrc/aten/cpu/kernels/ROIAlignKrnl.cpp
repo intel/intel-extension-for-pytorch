@@ -678,7 +678,7 @@ at::Tensor roi_align_forward_kernel_impl(
   printf("torch_ipex::ROIAlign_forward\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::ROIAlign_forward", std::vector<c10::IValue>({}));
+      "torch_ipex::ROIAlign_forward", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");
@@ -746,7 +746,7 @@ at::Tensor roi_align_backward_kernel_impl(
   printf("torch_ipex::ROIAlign_backward\n");
 #endif
   IPEX_RECORD_FUNCTION(
-      "torch_ipex::ROIAlign_backward", std::vector<c10::IValue>({}));
+      "torch_ipex::ROIAlign_backward", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");
   TORCH_CHECK(rois.device().is_cpu(), "rois must be a CPU tensor");

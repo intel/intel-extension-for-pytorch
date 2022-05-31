@@ -145,6 +145,15 @@ class TestNMS(TestCase):
             output.append(self.decode_single(bbox, prob, criteria, max_output))
         output2_raw = batch_score_nms(bboxes_clone, probs_clone, criteria, max_output)
 
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                bboxes_autocast = bboxes.clone().to(datatype)
+                probs_autocast = probs.clone().to(datatype)
+                output2_raw_autocast = batch_score_nms(bboxes_autocast, probs_autocast, criteria, max_output)
+                for i in range(3):
+                    self.assertTrue(output2_raw_autocast[i].dtype == torch.float32)
+
         # Re-assembly the result
         output2 = []
         idx = 0
@@ -249,6 +258,11 @@ class TestNMS(TestCase):
                 self.assertTrue(torch.allclose(bbox_keep, bbox_keep_ref2, rtol=1e-4, atol=1e-4))
                 self.assertTrue(torch.allclose(score_keep, score_keep_ref2, rtol=1e-4, atol=1e-4))
 
+                # test autocast
+                with torch.cpu.amp.autocast():
+                    result_autocast = nms(loc.clone(), score.clone(), criteria, False)
+                    self.assertEqual(result_autocast, result_ref)
+
     def test_rpn_nms_result(self):
         image_shapes = [(800, 824), (800, 1199)]
         min_size = 0
@@ -280,6 +294,15 @@ class TestNMS(TestCase):
 
         self.assertEqual(new_proposal, new_proposal_)
         self.assertEqual(new_score, new_score_)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                proposals_autocast = proposals.clone().to(datatype)
+                objectness_autocast = objectness.clone().to(datatype)
+                new_proposal_autocast, new_score_autocast = rpn_nms(proposals_autocast, objectness_autocast, image_shapes, min_size, nms_thresh, post_nms_top_n)
+                self.assertTrue(new_proposal_autocast[0].dtype == torch.float32)
+                self.assertTrue(new_score_autocast[0].dtype == torch.float32)
 
     def test_box_head_nms_result(self):
         image_shapes = [(800, 824), (800, 1199)]
@@ -341,6 +364,15 @@ class TestNMS(TestCase):
         self.assertEqual(boxes_out, boxes_out_)
         self.assertEqual(scores_out, scores_out_)
         self.assertEqual(labels_out, labels_out_)
+
+        # test autocast
+        with torch.cpu.amp.autocast():
+            for datatype in (torch.bfloat16, torch.float32):
+                proposals_autocast = (proposals[0].to(datatype), proposals[1].to(datatype))
+                class_prob_autocast = (class_prob[0].to(datatype), class_prob[1].to(datatype))
+                boxes_out_autocast, scores_out_autocast, labels_out_autocast = box_head_nms(proposals_autocast, class_prob_autocast, image_shapes, score_thresh, nms_, detections_per_img, num_classes)
+                self.assertTrue(boxes_out_autocast[0].dtype == torch.float32)
+                self.assertTrue(scores_out_autocast[0].dtype == torch.float32)
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -20,7 +20,8 @@ at::Tensor dil_linear_swish_customized(
     const at::Tensor& weight,
     const at::Tensor& bias) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dil_linear_swish_customized", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION(
+      "dil_linear_swish_customized", c10::ArrayRef<c10::IValue>({}));
 #endif
 
   // at::linear w/o bias

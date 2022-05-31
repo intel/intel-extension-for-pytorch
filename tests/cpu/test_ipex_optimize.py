@@ -8,11 +8,13 @@ import itertools
 import copy
 from common_utils import TestModule
 from intel_extension_for_pytorch.optim._lamb import Lamb
+import os
 
 class ConvBatchNorm(torch.nn.Module):
     def __init__(self,):
         super(ConvBatchNorm, self).__init__()
-        self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        self.input1 = torch.randn(1, 3, 224, 224)
+        self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
         self.bn = torch.nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
 
     def forward(self, x):
@@ -21,6 +23,8 @@ class ConvBatchNorm(torch.nn.Module):
 class TwoLayerMLP(torch.nn.Module):
     def __init__(self):
         super(TwoLayerMLP, self).__init__()
+        self.input1 = torch.randn(2, 2)
+        self.input2 = torch.randn(3, 3)
         self.l1 = torch.nn.Linear(2, 2)
         self.l2 = torch.nn.Linear(3, 3)
 
@@ -30,23 +34,36 @@ class TwoLayerMLP(torch.nn.Module):
 class OneLayerMLP(torch.nn.Module):
     def __init__(self):
         super(OneLayerMLP, self).__init__()
+        self.input1 = torch.randn(2, 2)
         self.l1 = torch.nn.Linear(2, 2)
 
     def forward(self, x1):
         return self.l1(x1)
 
+class ConvTranspose2d(torch.nn.Module):
+    def __init__(self, ):
+        super(ConvTranspose2d, self).__init__()
+        self.conv_transpose2d = torch.nn.ConvTranspose2d(5, 5, (3 ,3))
+
+    def forward(self, x):
+        x = self.conv_transpose2d(x)
+        return x
+
 class TestOptimizeCases(TestCase):
     def test_optimize_parameters_behavior(self):
         model = ConvBatchNorm().eval()
+        pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
+        torch._C._jit_set_texpr_fuser_enabled(False)
         for level in ["O0", "O1"]:
             # disbale conv_bn folding
             opt_M = ipex.optimize(model, level=level, dtype=torch.float, conv_bn_folding=False)
             with torch.no_grad():
-                x = torch.randn(1, 3, 224, 224)
+                x = model.input1
                 traced_model = torch.jit.trace(opt_M, x)
                 trace_graph = traced_model.graph_for(x)
             self.assertTrue(any(n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()))
             # TODO check weight_prepack.
+        torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
 
     def test_optimize_bf16_model(self):
         model = ConvBatchNorm()
@@ -65,6 +82,7 @@ class TestOptimizeCases(TestCase):
         for dtype, optimizer in options:
             model = ConvBatchNorm().to(memory_format=torch.channels_last).train()
             model.conv.weight.requires_grad_(False)
+            model.conv.bias.requires_grad_(False)
             origin_model = copy.deepcopy(model)
             lr = 1e-4 if optimizer is SGD else 1e-2
             origin_optimizer = optimizer(origin_model.parameters(), lr=lr)
@@ -72,7 +90,7 @@ class TestOptimizeCases(TestCase):
             for origi_p, opti_p in zip(origin_model.parameters(), ipex_model.parameters()):
                 self.assertEqual(origi_p.requires_grad, opti_p.requires_grad)
 
-            x = torch.randn(1, 3, 224, 224).to(memory_format=torch.channels_last)
+            x = model.input1.to(memory_format=torch.channels_last)
             origin_x = x.clone()
             ipex_x = x.clone()
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
@@ -110,7 +128,7 @@ class TestOptimizeCases(TestCase):
 
     def test_optimize_unsupport_freeze_optimization(self):
         model = ConvBatchNorm().eval()
-        x = torch.randn(1, 3, 224, 224)
+        x = model.input1
         with torch.no_grad():
             traced_model = torch.jit.trace(model, x)
             frozen_model = torch.jit.freeze(traced_model)
@@ -217,9 +235,9 @@ class TestOptimizeCases(TestCase):
         options = itertools.product([OneLayerMLP, TwoLayerMLP], [True, False])
         for module, inference_only in options:
             M = module()
-            input = torch.rand(2, 2)
+            input = M.input1
             if isinstance(M, TwoLayerMLP):
-                input = (input, torch.rand(3, 3))
+                input = (M.input1, M.input2)
             if inference_only:
                 M.eval()
                 opt_M = ipex.optimize(M, sample_input=input, auto_kernel_selection=True)
@@ -231,6 +249,19 @@ class TestOptimizeCases(TestCase):
             if isinstance(M, TwoLayerMLP):
                 self.assertEqual(M.l2.input_shape, (3, 3))
                 self.assertEqual(opt_M.l2.batch_size_collapsed, 3)
+
+    def test_traced_model_serialization(self):
+        for module in [ConvBatchNorm, OneLayerMLP]:
+            for dtype in [torch.float, torch.bfloat16]:
+                M = module().eval()
+                opt_M = ipex.optimize(M, dtype=dtype)
+                with torch.no_grad():
+                    traced_M = torch.jit.trace(M, M.input1).eval()
+                    traced_M.save('traced_m.pt')
+                    loaded_M = torch.jit.load('traced_m.pt')
+                    self.assertEqual(traced_M(M.input1), loaded_M(M.input1))
+                    os.remove('traced_m.pt')
+
 
 if __name__ == '__main__':
     test = unittest.main()

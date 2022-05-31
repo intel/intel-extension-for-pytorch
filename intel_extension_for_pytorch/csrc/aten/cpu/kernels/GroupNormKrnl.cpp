@@ -21,7 +21,7 @@
 #endif
 
 #include "csrc/aten/cpu/utils/utils.h"
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {

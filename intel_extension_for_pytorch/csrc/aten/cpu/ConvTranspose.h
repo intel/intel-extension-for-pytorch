@@ -9,7 +9,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor conv_transpose2d_kernel_impl(
+at::Tensor conv_transpose_kernel_impl(
     const at::Tensor& input,
     const ideep::tensor& w,
     const c10::optional<at::Tensor>& bias_opt,
@@ -21,14 +21,14 @@ at::Tensor conv_transpose2d_kernel_impl(
     at::IntArrayRef origin_weight_dims,
     const ideep::attr_t& attr);
 
-at::Tensor conv_transpose2d(
+at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
-    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+    const at::Tensor& op_context);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
-conv_transpose2d_backward_kernel_impl(
+conv_transpose_backward_kernel_impl(
     const at::Tensor& input,
     const at::Tensor& grad_output_t,
     const at::Tensor& at_weight,
@@ -38,7 +38,6 @@ conv_transpose2d_backward_kernel_impl(
     at::IntArrayRef output_padding,
     int64_t groups,
     at::IntArrayRef dilation,
-    at::IntArrayRef kernel_size,
     std::array<bool, 3> output_mask,
     bool weight_channels_last);
 
@@ -51,14 +50,14 @@ class IPEXConvTransposeOp
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+      const at::Tensor& op_context);
 
   static at::Tensor forward(
       torch::autograd::AutogradContext* ctx,
       const at::Tensor& input,
       const at::Tensor& weight,
       const c10::optional<at::Tensor>& bias_opt,
-      const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+      const at::Tensor& op_context);
 
   static torch::autograd::variable_list backward(
       torch::autograd::AutogradContext* ctx,

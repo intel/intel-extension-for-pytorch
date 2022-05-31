@@ -2,8 +2,7 @@
 #include "csrc/aten/cpu/Interaction.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/cpu/vec512/bf16/vec/bf16_vec_kernel.h"
-#include "csrc/cpu/vec512/int8/vec/int8_vec_kernel.h"
+#include "csrc/cpu/vec/vec.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/quantization/AutoCast.hpp"
 
@@ -22,6 +21,8 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+using namespace torch_ipex::cpu::kernel;
 
 template <typename T>
 static inline void cat(
@@ -104,7 +105,7 @@ static inline void transpose_add(
 
 template <typename T>
 inline at::Tensor _interaction_forward(const std::vector<at::Tensor>& input) {
-  IPEX_RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("_interaction_forward", c10::ArrayRef<c10::IValue>({}));
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -183,7 +184,7 @@ inline std::vector<at::Tensor> _interaction_backward(
     const at::Tensor& grad_out,
     const std::vector<at::Tensor>& input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
-  IPEX_RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({}));
+  IPEX_RECORD_FUNCTION("_interaction_backward", c10::ArrayRef<c10::IValue>({}));
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -338,7 +339,7 @@ template <>
 inline at::Tensor _interaction_forward<at::BFloat16>(
     const std::vector<at::Tensor>& input) {
   IPEX_RECORD_FUNCTION(
-      "_interaction_forward_bfloat16", std::vector<c10::IValue>({}));
+      "_interaction_forward_bfloat16", c10::ArrayRef<c10::IValue>({}));
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   int32_t vector_size = input[0].sizes()[1];
@@ -467,7 +468,7 @@ inline std::vector<at::Tensor> _interaction_backward<at::BFloat16>(
     const std::vector<at::Tensor>& input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
   IPEX_RECORD_FUNCTION(
-      "_interaction_backward_bfloat16", std::vector<c10::IValue>({}));
+      "_interaction_backward_bfloat16", c10::ArrayRef<c10::IValue>({}));
   int32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   int32_t vector_size = input[0].sizes()[1];
@@ -668,7 +669,7 @@ static inline void _interaction_s8s8_scale_s32s8_128(
   auto* a = (const __m512i*)&convert_to_s16_buf[0];
   auto* b = (const __m512i*)&convert_to_s16_buf[4];
   mul_and_sum_s16x128_to_s32x16(cat_buf[0], b, a);
-  size_t offset = 1;
+  int64_t offset = 1;
   for (int i = 2; i < M; i++) {
     auto* c = (const __m512i*)&convert_to_s16_buf[i * 4];
     int j = 0;
@@ -687,7 +688,7 @@ static inline void _interaction_s8s8_scale_s32s8_128(
   }
 
   // Do reduce add with scale
-  size_t off = 0;
+  int64_t off = 0;
   for (; off < offset - 15; off += 16) {
     __m512 scale_m512 = _mm512_load_ps((const void*)(scales + off));
     reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scale_m512);

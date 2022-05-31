@@ -3,17 +3,18 @@ namespace torch_ipex {
 namespace runtime {
 
 namespace {
+// IOMP symbol
 kmp_create_affinity_mask_p kmp_create_affinity_mask_ext;
 kmp_set_affinity_mask_proc_p kmp_set_affinity_mask_proc_ext;
 kmp_set_affinity_p kmp_set_affinity_ext;
 kmp_destroy_affinity_mask_p kmp_destroy_affinity_mask_ext;
 kmp_get_affinity_p kmp_get_affinity_ext;
 
+// IOMP symbol loading control flag
 std::once_flag
     iomp_symbol_loading_call_once_flag; // call_once_flag to ensure the iomp
                                         // symbol loaded once globally
-bool iomp_symbol_loaded{
-    false}; // Notice: iomp_symbol_loaded is not thread safe.
+std::atomic<bool> iomp_symbol_loaded{false};
 
 // current_cpu_core_list is only used to cache the cpu_core_list setting
 // of _pin_cpu_cores. It's thread_local, so different task thread can have
@@ -45,14 +46,20 @@ void loading_iomp_symbol() {
   return;
 }
 
-bool is_runtime_ext_enabled() {
+inline bool do_load_iomp_symbol() {
+  // If invoking std::call_once concurrently, only one thread will invoke the
+  // function as active execution. The other threads as passive execution will
+  // not return until the finish of active execution.
   std::call_once(iomp_symbol_loading_call_once_flag, loading_iomp_symbol);
   return iomp_symbol_loaded;
 }
 
+bool is_runtime_ext_enabled() {
+  return do_load_iomp_symbol();
+}
+
 void init_runtime_ext() {
-  std::call_once(iomp_symbol_loading_call_once_flag, loading_iomp_symbol);
-  if (!iomp_symbol_loaded) {
+  if (!do_load_iomp_symbol()) {
     throw std::runtime_error(
         "Didn't preload IOMP before using the runtime API");
   }
@@ -124,12 +131,6 @@ void set_mask_affinity_from_cpu_pool(const CPUPool& cpu_pool) {
 }
 
 CPUPool::CPUPool(const std::vector<int32_t>& cpu_core_list) {
-  // Notice: We shouldn't load iomp symbol in sub_thread, otherwise race
-  // condition happens.
-  if (!is_runtime_ext_enabled()) {
-    throw std::runtime_error(
-        "Fail to init CPUPool. Didn't preload IOMP before using the runtime API.");
-  }
   this->cpu_core_list = cpu_core_list;
   this->cpu_core_list_initialized_ = true;
 }

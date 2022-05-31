@@ -1,5 +1,6 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/jit/cpu/kernels/OpContext.h"
+#include "csrc/jit/cpu/passes/utils.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -12,10 +13,12 @@ namespace graph_rewrite {
 using namespace at::jit;
 using namespace torch_ipex::cpu;
 
-void replaceFrozenIPEXConvWithAtenConv(Block* b) {
+void replaceFrozenIPEXConvWithAtenConv(
+    Block* b,
+    std::vector<Node*>& get_data_handle_nodes) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      replaceFrozenIPEXConvWithAtenConv(block);
+      replaceFrozenIPEXConvWithAtenConv(block, get_data_handle_nodes);
     }
     if (n->kind() ==
         Symbol::fromQualString("torch_ipex::convolution_forward")) {
@@ -29,13 +32,12 @@ void replaceFrozenIPEXConvWithAtenConv(Block* b) {
                                    ->cast<TensorType>()
                                    ->sizes()
                                    .concrete_sizes();
+      auto prepack_node = n->inputs().at(3)->node()->inputs().at(0);
       // For graph before "freeze", cannot get custom class to repack
-      auto prepack_node = n->inputs().at(3);
       if (!toIValue(prepack_node).has_value())
         continue;
       auto conv_op_ctx =
           toIValue(prepack_node).value().toCustomClass<ConvolutionOpContext>();
-
       at::Tensor weight_tensor = conv_op_ctx->to_public(
           constant_as<at::Tensor>(n->namedInput("weight")).value());
       WithInsertPoint guard(n);
@@ -63,13 +65,19 @@ void replaceFrozenIPEXConvWithAtenConv(Block* b) {
       aten_conv->addInput(groups);
       aten_conv->output()->setType(n->output()->type()->cast<TensorType>());
       n->output()->replaceAllUsesWith(aten_conv->output());
+      get_data_handle_nodes.emplace_back(n->inputs().at(3)->node());
     }
   }
   EliminateDeadCode(b);
 }
 
 void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph) {
-  replaceFrozenIPEXConvWithAtenConv(graph->block());
+  std::vector<Node*> get_data_handle_nodes;
+  replaceFrozenIPEXConvWithAtenConv(graph->block(), get_data_handle_nodes);
+  for (auto& n : get_data_handle_nodes) {
+    n->destroy();
+  }
+  EliminateDeadCode(graph);
 }
 
 void insertPrePackedConvOp(Block* b) {
@@ -81,8 +89,7 @@ void insertPrePackedConvOp(Block* b) {
         n->kind() == aten::conv3d) {
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
-      auto prepack_node = graph->create(
-          Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
+      Node* prepack_node;
       auto input_size_option = n->inputs()
                                    .at(0)
                                    ->type()
@@ -112,18 +119,6 @@ void insertPrePackedConvOp(Block* b) {
                weight_size_option.value().size() == 5))) {
           continue;
         }
-        auto weight_size = weight_size_option.value();
-        // 1d case.
-        std::vector<int64_t> k_size = {weight_size[2]};
-        // 2d case.
-        if (weight_size.size() == 4) {
-          k_size.push_back(weight_size[3]);
-        }
-        // 3d case.
-        if (weight_size.size() == 5) {
-          k_size.push_back(weight_size[3]);
-          k_size.push_back(weight_size[4]);
-        }
         bool w_is_channels_last = false;
         if (constant_as<at::Tensor>(n->namedInput("weight")).has_value()) {
           at::Tensor weight_tensor =
@@ -132,26 +127,26 @@ void insertPrePackedConvOp(Block* b) {
               weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
               weight_tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d);
         }
-        int64_t o_channel = weight_size[0];
-        IValue kernel_size_value(k_size),
-            weight_is_channels_last_value(w_is_channels_last),
-            output_channel_value(o_channel);
+        IValue weight_is_channels_last_value(w_is_channels_last);
 
-        auto kernel_size = graph->insertConstant(kernel_size_value);
         auto weight_is_channels_last =
             graph->insertConstant(weight_is_channels_last_value);
-        auto output_channel = graph->insertConstant(output_channel_value);
 
+        // Note that once creating this "convolution_prepack" node, make sure it
+        // is also inserted into the graph. Details ref to "linear_prepack"
+        // creation in "graph_rewrite_linear.cpp"
+        prepack_node = graph->create(
+            Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
         for (auto i = 1; i < n->inputs().size() - 1; ++i) {
           Value* v = n->inputs().at(i);
           prepack_node->addInput(v);
         }
-        prepack_node->addInput(kernel_size);
         // add conv groups
         prepack_node->addInput(n->inputs().at(n->inputs().size() - 1));
-        prepack_node->addInput(output_channel);
         prepack_node->addInput(weight_is_channels_last);
       } else {
+        prepack_node = graph->create(
+            Symbol::fromQualString("ipex_prepack::convolution_prepack"), 1);
         for (auto i = 1; i < n->inputs().size(); ++i) {
           Value* v = n->inputs().at(i);
           prepack_node->addInput(v);
@@ -180,140 +175,122 @@ void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
-      rewriter_elu, rewriter_swish, rewriter_silu, rewriter_leaky_relu,
-      rewriter_gelu;
-  std::array<std::string, 2> relu_operators = {"relu", "relu_"};
+  SubgraphRewriter rewriter_hardtanh, rewriter_elu, rewriter_swish,
+      rewriter_leaky_relu, rewriter_gelu;
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> hardtanh_operators = {"hardtanh", "hardtanh_"};
   std::array<std::string, 2> elu_operators = {"elu", "elu_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
-  std::array<std::string, 2> silu_operators = {"silu", "silu_"};
   std::array<std::string, 2> leaky_relu_operators = {
       "leaky_relu", "leaky_relu_"};
 
-  auto conv_relu_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+  // For unary post OPs:
+  auto conv_op_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::${relu}(%x)
+        %res = ${op}(%x)
         return (%res))");
 
-  std::string conv_relu_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
-        %res = ipex_prepack::convolution_relu_run(%input, %packed_weight)
-        return (%res))";
-
-  auto conv_sigmoid_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
-        %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::${sigmoid}(%x)
+  auto conv_op_fused_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_${op}_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
+        %res = ipex_prepack::convolution_${op}_run(%input, %packed_weight)
         return (%res))");
 
-  std::string conv_sigmoid_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_sigmoid_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
-        %res = ipex_prepack::convolution_sigmoid_run(%input, %packed_weight)
-        return (%res))";
+  for (auto const& it : utils::supported_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
 
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        conv_op_rstring.format(env), conv_op_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
+
+  // For post OPs with multiple inputs
   auto conv_hardtanh_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %min, %max):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %min, %max):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %res = aten::${hardtanh}(%x, %min, %max)
         return (%res))");
 
   std::string conv_hardtanh_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %min, %max):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_hardtanh_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %min, %max)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %min, %max):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_hardtanh_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %min, %max)
         %res = ipex_prepack::convolution_hardtanh_run(%input, %min, %max, %packed_weight)
         return (%res))";
 
   auto conv_elu_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %alpha, %scale, %input_scale):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel,  %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %alpha, %scale, %input_scale):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups,  %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %res = aten::${elu}(%x, %alpha, %scale, %input_scale)
         return (%res))");
 
   std::string conv_elu_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %alpha, %scale, %input_scale):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_elu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel,  %weight_is_channels_last, %input_size, %alpha, %scale, %input_scale)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %alpha, %scale, %input_scale):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_elu_prepack(%weight, %bias, %stride, %padding, %dilation, %groups,  %weight_is_channels_last, %input_size, %alpha, %scale, %input_scale)
         %res = ipex_prepack::convolution_elu_run(%input, %alpha, %scale, %input_scale, %packed_weight)
         return (%res))";
 
   auto conv_sigmoid_mul_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %y = aten::${sigmoid}(%x)
         %res = aten::${mul}(%x, %y)
         return (%res))");
 
-  auto conv_silu_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight: __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
-        %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::${silu}(%x)
-        return (%res))");
-
   std::string conv_swish_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_swish_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_swish_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %res = ipex_prepack::convolution_swish_run(%input, %packed_weight)
         return (%res))";
 
   auto conv_leaky_relu_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %alpha):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %alpha):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %res = aten::${leaky_relu}(%x, %alpha)
         return (%res))");
 
   std::string conv_leaky_relu_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %alpha):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_leaky_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %alpha)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %alpha):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_leaky_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %alpha)
         %res = ipex_prepack::convolution_leaky_relu_run(%input, %alpha, %packed_weight)
         return (%res))";
 
   auto conv_gelu_rstring = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %res = aten::gelu(%x, %approximate)
         return (%res))";
 
   std::string conv_gelu_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_gelu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %approximate)
+    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_gelu_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %approximate)
         %res = ipex_prepack::convolution_gelu_run(%input, %approximate, %packed_weight)
         return (%res))";
-
-  for (const auto& relu : relu_operators) {
-    TemplateEnv env;
-    env.s("relu", relu);
-    rewriter_relu.RegisterRewritePattern(
-        conv_relu_rstring.format(env), conv_relu_fused);
-  }
 
   for (const auto& sigmoid : sigmoid_operators) {
     TemplateEnv env;
     env.s("sigmoid", sigmoid);
-    rewriter_sigmoid.RegisterRewritePattern(
-        conv_sigmoid_rstring.format(env), conv_sigmoid_fused);
     for (const auto& mul : mul_operators) {
       env.s("mul", mul);
       rewriter_swish.RegisterRewritePattern(
           conv_sigmoid_mul_rstring.format(env), conv_swish_fused);
     }
-  }
-  for (const auto& silu : silu_operators) {
-    TemplateEnv env;
-    env.s("silu", silu);
-    rewriter_silu.RegisterRewritePattern(
-        conv_silu_rstring.format(env), conv_swish_fused);
   }
 
   for (const auto& hardtanh : hardtanh_operators) {
@@ -359,13 +336,9 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
       };
 
   rewriter_gelu.RegisterRewritePattern(conv_gelu_rstring, conv_gelu_fused);
-
-  rewriter_relu.runOnGraph(graph);
-  rewriter_sigmoid.runOnGraph(graph);
   rewriter_hardtanh.runOnGraph(graph);
   rewriter_elu.runOnGraph(graph, filter_conv2d_elu);
   rewriter_swish.runOnGraph(graph);
-  rewriter_silu.runOnGraph(graph);
   rewriter_leaky_relu.runOnGraph(graph);
   rewriter_gelu.runOnGraph(graph, filter_conv_gelu);
 }
@@ -380,8 +353,8 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
   //    add
   // output = conv_output + alpha*Y
   auto conv_add_rstring_v1 = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last, %input_size:int[]):
-        %packed_weight = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last, %input_size:int[]):
+        %packed_weight = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %res = aten::${add}(%x, %accumu, %alpha) return (%res))");
 
@@ -390,26 +363,26 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
   //    add
   // output = Y + alpha*conv_output, alpha need to one or none.
   auto conv_add_rstring_v2 = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel,  %weight_is_channels_last, %input_size)
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups,  %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
         %res = aten::${add}(%accumu, %x, %alpha) return (%res))");
 
   std::string conv_add_fused = R"(
-    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_add_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %alpha)
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_add_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %alpha)
         %res = ipex_prepack::convolution_add_run(%input, %accumu, %alpha, %packed_weight)
         return (%res))";
 
   auto conv_add_relu_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_add_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %alpha)
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_add_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %alpha)
         %x = ipex_prepack::convolution_add_run(%input, %accumu, %alpha, %packed_weight)
         %res = aten::${relu}(%x) return (%res))");
 
   std::string conv_add_relu_fused = R"(
-    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %kernel_size:int[], %groups:int, %output_channel:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_add_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %kernel_size, %groups, %output_channel, %weight_is_channels_last, %input_size, %alpha)
+    graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_add_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %alpha)
         %res = ipex_prepack::convolution_add_relu_run(%input, %accumu, %alpha, %packed_weight) return (%res))";
 
   // conv+add
@@ -474,11 +447,11 @@ void fuseBottleneck(std::shared_ptr<Graph>& graph) {
         match.values_map.at(vmap.at("packed_weight3"))->node();
 
     auto weight1_is_channels_last =
-        constant_as<bool>(packed_weight1->inputs().at(8)).value();
+        constant_as<bool>(packed_weight1->inputs().at(6)).value();
     auto weight2_is_channels_last =
-        constant_as<bool>(packed_weight2->inputs().at(8)).value();
+        constant_as<bool>(packed_weight2->inputs().at(6)).value();
     auto weight3_is_channels_last =
-        constant_as<bool>(packed_weight3->inputs().at(8)).value();
+        constant_as<bool>(packed_weight3->inputs().at(6)).value();
     if (!weight1_is_channels_last || !weight2_is_channels_last ||
         !weight3_is_channels_last) {
       return false;
@@ -511,13 +484,13 @@ void fuseBottleneck(std::shared_ptr<Graph>& graph) {
         match.values_map.at(vmap.at("packed_weight4"))->node();
 
     auto weight1_is_channels_last =
-        constant_as<bool>(packed_weight1->inputs().at(8)).value();
+        constant_as<bool>(packed_weight1->inputs().at(6)).value();
     auto weight2_is_channels_last =
-        constant_as<bool>(packed_weight2->inputs().at(8)).value();
+        constant_as<bool>(packed_weight2->inputs().at(6)).value();
     auto weight3_is_channels_last =
-        constant_as<bool>(packed_weight3->inputs().at(8)).value();
+        constant_as<bool>(packed_weight3->inputs().at(6)).value();
     auto weight4_is_channels_last =
-        constant_as<bool>(packed_weight4->inputs().at(8)).value();
+        constant_as<bool>(packed_weight4->inputs().at(6)).value();
     if (!weight1_is_channels_last || !weight2_is_channels_last ||
         !weight3_is_channels_last || !weight4_is_channels_last) {
       return false;
