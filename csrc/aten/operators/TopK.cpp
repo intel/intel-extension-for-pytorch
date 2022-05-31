@@ -7,7 +7,7 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>
 #include "BitonicMergeSort.h"
-#include "ScanKernel.h"
+#include "Scan.h"
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
