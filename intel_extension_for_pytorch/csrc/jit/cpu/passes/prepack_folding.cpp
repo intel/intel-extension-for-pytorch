@@ -14,6 +14,8 @@ void PrePackingOpsFolder(Block* b) {
         n->kind() ==
             Symbol::fromQualString("ipex_prepack::convolution_relu_prepack") ||
         n->kind() ==
+            Symbol::fromQualString("ipex_prepack::convolution_tanh_prepack") ||
+        n->kind() ==
             Symbol::fromQualString(
                 "ipex_prepack::convolution_sigmoid_prepack") ||
         n->kind() ==

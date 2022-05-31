@@ -9,6 +9,11 @@ namespace cpu {
 namespace detail {
 namespace linear {
 
+#define DECLARE_LINEAR_UNARY_ELTWISE_RUN(FUSED_OP) \
+  at::Tensor linear_##FUSED_OP##_run(              \
+      const at::Tensor& input,                     \
+      const c10::intrusive_ptr<LinearOpContext>& op_context);
+
 c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -18,26 +23,15 @@ at::Tensor linear_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context);
 
-at::Tensor linear_relu_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(relu);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(sigmoid);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(swish);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(tanh);
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context,
     c10::string_view approximate);
-
-at::Tensor linear_tanh_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context);
-
-at::Tensor linear_sigmoid_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context);
-
-at::Tensor linear_swish_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context);
 
 at::Tensor linear_add_run(
     const at::Tensor& input,

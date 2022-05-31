@@ -11,6 +11,11 @@ namespace cpu {
 namespace detail {
 namespace convolution {
 
+#define DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(FUSED_OP) \
+  at::Tensor convolution_##FUSED_OP##_run(              \
+      const at::Tensor& input,                          \
+      const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+
 c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -25,17 +30,14 @@ at::Tensor convolution_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
-at::Tensor convolution_relu_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(relu);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(sigmoid);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(swish);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(tanh);
 
 at::Tensor convolution_leaky_relu_run(
     const at::Tensor& input,
     at::Scalar alpha,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
-
-at::Tensor convolution_sigmoid_run(
-    const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
 at::Tensor convolution_hardtanh_run(
@@ -49,10 +51,6 @@ at::Tensor convolution_elu_run(
     at::Scalar alpha,
     at::Scalar scale,
     at::Scalar input_scale,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
-
-at::Tensor convolution_swish_run(
-    const at::Tensor& input,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
 at::Tensor convolution_gelu_run(

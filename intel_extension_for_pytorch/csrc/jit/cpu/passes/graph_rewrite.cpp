@@ -434,7 +434,7 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
         Node* node = match.anchor;
         // check if the input is contiguous, and skip if it is not
         auto input_value = node->input(0)->type()->cast<TensorType>();
-        if (!is_contiguous(input_value)) {
+        if (!utils::is_contiguous(input_value)) {
           return false;
         }
 
@@ -707,7 +707,8 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
       return (
           (tensor.scalarType().value() == at::kFloat ||
            tensor.scalarType().value() == at::kBFloat16) &&
-          tensor.sizes()[1].value() % 16 == 0 && is_channelslast(tensor));
+          tensor.sizes()[1].value() % 16 == 0 &&
+          utils::is_channelslast(tensor));
     };
     // Check if the dimension of the first tensor is either 4 or 5.
     // Check if the data type, the size of Channels, and the memory format are

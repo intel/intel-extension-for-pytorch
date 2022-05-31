@@ -1,4 +1,5 @@
 #include <ATen/code_template.h>
+#include "csrc/jit/cpu/passes/utils.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -165,28 +166,38 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
   std::array<std::string, 2> tanh_operators = {"tanh", "tanh_"};
 
-  auto linear_relu_rstring = CodeTemplate(R"(
+  // For unary post OPs:
+  auto linear_op_rstring = at::jit::CodeTemplate(R"(
      graph(%input, %packed_weight):
         %x = ipex_prepack::linear_run(%input, %packed_weight)
-        %res = aten::${relu}(%x)
+        %res = ${op}(%x)
         return (%res))");
 
-  std::string linear_relu_fused = R"(
+  auto linear_op_fused_rstring = at::jit::CodeTemplate(R"(
     graph(%input, %packed_weight):
-        %res = ipex_prepack::linear_relu_run(%input, %packed_weight)
-        return (%res))";
-
-  auto linear_tanh_rstring = CodeTemplate(R"(
-    graph(%input, %packed_weight):    
-        %x = ipex_prepack::linear_run(%input, %packed_weight)
-        %res = aten::${tanh}(%x)
+        %res = ipex_prepack::linear_${op}_run(%input, %packed_weight)
         return (%res))");
 
-  std::string linear_tanh_fused = R"(
-    graph(%input, %packed_weight):
-        %res = ipex_prepack::linear_tanh_run(%input, %packed_weight)
-        return (%res))";
+  for (auto const& it : utils::supported_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
 
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        linear_op_rstring.format(env),
+        linear_op_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
+
+  // For post OPs with multiple inputs
   std::string linear_gelu = R"(
     graph(%input, %approximate, %packed_weight):
         %x = ipex_prepack::linear_run(%input, %packed_weight)
@@ -197,18 +208,6 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
     graph(%input, %approximate, %packed_weight):
         %res = ipex_prepack::linear_gelu_run(%input, %packed_weight, %approximate)
         return (%res))";
-
-  auto linear_sigmoid_rstring = CodeTemplate(R"(
-    graph(%input, %packed_weight):
-        %x = ipex_prepack::linear_run(%input, %packed_weight)
-        %res= aten::${sigmoid}(%x)
-        return (%res))");
-
-  auto linear_silu_rstring = CodeTemplate(R"(
-    graph(%input, %packed_weight):
-        %x = ipex_prepack::linear_run(%input, %packed_weight)
-        %res= aten::${silu}(%x)
-        return (%res))");
 
   auto linear_sigmoid_mul_rstring = CodeTemplate(R"(
     graph(%input, %packed_weight):
@@ -222,50 +221,18 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::linear_swish_run(%input, %packed_weight)
         return (%res))";
 
-  std::string linear_sigmoid_fused = R"(
-    graph(%input, %packed_weight):
-        %res = ipex_prepack::linear_sigmoid_run(%input, %packed_weight)
-        return (%res))";
-
-  for (const auto& relu : relu_operators) {
-    TemplateEnv env;
-    env.s("relu", relu);
-    rewriter_relu.RegisterRewritePattern(
-        linear_relu_rstring.format(env), linear_relu_fused);
-  }
-
-  for (const auto& tanh : tanh_operators) {
-    TemplateEnv env;
-    env.s("tanh", tanh);
-    rewriter_tanh.RegisterRewritePattern(
-        linear_tanh_rstring.format(env), linear_tanh_fused);
-  }
-
-  for (const auto& silu : silu_operators) {
-    TemplateEnv env;
-    env.s("silu", silu);
-    rewriter_silu.RegisterRewritePattern(
-        linear_silu_rstring.format(env), linear_swish_fused);
-  }
-
   for (const auto& sigmoid : sigmoid_operators) {
     TemplateEnv env;
     env.s("sigmoid", sigmoid);
-    rewriter_sigmoid.RegisterRewritePattern(
-        linear_sigmoid_rstring.format(env), linear_sigmoid_fused);
     for (const auto& mul : mul_operators) {
       env.s("mul", mul);
       rewriter_swish.RegisterRewritePattern(
           linear_sigmoid_mul_rstring.format(env), linear_swish_fused);
     }
   }
-  rewriter_silu.runOnGraph(graph);
-  rewriter_sigmoid.runOnGraph(graph);
   rewriter_swish.runOnGraph(graph);
-  rewriter_gelu.RegisterRewritePattern(linear_gelu, linear_gelu_fused);
 
-  rewriter_relu.runOnGraph(graph);
-  rewriter_tanh.runOnGraph(graph);
+  rewriter_gelu.RegisterRewritePattern(linear_gelu, linear_gelu_fused);
   rewriter_gelu.runOnGraph(graph);
 }
 

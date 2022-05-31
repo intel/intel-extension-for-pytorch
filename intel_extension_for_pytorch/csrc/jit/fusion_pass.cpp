@@ -386,12 +386,17 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // Insert ipex_prepack::convolution_prepack.
   // Conv weights will be re-prepacked in this step.
+  GRAPH_DUMP("After FrozenConvFolding.Before insertPrePackedConvOp", graph);
   graph_rewrite::insertPrePackedConvOp(graph);
 
   // convolution fusion
+  GRAPH_DUMP("After insertPrePackedConvOp.Before fuseConvWithEltwise", graph);
   graph_rewrite::fuseConvWithEltwise(graph);
+  GRAPH_DUMP("After fuseConvWithEltwise.Before fuseConvAddRelu", graph);
   graph_rewrite::fuseConvAddRelu(graph);
+  GRAPH_DUMP("After fuseConvAddRelu.Before fuseBottleneck", graph);
   graph_rewrite::fuseBottleneck(graph);
+  GRAPH_DUMP("After fuseBottleneck.", graph);
 
   // TODO: Record original aten nodes, while convert aten linear-> ipex linear,
   // will ignore these aten linear (if they are fp32 dtype). For BF16 dtype,
@@ -405,10 +410,15 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FrozenLinearFolding(graph);
 
   // linear fusion
+  GRAPH_DUMP("After FrozenLinearFolding.Before insertPrePackedLinearOp", graph);
   graph_rewrite::insertPrePackedLinearOp(
       graph, aten_linear_recorder.get_records());
+  GRAPH_DUMP(
+      "After insertPrePackedLinearOp.Before fuseLinearWithEltwise", graph);
   graph_rewrite::fuseLinearWithEltwise(graph);
+  GRAPH_DUMP("After fuseLinearWithEltwise.Before fuseLinearAddRelu", graph);
   graph_rewrite::fuseLinearAddRelu(graph);
+  GRAPH_DUMP("After fuseLinearAddRelu.", graph);
 
   graph_rewrite::FuseLinearSwishCustomized(graph);
   // fuse add+layernorm
@@ -443,8 +453,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::replaceAtenBatchNormWithIpexBatchNorm(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
+  GRAPH_DUMP("Before PrePackingOpsFolder", graph);
   // folding prepacking ops.
   PrePackingOpsFolder(graph);
+  GRAPH_DUMP("After PrePackingOpsFolder", graph);
 }
 
 bool checkQuantization(Block* block) {

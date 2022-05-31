@@ -14,6 +14,16 @@ namespace cpu {
 namespace detail {
 namespace convolution {
 
+#define DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(FUSED_OP)               \
+  at::Tensor convolution_##FUSED_OP##_run(                           \
+      const at::Tensor& input,                                       \
+      const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {  \
+    IPEX_RECORD_FUNCTION(                                            \
+        "ipex_prepack::convolution_" #FUSED_OP "_run",               \
+        c10::ArrayRef<c10::IValue>({}));                             \
+    return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP()); \
+  }
+
 c10::intrusive_ptr<ConvolutionOpContext> createConvolutionPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -46,13 +56,10 @@ at::Tensor convolution_run(
   return op_context->run(input, ideep::attr_t());
 }
 
-at::Tensor convolution_relu_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_relu_run", c10::ArrayRef<c10::IValue>({}));
-  return op_context->run(input, ideep::attr_t::fuse_relu());
-}
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(relu);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(sigmoid);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(swish);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(tanh);
 
 at::Tensor convolution_leaky_relu_run(
     const at::Tensor& input,
@@ -63,14 +70,6 @@ at::Tensor convolution_leaky_relu_run(
       c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
   return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
-}
-
-at::Tensor convolution_sigmoid_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_sigmoid_run", c10::ArrayRef<c10::IValue>({}));
-  return op_context->run(input, ideep::attr_t::fuse_sigmoid());
 }
 
 at::Tensor convolution_hardtanh_run(
@@ -100,14 +99,6 @@ at::Tensor convolution_elu_run(
   return op_context->run(
       input,
       ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value));
-}
-
-at::Tensor convolution_swish_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::convolution_swish_run", c10::ArrayRef<c10::IValue>({}));
-  return op_context->run(input, ideep::attr_t::fuse_swish());
 }
 
 at::Tensor convolution_gelu_run(

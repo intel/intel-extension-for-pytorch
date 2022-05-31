@@ -10,6 +10,16 @@ namespace cpu {
 namespace detail {
 namespace linear {
 
+#define DEFINE_LINEAR_UNARY_ELTWISE_RUN(FUSED_OP)                    \
+  at::Tensor linear_##FUSED_OP##_run(                                \
+      const at::Tensor& input,                                       \
+      const c10::intrusive_ptr<LinearOpContext>& op_context) {       \
+    IPEX_RECORD_FUNCTION(                                            \
+        "ipex_prepack::linear_" #FUSED_OP "_run",                    \
+        c10::ArrayRef<c10::IValue>({}));                             \
+    return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP()); \
+  }
+
 c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -33,14 +43,10 @@ at::Tensor linear_run(
   return op_context->run(input, ideep::attr_t());
 }
 
-at::Tensor linear_relu_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_relu_run", c10::ArrayRef<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_relu());
-}
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(relu);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(sigmoid);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(swish);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(tanh);
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
@@ -63,33 +69,6 @@ at::Tensor linear_gelu_run(
   }
   return op_context->run(
       input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
-}
-
-at::Tensor linear_tanh_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_tanh_run", c10::ArrayRef<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_tanh());
-}
-
-at::Tensor linear_sigmoid_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_sigmoid_run", c10::ArrayRef<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_sigmoid());
-}
-
-at::Tensor linear_swish_run(
-    const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_swish_run", c10::ArrayRef<c10::IValue>({}));
-
-  return op_context->run(input, ideep::attr_t::fuse_swish());
 }
 
 at::Tensor linear_add_run(

@@ -93,6 +93,17 @@ conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
 convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
 
+PyTorch_op_to_IPEX_op_map = {
+    torch.relu: "relu",
+    torch.relu_: "relu",
+    torch.sigmoid: "sigmoid",
+    torch.sigmoid_: "sigmoid",
+    nn.SiLU(inplace=True): "swish",
+    nn.SiLU(inplace=False): "swish",
+    torch.tanh: "tanh",
+    torch.tanh_: "tanh",    
+}
+
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvBatchNorm_Fixed, self).__init__()
@@ -379,40 +390,9 @@ class LinearGelu(nn.Module):
     def forward(self, x):
         return F.gelu(self.linear(x), approximate=self.approximate)
 
-class LinearTanh(nn.Module):
+class LinearSigmoidMul(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearTanh, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        return F.tanh(self.linear(x))
-
-class LinearSigmoid(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSigmoid, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        return F.sigmoid(self.linear(x))
-
-class LinearSwish(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSwish, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        linear_res = self.linear(x)
-        return F.silu(linear_res)
-
-class LinearSwish_v1(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSwish_v1, self).__init__()
+        super(LinearSigmoidMul, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
         self.linear = nn.Linear(in_channels, out_channels, **kwargs)
@@ -443,16 +423,6 @@ class Linear_Reshape_Relu(nn.Module):
 
     def forward(self, x):
         return F.relu(torch.reshape(self.linear(x),self.dest_shape), inplace=True)
-
-class LinearSigmoid(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearSigmoid, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-
-    def forward(self, x):
-        return torch.sigmoid(self.linear(x))
 
 class LinearBn(nn.Module):
     def __init__(self,dim,in_channels, out_channels, **kwargs):
@@ -517,50 +487,6 @@ class ConvSwishInplace(nn.Module):
         b = torch.sigmoid(a)
         res = a.mul_(b)
         return res
-
-class ConvSiluOutplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSiluOutplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.silu = nn.SiLU()
-
-    def forward(self, x):
-        a1 = self.conv(x)
-        b1 = self.silu(a1)
-        return b1
-
-class ConvSiluInplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSiluInplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.silu = nn.SiLU(inplace=True)
-
-    def forward(self, x):
-        a1 = self.conv(x)
-        b1 = self.silu(a1)
-        return b1
-
-class ConvSigmoidOutplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSigmoidOutplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = torch.sigmoid(a)
-        c = torch.add(b, b)
-        return c
-
-class ConvSigmoidInplace(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size):
-        super(ConvSigmoidInplace, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = torch.sigmoid_(a)
-        c = torch.add(b, b)
-        return c
 
 class ConvHardtanh(nn.Module):
     def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, inplace=False):
@@ -935,6 +861,23 @@ class Tester(TestCase):
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
+    def _test_onednn_fp32(self, model, input, kind_in_graph=None, kind_not_in_graph=None, prec=5e-3):
+        model = model.eval()
+        model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
+        with torch.no_grad():
+            res_ref = model(input)
+            tr_model = torch.jit.trace(model, (input))
+            tr_model = torch.jit.freeze(tr_model)
+            tr_model(input)
+            trace_graph = tr_model.graph_for(input)
+            res_jit = tr_model(input)
+            self.assertEqual(res_ref, res_jit)
+            
+            if kind_in_graph is not None:
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+            
+            if kind_not_in_graph is not None:
+                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
 
     def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
@@ -1358,7 +1301,49 @@ class Tester(TestCase):
             _check_match_mha_parts(mha_jit, qk, mask)
             _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
-    def test_conv_fusion(self):
+    def test_conv_unary_fusion(self):
+        class ConvEltwise(nn.Module):
+            def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size):
+                super(ConvEltwise, self).__init__()
+                self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+                self.eltwise = eltwise_fn
+
+            def forward(self, x):
+                a = self.conv(x)
+                b = self.eltwise(a)
+                c = torch.add(b, b)
+                return c
+
+        batch_size = 8
+        out_channels = 16
+        in_channels = 3
+        kernel_size = 3
+        image_size = 16
+
+        for dim in [2, 3]:
+            for eltwise in PyTorch_op_to_IPEX_op_map:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+
+                x = torch.randn(input_size)
+                m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
+
+                ipex_eltwise_op = PyTorch_op_to_IPEX_op_map[eltwise]
+
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op)
+                self._test_output_bf16(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
+                    prec=0.02)
+
+    def test_conv_non_unary_fusion(self):
         batch_size = 8
         out_channels = 16
         in_channels = 3
@@ -1391,50 +1376,6 @@ class Tester(TestCase):
                 x,
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvSiluOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
-            self._test_output(
-                ConvSiluInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
-            self._test_output_bf16(
-                ConvSiluOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
-                prec=0.02)
-            self._test_output_bf16(
-                ConvSiluInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_swish_run",
-                kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvSigmoidOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack")
-            self._test_output_bf16(
-                ConvSigmoidOutplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvSigmoidInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack")
-            self._test_output_bf16(
-                ConvSigmoidInplace(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_sigmoid_run",
-                kind_not_in_graph="ipex_prepack::convolution_sigmoid_prepack",
                 prec=0.02)
             self._test_output(
                 ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size, True),
@@ -1946,7 +1887,7 @@ class Tester(TestCase):
             kind_in_graph="ipex_prepack::convolution_run",
             kind_not_in_graph="ipex_prepack::convolution_add_run")
 
-    def test_output_conv_relu(self):
+    def test_output_conv_leaky_relu(self):
         batch_size = 8
         out_channels = 32
         in_channels = 3
@@ -1958,17 +1899,6 @@ class Tester(TestCase):
                 input_size.append(image_size)
             x = torch.randn(input_size)
 
-            self._test_output(
-                ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="ipex_prepack::convolution_relu_prepack")
-            self._test_output_bf16(
-                ConvRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="ipex_prepack::convolution_relu_prepack",
-                prec=0.02)
             self._test_output(
                 ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
@@ -2384,27 +2314,45 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::div",
                 prec=0.2)
 
-    def test_output_linear_relu(self):
-        self._test_output(
-            LinearRelu(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearRelu(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_relu_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=0.02)
-        self._test_output(
-            LinearRelu(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearRelu(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_relu_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=0.02)
+    def test_linear_unary_fusion(self):
+        class LinearEltwise(nn.Module):
+            def __init__(self, eltwise_fn, in_channels, out_channels, **kwargs):
+                super(LinearEltwise, self).__init__()
+                self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+                self.eltwise = eltwise_fn
+
+            def forward(self, x):
+                a = self.linear(x)
+                b = self.eltwise(a)
+                return b
+        
+        batch_size = 3
+        out_channels = 32
+        in_channels = 3
+        for bias in [True, False]:
+            for eltwise in PyTorch_op_to_IPEX_op_map:
+                input_size = [batch_size, in_channels]
+                
+                x = torch.randn(input_size)
+                m = LinearEltwise(eltwise, in_channels, out_channels, bias=bias)
+                
+                ipex_eltwise_op = PyTorch_op_to_IPEX_op_map[eltwise]
+                
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="aten::linear")
+                self._test_onednn_fp32(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::linear_prepack")                
+                self._test_output_bf16(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::linear_prepack",
+                    prec=0.02)                
 
     def test_output_linear_add(self):
         self._test_output(
@@ -2417,18 +2365,6 @@ class Tester(TestCase):
             Linear_Reshape_Relu(3, 32,(64,16),bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
-
-    def test_output_linear_sigmoid(self):
-        self._test_output(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=0.02)
 
     def test_output_linear_bn(self):
         self._test_output(
@@ -2456,97 +2392,25 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::linear_prepack",
                 prec=1e-2)
 
-    def test_output_linear_tanh(self):
-        self._test_output(
-            LinearTanh(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearTanh(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_tanh_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=5e-3)
-        self._test_output(
-            LinearTanh(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearTanh(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_tanh_run",
-            kind_not_in_graph="ipex_prepack::linear_prepack",
-            prec=5e-3)
-
     def test_output_linear_swish(self):
-        def _test_onednn_fp32(model, input, kind_in_graph, prec=5e-3):
-            model = model.eval()
-            model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
-            with torch.no_grad():
-                res_ref = model(input)
-                tr_model = torch.jit.trace(model, (input))
-                tr_model = torch.jit.freeze(tr_model)
-                tr_model(input)
-                trace_graph = tr_model.graph_for(input)
-                res_jit = tr_model(input)
-                self.assertEqual(res_ref, res_jit)
-                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-
-        _test_onednn_fp32(
-            LinearSwish_v1(3, 32, bias=True),
+        self._test_onednn_fp32(
+            LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run")
 
         self._test_output_bf16(
-            LinearSwish_v1(3, 32, bias=True),
+            LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
             prec=5e-3)
-        _test_onednn_fp32(
-            LinearSwish_v1(3, 32, bias=False),
+        self._test_onednn_fp32(
+            LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run")
         self._test_output_bf16(
-            LinearSwish_v1(3, 32, bias=False),
+            LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
-            prec=5e-3)
-        _test_onednn_fp32(
-            LinearSwish(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-        self._test_output_bf16(
-            LinearSwish(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run",
-            prec=5e-3)
-        _test_onednn_fp32(
-            LinearSwish(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-        self._test_output_bf16(
-            LinearSwish(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run", prec=5e-3)
-
-    def test_output_linear_sigmoid(self):
-        self._test_output(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearSigmoid(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_sigmoid_run",
-            prec=5e-3)
-        self._test_output(
-            LinearSigmoid(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="aten::linear")
-        self._test_output_bf16(
-            LinearSigmoid(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_sigmoid_run",
             prec=5e-3)
 
     def test_channel_shuffle(self):

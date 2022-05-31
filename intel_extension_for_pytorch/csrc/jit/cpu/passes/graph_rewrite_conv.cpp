@@ -1,5 +1,6 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/jit/cpu/kernels/OpContext.h"
+#include "csrc/jit/cpu/passes/utils.h"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -174,44 +175,48 @@ void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_relu, rewriter_sigmoid, rewriter_hardtanh,
-      rewriter_elu, rewriter_swish, rewriter_silu, rewriter_leaky_relu,
-      rewriter_gelu;
-  std::array<std::string, 2> relu_operators = {"relu", "relu_"};
+  SubgraphRewriter rewriter_hardtanh, rewriter_elu, rewriter_swish,
+      rewriter_leaky_relu, rewriter_gelu;
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> hardtanh_operators = {"hardtanh", "hardtanh_"};
   std::array<std::string, 2> elu_operators = {"elu", "elu_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
-  std::array<std::string, 2> silu_operators = {"silu", "silu_"};
   std::array<std::string, 2> leaky_relu_operators = {
       "leaky_relu", "leaky_relu_"};
 
-  auto conv_relu_rstring = CodeTemplate(R"(
+  // For unary post OPs:
+  auto conv_op_rstring = at::jit::CodeTemplate(R"(
     graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
         %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::${relu}(%x)
+        %res = ${op}(%x)
         return (%res))");
 
-  std::string conv_relu_fused = R"(
+  auto conv_op_fused_rstring = at::jit::CodeTemplate(R"(
     graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_relu_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
-        %res = ipex_prepack::convolution_relu_run(%input, %packed_weight)
-        return (%res))";
-
-  auto conv_sigmoid_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
-        %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::${sigmoid}(%x)
+        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_${op}_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
+        %res = ipex_prepack::convolution_${op}_run(%input, %packed_weight)
         return (%res))");
 
-  std::string conv_sigmoid_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_sigmoid_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
-        %res = ipex_prepack::convolution_sigmoid_run(%input, %packed_weight)
-        return (%res))";
+  for (auto const& it : utils::supported_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
 
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        conv_op_rstring.format(env), conv_op_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
+
+  // For post OPs with multiple inputs
   auto conv_hardtanh_rstring = CodeTemplate(R"(
     graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %min, %max):
         %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
@@ -246,13 +251,6 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = aten::${mul}(%x, %y)
         return (%res))");
 
-  auto conv_silu_rstring = CodeTemplate(R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
-        %packed_weight: __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
-        %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::${silu}(%x)
-        return (%res))");
-
   std::string conv_swish_fused = R"(
     graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
         %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_swish_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
@@ -285,29 +283,14 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::convolution_gelu_run(%input, %approximate, %packed_weight)
         return (%res))";
 
-  for (const auto& relu : relu_operators) {
-    TemplateEnv env;
-    env.s("relu", relu);
-    rewriter_relu.RegisterRewritePattern(
-        conv_relu_rstring.format(env), conv_relu_fused);
-  }
-
   for (const auto& sigmoid : sigmoid_operators) {
     TemplateEnv env;
     env.s("sigmoid", sigmoid);
-    rewriter_sigmoid.RegisterRewritePattern(
-        conv_sigmoid_rstring.format(env), conv_sigmoid_fused);
     for (const auto& mul : mul_operators) {
       env.s("mul", mul);
       rewriter_swish.RegisterRewritePattern(
           conv_sigmoid_mul_rstring.format(env), conv_swish_fused);
     }
-  }
-  for (const auto& silu : silu_operators) {
-    TemplateEnv env;
-    env.s("silu", silu);
-    rewriter_silu.RegisterRewritePattern(
-        conv_silu_rstring.format(env), conv_swish_fused);
   }
 
   for (const auto& hardtanh : hardtanh_operators) {
@@ -353,13 +336,9 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
       };
 
   rewriter_gelu.RegisterRewritePattern(conv_gelu_rstring, conv_gelu_fused);
-
-  rewriter_relu.runOnGraph(graph);
-  rewriter_sigmoid.runOnGraph(graph);
   rewriter_hardtanh.runOnGraph(graph);
   rewriter_elu.runOnGraph(graph, filter_conv2d_elu);
   rewriter_swish.runOnGraph(graph);
-  rewriter_silu.runOnGraph(graph);
   rewriter_leaky_relu.runOnGraph(graph);
   rewriter_gelu.runOnGraph(graph, filter_conv_gelu);
 }
