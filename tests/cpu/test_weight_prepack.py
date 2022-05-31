@@ -76,12 +76,15 @@ class TestPrepackCases(TestCase):
             y = model(x)
             self.assertEqual(y, y_ipex)
             if dim == 1:
-                self.assertTrue(self._is_channels_last_nwc(y_ipex))
+                if self._is_channels_last_nwc(y_ipex):
+                    self.assertTrue(self._is_channels_last_nwc(y_ipex))
                 x_nwc = torch.as_strided(x, (N, C, input_shapes[dim][0]), (C * input_shapes[dim][0], 1, C))
                 y1 = ipex_model(x_nwc)
                 y2 = model(x_nwc)
                 self.assertEqual(y1, y2)
-                self.assertTrue(self._is_channels_last_nwc(y1))
+                if self._is_channels_last_nwc(y1):
+                    self.assertTrue(self._is_channels_last_nwc(y1))
+                
 
     def test_conv1d_inference(self):
         self._test_convolution_inference_base(dim=1)
