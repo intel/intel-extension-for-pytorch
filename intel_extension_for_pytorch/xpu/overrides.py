@@ -24,6 +24,7 @@ def implements_sub(torch_function):
 
 implements_sub(torch.empty)
 
+
 def set_default_tensor_type(tensor_type):
     class XPUDefaultTensorTypeMode(TorchFunctionMode):
 
@@ -56,3 +57,39 @@ def set_default_tensor_type(tensor_type):
 
         mode = partial(XPUDefaultTensorTypeMode, tensor_type)(inner=inner)
         mode_info.set_mode(mode)
+
+
+def enable_cl_to():
+    class XPUDefaultTensorTypeMode(TorchFunctionMode):
+
+        def __init__(self):
+            pass
+
+        def __torch_function__(self, func, types, args=(), kwargs=None):
+            if kwargs is None:
+                kwargs = {}
+
+            if func in [torch.Tensor.to]:
+                print("johnlu catched:", func)
+                # print("kwargs", kwargs)
+                if "memory_format" in kwargs:
+                    print("got memory_format=", kwargs["memory_format"])
+                    if kwargs["memory_format"] is torch.channels_last:
+                        print("to CL 2D")
+                        # This is very hacking code for PoC
+                        return args[0].transpose(1,2).contiguous().transpose(1,2)
+                    if kwargs["memory_format"] is torch.channels_last_3d:
+                        print("to CL 3D")
+                        pass
+            return func(*args, **kwargs)
+
+    mode_info = torch.overrides._TorchFunctionModeInfo()
+
+    old = mode_info.get_mode()
+    if old is None:
+        inner = mode_info.base_mode_class(inner=None)
+    else:
+        inner = old
+
+    mode = partial(XPUDefaultTensorTypeMode)(inner=inner)
+    mode_info.set_mode(mode)
