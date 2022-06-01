@@ -61,6 +61,12 @@ struct PackedConvWeightQDPCPP : public ConvPackedParamsBase<kSpatialDim> {
     return output;
   }
 
+  at::Tensor apply_dynamic(const at::Tensor& input, bool reduce_range)
+      override {
+    Tensor output;
+    return output;
+  }
+
   std::tuple<at::Tensor, c10::optional<at::Tensor>> unpack() override {
     return std::tuple<at::Tensor, c10::optional<at::Tensor>>(weight, bias);
   }
