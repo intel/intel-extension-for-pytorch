@@ -334,17 +334,19 @@ Tensor& arange_dpcpp_out(
         if (size == 0) {
           return;
         } else if (numel != size) {
-          TORCH_WARN(
-              "The number of elements in the out tensor of shape ",
-              result.sizes(),
-              " is ",
-              numel,
-              " which does not match the computed number of elements ",
-              size,
-              ". Note that this may occur as a result of rounding error. "
-              "The out tensor will be resized to a tensor of shape (",
-              size,
-              ",).");
+          if (numel > 0) {
+            TORCH_WARN(
+                "The number of elements in the out tensor of shape ",
+                result.sizes(),
+                " is ",
+                numel,
+                " which does not match the computed number of elements ",
+                size,
+                ". Note that this may occur as a result of rounding error. "
+                "The out tensor will be resized to a tensor of shape (",
+                size,
+                ",).");
+          }
           result.resize_({size});
         }
         auto& dpcpp_queue = dpcppGetCurrentQueue();
