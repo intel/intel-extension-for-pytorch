@@ -30,6 +30,7 @@ class CPUOPsTester(TestCase):
         self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
         self.assertEqual(y1, y2)
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_pixel_shuffle_unshuffle(self):
         def _test_pixel_shuffle_unshuffle_helper(num_input_dims, valid_channels_dim=True,
                                                  upscale_factor=None):
@@ -122,6 +123,7 @@ class CPUOPsTester(TestCase):
         test_pixel_shuffle_unshuffle_4D()
         test_pixel_shuffle_unshuffle_5D()
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_pixel_shuffle_nhwc_cpu(self):
         input = torch.randn(3, 18, 4, 4, device='cpu')
         input = input.contiguous(memory_format=torch.channels_last).requires_grad_()
@@ -306,6 +308,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_nearest1d(self):
         x = torch.randn(2, 2, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -330,6 +333,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_nearest2d(self):
         x = torch.randn(2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -371,6 +375,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_nearest3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -403,6 +408,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last_3d))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last_3d))
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_linear1d(self):
         x = torch.randn(2, 2, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -427,6 +433,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y4.dtype == datatype)
                 self.assertTrue(x4.grad.dtype == datatype)
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_bilinear2d(self):
         x = torch.randn(2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()
@@ -468,6 +475,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_upsample_trilinear3d(self):
         x = torch.randn(2, 2, 2, 4, 4)
         x1 = x.clone().detach().requires_grad_()

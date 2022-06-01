@@ -307,45 +307,6 @@ IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
       TORCH_SELECTIVE_NAME("aten::avg_pool2d"),
       TORCH_FN((&torch_ipex::autocast::avg_pool2d)));
   m.impl(
-      TORCH_SELECTIVE_NAME("aten::adaptive_max_pool2d"),
-      TORCH_FN((&torch_ipex::autocast::adaptive_max_pool2d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_nearest1d"),
-      TORCH_FN((&torch_ipex::autocast::upsample_nearest1d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_nearest1d.vec"),
-      TORCH_FN((&torch_ipex::autocast::upsample_nearest1d_vec)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_nearest2d"),
-      TORCH_FN((&torch_ipex::autocast::upsample_nearest2d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_nearest2d.vec"),
-      TORCH_FN((&torch_ipex::autocast::upsample_nearest2d_vec)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_nearest3d"),
-      TORCH_FN((&torch_ipex::autocast::upsample_nearest3d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_nearest3d.vec"),
-      TORCH_FN((&torch_ipex::autocast::upsample_nearest3d_vec)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_linear1d"),
-      TORCH_FN((&torch_ipex::autocast::upsample_linear1d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_linear1d.vec"),
-      TORCH_FN((&torch_ipex::autocast::upsample_linear1d_vec)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_bilinear2d"),
-      TORCH_FN((&torch_ipex::autocast::upsample_bilinear2d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_bilinear2d.vec"),
-      TORCH_FN((&torch_ipex::autocast::upsample_bilinear2d_vec)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_trilinear3d"),
-      TORCH_FN((&torch_ipex::autocast::upsample_trilinear3d)));
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::upsample_trilinear3d.vec"),
-      TORCH_FN((&torch_ipex::autocast::upsample_trilinear3d_vec)));
-  m.impl(
       TORCH_SELECTIVE_NAME("aten::relu"),
       TORCH_FN((&torch_ipex::autocast::relu)));
   m.impl(
