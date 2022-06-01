@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/MemoryOverlap.h>
+#include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/SortingUtils.h>
 #include <c10/macros/Macros.h>
 
@@ -138,41 +139,85 @@ struct KthValueLauncher {
   }
 };
 
-// this does not reduce to median with dim beause we don't want to copy twice
-template <typename scalar_t>
-Tensor median_template(const Tensor& self) {
-  TORCH_CHECK(self.numel() > 0, "median cannot be called with empty tensor");
-  if (self.dim() == 0 && self.numel() == 1) {
-    return self.clone();
-  }
-  auto self_copy = self.clone().view(-1);
-  auto values = at::empty({1}, self.options());
-  auto indices = at::empty({1}, self.options().dtype(kLong));
+std::tuple<Tensor&, Tensor&> median_with_indices_impl(
+    Tensor& values,
+    Tensor& indices,
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim) {
+  at::globalContext().alertNotDeterministic("median XPU with indices output");
+
+  dim = at::maybe_wrap_dim(dim, self.dim());
+  Tensor in = self.dim() > 0 ? self.contiguous() : self.unsqueeze(0);
+
   TORCH_CHECK(
       self.dim() <= MAX_TENSORINFO_DIMS,
       "cannot operate on more than ",
       MAX_TENSORINFO_DIMS,
       " dimensions");
 
-  // Based on required index size, run the algorithm with the
-  // appropriate index type
-  if (canUse32BitIndexMath(self) && canUse32BitIndexMath(values) &&
-      canUse32BitIndexMath(indices)) {
-    run_launcher<scalar_t, uint32_t>(
-        values,
-        indices,
-        self_copy,
-        0,
-        KthValueLauncher((self_copy.size(0) + 1) / 2)); // KthValue is 1-based
-  } else {
-    run_launcher<scalar_t, uint64_t>(
-        values,
-        indices,
-        self_copy,
-        0,
-        KthValueLauncher((self_copy.size(0) + 1) / 2)); // KthValue is 1-based
+  std::vector<int64_t> out_shape = self.sizes().vec();
+  at::native::zero_numel_check_dims(self, dim, "median()");
+  if (self.dim() > 0) {
+    if (keepdim) {
+      out_shape[dim] = 1;
+    } else {
+      out_shape.erase(out_shape.begin() + dim);
+    }
   }
-  return values.squeeze();
+
+  values.resize_(out_shape);
+  indices.resize_(out_shape);
+
+  if (self.numel() > 0) {
+    Tensor vals = keepdim && self.dim() > 0 ? values : values.unsqueeze(dim);
+    Tensor inds = keepdim && self.dim() > 0 ? indices : indices.unsqueeze(dim);
+    IPEX_DISPATCH_ALL_TYPES_AND(
+        at::ScalarType::Half, self.scalar_type(), "median_out_impl", [&] {
+          if (canUse32BitIndexMath(vals) && canUse32BitIndexMath(inds) &&
+              canUse32BitIndexMath(in)) {
+            run_launcher<scalar_t, uint32_t>(
+                vals,
+                inds,
+                in,
+                dim,
+                KthValueLauncher(
+                    (in.size(dim) + 1) / 2)); // KthValue is 1-based
+          } else {
+            run_launcher<scalar_t, uint64_t>(
+                vals,
+                inds,
+                in,
+                dim,
+                KthValueLauncher(
+                    (in.size(dim) + 1) / 2)); // KthValue is 1-based
+          }
+        });
+  }
+  return std::forward_as_tuple(values, indices);
+}
+
+Tensor median_impl(const Tensor& self, bool ignore_nan) {
+  int64_t size = self.numel();
+  // Return nan for empty tensors
+  if (size <= 0) {
+    return at::full({}, std::numeric_limits<float>::quiet_NaN())
+        .to(self.options());
+  }
+
+  // Sort input tensor to efficiently query for median element
+  Tensor sorted = std::get<0>(self.flatten().sort());
+
+  if (!ignore_nan) {
+    // For torch.median return either the middle element or nan (sorted as
+    // largest) if there are any
+    int64_t k = (size - 1) / 2;
+    return at::where(sorted[-1].isnan(), sorted[-1], sorted[k]);
+  } else {
+    // For torch.nanmedian return the middle element among the non-nan values
+    Tensor k = ((size - 1) - sorted.isnan().sum()) / 2;
+    return sorted[k.toType(kLong)];
+  }
 }
 
 template <typename scalar_t>
@@ -457,10 +502,16 @@ std::tuple<Tensor, Tensor> mode(const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 Tensor median(const Tensor& self) {
-  return IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "median", [&] {
-        return impl::median_template<scalar_t>(self);
-      });
+  return impl::median_impl(self, /*ignore_nan=*/true);
+}
+
+std::tuple<Tensor&, Tensor&> median_out(
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim,
+    Tensor& values,
+    Tensor& indices) {
+  return impl::median_with_indices_impl(values, indices, self, dim, keepdim);
 }
 
 std::tuple<Tensor&, Tensor&> kthvalue_out(

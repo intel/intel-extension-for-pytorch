@@ -342,6 +342,7 @@ supported:
   - mean.dim
   - mean.out
   - median
+  - median.dim_values
   - min
   - min.dim
   - min.dim_min
