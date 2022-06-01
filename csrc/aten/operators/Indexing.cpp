@@ -269,8 +269,28 @@ void indexAdd(
   at::assert_no_overlap(dst, indices);
   at::assert_no_overlap(dst, src);
 
-  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(
+      dst.dim() <= MAX_DPCPPTORCH_DIMS,
+      "tensor has too many (>",
+      DPCPPTORCH_DIM_WARNING,
+      ") dims");
+  TORCH_CHECK(
+      src.dim() <= MAX_DPCPPTORCH_DIMS,
+      "tensor has too many (>",
+      DPCPPTORCH_DIM_WARNING,
+      ") dims");
+  TORCH_CHECK(
+      indices.dim() <= MAX_DPCPPTORCH_DIMS,
+      "tensor has too many (>",
+      DPCPPTORCH_DIM_WARNING,
+      ") dims");
+
+  // See Note [Enabling Deterministic Operations]
+  if (globalContext().deterministicAlgorithms()) {
+    // TODO: enable deterministic algorithm
+    TORCH_CHECK(
+        false, "index_add is not implemented with deterministic algorithm.")
+  }
 
   // The `src` is partitioned into two parts:
   // -the size of each slice we are indexing, which is the
@@ -909,7 +929,7 @@ void index(
       });
 }
 
-void index_put(
+void index_put_impl(
     TensorIterator& iter,
     IntArrayRef index_size,
     IntArrayRef index_stride,
@@ -1008,6 +1028,48 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
+static std::tuple<bool, Tensor> canDispatchToMaskedFill(
+    const Tensor& self,
+    const torch::List<c10::optional<at::Tensor>>& indices,
+    const Tensor& value) {
+  if (!(value.numel() == 1 && value.device().is_cpu())) {
+    return std::make_tuple(false, Tensor());
+  }
+  int64_t num_ind = 0;
+  Tensor mask;
+  auto self_device = self.device();
+  for (const c10::optional<Tensor> i : indices) {
+    if (!i.has_value() || !(*i).defined()) {
+      num_ind++;
+    } else {
+      Tensor index = std::move(*i);
+      if ((index.scalar_type() != kByte && index.scalar_type() != kBool) ||
+          index.device() != self_device || mask.defined()) {
+        return std::make_tuple(false, Tensor());
+      } else {
+        mask = index;
+        for (int64_t j = 0; j < index.dim(); j++) {
+          int64_t srcIdx = num_ind + j;
+          TORCH_CHECK_INDEX(
+              index.size(j) == self.size(srcIdx),
+              "The shape of the mask ",
+              index.sizes(),
+              " at index ",
+              j,
+              " does not match the shape of the indexed tensor ",
+              self.sizes(),
+              " at index ",
+              srcIdx);
+        }
+        num_ind += mask.ndimension();
+      }
+    }
+  }
+  for (int64_t i = num_ind; i < self.ndimension(); i++) {
+    mask = mask.unsqueeze(-1);
+  }
+  return std::make_tuple(true, mask);
+}
 } // namespace impl
 
 Tensor& index_select_out(
@@ -1070,6 +1132,9 @@ Tensor& index_copy_(
       "index_copy_(): Index should have dimension 1 or 0 (got ",
       index.dim(),
       ")");
+  at::assert_no_internal_overlap(self);
+  at::assert_no_overlap(self, index);
+  at::assert_no_overlap(self, source);
 
   int64_t numIndices = index.numel();
   if (source.dim() == 0 && numIndices != 1) {
@@ -1089,9 +1154,25 @@ Tensor& index_copy_(
         ")");
   }
 
-  TORCH_CHECK_INDEX(
+  TORCH_CHECK(
       index.scalar_type() == ScalarType::Long,
-      "index_copy_(): Expected Tensor for index");
+      "index_copy_(): Expected a long tensor for index, but got ",
+      index.scalar_type())
+  TORCH_CHECK(
+      self.scalar_type() == source.scalar_type(),
+      "index_copy_(): self and source expected to have the same dtype, but got (self) ",
+      self.scalar_type(),
+      " and (source) ",
+      source.scalar_type());
+  TORCH_CHECK(
+      self.device() == source.device() && self.device() == index.device(),
+      "index_copy_(): self, index and source expected to be in the same device, but got (self) ",
+      self.device(),
+      ", (index) ",
+      index.device(),
+      ", and (source) ",
+      source.device());
+
   // Check that source and destination slices have the same size
   auto selfSlicedSizes = self.sizes().vec();
   if (selfSlicedSizes.size() > 0) {
@@ -1122,6 +1203,13 @@ Tensor& index_copy_(
       source.size(dim),
       ")");
 
+  // See Note [Enabling Deterministic Operations]
+  if (globalContext().deterministicAlgorithms()) {
+    // TODO: enable deterministic algorithm
+    TORCH_CHECK(
+        false, "index_copy is not implemented with deterministic algorithm.");
+  }
+
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
@@ -1137,6 +1225,18 @@ Tensor& index_fill_(
     int64_t dim,
     const Tensor& index,
     const Scalar& value) {
+  TORCH_CHECK_INDEX(
+      index.scalar_type() == ScalarType::Long,
+      "index_fill_(): Expected dtype int64 for index.");
+
+  at::assert_no_overlap(self, index);
+  if (at::has_internal_overlap(self) == at::MemOverlap::YES) {
+    TORCH_WARN(
+        "Use of index_fill_ on expanded tensors is deprecated. "
+        "Please clone() the tensor before performing this operation. "
+        "This also applies to advanced indexing e.g. tensor[mask] = scalar");
+  }
+
   if (!self.is_complex() && value.isComplex()) {
     TORCH_CHECK(
         false,
@@ -1268,6 +1368,14 @@ Tensor& masked_scatter_(
     Tensor& self,
     const Tensor& mask,
     const Tensor& source) {
+  at::assert_no_internal_overlap(self);
+  TORCH_CHECK(
+      self.scalar_type() == source.scalar_type(),
+      "masked_scatter: expected self and source to have same dtypes but got",
+      self.scalar_type(),
+      " and ",
+      source.scalar_type());
+
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
@@ -1291,6 +1399,14 @@ Tensor& masked_scatter_(
 }
 
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
+  TORCH_CHECK(
+      self.scalar_type() == out.scalar_type(),
+      "masked_select(): self and result must have the same scalar type")
+
+  at::assert_no_internal_overlap(out);
+  at::assert_no_overlap(out, self);
+  at::assert_no_overlap(out, mask);
+
   c10::MaybeOwned<Tensor> b_self, b_mask;
   std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
@@ -1336,6 +1452,11 @@ Tensor& put_(
       self.dtype(),
       " and ",
       source_.dtype());
+
+  at::assert_no_internal_overlap(self);
+  at::assert_no_overlap(self, index_);
+  at::assert_no_overlap(self, source_);
+
   Tensor index;
   Tensor source;
   // Ensure index is on the same device as self
@@ -1422,10 +1543,43 @@ Tensor& _index_put_impl_(
       " (got ",
       indices.size(),
       ")");
+  if (at::has_internal_overlap(self) == MemOverlap::YES) {
+    TORCH_WARN(
+        "Use of index_put_ on expanded tensors is deprecated. "
+        "Please clone() the tensor before performing this operation. "
+        "This also applies to advanced indexing e.g. tensor[indices] = tensor");
+  }
+  if (!accumulate) {
+    auto masked_fill_dispatch =
+        impl::canDispatchToMaskedFill(self, indices, value);
+    if (std::get<0>(masked_fill_dispatch)) {
+      return self.masked_fill_(std::get<1>(masked_fill_dispatch), value.item());
+    }
+  }
+  auto value_ = value;
+  if (value.device() != self.device() && value.numel() == 1 &&
+      value.dim() == 0) {
+    value_ = value.to(self.device());
+  }
+  at::assert_no_overlap(self, value);
+  // NOLINTNEXTLINE(performance-implicit-conversion-in-loop)
+  for (const c10::optional<Tensor>& index : indices) {
+    if (index.has_value()) {
+      at::assert_no_overlap(self, *index);
+    }
+  }
+
+  // See Note [Enabling Deterministic Operations]
+  if (accumulate && globalContext().deterministicAlgorithms()) {
+    // TODO: enable deterministic algorithm and change the condition check.
+    TORCH_CHECK(
+        false, "index_put is not implemented with deterministic algorithm.");
+  }
 
   auto info = make_info(self, indices);
   auto iter = make_index_put_iterator(info, value);
-  impl::index_put(iter, info.indexed_sizes, info.indexed_strides, accumulate);
+  impl::index_put_impl(
+      iter, info.indexed_sizes, info.indexed_strides, accumulate);
   return self;
 }
 
