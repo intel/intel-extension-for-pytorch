@@ -178,6 +178,25 @@ void vectorized_elementwise_kernel(
   }
 }
 
+constexpr int max_scalar_size_(std::tuple<>) {
+  return 0;
+}
+
+template <typename scalar_t, typename... types>
+constexpr int max_scalar_size_(std::tuple<scalar_t, types...>) {
+  return std::max<int>(
+      sizeof(scalar_t), max_scalar_size_(std::tuple<types...>{}));
+}
+
+template <typename func_t>
+constexpr static inline int max_scalar_size() {
+  using traits = function_traits<func_t>;
+  using args_t = typename traits::ArgsTuple;
+  constexpr auto size = max_scalar_size_(args_t{});
+  using return_t = typename traits::result_type;
+  return std::max<int>(sizeof(return_t), size);
+}
+
 // Assumption:
 // this function assume trivial 1d and no dynamic casting
 template <
@@ -193,20 +212,24 @@ static inline void launch_vectorized_kernel(
     outp_calc_t& output_calc,
     int vec_size) {
   using traits = function_traits<func_t>;
+  constexpr auto max_scalar_bytes = max_scalar_size<func_t>();
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto thread_num = (N + vec_size - 1) / vec_size;
 
-#define VEC_LOOPS_KERNEL(vec_size)                                  \
-  {                                                                 \
-    auto cgf = DPCPP_Q_CGF(cgh) {                                   \
-      cgh.parallel_for(                                             \
-          DPCPP::range<1>(thread_num), [=](DPCPP::item<1> itemId) { \
-            vectorized_elementwise_kernel<vec_size>(                \
-                itemId, N, fn, data, input_calc, output_calc);      \
-          });                                                       \
-    };                                                              \
-    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);                               \
+#define VEC_LOOPS_KERNEL(vec_size)                                    \
+  {                                                                   \
+    TORCH_CHECK(max_scalar_bytes* vec_size <= 16);                    \
+    if constexpr (max_scalar_bytes * vec_size <= 16) {                \
+      auto cgf = DPCPP_Q_CGF(cgh) {                                   \
+        cgh.parallel_for(                                             \
+            DPCPP::range<1>(thread_num), [=](DPCPP::item<1> itemId) { \
+              vectorized_elementwise_kernel<vec_size>(                \
+                  itemId, N, fn, data, input_calc, output_calc);      \
+            });                                                       \
+      };                                                              \
+      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);                               \
+    }                                                                 \
   }
 
   switch (vec_size) {
