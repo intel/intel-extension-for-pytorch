@@ -404,6 +404,7 @@ setup(
               'intel_extension_for_pytorch.autograd',
               'intel_extension_for_pytorch.xpu.intrinsic',
               'intel_extension_for_pytorch.xpu.intrinsic.modules',
+              'intel_extension_for_pytorch.xpu.amp',
               'intel_extension_for_pytorch.optim'],
     install_requires=['typing_extensions'],
     package_data={

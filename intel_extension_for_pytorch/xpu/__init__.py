@@ -11,6 +11,7 @@ from .memory import *
 from .intrinsic import *
 from .settings import *
 from .itt import emit_itt
+from .amp import *
 
 from intel_extension_for_pytorch._utils import _get_device_index  # , _dummy_type
 import intel_extension_for_pytorch.optim as optim

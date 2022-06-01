@@ -37,7 +37,8 @@ if (NOT USE_HOOKS)
   file(GLOB disabled_src "core/detail/Hooks.cpp")
   list(REMOVE_ITEM aten_core_src "${disabled_src}")
 endif()
-set(IPEX_ATEN_CORE_SRCS ${aten_core_src} PARENT_SCOPE)
+FILE(GLOB aten_src "amp/*.cpp")
+set(IPEX_ATEN_CORE_SRCS ${aten_core_src} ${aten_src} PARENT_SCOPE)
 
 list(APPEND aten_core_headers
   ${IPEX_GPU_ATEN_CORE_DIR}/Allocator.h
