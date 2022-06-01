@@ -17,16 +17,22 @@ namespace dpcpp {
  *    Default = 0, Set 1 to show all launch option values
  * IPEX_VERBOSE:
  *    Default = 0, Set verbose level with synchronization execution mode
- * IPEX_XPU_BACKEND:
- *    Default = 0 (XB_GPU), Set XPU_BACKEND as global IPEX backend
- * IPEX_XPU_SYNC_MODE:
- *    Default = 0, Set 1 to enforce synchronization execution mode
- * IPEX_TILE_AS_DEVICE:
- *    Default = 1, Set 0 to disable tile partition and map per root device
- * IPEX_XPU_ONEDNN_LAYOUT:
- *    Default = 0, Set 1 to enable onednn specific layouts
- * IPEX_TF32_MODE:
- *    Default = 0, Set 1 to enable TF32 mode execution
+ * IPEX_FP32_MATH_MODE:
+ *    Default = 0, Set values for FP32 math mode (0: FP32, 1: TF32, 2: BF32)
+ *
+ * XPU private optionos:
+ *   IPEX_XPU_BACKEND:
+ *      Default = 0 (XB_GPU), Set XPU_BACKEND as global IPEX backend
+ *   IPEX_XPU_SYNC_MODE:
+ *      Default = 0, Set 1 to enforce synchronization execution mode
+ *   IPEX_TILE_AS_DEVICE:
+ *      Default = 1, Set 0 to disable tile partition and map per root device
+ *   IPEX_SIMPLE_TRACE:
+ *      Default = 0, Set 1 to enable simple trace for all operators*
+ *
+ * Experimental options:
+ *   IPEX_XPU_ONEDNN_LAYOUT:
+ *      Default = 0, Set 1 to enable onednn specific layouts
  */
 
 static std::mutex s_mutex;
@@ -78,15 +84,13 @@ Settings::Settings() {
     verbose_level = env_verbose_level.value();
   }
 
-  /* Not ready so far.
   xpu_backend = XPU_BACKEND::XB_GPU;
   DPCPP_ENV_TYPE_DEF(env_xpu_backend, XPU_BACKEND, xpu_backend, show_opt);
-  if (env_xpu_backend.has_value()
-      && ((env_xpu_backend.value() >= XPU_BACKEND::XB_GPU)
-        && (env_xpu_backend.value() < XPU_BACKEND::XB_MAX))) {
+  if (env_xpu_backend.has_value() &&
+      ((env_xpu_backend.value() >= XPU_BACKEND::XB_GPU) &&
+       (env_xpu_backend.value() < XPU_BACKEND::XB_MAX))) {
     xpu_backend = static_cast<XPU_BACKEND>(env_xpu_backend.value());
   }
-  */
 
   sync_mode_enabled = false;
   DPCPP_ENV_TYPE_DEF(env_sync_mode, XPU_SYNC_MODE, sync_mode_enabled, show_opt);
@@ -108,13 +112,13 @@ Settings::Settings() {
     onednn_layout_enabled = true;
   }
 
-  /* Not ready so far.
-  tf32_mode_enabled = false;
-  DPCPP_ENV_TYPE_DEF(env_tf32_mode, TF32_MODE, tf32_mode_enabled, show_opt);
-  if (env_tf32_mode.has_value() && (env_tf32_mode.value() != 0)) {
-    tf32_mode_enabled = true;
+  fp32_math_mode = FP32_MATH_MODE::FMM_FP32;
+  DPCPP_ENV_TYPE_DEF(env_math_mode, FP32_MATH_MODE, fp32_math_mode, show_opt);
+  if (env_math_mode.has_value() &&
+      ((env_math_mode.value() >= FP32_MATH_MODE::FMM_FP32) &&
+       (env_math_mode.value() < FP32_MATH_MODE::FMM_MAX))) {
+    fp32_math_mode = static_cast<FP32_MATH_MODE>(env_math_mode.value());
   }
-  */
 
 #ifdef BUILD_SIMPLE_TRACE
   simple_trace_enabled = false;
@@ -136,19 +140,24 @@ int Settings::get_verbose_level() const {
   return verbose_level;
 }
 
-void Settings::set_verbose_level(int level) {
+bool Settings::set_verbose_level(int level) {
   std::lock_guard<std::mutex> lock(s_mutex);
   verbose_level = level;
+  return true;
 }
 
-XPU_BACKEND Settings::get_xpu_backend() const {
+XPU_BACKEND Settings::get_backend() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return xpu_backend;
 }
 
-void Settings::set_xpu_backend(XPU_BACKEND backend) {
+bool Settings::set_backend(XPU_BACKEND backend) {
   std::lock_guard<std::mutex> lock(s_mutex);
-  xpu_backend = backend;
+  if ((backend >= XPU_BACKEND::XB_GPU) && (backend < XPU_BACKEND::XB_MAX)) {
+    xpu_backend = backend;
+    return true;
+  }
+  return false;
 }
 
 bool Settings::is_sync_mode_enabled() const {
@@ -186,19 +195,19 @@ void Settings::disable_onednn_layout() {
   onednn_layout_enabled = false;
 }
 
-bool Settings::is_tf32_mode_enabled() const {
+FP32_MATH_MODE Settings::get_fp32_math_mode() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return tf32_mode_enabled;
+  return fp32_math_mode;
 }
 
-void Settings::enable_tf32_mode() {
+bool Settings::set_fp32_math_mode(FP32_MATH_MODE math_mode) {
   std::lock_guard<std::mutex> lock(s_mutex);
-  tf32_mode_enabled = true;
-}
-
-void Settings::disable_tf32_mode() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  tf32_mode_enabled = false;
+  if ((math_mode >= FP32_MATH_MODE::FMM_FP32) &&
+      (math_mode < FP32_MATH_MODE::FMM_MAX)) {
+    fp32_math_mode = math_mode;
+    return true;
+  }
+  return false;
 }
 
 bool Settings::set_onednn_verbose(int level) {

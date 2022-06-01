@@ -537,14 +537,14 @@ void init_module(pybind11::module& m) {
       "_get_verbose_level", []() { return Settings::I().get_verbose_level(); });
 
   m.def("_set_verbose_level", [](int level) {
-    Settings::I().set_verbose_level(level);
+    return Settings::I().set_verbose_level(level);
   });
 
-  m.def("_get_xpu_backend", []() {
-    return int(Settings::I().get_xpu_backend());
+  m.def("_get_backend", []() {
+    return static_cast<int>(Settings::I().get_backend());
   });
-  m.def("_set_xpu_backend", [](const int backend) {
-    Settings::I().set_xpu_backend(static_cast<XPU_BACKEND>(backend));
+  m.def("_set_backend", [](const int backend) {
+    return Settings::I().set_backend(static_cast<XPU_BACKEND>(backend));
   });
 
   m.def("_is_sync_mode", []() { return Settings::I().is_sync_mode_enabled(); });
@@ -568,20 +568,20 @@ void init_module(pybind11::module& m) {
     Settings::I().disable_onednn_layout();
   });
 
-  m.def("_is_tf32_mode_enabled", []() {
-    return Settings::I().is_tf32_mode_enabled();
-  });
-
-  m.def("_enable_tf32_mode", []() { Settings::I().enable_tf32_mode(); });
-
-  m.def("_disable_tf32_mode", []() { Settings::I().disable_tf32_mode(); });
-
   m.def("_set_onednn_verbose", [](const int level) {
     return Settings::I().set_onednn_verbose(level);
   });
 
   m.def("_set_onemkl_verbose", [](const int level) {
     return Settings::I().set_onemkl_verbose(level);
+  });
+
+  m.def("_get_fp32_math_mode", []() {
+    return static_cast<int>(Settings::I().get_fp32_math_mode());
+  });
+  m.def("_set_fp32_math_mode", [](const int math_mode) {
+    return Settings::I().set_fp32_math_mode(
+        static_cast<FP32_MATH_MODE>(math_mode));
   });
 
   m.def("_enable_simple_trace", []() {

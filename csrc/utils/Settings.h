@@ -6,6 +6,12 @@ namespace xpu {
 namespace dpcpp {
 
 enum IPEX_API XPU_BACKEND { XB_GPU = 0, XB_CPU = 1, XB_AUTO = 2, XB_MAX = 3 };
+enum IPEX_API FP32_MATH_MODE {
+  FMM_FP32 = 0,
+  FMM_TF32 = 1,
+  FMM_BF32 = 2,
+  FMM_MAX = 3
+};
 
 class IPEX_API Settings final {
  public:
@@ -14,10 +20,10 @@ class IPEX_API Settings final {
   static Settings& I(); // Singleton
 
   int get_verbose_level() const;
-  void set_verbose_level(int level);
+  bool set_verbose_level(int level);
 
-  XPU_BACKEND get_xpu_backend() const;
-  void set_xpu_backend(XPU_BACKEND backend);
+  XPU_BACKEND get_backend() const;
+  bool set_backend(XPU_BACKEND backend);
 
   bool is_sync_mode_enabled() const;
   void enable_sync_mode();
@@ -29,9 +35,8 @@ class IPEX_API Settings final {
   void enable_onednn_layout();
   void disable_onednn_layout();
 
-  bool is_tf32_mode_enabled() const;
-  void enable_tf32_mode();
-  void disable_tf32_mode();
+  FP32_MATH_MODE get_fp32_math_mode() const;
+  bool set_fp32_math_mode(FP32_MATH_MODE math_mode);
 
   bool set_onednn_verbose(int level);
   bool set_onemkl_verbose(int level);
@@ -51,11 +56,11 @@ class IPEX_API Settings final {
  private:
   int verbose_level;
   XPU_BACKEND xpu_backend;
+  FP32_MATH_MODE fp32_math_mode;
 
   bool sync_mode_enabled;
   bool tile_as_device_enabled;
   bool onednn_layout_enabled;
-  bool tf32_mode_enabled;
 
 #ifdef BUILD_SIMPLE_TRACE
   bool simple_trace_enabled;
