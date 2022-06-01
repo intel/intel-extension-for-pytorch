@@ -1,5 +1,5 @@
 #include <ATen/core/op_registration/op_registration.h>
-#include <ATen/native/quantized/cpu/packed_params.h>
+#include <ATen/native/quantized/packed_params.h>
 
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
