@@ -60,6 +60,9 @@ bool is_channelslast(c10::TensorType tensor) {
 
 // Check if the memory format of the tensor is Contiguous
 bool is_contiguous(c10::TensorTypePtr tensor) {
+  if (!tensor->sizes().concrete_sizes().has_value()) {
+    return false;
+  }
   auto tensor_contiguous = tensor->contiguous();
   bool is_contiguous = tensor_contiguous->strides() == tensor->strides();
   return is_contiguous;

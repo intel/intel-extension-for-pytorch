@@ -2701,7 +2701,7 @@ class Tester(TestCase):
             kind_in_graph="ipex::batch_norm",
             prec=5e-3)
 
-    def test_restore_and_enable_inplace(self):
+    def test_restore_inplace(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
                 super(M, self).__init__()
@@ -2720,9 +2720,7 @@ class Tester(TestCase):
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
 #use torch.sigmoid_(x)
                 eltwise_fn = getattr(torch, eltwise_fn_name)
-                eltwise_fn_outplace = getattr(torch, eltwise)
                 m = M(eltwise_fn)
-                m_outplace = M(eltwise_fn_outplace)
             elif eltwise == 'clamp':
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn, {"min": 0, "max": 2})
@@ -2730,13 +2728,10 @@ class Tester(TestCase):
 #use F.elu(x, inplace = True)
                 eltwise_fn = getattr(F, eltwise)
                 m = M(eltwise_fn, {"inplace": True})
-                m_outplace = M(eltwise_fn)
 
             with torch.no_grad():
                 m.eval()
-                m_outplace.eval()
                 x = torch.randn(1, 3, 16, 16)
-                x_outplace = torch.randn(1, 3, 16, 16)
 
 #test restore inplace
                 traced = torch.jit.trace(m, x)
@@ -2747,9 +2742,39 @@ class Tester(TestCase):
                 traced_y = traced(x)
                 self.assertEqual(y, traced_y)
 
+
+    def test_enable_inplace(self):
+        class M(nn.Module):
+            def __init__(self, eltwise_fn, params_dict={}):
+                super(M, self).__init__()
+                self.eltwise = eltwise_fn
+                self.params_dict = params_dict
+
+            def forward(self, x):
+                # put a softmax here for following reasons:
+                # (1) x is the input, pass it to eltwise op will make it unable to be inplace
+                # (2) ipex::softmax will not be fused into TE with following eltwise
+                x1 = nn.Softmax(dim=-1)(x)
+                x1 = self.eltwise(x1, **self.params_dict)
+                return x1
+
+        for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu']:
+            eltwise_fn_name = eltwise + '_'
+            if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
+#use torch.sigmoid_(x)
+                eltwise_fn_outplace = getattr(torch, eltwise)
+                m_outplace = M(eltwise_fn_outplace)
+            else:
+#use F.elu(x, inplace = True)
+                eltwise_fn = getattr(F, eltwise)
+                m = M(eltwise_fn, {"inplace": True})
+                m_outplace = M(eltwise_fn)
+
+            with torch.no_grad():
+                m_outplace.eval()
+                x_outplace = torch.randn(1, 3, 16, 16)
+
 #test enable inplace
-                if eltwise == 'clamp':
-                    continue
                 traced_outplace = torch.jit.trace(m_outplace, x_outplace)
                 trace_graph_outplace = traced_outplace.graph_for(x_outplace)
                 self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_outplace.nodes()))

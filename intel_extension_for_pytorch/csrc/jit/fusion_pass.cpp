@@ -439,9 +439,6 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // getSubgraphRewriter().runOnGraph(graph);
   OpFuser(graph->block(), graph).run();
 
-  // apply inplace optimization before outplace op replacements
-  ApplyInplaceOptimization(graph);
-
   // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
 
@@ -515,6 +512,11 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   if (tensorExprFuserEnabled()) {
     FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
   }
+
+  // Apply IPEX inplace optimization/replacement
+  // Note: Since TE is with priority and it has not supported inplace op yet,
+  //       we make inplace optimization after TE.
+  ApplyInplaceOptimization(graph);
 
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(
