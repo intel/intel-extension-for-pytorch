@@ -92,17 +92,16 @@ class TestPrepackCases(TestCase):
     def test_conv3d_inference(self):
         self._test_convolution_inference_base(dim=3)
 
-    def _test_convolution_training_base(self, dim):
+    def _test_convolution_training_base(self, dim, dtype, rtol=None, atol=None):
         input_shapes = {1: (224,), 2: (224, 224), 3: (55, 55, 55)}
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         options = itertools.product([True, False], [1, 2], [1, 4],
-                [torch.contiguous_format, channels_last], [torch.float, torch.bfloat16],
-                [True, False])
+                [torch.contiguous_format, channels_last], [True, False])
 
-        for bias, dilation, groups, memory_format, dtype, feed_sample_input in options:
+        for bias, dilation, groups, memory_format, feed_sample_input in options:
             N = torch.randint(3, 10, (1,)).item()
-            M = torch.randint(1, 3, (1,)).item() * groups
-            C = torch.randint(1, 3, (1,)).item() * groups
+            M = torch.randint(3, 10, (1,)).item() * groups
+            C = torch.randint(3, 10, (1,)).item() * groups
             x_shape = (N, C) + input_shapes[dim]
             x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
 
@@ -139,7 +138,6 @@ class TestPrepackCases(TestCase):
             origin_optimizer1.zero_grad()
             loss1.backward()
             origin_optimizer1.step()
-
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # ipex path with inplace=False
                 y2 = ipex_model1(x2)
@@ -154,21 +152,21 @@ class TestPrepackCases(TestCase):
                 loss3.backward()
                 ipex_optimizer2.step()
 
-            self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-03)
-            self.assertEqual(y1, y3.float(), rtol=1e-2, atol=1e-03)
-            self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-03)
-            self.assertEqual(x1.grad, x3.grad, rtol=1e-2, atol=1e-03)
+            self.assertEqual(y1, y2.float(), rtol=rtol, atol=atol)
+            self.assertEqual(y1, y3.float(), rtol=rtol, atol=atol)
+            self.assertEqual(x1.grad, x2.grad, rtol=rtol, atol=atol)
+            self.assertEqual(x1.grad, x3.grad, rtol=rtol, atol=atol)
             if bias:
-                self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad.float(),  rtol=1e-2, atol=1e-03)
-                self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad.float(),  rtol=1e-2, atol=1e-03)
+                self.assertEqual(origin_model1.bias.grad, ipex_model1.bias.grad.float(), rtol=rtol, atol=atol)
+                self.assertEqual(origin_model1.bias.grad, ipex_model2.bias.grad.float(), rtol=rtol, atol=atol)
 
             # compare origin_model parameters with origin_model parameters after grad updata
             origin_model_state = origin_model1.state_dict()
             ipex_model_state1 = ipex_model1.state_dict()
             ipex_model_state2 = ipex_model2.state_dict()
             for var_name in origin_model_state:
-                self.assertEqual(origin_model_state[var_name], ipex_model_state1[var_name], rtol=1e-2, atol=1e-03)
-                self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name], rtol=1e-2, atol=1e-03)
+                self.assertEqual(origin_model_state[var_name], ipex_model_state1[var_name], rtol=rtol, atol=atol)
+                self.assertEqual(origin_model_state[var_name], ipex_model_state2[var_name], rtol=rtol, atol=atol)
             # compare momentum_buffer in optimizer's state(sgd)
             # TODO: other optimizer.
             origin_optimizer_state = origin_optimizer1.state_dict()
@@ -177,15 +175,18 @@ class TestPrepackCases(TestCase):
 
             for var_name in origin_optimizer_state:
                 if var_name == 'state':
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=1e-2, atol=1e-03)
-                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=1e-2, atol=1e-03)
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state1[var_name], rtol=rtol, atol=atol)
+                    self.assertEqual(origin_optimizer_state[var_name], ipex_optimizer_state2[var_name], rtol=rtol, atol=atol)
 
     def test_conv2d_training(self):
-        self._test_convolution_training_base(dim=2)
+        self._test_convolution_training_base(dim=2, dtype=torch.float)
+        self._test_convolution_training_base(dim=2, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
+
         # TODO: add inference case.
 
     def test_conv3d_training(self):
-        self._test_convolution_training_base(dim=3)
+        self._test_convolution_training_base(dim=3, dtype=torch.float)
+        self._test_convolution_training_base(dim=3, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
         # TODO: add inference case.
 
     def _test_conv_nc11_base(self, dim):
