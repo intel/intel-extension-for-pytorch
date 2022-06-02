@@ -7,13 +7,13 @@ import pytest
 
 class TestVerbose(TestCase):
     def test_ipex_verbose(self):
-        verb_list = [torch.xpu.VERBOSE_LEVEL.ON, torch.xpu.VERBOSE_LEVEL.OFF]
+        verb_list = [torch.xpu.VerbLevel.ON, torch.xpu.VerbLevel.OFF]
         for verb in verb_list:
             torch.xpu.set_verbose_level(verb)
             assert torch.xpu.get_verbose_level() == verb, 'Fail to set IPEX_VERBOSE level: ' + verb
 
     def test_onednn_verbose(self):
-        verb_list = [torch.xpu.ONEDNN_VERB_LEVEL.OFF, torch.xpu.ONEDNN_VERB_LEVEL.ON, torch.xpu.ONEDNN_VERB_LEVEL.ON_DETAIL]
+        verb_list = [torch.xpu.OnednnVerbLevel.OFF, torch.xpu.OnednnVerbLevel.ON, torch.xpu.OnednnVerbLevel.ON_DETAIL]
         for verb in verb_list:
             torch.xpu.set_onednn_verbose(verb)
 
@@ -22,7 +22,7 @@ class TestVerbose(TestCase):
                 pass
 
     def test_onemkl_verbose(self):
-        verb_list = [torch.xpu.ONEMKL_VERB_LEVEL.OFF, torch.xpu.ONEMKL_VERB_LEVEL.ON, torch.xpu.ONEMKL_VERB_LEVEL.ON_SYNC]
+        verb_list = [torch.xpu.OnemklVerbLevel.OFF, torch.xpu.OnemklVerbLevel.ON, torch.xpu.OnemklVerbLevel.ON_SYNC]
         for verb in verb_list:
             torch.xpu.set_onemkl_verbose(verb)
 
@@ -31,7 +31,7 @@ class TestVerbose(TestCase):
                 pass
 
     def test_fp32_math_mode(self):
-        mode_list = [torch.xpu.FP32_MATH_MODE.FP32, torch.xpu.FP32_MATH_MODE.TF32, torch.xpu.FP32_MATH_MODE.BF32]
+        mode_list = [torch.xpu.FP32MathMode.FP32, torch.xpu.FP32MathMode.TF32, torch.xpu.FP32MathMode.BF32]
         for mode in mode_list:
             torch.xpu.set_fp32_math_mode(mode)
             assert torch.xpu.get_fp32_math_mode() == mode, 'Fail to enable FP32 math mode: ' + mode
@@ -49,7 +49,7 @@ class TestVerbose(TestCase):
             assert torch.xpu.using_onednn_layout(), 'Fail to set onednn layout'
 
     def test_xpu_backend(self):
-        backend_list = [torch.xpu.XPU_BACKEND.GPU, torch.xpu.XPU_BACKEND.CPU, torch.xpu.XPU_BACKEND.AUTO]
+        backend_list = [torch.xpu.Backend.GPU, torch.xpu.Backend.CPU, torch.xpu.Backend.AUTO]
         for backend in backend_list:
             torch.xpu.set_backend(backend)
             assert torch.xpu.get_backend() == backend, 'Fail to set XPU backend: ' + backend
