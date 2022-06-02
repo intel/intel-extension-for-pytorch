@@ -23,6 +23,20 @@ const std::map<std::string, PostOp>& supported_unary_post_op_fusion_set() {
       {"aten::tanh_", {"tanh"}},
       {"aten::mish", {"mish"}},
       {"aten::mish_", {"mish"}},
+      {"aten::abs", {"abs"}},
+      {"aten::abs_", {"abs"}},
+      {"aten::exp", {"exp"}},
+      {"aten::exp_", {"exp"}},
+      {"aten::hardswish", {"hardswish"}},
+      {"aten::hardswish_", {"hardswish"}},
+      {"aten::square", {"square"}},
+      {"aten::square_", {"square"}},
+      {"aten::log", {"log"}},
+      {"aten::log_", {"log"}},
+      {"aten::round", {"round"}},
+      {"aten::round_", {"round"}},
+      {"aten::sqrt", {"sqrt"}},
+      {"aten::sqrt_", {"sqrt"}},
   };
   return fusion_attr_map;
 }

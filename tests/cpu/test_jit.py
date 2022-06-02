@@ -52,13 +52,13 @@ All rights reserved.
 import math
 import random
 import unittest
-from functools import reduce
+import time
+import sys
 import warnings
 import itertools
 import contextlib
 import torch
 import torch.nn as nn
-from torch.jit._recursive import wrap_cpp_module
 import torch.fx.experimental.optimization as optimization
 import copy
 
@@ -66,18 +66,12 @@ import intel_extension_for_pytorch as ipex
 import intel_extension_for_pytorch._C as core
 
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
-from torch.nn import Parameter
 import torch.nn.functional as F
-from torch.autograd import gradcheck
-from torch.autograd.gradcheck import gradgradcheck
-from torch._six import inf, nan
 
-from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
-    TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
-    IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
-    IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
+from common_utils import TestCase
+
+def get_rand_seed():
+    return int(time.time() * 1000000000)
 
 try:
     import torchvision
@@ -93,18 +87,51 @@ conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
 convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
 
+class UnaryFusionOp:
+    def __init__(self, ipex_eltwise_op, bf16_supported=True, prec=0.02):
+        self.ipex_eltwise_op = ipex_eltwise_op
+        self.bf16_supported = bf16_supported
+        self.prec = prec
+
 PyTorch_op_to_IPEX_op_map = {
-    # PyTorch_op_name: [ipex_op_name, BF16_supported]
-    torch.relu: ["relu", True],
-    torch.relu_: ["relu", True],
-    torch.sigmoid: ["sigmoid", True],
-    torch.sigmoid_: ["sigmoid", True],
-    nn.SiLU(inplace=True): ["swish", True],
-    nn.SiLU(inplace=False): ["swish", True],
-    torch.tanh: ["tanh", True],
-    torch.tanh_: ["tanh", True],
-    nn.Mish(inplace=True): ["mish", False], # TODO: support bf16 mish_ in stock PyTorch
-    nn.Mish(inplace=False): ["mish", False], # TODO: support bf16 mish in stock PyTorch
+    # PyTorch_op_name: [ipex_op_name, BF16_supported, prec]
+    torch.relu: UnaryFusionOp("relu"),
+    torch.relu_: UnaryFusionOp("relu"),
+    torch.sigmoid: UnaryFusionOp("sigmoid"),
+    torch.sigmoid_: UnaryFusionOp("sigmoid"),
+    nn.SiLU(inplace=True): UnaryFusionOp("swish"),
+    nn.SiLU(inplace=False): UnaryFusionOp("swish"),
+    torch.tanh: UnaryFusionOp("tanh"),
+    torch.tanh_: UnaryFusionOp("tanh"),
+    nn.Mish(inplace=True): UnaryFusionOp("mish", bf16_supported=False), # TODO: support bf16 mish_ in stock PyTorch
+    nn.Mish(inplace=False): UnaryFusionOp("mish", bf16_supported=False), # TODO: support bf16 mish in stock PyTorch
+    torch.abs: UnaryFusionOp("abs"),
+    torch.abs_: UnaryFusionOp("abs"),
+    torch.exp: UnaryFusionOp("exp", prec=0.035),
+    torch.exp_: UnaryFusionOp("exp", prec=0.035),
+    torch.nn.Hardswish(inplace=True): UnaryFusionOp("hardswish"),
+    torch.nn.Hardswish(inplace=False): UnaryFusionOp("hardswish"),
+    torch.square: UnaryFusionOp("square", prec=0.035),
+    torch.square_: UnaryFusionOp("square", prec=0.035),
+}
+
+# The below eltwise OP have unstable numeric issue.
+# We will run the tests with fixed seed to avoid false positive.
+# For example, for log, when running bf16 linear-log test
+# y = linear(x)
+# z = log(y)
+# Supposing we meet a case where
+# y_fp32 = 0 and y_bf16 = 0.0008
+# Then z_fp32 = log(0) = nan
+#      z_bf16 = log(0.0008) = -7.1309
+# We're not able to directly compare z_fp32 with z_bf16.
+PyTorch_op_to_IPEX_op_fixed_seed_map = {
+    torch.log: UnaryFusionOp("log", prec=0.065),
+    torch.log_: UnaryFusionOp("log", prec=0.065),
+    torch.round: UnaryFusionOp("round"),
+    torch.round_: UnaryFusionOp("round"),
+    torch.sqrt: UnaryFusionOp("sqrt"),
+    torch.sqrt_: UnaryFusionOp("sqrt"),
 }
 
 class ConvBatchNorm_Fixed(nn.Module):
@@ -1304,7 +1331,7 @@ class Tester(TestCase):
             _check_match_mha_parts(mha_jit, qk, mask)
             _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
-    def test_conv_unary_fusion(self):
+    def _test_conv_unary_fusion(self, op_list, seed=None):
         class ConvEltwise(nn.Module):
             def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size):
                 super(ConvEltwise, self).__init__()
@@ -1313,9 +1340,9 @@ class Tester(TestCase):
 
             def forward(self, x):
                 a = self.conv(x)
+                a = a / 2
                 b = self.eltwise(a)
-                c = torch.add(b, b)
-                return c
+                return b
 
         batch_size = 8
         out_channels = 16
@@ -1323,8 +1350,16 @@ class Tester(TestCase):
         kernel_size = 3
         image_size = 16
 
+        if seed is None:
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+        else:
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            torch.manual_seed(seed)
+
         for dim in [2, 3]:
-            for eltwise in PyTorch_op_to_IPEX_op_map:
+            for eltwise in op_list:
                 input_size = [batch_size, in_channels, image_size, image_size]
                 if dim == 3:
                     input_size.append(image_size)
@@ -1332,7 +1367,10 @@ class Tester(TestCase):
                 x = torch.randn(input_size)
                 m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
 
-                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
+                unary_fusion_op = op_list[eltwise]
+                ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+                bf16_supported = unary_fusion_op.bf16_supported
+                prec = unary_fusion_op.prec
 
                 self._test_output(
                     m,
@@ -1345,7 +1383,11 @@ class Tester(TestCase):
                         x,
                         kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
                         kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
-                        prec=0.02)
+                        prec=prec)
+
+    def test_conv_unary_fusion(self):
+        self._test_conv_unary_fusion(PyTorch_op_to_IPEX_op_map)
+        self._test_conv_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654064339261196288)
 
     def test_conv_non_unary_fusion(self):
         batch_size = 8
@@ -2318,7 +2360,7 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::div",
                 prec=0.2)
 
-    def test_linear_unary_fusion(self):
+    def _test_linear_unary_fusion(self, op_list, seed=None):
         class LinearEltwise(nn.Module):
             def __init__(self, eltwise_fn, in_channels, out_channels, **kwargs):
                 super(LinearEltwise, self).__init__()
@@ -2327,20 +2369,33 @@ class Tester(TestCase):
 
             def forward(self, x):
                 a = self.linear(x)
+                a = a / 2
                 b = self.eltwise(a)
                 return b
         
         batch_size = 3
         out_channels = 32
         in_channels = 3
+
+        if seed is None:
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+        else:
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            torch.manual_seed(seed)         
+
         for bias in [True, False]:
-            for eltwise in PyTorch_op_to_IPEX_op_map:
+            for eltwise in op_list:
                 input_size = [batch_size, in_channels]
                 
                 x = torch.randn(input_size)
                 m = LinearEltwise(eltwise, in_channels, out_channels, bias=bias)
                 
-                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
+                unary_fusion_op = op_list[eltwise]
+                ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+                bf16_supported = unary_fusion_op.bf16_supported
+                prec = unary_fusion_op.prec
                 
                 self._test_output(
                     m,
@@ -2357,7 +2412,11 @@ class Tester(TestCase):
                         x,
                         kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
                         kind_not_in_graph="ipex_prepack::linear_prepack",
-                        prec=0.02)
+                        prec=prec)
+
+    def test_linear_unary_fusion(self):
+        self._test_linear_unary_fusion(PyTorch_op_to_IPEX_op_map)
+        self._test_linear_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654065112450588160)
 
     def test_output_linear_add(self):
         self._test_output(

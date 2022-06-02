@@ -160,12 +160,28 @@ RegisterOperators op({
     CreateConvUnaryPostOpPrepack(swish),
     CreateConvUnaryPostOpPrepack(tanh),
     CreateConvUnaryPostOpPrepack(mish),
+    CreateConvUnaryPostOpPrepack(abs),
+    CreateConvUnaryPostOpPrepack(exp),
+    CreateConvUnaryPostOpPrepack(hardswish),
+    CreateConvUnaryPostOpPrepack(square),
+    CreateConvUnaryPostOpPrepack(log),
+    CreateConvUnaryPostOpPrepack(round),
+    CreateConvUnaryPostOpPrepack(sqrt),
+
     CreateConvUnaryPostOpRun(run),
     CreateConvUnaryPostOpRun(relu_run),
     CreateConvUnaryPostOpRun(sigmoid_run),
     CreateConvUnaryPostOpRun(swish_run),
     CreateConvUnaryPostOpRun(tanh_run),
     CreateConvUnaryPostOpRun(mish_run),
+    CreateConvUnaryPostOpRun(abs_run),
+    CreateConvUnaryPostOpRun(exp_run),
+    CreateConvUnaryPostOpRun(hardswish_run),
+    CreateConvUnaryPostOpRun(square_run),
+    CreateConvUnaryPostOpRun(log_run),
+    CreateConvUnaryPostOpRun(round_run),
+    CreateConvUnaryPostOpRun(sqrt_run),
+
     CreateConvBinaryPostOpPrepack(add, fuse_sum),
     CreateConvBinaryPostOpPrepack(add_relu, residual),
     CreateConvBinaryPostOpRun(add_run),
@@ -425,6 +441,14 @@ RegisterOperators op({
     CreateLinearUnaryPostOpRun(swish_run),
     CreateLinearUnaryPostOpRun(tanh_run),
     CreateLinearUnaryPostOpRun(mish_run),
+    CreateLinearUnaryPostOpRun(abs_run),
+    CreateLinearUnaryPostOpRun(exp_run),
+    CreateLinearUnaryPostOpRun(hardswish_run),
+    CreateLinearUnaryPostOpRun(square_run),
+    CreateLinearUnaryPostOpRun(log_run),
+    CreateLinearUnaryPostOpRun(round_run),
+    CreateLinearUnaryPostOpRun(sqrt_run),
+
     Operator(
         "ipex_prepack::linear_gelu_run(Tensor input, "
         "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack, "
