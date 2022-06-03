@@ -10,11 +10,11 @@ import copy
 
 class TestOptimizers(TestCase):
 
-    def _test_update(self, module, optimizer, dtype, split_master_weight_for_bf16, set_to_none):
+    def _test_update(self, module, optimizer, dtype, split_master_weight_for_bf16, set_to_none, fused):
         atol, rtol = None, None
         if dtype == torch.bfloat16:
             atol, rtol = 1e-2, 1e-2
-        ipex_module, ipex_optimizer = ipex.optimize(module, dtype=dtype, optimizer=optimizer, split_master_weight_for_bf16=split_master_weight_for_bf16)
+        ipex_module, ipex_optimizer = ipex.optimize(module, dtype=dtype, optimizer=optimizer, split_master_weight_for_bf16=split_master_weight_for_bf16, fuse_update_step=fused)
         for i in range(2):
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
                 # torch optmizer
@@ -39,22 +39,45 @@ class TestOptimizers(TestCase):
 
     def test_sgd(self):
         M = TestModule()
-        options1 = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [0.1, 0], [0.1, 0], [False])
-        options2 = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1], [0.1, 0], [0], [True])
-        for set_to_none, split_master_weight_for_bf16, dtype, momentum, weight_decay, dampening, nesterov in list(options1) + list(options2):
+        options = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [0.1, 0], [0.1, 0], [True, False], [True, False], [True, False], [True, False])
+        for set_to_none, split_master_weight_for_bf16, dtype, momentum, weight_decay, dampening, nesterov, foreach, maximize, fused in options:
+            if nesterov and (momentum <= 0 or dampening != 0):
+                # dose not support such configs
+                continue
             sgd = torch.optim.SGD(
                 M.parameters(), lr=0.001, momentum=momentum, weight_decay=weight_decay,
-                dampening=dampening, nesterov=nesterov)
-            self._test_update(M, sgd, dtype, split_master_weight_for_bf16, set_to_none)
+                dampening=dampening, nesterov=nesterov, foreach=foreach, maximize=maximize)
+            self._test_update(M, sgd, dtype, split_master_weight_for_bf16, set_to_none, fused=fused)
+
+    def test_sgd_fallback(self):
+        # for sparse grad with weight_decay/momentum !=0, stock pytorch will also failed
+        M = TestModule(has_sparse_grad=True)
+        options = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [True, False], [True, False])
+        for set_to_none, split_master_weight_for_bf16, dtype, dampening, foreach, maximize in options:
+            sgd = torch.optim.SGD(
+                M.parameters(), lr=0.001,
+                dampening=dampening, foreach=foreach, maximize=maximize)
+            self._test_update(M, sgd, dtype, split_master_weight_for_bf16, set_to_none, fused=True)
 
     def test_adagrad(self):
         M = TestModule()
-        options = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [0.1, 0], [0.1, 0], [1e-5, 0])
-        for set_to_none, split_master_weight_for_bf16, dtype, lr_decay, weight_decay, initial_accumulator_value, eps in options:
+        options = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [0.1, 0], [0.1, 0], [1e-5, 0], [True, False], [True, False], [True])
+        for set_to_none, split_master_weight_for_bf16, dtype, lr_decay, weight_decay, initial_accumulator_value, eps, foreach, maximize, fused in options:
             adagrad = torch.optim.Adagrad(
                 M.parameters(), lr=0.001, lr_decay=lr_decay, weight_decay=weight_decay,
-                initial_accumulator_value=initial_accumulator_value, eps=eps)
-            self._test_update(M, adagrad, dtype, split_master_weight_for_bf16, set_to_none)
+                initial_accumulator_value=initial_accumulator_value, eps=eps,
+                foreach=foreach, maximize=maximize)
+            self._test_update(M, adagrad, dtype, split_master_weight_for_bf16, set_to_none, fused)
+
+    def test_adagrad_fallback(self):
+        M = TestModule(has_sparse_grad=True)
+        options = itertools.product([True, False], [True, False], [torch.float, torch.bfloat16], [0.1, 0], [0.1, 0], [1e-5, 0], [True, False])
+        for set_to_none, split_master_weight_for_bf16, dtype, lr_decay, initial_accumulator_value, eps, maximize in options:
+            adagrad = torch.optim.Adagrad(
+                M.parameters(), lr=0.001, lr_decay=lr_decay,
+                initial_accumulator_value=initial_accumulator_value, eps=eps,
+                maximize=maximize)
+            self._test_update(M, adagrad, dtype, split_master_weight_for_bf16, set_to_none, fused=True)
 
     def test_lamb(self):
         M = TestModule()
@@ -63,7 +86,7 @@ class TestOptimizers(TestCase):
             lamb = ipex.optim._lamb.Lamb(
                 M.parameters(), lr=0.001, betas=betas, eps=eps,
                 weight_decay=weight_decay, fused=fused)
-            self._test_update(M, lamb, dtype, split_master_weight_for_bf16, set_to_none)
+            self._test_update(M, lamb, dtype, split_master_weight_for_bf16, set_to_none, fused)
 
 class TestFusedSteps(TestCase):
 
@@ -350,7 +373,6 @@ class TestPatchedMethod(TestCase):
 
             # check the num of calls for 'zero_grad' are same
             self.assertEqual(count_zero_grad(ori_prof.function_events), count_zero_grad(ipex_prof.function_events))
-
 
 if __name__ == '__main__':
     test = unittest.main()

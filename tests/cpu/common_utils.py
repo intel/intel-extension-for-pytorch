@@ -1450,12 +1450,12 @@ def int8_calibration(model, data, dir):
     conf.save(dir)
 
 class TestModule(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, has_sparse_grad=False):
         super(TestModule, self).__init__()
         self.linear = torch.nn.Linear(5, 10)
         self.conv = torch.nn.Conv2d(1, 10, 5, 1)
         self.bn = torch.nn.BatchNorm2d(num_features=10)
-        self.embeddingbag = torch.nn.EmbeddingBag(10, 10, mode='sum')
+        self.embeddingbag = torch.nn.EmbeddingBag(10, 10, mode='sum', sparse=has_sparse_grad)
         self.input = (
             torch.ones(10, 1, 5, 5),
             torch.ones(10, 5),

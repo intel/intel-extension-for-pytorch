@@ -14,7 +14,7 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
     const at::Tensor& grad_,
     const at::Tensor& state_sum_,
     const at::Tensor& param2_,
-    int64_t step,
+    double step,
     double learning_rate,
     double weight_decay,
     double lr_decay,
@@ -81,7 +81,7 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "adagrad_fused_step(Tensor(a!) param, Tensor grad, Tensor(b!) "
-      "state_sum, Tensor trail, int step, float lr, float weight_decay, "
+      "state_sum, Tensor trail, float step, float lr, float weight_decay, "
       "float lr_decay, float eps) -> (Tensor(a!), Tensor(b!))",
       torch_ipex::cpu::adagrad_fused_step);
 }
