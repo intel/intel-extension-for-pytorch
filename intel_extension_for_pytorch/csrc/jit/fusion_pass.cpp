@@ -1,6 +1,5 @@
 #include "fusion_pass.h"
 #include <string>
-#include "autocast/autocast_mode.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
 #include "cpu/passes/prepack_folding.h"
@@ -492,7 +491,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
       graph);
 
-  if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+  if (isQuantized(graph) || fuser::onednn::is_llga_fp32_bf16_enabled()) {
     RemoveRedundantAliases(graph);
     fuser::onednn::fuseGraph(graph);
   }

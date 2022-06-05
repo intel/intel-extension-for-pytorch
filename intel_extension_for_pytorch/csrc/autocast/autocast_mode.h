@@ -37,16 +37,9 @@ enum class DtypeCastPolicy : uint8_t {
   promote, // Run in the widest dtype among several args.
 };
 
-bool is_quantization_enabled();
-void set_quantization_enabled(bool new_enabled);
-
-bool is_llga_fp32_bf16_enabled();
-void set_llga_fp32_bf16_enabled(bool new_enabled);
 
 at::ScalarType get_autocast_dtype();
 void set_autocast_dtype(at::ScalarType dtype);
-int autocast_increment_nesting();
-int autocast_decrement_nesting();
 void clear_autocast_cache();
 
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg);

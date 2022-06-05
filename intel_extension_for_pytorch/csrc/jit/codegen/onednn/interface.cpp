@@ -29,6 +29,17 @@ namespace jit {
 namespace fuser {
 namespace onednn {
 
+namespace {
+thread_local bool llga_fp32_bf16_enabled = false;
+}
+
+bool is_llga_fp32_bf16_enabled() {
+  return llga_fp32_bf16_enabled;
+}
+void set_llga_fp32_bf16_enabled(bool new_enabled) {
+  llga_fp32_bf16_enabled = new_enabled;
+}
+
 void fuseGraph(std::shared_ptr<Graph>& g) {
   // Follow the process of the tensorexpr_fuser in profiling mode:
   // Remove prim::profile nodes and embed the profile info directly in the

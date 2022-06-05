@@ -90,27 +90,7 @@ void InitIpexModuleBindings(py::module m) {
         torch::python::detail::py_object_to_dtype(dtype);
     torch_ipex::autocast::set_autocast_dtype(target_dtype);
   });
-  m.def(
-      "is_quantization_enabled",
-      &torch_ipex::autocast::is_quantization_enabled);
-  m.def(
-      "set_quantization_enabled",
-      &torch_ipex::autocast::set_quantization_enabled);
-  m.def(
-      "is_llga_fp32_bf16_enabled",
-      &torch_ipex::autocast::is_llga_fp32_bf16_enabled);
-  m.def(
-      "set_llga_fp32_bf16_enabled",
-      &torch_ipex::autocast::set_llga_fp32_bf16_enabled);
-
-  m.def(
-      "autocast_increment_nesting",
-      &torch_ipex::autocast::autocast_increment_nesting);
-  m.def(
-      "autocast_decrement_nesting",
-      &torch_ipex::autocast::autocast_decrement_nesting);
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
-
   m.def("set_fp32_low_precision_mode", [](IPEXLowPrecisionMode mode) {
     torch_ipex::setFP32LowPrecisionModeCpu(mode);
   });
@@ -118,6 +98,12 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_fp32_low_precision_mode", &torch_ipex::getFP32LowPrecisionModeCpu);
 
   // llga path
+  m.def(
+      "is_llga_fp32_bf16_enabled",
+      &torch::jit::fuser::onednn::is_llga_fp32_bf16_enabled);
+  m.def(
+      "set_llga_fp32_bf16_enabled",
+      &torch::jit::fuser::onednn::set_llga_fp32_bf16_enabled);
   m.def(
       "_jit_set_llga_weight_cache_enabled",
       &torch::jit::fuser::onednn::setLlgaWeightCacheEnabled);

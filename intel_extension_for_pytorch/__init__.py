@@ -27,6 +27,7 @@ from . import nn
 from . import jit
 from . import profiler
 from . import ao
+from . import autocast
 
 from .utils.verbose import verbose
 from .frontend import optimize, enable_onednn_fusion

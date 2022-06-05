@@ -1,8 +1,7 @@
 import torch
 import intel_extension_for_pytorch._C as core
 
-# Expand torch cpu autocast to support fp32 dtype for int8 path,
-# for pytorch torch.cpu.amp.autocast, if give dtyps is fp32, the autocast will be disabled.
+# Expand torch cpu autocast to support more data types in the future
 class _autocast(torch.cpu.amp.autocast):
     def __enter__(self):
         self.prev_cache_enabled = torch.is_autocast_cache_enabled()
