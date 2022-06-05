@@ -485,6 +485,7 @@ at::Tensor run(
       output =
           at::empty_strided(output_sizes, output_strides, input_.options());
     }
+
     const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
     ideep::tensor mkldnn_output = itensor_view_from_dense(output);
     if (context.bias_.is_empty()) {
@@ -537,9 +538,19 @@ at::Tensor& run(
   auto input_ = input;
   if (!is_channels_last_1d(input)) {
     input_ = input.contiguous(memory_format);
+    if (input.dim() == 3) {
+      input_ = to_channels_last_1d(input_);
+    }
   }
+
   // always align accumu format with inputs' format.
-  accumu = accumu.contiguous(memory_format);
+  if (!is_channels_last_1d(accumu)) {
+    accumu = accumu.contiguous(memory_format);
+    if (input.dim() == 3) {
+      accumu = to_channels_last_1d(accumu);
+    }
+  }
+
   if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
       attr == context.conv_params_.op_attr &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {

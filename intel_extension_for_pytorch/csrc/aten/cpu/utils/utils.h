@@ -44,6 +44,15 @@ inline bool is_channels_last_1d(const at::Tensor& input) {
   return true;
 }
 
+inline at::Tensor to_channels_last_1d(const at::Tensor& input) {
+  // This a temporary workaround before channels last 1D is formally
+  // supported in PyTorch. We will force to return nwc output.
+  // sizes:   input[n, h , w]   -> [n, w , h]   -> [n, w , h]   -> return[n, h ,
+  // w] strides: input[h*w, w , 1] -> [h*w, 1 , w] -> [h*w, h , 1] ->
+  // return[h*w, 1 , h]
+  return input.transpose(1, 2).contiguous().transpose(1, 2);
+}
+
 #ifndef IS_CONTIGUOUS_ANY
 #define IS_CONTIGUOUS_ANY(input_tensor)                               \
   input_tensor.is_contiguous(at::MemoryFormat::Contiguous) ||         \

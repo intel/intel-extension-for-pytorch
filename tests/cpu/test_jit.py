@@ -83,7 +83,7 @@ skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 device = 'cpu:0'
 SIZE = 100
 
-conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
+conv_module = {1: torch.nn.Conv1d, 2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
 convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
 
@@ -1963,8 +1963,11 @@ class Tester(TestCase):
         in_channels = 3
         kernel_size = 3
         image_size = 64
-        for dim in [2, 3]:
-            input_size = [batch_size, in_channels, image_size, image_size]
+        for dim in [1, 2, 3]:
+            if dim == 1:
+                input_size = [batch_size, in_channels, image_size]
+            else:
+                input_size = [batch_size, in_channels, image_size, image_size]
             if dim == 3:
                 input_size.append(image_size)
             x = torch.randn(input_size)
