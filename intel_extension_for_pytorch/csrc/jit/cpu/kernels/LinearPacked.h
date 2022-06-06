@@ -36,6 +36,29 @@ DECLARE_LINEAR_UNARY_ELTWISE_RUN(log);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(round);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(sqrt);
 
+at::Tensor linear_leaky_relu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_hardtanh_run(
+    const at::Tensor& input,
+    at::Scalar lower_bound,
+    at::Scalar upper_bound,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_elu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    at::Scalar scale,
+    at::Scalar input_scale,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context,

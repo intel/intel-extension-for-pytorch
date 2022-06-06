@@ -109,6 +109,17 @@ at::Tensor convolution_elu_run(
       ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value));
 }
 
+at::Tensor convolution_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::convolution_pow_run", c10::ArrayRef<c10::IValue>({}));
+  auto exponent_value = exponent.to<float>();
+  return op_context->run(
+      input, ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value));
+}
+
 at::Tensor convolution_gelu_run(
     const at::Tensor& input,
     const c10::string_view approximate,

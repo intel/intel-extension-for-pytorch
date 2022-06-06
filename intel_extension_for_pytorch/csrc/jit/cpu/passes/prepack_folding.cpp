@@ -25,6 +25,7 @@ static const std::set<std::string> prepack_foldable_ops = {
     "ipex_prepack::convolution_elu_prepack",
     "ipex_prepack::convolution_hardtanh_prepack",
     "ipex_prepack::convolution_leaky_relu_prepack",
+    "ipex_prepack::convolution_pow_prepack",
     "ipex_prepack::convolution_gelu_prepack",
     "ipex_prepack::convolution_add_prepack",
     "ipex_prepack::convolution_add_relu_prepack",

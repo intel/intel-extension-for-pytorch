@@ -61,6 +61,11 @@ at::Tensor convolution_elu_run(
     at::Scalar input_scale,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
+at::Tensor convolution_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+
 at::Tensor convolution_gelu_run(
     const at::Tensor& input,
     c10::string_view approximate,
