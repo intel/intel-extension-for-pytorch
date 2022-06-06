@@ -15,22 +15,22 @@ conda install intel-openmp
 ```
 export OMP_NUM_THREADS=1
 export CORES=`lscpu | grep Core | awk '{print $4}'`
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 interaction.py --num-instance=$CORES --inference # for fp32
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 interaction.py --num-instance=$CORES --inference --bf16 # for bf16
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 interaction.py --num-instance=$CORES --inference # for fp32
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 interaction.py --num-instance=$CORES --inference --bf16 # for bf16
 ```
 unset OMP_NUM_THREADS
 2.Training: 1 instance on 1 socket in real world scenario
 
 ```
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 interaction.py # for fp32
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 interaction.py --bf16 # for bf16
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 interaction.py # for fp32
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 interaction.py --bf16 # for bf16
 ```
 
 ## Evaluate IPEX fused optimizer
 ```
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --optimizer sgd # for sgd
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --optimizer lamb # for lamb
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --optimizer adagrad # for adagrad
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 optimizer.py --optimizer sgd # for sgd
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 optimizer.py --optimizer lamb # for lamb
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 optimizer.py --optimizer adagrad # for adagrad
 ```
 
 ## Evaluate IPEX [MergedEmbeddingBag](../../../../intel_extension_for_pytorch/nn/module/merged_embeddingbag.py)
@@ -38,9 +38,9 @@ python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 optimizer.py --op
 export CORES=`lscpu | grep Core | awk '{print $4}'`
 export BATCHSIZE=$((128*CORES))
 # Data distribution will not impact inference performance
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 merged_embeddingbag.py --inference --data-distribution=balance --batch-size=${BATCHSIZE}
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag.py --inference --data-distribution=balance --batch-size=${BATCHSIZE}
 
 # For training, data distribution will have big impact while update weight. Under the "unbalance" arg, we will use generate datas with half of indice update same raw (which is similiar with real world dataset as DLRM mlperf dataset)
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 merged_embeddingbag.py --data-distribution=balance --batch-size=${BATCHSIZE}
-python -m intel_extension_for_pytorch.cpu.launch --socket_id 0 merged_embeddingbag.py --data-distribution=unbalance --batch-size=${BATCHSIZE}
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag.py --data-distribution=balance --batch-size=${BATCHSIZE}
+python -m intel_extension_for_pytorch.cpu.launch --node_id 0 merged_embeddingbag.py --data-distribution=unbalance --batch-size=${BATCHSIZE}
 ```

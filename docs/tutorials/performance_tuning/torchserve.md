@@ -61,7 +61,7 @@ Some useful `cpu_launcher_args` to note are:
    * PyTorch by defualt uses PTMalloc. TCMalloc/JeMalloc generally gives better performance.
 2. OpenMP library: [GNU OpenMP `--disable_iomp` | *Intel OpenMP*]
    * PyTorch by default uses GNU OpenMP. Launcher by default uses Intel OpenMP. Intel OpenMP library generally gives better performance.
-3. Socket id: [`--socket_id`]
+3. Node id: [`--node_id`]
    * Launcher by default uses all physical cores. Limit memory access to local memories on the Nth socket to avoid Non-Uniform Memory Access (NUMA).
 
 Please refer to [here](https://github.com/intel/intel-extension-for-pytorch/blob/master/docs/tutorials/performance_tuning/launch_script.md) for a full list of tunable configuration of launcher. 
@@ -229,7 +229,7 @@ Above shows performance improvement of Torchserve with IPEX and launcher on ResN
 ```
 ipex_enable=true
 cpu_launcher_enable=true
-cpu_launcher_args=--socket_id 0 --ninstance 1 --enable_jemalloc
+cpu_launcher_args=--node_id 0 --ninstance 1 --enable_jemalloc
 ```
 Use the following command to reproduce the results. 
 ```
