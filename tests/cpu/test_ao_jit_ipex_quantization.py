@@ -199,9 +199,11 @@ class TestIpexOps(JitLlgaTestCase):
             def __init__(self, input_size, hidden_size, num_layers, bidirectional=False, bias=False, dropout=0, batch_first=False):
                 super(M, self).__init__()
                 self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+
             def forward(self, x, h = None):
                 x, h = self.lstm(x, h)
                 return x, h
+
         def _lstm_params_list():
             params_dict = {
                 "input_size": [1, 32],
@@ -237,11 +239,7 @@ class TestIpexOps(JitLlgaTestCase):
             c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
             m = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
             graph = self.checkQuantizeTrace(m, [x], atol=3e-2, rtol=1e-1)
-            weights_number = len(m.lstm._flat_weights)
-            quantizer_number = weights_number / 2 if m.lstm.bias else weights_number
-            self.assertGraphContainsExactly(graph, 'aten::dequantize', quantizer_number + 2)
-            # it will be enabled after lstm int8 support
-            #self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
+            self.assertGraphContainsExactly(graph, 'ipex::quantized_lstm', 1)
 
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_convert(self):
