@@ -342,17 +342,30 @@ class TestRemoveMutate(JitLlgaTestCase):
 
 class TestDynamicQuantization(JitLlgaTestCase):
     def test_linear_dynamic(self):
-        class M(nn.Module):
+        class SubModule(nn.Module):
             def __init__(self):
-                super(M, self).__init__()
-                self.linear = torch.nn.Linear(3, 3)
+                super(SubModule, self).__init__()
+                self.linear = nn.Linear(3, 3)
 
             def forward(self, x):
                 x = self.linear(x)
                 return x
 
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Sequential(nn.Linear(3, 3))
+                self.linear2 = SubModule()
+                self.linear3 = nn.Linear(3, 3)
+
+            def forward(self, x):
+                x = self.linear1(x)
+                x = self.linear2(x)
+                x = self.linear3(x)
+                return x
+
         m = M().eval()
-        x = torch.randn(1, 3)
+        x = torch.randn(3, 3)
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=dynamic_qconfig)
         FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
     
