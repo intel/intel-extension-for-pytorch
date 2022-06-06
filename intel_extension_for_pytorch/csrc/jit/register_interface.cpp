@@ -16,6 +16,7 @@ bool canFuseNode(const Node* node) {
       node->kind() == Symbol::aten("_convolution") ||
       node->kind() == Symbol::aten("conv2d") ||
       node->kind() == Symbol::aten("add") ||
+      node->kind() == Symbol::aten("add_") ||
       node->kind() == Symbol::aten("div") ||
       node->kind() == Symbol::aten("tanh") ||
       node->kind() == Symbol::aten("relu") ||

@@ -316,6 +316,22 @@ class ConvSum(nn.Module):
         b = self.conv1(x)
         return a+b
 
+class ConvSum_v2(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvSum_v2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+
+    def forward(self, x):
+        a = self.conv(x)
+        b = self.conv(x)
+        a.add_(b)
+        c = self.conv1(x)
+        a.add_(c)
+        return a
+
 class ConvScalarSum(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvScalarSum, self).__init__()
@@ -1978,6 +1994,17 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack")
             self._test_output_bf16(
                 ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack",
+                prec=0.1)
+            self._test_output(
+                ConvSum_v2(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack")
+            self._test_output_bf16(
+                ConvSum_v2(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
                 kind_in_graph="ipex_prepack::convolution_add_run",
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
