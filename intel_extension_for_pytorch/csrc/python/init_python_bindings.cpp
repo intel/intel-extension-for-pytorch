@@ -87,11 +87,12 @@ void InitIpexModuleBindings(py::module m) {
     torch_ipex::autocast::set_autocast_dtype(target_dtype);
   });
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
-  m.def("set_fp32_low_precision_mode", [](IPEXLowPrecisionMode mode) {
-    torch_ipex::setFP32LowPrecisionModeCpu(mode);
+
+  m.def("set_fp32_math_mode", [](FP32MathMode mode) {
+    torch_ipex::setFP32MathModeCpu(mode);
   });
 
-  m.def("get_fp32_low_precision_mode", &torch_ipex::getFP32LowPrecisionModeCpu);
+  m.def("get_fp32_math_mode", &torch_ipex::getFP32MathModeCpu);
 
   // llga path
   m.def(
@@ -171,9 +172,10 @@ void InitIpexModuleBindings(py::module m) {
             return self.run_async(std::move(args), std::move(kwargs));
           });
 
-  py::enum_<IPEXLowPrecisionMode>(m, "IPEXLowPrecisionMode")
-      .value("BF32", IPEXLowPrecisionMode::BF32)
-      .value("FP32", IPEXLowPrecisionMode::FP32)
+  py::enum_<FP32MathMode>(m, "FP32MathMode")
+      .value("FP32", FP32MathMode::FP32)
+      .value("TF32", FP32MathMode::TF32)
+      .value("BF32", FP32MathMode::BF32)
       .export_values();
 
   m.def("is_runtime_ext_enabled", &torch_ipex::runtime::is_runtime_ext_enabled);
