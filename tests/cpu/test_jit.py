@@ -181,6 +181,18 @@ class LinearEltwise(nn.Module):
         b = self.eltwise(a, **self.kwargs)
         return b
 
+class ConvTransposeEltwise(nn.Module):
+    def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeEltwise, self).__init__()
+        self.conv_transpose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.eltwise = eltwise_fn
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = self.conv_transpose(x)
+        b = self.eltwise(a, **self.kwargs)
+        return b
+
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvBatchNorm_Fixed, self).__init__()
@@ -1410,6 +1422,49 @@ class Tester(TestCase):
                         kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
                         prec=prec)
 
+    def _test_conv_transpose_unary_fusion(self, op_list, seed=None):
+        batch_size = 1
+        out_channels = 5
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+
+        if seed is None:
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+        else:
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            torch.manual_seed(seed)
+
+        for dim in [2, 3]:
+            for eltwise in op_list:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+
+                unary_fusion_op = op_list[eltwise]
+                ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+                bf16_supported = unary_fusion_op.bf16_supported
+                prec = unary_fusion_op.prec
+                op_input_list = unary_fusion_op.op_input_list
+
+                x = torch.randn(input_size)
+                m = ConvTransposeEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
+
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
+                if bf16_supported:
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        prec=prec)
+
     def test_conv_unary_fusion(self):
         self._test_conv_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
         self._test_conv_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654064339261196288)
@@ -2227,6 +2282,10 @@ class Tester(TestCase):
                         kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
                         levels=["O1"],
                         prec=0.02)
+
+    def test_conv_transpose_unary_fusion(self):
+        self._test_conv_transpose_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
+        self._test_conv_transpose_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654583254233936896)
 
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)

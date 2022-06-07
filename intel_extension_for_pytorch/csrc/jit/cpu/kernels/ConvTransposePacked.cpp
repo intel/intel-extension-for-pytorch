@@ -11,6 +11,16 @@ namespace cpu {
 namespace detail {
 namespace conv_transpose {
 
+#define DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(FUSED_OP)             \
+  at::Tensor conv_transpose_##FUSED_OP##_run(                         \
+      const at::Tensor& input,                                        \
+      const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) { \
+    IPEX_RECORD_FUNCTION(                                             \
+        "ipex_prepack::conv_transpose_" #FUSED_OP "_run",             \
+        c10::ArrayRef<c10::IValue>({}));                              \
+    return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP());  \
+  }
+
 c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -44,6 +54,19 @@ at::Tensor conv_transpose_run(
 
   return op_context->run(input, ideep::attr_t());
 }
+
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(relu);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sigmoid);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(swish);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(tanh);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(mish);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(abs);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(exp);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(hardswish);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(square);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
 
 ContextConvTranspose create(
     const at::Tensor& weight,

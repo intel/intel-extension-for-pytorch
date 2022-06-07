@@ -103,7 +103,8 @@ at::Tensor conv_transpose_kernel_impl(
         padding.vec(),
         padding_r(padding, output_padding),
         dilation.vec(),
-        groups);
+        groups,
+        attr);
   } else {
     ideep::convolution_transpose_forward::compute(
         x,
@@ -114,7 +115,8 @@ at::Tensor conv_transpose_kernel_impl(
         padding.vec(),
         padding_r(padding, output_padding),
         dilation.vec(),
-        groups);
+        groups,
+        attr);
   }
 
   if (!is_channels_last) {

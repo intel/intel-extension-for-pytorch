@@ -422,8 +422,16 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseLinearSwishCustomized(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
+
   // deconvolution fusion
+  GRAPH_DUMP(
+      "After FuseAddLayerNorm.Before insertPrePackedConvTransposeOp", graph);
   graph_rewrite::insertPrePackedConvTransposeOp(graph);
+  GRAPH_DUMP(
+      "After insertPrePackedConvTransposeOp.Before fuseConvTransposeWithEltwise",
+      graph);
+  graph_rewrite::fuseConvTransposeWithEltwise(graph);
+  GRAPH_DUMP("After fuseConvTransposeWithEltwise.", graph);
 
   // fuse concat+bn+relu for the input float tensors with the same sizes
   // and channelslast format

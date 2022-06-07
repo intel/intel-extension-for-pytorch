@@ -154,6 +154,25 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
       },                                                      \
       aliasAnalysisFromSchema())
 
+#define CreateConvTransposeUnaryPostOpRun(FUSED_OP)                  \
+  Operator(                                                          \
+      "ipex_prepack::conv_transpose_" #FUSED_OP                      \
+      "(Tensor input, "                                              \
+      "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext " \
+      "W_prepack) -> Tensor",                                        \
+      [](const Node* node) -> Operation {                            \
+        return [](Stack* stack) {                                    \
+          auto result = conv_transpose_##FUSED_OP(                   \
+              (std::move(peek(stack, 0, 2))).toTensor(),             \
+              (std::move(peek(stack, 1, 2)))                         \
+                  .toCustomClass<ConvTransposeOpContext>());         \
+          drop(stack, 2);                                            \
+          pack(stack, std::move(result));                            \
+          return 0;                                                  \
+        };                                                           \
+      },                                                             \
+      aliasAnalysisFromSchema())
+
 RegisterOperators op({
     CreateConvUnaryPostOpPrepack(relu),
     CreateConvUnaryPostOpPrepack(sigmoid),
@@ -443,22 +462,6 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex_prepack::conv_transpose_run(Tensor input, "
-        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
-        "W_prepack) -> Tensor",
-        [](const Node* node) -> Operation {
-          return [](Stack* stack) {
-            auto result = conv_transpose_run(
-                (std::move(peek(stack, 0, 2))).toTensor(),
-                (std::move(peek(stack, 1, 2)))
-                    .toCustomClass<ConvTransposeOpContext>());
-            drop(stack, 2);
-            pack(stack, std::move(result));
-            return 0;
-          };
-        },
-        aliasAnalysisFromSchema()),
-    Operator(
         "ipex_prepack::convolution_gelu_run(Tensor input, str approximate, "
         "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
         "W_prepack) -> Tensor",
@@ -600,6 +603,22 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+
+    // ConvTranspose fusion run OP
+    CreateConvTransposeUnaryPostOpRun(run),
+    CreateConvTransposeUnaryPostOpRun(relu_run),
+    CreateConvTransposeUnaryPostOpRun(sigmoid_run),
+    CreateConvTransposeUnaryPostOpRun(swish_run),
+    CreateConvTransposeUnaryPostOpRun(tanh_run),
+    CreateConvTransposeUnaryPostOpRun(mish_run),
+    CreateConvTransposeUnaryPostOpRun(abs_run),
+    CreateConvTransposeUnaryPostOpRun(exp_run),
+    CreateConvTransposeUnaryPostOpRun(hardswish_run),
+    CreateConvTransposeUnaryPostOpRun(square_run),
+    CreateConvTransposeUnaryPostOpRun(log_run),
+    CreateConvTransposeUnaryPostOpRun(round_run),
+    CreateConvTransposeUnaryPostOpRun(sqrt_run),
+
     Operator(
         "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
         "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
