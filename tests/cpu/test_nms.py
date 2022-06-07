@@ -79,8 +79,13 @@ class TestScaleBackBatch(TestCase):
         dboxes_xywh = torch.randn((1, number_boxes, 4)).contiguous().to(torch.float64)
         bbox_res1, score_res1 = self.scale_back_batch(predicted_loc.clone(), predicted_score.clone(), dboxes_xywh.clone(), scale_xy, scale_wh)
         bbox_res2, score_res2 = parallel_scale_back_batch(predicted_loc, predicted_score, dboxes_xywh, scale_xy, scale_wh)
+        # test autocast
+        with torch.cpu.amp.autocast():
+            bbox_res3, score_res3 = parallel_scale_back_batch(predicted_loc, predicted_score, dboxes_xywh, scale_xy, scale_wh)
         self.assertTrue(torch.allclose(bbox_res1, bbox_res2, rtol=1e-4, atol=1e-4))
+        self.assertTrue(torch.allclose(bbox_res1, bbox_res3, rtol=1e-4, atol=1e-4))
         self.assertTrue(torch.allclose(score_res1, score_res2, rtol=1e-4, atol=1e-4))
+        self.assertTrue(torch.allclose(score_res1, score_res3, rtol=1e-4, atol=1e-4))
 
 class TestNMS(TestCase):
     def decode_single(self, bboxes_in, scores_in, criteria, max_output, max_num=200):

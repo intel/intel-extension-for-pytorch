@@ -691,7 +691,7 @@ void avg_pool2d_kernel_impl(
                   count_include_pad,
                   divisor_override);
             } else {
-              cpu_avg_pool_channels_last<scalar_t, /* is_3d */ false>(
+              cpu_avg_pool<scalar_t, scalar_t, /* is_3d */ false>(
                   output,
                   input,
                   kW,

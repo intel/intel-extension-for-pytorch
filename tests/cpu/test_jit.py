@@ -635,7 +635,7 @@ class MatmulDiv(nn.Module):
 
     def forward(self, x):
         mm_res = None
-        y = torch.transpose(x, 1, 2).contiguous()
+        y = torch.transpose(x, -1, -2).contiguous()
         mm_res_shape = x.size()[:-1] + (y.size()[-1:])
         if self.with_out:
             mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
@@ -1081,6 +1081,17 @@ class Tester(TestCase):
         self.assertEqual(jit_res, ori_res)
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+
+        # not contiguous
+        a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        ori_res = model(a_not_cont, b_not_cont)
+        jit_model = torch.jit.trace(model,(a, b))
+        trace_graph = jit_model.graph_for(a, b)
+        jit_res = jit_model(a_not_cont, b_not_cont)
+        node = "ipex::add_layernorm"
+        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+        self.assertEqual(jit_res, ori_res)
 
         a_bf16 = a.to(torch.bfloat16)
         b_bf16 = b.to(torch.bfloat16)
@@ -2530,50 +2541,52 @@ class Tester(TestCase):
         self.assertEqual(traced_fn(input, weight, bias), result)
 
     def test_matmul_div(self):
-        self._test_output(
-            MatmulDiv(div_scalar=True, with_out=True),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output(
-            MatmulDiv(div_scalar=True, with_out=False),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output(
-            MatmulDiv(div_scalar=False, with_out=False),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output(
-            MatmulDiv(div_scalar=False, with_out=True),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=True, with_out=True),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-2)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=True, with_out=False),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-2)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=False, with_out=True),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-3)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=False, with_out=False),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-3)
+        inputs = [torch.randn(10, 3, 4), torch.randn(3, 4)]
+        for x in inputs:
+            self._test_output(
+                MatmulDiv(div_scalar=True, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDiv(div_scalar=True, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDiv(div_scalar=False, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDiv(div_scalar=False, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=True, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=True, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=False, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=False, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
 
     def test_bmm_add(self):
         M = torch.randn(10, 3, 5)
