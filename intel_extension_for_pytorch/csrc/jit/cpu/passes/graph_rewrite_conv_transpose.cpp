@@ -176,13 +176,13 @@ void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph) {
 
 void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
   // For unary post OPs:
-  auto conv_op_rstring = at::jit::CodeTemplate(R"(
+  auto conv_transpose_op_rstring = at::jit::CodeTemplate(R"(
     graph(%input, %packed_weight):
         %x : Tensor = ipex_prepack::conv_transpose_run(%input, %packed_weight)
         %res = ${op}(%x)
         return (%res))");
 
-  auto conv_op_fused_rstring = at::jit::CodeTemplate(R"(
+  auto conv_transpose_op_fused_rstring = at::jit::CodeTemplate(R"(
     graph(%input, %packed_weight):
         %res = ipex_prepack::conv_transpose_${op}_run(%input, %packed_weight)
         return (%res))");
@@ -199,7 +199,43 @@ void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
 
     SubgraphRewriter rewriter;
     rewriter.RegisterRewritePattern(
-        conv_op_rstring.format(env), conv_op_fused_rstring.format(env_fused));
+        conv_transpose_op_rstring.format(env),
+        conv_transpose_op_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
+
+  // For non-unary post OPs:
+  auto conv_transpose_op_non_unary_rstring = at::jit::CodeTemplate(R"(
+     graph(%input, %packed_weight, ${op_input_str}):
+        %x : Tensor = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = ${op}(%x, ${op_input_str})
+        return (%res))");
+
+  auto conv_transpose_op_non_unary_fused_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %packed_weight, ${op_input_str}):
+        %res = ipex_prepack::conv_transpose_${op}_run(%input, ${op_input_str}, %packed_weight)
+        return (%res))");
+
+  for (auto const& it : utils::supported_non_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
+    std::vector<std::string> op_input_list = it.second.op_input_list;
+    std::string op_input_str = c10::Join(", ", op_input_list);
+
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+    env.s("op_input_str", op_input_str);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+    env_fused.s("op_input_str", op_input_str);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        conv_transpose_op_non_unary_rstring.format(env),
+        conv_transpose_op_non_unary_fused_rstring.format(env_fused));
 
     auto filters = it.second.filters;
     rewriter.runOnGraph(graph, filters);

@@ -130,10 +130,10 @@ non_unary_PyTorch_op_to_IPEX_op_map = {
 }
 
 unsupported_PyTorch_op_to_IPEX_op_map = {
-    torch.clamp: EltwiseFusionOp("hardtanh", op_input_list={"min": -2}),
-    torch.clamp_: EltwiseFusionOp("hardtanh", op_input_list={"max": 3}),
-    torch.pow: EltwiseFusionOp("pow", op_input_list={"exponent": torch.randn(32)}), # conv/linear-pow fusion requires exponent to be a Scalar but not a Tensor
-    lambda t: t.pow_(torch.randn(1)): EltwiseFusionOp("pow"), # conv/linear-pow_ fusion requires exponent to be a Scalar but not a Tensor
+    torch.clamp: EltwiseFusionOp("hardtanh", op_input_list={"min": -2}), # clamp fusion requires that neither of min and max is None
+    torch.clamp_: EltwiseFusionOp("hardtanh", op_input_list={"max": 3}), # clamp_ fusion requires that neither of min and max is None
+    torch.pow: EltwiseFusionOp("pow", op_input_list={"exponent": torch.randn(1)}), # pow fusion requires exponent to be a Scalar but not a Tensor
+    lambda t: t.pow_(torch.randn(1)): EltwiseFusionOp("pow"), # pow_ fusion requires exponent to be a Scalar but not a Tensor
 }
 
 # The below eltwise OP have unstable numeric issue.
@@ -993,6 +993,21 @@ class Tester(TestCase):
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
+    def _test_fusion_unsupported_case(self, m, x, auto_kernel_selection=False, kind_in_graph=None, kind_not_in_graph=None):
+        m.eval()
+        model = ipex.optimize(m, dtype=torch.float32, auto_kernel_selection=auto_kernel_selection)
+        with torch.no_grad():
+            result = model(x)
+            traced_model = torch.jit.trace(model, x).eval()
+            traced_model = torch.jit.freeze(traced_model)
+            tresult = traced_model(x)
+            trace_graph = traced_model.graph_for(x)                
+            
+            if kind_in_graph is not None:
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+
+            if kind_not_in_graph is not None:
+                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
     def test_jit_freeze(self):
         model = ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1).eval()
@@ -1491,18 +1506,11 @@ class Tester(TestCase):
 
             x = torch.randn(input_size)
             m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
-
-            m.eval()
-            model = ipex.optimize(m, dtype=torch.float32)
-            with torch.no_grad():
-                result = model(x)
-                traced_model = torch.jit.trace(model, x).eval()
-                traced_model = torch.jit.freeze(traced_model)
-                tresult = traced_model(x)
-                trace_graph = traced_model.graph_for(x)
-                
-                kind_not_in_graph = 'ipex_prepack::convolution_%s_run' % ipex_eltwise_op
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+            
+            self._test_fusion_unsupported_case(
+                m,
+                x,
+                kind_not_in_graph = 'ipex_prepack::convolution_%s_run' % ipex_eltwise_op)
 
     def test_conv_fusion(self):
         batch_size = 8
@@ -2287,6 +2295,35 @@ class Tester(TestCase):
         self._test_conv_transpose_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
         self._test_conv_transpose_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654583254233936896)
 
+    def test_conv_transpose_non_unary_fusion(self):        
+        self._test_conv_transpose_unary_fusion(non_unary_PyTorch_op_to_IPEX_op_map)
+
+    def test_conv_transpose_fusion_unsupported_case(self):
+        dim = 2
+        batch_size = 1
+        in_channels = 3
+        out_channels = 5
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+        
+        for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
+            input_size = [batch_size, in_channels, image_size, image_size]
+
+            unary_fusion_op = unsupported_PyTorch_op_to_IPEX_op_map[eltwise]
+            ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+            bf16_supported = unary_fusion_op.bf16_supported
+            prec = unary_fusion_op.prec
+            op_input_list = unary_fusion_op.op_input_list
+
+            x = torch.randn(input_size)
+            m = ConvTransposeEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
+
+            self._test_fusion_unsupported_case(
+                m,
+                x,
+                kind_not_in_graph = 'ipex_prepack::conv_transpose_%s_run' % ipex_eltwise_op)
+
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
         options = itertools.product(['O0', 'O1'], [True, False])
@@ -2497,17 +2534,11 @@ class Tester(TestCase):
             x = torch.randn(input_size)
             m = LinearEltwise(eltwise, in_channels, out_channels, bias, **op_input_list)
 
-            m.eval()
-            model = ipex.optimize(m, dtype=torch.float32, auto_kernel_selection=True)
-            with torch.no_grad():
-                result = model(x)
-                traced_model = torch.jit.trace(model, x).eval()
-                traced_model = torch.jit.freeze(traced_model)
-                tresult = traced_model(x)
-                trace_graph = traced_model.graph_for(x)
-                
-                kind_not_in_graph = 'ipex_prepack::linear_%s_run' % ipex_eltwise_op
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+            self._test_fusion_unsupported_case(
+                m,
+                x,
+                auto_kernel_selection=True,
+                kind_not_in_graph='ipex_prepack::linear_%s_run' % ipex_eltwise_op)
 
     def test_output_linear_add(self):
         self._test_output(

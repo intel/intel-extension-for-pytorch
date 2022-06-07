@@ -68,6 +68,58 @@ DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
 
+at::Tensor conv_transpose_leaky_relu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_leaky_relu_run",
+      c10::ArrayRef<c10::IValue>({}));
+  auto alpha_value = alpha.to<float>();
+  return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
+}
+
+at::Tensor conv_transpose_hardtanh_run(
+    const at::Tensor& input,
+    at::Scalar lower_bound,
+    at::Scalar upper_bound,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_hardtanh_run",
+      c10::ArrayRef<c10::IValue>({}));
+  auto lower_bound_value = lower_bound.to<float>();
+  auto upper_bound_value = upper_bound.to<float>();
+  return op_context->run(
+      input, ideep::attr_t::fuse_clamp(lower_bound_value, upper_bound_value));
+}
+
+at::Tensor conv_transpose_elu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    at::Scalar scale,
+    at::Scalar input_scale,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_elu_run", c10::ArrayRef<c10::IValue>({}));
+  auto alpha_value = alpha.to<float>();
+  auto scale_value = scale.to<float>();
+  auto input_scale_value = input_scale.to<float>();
+  return op_context->run(
+      input,
+      ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value));
+}
+
+at::Tensor conv_transpose_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_pow_run", c10::ArrayRef<c10::IValue>({}));
+  auto exponent_value = exponent.to<float>();
+  return op_context->run(
+      input, ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value));
+}
+
 ContextConvTranspose create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
