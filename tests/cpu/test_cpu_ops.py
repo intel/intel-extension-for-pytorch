@@ -775,5 +775,15 @@ class CPUOPsTester(TestCase):
         self.assertTrue(y2.dtype == torch.bfloat16)
         self.assertEqual(y2, y, prec=0.01)
 
+    def test_cat(self):
+        x = x = torch.randn(2, 3)
+        y = torch.cat((x, x, x), 0)
+
+        # test bfloat16
+        x2 = x.clone().detach().bfloat16()
+        y2 = torch.cat((x2, x2, x2), 0)
+        self.assertTrue(y2.dtype == torch.bfloat16)
+        self.assertEqual(y2, y, prec=0.01)
+
 if __name__ == '__main__':
     test = unittest.main()
