@@ -754,5 +754,16 @@ class CPUOPsTester(TestCase):
             h = torch.bmm(e, f)
             self.assertTrue(torch.equal(g, h))
 
+    def test_index_select(self):
+        x = torch.randn(3, 64, 8, 9)
+        indices = torch.tensor([0, 2])
+        y = x.index_select(1, indices)
+
+        # test bfloat16
+        x2 = x.clone().detach().bfloat16()
+        y2 = x2.index_select(1, indices)
+        self.assertTrue(y2.dtype == torch.bfloat16)
+        self.assertEqual(y2, y, prec=0.01)
+
 if __name__ == '__main__':
     test = unittest.main()
