@@ -108,8 +108,8 @@ at::Tensor linear_pow_run(
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context,
-    const c10::string_view approximate) {
+    const c10::string_view approximate,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
   IPEX_RECORD_FUNCTION(
       "ipex_prepack::linear_gelu_run", c10::ArrayRef<c10::IValue>({}));
   // https://github.com/pytorch/pytorch/pull/61439

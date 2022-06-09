@@ -117,6 +117,8 @@ unary_PyTorch_op_to_IPEX_op_map = {
 }
 
 non_unary_PyTorch_op_to_IPEX_op_map = {
+    nn.GELU(approximate="none"): EltwiseFusionOp("gelu"),
+    nn.GELU(approximate="tanh"): EltwiseFusionOp("gelu"),
     nn.LeakyReLU(0.1, inplace=True): EltwiseFusionOp("leaky_relu"),
     nn.LeakyReLU(0.1, inplace=False): EltwiseFusionOp("leaky_relu"),
     nn.Hardtanh(inplace=True): EltwiseFusionOp("hardtanh"),
@@ -470,17 +472,6 @@ class LinearRelu(nn.Module):
     def forward(self, x):
         return F.relu(self.linear(x), inplace=True)
 
-class LinearGelu(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearGelu, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.approximate = kwargs["approximate"]
-        self.linear = nn.Linear(in_channels, out_channels, kwargs["bias"])
-
-    def forward(self, x):
-        return F.gelu(self.linear(x), approximate=self.approximate)
-
 class LinearSigmoidMul(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearSigmoidMul, self).__init__()
@@ -579,15 +570,6 @@ class ConvSwishInplace(nn.Module):
         res = a.mul_(b)
         return res
 
-class ConvGelu(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
-        super(ConvGelu, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.approximate = kwargs["approximate"]
-
-    def forward(self, x):
-        return F.gelu(self.conv(x), approximate=self.approximate)
-
 class ConvTranspose(nn.Module):
     def __init__(self, dim, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
         super(ConvTranspose, self).__init__()
@@ -596,6 +578,18 @@ class ConvTranspose(nn.Module):
     def forward(self, x):
         x = self.conv_transpose(x)
         return x
+
+class ConvTransposeSigmoidMul(nn.Module):
+    def __init__(self, mul, dim, in_channels, out_channels, kernel_size, image_size):
+        super(ConvTransposeSigmoidMul, self).__init__()
+        self.conv_transpose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.mul_op = mul
+
+    def forward(self, x):
+        a1 = self.conv_transpose(x)
+        b1 = torch.sigmoid(a1)
+        c1 = self.mul_op(a1, b1)
+        return c1    
 
 class ChannelShuffle_with_Static_Shape(nn.Module):
     def __init__(self, batchsize, num_channels, height, width, groups):
@@ -1546,12 +1540,6 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
                 prec=0.02)
-            for approximate in ["none", "tanh"]:
-                self._test_output(
-                    ConvGelu(dim, in_channels, out_channels, kernel_size, image_size, approximate=approximate),
-                    x,
-                    kind_in_graph="ipex_prepack::convolution_gelu_run",
-                    kind_not_in_graph="ipex_prepack::convolution_gelu_prepack")
 
     def test_output_conv_bn(self):
         batch_size = 8
@@ -2324,6 +2312,38 @@ class Tester(TestCase):
                 x,
                 kind_not_in_graph = 'ipex_prepack::conv_transpose_%s_run' % ipex_eltwise_op)
 
+    def test_conv_transpose_sigmoid_mul(self):
+        batch_size = 1
+        out_channels = 5
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        prec = 0.02
+        for dim in [2, 3]:
+            for eltwise in [torch.mul, lambda a, b: a.mul_(b)]:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+                ipex_eltwise_op = "swish"
+                x = torch.randn(input_size)
+                m = ConvTransposeSigmoidMul(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
+
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
+                self._test_output_bf16(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                    prec=prec)        
+
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
         options = itertools.product(['O0', 'O1'], [True, False])
@@ -2563,20 +2583,6 @@ class Tester(TestCase):
             Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True),
             torch.rand(1, 1, 32, 32),
             kind_in_graph="aten::linear")
-
-    def test_output_linear_gelu(self):
-        options = itertools.product([True, False], ["none", "tanh"])
-        for bias, approximate in options:
-            self._test_output(
-                LinearGelu(3, 32, bias=bias, approximate=approximate),
-                torch.rand(32, 3),
-                kind_in_graph="aten::linear")
-            self._test_output_bf16(
-                LinearGelu(3, 32, bias=bias, approximate=approximate),
-                torch.rand(32, 3),
-                kind_in_graph="ipex_prepack::linear_gelu_run",
-                kind_not_in_graph="ipex_prepack::linear_prepack",
-                prec=1e-2)
 
     def test_output_linear_swish(self):
         self._test_onednn_fp32(

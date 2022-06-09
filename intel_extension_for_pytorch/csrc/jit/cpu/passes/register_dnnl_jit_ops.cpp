@@ -567,16 +567,16 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex_prepack::linear_gelu_run(Tensor input, "
-        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack, "
-        "str approximate) "
-        "-> Tensor",
+        "ipex_prepack::linear_gelu_run(Tensor input, str approximate, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext "
+        "W_prepack) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = linear_gelu_run(
                 (std::move(peek(stack, 0, 3))).toTensor(),
-                (std::move(peek(stack, 1, 3))).toCustomClass<LinearOpContext>(),
-                (std::move(peek(stack, 2, 3))).toStringView());
+                (std::move(peek(stack, 1, 3))).toStringView(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
             drop(stack, 3);
             pack(stack, std::move(result));
             return 0;
@@ -619,6 +619,23 @@ RegisterOperators op({
     CreateConvTransposeUnaryPostOpRun(round_run),
     CreateConvTransposeUnaryPostOpRun(sqrt_run),
 
+    Operator(
+        "ipex_prepack::conv_transpose_gelu_run(Tensor input, str approximate, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = conv_transpose_gelu_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toStringView(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
     Operator(
         "ipex_prepack::conv_transpose_leaky_relu_run(Tensor input, Scalar alpha, "
         "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
