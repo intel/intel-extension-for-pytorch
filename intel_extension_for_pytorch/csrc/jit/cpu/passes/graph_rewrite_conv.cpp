@@ -175,7 +175,7 @@ void insertPrePackedConvOp(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_swish, rewriter_gelu;
+  SubgraphRewriter rewriter_swish;
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
 
@@ -262,19 +262,6 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::convolution_swish_run(%input, %packed_weight)
         return (%res))";
 
-  auto conv_gelu_rstring = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
-        %x = ipex_prepack::convolution_run(%input, %packed_weight)
-        %res = aten::gelu(%x, %approximate)
-        return (%res))";
-
-  std::string conv_gelu_fused = R"(
-    graph(%input, %weight, %bias, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[], %approximate):
-        %packed_weight : __torch__.torch.classes.ipex_prepack.ConvolutionOpContext = ipex_prepack::convolution_gelu_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size, %approximate)
-        %res = ipex_prepack::convolution_gelu_run(%input, %approximate, %packed_weight)
-        return (%res))";
-
   for (const auto& sigmoid : sigmoid_operators) {
     TemplateEnv env;
     env.s("sigmoid", sigmoid);
@@ -285,18 +272,7 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
     }
   }
 
-  auto filter_conv_gelu =
-      [](const Match& match,
-         const std::unordered_map<std::string, Value*>& vmap) {
-        const auto& match_vmap = match.values_map;
-        auto approximate_value =
-            getIValue("approximate", match_vmap, vmap).value();
-        return approximate_value == "none" || approximate_value == "tanh";
-      };
-
-  rewriter_gelu.RegisterRewritePattern(conv_gelu_rstring, conv_gelu_fused);
   rewriter_swish.runOnGraph(graph);
-  rewriter_gelu.runOnGraph(graph, filter_conv_gelu);
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {

@@ -68,6 +68,26 @@ DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
 
+at::Tensor conv_transpose_gelu_run(
+    const at::Tensor& input,
+    c10::string_view approximate,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_gelu_run", c10::ArrayRef<c10::IValue>({}));
+  dnnl::algorithm gelu_type;
+  if (approximate == "none") {
+    gelu_type = dnnl::algorithm::eltwise_gelu_erf;
+  } else if (approximate == "tanh") {
+    gelu_type = dnnl::algorithm::eltwise_gelu_tanh;
+  } else {
+    TORCH_CHECK(
+        false,
+        "ipex::conv_transpose_gelu_run only support tanh approximate now");
+  }
+  return op_context->run(
+      input, ideep::attr_t::fuse_gelu(1.0, 0.f, 0.f, gelu_type));
+}
+
 at::Tensor conv_transpose_leaky_relu_run(
     const at::Tensor& input,
     at::Scalar alpha,

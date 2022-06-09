@@ -7,6 +7,15 @@ namespace jit {
 namespace graph_rewrite {
 namespace utils {
 
+bool aten_gelu_approximate_is_supported(
+    const Match& match,
+    const std::unordered_map<std::string, Value*>& vmap) {
+  const auto& match_vmap = match.values_map;
+  auto approximate_value =
+      graph_rewrite_helper::getIValue("approximate", match_vmap, vmap).value();
+  return approximate_value == "none" || approximate_value == "tanh";
+}
+
 bool aten_elu_no_input_scale(
     const Match& match,
     const std::unordered_map<std::string, Value*>& vmap) {
@@ -86,6 +95,10 @@ supported_non_unary_post_op_fusion_set() {
   // the op_input_list should be set to:
   //   std::vector<std::string>({"%alpha", "%scale", "%input_scale"}).
   static const std::map<std::string, NonUnaryPostOp> fusion_attr_map{
+      {"aten::gelu",
+       {"gelu",
+        std::vector<std::string>({"%approximate"}),
+        {aten_gelu_approximate_is_supported}}},
       {"aten::leaky_relu",
        {"leaky_relu", std::vector<std::string>({"%alpha"})}},
       {"aten::leaky_relu_",

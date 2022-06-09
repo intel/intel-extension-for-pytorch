@@ -44,6 +44,11 @@ DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
 DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
 DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
 
+at::Tensor conv_transpose_gelu_run(
+    const at::Tensor& input,
+    c10::string_view approximate,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
 at::Tensor conv_transpose_leaky_relu_run(
     const at::Tensor& input,
     at::Scalar alpha,

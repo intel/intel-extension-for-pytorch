@@ -240,6 +240,35 @@ void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
     auto filters = it.second.filters;
     rewriter.runOnGraph(graph, filters);
   }
+
+  // For conv_transpose-sigmoid-mul
+  SubgraphRewriter rewriter_swish;
+  std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
+  std::array<std::string, 2> mul_operators = {"mul", "mul_"};
+
+  auto conv_transpose_sigmoid_mul_rstring = CodeTemplate(R"(
+    graph(%input, %packed_weight):
+        %x = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %y = aten::${sigmoid}(%x)
+        %res = aten::${mul}(%x, %y)
+        return (%res))");
+
+  std::string conv_transpose_swish_fused = R"(
+    graph(%input, %packed_weight):
+        %res = ipex_prepack::conv_transpose_swish_run(%input, %packed_weight)
+        return (%res))";
+
+  for (const auto& sigmoid : sigmoid_operators) {
+    TemplateEnv env;
+    env.s("sigmoid", sigmoid);
+    for (const auto& mul : mul_operators) {
+      env.s("mul", mul);
+      rewriter_swish.RegisterRewritePattern(
+          conv_transpose_sigmoid_mul_rstring.format(env),
+          conv_transpose_swish_fused);
+    }
+  }
+  rewriter_swish.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite
