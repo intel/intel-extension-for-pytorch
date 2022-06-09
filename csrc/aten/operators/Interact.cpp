@@ -153,8 +153,8 @@ void interaction_kernel(
                   half* value_col_half = reinterpret_cast<half(*)>(&value_col);
 
                   // 2 times multiple in here
-                  res[i][j] += value_row_half[0] * value_col_half[0];
-                  res[i][j] += value_row_half[1] * value_col_half[1];
+                  res[i][j] += (float)(value_row_half[0] * value_col_half[0]);
+                  res[i][j] += (float)(value_row_half[1] * value_col_half[1]);
                 }
               }
             }
