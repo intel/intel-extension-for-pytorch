@@ -35,9 +35,14 @@ static_qconfig = [
             weight = default_weight_observer),
         ]
 
-dynamic_qconfig = QConfig(
+dynamic_qconfig = [
+    QConfig(
         activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-        weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric))
+        weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)),
+    QConfig(
+        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
+        weight = default_weight_observer),
+    ]
 
 class TestIpexOps(JitLlgaTestCase):
     def test_adaptive_avg_pool2d(self):
@@ -364,8 +369,9 @@ class TestDynamicQuantization(JitLlgaTestCase):
 
         m = M().eval()
         x = torch.randn(3, 3)
-        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=dynamic_qconfig)
-        FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
+        for qconfig in dynamic_qconfig:
+            graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
+            FileCheck().check_not("aten:linear").check("quantized::linear_dynamic").run(graph)
     
     def test_lstm_dynamic(self):
         class M(nn.Module):
@@ -381,8 +387,9 @@ class TestDynamicQuantization(JitLlgaTestCase):
         x = torch.randn(5, 3, 10)
         h = torch.randn(2, 3, 20)
         c = torch.randn(2, 3, 20)
-        graph = self.checkQuantizeTrace(m, [x, h, c], atol=2e-1, qconfig=dynamic_qconfig)
-        FileCheck().check_not("aten:lstm").check("aten::quantized_lstm").run(graph)
+        for qconfig in dynamic_qconfig:
+            graph = self.checkQuantizeTrace(m, [x, h, c], atol=2e-1, qconfig=qconfig)
+            FileCheck().check_not("aten:lstm").check("aten::quantized_lstm").run(graph)
 
 
 if __name__ == '__main__':

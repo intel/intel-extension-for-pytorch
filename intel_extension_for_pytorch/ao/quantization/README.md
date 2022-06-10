@@ -78,15 +78,15 @@ from intel_extension_for_pytorch.quantization import prepare, convert
 from torch.ao.quantization import MinMaxObserver, PlaceholderObserver, QConfig
 dynamic_qconfig = QConfig(
         activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-        weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric))
+        weight = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
 ```
 
-Note: For weight observer, it only support dtype **torch.qint8**, and the qscheme can be **torch.per_tensor_symmetric** or **torch.per_tensor_symmetric**.
+Note: For weight observer, it only support dtype **torch.qint8**, and the qscheme only can be **torch.per_tensor_symmetric** or **torch.per_channel_symmetric**.
 
 ### Prepare Model
 
 ```python
-prepared_model = prepare(user_model, qconfig, example_inputs=example_inputs, inplace=False)
+prepared_model = prepare(user_model, dynamic_qconfig, example_inputs=example_inputs)
 ```
 
 ## Convert to Dynamic Quantized Model and Deploy
@@ -94,15 +94,25 @@ prepared_model = prepare(user_model, qconfig, example_inputs=example_inputs, inp
 ```python
 # make sure the example_inputs's size is same as the real input's size
 convert_model = convert(prepared_model)
-with torch.no_grad():
-    traced_model = torch.jit.trace(convert_model, example_input)
-    traced_model = torch.jit.freeze(traced_model)
-# for inference 
-y = traced_model(x)
+# Optional: convert the model to traced model
+#with torch.no_grad():
+#    traced_model = torch.jit.trace(convert_model, example_input)
+#    traced_model = torch.jit.freeze(traced_model)
 
 # or save the model to deploy
 # traced_model.save("quantized_model.pt")
 # quantized_model = torch.jit.load("quantized_model.pt")
 # quantized_model = torch.jit.freeze(quantized_model.eval())
 # ...
+# for inference 
+y = convert_model(x)
+
 ```
+
+Note: we only support the following ops to do dynamic quantization:
+- torch.nn.Linear
+- torch.nn.LSTM 
+- torch.nn.GRU 
+- torch.nn.LSTMCell
+- torch.nn.RNNCell
+- torch.nn.GRUCell

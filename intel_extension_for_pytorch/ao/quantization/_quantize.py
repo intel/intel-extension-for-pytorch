@@ -24,7 +24,7 @@ def prepare(
     Returns:
         torch.nn.Module
     """
-
+    assert isinstance(model, torch.nn.Module), "Only support nn.Module prepare for quantization path"
     try:
         prepare_model = optimization.fuse(model, inplace=inplace)
     except:  # noqa E722
