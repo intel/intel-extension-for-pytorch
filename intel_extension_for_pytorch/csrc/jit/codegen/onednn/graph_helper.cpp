@@ -239,6 +239,9 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return makeEltwiseOp(node, opkind::HardTanh)
         .setAttr("min", Operator::Float, 1)
         .setAttr("max", Operator::Float, 2);
+  } else if (nodeKind == Symbol::aten("leaky_relu")) {
+    return makeEltwiseOp(node, opkind::LeakyReLU)
+        .setAttr("alpha", Operator::Float, 1);
   } else if (nodeKind == Symbol::aten("softmax")) {
     auto dim0 = getDimensions(node->input(0));
     REQ(dim0.has_value());

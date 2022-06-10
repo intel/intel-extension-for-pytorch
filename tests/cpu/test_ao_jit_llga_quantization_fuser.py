@@ -368,7 +368,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.conv2(x)
                 return x
 
-        for eltwise in ['relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
+        for eltwise in ['relu', 'leaky_relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
             for inplace in [False, True]:
                 for memory_format in [torch.contiguous_format, torch.channels_last]:
                     eltwise_fn_name = eltwise + '_' if inplace else eltwise
