@@ -33,10 +33,6 @@ set(IPEX_ATEN_OPS_SRCS ${slow_srcs} ${fast_srcs} PARENT_SCOPE)
 # Add oneDNN runtime src here to avoid adding
 # any unexpected kernel src in oneDNN folder
 FILE(GLOB aten_core_src "core/*.cpp" "core/detail/*.cpp" "../oneDNN/Runtime.cpp")
-if (NOT USE_HOOKS)
-  file(GLOB disabled_src "core/detail/Hooks.cpp")
-  list(REMOVE_ITEM aten_core_src "${disabled_src}")
-endif()
 FILE(GLOB aten_src "amp/*.cpp")
 set(IPEX_ATEN_CORE_SRCS ${aten_core_src} ${aten_src} PARENT_SCOPE)
 

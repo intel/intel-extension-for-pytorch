@@ -151,11 +151,25 @@ struct DPCPPTensorContext {
   }
 
   static DPCPPTensorContext get_tensor_ctx(const at::Tensor& t) {
-    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()
-                ->storage()
-                .unsafeGetStorageImpl()
-                ->data_ptr()
-                .get_context();
+    auto deleter_ptr = t.unsafeGetTensorImpl()
+                           ->storage()
+                           .unsafeGetStorageImpl()
+                           ->data_ptr()
+                           .get_deleter();
+    if (deleter_ptr == getDeviceAllocator()->raw_deleter()) {
+      return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                  ->storage()
+                  .unsafeGetStorageImpl()
+                  ->data_ptr()
+                  .get_context();
+    } else {
+      // If the XPU tensor is not malloced by IPEX, it should be plain format.
+      return DPCPPTensorContext{t.unsafeGetTensorImpl()
+                                    ->storage()
+                                    .unsafeGetStorageImpl()
+                                    ->data_ptr()
+                                    .get()};
+    }
   }
 
   // set underlying tensor context to given `const` tensor
@@ -167,37 +181,66 @@ struct DPCPPTensorContext {
                               .get();
     data_t tag_raw_data = _ctx.data();
 
-    auto tag_ctx = new DPCPPTensorContext(_ctx);
-    at::DataPtr tag_dptr(
-        tag_ctx->data(),
-        tag_ctx,
-        getDeviceAllocator()->raw_deleter(),
-        t.device());
-
-    // release raw data to avoid auto-free after data_ptr dtor
-    DPCPPTensorContext* cur_ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
-                                      ->storage()
-                                      .unsafeGetStorageImpl()
-                                      ->data_ptr()
-                                      .release_context();
-
-    // swap and old data_ptr dtor
-    t.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->set_data_ptr(
-        std::move(tag_dptr));
-
-    // t->data == ctx->data. raw data is released and reclaim in new data_ptr
-    // t->data != ctx->data. old raw data is released and should be deleted by
-    // us
-    if (cur_raw_data != tag_raw_data)
-      getDeviceAllocator()->raw_deleter()(cur_ctx);
+    auto deleter_ptr = t.unsafeGetTensorImpl()
+                           ->storage()
+                           .unsafeGetStorageImpl()
+                           ->data_ptr()
+                           .get_deleter();
+    if (deleter_ptr == getDeviceAllocator()->raw_deleter()) {
+      // This tensor is malloced by IPEX.
+      if (cur_raw_data == tag_raw_data) {
+        // It is inplace modification.
+        DPCPPTensorContext* cur_ctx =
+            static_cast<DPCPPTensorContext*>(t.unsafeGetTensorImpl()
+                                                 ->storage()
+                                                 .unsafeGetStorageImpl()
+                                                 ->data_ptr()
+                                                 .get_context());
+        *cur_ctx = _ctx;
+      } else {
+        // It is replacing the memory with a new one.
+        auto tag_ctx = new DPCPPTensorContext(_ctx);
+        at::DataPtr tag_dptr(
+            tag_ctx->data(),
+            tag_ctx,
+            getDeviceAllocator()->raw_deleter(),
+            t.device());
+        auto old_dptr = t.unsafeGetTensorImpl()
+                            ->storage()
+                            .unsafeGetStorageImpl()
+                            ->set_data_ptr(std::move(tag_dptr));
+      }
+    } else {
+      // The tensor is not created by IPEX.
+      if (cur_raw_data == tag_raw_data) {
+        // It is inplace modification.
+        TORCH_CHECK(
+            false,
+            "To set the new format on the shared tensor not allocated by XPU inplacely");
+      } else {
+        // It is replacing the memory with a new one.
+        TORCH_WARN(
+            "IPEX relpacing the plain memory format from a shared tensor with block format.",
+            "This may break some alias in shared tensor from DLPack");
+        auto tag_ctx = new DPCPPTensorContext(_ctx);
+        at::DataPtr tag_dptr(
+            tag_ctx->data(),
+            tag_ctx,
+            getDeviceAllocator()->raw_deleter(),
+            t.device());
+        auto old_dptr = t.unsafeGetTensorImpl()
+                            ->storage()
+                            .unsafeGetStorageImpl()
+                            ->set_data_ptr(std::move(tag_dptr));
+      }
+    }
   }
 };
 
 class DPCPPTensorConvertor {
  public:
   static bool is_opaque_tensor(const at::Tensor& t) {
-    auto ctx = *(static_cast<DPCPPTensorContext*>(
-        t.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
+    auto ctx = DPCPPTensorContext::get_tensor_ctx(t);
     return !ctx.is_plain();
   }
 
