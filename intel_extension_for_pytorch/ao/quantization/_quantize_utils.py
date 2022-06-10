@@ -1,8 +1,9 @@
 import os
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 import torch
 import torch.nn.functional as F
 from torch.fx.node import map_aggregate
+from torch.ao.quantization import PlaceholderObserver
 from torch.quantization.qconfig import QConfig
 
 from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type, OpQuantizeabilityType, \
@@ -333,9 +334,13 @@ def auto_prepare(
             else:
                 assert False, "Can not load a empty file or none existed file" + qconf_summary
 
-    model.__class__ = QuantizationInterceptionModule
-    # inint model quantization state using example_args
-    model(*example_inputs)
+    model.q_config = configure
+    # For Dynamic quantization, most user model has a dynamic control flow, the DBR
+    # doesn't support it now, so there skip DRB when user want to run dynamic quantization. 
+    if not isinstance(configure.activation(), PlaceholderObserver):
+        model.__class__ = QuantizationInterceptionModule
+        # init model quantization state using example_inputs
+        model(*example_inputs)
     return model
 
 def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
@@ -524,9 +529,21 @@ def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
                 torch.nn.Module.__call__ = orig_module_call
                 torch.nn.Sequential.forward = orig_nn_sequential_forward  # type: ignore[assignment]
 
+    # If the module's activation's qconfig is PlaceholderObserver, we can say that the module want to run dynamic quantization path.
+    if isinstance(module.q_config.activation(), PlaceholderObserver):
+        qconfig_spec = {
+            torch.nn.Linear : module.q_config,
+            torch.nn.LSTM : module.q_config,
+            torch.nn.GRU : module.q_config,
+            torch.nn.LSTMCell : module.q_config,
+            torch.nn.RNNCell : module.q_config,
+            torch.nn.GRUCell : module.q_config,
+        }
+        return torch.quantization.quantize_dynamic(module, qconfig_spec=qconfig_spec)
+
     # If module doesn't have a configure_file attr, we can say that user has run save_qconf_summary method which have
-    # computed the scales and zp, or use the user's setting from a given json file(loas_qconf_summary), we need compute the
-    # scale and zp here.
+    # computed the scales and zp, or use the user's setting from a given json file(load_qconf_summary), we need to compute
+    # the scale and zp here.
     if not hasattr(module, '_qconf_summary'):
         quant_state_map = module._fqn_to_auto_quant_state_map
         # compute scales and zero_point.
