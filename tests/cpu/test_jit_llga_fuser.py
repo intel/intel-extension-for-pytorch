@@ -62,6 +62,22 @@ class TestOp(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
+    def test_conv2d_script(self):
+        for bias in [True, False]:
+            m = nn.Conv2d(in_channels=3,
+                            out_channels=3,
+                            kernel_size=3,
+                            padding=1,
+                            stride=1,
+                            dilation=1,
+                            groups=1,
+                            bias=bias)
+
+        x = torch.rand(1, 3, 5, 5)
+        graph, _ = self.checkScript(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)        
+
+    @llga_fp32_bf16_test_env
     def test_bn2d(self):
         m = nn.BatchNorm2d(32).eval()
         x = torch.rand(1, 32, 28, 28)
@@ -78,7 +94,8 @@ class TestOp(JitLlgaTestCase):
             def forward(self, x):
                 return self.eltwise(x)
 
-        for eltwise in ['relu', 'gelu']:
+
+        for eltwise in ['relu', 'gelu', 'tanh', 'sqrt', 'square']:
             eltwise_fn = get_eltwise_fn(eltwise)
             m = M(eltwise_fn)
             x = torch.rand(1, 32, 28, 28)
@@ -240,6 +257,16 @@ class TestOp(JitLlgaTestCase):
         x = torch.randn(8, 128, 368)
         y = torch.randn(368, 3072)
         graph, _ = self.checkTrace(forward_matmul, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @llga_fp32_bf16_test_env
+    def test_mm(self):
+        def forward_mm(x, y):
+            return torch.mm(x, y)
+
+        x = torch.randn(2, 3)
+        y = torch.randn(3, 3)
+        graph, _ = self.checkTrace(forward_mm, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
