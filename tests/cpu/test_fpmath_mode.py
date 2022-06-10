@@ -38,15 +38,15 @@ class TestFPMathCases(TestCase):
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
                 for line in p.stdout.readlines():
                     line = str(line, 'utf-8').strip()
-                    if "attr-fpmath:bf16" in line and "convolution" in line:
+                    if "fpmath_mode_bf16" in line and "convolution" in line:
                         num1 = num1 + 1
                         if "backward" in line:
                             num4 = num4 + 1
-                    if "attr-fpmath:bf16" in line and "inner_product" in line:
+                    if "fpmath_mode_bf16" in line and "inner_product" in line:
                         num2 = num2 + 1
                         if "backward" in line:
                             num5 = num5 + 1
-                    if "attr-fpmath:bf16" in line and "matmul" in line:
+                    if "fpmath_mode_bf16" in line and "matmul" in line:
                         num3 = num3 + 1
             assert num1 > 0 and num2 > 0 and num3 > 0, 'The implicit FP32 to BF16 data type conversion failed to enable.'
             assert num4 > 0 and num5 > 0 and num3 >= 3, 'The implicit FP32 to BF16 data type conversion failed to enable in backward pass.'
@@ -62,7 +62,7 @@ class TestFPMathCases(TestCase):
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
                 for line in p.stdout.readlines():
                     line = str(line, 'utf-8').strip()
-                    if "attr-fpmath:bf16" in line:
+                    if "fpmath_mode_bf16" in line:
                         num = num + 1
             assert num == 0, 'The implicit FP32 to BF16 data type conversion failed to disable.'
 
@@ -78,11 +78,11 @@ class TestFPMathCases(TestCase):
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
                 for line in p.stdout.readlines():
                     line = str(line, 'utf-8').strip()
-                    if "attr-fpmath:bf16" in line and "convolution" in line:
+                    if "fpmath_mode_bf16" in line and "convolution" in line:
                         num1 = num1 + 1
-                    if "attr-fpmath:bf16" in line and "inner_product" in line:
+                    if "fpmath_mode_bf16" in line and "inner_product" in line:
                         num2 = num2 + 1
-                    if "attr-fpmath:bf16" in line and "matmul" in line:
+                    if "fpmath_mode_bf16" in line and "matmul" in line:
                         num3 = num3 + 1
             assert num1 > 0 and num2 > 0 and num3 > 0, 'The implicit FP32 to BF16 data type conversion failed to enable.'
 

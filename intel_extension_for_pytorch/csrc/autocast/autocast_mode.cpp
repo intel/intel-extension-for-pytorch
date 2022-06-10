@@ -1,5 +1,5 @@
 #include "autocast_mode.h"
-
+#include "autocast_kernel.hpp"
 #include "library.h"
 
 #include <exception>
@@ -155,6 +155,12 @@ MAKE_REGISTER_FUNC(
 
 // fp32 cast policy a.k.a BlackList
 MAKE_REGISTER_FUNC(ADD_NS(mish), "mish", Tensor(const Tensor&), fp32)
+
+IPEX_TORCH_LIBRARY_IMPL(aten, AutocastCPU, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::_convolution"),
+      TORCH_FN((&torch_ipex::autocast::_convolution)));
+}
 
 } // namespace autocast
 } // namespace torch_ipex

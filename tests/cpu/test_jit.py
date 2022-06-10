@@ -1466,13 +1466,14 @@ class Tester(TestCase):
                     x,
                     kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
                     kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
-                if bf16_supported:
-                    self._test_output_bf16(
-                        m,
-                        x,
-                        kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
-                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
-                        prec=prec)
+                # TODO: stock PyTorch does not support bf16 deconv.
+                # if bf16_supported:
+                #     self._test_output_bf16(
+                #         m,
+                #         x,
+                #         kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                #         kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                #         prec=prec)
 
     def test_conv_unary_fusion(self):
         self._test_conv_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
@@ -2258,26 +2259,28 @@ class Tester(TestCase):
                         kind_in_graph="ipex_prepack::conv_transpose_run",
                         kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
                         levels=["O0"])
-                    self._test_output_bf16(
-                        model,
-                        x,
-                        kind_in_graph="ipex_prepack::conv_transpose_run",
-                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
-                        levels=["O0"],
-                        prec=0.02)
+                    # TODO: stock PyTorch does not support bf16 deconv.
+                    # self._test_output_bf16(
+                    #     model,
+                    #     x,
+                    #     kind_in_graph="ipex_prepack::conv_transpose_run",
+                    #     kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                    #     levels=["O0"],
+                    #     prec=0.02)
                     self._test_output(
                         model,
                         x,
                         kind_in_graph="ipex_prepack::conv_transpose_run",
                         kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
                         levels=["O1"])
-                    self._test_output_bf16(
-                        model,
-                        x,
-                        kind_in_graph="ipex_prepack::conv_transpose_run",
-                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
-                        levels=["O1"],
-                        prec=0.02)
+                    # TODO: stock PyTorch does not support bf16 deconv.
+                    # self._test_output_bf16(
+                    #     model,
+                    #     x,
+                    #     kind_in_graph="ipex_prepack::conv_transpose_run",
+                    #     kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                    #     levels=["O1"],
+                    #     prec=0.02)
 
     def test_conv_transpose_unary_fusion(self):
         self._test_conv_transpose_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
