@@ -306,6 +306,8 @@ void grid_sampler_2d_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
+      if (index >= nthreads)
+        return;
       const index_t w = index % out_W;
       const index_t h = (index / out_W) % out_H;
       const index_t n = index / (out_H * out_W);
@@ -428,6 +430,8 @@ void grid_sampler_2d_backward_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
+      if (index >= nthreads)
+        return;
       const index_t w = index % out_W;
       const index_t h = (index / out_W) % out_H;
       const index_t n = index / (out_H * out_W);
@@ -621,6 +625,8 @@ void grid_sampler_3d_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
+      if (index >= nthreads)
+        return;
 
       const index_t w = index % out_W;
       const index_t h = (index / out_W) % out_H;
@@ -832,6 +838,8 @@ void grid_sampler_3d_backward_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto index = item_id.get_global_linear_id();
+      if (index >= nthreads)
+        return;
 
       const index_t w = index % out_W;
       const index_t h = (index / out_W) % out_H;
