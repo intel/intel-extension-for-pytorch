@@ -6,10 +6,12 @@
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/runtime/operator.h>
+#include <iostream>
 #include <string>
+#include <vector>
 #include "accelerated_ops.h"
-
 using namespace torch::jit;
+using namespace std;
 
 // XXX: move to somewhere convenient
 namespace std {
@@ -26,6 +28,8 @@ struct hash<std::pair<Symbol, Symbol>> {
 namespace torch {
 namespace jit {
 namespace xpu {
+
+vector<c10::Symbol> not_check_uses_ops{xpu::softplus_tanh_mul_sym};
 
 //
 // The main goal of oneDNN fusion is to limit bandwidth wasting.
@@ -212,11 +216,21 @@ class OpFuser {
     return newNode;
   }
 
+  bool needCheckUses(Node* node) {
+    vector<c10::Symbol>::iterator it = find(
+        not_check_uses_ops.begin(), not_check_uses_ops.end(), node->kind());
+    if (it == not_check_uses_ops.end()) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   bool aliasIsSafeForSquashingValue(Node* node, Value* v) {
     bool safe = false;
     auto prev = v->node();
     if (aliasDb_->moveAfterTopologicallyValid(node, prev)) {
-      if (v->uses().size() == 1 ||
+      if (!needCheckUses(node) || v->uses().size() == 1 ||
           aliasDb_->mayAlias /* mustAlias */ (v, node->output())) {
         safe = true;
       }
@@ -240,13 +254,14 @@ class OpFuser {
   const FunctionSchema& matchSchemaForFusion(
       c10::Symbol symbol,
       Node* prev,
-      Node* node) {
+      Node* node,
+      int v_used_times) {
     auto ops = getAllOperatorsFor(symbol);
 
     for (auto& op : ops) {
       auto& schema = op->schema();
       if (schema.arguments().size() ==
-              prev->inputs().size() + node->inputs().size() - 1 &&
+              prev->inputs().size() + node->inputs().size() - v_used_times &&
           schema.returns().size() == node->outputs().size())
         return schema;
     }
@@ -323,13 +338,15 @@ class OpFuser {
     if (safe && node->inputs().size() > 1) {
       TORCH_INTERNAL_ASSERT(r);
       auto rule = *r.value();
-      auto& schema = matchSchemaForFusion(rule.second, v->node(), node);
+      auto& schema =
+          matchSchemaForFusion(rule.second, v->node(), node, v->uses().size());
       auto o_schema = node->schema();
 
       auto pos = v->node()->inputs().size();
 
       TORCH_INTERNAL_ASSERT(
-          schema.arguments().size() == pos + node->inputs().size() - 1);
+          schema.arguments().size() ==
+          pos + node->inputs().size() - v->uses().size());
 
       for (int i = 0; i < node->inputs().size(); ++i) {
         if (node->input(i) != v) { /* avoid squashing path */
@@ -403,6 +420,29 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("aten::leaky_relu_")},
      xpu::q_conv2d_leaky_relu_sym},
+    // YOLOv4 INT8 For ATS-M: conv2d + dequantize
+    {{Symbol::fromQualString("quantized::conv2d"),
+      Symbol::fromQualString("aten::dequantize")},
+     xpu::q_conv2d_dequantize_sym},
+    // YOLOv4 INT8 For ATS-M: softplus + tanh
+    {{Symbol::fromQualString("aten::softplus"),
+      Symbol::fromQualString("aten::tanh")},
+     xpu::softplus_tanh_sym},
+    // YOLOv4 INT8 For ATS-M: softplus_tanh + mul
+    {{xpu::softplus_tanh_sym, aten::mul}, xpu::softplus_tanh_mul_sym},
+    {{xpu::softplus_tanh_sym, Symbol::fromQualString("aten::mul")},
+     xpu::softplus_tanh_mul_sym},
+    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize + softplus_tanh_mul
+    {{xpu::q_conv2d_dequantize_sym, xpu::softplus_tanh_mul_sym},
+     xpu::q_conv2d_dequantize_softplus_tanh_mul_sym},
+    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize_softplus_tanh_mul + quantize
+    {{xpu::q_conv2d_dequantize_softplus_tanh_mul_sym,
+      Symbol::fromQualString("aten::quantize_per_tensor")},
+     xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym},
+    // YOLOv4 INT8 For ATS-M: q_conv2d_dequantize_softplus_tanh_mul_quantize_add
+    {{xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_sym,
+      Symbol::fromQualString("quantized::add")},
+     xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym},
     // DLRM: linear with bias + relu/sigmoid
     {{aten::t, aten::addmm}, xpu::t_addmm_sym},
     {{xpu::t_addmm_sym, aten::relu}, xpu::t_addmm_relu_sym},

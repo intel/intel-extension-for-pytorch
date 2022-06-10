@@ -37,6 +37,19 @@ static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_sum_relu");
 static auto q_conv2d_leaky_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_leaky_relu");
+static auto q_conv2d_dequantize_sym =
+    Symbol::fromQualString("xpu::q_conv2d_dequantize");
+static auto softplus_tanh_sym = Symbol::fromQualString("xpu::softplus_tanh");
+static auto softplus_tanh_mul_sym =
+    Symbol::fromQualString("xpu::softplus_tanh_mul");
+static auto q_conv2d_dequantize_softplus_tanh_mul_sym =
+    Symbol::fromQualString("xpu::q_conv2d_dequantize_softplus_tanh_mul");
+static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_sym =
+    Symbol::fromQualString(
+        "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize");
+static auto q_conv2d_dequantize_softplus_tanh_mul_quantize_add_sym =
+    Symbol::fromQualString(
+        "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add");
 static auto t_addmm_sym = Symbol::fromQualString("xpu::t_addmm");
 static auto t_addmm_dropout_sym =
     Symbol::fromQualString("xpu::t_addmm_dropout");

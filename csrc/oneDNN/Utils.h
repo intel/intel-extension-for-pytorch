@@ -25,6 +25,8 @@ enum post_attr {
   with_bin_add = 0b10000,
   with_bin_sub = 0b100000,
   with_gelu = 0b1000000,
+  with_mish = 0b10000000,
+  with_linear = 0b100000000,
 };
 
 static inline dnnl::memory::format_tag get_dnnl_default_format(

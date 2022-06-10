@@ -79,6 +79,101 @@ at::Tensor& conv2d_sum_relu(
   return accumu;
 }
 
+at::Tensor q_conv2d_dequantize(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point) {
+  RECORD_FUNCTION(
+      "q_conv2d_dequantize", std::vector<c10::IValue>({input, packed_weight}));
+  return at::AtenIpexTypeXPU::q_conv2d_dequantize(
+      input, packed_weight, output_scale, output_zero_point);
+}
+
+at::Tensor softplus_tanh(
+    const Tensor& self,
+    const Scalar& beta,
+    const Scalar& threshold) {
+  return at::AtenIpexTypeXPU::softplus_tanh(self, beta, threshold);
+}
+
+at::Tensor softplus_tanh_mul(
+    const Tensor& self,
+    const Scalar& beta,
+    const Scalar& threshold,
+    const Tensor& mul_input) {
+  return at::AtenIpexTypeXPU::softplus_tanh_mul(
+      self, beta, threshold, mul_input);
+}
+
+at::Tensor q_conv2d_dequantize_softplus_tanh_mul(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    const Scalar& beta,
+    const Scalar& threshold) {
+  return at::AtenIpexTypeXPU::q_conv2d_dequantize_softplus_tanh_mul(
+      input, packed_weight, output_scale, output_zero_point, beta, threshold);
+}
+
+at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    const Scalar& beta,
+    const Scalar& threshold,
+    double q_scale,
+    int64_t q_zpoint,
+    at::ScalarType dtype) {
+  RECORD_FUNCTION(
+      "q_conv2d_dequantize_softplus_tanh_mul_quantize",
+      std::vector<c10::IValue>({input}));
+  return at::AtenIpexTypeXPU::q_conv2d_dequantize_softplus_tanh_mul_quantize(
+      input,
+      packed_weight,
+      output_scale,
+      output_zero_point,
+      beta,
+      threshold,
+      q_scale,
+      q_zpoint,
+      dtype);
+}
+
+at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    const Scalar& beta,
+    const Scalar& threshold,
+    double q_scale,
+    int64_t q_zpoint,
+    at::ScalarType dtype,
+    Tensor qb,
+    double add_scale,
+    int64_t add_zero_point) {
+  RECORD_FUNCTION(
+      "q_conv2d_dequantize_softplus_tanh_mul_quantize_add",
+      std::vector<c10::IValue>({input}));
+  return at::AtenIpexTypeXPU::
+      q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
+          input,
+          packed_weight,
+          output_scale,
+          output_zero_point,
+          beta,
+          threshold,
+          q_scale,
+          q_zpoint,
+          dtype,
+          qb,
+          add_scale,
+          add_zero_point);
+}
+
 at::Tensor conv2d_relu(
     const at::Tensor& input,
     const at::Tensor& weight,

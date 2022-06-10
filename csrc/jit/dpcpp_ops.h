@@ -145,6 +145,56 @@ at::Tensor q_conv2d_leaky_relu(
     int64_t out_zpoint,
     Scalar negative_scope);
 
+at::Tensor q_conv2d_dequantize(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point);
+
+at::Tensor softplus_tanh(
+    const Tensor& self,
+    const Scalar& beta,
+    const Scalar& threshold);
+
+at::Tensor softplus_tanh_mul(
+    const Tensor& self,
+    const Scalar& beta,
+    const Scalar& threshold,
+    const Tensor& mul_input);
+
+at::Tensor q_conv2d_dequantize_softplus_tanh_mul(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    const Scalar& beta,
+    const Scalar& threshold);
+
+at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    const Scalar& beta,
+    const Scalar& threshold,
+    double q_scale,
+    int64_t q_zpoint,
+    at::ScalarType dtype);
+
+at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zero_point,
+    const Scalar& beta,
+    const Scalar& threshold,
+    double q_scale,
+    int64_t q_zpoint,
+    at::ScalarType dtype,
+    Tensor qb,
+    double add_scale,
+    int64_t add_zero_point);
+
 at::Tensor trans_addmm(
     const at::Tensor& weight,
     const at::Tensor& bias,

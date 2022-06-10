@@ -28,6 +28,9 @@ struct ConvAttr {
   static const int64_t kind_with_relu = xpu::oneDNN::with_relu; // 0b01;
   static const int64_t kind_with_sum = xpu::oneDNN::with_sum; // 0b10;
   static const int64_t kind_with_sigmoid = xpu::oneDNN::with_sigmoid; // 0b100;
+  static const int64_t kind_with_mish = xpu::oneDNN::with_mish; // 0b10000000;
+  static const int64_t kind_with_linear =
+      xpu::oneDNN::with_linear; // 0b100000000;
 
   ConvAttr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
   ConvAttr(float scale, float alpha, float beta, float oscale, int64_t attr)
@@ -47,6 +50,14 @@ struct ConvAttr {
 
   bool with_sigmoid() {
     return attr_ & kind_with_sigmoid;
+  }
+
+  bool with_mish() {
+    return attr_ & kind_with_mish;
+  }
+
+  bool with_linear() {
+    return attr_ & kind_with_linear;
   }
 
   int64_t attr() {
@@ -348,6 +359,11 @@ static at::Tensor convolution(
   } else if (attr.with_sigmoid()) {
     po.append_eltwise(
         1.0, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
+  } else if (attr.with_mish()) {
+    po.append_eltwise(1.0, algorithm::eltwise_mish, attr.alpha_, attr.beta_);
+  }
+  if (attr.with_linear()) {
+    po.append_eltwise(1.0, algorithm::eltwise_linear, attr.alpha_, attr.beta_);
   }
   pattr.set_post_ops(po);
 

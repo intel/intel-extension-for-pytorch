@@ -425,6 +425,111 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "xpu::q_conv2d_dequantize(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result = torch::jit::xpu::q_conv2d_dequantize(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4)))
+                    .toCustomClass<ConvPackedParamsBase<2>>(),
+                (std::move(peek(stack, 2, 4))).toDouble(),
+                (std::move(peek(stack, 3, 4))).toInt());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "xpu::softplus_tanh(Tensor self, Scalar beta, Scalar threshold) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result = torch::jit::xpu::softplus_tanh(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3))).toScalar());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "xpu::softplus_tanh_mul(Tensor self, Scalar beta, Scalar threshold, Tensor mul_input) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result = torch::jit::xpu::softplus_tanh_mul(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toScalar(),
+                (std::move(peek(stack, 2, 4))).toScalar(),
+                (std::move(peek(stack, 3, 4))).toTensor());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "xpu::q_conv2d_dequantize_softplus_tanh_mul(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Scalar beta, Scalar threshold) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result =
+                torch::jit::xpu::q_conv2d_dequantize_softplus_tanh_mul(
+                    (std::move(peek(stack, 0, 6))).toTensor(),
+                    (std::move(peek(stack, 1, 6)))
+                        .toCustomClass<ConvPackedParamsBase<2>>(),
+                    (std::move(peek(stack, 2, 6))).toDouble(),
+                    (std::move(peek(stack, 3, 6))).toInt(),
+                    (std::move(peek(stack, 4, 6))).toScalar(),
+                    (std::move(peek(stack, 5, 6))).toScalar());
+            drop(stack, 6);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Scalar beta, Scalar threshold, float q_scale, int q_zpoint, ScalarType dtype) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result =
+                torch::jit::xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize(
+                    (std::move(peek(stack, 0, 9))).toTensor(),
+                    (std::move(peek(stack, 1, 9)))
+                        .toCustomClass<ConvPackedParamsBase<2>>(),
+                    (std::move(peek(stack, 2, 9))).toDouble(),
+                    (std::move(peek(stack, 3, 9))).toInt(),
+                    (std::move(peek(stack, 4, 9))).toScalar(),
+                    (std::move(peek(stack, 5, 9))).toScalar(),
+                    (std::move(peek(stack, 6, 9))).toDouble(),
+                    (std::move(peek(stack, 7, 9))).toInt(),
+                    (std::move(peek(stack, 8, 9))).toScalarType());
+            drop(stack, 9);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "xpu::q_conv2d_dequantize_softplus_tanh_mul_quantize_add(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Scalar beta, Scalar threshold, float q_scale, int q_zpoint, ScalarType dtype, Tensor qb, double add_scale, int64_t add_zero_point) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result = torch::jit::xpu::
+                q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
+                    (std::move(peek(stack, 0, 12))).toTensor(),
+                    (std::move(peek(stack, 1, 12)))
+                        .toCustomClass<ConvPackedParamsBase<2>>(),
+                    (std::move(peek(stack, 2, 12))).toDouble(),
+                    (std::move(peek(stack, 3, 12))).toInt(),
+                    (std::move(peek(stack, 4, 12))).toScalar(),
+                    (std::move(peek(stack, 5, 12))).toScalar(),
+                    (std::move(peek(stack, 6, 12))).toDouble(),
+                    (std::move(peek(stack, 7, 12))).toInt(),
+                    (std::move(peek(stack, 8, 12))).toScalarType(),
+                    (std::move(peek(stack, 9, 12))).toTensor(),
+                    (std::move(peek(stack, 10, 12))).toDouble(),
+                    (std::move(peek(stack, 11, 12))).toInt());
+            drop(stack, 12);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "xpu::t_addmm(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack& stack) {
