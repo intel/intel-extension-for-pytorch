@@ -12,7 +12,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename scalar_t>
+template <typename scalar_t, typename index_t>
 static inline void embedding_backward_dpcpp_kernel(
     const Tensor& indices,
     const scalar_t* __restrict__ grad_data,
@@ -23,7 +23,7 @@ static inline void embedding_backward_dpcpp_kernel(
     int numel_weights,
     bool scale_grad_by_freq) {
   auto indices_contig = indices.contiguous();
-  auto indices_data = indices_contig.data_ptr<int64_t>();
+  auto indices_data = indices_contig.data_ptr<index_t>();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   if (scale_grad_by_freq) {
     auto row_num_weights = numel_weights / stride;
@@ -119,7 +119,7 @@ Tensor embedding_dense_backward_dpcpp(
   // printf("this is %s\n", __func__);
   auto grad_arg = TensorArg(grad_, "grad", 1);
   auto indices_arg = TensorArg(indices, "indices", 1);
-  checkScalarType("embedding_backward", indices_arg, kLong);
+  checkScalarTypes("embedding_backward", indices_arg, {kLong, kInt});
   IsOnSameDevice("embedding_backward", grad_arg, indices_arg);
 
   auto num_indices = indices.numel();
@@ -134,15 +134,18 @@ Tensor embedding_dense_backward_dpcpp(
       grad_.scalar_type(),
       "embedding_backward",
       [&]() {
-        embedding_backward_dpcpp_kernel<scalar_t>(
-            indices,
-            grad.data_ptr<scalar_t>(),
-            grad_weight.data_ptr<scalar_t>(),
-            static_cast<int>(num_indices),
-            static_cast<int64_t>(stride),
-            static_cast<int>(padding_idx),
-            grad_weight.numel(),
-            scale_grad_by_freq);
+        IPEX_DISPATCH_INDEX_TYPES(
+            indices.scalar_type(), "embedding_backward", [&] {
+              embedding_backward_dpcpp_kernel<scalar_t, index_t>(
+                  indices,
+                  grad.data_ptr<scalar_t>(),
+                  grad_weight.data_ptr<scalar_t>(),
+                  static_cast<int>(num_indices),
+                  static_cast<int64_t>(stride),
+                  static_cast<int>(padding_idx),
+                  grad_weight.numel(),
+                  scale_grad_by_freq);
+            });
       });
 
   return grad_weight;

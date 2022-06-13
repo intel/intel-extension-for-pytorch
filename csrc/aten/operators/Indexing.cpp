@@ -30,6 +30,65 @@ Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype);
 
 namespace impl {
 
+template <typename scalar_t, typename index_t>
+void indexSelectKernel(
+    scalar_t* src_data,
+    scalar_t* dst_data,
+    index_t* idx_data,
+    TensorInfo<scalar_t, unsigned int>& src_info,
+    TensorInfo<scalar_t, unsigned int>& dst_info,
+    TensorInfo<index_t, unsigned int>& indices_info,
+    int src_select_dim,
+    int dst_select_dim,
+    uint64_t num_slices,
+    uint64_t slice_size,
+    uint64_t n_work_item_iter,
+    uint64_t wgroup_size) {
+  auto& queue = dpcppGetCurrentQueue();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto src_ptr = src_data;
+    auto dst_ptr = dst_data;
+    auto idx_ptr = idx_data;
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+      auto dst_slice_id = item_id.get_group(0);
+
+      auto slice_off =
+          IndexToOffset<index_t, unsigned int>::get(dst_slice_id, indices_info);
+      auto src_slice_id = idx_ptr[slice_off] /* - TH_INDEX_BASE*/;
+
+      auto g_src_ptr =
+          src_ptr + src_slice_id * src_info.strides[src_select_dim];
+      auto g_dst_ptr =
+          dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
+
+      auto ii_ = item_id.get_local_id(0);
+      auto src_offset_ =
+          IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+      auto dst_offset_ =
+          IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+
+      g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
+
+      for (int iter = 1; iter < n_work_item_iter; iter++) {
+        auto __inner_idx = iter * wgroup_size + ii_;
+        if (__inner_idx < slice_size) {
+          src_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, src_info);
+          dst_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
+          g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
+        }
+      }
+    };
+    cgh.parallel_for(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(num_slices * wgroup_size),
+            DPCPP::range<1>(wgroup_size)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
 template <typename scalar_t>
 void indexSelect(
     const Tensor& dst,
@@ -62,107 +121,72 @@ void indexSelect(
       dim >= -1 && dim < srcDims,
       "Indexing dim should be >= -1 and < dims - 1");
   TORCH_CHECK(srcDims > 0, "Source tensor is empty");
-
   TORCH_CHECK(
-      indices.scalar_type() == ScalarType::Long,
-      "index_select(): Expected dtype int64 for index but got: ",
+      indices.scalar_type() == ScalarType::Long ||
+          indices.scalar_type() == ScalarType::Int,
+      "index_select(): Expected dtype int32 or int64 for index but got: ",
       indices.scalar_type());
   TORCH_CHECK(
       src.scalar_type() == dst.scalar_type(),
       "index_select(): Source and result must have the same scalar type");
 
-  TensorInfo<int64_t, unsigned int> indices_info =
-      getTensorInfo<int64_t, unsigned int>(indices);
-  indices_info.collapseDims();
+  IPEX_DISPATCH_INDEX_TYPES(indices.scalar_type(), "indexSelect", [&] {
+    TensorInfo<index_t, unsigned int> indices_info =
+        getTensorInfo<index_t, unsigned int>(indices);
+    indices_info.collapseDims();
 
-  auto new_size = src.sizes().vec();
-  auto collapse_dim = (dim == -1) ? new_size.size() - 1 : dim;
-  new_size[collapse_dim] = indices_info.sizes[0];
-  dst.resize_(new_size);
+    auto new_size = src.sizes().vec();
+    auto collapse_dim = (dim == -1) ? new_size.size() - 1 : dim;
+    new_size[collapse_dim] = indices_info.sizes[0];
+    dst.resize_(new_size);
 
-  ptrdiff_t dst_num_elem = dst.numel();
-  if (dst_num_elem == 0) {
-    return;
-  }
+    ptrdiff_t dst_num_elem = dst.numel();
+    if (dst_num_elem == 0) {
+      return;
+    }
 
-  TensorInfo<scalar_t, unsigned int> dst_info =
-      getTensorInfo<scalar_t, unsigned int>(dst);
-  int dst_select_dim = dst_info.collapseDims(collapse_dim);
-  dst_info.reduceDim(dst_select_dim);
+    TensorInfo<scalar_t, unsigned int> dst_info =
+        getTensorInfo<scalar_t, unsigned int>(dst);
+    int dst_select_dim = dst_info.collapseDims(collapse_dim);
+    dst_info.reduceDim(dst_select_dim);
 
-  TensorInfo<scalar_t, unsigned int> src_info =
-      getTensorInfo<scalar_t, unsigned int>(src);
-  int src_select_dim = src_info.collapseDims(collapse_dim);
-  src_info.reduceDim(src_select_dim);
+    TensorInfo<scalar_t, unsigned int> src_info =
+        getTensorInfo<scalar_t, unsigned int>(src);
+    int src_select_dim = src_info.collapseDims(collapse_dim);
+    src_info.reduceDim(src_select_dim);
 
-  // The `src` is partitioned into two parts:
-  // -the size of each slice we are indexing, which is the
-  // total size of the tensor ignoring dimension `dim`;
-  // -the number of indices we are choosing, which is the total size
-  // of the tensor `indices`.
-  // TODO: if the slice number is to large. Need to balance the work group and
-  // work item number.
-  // Make the work balance based on the MCU number.
-  // auto __mcu = dpcppMaxComputeUnitSize(dev_id);
-  uint64_t num_slices = indices.numel();
+    // The `src` is partitioned into two parts:
+    // -the size of each slice we are indexing, which is the
+    // total size of the tensor ignoring dimension `dim`;
+    // -the number of indices we are choosing, which is the total size
+    // of the tensor `indices`.
+    // TODO: if the slice number is to large. Need to balance the work group and
+    // work item number.
+    // Make the work balance based on the MCU number.
+    // auto __mcu = dpcppMaxComputeUnitSize(dev_id);
+    uint64_t num_slices = indices.numel();
+    auto slice_size = dst_num_elem / num_slices;
+    auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+    auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+    wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
 
-  auto slice_size = dst_num_elem / num_slices;
+    auto n_work_item_iter = (slice_size + wgroup_size - 1) / wgroup_size;
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
+    indexSelectKernel<scalar_t, index_t>(
+        src.data_ptr<scalar_t>(),
+        dst.data_ptr<scalar_t>(),
+        indices.data_ptr<index_t>(),
+        src_info,
+        dst_info,
+        indices_info,
+        src_select_dim,
+        dst_select_dim,
+        num_slices,
+        slice_size,
+        n_work_item_iter,
+        wgroup_size);
+  });
 
-  auto n_work_item_iter = (slice_size + wgroup_size - 1) / wgroup_size;
-
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_data = src.data_ptr<scalar_t>();
-    auto dst_data = dst.data_ptr<scalar_t>();
-    auto idx_data = indices.data_ptr<int64_t>();
-
-    __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(
-            DPCPP::range</*dim=*/1>(num_slices * wgroup_size),
-            DPCPP::range</*dim=*/1>(wgroup_size)),
-        [=](DPCPP::nd_item<1> item_id) {
-          auto src_ptr = src_data;
-          auto dst_ptr = dst_data;
-          auto idx_ptr = idx_data;
-
-          auto dst_slice_id = item_id.get_group(0);
-
-          auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
-              dst_slice_id, indices_info);
-          auto src_slice_id = idx_ptr[slice_off] /* - TH_INDEX_BASE*/;
-
-          auto g_src_ptr =
-              src_ptr + src_slice_id * src_info.strides[src_select_dim];
-          auto g_dst_ptr =
-              dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
-
-          auto ii_ = item_id.get_local_id(0);
-          auto src_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-          auto dst_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-
-          g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
-
-          for (int iter = 1; iter < n_work_item_iter; iter++) {
-            auto __inner_idx = iter * wgroup_size + ii_;
-            if (__inner_idx < slice_size) {
-              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                  __inner_idx, src_info);
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                  __inner_idx, dst_info);
-
-              g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
-            }
-          }
-        });
-  };
-
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   return;
 }
 
