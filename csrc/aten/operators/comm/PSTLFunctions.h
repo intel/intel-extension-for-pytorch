@@ -90,14 +90,14 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
         }
         if (local_id == 0)
           local_scan[local_id] += cur_init;
-        group_barrier(item_id.get_group());
+        item_id.barrier(dpcpp_local_fence);
 
         // body of KS algo
         for (auto __k = 1; __k < N; __k <<= 1) {
           auto tmp = (local_id >= __k) ? local_scan[local_id - __k] : 0;
-          group_barrier(item_id.get_group());
+          item_id.barrier(dpcpp_local_fence);
           local_scan[local_id] += tmp;
-          group_barrier(item_id.get_group());
+          item_id.barrier(dpcpp_local_fence);
         }
 
         // flush result into dst
@@ -139,14 +139,14 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
           carry_ptr[group_id] = first[global_id];
         }
       }
-      group_barrier(item_id.get_group());
+      item_id.barrier(dpcpp_local_fence);
 
       // body of KS algo
       for (auto __k = 1; __k < wgroup_size; __k <<= 1) {
         auto tmp = (local_id >= __k) ? local_scan[local_id - __k] : 0;
-        group_barrier(item_id.get_group());
+        item_id.barrier(dpcpp_local_fence);
         local_scan[local_id] += tmp;
-        group_barrier(item_id.get_group());
+        item_id.barrier(dpcpp_local_fence);
       }
 
       // flush result into dst
@@ -180,7 +180,7 @@ DPCPP_DEVICE static inline OutputIt _scan_kernel(
 
       if (local_id == 0)
         local_carry[0] = carry_ptr[group_id];
-      group_barrier(item_id.get_group());
+      item_id.barrier(dpcpp_local_fence);
 
       if (global_id < N) {
         d_first[global_id] += local_carry[0];

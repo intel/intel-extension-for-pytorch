@@ -652,7 +652,7 @@ struct ReduceOp {
       int address_base = l_x + l_y * gp_x;
       shared[address_base] = value;
       for (int offset = dim_x / 2; offset >= sbgrpSize; offset >>= 1) {
-        DPCPP::group_barrier(pos.get_group());
+        pos.barrier(dpcpp_local_fence);
         if (l_x < offset && l_x + offset < gp_x /* redundant??? */) {
           args_vec_t other = shared[address_base + offset];
 #pragma unroll(output_vec_size)
@@ -665,7 +665,7 @@ struct ReduceOp {
       dim_x = sbgrpSize;
     }
 
-    DPCPP::group_barrier(pos.get_group());
+    pos.barrier(dpcpp_local_fence);
 
     // sub-group reduction
     for (int offset = 1; offset < dim_x; offset <<= 1) {
@@ -690,7 +690,7 @@ struct ReduceOp {
     auto l_y = pos.get_local_id(0);
     auto dim_y = pos.get_local_range(0);
     for (int offset = dim_y / 2; offset > 0; offset >>= 1) {
-      DPCPP::group_barrier(pos.get_group());
+      pos.barrier(dpcpp_local_fence);
       if (l_y < offset && l_y + offset < dim_y /* redundant ??? */) {
         args_vec_t other = shared[config.slm_offset(pos, offset)];
 #pragma unroll(output_vec_size)
@@ -707,7 +707,7 @@ struct ReduceOp {
   void mark_group_finished(
       DPCPP::nd_item<2> pos,
       dpcpp_local_ptr<bool> finished) const {
-    DPCPP::group_barrier(pos.get_group());
+    pos.barrier(dpcpp_local_fence);
 
     if (pos.get_local_linear_id() == 0) {
       dpcpp_atomic_ref_t<int> count(semaphores[pos.get_group(1)]);
@@ -716,7 +716,7 @@ struct ReduceOp {
           /* , default memory scope is device */);
       finished[0] = (prev_groups_finished == (pos.get_group_range(0) - 1));
     }
-    DPCPP::group_barrier(pos.get_group());
+    pos.barrier(dpcpp_local_fence);
   }
 
   template <int output_vec_size, bool can_acc>
@@ -826,7 +826,7 @@ struct ReduceOp {
       reduce_buffer[offset] = value;
     }
 
-    DPCPP::group_barrier(pos.get_group());
+    pos.barrier(dpcpp_local_fence);
     mark_group_finished(pos, is_last_group_done);
 
     if (is_last_group_done[0]) {

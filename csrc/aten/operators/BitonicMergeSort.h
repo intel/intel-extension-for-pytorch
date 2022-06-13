@@ -42,7 +42,7 @@ inline void compare_and_swap(
 template <
     typename KeyType,
     typename ValueType,
-    DPCPP::memory_scope fence_scope,
+    DPCPP::access::fence_space fence_space,
     typename CompFunc>
 inline void bitonic_sort(
     const DPCPP::nd_item<1>& item,
@@ -60,7 +60,7 @@ inline void bitonic_sort(
        ordered_seq_sz *= 2) {
     for (unsigned int bitonic_seq_sz = ordered_seq_sz / 2; bitonic_seq_sz > 0;
          bitonic_seq_sz /= 2) {
-      DPCPP::group_barrier(item.get_group(), fence_scope);
+      item.barrier(fence_space);
       for (unsigned int loc = item_id; loc < sort_sz / 2; loc += local_sz) {
         bool order =
             !(loc & (ordered_seq_sz >> 1)) && !(ordered_seq_sz == sort_sz);
@@ -72,7 +72,7 @@ inline void bitonic_sort(
       }
     }
   }
-  DPCPP::group_barrier(item.get_group(), fence_scope);
+  item.barrier(fence_space);
 }
 
 inline uint64_t last_power2(uint64_t n) {
@@ -178,7 +178,7 @@ void bitonic_merge_sort_kernel(
                                                    : static_cast<ValueType>(0);
           }
 
-          impl::bitonic_sort<KeyType, ValueType, dpcpp_mem_scp_wg>(
+          impl::bitonic_sort<KeyType, ValueType, dpcpp_local_fence>(
               item,
               s_key.get_pointer().get(),
               s_val.get_pointer().get(),
@@ -206,7 +206,7 @@ void bitonic_merge_sort_kernel(
 
       // global merge if needed
       if (sliced) {
-        impl::bitonic_sort<KeyType, ValueType, dpcpp_mem_scp_dev>(
+        impl::bitonic_sort<KeyType, ValueType, dpcpp_global_fence>(
             item,
             g_key_ + batch_off_,
             g_val_ + batch_off_,

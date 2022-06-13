@@ -90,7 +90,7 @@ void interaction_kernel(
               }
             }
           }
-          DPCPP::group_barrier(item.get_group());
+          item.barrier(dpcpp_local_fence);
 
           int item_row =
               static_cast<int>(index[2 * local_row]) * TILE_OUTPUT_COL + 1;
@@ -102,7 +102,7 @@ void interaction_kernel(
           int cub_numel = (Row - 1) * TILE_BN * TILE_INPUT_COL_FLOAT;
           // Computation in Col direction
           for (int col = 0; col < Col_fp; col += TILE_INPUT_COL_FLOAT) {
-            DPCPP::group_barrier(item.get_group());
+            item.barrier(dpcpp_local_fence);
 
             // Load one-sub-cube data to SLM
             size_t global_offset = group_id * TILE_BN * Col_fp + col;
@@ -122,7 +122,7 @@ void interaction_kernel(
                 in_local_data[bn_idx][row_idx + 1][col_idx] = in_ptr[offset];
               }
             }
-            DPCPP::group_barrier(item.get_group());
+            item.barrier(dpcpp_local_fence);
 
         // Write the first 128 data (TILE_INPUT_COL_HALF for each cycle k)
 #pragma unroll
@@ -135,7 +135,7 @@ void interaction_kernel(
                 output_bn[2 * col + 2 * idx + 1] = local_data_half[2 * idx + 1];
               }
             }
-            DPCPP::group_barrier(item.get_group());
+            item.barrier(dpcpp_local_fence);
 
             // Compute
             if (local_row >= working_set)
