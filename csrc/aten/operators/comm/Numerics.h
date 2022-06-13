@@ -589,6 +589,9 @@ struct Numerics<at::Half> {
   static inline at::Half copysign(at::Half a, at::Half b) {
     return DPCPP::copysign((float)a, (float)b);
   }
+  static inline at::Half fmod(at::Half a, at::Half b) {
+    return DPCPP::fmod((float)a, (float)b);
+  }
 };
 
 template <>
@@ -774,6 +777,9 @@ struct Numerics<at::BFloat16> {
   }
   static inline at::BFloat16 copysign(at::BFloat16 a, at::BFloat16 b) {
     return DPCPP::copysign((float)a, (float)b);
+  }
+  static inline at::BFloat16 fmod(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::fmod((float)a, (float)b);
   }
 };
 
@@ -961,6 +967,9 @@ struct Numerics<float> {
   static inline float copysign(float a, float b) {
     return DPCPP::copysign(a, b);
   }
+  static inline float fmod(float a, float b) {
+    return DPCPP::fmod(a, b);
+  }
 };
 
 template <>
@@ -1145,6 +1154,9 @@ struct Numerics<double> {
   }
   static inline double copysign(double a, double b) {
     return DPCPP::copysign(a, b);
+  }
+  static inline double fmod(double a, double b) {
+    return DPCPP::fmod(a, b);
   }
 };
 
