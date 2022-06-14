@@ -160,3 +160,34 @@ class TestTorchMethod(TestCase):
                 atol = 1e-1
             self.assertEqual(torch.cumsum(x2, dim=2), torch.cumsum(
                 x2_dpcpp, dim=2).to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
+
+
+    def test_mult_transposed_dim(self, dtype=torch.float):
+        a_cpu = torch.randn(11, 22, 1024, 22, 11)
+        a_xpu = a_cpu.to(dpcpp_device)
+
+        a_cpu = a_cpu.transpose(1, 2)
+        a_xpu = a_xpu.transpose(1, 2)
+        b_cpu = torch.cumsum(a_cpu, dim=1)
+        b_xpu = torch.cumsum(a_xpu, dim=1)
+        self.assertEqual(b_cpu, b_xpu.to(cpu_device), rtol=1e-5, atol=1e-4)
+
+
+    def test_mult_strided_dim(self, dtype=torch.float):
+        a_cpu = torch.randn(8, 82, 814)
+        a_xpu = a_cpu.to(dpcpp_device)
+
+        a_strided_cpu = torch.as_strided(a_cpu, (4, 41, 407), (2 * 814 * 82, 2 * 814, 2))
+        a_strided_xpu = torch.as_strided(a_xpu, (4, 41, 407), (2 * 814 * 82, 2 * 814, 2))
+
+        b_cpu = torch.cumsum(a_strided_cpu, dim=2)
+        b_xpu = torch.cumsum(a_strided_xpu, dim=2)
+        self.assertEqual(b_cpu, b_xpu.to(cpu_device), rtol=1e-5, atol=1e-4)
+
+        b_cpu = torch.cumsum(a_strided_cpu, dim=1)
+        b_xpu = torch.cumsum(a_strided_xpu, dim=1)
+        self.assertEqual(b_cpu, b_xpu.to(cpu_device), rtol=1e-5, atol=1e-4)
+
+        b_cpu = torch.cumsum(a_strided_cpu, dim=0)
+        b_xpu = torch.cumsum(a_strided_xpu, dim=0)
+        self.assertEqual(b_cpu, b_xpu.to(cpu_device), rtol=1e-5, atol=1e-4)

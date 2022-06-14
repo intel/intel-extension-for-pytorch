@@ -17,6 +17,7 @@
 #include "comm/Numerics.h"
 #include "comm/PSTLFunctions.h"
 
+#include "Indexing.h"
 #include "IndexingUtils.h"
 #include "Loops.h"
 #include "ParttenScan.h"
@@ -443,94 +444,29 @@ void indexAdd(
 }
 
 template <typename scalar_t>
-void indexFill(
+void _index_fill(
     Tensor& dst,
     int64_t dim,
     const Tensor& indices,
     Scalar val_scalar) {
-  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(indices.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-
-  // The `src` is partitioned into two parts:
-  // -the size of each slice we are indexing, which is the
-  // total size of the tensor ignoring dimension `dim`;
-  // -the number of indices we are choosing, which is the total size
-  // of the tensor `indices`.
-  int dstDims = dst.dim() == 0 ? 1 : dst.dim();
-
-  TORCH_CHECK(indices.dim() <= 1, "expecting vector of indices");
-  TORCH_CHECK(dim >= 0 && dim < dstDims, "Indexing dim is out of bounds");
-
   auto val = val_scalar.to<scalar_t>();
-  ptrdiff_t sliceSize = 1;
-  int64_t prb_dim_size = dst.size(dim);
-  for (int d = 0; d < dstDims; d++) {
-    if (d != dim) {
-      sliceSize *= dst.dim() == 0 ? 1 : dst.size(d);
-    }
-  }
-  ptrdiff_t dstTotalSize = dst.numel();
-  ptrdiff_t numIndices = indices.numel();
+  auto dst_ptr = dst.data_ptr<scalar_t>();
+  auto idx_ptr = indices.data_ptr<int64_t>();
+  int64_t indexing = dst.size(dim);
+  int64_t inner = dst.stride(dim);
+  int64_t outter = dst.numel() / (indexing * inner);
 
-  if (sliceSize == 0) {
-    return;
-  }
-
-  TensorInfo<int64_t, unsigned int> indices_info =
-      getTensorInfo<int64_t, unsigned int>(indices);
+  TensorInfo<int64_t, int64_t> indices_info =
+      getTensorInfo<int64_t, int64_t>(indices);
   indices_info.collapseDims();
 
-  TensorInfo<scalar_t, unsigned int> dst_info =
-      getTensorInfo<scalar_t, unsigned int>(dst);
-  int dst_fill_dim = dst_info.collapseDims(dim);
-  dst_info.reduceDim(dst_fill_dim);
+  TensorInfo<scalar_t, int64_t> dst_info =
+      getTensorInfo<scalar_t, int64_t>(dst);
+  int dim_after_collapse = dst_info.collapseDims(dim);
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
-  auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
+  _index_fill_kernel<scalar_t>(dst_info, indices_info, dim_after_collapse, val);
 
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto dst_data = dst.data_ptr<scalar_t>();
-    auto idx_data = indices.data_ptr<long>();
-
-    __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(
-            DPCPP::range</*dim=*/1>(numIndices * wgroup_size),
-            DPCPP::range</*dim=*/1>(wgroup_size)),
-        [=](DPCPP::nd_item<1> item_id) {
-          auto dst_ptr = dst_data;
-          auto idx_ptr = idx_data;
-
-          auto src_slice_id = item_id.get_group(0);
-          auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
-              src_slice_id, indices_info);
-          auto dst_slice_id = idx_ptr[slice_off];
-          if (dst_slice_id < 0) {
-            dst_slice_id = prb_dim_size + dst_slice_id;
-          }
-          auto g_dst_ptr =
-              dst_ptr + dst_slice_id * dst_info.strides[dst_fill_dim];
-
-          auto ii_ = item_id.get_local_id(0);
-          auto dst_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-          g_dst_ptr[dst_offset_] = val;
-
-          for (int iter = 1; iter < n_work_item_iter; iter++) {
-            auto __inner_idx = iter * wgroup_size + ii_;
-            if (__inner_idx < dstTotalSize) {
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                  __inner_idx, dst_info);
-
-              g_dst_ptr[dst_offset_] = val;
-            }
-          }
-        });
-  };
-
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  return;
 }
 
 template <typename scalar_t>
@@ -1271,15 +1207,36 @@ Tensor& index_fill_(
   Tensor self_nonzero_dim = (self.dim() == 0) ? self.unsqueeze(-1) : self;
 
   TORCH_CHECK(index.dim() <= 1, "Index has to be a vector/scalar");
+  TORCH_CHECK(self.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+
+  // The `src` is partitioned into two parts:
+  // -the size of each slice we are indexing, which is the
+  // total size of the tensor ignoring dimension `dim`;
+  // -the number of indices we are choosing, which is the total size
+  // of the tensor `indices`.
+  int selfDims = self.dim() == 0 ? 1 : self.dim();
+
+  TORCH_CHECK(dim >= 0 && dim < selfDims, "Indexing dim is out of bounds");
+
+  ptrdiff_t sliceSize = 1;
+  for (int d = 0; d < selfDims; d++) {
+    if (d != dim) {
+      sliceSize *= self.dim() == 0 ? 1 : self.size(d);
+    }
+  }
+  if (sliceSize == 0) {
+    return self;
+  }
 
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       self.scalar_type(),
-      "indexFill",
+      "index_fill",
       [&]() {
-        impl::indexFill<scalar_t>(self_nonzero_dim, dim, index, value);
+        impl::_index_fill<scalar_t>(self_nonzero_dim, dim, index, value);
       });
   return self;
 }

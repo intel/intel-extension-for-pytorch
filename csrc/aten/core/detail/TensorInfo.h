@@ -3,6 +3,8 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
 
+#include <core/IntegerDivider.h>
+
 namespace xpu {
 namespace dpcpp {
 namespace detail {
@@ -19,6 +21,8 @@ namespace detail {
 // DPCPP kernel argument taht defines tensor layout
 template <typename T, typename IndexType>
 struct TensorInfo {
+  using scalar_t = T;
+
   TensorInfo();
   TensorInfo(
       T* p,
@@ -34,22 +38,37 @@ struct TensorInfo {
   // See note on [collapse dims].
   int collapseDims(const int excludeDim = -1);
 
+  int outerSize(const int dim);
+
+  int innerSize(const int dim);
+
   // Contiguous tensors of more than one dimension are collapsed down
   // to one tensor
   inline bool isContiguous() const {
-    return (dims == 1 && strides[0] == 1);
+    return dims == 1 && strides[0] == 1;
+  }
+
+  inline bool isContiguousCheckStrict(bool strict_contiguous) const {
+    if (strict_contiguous)
+      return is_strict_contiguous;
+    else
+      return is_contiguous;
   }
 
   T* data;
   IndexType sizes[MAX_TENSORINFO_DIMS];
   IndexType strides[MAX_TENSORINFO_DIMS];
   int dims;
+  bool is_contiguous;
+  bool is_strict_contiguous;
 };
 
 template <typename T, typename IndexType>
 TensorInfo<T, IndexType>::TensorInfo() {
   data = nullptr;
   dims = 0;
+  is_contiguous = true;
+  is_strict_contiguous = true;
 }
 
 template <typename T, typename IndexType>
@@ -62,10 +81,20 @@ TensorInfo<T, IndexType>::TensorInfo(
   dims = dim;
   TORCH_INTERNAL_ASSERT(dims <= MAX_TENSORINFO_DIMS);
 
-  for (int i = 0; i < dim; i++) {
+  is_contiguous = true;
+  int z = 1;
+  for (int i = dim - 1; i >= 0; i--) {
     sizes[i] = sz[i];
     strides[i] = st[i];
+
+    if (is_contiguous && strides[i] == z) {
+      z *= sizes[i];
+    } else {
+      is_contiguous = false;
+    }
   }
+
+  is_strict_contiguous = dims == 1 && strides[0] == 1;
 }
 
 template <typename T, typename IndexType>
@@ -81,54 +110,49 @@ int TensorInfo<T, IndexType>::collapseDims(const int excludeDim) {
   return std::get<0>(result);
 }
 
-// Translate a linear index for the apply to a T* offset;
-// specialized on `Dims` to reduce nvcc compilation time
-template <typename T, typename IndexType, int Dims = -1>
-struct IndexToOffset {
-  static IndexType get(
-      IndexType linearId,
-      const TensorInfo<T, IndexType>& info) {
-    if (info.isContiguous()) {
-      return linearId;
-    }
-
-    IndexType offset = 0;
-    // Uses static dims
-#pragma unroll
-    for (int i = Dims - 1; i > 0; --i) {
-      IndexType curDimIndex = linearId % info.sizes[i];
-      IndexType curDimOffset = curDimIndex * info.strides[i];
-      offset += curDimOffset;
-      linearId /= info.sizes[i];
-    }
-
-    return offset + linearId * info.strides[0];
-  }
-};
-
-// Uses dynamic (runtime) instead of static (compiletime) dims
 template <typename T, typename IndexType>
-struct IndexToOffset<T, IndexType, -1> {
+int TensorInfo<T, IndexType>::innerSize(const int exclusive) {
+  int size = 1;
+  for (int i = dims - 1; i > exclusive; i--) {
+    size *= sizes[i];
+  }
+  return size;
+}
+
+template <typename T, typename IndexType>
+int TensorInfo<T, IndexType>::outerSize(const int exclusive) {
+  int size = 1;
+  for (int i = 0; i < exclusive; i++) {
+    size *= sizes[i];
+  }
+  return size;
+}
+
+// Translate a linear index for the apply to a T* offset;
+template <typename T, typename IndexType, /* deprecated */ int DIM = -1>
+struct IndexToOffset {
+  static constexpr bool STRICT_CONTIGUOUS = true;
+  static constexpr bool NON_STRICT_CONTIGUOUS = false;
   static inline IndexType get(
       IndexType linearId,
-      const TensorInfo<T, IndexType>& info) {
-    if (info.isContiguous()) {
+      const TensorInfo<T, IndexType>& info,
+      bool strict_contiguous = true) {
+    IndexType offset = 0;
+
+    if (info.isContiguousCheckStrict(strict_contiguous)) {
       return linearId;
     }
 
-    IndexType offset = 0;
-
 #pragma unroll
-    for (int i = MAX_TENSORINFO_DIMS; i > 0; --i) {
-      if (i < info.dims) {
-        IndexType curDimIndex = linearId % info.sizes[i];
-        IndexType curDimOffset = curDimIndex * info.strides[i];
-        offset += curDimOffset;
-        linearId /= info.sizes[i];
+    for (int dim = MAX_TENSORINFO_DIMS - 1; dim >= 0; --dim) {
+      if (dim < info.dims) {
+        auto divider = IntDivider<IndexType>(info.sizes[dim]);
+        auto divmod = divider.divmod(linearId);
+        linearId = divmod.div;
+        offset += divmod.mod * info.strides[dim];
       }
     }
-
-    return offset + linearId * info.strides[0];
+    return offset;
   }
 };
 

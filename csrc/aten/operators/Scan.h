@@ -1,110 +1,68 @@
+#pragma once
+#include <core/detail/TensorInfo.h>
 #include <utils/DPCPP.h>
+#include "BatchKernel.h"
 
-// Collection of in-kernel scan / prefix sum utilities
-
-// Inclusive Scan via an upsweep/downsweep mechanism. Assumes:
-//
-// 1. Power2ScanSize is a power of 2. This code still works for collections that
-// do not exactly contain a power of 2 number of elements, simply round up to
-// the
-// nearest power of 2 and then call.
-//
-// 2. That there are two-elements per thread, i.e. the size of the smem storage
-// is 2 * blockDim.x * sizeof(T).
-//
-// Consider a (+)-Scan on the following elements:
-//
-// Upsweep:
-//
-//    0  1  2  3  4  5  6  7
-//       1     5     9    13
-//             6          22
-//                        28
-//
-// Downsweep:
-//                  15
-//         3     10    21
-#define DEFAULT_SG_SIZE 32
-#define MIN_SG_SIZE 8
+using namespace xpu::dpcpp::detail;
 
 typedef enum {
   EXCLUSIVE_TYPE = 0,
   INCLUSIVE_TYPE = 1,
 } ScanType;
 
-template <class InputIt, class OutputIt, class T, class BinaryFunction>
-class scan_config {
+template <class InputInfo, class OutputInfo, typename T, class BinaryFunction>
+class ScanConfig : public BatchKernelConfig {
  public:
   using arg_t = T;
   using func_t = BinaryFunction;
+  using InputInfoType = InputInfo;
+  using OutputInfoType = OutputInfo;
 
-  scan_config() = delete;
-  scan_config(
-      InputIt input,
-      OutputIt output,
+  ScanConfig() = delete;
+  ScanConfig(
+      InputInfo input_info,
+      OutputInfo output_info,
       int64_t batch,
       int64_t problem,
       int64_t stride,
+      bool problem_along_x,
       T init,
       ScanType type,
       BinaryFunction func)
-      : input_(input),
-        output_(output),
-        batch_(batch),
-        problem_(problem),
-        stride_(stride),
+      : BatchKernelConfig(
+            batch,
+            problem,
+            stride,
+            batch * stride,
+            problem_along_x),
+        iinfo_(input_info),
+        oinfo_(output_info),
         init_(init),
         type_(type),
-        scan_along_x_([&]() -> bool {
-          if (stride == 1)
-            return true;
-          else
-            return false;
-        }()),
         func_(func),
-        problem_wg_range_(0),
-        problem_glb_range_(0),
-        glb_range_x_(0),
-        glb_range_y_(0),
-        wg_range_x_(0),
-        wg_range_y_(0),
-        carrier_(nullptr) {
-    int64_t wg_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
-    wg_range_x_ = DEFAULT_SG_SIZE;
-    wg_range_y_ = wg_size / wg_range_x_;
+        carrier_(nullptr) {}
 
-    // ensure input loading along contiguous dimension
-    if (!scan_along_x_) {
-      while (problem_ <= wg_range_y_ >> 1 && wg_range_x_ <= wg_size) {
-        wg_range_y_ = wg_range_y_ >> 1;
-        wg_range_x_ = wg_size / wg_range_y_;
-      }
-    }
-
-    if (scan_along_x_) {
-      glb_range_x_ =
-          int64_t((problem_ + wg_range_x_ - 1) / wg_range_x_) * wg_range_x_;
-      glb_range_y_ =
-          int64_t((batch_ * stride_ + wg_range_y_ - 1) / wg_range_y_) *
-          wg_range_y_;
-    } else {
-      glb_range_x_ =
-          int64_t((batch_ * stride_ + wg_range_x_ - 1) / wg_range_x_) *
-          wg_range_x_;
-      glb_range_y_ =
-          int64_t((problem_ + wg_range_y_ - 1) / wg_range_y_) * wg_range_y_;
-    }
-
-    problem_wg_range_ = scan_along_x_ ? wg_range_x_ : wg_range_y_;
-    problem_glb_range_ = scan_along_x_ ? glb_range_x_ : glb_range_y_;
-  }
-
-  DPCPP::range<2> global_size() const {
-    return {glb_range_y_, glb_range_x_};
-  }
-
-  DPCPP::range<2> group_size() const {
-    return {wg_range_y_, wg_range_x_};
+  static ScanConfig<InputInfo, OutputInfo, T, BinaryFunction> make_config(
+      InputInfo& input_info,
+      OutputInfo& output_info,
+      int scan_dim,
+      T init,
+      ScanType type,
+      BinaryFunction func) {
+    int64_t batch = input_info.outerSize(scan_dim);
+    int64_t stride = input_info.innerSize(scan_dim);
+    int64_t problem = input_info.sizes[scan_dim];
+    int64_t problem_along_x = input_info.strides[scan_dim] == 1 ? true : false;
+    return {
+        input_info,
+        output_info,
+        batch,
+        problem,
+        stride,
+        problem_along_x,
+        init,
+        type,
+        func};
   }
 
   int64_t carrier_size() {
@@ -119,56 +77,21 @@ class scan_config {
     type_ = other;
   }
 
-  struct item_desc {
-    /* chunk id along problem dim */ int64_t chunk;
-    /* local task to scan */ int64_t chunk_size;
-    /* current local assignment id */ int64_t chunk_off;
-    /* how many chunks along problem dim */ int64_t chunk_num;
-    /* parallel batch, not tensor batch */ int64_t glb_batch;
-    /* current global assignment id */ int64_t glb_problem;
-  };
-
-  item_desc get_item_desc(DPCPP::nd_item<2> item) const {
-    auto lix = item.get_local_id(1);
-    auto liy = item.get_local_id(0);
-    auto lrx = item.get_local_range(1);
-    auto lry = item.get_local_range(0);
-    auto wgrx = item.get_group_range(1);
-    auto wgry = item.get_group_range(0);
-    auto gix = item.get_global_id(1);
-    auto giy = item.get_global_id(0);
-    auto gx = item.get_group(1);
-    auto gy = item.get_group(0);
-
-    if (scan_along_x_) {
-      return {gx, lrx, lix, wgrx, giy, gix};
-    } else {
-      return {gy, lry, liy, wgry, gix, giy};
-    }
-  }
-
  public:
-  InputIt input_;
-  OutputIt output_;
-  int64_t batch_;
-  int64_t problem_;
-  int64_t stride_;
+  InputInfo iinfo_;
+  OutputInfo oinfo_;
   T init_;
   ScanType type_;
-  bool scan_along_x_;
   BinaryFunction func_;
-  int problem_wg_range_;
-  int problem_glb_range_;
-  int glb_range_x_;
-  int glb_range_y_;
-  int wg_range_x_;
-  int wg_range_y_;
-  T* carrier_;
+  /* contiguous temp buffer */ T* carrier_;
 };
 
 template <class SConfig, class T, class BinaryFunction>
 class group_scan_kernel {
  public:
+  using InputInfo = typename SConfig::InputInfoType;
+  using OutputInfo = typename SConfig::OutputInfoType;
+
   group_scan_kernel(const SConfig& cfg) : cfg(cfg) {}
 
  public:
@@ -264,24 +187,42 @@ class group_scan_kernel {
   DPCPP_DEVICE void run(DPCPP::nd_item<2> item, dpcpp_local_acc_t<T> slm)
       const {
     typename SConfig::item_desc id = cfg.get_item_desc(item);
-    int64_t si, pi, bi, glb_ldr_off, glb_str_off, crr_off;
+    int64_t si, pi, bi, glb_ldr_off, glb_str_off, glb_str_off_0,
+        glb_ldr_logical_off, glb_str_logical_off, crr_off;
 
     si = id.glb_batch % cfg.stride_;
     bi = id.glb_batch / cfg.stride_;
     pi = id.chunk * id.chunk_size + id.chunk_off;
 
     int64_t e = cfg.type_ == INCLUSIVE_TYPE ? 0 : 1;
-    glb_ldr_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
-    glb_str_off = si + (pi + e) * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+    glb_ldr_logical_off =
+        si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
+    glb_str_logical_off =
+        si + (pi + e) * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
     crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
 
+    glb_ldr_off = IndexToOffset<typename InputInfo::scalar_t, int64_t>::get(
+        glb_ldr_logical_off,
+        cfg.iinfo_,
+        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
+    glb_str_off = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
+        glb_str_logical_off,
+        cfg.oinfo_,
+        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
+    glb_str_off_0 = IndexToOffset<typename OutputInfo::scalar_t, int64_t>::get(
+        glb_ldr_logical_off,
+        cfg.oinfo_,
+        IndexToOffset<typename InputInfo::scalar_t, int64_t>::
+            NON_STRICT_CONTIGUOUS);
+
     T value = cfg.init_;
-    if (id.glb_problem < cfg.problem_ &&
-        id.glb_batch < cfg.batch_ * cfg.stride_) {
-      value = cfg.input_[glb_ldr_off];
+    if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
+      value = cfg.iinfo_.data[glb_ldr_off];
     }
 
-    if (cfg.scan_along_x_) {
+    if (cfg.problem_along_x_) {
       // so far assign all work items along problem dimension
       // sg_shuffle benefits reduce on the dimension
       value = group_x_scan(item, value, slm, cfg.func_);
@@ -290,18 +231,18 @@ class group_scan_kernel {
       value = group_y_scan(item, value, slm, cfg.func_);
     }
 
-    if (id.glb_batch < cfg.batch_ * cfg.stride_) {
+    if (id.glb_batch < cfg.problem_batch_) {
       if (cfg.type_ == INCLUSIVE_TYPE) {
         if (id.glb_problem < cfg.problem_) {
-          cfg.output_[glb_str_off] = value;
+          cfg.oinfo_.data[glb_str_off] = value;
         }
       } else {
         if (id.glb_problem < cfg.problem_ - 1 &&
             id.chunk_off < id.chunk_size - 1) {
-          cfg.output_[glb_str_off] = value;
+          cfg.oinfo_.data[glb_str_off] = value;
         }
         if (id.glb_problem < cfg.problem_ && id.chunk_off == 0) {
-          cfg.output_[glb_ldr_off] = cfg.init_;
+          cfg.oinfo_.data[glb_str_off_0] = cfg.init_;
         }
       }
 
@@ -343,7 +284,7 @@ static inline void launch_group_scan(const SConfig& cfg) {
 #ifndef SG_SCAN
     int slm_size = wg_size;
 #else
-    int slm_size = cfg.scan_along_x_ ? carrier_size : wg_size;
+    int slm_size = cfg.problem_along_x_ ? carrier_size : wg_size;
 #endif
     dpcpp_local_acc_t<typename SConfig::arg_t> shared(slm_size, __cgh);
     group_scan_kernel<
@@ -375,10 +316,9 @@ static inline void accumulate_carrier(const SConfig& cfg) {
       glb_off = si + pi * cfg.stride_ + bi * cfg.problem_ * cfg.stride_;
       crr_off = si + id.chunk * cfg.stride_ + bi * id.chunk_num * cfg.stride_;
 
-      if (id.glb_problem < cfg.problem_ &&
-          id.glb_batch < cfg.batch_ * cfg.stride_) {
-        cfg.output_[glb_off] =
-            cfg.func_(cfg.output_[glb_off], cfg.carrier_[crr_off]);
+      if (id.glb_problem < cfg.problem_ && id.glb_batch < cfg.problem_batch_) {
+        cfg.oinfo_.data[glb_off] =
+            cfg.func_(cfg.oinfo_.data[glb_off], cfg.carrier_[crr_off]);
       }
     };
     __cgh.parallel_for(

@@ -20,42 +20,37 @@ namespace impl {
 
 template <
     ScanType Type,
-    class InputIt,
-    class OutputIt,
-    class T,
+    typename T,
+    class InputInfo,
+    class OutputInfo,
     class BinaryFunction>
 static inline void _scan_kernel(
-    InputIt input,
-    OutputIt output,
-    const int64_t problem,
-    const int64_t stride,
-    const int64_t batch,
+    InputInfo& input_info,
+    OutputInfo& output_info,
+    int dim_after_collapse,
     T init,
     BinaryFunction func) {
-  scan_config cfg = {input, output, batch, problem, stride, init, Type, func};
+  auto cfg = ScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
+      input_info, output_info, dim_after_collapse, init, Type, func);
 
   // 0. recursive convergence
-  if (problem <= cfg.problem_wg_range_) {
+  if (cfg.problem_ <= cfg.problem_wg_range_) {
     cfg.set_carrier(nullptr);
     launch_group_scan(cfg);
     return;
   }
 
   // 1. inclusive scan in each chunk
-  Tensor carrier_holder = at::empty({cfg.carrier_size()}, map_options<T>());
-  auto carrier = carrier_holder.data_ptr<T>();
-  cfg.set_carrier(carrier);
+  Tensor carrier_holder = at::empty(
+      {cfg.batch_, cfg.problem_glb_range_ / cfg.problem_wg_range_, cfg.stride_},
+      map_options<T>());
+  TensorInfo<T, int64_t> carrier_info =
+      getTensorInfo<T, int64_t>(carrier_holder);
+  cfg.set_carrier(carrier_info.data);
   launch_group_scan(cfg);
 
   // 2. recursion for carrier
-  _scan_kernel<EXCLUSIVE_TYPE>(
-      carrier,
-      carrier,
-      /* carrier problem */ cfg.problem_glb_range_ / cfg.problem_wg_range_,
-      /* carrier stride */ stride,
-      /* carrier batch */ batch,
-      init,
-      func);
+  _scan_kernel<EXCLUSIVE_TYPE>(carrier_info, carrier_info, 1, init, func);
 
   // 3. accumulate among all chunk
   accumulate_carrier(cfg);
@@ -71,41 +66,37 @@ template <
     typename oscalar_t,
     class BinaryFunction>
 void scan(
-    Tensor& self_,
-    const Tensor& input_,
+    Tensor& self,
+    const Tensor& input,
     int dimension,
     scalar_t init,
     BinaryFunction func) {
-  self_.resize_as_(input_);
-  if (input_.dim() == 0) {
-    self_.fill_(input_);
+  self.resize_as_(input);
+  if (input.dim() == 0) {
+    self.fill_(input);
     return;
-  } else if (input_.numel() == 0) {
-    self_.zero_();
+  } else if (input.numel() == 0) {
+    self.zero_();
     return;
   }
 
-  dimension = maybe_wrap_dim(dimension, input_.dim());
+  dimension = maybe_wrap_dim(dimension, input.dim());
   TORCH_CHECK(
-      dimension >= 0 && dimension < input_.dim(),
+      dimension >= 0 && dimension < input.dim(),
       "dimension ",
       dimension,
       " out of range");
 
-  auto self = self_.contiguous();
-  auto input = input_.contiguous();
+  TensorInfo<scalar_t, int64_t> input_info =
+      getTensorInfo<scalar_t, int64_t>(input);
+  int dim_after_collapse = input_info.collapseDims(dimension);
 
-  auto N = self.numel();
-  int64_t problem = input.size(dimension);
-  int64_t stride = input.stride(dimension);
-  int64_t batch = N / (problem * stride);
-  auto input_ptr = input.data_ptr<scalar_t>();
-  auto output_ptr = self.data_ptr<oscalar_t>();
+  TensorInfo<oscalar_t, int64_t> output_info =
+      getTensorInfo<oscalar_t, int64_t>(self);
+  output_info.collapseDims(dimension);
 
   impl::_scan_kernel<Type>(
-      input_ptr, output_ptr, problem, stride, batch, init, func);
-
-  self_.copy_(self);
+      input_info, output_info, dim_after_collapse, init, func);
 }
 
 Tensor& cumsum_out(
