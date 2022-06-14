@@ -1,4 +1,5 @@
 import os
+import copy
 from typing import List, Dict, Tuple, Any, Optional
 import torch
 import torch.nn.functional as F
@@ -8,7 +9,8 @@ from torch.quantization.qconfig import QConfig
 
 from ._utils import get_torch_function_hook_type, HookType, get_module_hook_type, OpQuantizeabilityType, \
     attach_op_convert_info_to_model, save_quant_state, attach_scale_zp_values_to_model, convert_quant_state_map_to_nodes, \
-        sync_pool_and_lstm_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, load_qconf_summary_to_model
+        sync_pool_and_lstm_input_output_scale_zp, module_call_to_function_call, quantized_modules_has_weights, \
+        load_qconf_summary_to_model, get_fqn_valid_for_module_dict_key
 from ._quantization_state import AutoQuantizationState, AutoQuantizationStateModuleDict, init_model_quant_state
 from ._recipe import get_default_recipe
 from ._module_swap_utils import swap_child_modules
@@ -343,7 +345,26 @@ def auto_prepare(
         model(*example_inputs)
     return model
 
-def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
+def copy_prepared_model(model):
+    copied_model = copy.deepcopy(model)
+    copied_model.q_config = model.q_config
+    if isinstance(copied_model.q_config.activation(), PlaceholderObserver):
+        return copied_model
+    copied_model._fqn_to_auto_quant_state_map = copy.deepcopy(model._fqn_to_auto_quant_state_map)
+    named_modules = list(copied_model.named_modules())
+    for fqn, v in named_modules:
+        fqn_to_use_for_key = get_fqn_valid_for_module_dict_key(fqn)
+        if fqn_to_use_for_key in copied_model._fqn_to_auto_quant_state_map:
+            auto_quant_state = copied_model._fqn_to_auto_quant_state_map[fqn_to_use_for_key]
+            object.__setattr__(v, '_auto_quant_state', auto_quant_state)
+    if hasattr(model, '_qconf_summary'):
+        copied_model._qconf_summary = copy.deepcopy(model._qconf_summary)
+    copied_model.__class__ = model.__class__
+    return copied_model
+
+def auto_convert(
+    module : torch.nn.Module,
+    ) -> torch.nn.Module:
     def convert_to_dispatch_proxy(x):
         if isinstance(x, torch.Tensor):
             return x.as_subclass(QuantizationConvertTensorProxy)  # type: ignore[arg-type]
@@ -528,19 +549,7 @@ def auto_convert(module : torch.nn.Module) -> torch.nn.Module:
             finally:
                 torch.nn.Module.__call__ = orig_module_call
                 torch.nn.Sequential.forward = orig_nn_sequential_forward  # type: ignore[assignment]
-
-    # If the module's activation's qconfig is PlaceholderObserver, we can say that the module want to run dynamic quantization path.
-    if isinstance(module.q_config.activation(), PlaceholderObserver):
-        qconfig_spec = {
-            torch.nn.Linear : module.q_config,
-            torch.nn.LSTM : module.q_config,
-            torch.nn.GRU : module.q_config,
-            torch.nn.LSTMCell : module.q_config,
-            torch.nn.RNNCell : module.q_config,
-            torch.nn.GRUCell : module.q_config,
-        }
-        return torch.quantization.quantize_dynamic(module, qconfig_spec=qconfig_spec)
-
+ 
     # If module doesn't have a configure_file attr, we can say that user has run save_qconf_summary method which have
     # computed the scales and zp, or use the user's setting from a given json file(load_qconf_summary), we need to compute
     # the scale and zp here.

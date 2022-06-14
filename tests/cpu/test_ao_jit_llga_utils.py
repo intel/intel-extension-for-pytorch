@@ -102,7 +102,8 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, remove_dropout=False, x_var=None, qconfig=default_static_qconfig, int8_bf16=False):
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, remove_dropout=False, x_var=None,
+            qconfig=default_static_qconfig, int8_bf16=False):
         graph, traced_model, fp32_model = self.prepareModel(model, x, remove_dropout, qconfig, int8_bf16)
         with torch.no_grad():
             y = fp32_model(*x)
@@ -119,23 +120,24 @@ class JitLlgaTestCase(JitTestCase):
 
             return graph
 
-    def prepareModel(self, model, x, remove_dropout=False, qconfig=default_static_qconfig, int8_bf16=False, inplace=False):
+    def prepareModel(self, model, x, remove_dropout=False, qconfig=default_static_qconfig,
+            int8_bf16=False, prepare_inplace=True, convert_inplace=True,):
         model.eval()
         fp32_model = copy.deepcopy(model)
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             # fold conv bn
             if remove_dropout:
                 ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
-            model = ipex.quantization.prepare(model, qconfig, x, inplace=inplace)
+            model = ipex.quantization.prepare(model, qconfig, x, inplace=prepare_inplace)
             # do calibration
             y = model(*x)
             # jit trace to insert quant/dequant
             if int8_bf16:
                 with torch.cpu.amp.autocast():
-                    convert_model = ipex.quantization.convert(model)
+                    convert_model = ipex.quantization.convert(model, inplace=convert_inplace)
                     traced_model = torch.jit.trace(convert_model, x)
             else:
-                convert_model = ipex.quantization.convert(model)
+                convert_model = ipex.quantization.convert(model, inplace=convert_inplace)
                 traced_model = torch.jit.trace(convert_model, x)
             traced_model = torch.jit.freeze(traced_model)
 
