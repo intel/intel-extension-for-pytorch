@@ -836,42 +836,54 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
     return;
   }
 
-  TensorInfo<scalar_t, uint32_t> src_info =
-      getTensorInfo<scalar_t, uint32_t>(src);
+  TensorInfo<scalar_t, int64_t> src_info =
+      getTensorInfo<scalar_t, int64_t>(src);
   src_info.collapseDims();
 
-  TensorInfo<scalar_t, uint32_t> dst_info =
-      getTensorInfo<scalar_t, uint32_t>(dst);
+  TensorInfo<scalar_t, int64_t> dst_info =
+      getTensorInfo<scalar_t, int64_t>(dst);
   dst_info.collapseDims();
 
-  TensorInfo<int64_t, uint32_t> idx_info =
-      getTensorInfo<int64_t, uint32_t>(index);
+  TensorInfo<int64_t, int64_t> idx_info =
+      getTensorInfo<int64_t, int64_t>(index);
   idx_info.collapseDims();
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  auto wgroup_range = (dst_num_elem + wgroup_size - 1) / wgroup_size;
+
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<scalar_t>();
     auto dst_data = dst.data_ptr<scalar_t>();
     auto idx_data = index.data_ptr<int64_t>();
 
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
-      auto src_ptr = src_data;
-      auto dst_ptr = dst_data;
-      auto idx_ptr = idx_data;
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto linear_idx = item.get_global_linear_id();
+      if (linear_idx < dst_num_elem) {
+        auto idx_offset = linear_idx;
+        IndexToOffset<int64_t, int64_t>::get(
+            linear_idx,
+            idx_info,
+            IndexToOffset<int64_t, int64_t>::NON_STRICT_CONTIGUOUS);
+        auto idx = idx_data[idx_offset];
+        auto source_offset = idx;
+        IndexToOffset<scalar_t, int64_t>::get(
+            idx,
+            src_info,
+            IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
+        auto dst_offset = linear_idx;
+        IndexToOffset<scalar_t, int64_t>::get(
+            linear_idx,
+            dst_info,
+            IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
 
-      auto linear_idx = item.get_linear_id();
-      auto idx_offset =
-          IndexToOffset<int64_t, uint32_t>::get(linear_idx, idx_info);
-      auto idx = idx_ptr[idx_offset];
-      auto source_offset =
-          IndexToOffset<scalar_t, uint32_t>::get(idx, src_info);
-      auto dst_offset =
-          IndexToOffset<scalar_t, uint32_t>::get(linear_idx, dst_info);
-
-      dst_ptr[dst_offset] = src_ptr[source_offset];
+        dst_data[dst_offset] = src_data[source_offset];
+      }
     };
 
-    cgh.parallel_for(DPCPP::range<1>(dst_num_elem), kfn);
+    cgh.parallel_for(
+        DPCPP::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
   };
 
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
