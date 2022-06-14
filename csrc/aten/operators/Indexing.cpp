@@ -263,7 +263,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 }
 
 template <typename scalar_t>
-void indexAdd(
+void _index_add(
     Tensor& dst,
     int64_t dim,
     const Tensor& indices,
@@ -371,76 +371,19 @@ void indexAdd(
     return;
   }
 
-  TensorInfo<int64_t, unsigned int> indices_info =
-      getTensorInfo<int64_t, unsigned int>(indices);
+  TensorInfo<int64_t, int64_t> indices_info =
+      getTensorInfo<int64_t, int64_t>(indices);
   indices_info.collapseDims();
 
-  TensorInfo<scalar_t, unsigned int> dst_info =
-      getTensorInfo<scalar_t, unsigned int>(dst);
-  int dst_add_dim = dst_info.collapseDims(dim);
-  dst_info.reduceDim(dst_add_dim);
+  TensorInfo<scalar_t, int64_t> src_info =
+      getTensorInfo<scalar_t, int64_t>(src);
 
-  TensorInfo<scalar_t, unsigned int> src_info =
-      getTensorInfo<scalar_t, unsigned int>(src);
-  int src_add_dim = src_info.collapseDims(dim);
-  src_info.reduceDim(src_add_dim);
+  TensorInfo<scalar_t, int64_t> dst_info =
+      getTensorInfo<scalar_t, int64_t>(dst);
+  int new_indexing_dim = dst_info.collapseDims(dim);
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
-
-  auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
-
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_data = src.data_ptr<scalar_t>();
-    auto dst_data = dst.data_ptr<scalar_t>();
-    auto idx_data = indices.data_ptr<long>();
-
-    __cgh.parallel_for(
-        DPCPP::nd_range</*dim=*/1>(
-            DPCPP::range</*dim=*/1>(numIndices * wgroup_size),
-            DPCPP::range</*dim=*/1>(wgroup_size)),
-        [=](DPCPP::nd_item<1> item_id) {
-          auto src_ptr = src_data;
-          auto dst_ptr = dst_data;
-          auto idx_ptr = idx_data;
-
-          auto src_slice_id = item_id.get_group(0);
-          auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
-              src_slice_id, indices_info);
-          auto dst_slice_id = idx_ptr[slice_off];
-
-          auto g_dst_ptr =
-              dst_ptr + dst_slice_id * dst_info.strides[dst_add_dim];
-          auto g_src_ptr =
-              src_ptr + src_slice_id * src_info.strides[src_add_dim];
-
-          auto ii_ = item_id.get_local_id(0);
-          auto dst_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-          auto src_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-          atomicAdd(
-              (dpcpp_global_ptr_pt<scalar_t>)&(g_dst_ptr[dst_offset_]),
-              g_src_ptr[src_offset_] * alpha_val);
-
-          for (int iter = 1; iter < n_work_item_iter; iter++) {
-            auto __inner_idx = iter * wgroup_size + ii_;
-            if (__inner_idx < sliceSize) {
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                  __inner_idx, dst_info);
-              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                  __inner_idx, src_info);
-              atomicAdd(
-                  (dpcpp_global_ptr_pt<scalar_t>)&(g_dst_ptr[dst_offset_]),
-                  g_src_ptr[src_offset_] * alpha_val);
-            }
-          }
-        });
-  };
-
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  _index_add_kernel(
+      src_info, dst_info, indices_info, alpha_val, new_indexing_dim);
 }
 
 template <typename scalar_t>
@@ -470,7 +413,7 @@ void _index_fill(
 }
 
 template <typename scalar_t>
-void indexCopy(
+void _index_copy(
     Tensor& dst,
     int64_t dim,
     const Tensor& indices,
@@ -501,73 +444,19 @@ void indexCopy(
     return;
   }
 
-  TensorInfo<int64_t, unsigned int> indices_info =
-      getTensorInfo<int64_t, unsigned int>(indices);
+  TensorInfo<int64_t, int64_t> indices_info =
+      getTensorInfo<int64_t, int64_t>(indices);
   indices_info.collapseDims();
 
-  TensorInfo<scalar_t, unsigned int> src_info =
-      getTensorInfo<scalar_t, unsigned int>(source);
-  auto src_collapse_dim = (source.dim() == 0) ? -1 : dim;
-  int src_dim = src_info.collapseDims(src_collapse_dim);
-  src_info.reduceDim(src_dim);
+  TensorInfo<scalar_t, int64_t> src_info =
+      getTensorInfo<scalar_t, int64_t>(source);
 
-  TensorInfo<scalar_t, unsigned int> dst_info =
-      getTensorInfo<scalar_t, unsigned int>(dst);
-  auto dst_collapse_dim = (dst.dim() == 0) ? -1 : dim;
-  int dst_fill_dim = dst_info.collapseDims(dst_collapse_dim);
-  dst_info.reduceDim(dst_fill_dim);
+  TensorInfo<scalar_t, int64_t> dst_info =
+      getTensorInfo<scalar_t, int64_t>(dst);
+  auto collapse_dim = (dst.dim() == 0) ? -1 : dim;
+  int new_indexing_dim = dst_info.collapseDims(collapse_dim);
 
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
-  auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto dst_data = dst.data_ptr<scalar_t>();
-    auto src_data = source.data_ptr<scalar_t>();
-    auto idx_data = indices.data_ptr<long>();
-
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-      auto dst_ptr = dst_data;
-      auto src_ptr = src_data;
-      auto idx_ptr = idx_data;
-
-      auto src_slice_id = item_id.get_group(0);
-      auto slice_off =
-          IndexToOffset<int64_t, unsigned int>::get(src_slice_id, indices_info);
-      auto dst_slice_id = idx_ptr[slice_off];
-      auto g_dst_ptr = dst_ptr + dst_slice_id * dst_info.strides[dst_fill_dim];
-      auto g_src_ptr = src_ptr + src_slice_id * src_info.strides[src_dim];
-
-      auto ii_ = item_id.get_local_id(0);
-      auto dst_offset_ =
-          IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-      auto src_offset_ =
-          IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-      g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
-
-      for (int iter = 1; iter < n_work_item_iter; iter++) {
-        auto __inner_idx = iter * wgroup_size + ii_;
-        if (__inner_idx < sliceSize) {
-          src_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, src_info);
-          dst_offset_ =
-              IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
-
-          g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
-        }
-      }
-    };
-
-    cgh.parallel_for(
-        DPCPP::nd_range<1>(
-            DPCPP::range<1>(numIndices * wgroup_size),
-            DPCPP::range<1>(wgroup_size)),
-        kfn);
-  };
-
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+  _index_copy_kernel(src_info, dst_info, indices_info, new_indexing_dim);
 }
 
 template <typename scalar_t>
@@ -1076,7 +965,7 @@ Tensor& index_add_(
     const Scalar& alpha) {
   IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
       self.scalar_type(), "index_add_", [&] {
-        impl::indexAdd<scalar_t>(self, dim, index, source, alpha);
+        impl::_index_add<scalar_t>(self, dim, index, source, alpha);
       });
   return self;
 }
@@ -1175,8 +1064,8 @@ Tensor& index_copy_(
       at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       self.scalar_type(),
-      "indexCopy",
-      [&]() { impl::indexCopy<scalar_t>(self, dim, index, source); });
+      "index_copy",
+      [&]() { impl::_index_copy<scalar_t>(self, dim, index, source); });
   return self;
 }
 
