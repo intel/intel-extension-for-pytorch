@@ -199,7 +199,6 @@ class TestOp(JitLlgaTestCase):
 
         for bias in [True]: # TODO：[True, False] when supported in backend
             x = torch.randn(2, 15)
-            m = M(bias)
 
             patterns = [
                 ["aten::to", "aten::quantize_per_tensor"],
@@ -207,6 +206,7 @@ class TestOp(JitLlgaTestCase):
             ]
 
             for qconfig in static_qconfig:
+                m = M(bias)
                 graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig, int8_bf16=True)
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
                 # single aten::to won't be rewritten by llga backend
