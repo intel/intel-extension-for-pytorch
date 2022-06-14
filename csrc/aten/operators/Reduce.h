@@ -67,8 +67,6 @@ struct ReduceConfig {
   static constexpr int GROUP_Y = 1;
   static constexpr int GROUP = 2;
 
-  static constexpr int input_vec_size = 4;
-
   ReduceConfig(int element_size_bytes, int num_outputs, int num_inputs)
       : element_size_bytes(element_size_bytes),
         num_inputs(num_inputs),
@@ -90,6 +88,7 @@ struct ReduceConfig {
   int num_items; /* workgroup size */
 
   bool vectorize_input = false;
+  int input_vec_size = 1;
   int output_vec_size = 1;
 
   template <typename T>
@@ -318,8 +317,6 @@ struct ReduceOp {
   static constexpr float acc_buffer_multiplier =
       (float)sizeof(arg_t) / sizeof(out_scalar_t);
 
-  static constexpr int input_vec_size = ReduceConfig::input_vec_size;
-
   ops_t ops;
   arg_t ident;
   ReduceConfig config;
@@ -381,6 +378,7 @@ struct ReduceOp {
 
     using arg_vec_t = at::detail::Array<arg_t, output_vec_size>;
     arg_vec_t value;
+#pragma unroll(output_vec_size)
     for (int i = 0; i < output_vec_size; i++) {
       value[i] = ident;
     }
@@ -391,11 +389,15 @@ struct ReduceOp {
       value = item_reduce<output_vec_size>(pos, input_slice);
     }
 
-    if (config.should_group_y_reduce()) {
-      value = group_y_reduce<output_vec_size>(pos, value, shared);
-    }
-    if (config.should_group_x_reduce()) {
-      value = group_x_reduce<output_vec_size>(pos, value, shared);
+    if (config.should_group_x_reduce() && config.should_group_y_reduce()) {
+      value = group_reduce<output_vec_size>(pos, value, shared);
+    } else {
+      if (config.should_group_y_reduce()) {
+        value = group_y_reduce<output_vec_size>(pos, value, shared);
+      }
+      if (config.should_group_x_reduce()) {
+        value = group_x_reduce<output_vec_size>(pos, value, shared);
+      }
     }
 
     using out_ptr_vec_t = at::detail::Array<out_scalar_t*, output_vec_size>;
@@ -460,14 +462,25 @@ struct ReduceOp {
   }
 
   template <int output_vec_size>
-  SYCL_EXTERNAL at::detail::Array<arg_t, output_vec_size> item_reduce(
+  at::detail::Array<arg_t, output_vec_size> item_reduce(
       DPCPP::nd_item<2> pos,
       const scalar_t* data) const {
     if (config.vectorize_input) {
       // assert(output_vec_size == 1);
       // reduce at the header of input_slice where memory is not aligned,
       // so that group_reduce will have an aligned memory to work on.
-      return {input_vectorized_item_reduce_impl(pos, data)};
+      switch (config.input_vec_size) {
+        case 16:
+          return {input_vectorized_item_reduce_impl<16>(pos, data)};
+        case 8:
+          return {input_vectorized_item_reduce_impl<8>(pos, data)};
+        case 4:
+          return {input_vectorized_item_reduce_impl<4>(pos, data)};
+        case 2:
+          return {input_vectorized_item_reduce_impl<2>(pos, data)};
+        default:
+          return {input_vectorized_item_reduce_impl<1>(pos, data)};
+      };
     } else {
       index_t element_stride = input_calc.strides_[0][0] / sizeof(scalar_t);
       bool is_contiguous = (input_calc.dims == 1 && element_stride == 1);
@@ -485,6 +498,7 @@ struct ReduceOp {
     }
   }
 
+  template <int input_vec_size>
   SYCL_EXTERNAL arg_t input_vectorized_item_reduce_impl(
       DPCPP::nd_item<2> pos,
       const scalar_t* data) const {
@@ -633,6 +647,72 @@ struct ReduceOp {
       }
     }
     return value_list[0];
+  }
+
+  template <int output_vec_size>
+  at::detail::Array<arg_t, output_vec_size> group_reduce(
+      DPCPP::nd_item<2> pos,
+      at::detail::Array<arg_t, output_vec_size> value,
+      dpcpp_local_ptr<void> shared_memory) const {
+    auto sg = pos.get_sub_group();
+    uint32_t sbgrpSize = sg.get_local_range()[0];
+    int l_x = pos.get_local_linear_id();
+    int sg_lid = sg.get_local_linear_id();
+    int sg_gid = sg.get_group_linear_id();
+    int sg_range = sg.get_group_range()[0];
+
+    for (int offset = 1; offset < sbgrpSize; offset <<= 1) {
+#pragma unroll(output_vec_size)
+      for (int i = 0; i < output_vec_size; ++i) {
+        arg_t other = sg.shuffle_down(value[i], offset);
+        value[i] = ops.combine(value[i], other);
+      }
+    }
+
+    using args_vec_t = at::detail::Array<arg_t, output_vec_size>;
+    dpcpp_local_ptr<args_vec_t> shared{shared_memory};
+
+    if (sg_lid == 0) {
+      shared[sg_gid] = value;
+    }
+    pos.barrier(dpcpp_local_fence);
+
+    if (sg_range <= sbgrpSize) {
+      // sub-group reduce
+#pragma unroll(output_vec_size)
+      for (int i = 0; i < output_vec_size; i++) {
+        value[i] = ident;
+      }
+      if (sg_gid == 0 && sg_lid < sg_range) {
+        value = shared[sg_lid];
+        for (int offset = 1; offset < sg_range; offset <<= 1) {
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            arg_t other = sg.shuffle_down(value[i], offset);
+            value[i] = ops.combine(value[i], other);
+          }
+        }
+      }
+    } else {
+      // work item tree reduce
+      if (l_x < sg_range) {
+        value = shared[l_x];
+      }
+
+      for (int offset = sg_range / 2; offset > 0; offset >>= 1) {
+        if (l_x < offset) {
+          args_vec_t other = shared[l_x + offset];
+#pragma unroll(output_vec_size)
+          for (int i = 0; i < output_vec_size; ++i) {
+            value[i] = ops.combine(value[i], other[i]);
+          }
+          shared[l_x] = value;
+        }
+        pos.barrier(dpcpp_local_fence);
+      }
+    }
+
+    return value;
   }
 
   template <int output_vec_size>
@@ -1024,8 +1104,8 @@ inline void dpcpp_reduce_kernel(
   bool can_use_32bit_indexing = iter.can_use_32bit_indexing();
   std::unique_ptr<AccumulationBuffer> owned_buf_ptr;
 
-  // The acc_buf_ptr is a shared pointer. It is create at the first entrance and
-  // resued by all recursive function calls.
+  // The acc_buf_ptr is a shared pointer. It is create at the first entrance
+  // and resued by all recursive function calls.
   if (acc_buf_ptr == nullptr) {
     // acc_buf_ptr holds buffer used for accuulation amoung multiple sub_iter
     // when accumulation in output is not possible.
@@ -1057,7 +1137,7 @@ inline void dpcpp_reduce_kernel(
     return;
   }
 
-  const char* in_data = (char*)iter.data_ptr(iter.ntensors() - 1);
+  char* in_data = (char*)iter.data_ptr(iter.ntensors() - 1);
   char* out_data = (char*)iter.data_ptr(0);
   const auto noutputs = iter.noutputs();
   c10::optional<char*> out_data_extra;
@@ -1082,20 +1162,20 @@ inline void dpcpp_reduce_kernel(
   bool reduction_on_fastest_striding_dimension;
 
   if (iter.ndim() > 0) {
-    // Adjust group size to map group width to fastest changing dimension of the
-    // input tensor. This grants the best possible memory accessing pattern,
-    // given that for non-contiguous tensor with space in between, we cannot
-    // have perfect memory coalescing.
+    // Adjust group size to map group width to fastest changing dimension of
+    // the input tensor. This grants the best possible memory accessing
+    // pattern, given that for non-contiguous tensor with space in between, we
+    // cannot have perfect memory coalescing.
     reduction_on_fastest_striding_dimension =
         (iter.num_reduce_dims() == iter.ndim()) ||
         (iter.strides(/*arg=*/input_index)[0] <
          iter.strides(/*arg=*/input_index)[iter.num_reduce_dims()]);
-    // Notice that dim0 & dim1 does NOT guarantee any launch configuration here!
-    // dim0 & dim1 are more like the upper bound of the group dimension. The
-    // actual launch config and reduction scheme is determined by setting values
-    // to 'config.input_mult' and 'config.output_mult'.
-    // We try to max out dim1 so that we have enough threads per CTA to deliver
-    // performance for larger problem size.
+    // Notice that dim0 & dim1 does NOT guarantee any launch configuration
+    // here! dim0 & dim1 are more like the upper bound of the group dimension.
+    // The actual launch config and reduction scheme is determined by setting
+    // values to 'config.input_mult' and 'config.output_mult'. We try to max
+    // out dim1 so that we have enough threads per CTA to deliver performance
+    // for larger problem size.
     if (reduction_on_fastest_striding_dimension) {
       // Map group.x to the fastest reducing dimension. It implies:
       //   1. group_x_reduce is required.
@@ -1119,9 +1199,9 @@ inline void dpcpp_reduce_kernel(
     dim1 = 1;
   }
 
-  // We do vectorization to gain better memory access, there are two cases which
-  // we call "vectorize along input" and "vectorize along output". Note that the
-  // "input/output" here does not mean we are vectorizing load/store
+  // We do vectorization to gain better memory access, there are two cases
+  // which we call "vectorize along input" and "vectorize along output". Note
+  // that the "input/output" here does not mean we are vectorizing load/store
   // instructions. We always only vectorize load instructions.
   //
   // Case 1: "vectorize along input"
@@ -1131,17 +1211,21 @@ inline void dpcpp_reduce_kernel(
   // values in each loaded vector always correspond to the same output.
   //
   // Case 2: "vectorize along output"
-  // This case happens when the fastest moving dimension is not the dimension of
-  // reduction. In such case, WIs with different dim1 are independent
-  // and will produce results for different outputs. In such case, values in
-  // each loaded vector always correspond to different outputs.
+  // This case happens when the fastest moving dimension is not the dimension
+  // of reduction. In such case, WIs with different dim1 are independent and
+  // will produce results for different outputs. In such case, values in each
+  // loaded vector always correspond to different outputs.
   if (fastest_moving_stride == sizeof(scalar_t)) {
+    auto vec_size = at::native::Memory::can_vectorize_up_to_loop<scalar_t>(
+        getDeviceIdOfCurrentQueue(), in_data);
     if (reduction_on_fastest_striding_dimension && dim0 > 128 &&
-        iter.num_reduce_dims() == 1 && vt0 > ReduceConfig::input_vec_size) {
+        iter.num_reduce_dims() == 1 && vt0 >= vec_size / 2) {
       // Case 1: "vectorize along input"
-      // Note that if vt0 < ReduceConfig::vec_size, then this means the register
-      // pressure could be high, in such case, we should avoid vectorization.
+      // Note that if vt0 < ReduceConfig::vec_size, then this means the
+      // register pressure could be high, in such case, we should avoid
+      // vectorization.
       config.vectorize_input = true;
+      config.input_vec_size = vec_size;
     } else if (!reduction_on_fastest_striding_dimension) {
       // Case 2: "vectorize along output"
       config.output_vec_size = get_output_vec_size<scalar_t>(iter);
@@ -1165,8 +1249,11 @@ inline void dpcpp_reduce_kernel(
     config.output_mult[0] = config.split_output(group_width);
   }
 
+  // XXX: Avoid all WIs in a work group contributes on one output. If so,
+  // It is inefficient to store output, each work group stores only one output.
+  // It is not friendly to collapse memory request in an EU.
   if (config.values_per_item() >= group_height * 16 ||
-      config.values_per_item() >= 256) {
+      config.values_per_item() >= 512) {
     // Divide the input across SGs in a work group, if that leaves at least
     // 16 elements to be summed by each WI. This will require inter-SG
     // reduction using shared memory.
@@ -1198,9 +1285,9 @@ inline void dpcpp_reduce_kernel(
         div_up(config.values_per_item(), min_values_per_item);
     auto groups_per_output3 =
         div_up(config.values_per_item(), max_values_per_item);
-    // We want the minimum of groups_per_output1 and groups_per_output2, so that
-    // each WI can have a large number of values to deal with. But we don't
-    // want values_per_item to be larger than max_values_per_item
+    // We want the minimum of groups_per_output1 and groups_per_output2, so
+    // that each WI can have a large number of values to deal with. But we
+    // don't want values_per_item to be larger than max_values_per_item
     config.groups_per_output = std::max(
         std::min(groups_per_output1, groups_per_output2), groups_per_output3);
     if (config.groups_per_output > 1) {
