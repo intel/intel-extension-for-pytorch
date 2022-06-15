@@ -1,5 +1,7 @@
 #include <ATen/code_template.h>
+#include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/jit/cpu/passes/utils.h"
+
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
@@ -98,7 +100,8 @@ void insertPrePackedLinearOp(Block* b, std::unordered_set<Node*>& aten_linear) {
     }
     auto weight_dtype_option = tt->scalarType();
     if (!(weight_dtype_option.has_value() &&
-              (weight_dtype_option.value() == at::ScalarType::BFloat16) ||
+              (weight_dtype_option.value() == at::ScalarType::BFloat16) &&
+              ideep::has_bf16_type_support() ||
           aten_linear.find(n) == aten_linear.end())) {
       continue;
     }

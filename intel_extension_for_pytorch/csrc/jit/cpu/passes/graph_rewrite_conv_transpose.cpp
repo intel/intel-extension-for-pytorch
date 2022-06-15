@@ -1,3 +1,4 @@
+#include "csrc/cpu/ideep/ideep.hpp"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 #include "utils.h"
@@ -35,19 +36,19 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
       }
       IValue input_size_value(input_size_option.value());
 
-      auto weight_size_option = n->inputs()
-                                    .at(1)
-                                    ->type()
-                                    ->cast<TensorType>()
-                                    ->sizes()
-                                    .concrete_sizes();
+      auto weight_tensor_type = n->inputs().at(1)->type()->cast<TensorType>();
+      auto weight_size_option = weight_tensor_type->sizes().concrete_sizes();
       // weight has not shape info, will not do weight prapacked.
       if (!(weight_size_option.has_value() &&
             (weight_size_option.value().size() == 4 ||
              weight_size_option.value().size() == 5))) {
         continue;
       }
-
+      const auto dtype = weight_tensor_type->scalarType();
+      if (dtype.has_value() && *dtype == at::ScalarType::BFloat16 &&
+          !ideep::has_bf16_type_support()) {
+        continue;
+      }
       // # padding - output_padding + stride <= 0 unsupported in mkldnn
       auto stride = toIValue(n->input(3))->toIntList();
       auto padding = toIValue(n->input(4))->toIntList();
