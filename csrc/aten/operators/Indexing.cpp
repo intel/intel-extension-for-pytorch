@@ -407,7 +407,7 @@ void _index_fill(
       getTensorInfo<scalar_t, int64_t>(dst);
   int dim_after_collapse = dst_info.collapseDims(dim);
 
-  _index_fill_kernel<scalar_t>(dst_info, indices_info, dim_after_collapse, val);
+  _index_fill_kernel(dst_info, indices_info, dim_after_collapse, val);
 
   return;
 }

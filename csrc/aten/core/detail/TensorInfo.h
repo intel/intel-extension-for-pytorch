@@ -55,10 +55,10 @@ struct TensorInfo {
       return is_contiguous;
   }
 
-  T* data;
+  T* data = nullptr;
   IndexType sizes[MAX_TENSORINFO_DIMS];
   IndexType strides[MAX_TENSORINFO_DIMS];
-  int dims;
+  int dims = 0;
   bool is_contiguous;
   bool is_strict_contiguous;
 };

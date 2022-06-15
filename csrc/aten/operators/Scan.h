@@ -186,7 +186,7 @@ class group_scan_kernel {
 
   DPCPP_DEVICE void run(DPCPP::nd_item<2> item, dpcpp_local_acc_t<T> slm)
       const {
-    typename SConfig::item_desc id = cfg.get_item_desc(item);
+    auto id = cfg.get_item_desc(item);
     int64_t si, pi, bi, glb_ldr_off, glb_str_off, glb_str_off_0,
         glb_ldr_logical_off, glb_str_logical_off, crr_off;
 
@@ -307,7 +307,7 @@ static inline void accumulate_carrier(const SConfig& cfg) {
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      typename SConfig::item_desc id = cfg.get_item_desc(item);
+      auto id = cfg.get_item_desc(item);
       int64_t si, pi, bi, glb_off, crr_off;
 
       si = id.glb_batch % cfg.stride_;

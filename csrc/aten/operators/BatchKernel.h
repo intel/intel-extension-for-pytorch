@@ -63,7 +63,7 @@ class BatchKernelConfig {
     return {wg_range_y_, wg_range_x_};
   }
 
-  struct item_desc {
+  struct ItemDesc {
     /* chunk id along problem dim */ int64_t chunk;
     /* problem chunk size */ int64_t chunk_size;
     /* offsite in current chunk */ int64_t chunk_off;
@@ -72,7 +72,7 @@ class BatchKernelConfig {
     /* global problem id */ int64_t glb_problem;
   };
 
-  DPCPP_DEVICE item_desc get_item_desc(DPCPP::nd_item<2> item) const {
+  DPCPP_DEVICE ItemDesc get_item_desc(DPCPP::nd_item<2> item) const {
     auto lix = item.get_local_id(1);
     auto liy = item.get_local_id(0);
     auto lrx = item.get_local_range(1);
