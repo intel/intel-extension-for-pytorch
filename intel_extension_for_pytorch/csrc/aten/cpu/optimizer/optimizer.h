@@ -25,7 +25,7 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step_kernel_impl(
     const at::Tensor& grad_,
     const at::Tensor& state_sum_,
     const at::Tensor& param2_,
-    int64_t step,
+    double step,
     double learning_rate,
     double weight_decay,
     double lr_decay,
@@ -48,6 +48,21 @@ void packed_add_kernel_impl(
     const at::Tensor& grad,
     double alpha);
 
+void adam_fused_step_kernel_impl(
+    const at::Tensor& param_,
+    const at::Tensor& exp_avg_,
+    const at::Tensor& exp_avg_sq_,
+    const at::Tensor& max_exp_avg_sq_,
+    const at::Tensor& grad_,
+    const at::Tensor& param2_,
+    bool amsgrad,
+    double step,
+    double beta1,
+    double beta2,
+    double learning_rate,
+    double weight_decay,
+    double eps);
+
 } // namespace
 
 using adagrad_fused_step_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
@@ -55,7 +70,7 @@ using adagrad_fused_step_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
     const at::Tensor&,
     const at::Tensor&,
     const at::Tensor&,
-    int64_t,
+    double,
     double,
     double,
     double,
@@ -92,6 +107,22 @@ DECLARE_DISPATCH(sgd_fused_step_kernel_fn, sgd_fused_step_kernel_stub);
 using packed_add_kernel_fn =
     void (*)(at::Tensor&, at::Tensor&, const at::Tensor&, double);
 DECLARE_DISPATCH(packed_add_kernel_fn, packed_add_kernel_stub);
+
+using adam_fused_step_kernel_fn = void (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    bool,
+    double,
+    double,
+    double,
+    double,
+    double,
+    double);
+DECLARE_DISPATCH(adam_fused_step_kernel_fn, adam_fused_step_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

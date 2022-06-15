@@ -5,6 +5,7 @@ import intel_extension_for_pytorch._C as core
 from .cpupool import CPUPool
 from .task import Task
 import copy
+import warnings
 
 class MultiStreamModuleHint(object):
     def __init__(self, *args, **kwargs):
@@ -91,6 +92,9 @@ class MultiStreamModule(nn.Module):
                 output_concat_hint: MultiStreamModuleHint = default_multi_stream_module_concat_hint):
         super(MultiStreamModule, self).__init__()
         assert type(cpu_pool) is CPUPool, "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
+        if not isinstance(model, torch.jit.ScriptModule):
+            warnings.warn("Creating MultiStreamModule on an nn.Module. This can be slow due "
+            "to Python Global Interpreter Lock (GIL). Suggest to use JIT ScriptModule for better performance.")
         self.core_list = cpu_pool.core_ids
         if isinstance(num_streams, str):
             # For str input of num_streams, it must be "auto"
@@ -215,7 +219,7 @@ class MultiStreamModule(nn.Module):
                     self.init_forward_status(input_object[idx_or_key].size(hint_object[idx_or_key]), stream_id)
                 # Get the split input for each stream
                 # Here we assume split along the outside dim, otherwise memory copy happens and obviously hurt multi stream module's performance.
-                if hint_object[idx_or_key] is 0:
+                if hint_object[idx_or_key] == 0:
                     # Split along dim 0, the slice will not create new tensor
                     stream_input_object[idx_or_key] = input_object[idx_or_key][self.current_split_start_idx:self.current_split_end_idx]
                 else:

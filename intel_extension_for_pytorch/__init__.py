@@ -27,8 +27,7 @@ from . import nn
 from . import jit
 from . import profiler
 from . import ao
+from . import autocast
 
 from .utils.verbose import verbose
-from .frontend import optimize, enable_onednn_fusion
-from .backends.cpu import set_fp32_low_precision_mode, get_fp32_low_precision_mode, LowPrecisionMode
-
+from .frontend import optimize, enable_onednn_fusion, set_fp32_math_mode, get_fp32_math_mode, FP32MathMode

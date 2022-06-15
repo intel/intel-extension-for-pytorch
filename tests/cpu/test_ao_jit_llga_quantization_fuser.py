@@ -96,6 +96,24 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
                 self.checkPatterns(graph, patterns)
 
+    def test_conv_no_freeze(self):
+        m = nn.Conv2d(in_channels=3,
+                        out_channels=3,
+                        kernel_size=3,
+                        padding=1,
+                        stride=1,
+                        dilation=1,
+                        groups=1,
+                        bias=True)
+        x = torch.rand(1, 3, 5, 5)
+        graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=static_qconfig[0], freeze=False)
+        patterns = [
+            ["aten::dequantize", "aten::quantize_per_channel", "aten::_convolution"]
+        ]        
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::_convolution', 'aten::quantize_per_channel', 'aten::dequantize'])
+        self.checkPatterns(graph, patterns)    
+
     def test_conv_share_dequant_weight(self):
         class M(nn.Module):
             def __init__(self):
@@ -181,7 +199,6 @@ class TestOp(JitLlgaTestCase):
 
         for bias in [True]: # TODO：[True, False] when supported in backend
             x = torch.randn(2, 15)
-            m = M(bias)
 
             patterns = [
                 ["aten::to", "aten::quantize_per_tensor"],
@@ -189,6 +206,7 @@ class TestOp(JitLlgaTestCase):
             ]
 
             for qconfig in static_qconfig:
+                m = M(bias)
                 graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig, int8_bf16=True)
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
                 # single aten::to won't be rewritten by llga backend
@@ -350,7 +368,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.conv2(x)
                 return x
 
-        for eltwise in ['relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
+        for eltwise in ['relu', 'leaky_relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
             for inplace in [False, True]:
                 for memory_format in [torch.contiguous_format, torch.channels_last]:
                     eltwise_fn_name = eltwise + '_' if inplace else eltwise
@@ -1195,6 +1213,22 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::dequantize', 'aten::linear'])
         self.checkPatterns(graph, patterns)
 
+    def test_dequant_remove_attr(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                x = torch.quantize_per_channel(x, torch.tensor([0.1, 0.01]), torch.tensor([10, 0]), 0, torch.quint8)
+                x = torch.dequantize(x)
+                return x
+
+        x = x = torch.tensor([[-1.0, 0.0], [1.0, 2.0]])
+        m = M()
+        traced = torch.jit.trace(m, x)
+        traced(x)
+        graph = traced.graph_for(x)
+        self.checkAttr(graph, "aten::dequantize", "qtype")
 
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, 'Size peephole optimization not enabled yet')

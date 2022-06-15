@@ -52,13 +52,13 @@ All rights reserved.
 import math
 import random
 import unittest
-from functools import reduce
+import time
+import sys
 import warnings
 import itertools
 import contextlib
 import torch
 import torch.nn as nn
-from torch.jit._recursive import wrap_cpp_module
 import torch.fx.experimental.optimization as optimization
 import copy
 
@@ -66,18 +66,12 @@ import intel_extension_for_pytorch as ipex
 import intel_extension_for_pytorch._C as core
 
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
-from torch.nn import Parameter
 import torch.nn.functional as F
-from torch.autograd import gradcheck
-from torch.autograd.gradcheck import gradgradcheck
-from torch._six import inf, nan
 
-from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
-    TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
-    IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
-    IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
+from common_utils import TestCase
+
+def get_rand_seed():
+    return int(time.time() * 1000000000)
 
 try:
     import torchvision
@@ -89,23 +83,117 @@ skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 device = 'cpu:0'
 SIZE = 100
 
-conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
+conv_module = {1: torch.nn.Conv1d, 2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
 convtranspose_module = {2 : torch.nn.ConvTranspose2d, 3 : torch.nn.ConvTranspose3d}
 bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
 
-PyTorch_op_to_IPEX_op_map = {
-    # PyTorch_op_name: [ipex_op_name, BF16_supported]
-    torch.relu: ["relu", True],
-    torch.relu_: ["relu", True],
-    torch.sigmoid: ["sigmoid", True],
-    torch.sigmoid_: ["sigmoid", True],
-    nn.SiLU(inplace=True): ["swish", True],
-    nn.SiLU(inplace=False): ["swish", True],
-    torch.tanh: ["tanh", True],
-    torch.tanh_: ["tanh", True],
-    nn.Mish(inplace=True): ["mish", False], # TODO: support bf16 mish_ in stock PyTorch
-    nn.Mish(inplace=False): ["mish", False], # TODO: support bf16 mish in stock PyTorch
+class EltwiseFusionOp:
+    def __init__(self, ipex_eltwise_op, bf16_supported=True, prec=0.02, op_input_list={}):
+        self.ipex_eltwise_op = ipex_eltwise_op
+        self.bf16_supported = bf16_supported
+        self.prec = prec
+        self.op_input_list = op_input_list
+
+unary_PyTorch_op_to_IPEX_op_map = {
+    # PyTorch_op_name: [ipex_op_name, BF16_supported, prec]
+    torch.relu: EltwiseFusionOp("relu"),
+    torch.relu_: EltwiseFusionOp("relu"),
+    torch.sigmoid: EltwiseFusionOp("sigmoid"),
+    torch.sigmoid_: EltwiseFusionOp("sigmoid"),
+    nn.SiLU(inplace=True): EltwiseFusionOp("swish"),
+    nn.SiLU(inplace=False): EltwiseFusionOp("swish"),
+    torch.tanh: EltwiseFusionOp("tanh"),
+    torch.tanh_: EltwiseFusionOp("tanh"),
+    nn.Mish(inplace=True): EltwiseFusionOp("mish", bf16_supported=False), # TODO: support bf16 mish_ in stock PyTorch
+    nn.Mish(inplace=False): EltwiseFusionOp("mish", bf16_supported=False), # TODO: support bf16 mish in stock PyTorch
+    torch.abs: EltwiseFusionOp("abs"),
+    torch.abs_: EltwiseFusionOp("abs"),
+    torch.exp: EltwiseFusionOp("exp", prec=0.035),
+    torch.exp_: EltwiseFusionOp("exp", prec=0.035),
+    torch.nn.Hardswish(inplace=True): EltwiseFusionOp("hardswish"),
+    torch.nn.Hardswish(inplace=False): EltwiseFusionOp("hardswish"),
+    torch.square: EltwiseFusionOp("square", prec=0.035),
+    torch.square_: EltwiseFusionOp("square", prec=0.035),
 }
+
+non_unary_PyTorch_op_to_IPEX_op_map = {
+    nn.GELU(approximate="none"): EltwiseFusionOp("gelu"),
+    nn.GELU(approximate="tanh"): EltwiseFusionOp("gelu"),
+    nn.LeakyReLU(0.1, inplace=True): EltwiseFusionOp("leaky_relu"),
+    nn.LeakyReLU(0.1, inplace=False): EltwiseFusionOp("leaky_relu"),
+    nn.Hardtanh(inplace=True): EltwiseFusionOp("hardtanh"),
+    nn.Hardtanh(inplace=False): EltwiseFusionOp("hardtanh"),
+    nn.ELU(inplace=True): EltwiseFusionOp("elu"),
+    nn.ELU(inplace=False): EltwiseFusionOp("elu"),
+    torch.clamp: EltwiseFusionOp("hardtanh", op_input_list={"min": -2, "max": 3}),
+    torch.clamp_: EltwiseFusionOp("hardtanh", op_input_list={"min": -2, "max": 3}),
+    torch.pow: EltwiseFusionOp("pow", op_input_list={"exponent": 2}),
+    lambda t: t.pow_(2): EltwiseFusionOp("pow"),
+}
+
+unsupported_PyTorch_op_to_IPEX_op_map = {
+    torch.clamp: EltwiseFusionOp("hardtanh", op_input_list={"min": -2}), # clamp fusion requires that neither of min and max is None
+    torch.clamp_: EltwiseFusionOp("hardtanh", op_input_list={"max": 3}), # clamp_ fusion requires that neither of min and max is None
+    torch.pow: EltwiseFusionOp("pow", op_input_list={"exponent": torch.randn(1)}), # pow fusion requires exponent to be a Scalar but not a Tensor
+    lambda t: t.pow_(torch.randn(1)): EltwiseFusionOp("pow"), # pow_ fusion requires exponent to be a Scalar but not a Tensor
+}
+
+# The below eltwise OP have unstable numeric issue.
+# We will run the tests with fixed seed to avoid false positive.
+# For example, for log, when running bf16 linear-log test
+# y = linear(x)
+# z = log(y)
+# Supposing we meet a case where
+# y_fp32 = 0 and y_bf16 = 0.0008
+# Then z_fp32 = log(0) = nan
+#      z_bf16 = log(0.0008) = -7.1309
+# We're not able to directly compare z_fp32 with z_bf16.
+PyTorch_op_to_IPEX_op_fixed_seed_map = {
+    torch.log: EltwiseFusionOp("log", prec=0.065),
+    torch.log_: EltwiseFusionOp("log", prec=0.065),
+    torch.round: EltwiseFusionOp("round"),
+    torch.round_: EltwiseFusionOp("round"),
+    torch.sqrt: EltwiseFusionOp("sqrt"),
+    torch.sqrt_: EltwiseFusionOp("sqrt"),
+}
+
+class ConvEltwise(nn.Module):
+    def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvEltwise, self).__init__()
+        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.eltwise = eltwise_fn
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = self.conv(x)
+        a = a / 2
+        b = self.eltwise(a, **self.kwargs)
+        return b
+
+class LinearEltwise(nn.Module):
+    def __init__(self, eltwise_fn, in_channels, out_channels, bias, **kwargs):
+        super(LinearEltwise, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=bias)
+        self.eltwise = eltwise_fn
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = self.linear(x)
+        a = a / 2
+        b = self.eltwise(a, **self.kwargs)
+        return b
+
+class ConvTransposeEltwise(nn.Module):
+    def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeEltwise, self).__init__()
+        self.conv_transpose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.eltwise = eltwise_fn
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = self.conv_transpose(x)
+        b = self.eltwise(a, **self.kwargs)
+        return b
 
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -174,20 +262,6 @@ class ConvRelu_Fixed(nn.Module):
 
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
-
-class ConvLeakyRelu_Fixed(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, **kwargs):
-        super(ConvLeakyRelu_Fixed, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
-        self.leaky_relu = nn.LeakyReLU(0.1)
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.leaky_relu(x)
-        return x
-
 
 class Conv_Relu_Add(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -289,6 +363,22 @@ class ConvSum(nn.Module):
         b = self.conv1(x)
         return a+b
 
+class ConvSum_v2(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvSum_v2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+
+    def forward(self, x):
+        a = self.conv(x)
+        b = self.conv(x)
+        a.add_(b)
+        c = self.conv1(x)
+        a.add_(c)
+        return a
+
 class ConvScalarSum(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvScalarSum, self).__init__()
@@ -381,17 +471,6 @@ class LinearRelu(nn.Module):
 
     def forward(self, x):
         return F.relu(self.linear(x), inplace=True)
-
-class LinearGelu(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(LinearGelu, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.approximate = kwargs["approximate"]
-        self.linear = nn.Linear(in_channels, out_channels, kwargs["bias"])
-
-    def forward(self, x):
-        return F.gelu(self.linear(x), approximate=self.approximate)
 
 class LinearSigmoidMul(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -491,39 +570,6 @@ class ConvSwishInplace(nn.Module):
         res = a.mul_(b)
         return res
 
-class ConvHardtanh(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, inplace=False):
-        super(ConvHardtanh, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.hardtanh = nn.Hardtanh(inplace=inplace)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = self.hardtanh(a)
-        c = torch.add(b, b)
-        return c
-
-class ConvElu(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, inplace=False):
-        super(ConvElu, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.elu = nn.ELU(inplace=inplace)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = self.elu(a)
-        c = torch.add(b, b)
-        return c
-
-class ConvGelu(nn.Module):
-    def __init__(self, dim, in_channels, out_channels, kernel_size, image_size, **kwargs):
-        super(ConvGelu, self).__init__()
-        self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-        self.approximate = kwargs["approximate"]
-
-    def forward(self, x):
-        return F.gelu(self.conv(x), approximate=self.approximate)
-
 class ConvTranspose(nn.Module):
     def __init__(self, dim, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1):
         super(ConvTranspose, self).__init__()
@@ -532,6 +578,18 @@ class ConvTranspose(nn.Module):
     def forward(self, x):
         x = self.conv_transpose(x)
         return x
+
+class ConvTransposeSigmoidMul(nn.Module):
+    def __init__(self, mul, dim, in_channels, out_channels, kernel_size, image_size):
+        super(ConvTransposeSigmoidMul, self).__init__()
+        self.conv_transpose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.mul_op = mul
+
+    def forward(self, x):
+        a1 = self.conv_transpose(x)
+        b1 = torch.sigmoid(a1)
+        c1 = self.mul_op(a1, b1)
+        return c1    
 
 class ChannelShuffle_with_Static_Shape(nn.Module):
     def __init__(self, batchsize, num_channels, height, width, groups):
@@ -583,7 +641,7 @@ class MatmulDiv(nn.Module):
 
     def forward(self, x):
         mm_res = None
-        y = torch.transpose(x, 1, 2).contiguous()
+        y = torch.transpose(x, -1, -2).contiguous()
         mm_res_shape = x.size()[:-1] + (y.size()[-1:])
         if self.with_out:
             mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
@@ -929,6 +987,21 @@ class Tester(TestCase):
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
+    def _test_fusion_unsupported_case(self, m, x, auto_kernel_selection=False, kind_in_graph=None, kind_not_in_graph=None):
+        m.eval()
+        model = ipex.optimize(m, dtype=torch.float32, auto_kernel_selection=auto_kernel_selection)
+        with torch.no_grad():
+            result = model(x)
+            traced_model = torch.jit.trace(model, x).eval()
+            traced_model = torch.jit.freeze(traced_model)
+            tresult = traced_model(x)
+            trace_graph = traced_model.graph_for(x)                
+            
+            if kind_in_graph is not None:
+                self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+
+            if kind_not_in_graph is not None:
+                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
     def test_jit_freeze(self):
         model = ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1).eval()
@@ -1029,6 +1102,17 @@ class Tester(TestCase):
         self.assertEqual(jit_res, ori_res)
         node = "ipex::add_layernorm"
         self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+
+        # not contiguous
+        a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        ori_res = model(a_not_cont, b_not_cont)
+        jit_model = torch.jit.trace(model,(a, b))
+        trace_graph = jit_model.graph_for(a, b)
+        jit_res = jit_model(a_not_cont, b_not_cont)
+        node = "ipex::add_layernorm"
+        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+        self.assertEqual(jit_res, ori_res)
 
         a_bf16 = a.to(torch.bfloat16)
         b_bf16 = b.to(torch.bfloat16)
@@ -1304,35 +1388,35 @@ class Tester(TestCase):
             _check_match_mha_parts(mha_jit, qk, mask)
             _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
-    def test_conv_unary_fusion(self):
-        class ConvEltwise(nn.Module):
-            def __init__(self, eltwise_fn, dim, in_channels, out_channels, kernel_size, image_size):
-                super(ConvEltwise, self).__init__()
-                self.conv = conv_module[dim](in_channels, out_channels, kernel_size, image_size)
-                self.eltwise = eltwise_fn
-
-            def forward(self, x):
-                a = self.conv(x)
-                b = self.eltwise(a)
-                c = torch.add(b, b)
-                return c
-
+    def _test_conv_unary_fusion(self, op_list, seed=None):
         batch_size = 8
         out_channels = 16
         in_channels = 3
         kernel_size = 3
         image_size = 16
 
+        if seed is None:
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+        else:
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            torch.manual_seed(seed)
+
         for dim in [2, 3]:
-            for eltwise in PyTorch_op_to_IPEX_op_map:
+            for eltwise in op_list:
                 input_size = [batch_size, in_channels, image_size, image_size]
                 if dim == 3:
                     input_size.append(image_size)
 
-                x = torch.randn(input_size)
-                m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
+                unary_fusion_op = op_list[eltwise]
+                ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+                bf16_supported = unary_fusion_op.bf16_supported
+                prec = unary_fusion_op.prec
+                op_input_list = unary_fusion_op.op_input_list
 
-                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
+                x = torch.randn(input_size)
+                m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
 
                 self._test_output(
                     m,
@@ -1345,9 +1429,84 @@ class Tester(TestCase):
                         x,
                         kind_in_graph="ipex_prepack::convolution_%s_run" % ipex_eltwise_op,
                         kind_not_in_graph="ipex_prepack::convolution_%s_prepack" % ipex_eltwise_op,
-                        prec=0.02)
+                        prec=prec)
 
-    def test_conv_non_unary_fusion(self):
+    def _test_conv_transpose_unary_fusion(self, op_list, seed=None):
+        batch_size = 1
+        out_channels = 5
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+
+        if seed is None:
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+        else:
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            torch.manual_seed(seed)
+
+        for dim in [2, 3]:
+            for eltwise in op_list:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+
+                unary_fusion_op = op_list[eltwise]
+                ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+                bf16_supported = unary_fusion_op.bf16_supported
+                prec = unary_fusion_op.prec
+                op_input_list = unary_fusion_op.op_input_list
+
+                x = torch.randn(input_size)
+                m = ConvTransposeEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
+
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
+                if bf16_supported:
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        prec=prec)
+
+    def test_conv_unary_fusion(self):
+        self._test_conv_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
+        self._test_conv_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654064339261196288)
+
+    def test_conv_non_unary_fusion(self):        
+        self._test_conv_unary_fusion(non_unary_PyTorch_op_to_IPEX_op_map)
+
+    def test_conv_fusion_unsupported_case(self):
+        dim = 2
+        batch_size = 1
+        in_channels = 3
+        out_channels = 16
+        in_channels = 3
+        kernel_size = 3
+        image_size = 16      
+        for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
+            input_size = [batch_size, in_channels, image_size, image_size]
+
+            unary_fusion_op = unsupported_PyTorch_op_to_IPEX_op_map[eltwise]
+            ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+            bf16_supported = unary_fusion_op.bf16_supported
+            prec = unary_fusion_op.prec
+            op_input_list = unary_fusion_op.op_input_list
+
+            x = torch.randn(input_size)
+            m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
+            
+            self._test_fusion_unsupported_case(
+                m,
+                x,
+                kind_not_in_graph = 'ipex_prepack::convolution_%s_run' % ipex_eltwise_op)
+
+    def test_conv_fusion(self):
         batch_size = 8
         out_channels = 16
         in_channels = 3
@@ -1381,52 +1540,6 @@ class Tester(TestCase):
                 kind_in_graph="ipex_prepack::convolution_swish_run",
                 kind_not_in_graph="ipex_prepack::convolution_swish_prepack",
                 prec=0.02)
-            self._test_output(
-                ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size, True),
-                x,
-                kind_in_graph="ipex_prepack::convolution_hardtanh_run",
-                kind_not_in_graph="ipex_prepack::convolution_hardtanh_prepack")
-            self._test_output_bf16(
-                ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size, True),
-                x,
-                kind_in_graph="ipex_prepack::convolution_hardtanh_run",
-                kind_not_in_graph="ipex_prepack::convolution_hardtanh_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_hardtanh_run",
-                kind_not_in_graph="ipex_prepack::convolution_hardtanhprepack")
-            self._test_output_bf16(
-                ConvHardtanh(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_hardtanh_run",
-                kind_not_in_graph="ipex_prepack::convolution_hardtanh_prepack",
-                prec=0.02)
-            self._test_output(
-                ConvElu(dim, in_channels, out_channels, kernel_size, image_size, True),
-                x,
-                kind_in_graph="ipex_prepack::convolution_elu_run")
-#self._test_output_bf16(
-#ConvElu(in_channels, out_channels, kernel_size, image_size, True),
-#torch.randn(batch_size, in_channels, image_size, image_size),
-#kind_in_graph = "ipex::conv2d_elu",
-#prec = 0.02)
-            self._test_output(
-                ConvElu(dim, in_channels, out_channels, kernel_size, image_size),
-                x,
-                kind_in_graph="ipex_prepack::convolution_elu_run")
-#self._test_output_bf16(
-#ConvElu(in_channels, out_channels, kernel_size, image_size),
-#torch.randn(batch_size, in_channels, image_size, image_size),
-#kind_in_graph = "ipex::conv2d_elu",
-#prec = 0.02)
-            for approximate in ["none", "tanh"]:
-                self._test_output(
-                    ConvGelu(dim, in_channels, out_channels, kernel_size, image_size, approximate=approximate),
-                    x,
-                    kind_in_graph="ipex_prepack::convolution_gelu_run",
-                    kind_not_in_graph="ipex_prepack::convolution_gelu_prepack")
 
     def test_output_conv_bn(self):
         batch_size = 8
@@ -1891,38 +2004,17 @@ class Tester(TestCase):
             kind_in_graph="ipex_prepack::convolution_run",
             kind_not_in_graph="ipex_prepack::convolution_add_run")
 
-    def test_output_conv_leaky_relu(self):
-        batch_size = 8
-        out_channels = 32
-        in_channels = 3
-        kernel_size = 3
-        image_size = 64
-        for dim in [2, 3]:
-            input_size = [batch_size, in_channels, image_size, image_size]
-            if dim == 3:
-                input_size.append(image_size)
-            x = torch.randn(input_size)
-
-            self._test_output(
-                ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_leaky_relu_run",
-                kind_not_in_graph="ipex_prepack::convolution_leaky_relu_prepack")
-            self._test_output_bf16(
-                ConvLeakyRelu_Fixed(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_leaky_relu_run",
-                kind_not_in_graph="ipex_prepack::convolution_leaky_relu_prepack",
-                prec=0.02)
-
     def test_output_conv_sum(self):
         batch_size = 8
         out_channels = 32
         in_channels = 3
         kernel_size = 3
         image_size = 64
-        for dim in [2, 3]:
-            input_size = [batch_size, in_channels, image_size, image_size]
+        for dim in [1, 2, 3]:
+            if dim == 1:
+                input_size = [batch_size, in_channels, image_size]
+            else:
+                input_size = [batch_size, in_channels, image_size, image_size]
             if dim == 3:
                 input_size.append(image_size)
             x = torch.randn(input_size)
@@ -1933,6 +2025,17 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack")
             self._test_output_bf16(
                 ConvSum(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack",
+                prec=0.1)
+            self._test_output(
+                ConvSum_v2(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex_prepack::convolution_add_run",
+                kind_not_in_graph="ipex_prepack::convolution_add_prepack")
+            self._test_output_bf16(
+                ConvSum_v2(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
                 x,
                 kind_in_graph="ipex_prepack::convolution_add_run",
                 kind_not_in_graph="ipex_prepack::convolution_add_prepack",
@@ -2176,6 +2279,71 @@ class Tester(TestCase):
                         levels=["O1"],
                         prec=0.02)
 
+    def test_conv_transpose_unary_fusion(self):
+        self._test_conv_transpose_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
+        self._test_conv_transpose_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654583254233936896)
+
+    def test_conv_transpose_non_unary_fusion(self):        
+        self._test_conv_transpose_unary_fusion(non_unary_PyTorch_op_to_IPEX_op_map)
+
+    def test_conv_transpose_fusion_unsupported_case(self):
+        dim = 2
+        batch_size = 1
+        in_channels = 3
+        out_channels = 5
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+        
+        for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
+            input_size = [batch_size, in_channels, image_size, image_size]
+
+            unary_fusion_op = unsupported_PyTorch_op_to_IPEX_op_map[eltwise]
+            ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+            bf16_supported = unary_fusion_op.bf16_supported
+            prec = unary_fusion_op.prec
+            op_input_list = unary_fusion_op.op_input_list
+
+            x = torch.randn(input_size)
+            m = ConvTransposeEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
+
+            self._test_fusion_unsupported_case(
+                m,
+                x,
+                kind_not_in_graph = 'ipex_prepack::conv_transpose_%s_run' % ipex_eltwise_op)
+
+    def test_conv_transpose_sigmoid_mul(self):
+        batch_size = 1
+        out_channels = 5
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        prec = 0.02
+        for dim in [2, 3]:
+            for eltwise in [torch.mul, lambda a, b: a.mul_(b)]:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+                ipex_eltwise_op = "swish"
+                x = torch.randn(input_size)
+                m = ConvTransposeSigmoidMul(eltwise, dim, in_channels, out_channels, kernel_size, image_size)
+
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
+                self._test_output_bf16(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                    prec=prec)        
+
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
         options = itertools.product(['O0', 'O1'], [True, False])
@@ -2318,29 +2486,31 @@ class Tester(TestCase):
                 kind_not_in_graph="aten::div",
                 prec=0.2)
 
-    def test_linear_unary_fusion(self):
-        class LinearEltwise(nn.Module):
-            def __init__(self, eltwise_fn, in_channels, out_channels, **kwargs):
-                super(LinearEltwise, self).__init__()
-                self.linear = nn.Linear(in_channels, out_channels, **kwargs)
-                self.eltwise = eltwise_fn
-
-            def forward(self, x):
-                a = self.linear(x)
-                b = self.eltwise(a)
-                return b
-        
+    def _test_linear_unary_fusion(self, op_list, seed=None):
         batch_size = 3
         out_channels = 32
         in_channels = 3
+
+        if seed is None:
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+        else:
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            torch.manual_seed(seed)         
+
         for bias in [True, False]:
-            for eltwise in PyTorch_op_to_IPEX_op_map:
+            for eltwise in op_list:
                 input_size = [batch_size, in_channels]
                 
-                x = torch.randn(input_size)
-                m = LinearEltwise(eltwise, in_channels, out_channels, bias=bias)
+                unary_fusion_op = op_list[eltwise]
+                ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+                bf16_supported = unary_fusion_op.bf16_supported
+                prec = unary_fusion_op.prec
+                op_input_list = unary_fusion_op.op_input_list
                 
-                ipex_eltwise_op, bf16_supported = PyTorch_op_to_IPEX_op_map[eltwise]
+                x = torch.randn(input_size)
+                m = LinearEltwise(eltwise, in_channels, out_channels, bias, **op_input_list)
                 
                 self._test_output(
                     m,
@@ -2357,7 +2527,38 @@ class Tester(TestCase):
                         x,
                         kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
                         kind_not_in_graph="ipex_prepack::linear_prepack",
-                        prec=0.02)
+                        prec=prec)
+
+    def test_linear_unary_fusion(self):
+        self._test_linear_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
+        self._test_linear_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654065112450588160)
+
+    def test_linear_non_unary_fusion(self):
+        self._test_linear_unary_fusion(non_unary_PyTorch_op_to_IPEX_op_map)
+
+    def test_linear_fusion_unsupported_case(self):
+        batch_size = 3
+        out_channels = 32
+        in_channels = 3
+        bias = False       
+
+        for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
+            input_size = [batch_size, in_channels]
+            
+            unary_fusion_op = unsupported_PyTorch_op_to_IPEX_op_map[eltwise]
+            ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
+            bf16_supported = unary_fusion_op.bf16_supported
+            prec = unary_fusion_op.prec
+            op_input_list = unary_fusion_op.op_input_list
+            
+            x = torch.randn(input_size)
+            m = LinearEltwise(eltwise, in_channels, out_channels, bias, **op_input_list)
+
+            self._test_fusion_unsupported_case(
+                m,
+                x,
+                auto_kernel_selection=True,
+                kind_not_in_graph='ipex_prepack::linear_%s_run' % ipex_eltwise_op)
 
     def test_output_linear_add(self):
         self._test_output(
@@ -2382,20 +2583,6 @@ class Tester(TestCase):
             Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True),
             torch.rand(1, 1, 32, 32),
             kind_in_graph="aten::linear")
-
-    def test_output_linear_gelu(self):
-        options = itertools.product([True, False], ["none", "tanh"])
-        for bias, approximate in options:
-            self._test_output(
-                LinearGelu(3, 32, bias=bias, approximate=approximate),
-                torch.rand(32, 3),
-                kind_in_graph="aten::linear")
-            self._test_output_bf16(
-                LinearGelu(3, 32, bias=bias, approximate=approximate),
-                torch.rand(32, 3),
-                kind_in_graph="ipex_prepack::linear_gelu_run",
-                kind_not_in_graph="ipex_prepack::linear_prepack",
-                prec=1e-2)
 
     def test_output_linear_swish(self):
         self._test_onednn_fp32(
@@ -2450,50 +2637,52 @@ class Tester(TestCase):
         self.assertEqual(traced_fn(input, weight, bias), result)
 
     def test_matmul_div(self):
-        self._test_output(
-            MatmulDiv(div_scalar=True, with_out=True),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output(
-            MatmulDiv(div_scalar=True, with_out=False),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output(
-            MatmulDiv(div_scalar=False, with_out=False),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output(
-            MatmulDiv(div_scalar=False, with_out=True),
-            torch.randn(10, 3, 4),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=True, with_out=True),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-2)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=True, with_out=False),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-2)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=False, with_out=True),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-3)
-        self._test_output_bf16(
-            MatmulDiv(div_scalar=False, with_out=False),
-            torch.randn(10, 3, 4, dtype=torch.bfloat16),
-            kind_in_graph="ipex::matmul_div",
-            kind_not_in_graph=None,
-            prec=5e-3)
+        inputs = [torch.randn(10, 3, 4), torch.randn(3, 4)]
+        for x in inputs:
+            self._test_output(
+                MatmulDiv(div_scalar=True, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDiv(div_scalar=True, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDiv(div_scalar=False, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDiv(div_scalar=False, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=True, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=True, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=False, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
+            self._test_output_bf16(
+                MatmulDiv(div_scalar=False, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
 
     def test_bmm_add(self):
         M = torch.randn(10, 3, 5)
@@ -2642,7 +2831,7 @@ class Tester(TestCase):
             kind_in_graph="ipex::batch_norm",
             prec=5e-3)
 
-    def test_restore_and_enable_inplace(self):
+    def test_restore_inplace(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
                 super(M, self).__init__()
@@ -2661,9 +2850,7 @@ class Tester(TestCase):
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
 #use torch.sigmoid_(x)
                 eltwise_fn = getattr(torch, eltwise_fn_name)
-                eltwise_fn_outplace = getattr(torch, eltwise)
                 m = M(eltwise_fn)
-                m_outplace = M(eltwise_fn_outplace)
             elif eltwise == 'clamp':
                 eltwise_fn = getattr(torch, eltwise_fn_name)
                 m = M(eltwise_fn, {"min": 0, "max": 2})
@@ -2671,13 +2858,10 @@ class Tester(TestCase):
 #use F.elu(x, inplace = True)
                 eltwise_fn = getattr(F, eltwise)
                 m = M(eltwise_fn, {"inplace": True})
-                m_outplace = M(eltwise_fn)
 
             with torch.no_grad():
                 m.eval()
-                m_outplace.eval()
                 x = torch.randn(1, 3, 16, 16)
-                x_outplace = torch.randn(1, 3, 16, 16)
 
 #test restore inplace
                 traced = torch.jit.trace(m, x)
@@ -2688,9 +2872,39 @@ class Tester(TestCase):
                 traced_y = traced(x)
                 self.assertEqual(y, traced_y)
 
+
+    def test_enable_inplace(self):
+        class M(nn.Module):
+            def __init__(self, eltwise_fn, params_dict={}):
+                super(M, self).__init__()
+                self.eltwise = eltwise_fn
+                self.params_dict = params_dict
+
+            def forward(self, x):
+                # put a softmax here for following reasons:
+                # (1) x is the input, pass it to eltwise op will make it unable to be inplace
+                # (2) ipex::softmax will not be fused into TE with following eltwise
+                x1 = nn.Softmax(dim=-1)(x)
+                x1 = self.eltwise(x1, **self.params_dict)
+                return x1
+
+        for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu']:
+            eltwise_fn_name = eltwise + '_'
+            if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
+#use torch.sigmoid_(x)
+                eltwise_fn_outplace = getattr(torch, eltwise)
+                m_outplace = M(eltwise_fn_outplace)
+            else:
+#use F.elu(x, inplace = True)
+                eltwise_fn = getattr(F, eltwise)
+                m = M(eltwise_fn, {"inplace": True})
+                m_outplace = M(eltwise_fn)
+
+            with torch.no_grad():
+                m_outplace.eval()
+                x_outplace = torch.randn(1, 3, 16, 16)
+
 #test enable inplace
-                if eltwise == 'clamp':
-                    continue
                 traced_outplace = torch.jit.trace(m_outplace, x_outplace)
                 trace_graph_outplace = traced_outplace.graph_for(x_outplace)
                 self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_outplace.nodes()))

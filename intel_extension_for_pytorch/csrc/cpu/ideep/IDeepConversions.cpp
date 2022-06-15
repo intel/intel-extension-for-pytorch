@@ -46,10 +46,19 @@ dnnl::memory::dims get_stride_with_size_1_fix(const at::Tensor& tensor) {
   // check if the tensor need to check (dim size contains 1 and is contiguous)
   for (int i = 0; i < dim_; i++) {
     if (tensor.size(i) == 1) {
+      // if tensor is contiguous, we need make sure its stride meet contiguous
+      // context
       if (tensor.is_contiguous()) {
         need_check_stride = true;
-      } else if (
-          tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+      }
+      // if tensor is channelsLast, we need make sure its stride meet
+      // channelsLast
+      // Note: if tensor is both contiguous and channelsLast, we
+      // make sure its stride meets channelsLast context since channelsLast is
+      // with priority, e.g.,  for shape [n, 1, h ,w] and stride [h*w, 1 , w,
+      // 1], it should remain to be channelsLast stride [h*w, 1 , w, 1] instead
+      // of contiguous stride [h*w, h*w , w, 1]
+      if (tensor.is_contiguous(at::MemoryFormat::ChannelsLast) ||
           tensor.is_contiguous(at::MemoryFormat::ChannelsLast3d)) {
         is_channelslast_contiguous = true;
         need_check_stride = true;

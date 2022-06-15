@@ -35,6 +35,13 @@ DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(sigmoid);
 DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(swish);
 DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(tanh);
 DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(mish);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(abs);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(exp);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(hardswish);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(square);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(log);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(round);
+DECLARE_CONVOLUTION_UNARY_ELTWISE_RUN(sqrt);
 
 at::Tensor convolution_leaky_relu_run(
     const at::Tensor& input,
@@ -52,6 +59,11 @@ at::Tensor convolution_elu_run(
     at::Scalar alpha,
     at::Scalar scale,
     at::Scalar input_scale,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
+
+at::Tensor convolution_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
     const c10::intrusive_ptr<ConvolutionOpContext>& op_context);
 
 at::Tensor convolution_gelu_run(

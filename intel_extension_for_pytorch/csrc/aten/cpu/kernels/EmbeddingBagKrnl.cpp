@@ -2,7 +2,6 @@
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/vec/vec.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
-#include "csrc/quantization/AutoCast.hpp"
 #include "csrc/utils/rw_lock.h"
 
 #include <ATen/Parallel.h>

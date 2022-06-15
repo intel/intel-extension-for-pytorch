@@ -30,8 +30,7 @@ bool any_variable_defined(const variable_list& variables) {
 
 variable_list BmmBackward0::apply(variable_list&& grads) {
   bool useOneDNN =
-      (torch_ipex::getFP32LowPrecisionModeCpu() ==
-       torch_ipex::IPEXLowPrecisionMode::BF32);
+      (torch_ipex::getFP32MathModeCpu() == torch_ipex::FP32MathMode::BF32);
   std::lock_guard<std::mutex> lock(mutex_);
 
   IndexRangeGenerator gen;
@@ -146,8 +145,10 @@ void handle_grad(
       }
       grad_fn->mat2_sizes = mat2.sizes().vec();
       grad_fn->mat2_strides = strides_or_error(mat2, "mat2").vec();
+      grad_fn->mat2_layout = mat2.layout();
       grad_fn->self_sizes = self.sizes().vec();
       grad_fn->self_strides = strides_or_error(self, "self").vec();
+      grad_fn->self_layout = self.layout();
       if (grad_fn->should_compute_output(0)) {
         grad_fn->mat2_ = torch::autograd::SavedVariable(mat2, false);
       }
@@ -283,8 +284,8 @@ at::Tensor matmul_impl(
     c10::optional<at::Tensor> out_opt,
     const at::Tensor& tensor1,
     const at::Tensor& tensor2) {
-  bool useOneDNN = (torch_ipex::getFP32LowPrecisionModeCpu() ==
-                    torch_ipex::IPEXLowPrecisionMode::BF32) &&
+  bool useOneDNN =
+      (torch_ipex::getFP32MathModeCpu() == torch_ipex::FP32MathMode::BF32) &&
       (tensor1.scalar_type() == at::ScalarType::Float) &&
       (tensor2.scalar_type() == at::ScalarType::Float) &&
       (tensor1.numel() > 0 && tensor2.numel() > 0);

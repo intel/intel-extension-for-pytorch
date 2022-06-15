@@ -1,6 +1,5 @@
 #include "fusion_pass.h"
 #include <string>
-#include "autocast/autocast_mode.h"
 #include "codegen/onednn/interface.h"
 #include "cpu/passes/graph_rewrite.h"
 #include "cpu/passes/prepack_folding.h"
@@ -423,8 +422,16 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::FuseLinearSwishCustomized(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
+
   // deconvolution fusion
+  GRAPH_DUMP(
+      "After FuseAddLayerNorm.Before insertPrePackedConvTransposeOp", graph);
   graph_rewrite::insertPrePackedConvTransposeOp(graph);
+  GRAPH_DUMP(
+      "After insertPrePackedConvTransposeOp.Before fuseConvTransposeWithEltwise",
+      graph);
+  graph_rewrite::fuseConvTransposeWithEltwise(graph);
+  GRAPH_DUMP("After fuseConvTransposeWithEltwise.", graph);
 
   // fuse concat+bn+relu for the input float tensors with the same sizes
   // and channelslast format
@@ -438,9 +445,6 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);
   OpFuser(graph->block(), graph).run();
-
-  // apply inplace optimization before outplace op replacements
-  ApplyInplaceOptimization(graph);
 
   // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
@@ -495,7 +499,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
       "After RemoveProfileNodesAndSpecializeTypes. Before LLGA fusion pass",
       graph);
 
-  if (isQuantized(graph) || torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+  if (isQuantized(graph) || fuser::onednn::is_llga_fp32_bf16_enabled()) {
     RemoveRedundantAliases(graph);
     fuser::onednn::fuseGraph(graph);
   }
@@ -515,6 +519,11 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   if (tensorExprFuserEnabled()) {
     FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
   }
+
+  // Apply IPEX inplace optimization/replacement
+  // Note: Since TE is with priority and it has not supported inplace op yet,
+  //       we make inplace optimization after TE.
+  ApplyInplaceOptimization(graph);
 
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(

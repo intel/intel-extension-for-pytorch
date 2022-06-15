@@ -3,7 +3,6 @@
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
-#include "csrc/quantization/AutoCast.hpp"
 
 #include <ATen/Parallel.h>
 #include <ATen/quantized/Quantizer.h>
@@ -86,9 +85,6 @@ at::Tensor interaction_forward(const std::vector<at::Tensor>& input) {
                        .typed<decltype(interaction_forward)>();
 
   auto target_type = get_autocast_dtype();
-  if (is_quantization_enabled()) {
-    return int8::interaction_forward(input);
-  }
 
   auto type = promote_type(get_autocast_dtype(), input);
   return op.call(cpu_cached_cast(type, input));

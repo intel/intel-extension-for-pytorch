@@ -5,8 +5,8 @@
 #include <torch/torch.h>
 #include <regex>
 #include <string>
+#include "intel_extension_for_pytorch/csrc/jit/auto_opt_config.h"
 #include "intel_extension_for_pytorch/csrc/jit/fusion_pass.h"
-#include "intel_extension_for_pytorch/csrc/quantization/auto_opt_config.hpp"
 #include "intel_extension_for_pytorch/csrc/version.h"
 
 namespace torch_ipex {

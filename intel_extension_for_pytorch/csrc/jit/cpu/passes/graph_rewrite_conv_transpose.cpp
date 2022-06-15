@@ -1,5 +1,6 @@
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
+#include "utils.h"
 
 #include <ATen/code_template.h>
 
@@ -171,6 +172,103 @@ void mayRePackConvTransposeOpForIpex(Block* b) {
 void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph) {
   insertPrePackedConvTransposeOpForATen(graph->block());
   mayRePackConvTransposeOpForIpex(graph->block());
+}
+
+void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
+  // For unary post OPs:
+  auto conv_transpose_op_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %packed_weight):
+        %x : Tensor = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = ${op}(%x)
+        return (%res))");
+
+  auto conv_transpose_op_fused_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %packed_weight):
+        %res = ipex_prepack::conv_transpose_${op}_run(%input, %packed_weight)
+        return (%res))");
+
+  for (auto const& it : utils::supported_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
+
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        conv_transpose_op_rstring.format(env),
+        conv_transpose_op_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
+
+  // For non-unary post OPs:
+  auto conv_transpose_op_non_unary_rstring = at::jit::CodeTemplate(R"(
+     graph(%input, %packed_weight, ${op_input_str}):
+        %x : Tensor = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = ${op}(%x, ${op_input_str})
+        return (%res))");
+
+  auto conv_transpose_op_non_unary_fused_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %packed_weight, ${op_input_str}):
+        %res = ipex_prepack::conv_transpose_${op}_run(%input, ${op_input_str}, %packed_weight)
+        return (%res))");
+
+  for (auto const& it : utils::supported_non_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
+    std::vector<std::string> op_input_list = it.second.op_input_list;
+    std::string op_input_str = c10::Join(", ", op_input_list);
+
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+    env.s("op_input_str", op_input_str);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+    env_fused.s("op_input_str", op_input_str);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        conv_transpose_op_non_unary_rstring.format(env),
+        conv_transpose_op_non_unary_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
+
+  // For conv_transpose-sigmoid-mul
+  SubgraphRewriter rewriter_swish;
+  std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
+  std::array<std::string, 2> mul_operators = {"mul", "mul_"};
+
+  auto conv_transpose_sigmoid_mul_rstring = CodeTemplate(R"(
+    graph(%input, %packed_weight):
+        %x = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %y = aten::${sigmoid}(%x)
+        %res = aten::${mul}(%x, %y)
+        return (%res))");
+
+  std::string conv_transpose_swish_fused = R"(
+    graph(%input, %packed_weight):
+        %res = ipex_prepack::conv_transpose_swish_run(%input, %packed_weight)
+        return (%res))";
+
+  for (const auto& sigmoid : sigmoid_operators) {
+    TemplateEnv env;
+    env.s("sigmoid", sigmoid);
+    for (const auto& mul : mul_operators) {
+      env.s("mul", mul);
+      rewriter_swish.RegisterRewritePattern(
+          conv_transpose_sigmoid_mul_rstring.format(env),
+          conv_transpose_swish_fused);
+    }
+  }
+  rewriter_swish.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

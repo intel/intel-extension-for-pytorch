@@ -7,7 +7,7 @@ import warnings
 from .nn import utils
 from .optim._optimizer_utils import optimizer_fusion, IPEX_FUSED_OPTIMIZER_LIST
 import intel_extension_for_pytorch._C as core
-
+from enum import IntEnum
 
 def _copy_model_and_optimizer(model, optimizer):
     new_model = copy.deepcopy(model)
@@ -323,3 +323,59 @@ def enable_onednn_fusion(enabled):
         core.enable_jit_opt()
     else:
         core.disable_jit_opt()
+
+class FP32MathMode(IntEnum):
+    FP32 = int(core.FP32MathMode.FP32)
+    TF32 = int(core.FP32MathMode.TF32)
+    BF32 = int(core.FP32MathMode.BF32)
+
+def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
+    r"""
+    Enable or disable implicit data type conversion.
+    If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
+    If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down convert to bfloat16 implicitly.
+
+    Args:
+        mode (FP32MathMode): Only works for ``FP32MathMode.FP32`` and ``FP32MathMode.BF32``.
+            oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
+            The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32`.
+        device (string): Only "cpu" is supported right now.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to enable the implicit data type conversion
+        >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32)
+        >>> # to disable the implicit data type conversion
+        >>> ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32)
+    """
+
+    if mode == FP32MathMode.BF32:
+        core.set_fp32_math_mode(core.FP32MathMode.BF32)
+    elif mode == FP32MathMode.FP32:
+        core.set_fp32_math_mode(core.FP32MathMode.FP32)
+    else:
+        warnings.warn("IPEX does not support mode except FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now.")
+
+
+def get_fp32_math_mode(device="cpu"):
+    r"""
+    Get the current fpmath_mode setting.
+
+    Args:
+        device (string): Only "cpu" is supported right now
+
+    Returns:
+        Fpmath mode
+        The value will be ``FP32MathMode.FP32`` or ``FP32MathMode.BF32``.
+        ``FP32MathMode.FP32`` means implicit down-conversion is disabled,
+        while ``FP32MathMode.BF32`` means implicit down-conversions from f32 to bf16/f16 or compatible FP type is allowed.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch as ipex
+        >>> # to get the current fpmath mode
+        >>> ipex.get_fp32_math_mode(device="cpu")
+    """
+
+    return core.get_fp32_math_mode()

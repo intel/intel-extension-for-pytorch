@@ -146,6 +146,99 @@ at::Tensor dil_div_add_softmax(
   });
   return output;
 } // dil_add_softmax
+
+/**
+ * @brief Fuse the add operator and softmax
+ * operator. softmax(a + b)
+ *
+ * @attention
+ * There are some assumptions for this operator.
+ * - The reduce dimension for softmax is the last dimension
+ * - The reduce dimension for softmax is the leading dimension
+ * - The elements number of the reduce dimension for softmax is n*16
+ * - The input tensors are contiguous
+ * - The number of the input tensor dimension should be >=2
+ * - Only the second input tensor is broadcastable
+ * - The datatype for inputs(a,b) are same.
+ *
+ * @param[in] a a contiguous tensor to be added
+ * @param[in] b a tensor to be added while it should be broadcastable
+ * @return The tensor stores the result of @code softmax(a + b) @endcode
+ */
+at::Tensor& dil_add_softmax_(at::Tensor& a, const at::Tensor& b) {
+  float* a_data_base = a.data_ptr<float>();
+  float* b_data_base = b.data_ptr<float>();
+
+  // Check if the tensor needs to be broadcasted
+  auto infered_size = a.sizes().vec();
+  auto need_broadcast = (infered_size != b.sizes());
+  if (need_broadcast) {
+    infered_size = at::infer_size(a.sizes(), b.sizes());
+  }
+
+  // Calculate the strides for the input tensor
+  std::vector<int64_t> b_adjusted_strides = _adjust_strides(b, infered_size);
+
+  std::vector<int64_t> outer_size_per_dim;
+  int64_t dim_size = infered_size[infered_size.size() - 1];
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim_size != 1);
+
+  int64_t outer_size = 1;
+  // The last dim is the loop unit. We need to minus 2 to exclude the last dim.
+  // infered_size.size() - 2 is the -2th dimension.
+  for (int64_t i = infered_size.size() - 2; i >= 0; i--) {
+    // Record outer dimensions
+    outer_size_per_dim.insert(outer_size_per_dim.begin(), outer_size);
+    // Calculate outer loop number;
+    outer_size *= infered_size[i];
+  }
+
+  int64_t grain_size = at::internal::GRAIN_SIZE / (16 * dim_size);
+  if (grain_size < 1)
+    grain_size = 1;
+
+  int64_t outer_dims_num = outer_size_per_dim.size();
+  at::parallel_for(0, outer_size, grain_size, [&](int64_t begin, int64_t end) {
+    float val = 0.0;
+    int64_t b_offset = 0;
+    for (int64_t i = begin; i < end; i++) {
+      if (need_broadcast) {
+        b_offset =
+            _calc_element_offset(i, outer_size_per_dim, b_adjusted_strides);
+      } else {
+        b_offset = i * dim_size;
+      }
+      // Add a and b and get the maximum value:
+      //    output_data = a + b
+      //    val = max(output_data)
+      _dil_add_reduce_max_fusion_kernel(
+          a_data_base + i * dim_size,
+          b_data_base + b_offset,
+          dim_size,
+          a_data_base + i * dim_size,
+          val);
+      // Calculate the e^x and get the sum value:
+      //    output_data = output_data - max(output_data)
+      //    output_data = e^(output_data)
+      //    val = sum(output_data)
+
+      _dil_exp_reduce_sum_fusion_kernel(
+          a_data_base + i * dim_size,
+          dim_size,
+          a_data_base + i * dim_size,
+          val);
+      // Calculat the normalization [e^x / sum(e^x)]:
+      //  output_data = output_data / sum(output_data)
+
+      _dil_normalization_kernel<float>(
+          a_data_base + i * dim_size,
+          val,
+          dim_size,
+          a_data_base + i * dim_size);
+    }
+  });
+  return a;
+} // add_softmax_
 #endif
 
 at::Tensor div_add_softmax_kernel_impl(
@@ -164,9 +257,24 @@ at::Tensor div_add_softmax_kernel_impl(
   return at::softmax(at::add(a, b, 1.0f), -1);
 }
 
+at::Tensor& add_softmax_inplace_kernel_impl(
+    at::Tensor& a,
+    const at::Tensor& b) {
+#if defined(CPU_CAPABILITY_AVX512)
+  if (a.scalar_type() == at::kFloat && b.scalar_type() == at::kFloat) {
+    return dil_add_softmax_(a, b);
+  }
+#endif
+  a.copy_(at::softmax(a.add_(b), -1));
+  return a;
+}
+
 } // anonymous namespace
 
 REGISTER_DISPATCH(div_add_softmax_kernel_stub, &div_add_softmax_kernel_impl);
+REGISTER_DISPATCH(
+    add_softmax_inplace_kernel_stub,
+    &add_softmax_inplace_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

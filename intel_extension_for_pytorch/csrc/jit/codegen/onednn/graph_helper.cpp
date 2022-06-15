@@ -1,8 +1,8 @@
 #include "graph_helper.h"
 #include "fusion_group_name.h"
 
-#include "csrc/autocast/autocast_mode.h"
 #include "csrc/jit/codegen/LlgaTensorImpl.h"
+#include "csrc/jit/codegen/onednn/interface.h"
 
 #include <ATen/core/functional.h>
 #include <torch/csrc/jit/jit_log.h>
@@ -239,6 +239,9 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return makeEltwiseOp(node, opkind::HardTanh)
         .setAttr("min", Operator::Float, 1)
         .setAttr("max", Operator::Float, 2);
+  } else if (nodeKind == Symbol::aten("leaky_relu")) {
+    return makeEltwiseOp(node, opkind::LeakyReLU)
+        .setAttr("alpha", Operator::Float, 1);
   } else if (nodeKind == Symbol::aten("softmax")) {
     auto dim0 = getDimensions(node->input(0));
     REQ(dim0.has_value());
@@ -459,7 +462,7 @@ void mayAddListConstructIntoConcatPartition(
 // bf16
 bool shouldRewrite(dnnl::graph::partition partition) {
   // TODO: debug feature to enable llga for fp32 and bf16
-  if (torch_ipex::autocast::is_llga_fp32_bf16_enabled()) {
+  if (is_llga_fp32_bf16_enabled()) {
     return true;
   }
 

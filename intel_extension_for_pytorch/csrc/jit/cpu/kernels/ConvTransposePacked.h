@@ -11,6 +11,11 @@ namespace cpu {
 namespace detail {
 namespace conv_transpose {
 
+#define DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(FUSED_OP) \
+  at::Tensor conv_transpose_##FUSED_OP##_run(              \
+      const at::Tensor& input,                             \
+      const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
 c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -24,6 +29,47 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
 
 at::Tensor conv_transpose_run(
     const at::Tensor& input,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(relu);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sigmoid);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(swish);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(tanh);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(mish);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(abs);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(exp);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(hardswish);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(square);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
+
+at::Tensor conv_transpose_gelu_run(
+    const at::Tensor& input,
+    c10::string_view approximate,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
+at::Tensor conv_transpose_leaky_relu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
+at::Tensor conv_transpose_hardtanh_run(
+    const at::Tensor& input,
+    at::Scalar lower_bound,
+    at::Scalar upper_bound,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
+at::Tensor conv_transpose_elu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    at::Scalar scale,
+    at::Scalar input_scale,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
+at::Tensor conv_transpose_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
 
 ContextConvTranspose create(

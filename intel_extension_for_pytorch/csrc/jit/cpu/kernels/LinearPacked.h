@@ -28,11 +28,41 @@ DECLARE_LINEAR_UNARY_ELTWISE_RUN(sigmoid);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(swish);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(tanh);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(mish);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(abs);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(exp);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(hardswish);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(square);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(log);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(round);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(sqrt);
+
+at::Tensor linear_leaky_relu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_hardtanh_run(
+    const at::Tensor& input,
+    at::Scalar lower_bound,
+    at::Scalar upper_bound,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_elu_run(
+    const at::Tensor& input,
+    at::Scalar alpha,
+    at::Scalar scale,
+    at::Scalar input_scale,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
 
 at::Tensor linear_gelu_run(
     const at::Tensor& input,
-    const c10::intrusive_ptr<LinearOpContext>& op_context,
-    c10::string_view approximate);
+    c10::string_view approximate,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
 
 at::Tensor linear_add_run(
     const at::Tensor& input,

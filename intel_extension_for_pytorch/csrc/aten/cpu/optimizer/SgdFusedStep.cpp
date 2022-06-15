@@ -38,8 +38,6 @@ c10::optional<at::Tensor> sgd_fused_step(
       "torch_ipex::sgd_fused_step", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
-      learning_rate >= 0, "Expect learning rate >= 0.0, got ", learning_rate);
-  TORCH_CHECK(
       weight_decay >= 0, "Expect weight_decay >= 0.0, got ", weight_decay);
 
   TORCH_CHECK(

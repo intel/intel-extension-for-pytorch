@@ -158,14 +158,14 @@ void RecordAtenLinearNodes(
 }
 
 void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_gelu, rewriter_swish;
+  SubgraphRewriter rewriter_swish;
   std::array<std::string, 2> sigmoid_operators = {"sigmoid", "sigmoid_"};
   std::array<std::string, 2> mul_operators = {"mul", "mul_"};
 
   // For unary post OPs:
   auto linear_op_rstring = at::jit::CodeTemplate(R"(
      graph(%input, %packed_weight):
-        %x = ipex_prepack::linear_run(%input, %packed_weight)
+        %x : Tensor = ipex_prepack::linear_run(%input, %packed_weight)
         %res = ${op}(%x)
         return (%res))");
 
@@ -193,17 +193,40 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
     rewriter.runOnGraph(graph, filters);
   }
 
-  // For post OPs with multiple inputs
-  std::string linear_gelu = R"(
-    graph(%input, %approximate, %packed_weight):
-        %x = ipex_prepack::linear_run(%input, %packed_weight)
-        %res= aten::gelu(%x, %approximate)
-        return (%res))";
+  // For non-unary post OPs:
+  auto linear_op_non_unary_rstring = at::jit::CodeTemplate(R"(
+     graph(%input, %packed_weight, ${op_input_str}):
+        %x : Tensor = ipex_prepack::linear_run(%input, %packed_weight)
+        %res = ${op}(%x, ${op_input_str})
+        return (%res))");
 
-  std::string linear_gelu_fused = R"(
-    graph(%input, %approximate, %packed_weight):
-        %res = ipex_prepack::linear_gelu_run(%input, %packed_weight, %approximate)
-        return (%res))";
+  auto linear_op_non_unary_fused_rstring = at::jit::CodeTemplate(R"(
+    graph(%input, %packed_weight, ${op_input_str}):
+        %res = ipex_prepack::linear_${op}_run(%input, ${op_input_str}, %packed_weight)
+        return (%res))");
+
+  for (auto const& it : utils::supported_non_unary_post_op_fusion_set()) {
+    std::string op = it.first;
+    std::string ipex_op_name = it.second.ipex_op_name;
+    std::vector<std::string> op_input_list = it.second.op_input_list;
+    std::string op_input_str = c10::Join(", ", op_input_list);
+
+    at::jit::TemplateEnv env;
+    env.s("op", op);
+    env.s("op_input_str", op_input_str);
+
+    at::jit::TemplateEnv env_fused;
+    env_fused.s("op", ipex_op_name);
+    env_fused.s("op_input_str", op_input_str);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(
+        linear_op_non_unary_rstring.format(env),
+        linear_op_non_unary_fused_rstring.format(env_fused));
+
+    auto filters = it.second.filters;
+    rewriter.runOnGraph(graph, filters);
+  }
 
   auto linear_sigmoid_mul_rstring = CodeTemplate(R"(
     graph(%input, %packed_weight):
@@ -227,9 +250,6 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
     }
   }
   rewriter_swish.runOnGraph(graph);
-
-  rewriter_gelu.RegisterRewritePattern(linear_gelu, linear_gelu_fused);
-  rewriter_gelu.runOnGraph(graph);
 }
 
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {

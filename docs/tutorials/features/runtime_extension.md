@@ -7,7 +7,7 @@ Intel® Extension for PyTorch\* Runtime Extension provides a couple of PyTorch f
 2. Spawn asynchronous tasks via the Python frontend module `intel_extension_for_pytorch.cpu.runtime.Task`.
 3. Configure core bindings for OpenMP threads via the Python frontend `intel_extension_for_pytorch.cpu.runtime.pin`.
 
-Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
+Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **Experimental** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
 
 ## Requirements
 
@@ -17,7 +17,9 @@ Intel® Extension for PyTorch\* Runtime Extension relies on `intel omp` to bind 
 
 ### Example of Multi Stream Module
 
-Runtime extension supports weight-sharing multi-stream inference for throughput mode on CPU. You just need to convert the original model into multi stream model and run the new multi stream model as normal. The detailed description of parameters to create `MultiStreamModule` is available at [API Documentation page](../api_doc.html)
+Runtime extension supports weight-sharing multi-stream inference for throughput mode on CPU. You just need to convert the original model into multi stream model and run the new multi stream model as normal. The detailed description of parameters to create `MultiStreamModule` is available at [API Documentation page](../api_doc.html).
+
+`MultiStreamModule` targets to benefit performance for inference in throughput mode. Firstly, we suggest creating `MultiStreamModule` with `num_streams` of "AUTO" which heuristically decides the number of streams. Usually, it provides a reasonable performance. However, it may still not be optimal for some cases (refer to the section [Performance recipes](#performance-recipes) for details) which means manual tuning for number of streams is needed.
 
 The `MultiStreamModule` creates number of streams based on input parameter `num_streams` and bind cores to stream based on input parameter `cpu_pool`. If the number of cores inside `cpu_pool` is divisible by `num_streams`, the cores will be allocated equally to each stream. If the number of cores inside `cpu_pool` is not divisible by `num_streams` with remainder N, one extra core will be allocated to the first N streams. We suggest to set the `num_streams` as divisor of core number inside `cpu_pool`.
 

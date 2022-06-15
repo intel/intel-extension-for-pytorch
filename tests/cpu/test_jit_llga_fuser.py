@@ -6,6 +6,9 @@ import torch.nn.functional as F
 from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
 from torch.testing._internal.common_utils import TEST_SCIPY
 
+
+import intel_extension_for_pytorch as ipex
+
 try:
     import torchvision
     HAS_TORCHVISION = True
@@ -62,6 +65,22 @@ class TestOp(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
+    def test_conv2d_script(self):
+        for bias in [True, False]:
+            m = nn.Conv2d(in_channels=3,
+                            out_channels=3,
+                            kernel_size=3,
+                            padding=1,
+                            stride=1,
+                            dilation=1,
+                            groups=1,
+                            bias=bias)
+
+        x = torch.rand(1, 3, 5, 5)
+        graph, _ = self.checkScript(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)        
+
+    @llga_fp32_bf16_test_env
     def test_bn2d(self):
         m = nn.BatchNorm2d(32).eval()
         x = torch.rand(1, 32, 28, 28)
@@ -78,7 +97,8 @@ class TestOp(JitLlgaTestCase):
             def forward(self, x):
                 return self.eltwise(x)
 
-        for eltwise in ['relu', 'gelu']:
+
+        for eltwise in ['relu', 'gelu', 'tanh', 'sqrt', 'square']:
             eltwise_fn = get_eltwise_fn(eltwise)
             m = M(eltwise_fn)
             x = torch.rand(1, 32, 28, 28)
@@ -176,14 +196,13 @@ class TestOp(JitLlgaTestCase):
                 yield torch.rand(yshape), torch.rand(xshape)
 
     @llga_fp32_bf16_test_env
-    @unittest.skipIf(True, 'Disable mul due to bad performance')
-    def test_add(self):
+    def test_add_with_alpha(self):
         def forward_add(x, y):
             return torch.add(x, y, alpha=2)
 
         for x, y in self._gen_binary_inputs():
             graph, _ = self.checkTrace(forward_add, [x, y])
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_add_scalar(self):
@@ -240,6 +259,16 @@ class TestOp(JitLlgaTestCase):
         x = torch.randn(8, 128, 368)
         y = torch.randn(368, 3072)
         graph, _ = self.checkTrace(forward_matmul, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
+    @llga_fp32_bf16_test_env
+    def test_mm(self):
+        def forward_mm(x, y):
+            return torch.mm(x, y)
+
+        x = torch.randn(2, 3)
+        y = torch.randn(3, 3)
+        graph, _ = self.checkTrace(forward_mm, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
@@ -396,6 +425,34 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
         self.assertGraphContainsExactly(graph, "aten::abs", 1)
 
+    @llga_fp32_bf16_test_env
+    # Currently graph with sub-block is unsupported
+    # %z : Tensor = prim::If(%8) 
+    #     block0():
+    #     %z.7 : Tensor = aten::mul(%z.1, %y.1)
+    #     -> (%z.7)
+    #     block1():
+    #     %z.13 : Tensor = aten::mul(%z.1, %x.1)
+    #     -> (%z.13)
+    # return (%z)    
+    def test_block(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y, z):
+                if z[0][0] > 0:
+                    z = z * y
+                else :
+                    z = z * x
+                return z
+
+        x = torch.rand(10, 10)
+        y = torch.rand(10, 10)
+        z = torch.rand(10, 10)
+        m = M()
+        graph, scripted = self.checkScript(m, [x, y, z])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
 
 class TestFusionPattern(JitLlgaTestCase):
     @llga_fp32_bf16_test_env
@@ -677,6 +734,19 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
         self.assertFused(graph, ['aten::_convolution', 'aten::relu'])
 
+
+class TestAPI(JitLlgaTestCase):
+    def test_weight_cache_api(self):
+        weight_cache_enabled_default_value = ipex._C._jit_llga_weight_cache_enabled()
+        self.assertTrue(weight_cache_enabled_default_value)
+        
+        ipex._C._jit_set_llga_weight_cache_enabled(False)
+        weight_cache_enabled = ipex._C._jit_llga_weight_cache_enabled()
+        self.assertFalse(weight_cache_enabled)
+        
+        # set the value back to the default one
+        ipex._C._jit_set_llga_weight_cache_enabled(weight_cache_enabled_default_value)
+        
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision

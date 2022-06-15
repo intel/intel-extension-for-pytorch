@@ -71,11 +71,22 @@ void IpexQuantFusion(std::shared_ptr<Graph>& graph) {
     rewriter.RegisterRewritePattern(info.pattern, info.replacement);
     rewriter.runOnGraph(graph, info.filters);
   }
-  GRAPH_DUMP("Before IpexQuantFusion", graph);
+  GRAPH_DUMP(
+      "Before replaceEmbeddingBagWithQEmbeddingBag. Beginning of IpexQuantFusion",
+      graph);
   graph_rewrite::replaceEmbeddingBagWithQEmbeddingBag(graph);
+  GRAPH_DUMP(
+      "After replaceEmbeddingBagWithQEmbeddingBag. Before replaceInteractionWithQInteraction",
+      graph);
   graph_rewrite::replaceInteractionWithQInteraction(graph);
+  GRAPH_DUMP(
+      "After replaceInteractionWithQInteraction. Before preprocessSizeForQLstm",
+      graph);
+  graph_rewrite::preprocessSizeForQLstm(graph);
+  GRAPH_DUMP(
+      "After preprocessSizeForQLstm. Before replaceLstmWithQLstm", graph);
   graph_rewrite::replaceLstmWithQLstm(graph);
-  GRAPH_DUMP("After IpexQuantFusion", graph);
+  GRAPH_DUMP("After replaceLstmWithQLstm. End of IpexQuantFusion", graph);
 }
 
 } // namespace jit

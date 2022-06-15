@@ -36,6 +36,7 @@ void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph);
 void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph>& graph);
 void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph>& graph);
 void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
+void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph);
 void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph);
 
 void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph);
@@ -58,6 +59,7 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
+void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite

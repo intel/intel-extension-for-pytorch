@@ -11,32 +11,28 @@ def fpmath_mode_env(func):
     @wraps(func)
     def wrapTheFunction(*args):
         func(*args)
-        # set the fp32_low_precision_mode back to FP32 after each UT
-        ipex.backends.cpu.set_fp32_low_precision_mode(ipex.LowPrecisionMode.FP32)
+        # set the fp32_math_mode back to FP32 after each UT
+        ipex.set_fp32_math_mode()
     return wrapTheFunction
 
 class TestFPMathCases(TestCase):
     @fpmath_mode_env
     def test_set_and_get_fpmath(self):
-        fpmath_mode = [ipex.LowPrecisionMode.BF32, ipex.LowPrecisionMode.FP32]
+        fpmath_mode = [ipex.FP32MathMode.BF32, ipex.FP32MathMode.FP32]
         for mode in fpmath_mode:
-            ipex.backends.cpu.set_fp32_low_precision_mode(mode=mode)
-            assert ipex.backends.cpu.get_fp32_low_precision_mode() == mode, \
+            ipex.set_fp32_math_mode(mode=mode, device="cpu")
+            assert ipex.get_fp32_math_mode() == mode, \
             "The return value of get_fpmath_mode is different from the value passed to set_fpmath_mode."
-        ipex.backends.cpu.set_fp32_low_precision_mode()
-        assert ipex.backends.cpu.get_fp32_low_precision_mode() == ipex.LowPrecisionMode.BF32, \
-            "The default fp32_low_precision_mode should be LowPrecisionMode.BF32."
+        ipex.set_fp32_math_mode()
+        assert ipex.get_fp32_math_mode() == ipex.FP32MathMode.FP32, \
+            "The default fp32_math_mode should be LowFP32MathMode.FP32."
 
     @fpmath_mode_env
     def test_fpmath_bf32(self):
         modes = ["jit", "imperative"]
         bias = [True, False]
         for mode, b in itertools.product(modes, bias):
-            num1 = 0
-            num2 = 0
-            num3 = 0
-            num4 = 0
-            num5 = 0
+            num1, num2, num3, num4, num5 = 0, 0, 0, 0, 0
             loc = os.path.dirname(os.path.abspath(__file__))
             cmd = 'DNNL_VERBOSE=1 python -u {}/fpmath_mode.py --mode="{}" --fpmath="BF32" --bias={}'.format(loc, mode, b)
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
@@ -72,13 +68,11 @@ class TestFPMathCases(TestCase):
 
     @fpmath_mode_env
     def test_env(self):
-        os.environ["IPEX_FP32_LOW_PRECISION_MODE_CPU"] = "BF32"
+        os.environ["IPEX_FP32_MATH_MODE"] = "BF32"
         modes = ["jit", "imperative"]
         bias = [True, False]
         for mode, b in itertools.product(modes, bias):
-            num1 = 0
-            num2 = 0
-            num3 = 0
+            num1, num2, num3 = 0, 0, 0
             loc = os.path.dirname(os.path.abspath(__file__))
             cmd = 'DNNL_VERBOSE=1 python -u {}/fpmath_mode.py --mode="{}" --env --bias={}'.format(loc, mode, b)
             with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:

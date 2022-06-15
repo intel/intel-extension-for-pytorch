@@ -154,18 +154,53 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
       },                                                      \
       aliasAnalysisFromSchema())
 
+#define CreateConvTransposeUnaryPostOpRun(FUSED_OP)                  \
+  Operator(                                                          \
+      "ipex_prepack::conv_transpose_" #FUSED_OP                      \
+      "(Tensor input, "                                              \
+      "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext " \
+      "W_prepack) -> Tensor",                                        \
+      [](const Node* node) -> Operation {                            \
+        return [](Stack* stack) {                                    \
+          auto result = conv_transpose_##FUSED_OP(                   \
+              (std::move(peek(stack, 0, 2))).toTensor(),             \
+              (std::move(peek(stack, 1, 2)))                         \
+                  .toCustomClass<ConvTransposeOpContext>());         \
+          drop(stack, 2);                                            \
+          pack(stack, std::move(result));                            \
+          return 0;                                                  \
+        };                                                           \
+      },                                                             \
+      aliasAnalysisFromSchema())
+
 RegisterOperators op({
     CreateConvUnaryPostOpPrepack(relu),
     CreateConvUnaryPostOpPrepack(sigmoid),
     CreateConvUnaryPostOpPrepack(swish),
     CreateConvUnaryPostOpPrepack(tanh),
     CreateConvUnaryPostOpPrepack(mish),
+    CreateConvUnaryPostOpPrepack(abs),
+    CreateConvUnaryPostOpPrepack(exp),
+    CreateConvUnaryPostOpPrepack(hardswish),
+    CreateConvUnaryPostOpPrepack(square),
+    CreateConvUnaryPostOpPrepack(log),
+    CreateConvUnaryPostOpPrepack(round),
+    CreateConvUnaryPostOpPrepack(sqrt),
+
     CreateConvUnaryPostOpRun(run),
     CreateConvUnaryPostOpRun(relu_run),
     CreateConvUnaryPostOpRun(sigmoid_run),
     CreateConvUnaryPostOpRun(swish_run),
     CreateConvUnaryPostOpRun(tanh_run),
     CreateConvUnaryPostOpRun(mish_run),
+    CreateConvUnaryPostOpRun(abs_run),
+    CreateConvUnaryPostOpRun(exp_run),
+    CreateConvUnaryPostOpRun(hardswish_run),
+    CreateConvUnaryPostOpRun(square_run),
+    CreateConvUnaryPostOpRun(log_run),
+    CreateConvUnaryPostOpRun(round_run),
+    CreateConvUnaryPostOpRun(sqrt_run),
+
     CreateConvBinaryPostOpPrepack(add, fuse_sum),
     CreateConvBinaryPostOpPrepack(add_relu, residual),
     CreateConvBinaryPostOpRun(add_run),
@@ -245,6 +280,30 @@ RegisterOperators op({
                 (std::move(peek(stack, 6, 9))).toBool(),
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
                 ideep::attr_t::fuse_relu(1.0, alpha_value));
+            drop(stack, 9);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::convolution_pow_prepack(" CONV_PREPACK_ARGS
+        ", Scalar exponent) "
+        "-> __torch__.torch.classes.ipex_prepack.ConvolutionOpContext",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto exponent_value =
+                (std::move(peek(stack, 8, 9))).toScalar().to<float>();
+            auto result = IpexConvolutionOpContext::create_context(
+                std::move((std::move(peek(stack, 0, 9))).toTensor()),
+                std::move(toOptionalTensor(std::move(peek(stack, 1, 9)))),
+                std::move((std::move(peek(stack, 2, 9))).toIntVector()),
+                std::move((std::move(peek(stack, 3, 9))).toIntVector()),
+                std::move((std::move(peek(stack, 4, 9))).toIntVector()),
+                (std::move(peek(stack, 5, 9))).toInt(),
+                (std::move(peek(stack, 6, 9))).toBool(),
+                std::move((std::move(peek(stack, 7, 9))).toIntVector()),
+                ideep::attr_t::fuse_pow(1.0, exponent_value));
             drop(stack, 9);
             pack(stack, std::move(result));
             return 0;
@@ -336,6 +395,23 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::convolution_pow_run(Tensor input, Scalar exponent, "
+        "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = convolution_pow_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvolutionOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 
     Operator(
         "ipex_prepack::convolution_bottleneck_run(Tensor(a!) input, "
@@ -386,22 +462,6 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex_prepack::conv_transpose_run(Tensor input, "
-        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
-        "W_prepack) -> Tensor",
-        [](const Node* node) -> Operation {
-          return [](Stack* stack) {
-            auto result = conv_transpose_run(
-                (std::move(peek(stack, 0, 2))).toTensor(),
-                (std::move(peek(stack, 1, 2)))
-                    .toCustomClass<ConvTransposeOpContext>());
-            drop(stack, 2);
-            pack(stack, std::move(result));
-            return 0;
-          };
-        },
-        aliasAnalysisFromSchema()),
-    Operator(
         "ipex_prepack::convolution_gelu_run(Tensor input, str approximate, "
         "__torch__.torch.classes.ipex_prepack.ConvolutionOpContext "
         "W_prepack) -> Tensor",
@@ -425,17 +485,98 @@ RegisterOperators op({
     CreateLinearUnaryPostOpRun(swish_run),
     CreateLinearUnaryPostOpRun(tanh_run),
     CreateLinearUnaryPostOpRun(mish_run),
+    CreateLinearUnaryPostOpRun(abs_run),
+    CreateLinearUnaryPostOpRun(exp_run),
+    CreateLinearUnaryPostOpRun(hardswish_run),
+    CreateLinearUnaryPostOpRun(square_run),
+    CreateLinearUnaryPostOpRun(log_run),
+    CreateLinearUnaryPostOpRun(round_run),
+    CreateLinearUnaryPostOpRun(sqrt_run),
+
     Operator(
-        "ipex_prepack::linear_gelu_run(Tensor input, "
-        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack, "
-        "str approximate) "
-        "-> Tensor",
+        "ipex_prepack::linear_leaky_relu_run(Tensor input, Scalar alpha, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_leaky_relu_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_hardtanh_run(Tensor input, Scalar "
+        "lower_bound, Scalar upper_bound, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_hardtanh_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toScalar(),
+                (std::move(peek(stack, 2, 4))).toScalar(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_elu_run(Tensor input, Scalar alpha, "
+        "Scalar scale, Scalar input_scale, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_elu_run(
+                (std::move(peek(stack, 0, 5))).toTensor(),
+                (std::move(peek(stack, 1, 5))).toScalar(),
+                (std::move(peek(stack, 2, 5))).toScalar(),
+                (std::move(peek(stack, 3, 5))).toScalar(),
+                (std::move(peek(stack, 4, 5)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 5);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_pow_run(Tensor input, Scalar exponent, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = linear_pow_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_gelu_run(Tensor input, str approximate, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext "
+        "W_prepack) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = linear_gelu_run(
                 (std::move(peek(stack, 0, 3))).toTensor(),
-                (std::move(peek(stack, 1, 3))).toCustomClass<LinearOpContext>(),
-                (std::move(peek(stack, 2, 3))).toStringView());
+                (std::move(peek(stack, 1, 3))).toStringView(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<LinearOpContext>());
             drop(stack, 3);
             pack(stack, std::move(result));
             return 0;
@@ -462,6 +603,113 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+
+    // ConvTranspose fusion run OP
+    CreateConvTransposeUnaryPostOpRun(run),
+    CreateConvTransposeUnaryPostOpRun(relu_run),
+    CreateConvTransposeUnaryPostOpRun(sigmoid_run),
+    CreateConvTransposeUnaryPostOpRun(swish_run),
+    CreateConvTransposeUnaryPostOpRun(tanh_run),
+    CreateConvTransposeUnaryPostOpRun(mish_run),
+    CreateConvTransposeUnaryPostOpRun(abs_run),
+    CreateConvTransposeUnaryPostOpRun(exp_run),
+    CreateConvTransposeUnaryPostOpRun(hardswish_run),
+    CreateConvTransposeUnaryPostOpRun(square_run),
+    CreateConvTransposeUnaryPostOpRun(log_run),
+    CreateConvTransposeUnaryPostOpRun(round_run),
+    CreateConvTransposeUnaryPostOpRun(sqrt_run),
+
+    Operator(
+        "ipex_prepack::conv_transpose_gelu_run(Tensor input, str approximate, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = conv_transpose_gelu_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toStringView(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::conv_transpose_leaky_relu_run(Tensor input, Scalar alpha, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = conv_transpose_leaky_relu_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::conv_transpose_hardtanh_run(Tensor input, Scalar "
+        "lower_bound, Scalar upper_bound, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = conv_transpose_hardtanh_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toScalar(),
+                (std::move(peek(stack, 2, 4))).toScalar(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::conv_transpose_elu_run(Tensor input, Scalar alpha, "
+        "Scalar scale, Scalar input_scale, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = conv_transpose_elu_run(
+                (std::move(peek(stack, 0, 5))).toTensor(),
+                (std::move(peek(stack, 1, 5))).toScalar(),
+                (std::move(peek(stack, 2, 5))).toScalar(),
+                (std::move(peek(stack, 3, 5))).toScalar(),
+                (std::move(peek(stack, 4, 5)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 5);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::conv_transpose_pow_run(Tensor input, Scalar exponent, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = conv_transpose_pow_run(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toScalar(),
+                (std::move(peek(stack, 2, 3)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+
     Operator(
         "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
         "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",

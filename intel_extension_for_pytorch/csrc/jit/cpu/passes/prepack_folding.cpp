@@ -6,41 +6,37 @@
 namespace torch {
 namespace jit {
 
+static const std::set<std::string> prepack_foldable_ops = {
+    "ipex_prepack::convolution_prepack",
+
+    "ipex_prepack::convolution_relu_prepack",
+    "ipex_prepack::convolution_sigmoid_prepack",
+    "ipex_prepack::convolution_swish_prepack",
+    "ipex_prepack::convolution_tanh_prepack",
+    "ipex_prepack::convolution_mish_prepack",
+    "ipex_prepack::convolution_abs_prepack",
+    "ipex_prepack::convolution_exp_prepack",
+    "ipex_prepack::convolution_hardswish_prepack",
+    "ipex_prepack::convolution_square_prepack",
+    "ipex_prepack::convolution_log_prepack",
+    "ipex_prepack::convolution_round_prepack",
+    "ipex_prepack::convolution_sqrt_prepack",
+
+    "ipex_prepack::convolution_elu_prepack",
+    "ipex_prepack::convolution_hardtanh_prepack",
+    "ipex_prepack::convolution_leaky_relu_prepack",
+    "ipex_prepack::convolution_pow_prepack",
+    "ipex_prepack::convolution_gelu_prepack",
+    "ipex_prepack::convolution_add_prepack",
+    "ipex_prepack::convolution_add_relu_prepack",
+    "ipex_prepack::linear_prepack",
+    "ipex_prepack::conv_transpose_prepack",
+};
+
 void PrePackingOpsFolder(Block* b) {
   auto is_foldable_op = [](const Node* n) -> bool {
-    return (
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_relu_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_tanh_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString(
-                "ipex_prepack::convolution_sigmoid_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_swish_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_elu_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString(
-                "ipex_prepack::convolution_hardtanh_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_add_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString(
-                "ipex_prepack::convolution_add_relu_prepack") ||
-
-        n->kind() == Symbol::fromQualString("ipex_prepack::linear_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::conv_transpose_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString(
-                "ipex_prepack::convolution_leaky_relu_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_gelu_prepack") ||
-        n->kind() ==
-            Symbol::fromQualString("ipex_prepack::convolution_mish_prepack"));
+    return prepack_foldable_ops.find(n->kind().toQualString()) !=
+        prepack_foldable_ops.end();
   };
 
   std::unordered_set<Node*> nodes_to_delete;

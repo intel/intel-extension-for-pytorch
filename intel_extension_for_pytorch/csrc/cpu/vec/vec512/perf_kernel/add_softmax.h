@@ -157,7 +157,7 @@ inline void _dil_maskedfill_div_max_fusion_kernel(
 }
 
 inline void _dil_exp_reduce_sum_fusion_kernel(
-    const float* a,
+    float* a,
     const int& size,
     float* out,
     float& val) {
@@ -169,20 +169,20 @@ inline void _dil_exp_reduce_sum_fusion_kernel(
 
   int i = 0;
   for (; i <= size - 16; i += 16) {
-    vec_a = _mm512_load_ps(a + i);
+    vec_a = _mm512_loadu_ps(a + i);
     vec_out = _mm512_sub_ps(vec_a, vec_max);
     vec_out = _dil_exp_kernel(vec_out);
     vec_sum = _mm512_add_ps(vec_sum, vec_out);
-    _mm512_store_ps(out + i, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
   }
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    auto vec_a = _mm512_mask_load_ps(vec_max, mask, a + i);
+    auto vec_a = _mm512_mask_loadu_ps(vec_max, mask, a + i);
     auto vec_out = _mm512_sub_ps(vec_a, vec_max);
     vec_out = _dil_exp_kernel(vec_out);
     vec_sum = _mm512_mask_add_ps(vec_sum, mask, vec_sum, vec_out);
-    _mm512_mask_store_ps(out + i, mask, vec_out);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
   }
 
   // NOTE: _mm512_reduce_add_ps is sequence instruction
@@ -201,17 +201,51 @@ inline void _dil_normalization_kernel(
 
   int i = 0;
   for (; i <= size - 16; i += 16) {
-    auto vec_a = _mm512_load_ps(a + i);
+    auto vec_a = _mm512_loadu_ps(a + i);
     auto vec_out = _mm512_div_ps(vec_a, vec_sum);
     _storeu(out + i, vec_out);
   }
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    auto vec_a = _mm512_maskz_load_ps(mask, a + i);
+    auto vec_a = _mm512_maskz_loadu_ps(mask, a + i);
     auto vec_out = _mm512_div_ps(vec_a, vec_sum);
     _mask_storeu(out + i, vec_out, mask);
   }
+}
+
+inline void _dil_add_reduce_max_fusion_kernel(
+    float* a,
+    const float* b,
+    const int& size,
+    float* out,
+    float& max) {
+  auto vec_ps_min = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_ps_min_tail = _mm512_set1_ps(std::numeric_limits<float>::min());
+  auto vec_a = vec_ps_min;
+  auto vec_b = vec_ps_min;
+  auto vec_out = vec_ps_min;
+
+  int i = 0;
+  for (; i <= size - 16; i += 16) {
+    vec_a = _loadu(a + i);
+    vec_b = _loadu(b + i);
+    vec_out = _mm512_add_ps(vec_a, vec_b);
+    vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
+  }
+
+  if (i < size) {
+    __mmask16 mask = (1 << (size - i)) - 1;
+    vec_a = _maskz_loadu(a + i, mask);
+    vec_b = _maskz_loadu(b + i, mask);
+    vec_out = _mm512_add_ps(vec_a, vec_b);
+    vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
+  }
+
+  // NOTE: _mm512_reduce_max_ps is sequence instruction
+  max = _mm512_reduce_max_ps(vec_ps_min);
 }
 
 } // namespace kernel

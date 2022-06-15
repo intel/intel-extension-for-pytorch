@@ -72,15 +72,19 @@ def warmup_forward(f, *args, profiling_count=2):
 
 
 class JitLlgaTestCase(JitTestCase):
-    def checkScript(self, m, x):
-        requires_grad = any(t.requires_grad for t in x)
-        with torch.set_grad_enabled(requires_grad):
+    def checkScript(self, m, x, freeze=True):
+        if isinstance(m, torch.nn.Module):
+            m.eval()        
+        with torch.no_grad():
             ref = m(*x)
             scripted = torch.jit.script(m)
+            if isinstance(scripted, torch.nn.Module) and freeze:
+                scripted = torch.jit.freeze(scripted)            
+            warmup_forward(scripted, *x)
+            graph = scripted.graph_for(*x)
             y = scripted(*x)
             self.assertEqual(y, ref)
-            graph = scripted.graph_for(*x)
-        return scripted, graph
+        return graph, scripted
 
     def checkTrace(self, m, x, freeze=True, *args, **kwargs):
         if isinstance(m, torch.nn.Module):
@@ -102,8 +106,10 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, remove_dropout=False, x_var=None, qconfig=default_static_qconfig, int8_bf16=False):
-        graph, traced_model, fp32_model = self.prepareModel(model, x, remove_dropout, qconfig, int8_bf16)
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, remove_dropout=False, x_var=None,
+            qconfig=default_static_qconfig, int8_bf16=False, freeze=True):
+
+        graph, traced_model, fp32_model = self.prepareModel(model, x, remove_dropout, qconfig, int8_bf16, freeze=freeze)
         with torch.no_grad():
             y = fp32_model(*x)
             y = y.to(torch.bfloat16) if int8_bf16 else y
@@ -119,25 +125,28 @@ class JitLlgaTestCase(JitTestCase):
 
             return graph
 
-    def prepareModel(self, model, x, remove_dropout=False, qconfig=default_static_qconfig, int8_bf16=False, inplace=False):
+    def prepareModel(self, model, x, remove_dropout=False, qconfig=default_static_qconfig,
+            int8_bf16=False, prepare_inplace=True, convert_inplace=True, freeze=True):
+
         model.eval()
         fp32_model = copy.deepcopy(model)
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             # fold conv bn
             if remove_dropout:
                 ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
-            model = ipex.quantization.prepare(model, qconfig, x, inplace=inplace)
+            model = ipex.quantization.prepare(model, qconfig, x, inplace=prepare_inplace)
             # do calibration
             y = model(*x)
             # jit trace to insert quant/dequant
             if int8_bf16:
                 with torch.cpu.amp.autocast():
-                    convert_model = ipex.quantization.convert(model)
+                    convert_model = ipex.quantization.convert(model, inplace=convert_inplace)
                     traced_model = torch.jit.trace(convert_model, x)
             else:
-                convert_model = ipex.quantization.convert(model)
+                convert_model = ipex.quantization.convert(model, inplace=convert_inplace)
                 traced_model = torch.jit.trace(convert_model, x)
-            traced_model = torch.jit.freeze(traced_model)
+            if freeze:
+                traced_model = torch.jit.freeze(traced_model)
 
             # warm up run
             y0 = traced_model(*x)
@@ -152,3 +161,13 @@ class JitLlgaTestCase(JitTestCase):
         for i in range(len(fusion_groups)):
             for pattern in patterns[i]:
                 self.assertGraphContains(fusion_groups[i], pattern)
+
+    def checkAttr(self, graph, node, attr):
+        def count(block, node, attr):
+            for n in block.nodes():
+                if n.kind() == node:
+                    self.assertFalse(n.hasAttribute('qtype'))
+                for block in n.blocks():
+                    count(block, node, attr)
+        count(graph, node, attr)
+

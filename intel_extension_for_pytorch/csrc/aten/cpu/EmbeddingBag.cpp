@@ -1,7 +1,6 @@
 #include "EmbeddingBag.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
-#include "csrc/quantization/AutoCast.hpp"
 #include "csrc/utils/rw_lock.h"
 
 #include <ATen/Parallel.h>
@@ -150,10 +149,6 @@ at::Tensor embedding_bag(
                        .findSchemaOrThrow("torch_ipex::embedding_bag", "")
                        .typed<decltype(embedding_bag)>();
   auto target_type = get_autocast_dtype();
-  if (is_quantization_enabled()) {
-    return int8::embedding_bag(
-        weight, indices, offsets, sparse, include_last_offset);
-  }
   // only have bf16 support now, keep fp32 for other target_type
   bool cast_to_bfloat16 =
       !at::GradMode::is_enabled() && at::kBFloat16 == target_type;

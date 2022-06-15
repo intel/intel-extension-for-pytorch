@@ -164,6 +164,94 @@ struct attr_t : public dnnl::primitive_attr {
     return attr;
   }
 
+  static attr_t fuse_abs(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_abs, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_exp(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_exp, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_hardswish(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_hardswish, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_square(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_square, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_log(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_log, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_round(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_round, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_sqrt(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_sqrt, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_pow(
+      float scale = 1.0,
+      float alpha = 1.0,
+      float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_pow, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
   static attr_t residual(
       float sum_scale = 1.0,
       float relu_scale = 1.0,

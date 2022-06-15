@@ -4,11 +4,10 @@
 
 namespace torch_ipex {
 
-enum IPEXLowPrecisionMode : int { FP32 = 0, BF32 = 1 };
+enum FP32MathMode : int { FP32 = 0, TF32 = 1, BF32 = 2 };
 
-void setFP32LowPrecisionModeCpu(
-    IPEXLowPrecisionMode mode = IPEXLowPrecisionMode::BF32);
+void setFP32MathModeCpu(FP32MathMode mode = FP32MathMode::FP32);
 
-IPEXLowPrecisionMode getFP32LowPrecisionModeCpu();
+FP32MathMode getFP32MathModeCpu();
 
 } // namespace torch_ipex

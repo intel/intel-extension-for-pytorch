@@ -4,7 +4,6 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/vec/vec.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
-#include "csrc/quantization/AutoCast.hpp"
 
 #include <ATen/Parallel.h>
 #include <ATen/quantized/Quantizer.h>

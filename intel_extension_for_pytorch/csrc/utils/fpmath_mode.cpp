@@ -5,7 +5,7 @@
 namespace ideep {
 dnnl_fpmath_mode_t fpmath_mode = []() {
   dnnl_fpmath_mode_t mode = dnnl_fpmath_mode_strict;
-  static char* val = getenv("IPEX_FP32_LOW_PRECISION_MODE_CPU");
+  static char* val = getenv("IPEX_FP32_MATH_MODE");
   if (val != NULL) {
     std::string fpmath_mode = val;
     if (!fpmath_mode.empty()) {
@@ -19,23 +19,23 @@ dnnl_fpmath_mode_t fpmath_mode = []() {
 }
 namespace torch_ipex {
 
-void setFP32LowPrecisionModeCpu(IPEXLowPrecisionMode m) {
+void setFP32MathModeCpu(FP32MathMode m) {
   dnnl_fpmath_mode_t mode;
-  if (m == IPEXLowPrecisionMode::FP32) {
+  if (m == FP32MathMode::FP32) {
     mode = dnnl_fpmath_mode_strict;
-  } else if (m == IPEXLowPrecisionMode::BF32) {
+  } else if (m == FP32MathMode::BF32) {
     mode = dnnl_fpmath_mode_bf16;
   }
   ideep::utils::set_fpmath_mode(mode);
 }
 
-IPEXLowPrecisionMode getFP32LowPrecisionModeCpu() {
+FP32MathMode getFP32MathModeCpu() {
   dnnl_fpmath_mode_t mode = ideep::utils::get_fpmath_mode();
   switch (mode) {
     case dnnl_fpmath_mode_bf16:
-      return IPEXLowPrecisionMode::BF32;
+      return FP32MathMode::BF32;
     default:
-      return IPEXLowPrecisionMode::FP32;
+      return FP32MathMode::FP32;
   }
 }
 

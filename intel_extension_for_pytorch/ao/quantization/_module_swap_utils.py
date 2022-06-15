@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from torch.ao.quantization import swap_module
 import torch.nn.quantized.dynamic as nnqd
-
+from torch.quantization.qconfig import QConfig
 
 # Default map for swapping dynamic modules
 DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS : Dict[Callable, Any] = {
@@ -43,9 +43,9 @@ def _op_is_int8_dynamically_quantized(qconfig) -> bool:
         activation_compute_dtype is torch.quint8
     )
 
-
-def swap_child_modules(
+def _swap_child_modules(
     module: torch.nn.Module,
+    fqn_qconfig: Dict[str, QConfig],
     dynamic_mappings: Dict[Callable, Any] = DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS,
     parent_fqn: Optional[str] = None,
 ) -> None:
@@ -55,24 +55,37 @@ def swap_child_modules(
     and the module type is in the mapping.
     Recursively calls itself on each child.
     """
+    reassign = {}
+    for local_fqn, mod in module.named_children():
+        if parent_fqn is None:
+            global_fqn = local_fqn
+        else:
+            global_fqn = f"{parent_fqn}.{local_fqn}"
+        _swap_child_modules(mod, fqn_qconfig, dynamic_mappings, global_fqn)
 
-    if hasattr(module, '_auto_quant_state'):
-        qstate = module._auto_quant_state
-        for _, qopinfo in qstate.idx_to_seen_q_op_infos.items():
-            qconfig = qopinfo.qconfig
+        if global_fqn in fqn_qconfig:
+            qconfig = fqn_qconfig[global_fqn]
             if not qconfig:
                 continue
-            fqn = qopinfo.fqn
-            if not fqn:
-                continue
+            mod.qconfig = qconfig
             op_int8_dynamically_quantized = _op_is_int8_dynamically_quantized(qconfig)
-
             if op_int8_dynamically_quantized:
-                mod = module._modules[fqn]
                 if not type(mod) in dynamic_mappings:
-                    continue
-                mod.qconfig = qconfig
-                module._modules[fqn] = swap_module(mod, dynamic_mappings, {})
+                    continue 
+                reassign[local_fqn] = swap_module(mod, dynamic_mappings, {})
 
-    for _, child in module.named_children():
-        swap_child_modules(child)
+    for key, value in reassign.items():
+        module._modules[key] = value
+
+
+def swap_child_modules(
+    module: torch.nn.Module,
+    dynamic_mappings: Dict[Callable, Any] = DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS,
+) -> None:
+    fqn_qconfig = {}
+    for _, v in module._fqn_to_auto_quant_state_map.items():
+        if len(v.idx_to_seen_q_op_infos) > 0:
+            for _, op_info in v.idx_to_seen_q_op_infos.items():
+                fqn_qconfig[op_info.fqn] = op_info.qconfig
+
+    _swap_child_modules(module, fqn_qconfig, dynamic_mappings)

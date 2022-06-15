@@ -61,6 +61,13 @@ DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(sigmoid);
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(swish);
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(tanh);
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(mish);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(abs);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(exp);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(hardswish);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(square);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(log);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(round);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(sqrt);
 
 at::Tensor convolution_leaky_relu_run(
     const at::Tensor& input,
@@ -100,6 +107,17 @@ at::Tensor convolution_elu_run(
   return op_context->run(
       input,
       ideep::attr_t::fuse_elu(scale_value, alpha_value, input_scale_value));
+}
+
+at::Tensor convolution_pow_run(
+    const at::Tensor& input,
+    at::Scalar exponent,
+    const c10::intrusive_ptr<ConvolutionOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::convolution_pow_run", c10::ArrayRef<c10::IValue>({}));
+  auto exponent_value = exponent.to<float>();
+  return op_context->run(
+      input, ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value));
 }
 
 at::Tensor convolution_gelu_run(
@@ -478,6 +496,7 @@ at::Tensor run(
       output =
           at::empty_strided(output_sizes, output_strides, input_.options());
     }
+
     const ideep::tensor mkldnn_input = itensor_view_from_dense(input_);
     ideep::tensor mkldnn_output = itensor_view_from_dense(output);
     if (context.bias_.is_empty()) {
@@ -530,9 +549,19 @@ at::Tensor& run(
   auto input_ = input;
   if (!is_channels_last_1d(input)) {
     input_ = input.contiguous(memory_format);
+    if (input.dim() == 3) {
+      input_ = to_channels_last_1d(input_);
+    }
   }
+
   // always align accumu format with inputs' format.
-  accumu = accumu.contiguous(memory_format);
+  if (!is_channels_last_1d(accumu)) {
+    accumu = accumu.contiguous(memory_format);
+    if (input.dim() == 3) {
+      accumu = to_channels_last_1d(accumu);
+    }
+  }
+
   if (input_.sizes().vec() == context.conv_params_.pd.src_desc().dims() &&
       attr == context.conv_params_.op_attr &&
       omp_get_max_threads() == context.conv_params_.pd_use_threads) {

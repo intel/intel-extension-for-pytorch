@@ -18,11 +18,14 @@ class TestModel(torch.nn.Module):
 
 def run_model(args):
     mode = args.mode
-    fpmath_mode = ipex.LowPrecisionMode.BF32 if args.fpmath == "BF32" else ipex.LowPrecisionMode.FP32
+    fpmath_mode = ipex.FP32MathMode.BF32 if args.fpmath == "BF32" else ipex.FP32MathMode.FP32
     if not args.env:
-        ipex.backends.cpu.set_fp32_low_precision_mode(mode=fpmath_mode)
+        ipex.set_fp32_math_mode(mode=fpmath_mode, device="cpu")
     inputs = torch.randn(1, 3, 224, 224).requires_grad_()
-    model = TestModel(112, 10, args.bias).eval()
+    if args.bias:
+        model = TestModel(112, 10, True).eval()
+    else:
+        model = TestModel(112, 10, False).eval()
     model = ipex.optimize(model, dtype=torch.float32, level='O1', auto_kernel_selection=True)
     if mode == "jit":
         model = torch.jit.trace(model, inputs).eval()
