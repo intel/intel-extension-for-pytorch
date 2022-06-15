@@ -37,6 +37,8 @@ static auto q_conv2d_sum_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_sum_relu");
 static auto q_conv2d_leaky_relu_sym =
     Symbol::fromQualString("xpu::q_conv2d_leaky_relu");
+static auto q_conv2d_sigmoid_sym =
+    Symbol::fromQualString("xpu::q_conv2d_sigmoid");
 static auto q_conv2d_dequantize_sym =
     Symbol::fromQualString("xpu::q_conv2d_dequantize");
 static auto softplus_tanh_sym = Symbol::fromQualString("xpu::softplus_tanh");

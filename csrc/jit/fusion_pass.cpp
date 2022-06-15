@@ -420,6 +420,10 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("aten::leaky_relu_")},
      xpu::q_conv2d_leaky_relu_sym},
+    // SE-ResNeXt INT8: conv + sigmoid
+    {{Symbol::fromQualString("quantized::conv2d"),
+      Symbol::fromQualString("aten::sigmoid")},
+     xpu::q_conv2d_sigmoid_sym},
     // YOLOv4 INT8 For ATS-M: conv2d + dequantize
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("aten::dequantize")},

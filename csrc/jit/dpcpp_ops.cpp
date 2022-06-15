@@ -746,6 +746,17 @@ at::Tensor q_conv2d_sum_relu(
       sum_zpoint);
 }
 
+at::Tensor q_conv2d_sigmoid(
+    const at::Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zpoint) {
+  RECORD_FUNCTION(
+      "q_conv2d_sigmoid", std::vector<c10::IValue>({input, packed_weight}));
+  return at::AtenIpexTypeXPU::q_conv2d_sigmoid(
+      input, packed_weight, output_scale, output_zpoint);
+}
+
 at::Tensor q_conv2d_leaky_relu(
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,

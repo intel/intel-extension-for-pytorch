@@ -145,6 +145,12 @@ at::Tensor q_conv2d_leaky_relu(
     int64_t out_zpoint,
     Scalar negative_scope);
 
+at::Tensor q_conv2d_sigmoid(
+    const Tensor& input,
+    const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double output_scale,
+    int64_t output_zpoint);
+
 at::Tensor q_conv2d_dequantize(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,

@@ -425,6 +425,21 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "xpu::q_conv2d_sigmoid(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float output_scale, int output_zpoint) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack& stack) {
+            auto result = torch::jit::xpu::q_conv2d_sigmoid(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4)))
+                    .toCustomClass<ConvPackedParamsBase<2>>(),
+                (std::move(peek(stack, 2, 4))).toDouble(),
+                (std::move(peek(stack, 3, 4))).toInt());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "xpu::q_conv2d_dequantize(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack& stack) {
