@@ -487,6 +487,63 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::' + eltwise])
                 self.checkPatterns(graph, patterns)
 
+    def test_conv_relu_sigmoid_mul(self):
+        #        dequant
+        #           |
+        #         conv
+        #           |
+        #         relu
+        #          /  |
+        #       quant |
+        #        /    |
+        #     dequant | 
+        #       |     |
+        #     conv    |
+        #       |     |
+        #     relu    |
+        #       |     |
+        #     quant   |
+        #       |     |
+        #    dequant  |
+        #       |     |
+        #     conv    |
+        #       |     |
+        #    sigmoid  |
+        #         \   /
+        #          mul
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                
+                # The output y of relu is used by mul
+                y = x.relu()
+                
+                z = self.conv2(y)
+                z = z.relu()
+                z = self.conv3(z)
+                z = z.sigmoid()
+                z = z.mul(y)
+                return z
+        
+        x = torch.rand(1, 32,16, 16, requires_grad=False)
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
+        patterns = [
+            ["aten::dequantize", "aten::_convolution", "aten::relu"],
+            ["aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::_convolution", "aten::sigmoid", "aten::mul"],
+        ] 
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::sigmoid','aten::mul'])
+        self.checkPatterns(graph, patterns)     
+
     def test_conv_eltwise_tensor_method(self):
         class ConvSigmoid(nn.Module):
             def __init__(self):
