@@ -39,7 +39,7 @@ for data in calibration_data_set:
 
 # Optional, if you want to tuning(performance or accuracy), you can save the qparams as json file which
 # including the quantization state, such as scales, zero points and inference dtype.
-# And then you can achange the json file's settings, loading the changed json file
+# And then you can change the json file's settings, loading the changed json file
 # to model which will override the model's original quantization's settings.  
 #  
 # prepared_model.save_qconf_summary(qconf_summary = "configure.json")
@@ -111,8 +111,8 @@ y = convert_model(x)
 
 Note: we only support the following ops to do dynamic quantization:
 - torch.nn.Linear
-- torch.nn.LSTM 
-- torch.nn.GRU 
+- torch.nn.LSTM
+- torch.nn.GRU
 - torch.nn.LSTMCell
 - torch.nn.RNNCell
 - torch.nn.GRUCell
