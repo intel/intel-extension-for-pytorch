@@ -12,6 +12,8 @@ skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 
 import torch
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
+
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
 from intel_extension_for_pytorch.optim._lamb import Lamb
@@ -180,20 +182,25 @@ class TestPrepackCases(TestCase):
 
     def test_conv2d_training(self):
         self._test_convolution_training_base(dim=2, dtype=torch.float)
-        self._test_convolution_training_base(dim=2, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
+        if core.onednn_has_bf16_support(): 
+            self._test_convolution_training_base(dim=2, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
 
         # TODO: add inference case.
 
     def test_conv3d_training(self):
         # skip conv3d training case, because the backward weight get different result when calling different kernel.
         # self._test_convolution_training_base(dim=3, dtype=torch.float, rtol=1e-3, atol=1e-03)
-        self._test_convolution_training_base(dim=3, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
+        if core.onednn_has_bf16_support():
+            self._test_convolution_training_base(dim=3, dtype=torch.bfloat16, rtol=1e-2, atol=1e-03)
         # TODO: add inference case.
 
     def _test_conv_nc11_base(self, dim):
         # related issue: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/pull/86.
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
-        options = itertools.product([torch.float, torch.bfloat16],
+        test_dtypes = [torch.float]
+        if core.onednn_has_bf16_support():
+            test_dtypes.append(torch.bfloat16)
+        options = itertools.product(test_dtypes,
                                     [1, 256], [1, 324],
                                     [torch.contiguous_format, channels_last],
                                     [True, False])
@@ -272,7 +279,10 @@ class TestPrepackCases(TestCase):
     def _test_conv_serialization_base(self, dim):
         channels_last = torch.channels_last if dim ==2 else torch.channels_last_3d
         optimizer_options = [Lamb, Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD]
-        options = itertools.product([torch.float, torch.bfloat16], optimizer_options, [True, False])
+        test_dtypes = [torch.float]
+        if core.onednn_has_bf16_support():
+            test_dtypes.append(torch.bfloat16)
+        options = itertools.product(test_dtypes, optimizer_options, [True, False])
         input_shape = [8, 3, 56, 56]
         if dim == 3:
             input_shape.append(56)
@@ -370,7 +380,10 @@ class TestPrepackCases(TestCase):
 
     def _test_imagenet_model(self, model):
         model = model.to(memory_format=torch.channels_last)
-        for dtype, feed_sample_input in itertools.product([torch.float32, torch.bfloat16], [True, False]):
+        test_dtypes = [torch.float]
+        if core.onednn_has_bf16_support():
+            test_dtypes.append(torch.bfloat16)
+        for dtype, feed_sample_input in itertools.product(test_dtypes, [True, False]):
             model = model.to(dtype).float()
             # inference case, will do conv+bn folding 'O1'. do nothing for 'O0'.
             x = torch.randn(1, 3, 224, 224).to(dtype=dtype).float().to(memory_format=torch.channels_last)
@@ -436,27 +449,29 @@ class TestPrepackCases(TestCase):
         in_features = torch.randint(3, 10, (1,)).item()
 
         input_shapes = [(8, in_features), (2, 4, in_features), (2, 2, 2, in_features)]
-        options = itertools.product([True, False], input_shapes, [True, False])
-        for bias, x_shape, feed_sample_input  in options:
-            for dtype in [torch.float32, torch.bfloat16]:
-                x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
-                model = L(in_features, out_features, bias).to(dtype=dtype).float().eval()
-                x1 = x.clone().requires_grad_(False)
-                x2 = x.clone().requires_grad_(False)
-                origin_model = copy.deepcopy(model).eval()
-                if feed_sample_input:
-                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
-                else:
-                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
+        test_dtypes = [torch.float]
+        if core.onednn_has_bf16_support():
+            test_dtypes.append(torch.bfloat16)
+        options = itertools.product([True, False], input_shapes, [True, False], test_dtypes)
+        for bias, x_shape, feed_sample_input, dtype in options:
+            x = torch.randn(x_shape, dtype=torch.float32).to(dtype=dtype).float()
+            model = L(in_features, out_features, bias).to(dtype=dtype).float().eval()
+            x1 = x.clone().requires_grad_(False)
+            x2 = x.clone().requires_grad_(False)
+            origin_model = copy.deepcopy(model).eval()
+            if feed_sample_input:
+                ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1', sample_input=x)
+            else:
+                ipex_model = ipex.optimize(origin_model, dtype=dtype, level='O1')
 
-                self.assertEqual(ipex_model.linear.weight.dtype, dtype)
-                y1 = origin_model(x1)
-                with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
-                    # ipex path
-                    y2 = ipex_model(x2)
-                self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-3)
+            self.assertEqual(ipex_model.linear.weight.dtype, dtype)
+            y1 = origin_model(x1)
+            with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
+                # ipex path
+                y2 = ipex_model(x2)
+            self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-3)
 
-    # @unittest.skipIf(True, "ipex linear bf16 backward data has NAN issue")
+    @unittest.skipIf(not core.onednn_has_bf16_support(), "ipex linear bf16 is not supported on this CPU device")
     def test_linear_training(self):
         linear_module = torch.nn.Linear
         out_feature = [1024, 256, 1, torch.randint(3, 10, (1, )).item()]
@@ -464,6 +479,7 @@ class TestPrepackCases(TestCase):
         input_shapes = []
         for s in in_feature:
             input_shapes += [(128, s), (2, 64, s), (2, 2, 32, s)]
+        
         options = itertools.product(out_feature, [True, False], input_shapes, [torch.bfloat16], [True, False])
         for out_features, bias, x_shape, dtype, feed_sample_input in options:
             in_features = x_shape[-1]
@@ -617,8 +633,10 @@ class TestPrepackCases(TestCase):
                 elif dims == 3:
                     model = Deconv3d(ic, oc, kernel_size, stride, padding, output_padding, groups, bias, dilation).to(memory_format=torch.channels_last_3d)
                     x = torch.rand((2, ic, input_depth, input_height, input_width)).to(memory_format=torch.channels_last_3d)
-
-                for dtype, feed_sample_input in itertools.product([torch.float32, torch.bfloat16], [True, False]):
+                test_dtypes = [torch.float]
+                if core.onednn_has_bf16_support():
+                    test_dtypes.append(torch.bfloat16)
+                for dtype, feed_sample_input in itertools.product(test_dtypes, [True, False]):
                     x = x.to(dtype=dtype).float()
                     model = model.to(dtype=dtype).float()
                     if inference:

@@ -1,5 +1,6 @@
 import torch
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.nn.utils._weight_prepack import _IPEXLinear as _IPEXLinear, _IPEXConv2d as _IPEXConv2d
 from torch.testing._internal.common_utils import TestCase
 from torch.optim import Adadelta, Adagrad, Adam, AdamW, Adamax, ASGD, RMSprop, Rprop, SGD
@@ -125,6 +126,21 @@ class TestOptimizeCases(TestCase):
         with self.assertWarnsRegex(UserWarning,
                                    "WARNING: Can't convert model's parameters dtype"):
             optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
+
+    def test_optimize_bf16_upsupported(self):
+        class Conv(torch.nn.Module):
+            def __init__(self,):
+                super(Conv, self).__init__()
+                self.conv = torch.nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+
+        def forward(self, x):
+            return self.conv(x)
+
+        model = Conv()
+        if not core.onednn_has_bf16_support():
+            msg = r"BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, please set dtype to torch.float or set weights_prepack to False."
+            with self.assertRaisesRegex(AssertionError, msg):
+                optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
 
     def test_optimize_unsupport_freeze_optimization(self):
         model = ConvBatchNorm().eval()

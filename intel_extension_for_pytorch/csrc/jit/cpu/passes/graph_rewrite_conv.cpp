@@ -1,4 +1,5 @@
 #include "csrc/aten/cpu/WeightPack.h"
+#include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/jit/cpu/kernels/OpContext.h"
 #include "csrc/jit/cpu/passes/utils.h"
 #include "graph_rewrite.h"
@@ -106,17 +107,18 @@ void insertPrePackedConvOp(Block* b) {
       IValue input_size_value(input_size_option.value());
       if (n->kind() == aten::conv1d || n->kind() == aten::conv2d ||
           n->kind() == aten::conv3d) {
-        auto weight_size_option = n->inputs()
-                                      .at(1)
-                                      ->type()
-                                      ->cast<TensorType>()
-                                      ->sizes()
-                                      .concrete_sizes();
+        auto weight_tensor_type = n->inputs().at(1)->type()->cast<TensorType>();
+        auto weight_size_option = weight_tensor_type->sizes().concrete_sizes();
         // weight has not shape info, will not do weight prapacked.
         if (!(weight_size_option.has_value() &&
               (weight_size_option.value().size() == 3 ||
                weight_size_option.value().size() == 4 ||
                weight_size_option.value().size() == 5))) {
+          continue;
+        }
+        const auto dtype = weight_tensor_type->scalarType();
+        if (dtype.has_value() && *dtype == at::ScalarType::BFloat16 &&
+            !ideep::has_bf16_type_support()) {
           continue;
         }
         bool w_is_channels_last = false;

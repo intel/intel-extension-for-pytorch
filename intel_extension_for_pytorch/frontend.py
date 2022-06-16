@@ -287,6 +287,10 @@ def optimize(
         optimized_model, optimized_optimizer, params_attr = utils._weight_cast.weight_dtype_convert_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.split_master_weight_for_bf16)
     if opt_properties.weights_prepack:
+        if dtype == torch.bfloat16:
+            assert core.onednn_has_bf16_support(), \
+                    "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, " + \
+                    "please set dtype to torch.float or set weights_prepack to False."
         optimized_model, optimized_optimizer, params_attr = utils._weight_prepack.weight_prepack_with_ipex(
             optimized_model, optimized_optimizer, params_attr, opt_properties.auto_kernel_selection)
     # TODO: model list, optimizer list.
