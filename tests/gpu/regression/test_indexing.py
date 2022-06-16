@@ -6,6 +6,11 @@ import pytest
 
 cpu_device = torch.device("cpu")
 
+def double_step_seq(step1, len1, step2, len2):
+    seq1 = torch.arange(0, step1 * len1, step1)
+    seq2 = torch.arange(0, step2 * len2, step2)
+    return (seq1[:, None] + seq2[None, :]).reshape(1, -1)
+
 class TestTorchMethod(TestCase):
     def test_index_fill(self, dtype=torch.float):
         x = torch.randn((8192, 8192), device=cpu_device)
@@ -46,3 +51,14 @@ class TestTorchMethod(TestCase):
         y_xpu = x_xpu.index_add(0, index, t)
         print("y_xpu = ", y_xpu.cpu())
         self.assertEqual(y, y_xpu.cpu())
+
+    def test_index_2_dim(self, dtype=torch.float):
+        table = torch.randn([169, 16])
+        table_xpu = table.to("xpu")
+        rel_index_coords = double_step_seq(13, 7, 1, 7)
+        rel_position_index = rel_index_coords + rel_index_coords.T
+        rel_position_index = rel_position_index.flip(1).contiguous()
+
+        out_cpu = table[rel_position_index.view(-1)]
+        out_xpu = table_xpu[rel_position_index.view(-1)]
+        self.assertEqual(out_cpu, out_xpu.cpu())
