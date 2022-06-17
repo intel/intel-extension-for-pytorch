@@ -79,7 +79,7 @@ def enable_cl_to():
                         # This is very hacking code for PoC
                         if args[0].dim == 4:
                             # Error: Correct this for moving the 2nd dim to the last one
-                            return args[0].transpose(1,-1).contiguous().transpose(1,-1)
+                            return args[0].transpose(1, -1).contiguous().transpose(1, -1)
                     if kwargs["memory_format"] is torch.channels_last_3d:
                         print("to CL 3D")
                         pass
