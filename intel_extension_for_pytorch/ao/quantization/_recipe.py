@@ -15,7 +15,7 @@ elt_wise_noq_ops = [str(torch.relu_), str(torch.sigmoid_), str(nn.ReLU), str(tor
         str(nn.SiLU), str(F.silu), str(torch.Tensor.sigmoid), str(torch.sigmoid), str(F.sigmoid), str(nn.Sigmoid), str(F.gelu), str(nn.GELU)]
 conv_gemm_ops = [str(F.conv2d), str(nn.Conv2d), str(F.conv3d), str(nn.Conv3d), str(torch.conv2d), str(torch.conv3d), \
     str(F.conv_transpose2d), str(torch.nn.ConvTranspose2d), str(F.conv_transpose3d), str(torch.nn.ConvTranspose3d),
-    str(torch.conv_transpose2d), str(torch.conv_transpose2d), str(F.linear), str(nn.Linear), str(torch.matmul)]
+    str(torch.conv_transpose2d), str(torch.conv_transpose2d), str(F.linear), str(nn.Linear), str(torch.matmul), str(torch.Tensor.matmul)]
 rnn_ops = [str(torch.nn.LSTM)]
 
 # Those ops only support s8->s8 path, and also require the qscheme is per_tensor_symmetric.

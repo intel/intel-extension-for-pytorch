@@ -1062,6 +1062,49 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
         self.checkPatterns(graph, patterns)
 
+    def test_bmm_method_bf16(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                mm_res = x.matmul(y)
+                return mm_res
+
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
+        patterns = [
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        # single aten::to won't be rewritten by llga backend
+        self.assertFused(graph, ['aten::dequantize', 'aten::matmul'])
+        self.checkPatterns(graph, patterns)
+
+    def test_bmm_method_fp32(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                mm_res = x.matmul(y)
+                return mm_res
+
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
+        patterns = [
+            ["aten::dequantize", "aten::matmul"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::dequantize', 'aten::matmul'])
+        self.checkPatterns(graph, patterns)
+
     def test_strided_bmm_div_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
