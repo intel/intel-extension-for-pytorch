@@ -38,6 +38,8 @@ def prepare(
             except:
                 assert False, "The model's copy is failed, please try set inplace to True to do the prepare"
         warnings.warn("Conv BatchNorm folding failed during the prepare process.")
+    # replace dropout with identity to enable more fusion pattern.
+    nn.utils._model_convert.replace_dropout_with_identity(prepare_model)
     # Special case for common case of passing a single Tensor
     if isinstance(example_inputs, (torch.Tensor, dict)):
         example_inputs = (example_inputs,)

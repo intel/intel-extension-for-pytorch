@@ -755,7 +755,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ["aten::dequantize", "aten::linear"]
         ]
         for qconfig in static_qconfig:
-            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, qconfig=qconfig)
+            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
             self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
@@ -806,7 +806,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ["aten::dequantize", "aten::to", "aten::linear", "aten::to", "aten::quantize_per_tensor"],
             ["aten::dequantize", "aten::to", "aten::linear", "aten::add"]
         ]
-        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, int8_bf16=True)
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, int8_bf16=True)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
         self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
