@@ -70,6 +70,12 @@ SET(AVX512_BF16_CODE "
     __m512 src;
     // detect avx512f and avx512_bf16
     _mm512_cvtneps_pbh(src);
+
+    // Enhance check logical for Ubuntu 18.04 + gcc 11.1. Which compiler is not fully support BF16.
+    __m128 a;
+    __m128bh b;
+    b = _mm_cvtneps_pbh(a);
+
     return 0;
   }
 ")
