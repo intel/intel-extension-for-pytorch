@@ -1,6 +1,6 @@
 #pragma once
 #include <ATen/ATen.h>
-#include <ATen/native/quantized/packed_params.h>
+#include <ATen/native/quantized/PackedParams.h>
 #include <oneDNN/oneDNN.h>
 #include <oneapi/dnnl/dnnl.hpp>
 

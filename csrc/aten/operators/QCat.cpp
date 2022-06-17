@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/core/op_registration/op_registration.h>
-#include <ATen/native/quantized/packed_params.h>
+#include <ATen/native/quantized/PackedParams.h>
 
 #include <oneDNN/oneDNN.h>
 #include <quantized/Quantizer.h>
