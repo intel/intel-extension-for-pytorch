@@ -69,6 +69,10 @@ class Operator {
     return static_cast<float>(toIValue(node->input(offset))->toDouble());
   }
 
+  static float ScalarToFloat(const Node* node, size_t offset) {
+    return toIValue(node->input(offset))->toScalar().to<float>();
+  }
+
   static std::vector<float> FloatValueToVector(float value) {
     return {value};
   }

@@ -41,6 +41,8 @@ def get_eltwise_fn(name):
     elif hasattr(F, name):
         return getattr(F, name)
     else:
+        if name == 'hardswish_':
+            return torch.nn.Hardswish(inplace=True);
         raise NameError('Eltwise function %s not found' % name)
 
 class TestOp(JitLlgaTestCase):
@@ -368,7 +370,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.conv2(x)
                 return x
 
-        for eltwise in ['relu', 'leaky_relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
+        for eltwise in ['relu', 'leaky_relu', 'sigmoid', 'round', 'abs', 'square',
+                        'abs', 'round', 'exp', 'hardswish', 'tanh', 'hardtanh']:
             for inplace in [False, True]:
                 for memory_format in [torch.contiguous_format, torch.channels_last]:
                     eltwise_fn_name = eltwise + '_' if inplace else eltwise
@@ -386,6 +389,38 @@ class TestFusionPattern(JitLlgaTestCase):
                         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
                         self.assertFused(graph, ['aten::_convolution', 'aten::' + eltwise, 'aten::quantize_per_channel', 'aten::dequantize'])
                         self.checkPatterns(graph, patterns)
+
+    def test_conv2d_clamp(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv5 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = torch.clamp(x, min=float('-inf'))
+                x = self.conv2(x)
+                x = torch.clamp(x, min=-5)
+                x = self.conv3(x)
+                x = torch.clamp(x, min=0, max=float('inf'))
+                x = self.conv4(x)
+                x = torch.clamp(x, min=1, max=5)
+                x = self.conv5(x)
+                x = torch.clamp(x, max=2)
+                return x
+
+        for inplace in [False, True]:
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+                m = M()
+                for qconfig in static_qconfig:
+                    graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
+                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
+                    self.assertFused(graph, ['aten::_convolution', 'aten::' + "clamp", 'aten::quantize_per_channel', 'aten::dequantize'])
 
     def test_ensure_tensor_is_rewrapped(self):
         class M(nn.Module):

@@ -229,16 +229,39 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return makeEltwiseOp(node, opkind::Sigmoid);
   } else if (nodeKind == Symbol::aten("gelu")) {
     return makeEltwiseOp(node, opkind::GELU);
+  } else if (nodeKind == Symbol::aten("round")) {
+    return makeEltwiseOp(node, opkind::Round);
+  } else if (nodeKind == Symbol::aten("exp")) {
+    return makeEltwiseOp(node, opkind::Exp);
   } else if (nodeKind == Symbol::aten("sqrt")) {
     return makeEltwiseOp(node, opkind::Sqrt);
   } else if (nodeKind == Symbol::aten("abs")) {
     return makeEltwiseOp(node, opkind::Abs);
   } else if (nodeKind == Symbol::aten("square")) {
     return makeEltwiseOp(node, opkind::Square);
+  } else if (nodeKind == Symbol::aten("clamp")) {
+    // PyTorch API already checks that both min & max are not None.
+    // But we can check it nevertheless.
+    auto clamp_min = toIValue(node->input(1));
+    auto clamp_max = toIValue(node->input(2));
+    REQ(!(clamp_max->isNone() && clamp_min->isNone()));
+    auto clamp_min_value = (clamp_min->isNone())
+        ? -std::numeric_limits<float>::infinity()
+        : Operator::ScalarToFloat(node, 1);
+    auto clamp_max_value = (clamp_max->isNone())
+        ? std::numeric_limits<float>::infinity()
+        : Operator::ScalarToFloat(node, 2);
+    return makeEltwiseOp(node, opkind::Clamp)
+        .setAttr("min", clamp_min_value)
+        .setAttr("max", clamp_max_value);
   } else if (nodeKind == Symbol::aten("hardtanh")) {
     return makeEltwiseOp(node, opkind::HardTanh)
-        .setAttr("min", Operator::Float, 1)
-        .setAttr("max", Operator::Float, 2);
+        .setAttr("min", Operator::ScalarToFloat, 1)
+        .setAttr("max", Operator::ScalarToFloat, 2);
+  } else if (nodeKind == Symbol::aten("hardswish")) {
+    return makeEltwiseOp(node, opkind::HardSwish);
+  } else if (nodeKind == Symbol::aten("log")) {
+    return makeEltwiseOp(node, opkind::Log);
   } else if (nodeKind == Symbol::aten("leaky_relu")) {
     return makeEltwiseOp(node, opkind::LeakyReLU)
         .setAttr("alpha", Operator::Float, 1);
