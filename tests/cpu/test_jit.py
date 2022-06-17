@@ -2874,9 +2874,10 @@ class Tester(TestCase):
 
 
     def test_enable_inplace(self):
-        class M(nn.Module):
+        # M_apply_inplace is for testing success inplace replacement condition
+        class M_apply_inplace(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
-                super(M, self).__init__()
+                super(M_apply_inplace, self).__init__()
                 self.eltwise = eltwise_fn
                 self.params_dict = params_dict
 
@@ -2888,29 +2889,45 @@ class Tester(TestCase):
                 x1 = self.eltwise(x1, **self.params_dict)
                 return x1
 
+        # M_remain_outplace is for testing failed inplace replacement condition
+        class M_remain_outplace(nn.Module):
+            def __init__(self, eltwise_fn, params_dict={}):
+                super(M_remain_outplace, self).__init__()
+                self.eltwise = eltwise_fn
+                self.params_dict = params_dict
+
+            def forward(self, x):
+                x1 = self.eltwise(x, **self.params_dict)
+                return x1
+
         for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu']:
             eltwise_fn_name = eltwise + '_'
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
-#use torch.sigmoid_(x)
                 eltwise_fn_outplace = getattr(torch, eltwise)
-                m_outplace = M(eltwise_fn_outplace)
+                m_inplace = M_apply_inplace(eltwise_fn_outplace)
+                m_outplace = M_remain_outplace(eltwise_fn_outplace)
             else:
-#use F.elu(x, inplace = True)
                 eltwise_fn = getattr(F, eltwise)
-                m = M(eltwise_fn, {"inplace": True})
-                m_outplace = M(eltwise_fn)
+                m_inplace = M_apply_inplace(eltwise_fn)
+                m_outplace = M_remain_outplace(eltwise_fn)
 
             with torch.no_grad():
+                m_inplace.eval()
                 m_outplace.eval()
-                x_outplace = torch.randn(1, 3, 16, 16)
+                x = torch.randn(1, 3, 16, 16)
 
-#test enable inplace
-                traced_outplace = torch.jit.trace(m_outplace, x_outplace)
-                trace_graph_outplace = traced_outplace.graph_for(x_outplace)
-                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_outplace.nodes()))
+                traced_inplace = torch.jit.trace(m_inplace, x)
+                trace_graph_inplace = traced_inplace.graph_for(x)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_inplace.nodes()))
+                y_inplace = m_inplace(x)
+                traced_y_inplace = traced_inplace(x)
+                self.assertEqual(y_inplace, traced_y_inplace)
 
-                y_outplace = m_outplace(x_outplace)
-                traced_y_outplace = traced_outplace(x_outplace)
+                traced_outplace = torch.jit.trace(m_outplace, x)
+                trace_graph_outplace = traced_outplace.graph_for(x)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise for n in trace_graph_outplace.nodes()))
+                y_outplace = m_outplace(x)
+                traced_y_outplace = traced_outplace(x)
                 self.assertEqual(y_outplace, traced_y_outplace)
 
     def test_remove_bailout(self):
