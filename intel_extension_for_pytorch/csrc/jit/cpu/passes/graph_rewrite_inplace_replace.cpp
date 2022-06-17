@@ -21,7 +21,6 @@ bool hasSideEffectInDefNode(Node* def_node, int position) {
           def_node->hasSideEffects() || (def_node->kind() == prim::Param);
     }
   }
-
   return checkresult;
 }
 
@@ -45,12 +44,17 @@ bool hasSideEffectInBlocks(Block* block, Value* v) {
 
 bool hasSideEffectOrAliasInSubgraphs(Node* node, Value* v) {
   bool checkresult = false;
-  // A LLGAFusionGroup must have its fallbackgraph, we only need to check one of
-  // them
+  // A LLGAFusionGroup or TensorExprGroup must have its fallbackgraph, we only
+  // need to check one of them
   if (node->kind().toQualString() ==
       Symbol::fromQualString("ipex::LlgaFusionGroup").toQualString()) {
     return false;
   }
+  if (node->kind().toQualString() ==
+      Symbol::fromQualString("prim::TensorExprGroup").toQualString()) {
+    return false;
+  }
+
   // get the subgraph of the def node
   auto subgraph = node->g(attr::Subgraph);
 
@@ -58,18 +62,27 @@ bool hasSideEffectOrAliasInSubgraphs(Node* node, Value* v) {
   // for example, here find (%input.1), and the posion is 0:
   // graph(---),
   //    %input.1 : Tensor = Ops
-  //    return (%input.1)
-  int position = v->offset();
-  auto def_node = subgraph->outputs()[position]->node();
-  std::unique_ptr<AliasDb> aliasDb_ = std::make_unique<AliasDb>(subgraph);
+  //    %input.2 : Tensor = Ops
+  //    return (%input.1, %input.2)
 
-  checkresult = hasSideEffectInDefNode(def_node, position);
+  // position_in_subgraph is graph returned position, e.g, for %input.1 is 0,
+  // for %input.2 is 1
+  int position_in_subgraph = v->offset();
+  auto def_node = subgraph->outputs()[position_in_subgraph]->node();
+  // position_in_def_node is def node position, e.g, for %input.1 or %input.2 is
+  // 0
+  int position_in_def_node =
+      subgraph->outputs()[position_in_subgraph]->offset();
+
+  checkresult = hasSideEffectInDefNode(def_node, position_in_def_node);
 
   // for def node in subgraph, has to check its alias too
+  // if the output isn't contained or alias by the inputs to its node, it's
+  // unique. No need to check for alias if the node is a ListConstruct.
+  std::unique_ptr<AliasDb> aliasDb_ = std::make_unique<AliasDb>(subgraph);
   bool mayAliasInputs = (def_node->kind() != prim::ListConstruct) &&
       aliasDb_->mayContainAlias(
-          def_node->inputs(), def_node->outputs()[position]);
-
+          def_node->inputs(), def_node->outputs()[position_in_def_node]);
   checkresult = checkresult || mayAliasInputs;
   return checkresult;
 }
