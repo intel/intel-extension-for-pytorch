@@ -283,7 +283,7 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
 
 from torch.storage import _StorageBase
 
-from torch.storage import _TypedStorage, _LegacyStorage
+from torch.storage import _LegacyStorage
 
 @staticmethod  # type: ignore[misc]
 def _lazy_new(cls, *args, **kwargs):
@@ -383,27 +383,24 @@ class ComplexFloatStorage(_XPULegacyStorage):
 del _LegacyStorage
 del _XPULegacyStorage
 
-class ShortStorage(_XPUBase, intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
-    pass
-
-class _UntypedStorage(intel_extension_for_pytorch._C.ByteStorageBase, _StorageBase):
-    @classmethod
-    def from_buffer(cls, *args, **kwargs):
-        raise RuntimeError('from_buffer: Not available for XPU storage')
-
-    @classmethod
-    def _new_with_weak_ptr(cls, *args, **kwargs):
-        raise RuntimeError('_new_with_weak_ptr: Not available for XPU storage')
-
-    @classmethod
-    def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
-        raise RuntimeError('_new_shared_filename: Not available for XPU storage')
-
-
-class ByteStorage(_LegacyStorage):
-    @classproperty
-    def dtype(self):
-        return torch.uint8
+# class _UntypedStorage(intel_extension_for_pytorch._C.ByteStorageBase, _StorageBase):
+#     @classmethod
+#     def from_buffer(cls, *args, **kwargs):
+#         raise RuntimeError('from_buffer: Not available for XPU storage')
+#
+#     @classmethod
+#     def _new_with_weak_ptr(cls, *args, **kwargs):
+#         raise RuntimeError('_new_with_weak_ptr: Not available for XPU storage')
+#
+#     @classmethod
+#     def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
+#         raise RuntimeError('_new_shared_filename: Not available for XPU storage')
+#
+#
+# class ByteStorage(_LegacyStorage):
+#     @classproperty
+#     def dtype(self):
+#         return torch.uint8
 
 # class ShortStorage(intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
 #     pass
