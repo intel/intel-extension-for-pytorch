@@ -88,7 +88,7 @@ class IndexKernelConfig : public BatchKernelConfig {
       bool indexing_dst,
       FuncType func) {
     int64_t index_num = index_info.sizes[0];
-    int64_t indexing_dimension_size = dst_info.sizes[dim];
+    int64_t indexing_dimension_size;
 
     bool problem_along_x;
     int64_t batch, problem, stride, problem_batch;
@@ -98,6 +98,7 @@ class IndexKernelConfig : public BatchKernelConfig {
         "Indexing kernel backbone does not support null src ...");
 
     if (indexing_dst) {
+      indexing_dimension_size = dst_info.sizes[dim];
       indexing_problem_mapping(
           dst_info,
           index_info,
@@ -110,6 +111,7 @@ class IndexKernelConfig : public BatchKernelConfig {
           problem_batch,
           problem_along_x);
     } else {
+      indexing_dimension_size = src_info.sizes[dim];
       indexing_problem_mapping(
           src_info,
           index_info,
@@ -397,5 +399,41 @@ static inline void _index_add_kernel(
               dim,
               true,
               IndexAddOperator<scalar_t>());
+  launch_index_kernel(cfg);
+}
+
+template <typename ValType>
+class IndexSelectOperator {
+ public:
+  DPCPP_DEVICE void operator()(
+      ValType* dst,
+      ValType* src,
+      int64_t dst_off,
+      int64_t src_off,
+      ValType alpha) const {
+    dst[dst_off] = src[src_off];
+  }
+};
+
+template <class SrcInfo, class DstInfo, class IdxInfo>
+static inline void _index_select_kernel(
+    SrcInfo& src_info,
+    DstInfo& dst_info,
+    IdxInfo& index_info,
+    int64_t dim) {
+  using scalar_t = typename SrcInfo::scalar_t;
+  auto cfg = IndexKernelConfig<
+      SrcInfo,
+      DstInfo,
+      IdxInfo,
+      IndexSelectOperator<scalar_t>>::
+      make_config(
+          src_info,
+          dst_info,
+          index_info,
+          0,
+          dim,
+          false,
+          IndexSelectOperator<scalar_t>());
   launch_index_kernel(cfg);
 }
