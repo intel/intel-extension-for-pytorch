@@ -272,28 +272,26 @@ def _xpu_tag(obj):
 
 
 def validate_xpu_device(location):
-    # device = torch.xpu._utils._get_device_index(location, True)
-    #
-    # if not torch.xpu.is_available():
-    #     raise RuntimeError('Attempting to deserialize object on a xpu '
-    #                        'device but torch.xpu.is_available() is False. '
-    #                        'If you are running on a CPU-only machine, '
-    #                        'please use torch.load with map_location=torch.device(\'cpu\') '
-    #                        'to map your storages to the CPU.')
-    # device_count = torch.xpu.device_count()
-    # if device >= device_count:
-    #     raise RuntimeError('Attempting to deserialize object on xpu device '
-    #                        f'{device} but torch.xpu.device_count() is {device_count}. Please use '
-    #                        'torch.load with map_location to map your storages '
-    #                        'to an existing device.')
-    # return device
-    return current_device()
+    device = _get_device_index(location, True)
+    if not torch.xpu.is_available():
+        raise RuntimeError('Attempting to deserialize object on a xpu '
+                           'device but torch.xpu.is_available() is False. '
+                           'If you are running on a CPU-only machine, '
+                           'please use torch.load with map_location=torch.device(\'cpu\') '
+                           'to map your storages to the CPU.')
+    device_count = torch.xpu.device_count()
+    if device >= device_count:
+        raise RuntimeError('Attempting to deserialize object on xpu device '
+                           f'{device} but torch.xpu.device_count() is {device_count}. Please use '
+                           'torch.load with map_location to map your storages '
+                           'to an existing device.')
+    return device
 
 
 current_module = sys.modules[__name__]
 
 
-def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
+def _xpu(self, device=None, non_blocking=False, **kwargs):
     """Returns a copy of this object in xpu memory.
 
     If this object is already in xpu memory and on the correct device, then
@@ -307,16 +305,16 @@ def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
         **kwargs: For compatibility, may contain the key ``async`` in place of
             the ``non_blocking`` argument.
     """
-    # non_blocking = _get_async_or_non_blocking('xpu', non_blocking, kwargs)
+    non_blocking = torch._utils._get_async_or_non_blocking('xpu', non_blocking, kwargs)
     # if self.is_xpu:
     #     if device is None:
     #         device = torch.xpu.current_device()
     #     if self.get_device() == device:
     #         return self
     # else:
-    #     if device is None:
-    #         device = -1
-    with device(device_idx):
+    if device is None:
+        device = -1
+    with torch.xpu.device(device):
         if self.is_sparse:
             # new_type = getattr(torch.xpu.sparse, self.__class__.__name__)
             # indices = torch._indices(self).xpu(device, non_blocking)
@@ -351,5 +349,3 @@ torch._register_device_module('xpu', current_module)
 
 # post initial
 intel_extension_for_pytorch._C._postInitExtension()
-
-del torch
