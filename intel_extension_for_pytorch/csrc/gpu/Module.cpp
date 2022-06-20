@@ -1,7 +1,6 @@
+#include <torch/csrc/Dtype.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
-#include <torch/csrc/tensor/python_tensor.h>
 
 #include <ATen/autocast_mode.h>
 
@@ -16,7 +15,6 @@
 #include "Event.h"
 #include "LazyInit.h"
 #include "Module.h"
-#include "Storage.h"
 #include "Stream.h"
 
 #include <thread>
@@ -138,8 +136,6 @@ static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
       THPObjectPtr(PyImport_ImportModule("intel_extension_for_pytorch.xpu"));
   if (!module)
     throw python_error();
-
-  THDPStorage_postInitExtension(module);
 
   auto set_module_attr = [&](const char* name, PyObject* v) {
     // PyObject_SetAttrString doesn't steal reference. So no need to incref.
@@ -775,7 +771,6 @@ void init_module(pybind11::module& m) {
   auto module = m.ptr();
   THDPStream_init(module);
   THDPEvent_init(module);
-  THDPStorage_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
   register_xpu_device_properties(module);
   bindGetDeviceProperties(module);
