@@ -422,6 +422,59 @@ class TestFusionPattern(JitLlgaTestCase):
                     self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
                     self.assertFused(graph, ['aten::_convolution', 'aten::' + "clamp", 'aten::quantize_per_channel', 'aten::dequantize'])
 
+    def test_conv2d_silu(self):
+        class M(nn.Module):
+            def __init__(self, inplace):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.eltwise = nn.SiLU(inplace=inplace)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.eltwise(x)
+                x = self.conv2(x)
+                return x        
+        for inplace in [False, True]:
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                m = M(inplace)
+                x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+
+                silu_op = 'aten::silu_' if inplace else 'aten::silu'
+                
+                # oneDNN graph does not have silu OP. The bridge will convert silu to sigmoid - mul
+                patterns = [
+                    ["aten::dequantize", "aten::_convolution", 'aten::sigmoid', 'aten::mul', "aten::quantize_per_tensor"], # inplace op will become outplace op on the JIT graph
+                    ["aten::dequantize", "aten::_convolution"]
+                ]                
+
+                self.assertFused(graph, ['aten::_convolution', silu_op, 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)                
+
+    def test_deconv_silu(self):
+        class M(nn.Module):
+            def __init__(self, inplace):
+                super(M, self).__init__()
+                self.deconv = nn.ConvTranspose2d(3, 2, 3, stride=2)
+                self.eltwise = nn.SiLU(inplace=inplace)
+
+            def forward(self, x):
+                x = self.deconv(x)
+                x = self.eltwise(x)
+                return x        
+        
+        for inplace in [False, True]:
+            m = M(inplace)
+            x = torch.rand(1, 3, 28, 28)
+            silu_op = 'aten::silu_' if inplace else 'aten::silu'
+            graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+            # TODO: deconv is unsupported in the bridge, thus conv-silu will be fused by IPEX
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+            self.assertGraphContainsExactly(graph, silu_op, 1)         
+
     def test_ensure_tensor_is_rewrapped(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn):
@@ -539,6 +592,88 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
                 self.assertFused(graph, ['aten::' + eltwise])
                 self.checkPatterns(graph, patterns)
+
+    def test_linear_silu(self):
+        class M(nn.Module):
+            def __init__(self, inplace):
+                super(M, self).__init__()
+                self.linear = nn.Linear(28, 64)
+                self.eltwise = nn.SiLU(inplace=inplace)
+
+            def forward(self, x):
+                x = self.linear(x)
+                x = self.eltwise(x)
+                return x
+        for inplace in [False, True]:
+            m = M(inplace)
+            x = torch.rand(1, 28, requires_grad=False)
+
+            silu_op = 'aten::silu_' if inplace else 'aten::silu'
+
+            patterns = [
+                ["aten::dequantize", "aten::linear", "aten::sigmoid", "aten::mul"],
+            ]
+            graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.assertFused(graph, ['aten::linear', silu_op, 'aten::dequantize'])
+            self.checkPatterns(graph, patterns)
+
+    def test_conv_relu_sigmoid_mul(self):
+        #        dequant
+        #           |
+        #         conv
+        #           |
+        #         relu
+        #          /  |
+        #       quant |
+        #        /    |
+        #     dequant | 
+        #       |     |
+        #     conv    |
+        #       |     |
+        #     relu    |
+        #       |     |
+        #     quant   |
+        #       |     |
+        #    dequant  |
+        #       |     |
+        #     conv    |
+        #       |     |
+        #    sigmoid  |
+        #         \   /
+        #          mul
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                
+                # The output y of relu is used by mul
+                y = x.relu()
+                
+                z = self.conv2(y)
+                z = z.relu()
+                z = self.conv3(z)
+                z = z.sigmoid()
+                z = z.mul(y)
+                return z
+        
+        x = torch.rand(1, 32,16, 16, requires_grad=False)
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
+        patterns = [
+            ["aten::dequantize", "aten::_convolution", "aten::relu"],
+            ["aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::_convolution", "aten::sigmoid", "aten::mul"],
+        ] 
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::sigmoid','aten::mul'])
+        self.checkPatterns(graph, patterns)     
 
     def test_conv_eltwise_tensor_method(self):
         class ConvSigmoid(nn.Module):

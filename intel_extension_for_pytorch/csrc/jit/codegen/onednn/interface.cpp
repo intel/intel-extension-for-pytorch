@@ -10,6 +10,7 @@
 #include "lift_up_quant.h"
 #include "prepare_binary.h"
 #include "prepare_dequant.h"
+#include "prepare_silu.h"
 #include "quantization_patterns.h"
 #include "remove_mutation.h"
 
@@ -63,6 +64,9 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
     DecomposeOps(g);
     GRAPH_DUMP("After DecomposeOps. Before PrepareBinaryForLLGA", g);
     PrepareBinaryForLLGA(g);
+    GRAPH_DUMP("After DecomposeOps. Before PrepareSiluForLLGA", g);
+    PrepareSiluForLLGA(g);
+    GRAPH_DUMP("After PrepareSiluForLLGA. Before PrepareBinaryForLLGA", g);
     GRAPH_DUMP(
         "After PrepareBinaryForLLGA. Before EliminateCommonSubexpression", g);
     EliminateCommonSubexpression(g);
