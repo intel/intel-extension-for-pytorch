@@ -274,8 +274,8 @@ static void cat(
   for (int i = 0; i < inputs.size(); i++) {
     auto lap = at::get_overlap_status(result, inputs[i]);
     TORCH_CHECK(
-        lap != at::MemOverlapStatus::PARTIAL &&
-            lap != at::MemOverlapStatus::FULL,
+        lap != at::MemOverlapStatus::Partial &&
+            lap != at::MemOverlapStatus::Full,
         "unsupported operation: the input tensors cannot refer to any "
         "of the output memory locations. Found overlap in input "
         "tensor ",
@@ -370,8 +370,8 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
   for (const auto i : c10::irange(tensors.size())) {
     auto lap = at::get_overlap_status(out, tensors[i]);
     TORCH_CHECK(
-        lap != at::MemOverlapStatus::PARTIAL &&
-            lap != at::MemOverlapStatus::FULL,
+        lap != at::MemOverlapStatus::Partial &&
+            lap != at::MemOverlapStatus::Full,
         0,
         "unsupported operation: the input tensors cannot refer to any of the "
         "output memory locations. Found overlap in input tensor ",
