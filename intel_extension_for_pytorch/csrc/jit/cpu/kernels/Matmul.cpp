@@ -84,10 +84,10 @@ at::Tensor dil_matmul_div(
 
   if (out.defined()) {
     at::matmul_out(out, tensor1, tensor2);
-    return out.div(div_input);
+    return out.div_(div_input);
   }
   auto output = at::matmul(tensor1, tensor2);
-  return output.div(div_input);
+  return output.div_(div_input);
 }
 
 /**

@@ -218,6 +218,43 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   rewriter_aten.runOnGraph(graph);
 }
 
+void FuseMatmulDiv(std::shared_ptr<Graph>& graph) {
+  const std::string div_str = R"(div)";
+  const std::string div_inplace_str = R"(div_)";
+  std::vector<std::string> div_ops = {div_str, div_inplace_str};
+
+  auto aten_pattern = at::jit::CodeTemplate(R"(
+      graph(%x, %y, %z):
+        %mm_res = aten::matmul(%x, %y)
+        %div_res = aten::${div_op}(%mm_res, %z)
+        return (%div_res) )");
+
+  auto aten_pattern_with_out = at::jit::CodeTemplate(R"(
+      graph(%x, %y, %z, %out):
+        %mm_res = aten::matmul(%x, %y, %out)
+        %div_res = aten::${div_op}(%mm_res, %z)
+        return (%div_res) )");
+
+  std::string fused_matmul_div = R"(
+      graph(%x, %y, %z):
+        %r = ipex::matmul_div(%x, %y, %z)
+        return (%r) )";
+  std::string fused_matmul_div_with_out = R"(
+      graph(%x, %y, %z, %out):
+        %r = ipex::matmul_div(%x, %y, %out, %z)
+        return (%r) )";
+  for (auto const& it : div_ops) {
+    at::jit::TemplateEnv env;
+    env.s("div_op", it);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(aten_pattern.format(env), fused_matmul_div);
+    rewriter.RegisterRewritePattern(
+        aten_pattern_with_out.format(env), fused_matmul_div_with_out);
+    rewriter.runOnGraph(graph);
+  }
+}
+
 // MHA fusion covers aten::softmax, ipex::softmax and ipex::softmax_:
 // (1) MHA obviously shows better performance than aten div/matmul/add/softmax.
 // (2) MHA also shows better performance than aten add + matmul_div fusion

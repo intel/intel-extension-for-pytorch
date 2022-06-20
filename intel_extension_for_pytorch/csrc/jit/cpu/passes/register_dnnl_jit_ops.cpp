@@ -729,8 +729,8 @@ RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Tensor "
-        "div_input) -> Tensor",
+        "ipex::matmul_div(Tensor left, Tensor right, Tensor(a!) out_opt, Tensor "
+        "div_input) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = dil_matmul_div(
@@ -746,8 +746,8 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
-        "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Scalar "
-        "div_input) -> Tensor",
+        "ipex::matmul_div(Tensor left, Tensor right, Tensor(a!) out_opt, Scalar "
+        "div_input) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = dil_matmul_div(
