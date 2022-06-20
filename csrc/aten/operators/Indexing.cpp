@@ -1030,7 +1030,7 @@ Tensor& index_fill_(
       "index_fill_(): Expected dtype int64 for index.");
 
   at::assert_no_overlap(self, index);
-  if (at::has_internal_overlap(self) == at::MemOverlap::YES) {
+  if (at::has_internal_overlap(self) == at::MemOverlap::Yes) {
     TORCH_WARN(
         "Use of index_fill_ on expanded tensors is deprecated. "
         "Please clone() the tensor before performing this operation. "
@@ -1152,7 +1152,7 @@ Tensor& masked_fill_(Tensor& self, const Tensor& mask, const Scalar& value) {
       mask.scalar_type());
   auto maybe_outnames =
       namedinference::broadcast_to_outnames(self, mask, "masked_fill_");
-  if (at::has_internal_overlap(self) == MemOverlap::YES) {
+  if (at::has_internal_overlap(self) == MemOverlap::Yes) {
     TORCH_WARN(
         "Use of masked_fill_ on expanded tensors is deprecated. "
         "Please clone() the tensor before performing this operation. "
@@ -1364,7 +1364,7 @@ Tensor& _index_put_impl_(
       " (got ",
       indices.size(),
       ")");
-  if (at::has_internal_overlap(self) == MemOverlap::YES) {
+  if (at::has_internal_overlap(self) == MemOverlap::Yes) {
     TORCH_WARN(
         "Use of index_put_ on expanded tensors is deprecated. "
         "Please clone() the tensor before performing this operation. "
