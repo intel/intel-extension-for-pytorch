@@ -311,8 +311,12 @@ inline scalar_t relu_forward(scalar_t self) {
 template <typename scalar_t>
 inline scalar_t gelu_erf_forward(scalar_t self) {
   using accscalar_t = acc_type<scalar_t>;
-  auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
-  return (scalar_t)(M_SQRT1_2 * v * (1.0 + Numerics<accscalar_t>::erf(v)));
+  const accscalar_t alpha = accscalar_t(M_SQRT1_2);
+  const accscalar_t one = accscalar_t(1);
+  const accscalar_t pointfive = accscalar_t(0.5);
+  const accscalar_t x = static_cast<accscalar_t>(self);
+  return (scalar_t)(
+      x * pointfive * (one + Numerics<accscalar_t>::erf(x * alpha)));
 }
 
 template <typename scalar_t>
