@@ -80,6 +80,8 @@ const std::map<std::string, PostOp>& supported_unary_post_op_fusion_set() {
       {"aten::round_", {"round"}},
       {"aten::sqrt", {"sqrt"}},
       {"aten::sqrt_", {"sqrt"}},
+      {"aten::hardsigmoid", {"hardsigmoid"}},
+      {"aten::hardsigmoid_", {"hardsigmoid"}},
   };
   return fusion_attr_map;
 }

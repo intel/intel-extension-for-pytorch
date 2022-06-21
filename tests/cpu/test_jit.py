@@ -114,6 +114,8 @@ unary_PyTorch_op_to_IPEX_op_map = {
     torch.nn.Hardswish(inplace=False): EltwiseFusionOp("hardswish"),
     torch.square: EltwiseFusionOp("square", prec=0.035),
     torch.square_: EltwiseFusionOp("square", prec=0.035),
+    torch.nn.Hardsigmoid(inplace=True): EltwiseFusionOp("hardsigmoid"),
+    torch.nn.Hardsigmoid(inplace=False): EltwiseFusionOp("hardsigmoid"),
 }
 
 non_unary_PyTorch_op_to_IPEX_op_map = {

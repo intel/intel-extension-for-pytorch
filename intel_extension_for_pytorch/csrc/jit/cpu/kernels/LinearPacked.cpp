@@ -55,6 +55,7 @@ DEFINE_LINEAR_UNARY_ELTWISE_RUN(square);
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(log);
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(round);
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(sqrt);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(hardsigmoid);
 
 at::Tensor linear_leaky_relu_run(
     const at::Tensor& input,

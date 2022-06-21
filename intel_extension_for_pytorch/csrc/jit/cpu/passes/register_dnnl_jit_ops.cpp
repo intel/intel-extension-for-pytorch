@@ -186,6 +186,7 @@ RegisterOperators op({
     CreateConvUnaryPostOpPrepack(log),
     CreateConvUnaryPostOpPrepack(round),
     CreateConvUnaryPostOpPrepack(sqrt),
+    CreateConvUnaryPostOpPrepack(hardsigmoid),
 
     CreateConvUnaryPostOpRun(run),
     CreateConvUnaryPostOpRun(relu_run),
@@ -200,6 +201,7 @@ RegisterOperators op({
     CreateConvUnaryPostOpRun(log_run),
     CreateConvUnaryPostOpRun(round_run),
     CreateConvUnaryPostOpRun(sqrt_run),
+    CreateConvUnaryPostOpRun(hardsigmoid_run),
 
     CreateConvBinaryPostOpPrepack(add, fuse_sum),
     CreateConvBinaryPostOpPrepack(add_relu, residual),
@@ -492,6 +494,7 @@ RegisterOperators op({
     CreateLinearUnaryPostOpRun(log_run),
     CreateLinearUnaryPostOpRun(round_run),
     CreateLinearUnaryPostOpRun(sqrt_run),
+    CreateLinearUnaryPostOpRun(hardsigmoid_run),
 
     Operator(
         "ipex_prepack::linear_leaky_relu_run(Tensor input, Scalar alpha, "
@@ -618,6 +621,7 @@ RegisterOperators op({
     CreateConvTransposeUnaryPostOpRun(log_run),
     CreateConvTransposeUnaryPostOpRun(round_run),
     CreateConvTransposeUnaryPostOpRun(sqrt_run),
+    CreateConvTransposeUnaryPostOpRun(hardsigmoid_run),
 
     Operator(
         "ipex_prepack::conv_transpose_gelu_run(Tensor input, str approximate, "
