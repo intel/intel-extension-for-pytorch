@@ -105,76 +105,112 @@ int64_t mkl_getrf_scratchpad<c10::complex<float>>(
 template <typename scalar_t>
 int64_t mkl_getrs_scratchpad(
     DPCPP::queue& queue,
-    oneapi::mkl::transpose* trans,
-    int64_t* n,
-    int64_t* nrhs,
-    int64_t* lda,
-    int64_t* ldb,
-    int64_t group_count,
-    int64_t* group_sizes) {
+    oneapi::mkl::transpose trans,
+    int64_t n,
+    int64_t nrhs,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::getrs_batch_scratchpad_size<scalar_t>(
-      queue, trans, n, nrhs, lda, ldb, group_count, group_sizes);
+      queue,
+      trans,
+      n,
+      nrhs,
+      lda,
+      stride_a,
+      stride_ipiv,
+      ldb,
+      stride_b,
+      batch_size);
 }
 
 template <>
 int64_t mkl_getrs_scratchpad<c10::complex<double>>(
     DPCPP::queue& queue,
-    oneapi::mkl::transpose* trans,
-    int64_t* n,
-    int64_t* nrhs,
-    int64_t* lda,
-    int64_t* ldb,
-    int64_t group_count,
-    int64_t* group_sizes) {
+    oneapi::mkl::transpose trans,
+    int64_t n,
+    int64_t nrhs,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::getrs_batch_scratchpad_size<std::complex<double>>(
-      queue, trans, n, nrhs, lda, ldb, group_count, group_sizes);
+      queue,
+      trans,
+      n,
+      nrhs,
+      lda,
+      stride_a,
+      stride_ipiv,
+      ldb,
+      stride_b,
+      batch_size);
 }
 
 template <>
 int64_t mkl_getrs_scratchpad<c10::complex<float>>(
     DPCPP::queue& queue,
-    oneapi::mkl::transpose* trans,
-    int64_t* n,
-    int64_t* nrhs,
-    int64_t* lda,
-    int64_t* ldb,
-    int64_t group_count,
-    int64_t* group_sizes) {
+    oneapi::mkl::transpose trans,
+    int64_t n,
+    int64_t nrhs,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::getrs_batch_scratchpad_size<std::complex<float>>(
-      queue, trans, n, nrhs, lda, ldb, group_count, group_sizes);
+      queue,
+      trans,
+      n,
+      nrhs,
+      lda,
+      stride_a,
+      stride_ipiv,
+      ldb,
+      stride_b,
+      batch_size);
 }
 
 template <typename scalar_t>
 int64_t mkl_getri_scratchpad(
     DPCPP::queue& queue,
-    int64_t* n,
-    int64_t* lda,
-    int64_t group_count,
-    int64_t* group_sizes) {
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::getri_batch_scratchpad_size<scalar_t>(
-      queue, n, lda, group_count, group_sizes);
+      queue, n, lda, stride_a, stride_ipiv, batch_size);
 }
 
 template <>
 int64_t mkl_getri_scratchpad<c10::complex<double>>(
     DPCPP::queue& queue,
-    int64_t* n,
-    int64_t* lda,
-    int64_t group_count,
-    int64_t* group_sizes) {
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::getri_batch_scratchpad_size<std::complex<double>>(
-      queue, n, lda, group_count, group_sizes);
+      queue, n, lda, stride_a, stride_ipiv, batch_size);
 }
 
 template <>
 int64_t mkl_getri_scratchpad<c10::complex<float>>(
     DPCPP::queue& queue,
-    int64_t* n,
-    int64_t* lda,
-    int64_t group_count,
-    int64_t* group_sizes) {
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_ipiv,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::getri_batch_scratchpad_size<std::complex<float>>(
-      queue, n, lda, group_count, group_sizes);
+      queue, n, lda, stride_a, stride_ipiv, batch_size);
 }
 
 template <typename scalar_t>
@@ -267,16 +303,18 @@ void mkl_getrf<c10::complex<float>>(
 template <typename scalar_t>
 void mkl_getrs(
     DPCPP::queue& queue,
-    oneapi::mkl::transpose* trans,
-    int64_t* n,
-    int64_t* nrhs,
-    scalar_t** a,
-    int64_t* lda,
-    int64_t** ipiv,
-    scalar_t** b,
-    int64_t* ldb,
-    int64_t group_count,
-    int64_t* group_sizes,
+    oneapi::mkl::transpose trans,
+    int64_t n,
+    int64_t nrhs,
+    scalar_t* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    scalar_t* b,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size,
     scalar_t* scratchpad,
     int64_t scratchpad_size) {
   DPCPP_ONEMKL_SUBMIT(
@@ -288,11 +326,13 @@ void mkl_getrs(
       nrhs,
       a,
       lda,
+      stride_a,
       ipiv,
+      stride_ipiv,
       b,
       ldb,
-      group_count,
-      group_sizes,
+      stride_b,
+      batch_size,
       scratchpad,
       scratchpad_size);
 }
@@ -300,16 +340,18 @@ void mkl_getrs(
 template <>
 void mkl_getrs<c10::complex<double>>(
     DPCPP::queue& queue,
-    oneapi::mkl::transpose* trans,
-    int64_t* n,
-    int64_t* nrhs,
-    c10::complex<double>** a,
-    int64_t* lda,
-    int64_t** ipiv,
-    c10::complex<double>** b,
-    int64_t* ldb,
-    int64_t group_count,
-    int64_t* group_sizes,
+    oneapi::mkl::transpose trans,
+    int64_t n,
+    int64_t nrhs,
+    c10::complex<double>* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    c10::complex<double>* b,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size,
     c10::complex<double>* scratchpad,
     int64_t scratchpad_size) {
   DPCPP_ONEMKL_SUBMIT(
@@ -319,13 +361,15 @@ void mkl_getrs<c10::complex<double>>(
       trans,
       n,
       nrhs,
-      reinterpret_cast<std::complex<double>**>(a),
+      reinterpret_cast<std::complex<double>*>(a),
       lda,
+      stride_a,
       ipiv,
-      reinterpret_cast<std::complex<double>**>(b),
+      stride_ipiv,
+      reinterpret_cast<std::complex<double>*>(b),
       ldb,
-      group_count,
-      group_sizes,
+      stride_b,
+      batch_size,
       reinterpret_cast<std::complex<double>*>(scratchpad),
       scratchpad_size);
 }
@@ -333,16 +377,18 @@ void mkl_getrs<c10::complex<double>>(
 template <>
 void mkl_getrs<c10::complex<float>>(
     DPCPP::queue& queue,
-    oneapi::mkl::transpose* trans,
-    int64_t* n,
-    int64_t* nrhs,
-    c10::complex<float>** a,
-    int64_t* lda,
-    int64_t** ipiv,
-    c10::complex<float>** b,
-    int64_t* ldb,
-    int64_t group_count,
-    int64_t* group_sizes,
+    oneapi::mkl::transpose trans,
+    int64_t n,
+    int64_t nrhs,
+    c10::complex<float>* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    c10::complex<float>* b,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size,
     c10::complex<float>* scratchpad,
     int64_t scratchpad_size) {
   DPCPP_ONEMKL_SUBMIT(
@@ -352,13 +398,15 @@ void mkl_getrs<c10::complex<float>>(
       trans,
       n,
       nrhs,
-      reinterpret_cast<std::complex<float>**>(a),
+      reinterpret_cast<std::complex<float>*>(a),
       lda,
+      stride_a,
       ipiv,
-      reinterpret_cast<std::complex<float>**>(b),
+      stride_ipiv,
+      reinterpret_cast<std::complex<float>*>(b),
       ldb,
-      group_count,
-      group_sizes,
+      stride_b,
+      batch_size,
       reinterpret_cast<std::complex<float>*>(scratchpad),
       scratchpad_size);
 }
@@ -366,12 +414,13 @@ void mkl_getrs<c10::complex<float>>(
 template <typename scalar_t>
 void mkl_getri(
     DPCPP::queue& queue,
-    int64_t* n,
-    scalar_t** a,
-    int64_t* lda,
-    int64_t** ipiv,
-    int64_t group_count,
-    int64_t* group_sizes,
+    int64_t n,
+    scalar_t* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    int64_t batch_size,
     scalar_t* scratchpad,
     int64_t scratchpad_size) {
   DPCPP_ONEMKL_SUBMIT(
@@ -381,9 +430,10 @@ void mkl_getri(
       n,
       a,
       lda,
+      stride_a,
       ipiv,
-      group_count,
-      group_sizes,
+      stride_ipiv,
+      batch_size,
       scratchpad,
       scratchpad_size);
 }
@@ -391,12 +441,13 @@ void mkl_getri(
 template <>
 void mkl_getri<c10::complex<double>>(
     DPCPP::queue& queue,
-    int64_t* n,
-    c10::complex<double>** a,
-    int64_t* lda,
-    int64_t** ipiv,
-    int64_t group_count,
-    int64_t* group_sizes,
+    int64_t n,
+    c10::complex<double>* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    int64_t batch_size,
     c10::complex<double>* scratchpad,
     int64_t scratchpad_size) {
   DPCPP_ONEMKL_SUBMIT(
@@ -404,11 +455,12 @@ void mkl_getri<c10::complex<double>>(
       oneapi::mkl::lapack::getri_batch,
       queue,
       n,
-      reinterpret_cast<std::complex<double>**>(a),
+      reinterpret_cast<std::complex<double>*>(a),
       lda,
+      stride_a,
       ipiv,
-      group_count,
-      group_sizes,
+      stride_ipiv,
+      batch_size,
       reinterpret_cast<std::complex<double>*>(scratchpad),
       scratchpad_size);
 }
@@ -416,12 +468,13 @@ void mkl_getri<c10::complex<double>>(
 template <>
 void mkl_getri<c10::complex<float>>(
     DPCPP::queue& queue,
-    int64_t* n,
-    c10::complex<float>** a,
-    int64_t* lda,
-    int64_t** ipiv,
-    int64_t group_count,
-    int64_t* group_sizes,
+    int64_t n,
+    c10::complex<float>* a,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t* ipiv,
+    int64_t stride_ipiv,
+    int64_t batch_size,
     c10::complex<float>* scratchpad,
     int64_t scratchpad_size) {
   DPCPP_ONEMKL_SUBMIT(
@@ -429,11 +482,12 @@ void mkl_getri<c10::complex<float>>(
       oneapi::mkl::lapack::getri_batch,
       queue,
       n,
-      reinterpret_cast<std::complex<float>**>(a),
+      reinterpret_cast<std::complex<float>*>(a),
       lda,
+      stride_a,
       ipiv,
-      group_count,
-      group_sizes,
+      stride_ipiv,
+      batch_size,
       reinterpret_cast<std::complex<float>*>(scratchpad),
       scratchpad_size);
 }
@@ -441,49 +495,53 @@ void mkl_getri<c10::complex<float>>(
 template <typename scalar_t>
 int64_t mkl_geqrf_batch_scratchpad_size(
     DPCPP::queue& queue,
-    int64_t* m,
-    int64_t* n,
-    int64_t* lda,
-    int64_t group_count,
-    int64_t* batch_size) {
+    int64_t m,
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_tau,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::geqrf_batch_scratchpad_size<scalar_t>(
-      queue, m, n, lda, group_count, batch_size);
+      queue, m, n, lda, stride_a, stride_tau, batch_size);
 }
 
 template <>
 int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<float>>(
     DPCPP::queue& queue,
-    int64_t* m,
-    int64_t* n,
-    int64_t* lda,
-    int64_t group_count,
-    int64_t* batch_size) {
+    int64_t m,
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_tau,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::geqrf_batch_scratchpad_size<std::complex<float>>(
-      queue, m, n, lda, group_count, batch_size);
+      queue, m, n, lda, stride_a, stride_tau, batch_size);
 }
 
 template <>
 int64_t mkl_geqrf_batch_scratchpad_size<c10::complex<double>>(
     DPCPP::queue& queue,
-    int64_t* m,
-    int64_t* n,
-    int64_t* lda,
-    int64_t group_count,
-    int64_t* batch_size) {
+    int64_t m,
+    int64_t n,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t stride_tau,
+    int64_t batch_size) {
   return oneapi::mkl::lapack::geqrf_batch_scratchpad_size<std::complex<double>>(
-      queue, m, n, lda, group_count, batch_size);
+      queue, m, n, lda, stride_a, stride_tau, batch_size);
 }
 
 template <typename scalar_t>
 void mkl_geqrf_batch(
     DPCPP::queue& queue,
-    int64_t* m,
-    int64_t* n,
-    scalar_t** a,
-    int64_t* lda,
-    scalar_t** tau,
-    int64_t group_count,
-    int64_t* group_sizes,
+    int64_t m,
+    int64_t n,
+    scalar_t* a,
+    int64_t lda,
+    int64_t stride_a,
+    scalar_t* tau,
+    int64_t stride_tau,
+    int64_t batch_size,
     scalar_t* scratchpad,
     int64_t scratchpadsize) {
   DPCPP_ONEMKL_SUBMIT(
@@ -494,9 +552,10 @@ void mkl_geqrf_batch(
       n,
       a,
       lda,
+      stride_a,
       tau,
-      group_count,
-      group_sizes,
+      stride_tau,
+      batch_size,
       (scalar_t*)scratchpad,
       scratchpadsize);
 }
@@ -504,13 +563,14 @@ void mkl_geqrf_batch(
 template <>
 void mkl_geqrf_batch<c10::complex<float>>(
     DPCPP::queue& queue,
-    int64_t* m,
-    int64_t* n,
-    c10::complex<float>** a,
-    int64_t* lda,
-    c10::complex<float>** tau,
-    int64_t group_count,
-    int64_t* group_sizes,
+    int64_t m,
+    int64_t n,
+    c10::complex<float>* a,
+    int64_t lda,
+    int64_t stride_a,
+    c10::complex<float>* tau,
+    int64_t stride_tau,
+    int64_t batch_size,
     c10::complex<float>* scratchpad,
     int64_t scratchpadsize) {
   DPCPP_ONEMKL_SUBMIT(
@@ -519,11 +579,12 @@ void mkl_geqrf_batch<c10::complex<float>>(
       queue,
       m,
       n,
-      reinterpret_cast<std::complex<float>**>(a),
+      reinterpret_cast<std::complex<float>*>(a),
       lda,
-      reinterpret_cast<std::complex<float>**>(tau),
-      group_count,
-      group_sizes,
+      stride_a,
+      reinterpret_cast<std::complex<float>*>(tau),
+      stride_tau,
+      batch_size,
       reinterpret_cast<std::complex<float>*>(scratchpad),
       scratchpadsize);
 }
@@ -531,13 +592,14 @@ void mkl_geqrf_batch<c10::complex<float>>(
 template <>
 void mkl_geqrf_batch<c10::complex<double>>(
     DPCPP::queue& queue,
-    int64_t* m,
-    int64_t* n,
-    c10::complex<double>** a,
-    int64_t* lda,
-    c10::complex<double>** tau,
-    int64_t group_count,
-    int64_t* group_sizes,
+    int64_t m,
+    int64_t n,
+    c10::complex<double>* a,
+    int64_t lda,
+    int64_t stride_a,
+    c10::complex<double>* tau,
+    int64_t stride_tau,
+    int64_t batch_size,
     c10::complex<double>* scratchpad,
     int64_t scratchpadsize) {
   DPCPP_ONEMKL_SUBMIT(
@@ -546,11 +608,12 @@ void mkl_geqrf_batch<c10::complex<double>>(
       queue,
       m,
       n,
-      reinterpret_cast<std::complex<double>**>(a),
+      reinterpret_cast<std::complex<double>*>(a),
       lda,
-      reinterpret_cast<std::complex<double>**>(tau),
-      group_count,
-      group_sizes,
+      stride_a,
+      reinterpret_cast<std::complex<double>*>(tau),
+      stride_tau,
+      batch_size,
       reinterpret_cast<std::complex<double>*>(scratchpad),
       scratchpadsize);
 }
@@ -736,58 +799,48 @@ static void apply_lu_solve_dpcpp_(
   if (lu_.numel() == 0)
     return;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t batch_size = native::batchCount(b_);
-  int64_t group_count = (batch_size + local_size - 1) / local_size;
-  int64_t* group_sizes = new int64_t[group_count];
-  for (auto i = 0; i < group_count; i++)
-    group_sizes[i] = std::min(local_size, batch_size - i * local_size);
 
-  std::vector<oneapi::mkl::transpose> trans(group_count, to_blas(t));
-  std::vector<int64_t> n(group_count, lu_.size(-2));
-  std::vector<int64_t> nrhs(group_count, b_.size(-1));
-  std::vector<int64_t> lda(group_count, lu_.size(-2));
-  std::vector<int64_t> ldb(group_count, b_.size(-2));
-
-  scalar_t* a_ptr = (scalar_t*)(lu_.data_ptr());
-  int64_t* ipiv_ptr = (int64_t*)(pivots_.data_ptr());
-  scalar_t* b_ptr = (scalar_t*)(b_.data_ptr());
-  std::vector<scalar_t*> a;
-  std::vector<int64_t*> ipiv;
-  std::vector<scalar_t*> b;
+  auto trans = to_blas(t);
+  int64_t n = lu_.size(-2);
+  int64_t nrhs = b_.size(-1);
+  int64_t lda = lu_.size(-2);
   int64_t stride_a = native::matrixStride(lu_);
   int64_t stride_ipiv = pivots_.size(-1);
+  int64_t ldb = b_.size(-2);
   int64_t stride_b = native::matrixStride(b_);
-  for (auto i = 0; i < batch_size; i++) {
-    a.push_back(&a_ptr[i * stride_a]);
-    ipiv.push_back(&ipiv_ptr[i * stride_ipiv]);
-    b.push_back(&b_ptr[i * stride_b]);
-  }
+
+  scalar_t* a = (scalar_t*)(lu_.data_ptr());
+  int64_t* ipiv = (int64_t*)(pivots_.data_ptr());
+  scalar_t* b = (scalar_t*)(b_.data_ptr());
 
   int64_t scratchpadsize = mkl_getrs_scratchpad<scalar_t>(
       dpcpp_queue,
-      trans.data(),
-      n.data(),
-      nrhs.data(),
-      lda.data(),
-      ldb.data(),
-      group_count,
-      group_sizes);
+      trans,
+      n,
+      nrhs,
+      lda,
+      stride_a,
+      stride_ipiv,
+      ldb,
+      stride_b,
+      batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, b_.options());
   try {
     mkl_getrs<scalar_t>(
         dpcpp_queue,
-        trans.data(),
-        n.data(),
-        nrhs.data(),
-        a.data(),
-        lda.data(),
-        ipiv.data(),
-        b.data(),
-        ldb.data(),
-        group_count,
-        group_sizes,
+        trans,
+        n,
+        nrhs,
+        a,
+        lda,
+        stride_a,
+        ipiv,
+        stride_ipiv,
+        b,
+        ldb,
+        stride_b,
+        batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -807,40 +860,29 @@ static void apply_inverse_dpcpp_(Tensor& self_, std::vector<int64_t>& infos_) {
   impl::apply_lu_dpcpp_<scalar_t>(self_, pivots_, infos_);
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
   int64_t batch_size = native::batchCount(self_);
-  int64_t group_count = (batch_size + local_size - 1) / local_size;
-  int64_t* group_sizes = new int64_t[group_count];
-  for (auto i = 0; i < group_count; i++)
-    group_sizes[i] = std::min(local_size, batch_size - i * local_size);
 
-  std::vector<int64_t> n(group_count, self_.size(-2));
-  std::vector<int64_t> lda(group_count, self_.size(-2));
-
-  scalar_t* a_ptr = (scalar_t*)(self_.data_ptr());
-  int64_t* ipiv_ptr = (int64_t*)(pivots_.data_ptr());
-  std::vector<scalar_t*> a;
-  std::vector<int64_t*> ipiv;
+  int64_t n = self_.size(-2);
+  int64_t lda = self_.size(-2);
   int64_t stride_a = native::matrixStride(self_);
   int64_t stride_ipiv = pivots_.size(-1);
-  for (auto i = 0; i < batch_size; i++) {
-    a.push_back(&a_ptr[i * stride_a]);
-    ipiv.push_back(&ipiv_ptr[i * stride_ipiv]);
-  }
+
+  scalar_t* a = (scalar_t*)(self_.data_ptr());
+  int64_t* ipiv = (int64_t*)(pivots_.data_ptr());
 
   int64_t scratchpadsize = mkl_getri_scratchpad<scalar_t>(
-      dpcpp_queue, n.data(), lda.data(), group_count, group_sizes);
+      dpcpp_queue, n, lda, stride_a, stride_ipiv, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     mkl_getri<scalar_t>(
         dpcpp_queue,
-        n.data(),
-        a.data(),
-        lda.data(),
-        ipiv.data(),
-        group_count,
-        group_sizes,
+        n,
+        a,
+        lda,
+        stride_a,
+        ipiv,
+        stride_ipiv,
+        batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -860,42 +902,31 @@ static void apply_geqrf_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t group_count = (batch_size + local_size - 1) / local_size;
-  int64_t* group_sizes = new int64_t[group_count];
-  for (auto i = 0; i < group_count; i++)
-    group_sizes[i] = std::min(local_size, batch_size - i * local_size);
 
-  std::vector<int64_t> m(group_count, m_);
-  std::vector<int64_t> n(group_count, n_);
-  std::vector<int64_t> lda(group_count, self_.size(-2));
-
-  scalar_t* a_ptr = (scalar_t*)(self_.data_ptr());
-  scalar_t* tau_ptr = (scalar_t*)(tau_.data_ptr());
-  std::vector<scalar_t*> a;
-  std::vector<scalar_t*> tau;
+  int64_t m = m_;
+  int64_t n = n_;
+  int64_t lda = self_.size(-2);
   int64_t stride_a = native::matrixStride(self_);
   int64_t stride_tau = tau_.size(-1);
-  for (auto i = 0; i < batch_size; i++) {
-    a.push_back(&a_ptr[i * stride_a]);
-    tau.push_back(&tau_ptr[i * stride_tau]);
-  }
+
+  scalar_t* a = (scalar_t*)(self_.data_ptr());
+  scalar_t* tau = (scalar_t*)(tau_.data_ptr());
 
   int64_t scratchpadsize = mkl_geqrf_batch_scratchpad_size<scalar_t>(
-      dpcpp_queue, m.data(), n.data(), lda.data(), group_count, group_sizes);
+      dpcpp_queue, m, n, lda, stride_a, stride_tau, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     mkl_geqrf_batch<scalar_t>(
         dpcpp_queue,
-        m.data(),
-        n.data(),
-        a.data(),
-        lda.data(),
-        tau.data(),
-        group_count,
-        group_sizes,
+        m,
+        n,
+        a,
+        lda,
+        stride_a,
+        tau,
+        stride_tau,
+        batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -916,53 +947,36 @@ static void apply_orgqr_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int64_t batch_size = native::batchCount(self_);
-  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t group_count = (batch_size + local_size - 1) / local_size;
-  int64_t* group_sizes = new int64_t[group_count];
-  for (auto i = 0; i < group_count; i++)
-    group_sizes[i] = std::min(local_size, batch_size - i * local_size);
 
-  std::vector<int64_t> m(group_count, m_);
-  std::vector<int64_t> n(group_count, n_columns_);
-  std::vector<int64_t> k(group_count, k_);
-  std::vector<int64_t> lda(group_count, self_.size(-2));
-
-  scalar_t* a_ptr = (scalar_t*)(self_.data_ptr());
-  scalar_t* tau_ptr = (scalar_t*)(tau_.data_ptr());
-  std::vector<scalar_t*> a;
-  std::vector<scalar_t*> tau;
+  int64_t m = m_;
+  int64_t n = n_columns_;
+  int64_t k = k_;
+  int64_t lda = self_.size(-2);
   int64_t stride_a = native::matrixStride(self_);
   int64_t stride_tau = tau_.size(-1);
-  for (auto i = 0; i < batch_size; i++) {
-    a.push_back(&a_ptr[i * stride_a]);
-    tau.push_back(&tau_ptr[i * stride_tau]);
-  }
+
+  scalar_t* a = (scalar_t*)(self_.data_ptr());
+  scalar_t* tau = (scalar_t*)(tau_.data_ptr());
 
   int64_t scratchpadsize =
       oneapi::mkl::lapack::orgqr_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue,
-          m.data(),
-          n.data(),
-          k.data(),
-          lda.data(),
-          group_count,
-          group_sizes);
+          dpcpp_queue, m, n, k, lda, stride_a, stride_tau, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
   try {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
         oneapi::mkl::lapack::orgqr_batch,
         dpcpp_queue,
-        m.data(),
-        n.data(),
-        k.data(),
-        a.data(),
-        lda.data(),
-        tau.data(),
-        group_count,
-        group_sizes,
+        m,
+        n,
+        k,
+        a,
+        lda,
+        stride_a,
+        tau,
+        stride_tau,
+        batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
@@ -1442,58 +1456,38 @@ static void apply_cholesky_solve_dpcpp_(
     std::vector<int64_t>& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   oneapi::mkl::uplo uplo = upper_ ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
   int64_t batch_size = native::batchCount(b_);
-  int64_t local_size = dpcppMaxWorkGroupSize(dev_id);
-  int64_t group_count = (batch_size + local_size - 1) / local_size;
-  int64_t* group_sizes = new int64_t[group_count];
-  for (auto i = 0; i < group_count; i++)
-    group_sizes[i] = std::min(local_size, batch_size - i * local_size);
 
-  std::vector<oneapi::mkl::transpose> trans(
-      group_count, oneapi::mkl::transpose::nontrans);
-  std::vector<int64_t> n(group_count, A_.size(-2));
-  std::vector<int64_t> nrhs(group_count, b_.size(-1));
-  std::vector<int64_t> lda(group_count, A_.size(-2));
-  std::vector<int64_t> ldb(group_count, b_.size(-2));
-
-  scalar_t* a_ptr = (scalar_t*)(A_.data_ptr());
-  scalar_t* b_ptr = (scalar_t*)(b_.data_ptr());
-  std::vector<scalar_t*> a;
-  std::vector<scalar_t*> b;
+  int64_t n = A_.size(-2);
+  int64_t nrhs = b_.size(-1);
+  int64_t lda = A_.size(-2);
+  int64_t ldb = b_.size(-2);
   int64_t stride_a = native::matrixStride(A_);
   int64_t stride_b = native::matrixStride(b_);
-  for (auto i = 0; i < batch_size; i++) {
-    a.push_back(&a_ptr[i * stride_a]);
-    b.push_back(&b_ptr[i * stride_b]);
-  }
+
+  scalar_t* a = (scalar_t*)(A_.data_ptr());
+  scalar_t* b = (scalar_t*)(b_.data_ptr());
 
   int64_t scratchpadsize =
       oneapi::mkl::lapack::potrs_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue,
-          &uplo,
-          n.data(),
-          nrhs.data(),
-          lda.data(),
-          ldb.data(),
-          group_count,
-          group_sizes);
+          dpcpp_queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, b_.options());
   try {
     DPCPP_ONEMKL_SUBMIT(
         dpcpp_queue,
         oneapi::mkl::lapack::potrs_batch,
         dpcpp_queue,
-        &uplo,
-        n.data(),
-        nrhs.data(),
-        a.data(),
-        lda.data(),
-        b.data(),
-        ldb.data(),
-        group_count,
-        group_sizes,
+        uplo,
+        n,
+        nrhs,
+        a,
+        lda,
+        stride_a,
+        b,
+        ldb,
+        stride_b,
+        batch_size,
         (scalar_t*)(scratchpad_at.data_ptr()),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
