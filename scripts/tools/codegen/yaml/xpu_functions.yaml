@@ -273,10 +273,8 @@ supported:
   - le.Scalar_out
   - le.Tensor
   - le.Tensor_out
-  - leaky_relu
   - leaky_relu.out
-  - leaky_relu_
-  - leaky_relu_backward
+  - leaky_relu_backward.grad_input
   - lerp.Scalar
   - lerp.Scalar_out
   - lerp.Tensor

@@ -15,11 +15,7 @@ Tensor& leaky_relu_out(
     const Tensor& self,
     const Scalar& negative_slope,
     Tensor& out) {
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(out)
-                  .add_input(self)
-                  .build();
+  auto iter = TensorIterator::unary_op(out, self);
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -36,38 +32,13 @@ Tensor& leaky_relu_out(
   return out;
 }
 
-Tensor leaky_relu(const Tensor& self, const Scalar& negative_slope) {
-  bool is_channel_last = !self.is_contiguous() &&
-      (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-       self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
-  Tensor result;
-  if (is_channel_last) {
-    float alpha = negative_slope.to<float>();
-    result = self.is_contiguous(at::MemoryFormat::ChannelsLast)
-        ? at::empty(
-              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast)
-        : at::empty(
-              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast3d);
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
-        result, self, alpha, 0.0f);
-  } else {
-    result = at::empty(self.sizes(), self.options());
-    at::AtenIpexTypeXPU::leaky_relu_out(self, negative_slope, result);
-  }
-  return result;
-}
-
 Tensor& leaky_relu_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar negative_slope) {
-  auto iter = TensorIteratorConfig()
-                  .set_check_mem_overlap(true)
-                  .add_output(grad_input)
-                  .add_input(grad_output)
-                  .add_input(self)
-                  .build();
+    const Scalar& negative_slope,
+    bool self_is_result,
+    Tensor& grad_input) {
+  auto iter = TensorIterator::binary_op(grad_input, grad_output, self);
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
@@ -82,52 +53,6 @@ Tensor& leaky_relu_backward_out(
             });
       });
   return grad_input;
-}
-
-Tensor leaky_relu_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Scalar& negative_slope,
-    bool self_is_result) {
-  // TODO: self_is_result
-  bool is_channel_last = !self.is_contiguous() &&
-      (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-       self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
-  Tensor grad_input;
-  if (is_channel_last) {
-    float alpha = negative_slope.to<float>();
-    grad_input = self.is_contiguous(at::MemoryFormat::ChannelsLast)
-        ? at::empty(
-              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast)
-        : at::empty(
-              self.sizes(), self.options(), at::MemoryFormat::ChannelsLast3d);
-    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(
-        grad_input, self, grad_output, alpha, 0.0f);
-    return grad_input;
-  } else {
-    TORCH_CHECK(
-        !self_is_result || negative_slope.to<double>() >= 0.0,
-        "In-place leakyReLu backward calculation is triggered with a negative slope which is not supported. "
-        "This is caused by calling in-place forward function with a negative slope, "
-        "please call out-of-place version instead.");
-    grad_input = at::empty({0}, grad_output.options());
-    return at::AtenIpexTypeXPU::leaky_relu_backward_out(
-        grad_input, grad_output, self, negative_slope);
-  }
-}
-
-Tensor& leaky_relu_(Tensor& self, const Scalar& negative_slope) {
-  bool is_channel_last = !self.is_contiguous() &&
-      (self.is_contiguous(at::MemoryFormat::ChannelsLast) ||
-       self.is_contiguous(at::MemoryFormat::ChannelsLast3d));
-  if (is_channel_last) {
-    float alpha = negative_slope.to<float>();
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
-        self, self, alpha, 0.0f);
-    return self;
-  } else {
-    return at::AtenIpexTypeXPU::leaky_relu_out(self, negative_slope, self);
-  }
 }
 
 } // namespace AtenIpexTypeXPU
