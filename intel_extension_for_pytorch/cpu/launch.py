@@ -621,14 +621,11 @@ class DistributedTrainingLauncher(Launcher):
         self.set_env("MASTER_PORT", str(args.master_port))
         mpi_pin_domain = self.get_mpi_pin_domain(args.nproc_per_node, args.ccl_worker_count, total_cores_per_node)
         self.set_env("I_MPI_PIN_DOMAIN", mpi_pin_domain)
-        mpi_pin_domain = os.environ["I_MPI_PIN_DOMAIN"]
 
         ppn = args.nproc_per_node
         cores_per_rank = total_cores_per_node // ppn
 
         omp_num_threads = cores_per_rank - args.ccl_worker_count
-        self.set_env("OMP_NUM_THREADS", str(omp_num_threads))
-        omp_num_threads = os.environ["OMP_NUM_THREADS"]
         self.set_multi_thread_and_allocator(omp_num_threads,
                                             args.disable_iomp,
                                             True,
