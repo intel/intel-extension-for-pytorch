@@ -255,7 +255,7 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
         .setAttr("min", clamp_min_value)
         .setAttr("max", clamp_max_value);
   } else if (nodeKind == Symbol::aten("hardtanh")) {
-    return makeEltwiseOp(node, opkind::HardTanh)
+    return makeEltwiseOp(node, opkind::Clamp)
         .setAttr("min", Operator::ScalarToFloat, 1)
         .setAttr("max", Operator::ScalarToFloat, 2);
   } else if (nodeKind == Symbol::aten("hardswish")) {

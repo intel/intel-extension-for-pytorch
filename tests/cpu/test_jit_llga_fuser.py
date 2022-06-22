@@ -220,8 +220,8 @@ class TestOp(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.pool1 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
-                self.pool2 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+                self.pool1 = nn.AdaptiveAvgPool2d((5,7))
+                self.pool2 = nn.AdaptiveAvgPool2d((5,7))
 
             def forward(self, x):
                 x1 = self.pool1(x)
@@ -231,7 +231,9 @@ class TestOp(JitLlgaTestCase):
         m = M()
         x = torch.randn(1, 3, 4, 4)
         graph, _ = self.checkTrace(m, [x])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertGraphContainsExactly(graph, "aten::adaptive_avg_pool2d", 1)
+        self.assertFused(graph, 'aten::add')
 
     @llga_fp32_bf16_test_env
     @unittest.skipIf(True, 'Disable mul due to bad performance')
@@ -612,6 +614,25 @@ class TestFusionPattern(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
             self.assertFused(graph, ['aten::batch_norm', 'aten::' + eltwise])
+
+    @llga_fp32_bf16_test_env
+    def test_avg_pool2d_add(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.pool1 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+                self.pool2 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+
+            def forward(self, x):
+                x1 = self.pool1(x)
+                x2 = self.pool2(x)
+                return x1 + x2
+
+        m = M()
+        x = torch.randn(1, 3, 4, 4)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)        
+        self.assertFused(graph, ['aten::avg_pool2d', 'aten::add'])
 
     @unittest.skip("Semi-Compiler unit-test")
     @llga_fp32_bf16_test_env
