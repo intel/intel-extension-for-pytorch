@@ -21,28 +21,19 @@ from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, Hist
 default_weight_observer = PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric)
 
 static_qconfig = [
-        QConfig(
-            activation = MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
+    QConfig(activation = MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
             weight = default_weight_observer),
-        QConfig(
-            activation = MinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8),
+    QConfig(activation = MinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8),
             weight = default_weight_observer),
-        QConfig(
-            activation = HistogramObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8, reduce_range=True),
+    QConfig(activation = HistogramObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8, reduce_range=True),
             weight = default_weight_observer),
-        QConfig(
-            activation = HistogramObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8, reduce_range=True),
-            weight = default_weight_observer),
-        ]
+    ipex.quantization.default_static_qconfig]
 
 dynamic_qconfig = [
-    QConfig(
-        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-        weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)),
-    QConfig(
-        activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-        weight = default_weight_observer),
-    ]
+    QConfig(activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
+            weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric)),
+    ipex.quantization.default_dynamic_qconfig]
+
 
 class TestIpexOps(JitLlgaTestCase):
     def test_adaptive_avg_pool2d(self):
