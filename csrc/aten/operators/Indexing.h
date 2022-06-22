@@ -62,7 +62,7 @@ class IndexKernelConfig : public BatchKernelConfig {
       stride = indexing_dimension_size;
       batch = 1;
       problem_batch = index_num;
-      problem_along_x = tinfo.strides[dim] == 1 ? true : false;
+      problem_along_x = tinfo.strides[dim] == 1 ? false : true;
     } else if (outer == 1) {
       problem = inner;
       stride = 1;
