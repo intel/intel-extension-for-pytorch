@@ -8,11 +8,6 @@ import glob
 import subprocess 
 
 class TestLauncher(TestCase):
-    def del_env(self, env_name):
-
-        if env_name in os.environ:
-            del os.environ[env_name]
-
     def find_lib(self, lib_type):
         library_paths = []
         if "CONDA_PREFIX" in os.environ:
@@ -31,28 +26,21 @@ class TestLauncher(TestCase):
                 break
         return lib_find
 
-    def test_iomp_memory_allocator_setup(self):
+    def test_memory_allocator_setup(self):
        launcher = Launcher()
-       self.del_env("OMP_NUM_THREADS")
-       self.del_env("LD_PRELOAD")
-       self.del_env("KMP_AFFINITY")
-       self.del_env("KMP_BLOCKTIME")
-       launcher.set_multi_thread_and_allocator(10, disable_iomp=False, enable_tcmalloc=True)
-       find_iomp5 = self.find_lib("iomp5")
+    
+       # tcmalloc
+       launcher.set_memory_allocator(enable_tcmalloc=True)
        find_tcmalloc = self.find_lib("tcmalloc")
        ld_preload_in_os = "LD_PRELOAD" in os.environ
-       iomp5_enabled = "libiomp5.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
        tcmalloc_enabled = "libtcmalloc.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
-       self.assertEqual(find_iomp5, iomp5_enabled)
        self.assertEqual(find_tcmalloc, tcmalloc_enabled)
-       launcher.set_multi_thread_and_allocator(10, disable_iomp=False, enable_tcmalloc=False, enable_jemalloc=True)
+       
+       # jemalloc 
+       launcher.set_memory_allocator(enable_tcmalloc=False, enable_jemalloc=True)
        find_jemalloc = self.find_lib("jemalloc")
        jemalloc_enabled = "libjemalloc.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
        self.assertEqual(find_jemalloc, jemalloc_enabled)
-       kmp_affinity_enabled = "KMP_AFFINITY" in os.environ and os.environ["KMP_AFFINITY"] == "granularity=fine,compact,1,0"
-       block_time_enabled = "KMP_BLOCKTIME" in os.environ and os.environ["KMP_BLOCKTIME"] == "1"
-       self.assertEqual(kmp_affinity_enabled, True)
-       self.assertEqual(block_time_enabled, True)
        if jemalloc_enabled:
            self.assertEqual(jemalloc_enabled, "MALLOC_CONF" in os.environ)
 
@@ -77,7 +65,7 @@ class TestLauncher(TestCase):
         
         if numactl_available:
             expected_core_affinity = "numactl -C {}-{}".format(str(0), str(num_physical_cores-1))
-            cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--no_python", "hostname"]
+            cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--no_python", "ls"]
             r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert r.returncode == 0
             assert expected_core_affinity in str(r.stdout, "utf-8")
@@ -87,7 +75,7 @@ class TestLauncher(TestCase):
         num_physical_cores = cpuinfo.physical_core_nums()
     
         expected_core_affinity = "taskset -c {}-{}".format(str(0), str(num_physical_cores-1))
-        cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--disable_numactl", "--no_python", "hostname"]
+        cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--disable_numactl", "--no_python", "ls"]
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         assert r.returncode == 0
         assert expected_core_affinity in str(r.stdout, "utf-8")
@@ -101,7 +89,7 @@ class TestLauncher(TestCase):
             # ncore_per_instance that guarantees cross-node cores binding without --skip_cross_node_cores
             ncore_per_instance = num_cores_per_node -1
             
-            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python ls".format(ncore_per_instance)
             r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert r.returncode == 0
             
@@ -120,7 +108,7 @@ class TestLauncher(TestCase):
             # ncore_per_instance that guarantees cross-node cores binding without --skip_cross_node_cores
             ncore_per_instance = num_cores_per_node -1
             
-            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --use_logical_core --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --use_logical_core --skip_cross_node_cores --no_python ls".format(ncore_per_instance)
             r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert r.returncode == 0
             
@@ -142,7 +130,7 @@ class TestLauncher(TestCase):
             # ncore_per_instance that guarantees cross-node cores binding without --skip_cross_node_cores
             ncore_per_instance = num_cores_per_node -1
             
-            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --node_id 0 --use_logical_core --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --node_id 0 --use_logical_core --skip_cross_node_cores --no_python ls".format(ncore_per_instance)
             r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert r.returncode == 0
             
@@ -166,7 +154,7 @@ class TestLauncher(TestCase):
             
             expected_msg = "Please make sure --ncore_per_instance < core(s) per socket"
             
-            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python ls".format(ncore_per_instance)
             r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert r.returncode != 0
             assert expected_msg in str(r.stdout, "utf-8")
@@ -182,7 +170,7 @@ class TestLauncher(TestCase):
             
             expected_msg = "--skip_cross_node_cores is set, but there are no cross-node cores"
             
-            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python hostname".format(ncore_per_instance)
+            cmd = "python -m intel_extension_for_pytorch.cpu.launch --ncore_per_instance {} --skip_cross_node_cores --no_python ls".format(ncore_per_instance)
             r = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             assert r.returncode == 0
             assert expected_msg in str(r.stdout, "utf-8")
