@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ATen/ATen.h>
 #include <ATen/core/Array.h>
 #include <ATen/detail/FunctionTraits.h>
 #include <c10/macros/Macros.h>
@@ -110,6 +111,71 @@ struct multi_outputs_store_helper {
 
 } // namespace detail
 
+#define NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(_) \
+  _(uint8_t, Byte)                                                        \
+  _(int8_t, Char)                                                         \
+  _(int16_t, Short)                                                       \
+  _(int, Int)                                                             \
+  _(int64_t, Long)                                                        \
+  _(at::Half, Half)                                                       \
+  _(float, Float)                                                         \
+  _(c10::complex<float>, ComplexFloat)                                    \
+  _(bool, Bool)                                                           \
+  _(at::BFloat16, BFloat16)
+
+#define NO_DOUBLE_FETCH_AND_CAST_CASE(type, scalartype) \
+  case ScalarType::scalartype:                          \
+    return static_cast_with_inter_type<dest_t, type>::apply(*(const type*)ptr);
+template <typename dest_t>
+inline dest_t no_double_fetch_and_cast(
+    const ScalarType src_type,
+    const void* ptr) {
+  switch (src_type) {
+    NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(
+        NO_DOUBLE_FETCH_AND_CAST_CASE)
+    default:
+      CUDA_KERNEL_ASSERT(false);
+  }
+  return dest_t(0); // just to avoid compiler warning
+}
+
+#define NO_DOUBLE_CAST_AND_STORE_CASE(type, scalartype)                   \
+  case ScalarType::scalartype:                                            \
+    *(type*)ptr = static_cast_with_inter_type<type, src_t>::apply(value); \
+    return;
+template <typename src_t>
+inline void no_double_cast_and_store(
+    const ScalarType dest_type,
+    void* ptr,
+    src_t value) {
+  switch (dest_type) {
+    NO_DOUBLE_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(
+        NO_DOUBLE_CAST_AND_STORE_CASE)
+    default:;
+  }
+  CUDA_KERNEL_ASSERT(false);
+}
+
+#define NO_DOUBLE_DEFINE_UNCASTABLE(T, scalartype_)           \
+  template <>                                                 \
+  inline T no_double_fetch_and_cast<T>(                       \
+      const ScalarType src_type, const void* ptr) {           \
+    CUDA_KERNEL_ASSERT(ScalarType::scalartype_ == src_type);  \
+    return *(const T*)ptr;                                    \
+  }                                                           \
+  template <>                                                 \
+  inline void no_double_cast_and_store<T>(                    \
+      const ScalarType dest_type, void* ptr, T value) {       \
+    CUDA_KERNEL_ASSERT(ScalarType::scalartype_ == dest_type); \
+    *(T*)ptr = value;                                         \
+  }
+
+AT_FORALL_QINT_TYPES(NO_DOUBLE_DEFINE_UNCASTABLE)
+
+#undef NO_DOUBLE_FETCH_AND_CAST_CASE
+#undef NO_DOUBLE_CAST_AND_STORE_CASE
+#undef NO_DOUBLE_DEFINE_UNCASTABLE
+
 struct LoadWithoutCast {
   template <typename scalar_t, typename offset_t>
   scalar_t load(char* base_ptr, offset_t offset, int arg) {
@@ -117,7 +183,7 @@ struct LoadWithoutCast {
   }
 };
 
-template <int N>
+template <int N, bool no_double_cast = false>
 struct LoadWithCast {
   using array_t = at::detail::Array<at::ScalarType, std::max<int>(N, 1)>;
   using size_array_t = at::detail::Array<uint32_t, std::max<int>(N, 1)>;
@@ -137,7 +203,15 @@ struct LoadWithCast {
   template <typename scalar_t, typename offset_t>
   scalar_t load(char* base_ptr, offset_t offset, int arg) {
     void* ptr = base_ptr + element_sizes[arg] * offset;
-    return c10::fetch_and_cast<scalar_t>(dtypes[arg], ptr);
+    /* FIXME: For GPU arch without double support, DPC++/IGC compiler will
+     * scoop out kernel body and insert assertion for critical warning, instead.
+     * To avoid functionality issue, we split cast support to two paths to cover
+     * both double and non-double cases.
+     */
+    if constexpr (no_double_cast)
+      return no_double_fetch_and_cast<scalar_t>(dtypes[arg], ptr);
+    else
+      return c10::fetch_and_cast<scalar_t>(dtypes[arg], ptr);
   }
 };
 
@@ -148,6 +222,7 @@ struct StoreWithoutCast {
   }
 };
 
+template <bool no_double_cast = false>
 struct StoreWithCast {
   at::ScalarType dtype;
   uint32_t element_size;
@@ -156,7 +231,15 @@ struct StoreWithCast {
   template <typename scalar_t, typename offset_t>
   void store(scalar_t value, char* base_ptr, offset_t offset) {
     void* ptr = base_ptr + element_size * offset;
-    c10::cast_and_store<scalar_t>(dtype, ptr, value);
+    /* FIXME: For GPU arch without double support, DPC++/IGC compiler will
+     * scoop out kernel body and insert assertion for critical warning, instead.
+     * To avoid functionality issue, we split cast support to two paths to cover
+     * both double and non-double cases.
+     */
+    if constexpr (no_double_cast)
+      no_double_cast_and_store<scalar_t>(dtype, ptr, value);
+    else
+      c10::cast_and_store<scalar_t>(dtype, ptr, value);
   }
 };
 

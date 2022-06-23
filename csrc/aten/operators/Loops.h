@@ -197,6 +197,34 @@ constexpr static inline int max_scalar_size() {
   return std::max<int>(sizeof(return_t), size);
 }
 
+template <typename scalar_t>
+constexpr inline bool check_double() {
+  return std::is_same<scalar_t, double>::value ||
+      std::is_same<scalar_t, c10::complex<double>>::value;
+}
+
+constexpr bool has_double_arg_(std::tuple<>) {
+  return false;
+}
+
+template <typename scalar_t, typename... types>
+constexpr bool has_double_arg_(std::tuple<scalar_t, types...>) {
+  return check_double<scalar_t>() || has_double_arg_(std::tuple<types...>{});
+}
+
+template <typename func_t>
+static inline bool has_double_arg(TensorIteratorBase& iter) {
+  using traits = function_traits<func_t>;
+  using args_t = typename traits::ArgsTuple;
+  using return_t = typename traits::result_type;
+  for (int i = 0; i < iter.ntensors(); i++) {
+    if (iter.tensor(i).scalar_type() == at::kDouble ||
+        iter.tensor(i).scalar_type() == at::kComplexDouble)
+      return true;
+  }
+  return check_double<return_t>() || has_double_arg_(args_t{});
+}
+
 // Assumption:
 // this function assume trivial 1d and no dynamic casting
 template <
@@ -355,35 +383,48 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
     for (int i = 0; i < traits::arity; i++) {
       dtypes[i] = iter.tensor(i + 1).scalar_type();
     }
-    auto loader = at::native::Memory::LoadWithCast<traits::arity>(dtypes);
-    auto storer =
-        at::native::Memory::StoreWithCast(iter.tensor(0).scalar_type());
 
-    if (contiguous) {
-      auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
-      auto output_offset_calculator = TrivialOffsetCalculator<1>();
-      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
-          numel,
-          f,
-          data,
-          input_offset_calculator,
-          output_offset_calculator,
-          loader,
-          storer);
+#define HANDLE_DYNAMIC_CAST(REMOVE_DOUBLE)                                     \
+  {                                                                            \
+    auto loader =                                                              \
+        at::native::Memory::LoadWithCast<traits::arity, REMOVE_DOUBLE>(        \
+            dtypes);                                                           \
+    auto storer = at::native::Memory::StoreWithCast<REMOVE_DOUBLE>(            \
+        iter.tensor(0).scalar_type());                                         \
+    if (contiguous) {                                                          \
+      auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>(); \
+      auto output_offset_calculator = TrivialOffsetCalculator<1>();            \
+      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(                     \
+          numel,                                                               \
+          f,                                                                   \
+          data,                                                                \
+          input_offset_calculator,                                             \
+          output_offset_calculator,                                            \
+          loader,                                                              \
+          storer);                                                             \
+    } else {                                                                   \
+      auto input_offset_calculator =                                           \
+          make_input_offset_calculator<traits::arity, singed_strides>(iter);   \
+      auto output_offset_calculator =                                          \
+          make_output_offset_calculator<1, singed_strides>(iter);              \
+      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(                     \
+          numel,                                                               \
+          f,                                                                   \
+          data,                                                                \
+          input_offset_calculator,                                             \
+          output_offset_calculator,                                            \
+          loader,                                                              \
+          storer);                                                             \
+    }                                                                          \
+  }
+
+    if (!has_double_arg<func_t>(iter)) {
+      HANDLE_DYNAMIC_CAST(true)
     } else {
-      auto input_offset_calculator =
-          make_input_offset_calculator<traits::arity, singed_strides>(iter);
-      auto output_offset_calculator =
-          make_output_offset_calculator<1, singed_strides>(iter);
-      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
-          numel,
-          f,
-          data,
-          input_offset_calculator,
-          output_offset_calculator,
-          loader,
-          storer);
+      HANDLE_DYNAMIC_CAST(false)
     }
+
+#undef HANDLE_DYNAMIC_CAST
   }
 }
 
