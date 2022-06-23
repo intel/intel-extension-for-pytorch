@@ -5,6 +5,7 @@
 #include "core/detail/TensorInfo.h"
 
 using namespace at::AtenIpexTypeXPU;
+using namespace xpu::dpcpp::detail;
 
 template <class SrcInfo, class DstInfo, class IdxInfo, class FuncType>
 class IndexKernelConfig : public BatchKernelConfig {
@@ -274,7 +275,12 @@ class IndexKernel {
     }
 
     cfg_.func_(
-        cfg_.dinfo_.data, cfg_.sinfo_.data, dst_off, src_off, cfg_.alpha_);
+        cfg_.dinfo_.data,
+        cfg_.sinfo_.data,
+        dst_off,
+        src_off,
+        glb_batch_group_loc_off,
+        cfg_.alpha_);
   }
 
  private:
@@ -300,6 +306,7 @@ class IndexFillOperator {
       ValType* src,
       int64_t dst_off,
       int64_t src_off,
+      int64_t idx,
       ValType alpha) const {
     dst[dst_off] = alpha;
   }
@@ -339,6 +346,7 @@ class IndexCopyOperator {
       ValType* src,
       int64_t dst_off,
       int64_t src_off,
+      int64_t idx,
       ValType alpha) const {
     dst[dst_off] = src[src_off];
   }
@@ -375,6 +383,7 @@ class IndexAddOperator {
       ValType* src,
       int64_t dst_off,
       int64_t src_off,
+      int64_t idx,
       ValType alpha) const {
     atomicAdd(
         (dpcpp_global_ptr_pt<ValType>)(dst + dst_off), src[src_off] * alpha);
@@ -410,6 +419,7 @@ class IndexSelectOperator {
       ValType* src,
       int64_t dst_off,
       int64_t src_off,
+      int64_t idx,
       ValType alpha) const {
     dst[dst_off] = src[src_off];
   }
