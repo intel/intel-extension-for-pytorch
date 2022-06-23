@@ -2813,6 +2813,37 @@ class Tester(TestCase):
         model = EinsumAdd(("ij,j"))
         _test_fp32(model, input1, input2, bias)
 
+        bias = torch.randn(1, 4, 49, 49)
+        input1 = torch.randn(8, 4, 49, 32)
+        input2 = torch.randn(8, 4, 49, 32)
+        model_from_vit = EinsumAdd('bhid,bhjd->bhij')
+        _test_fp32(model_from_vit, input1, input2, bias)
+
+        bias = torch.randn(1, 1, 49, 49)
+        input1 = torch.randn(8, 6, 49, 32)
+        input2 = torch.randn(8, 6, 49, 32)
+        model_from_vit_v2 = EinsumAdd('bhid,bhjd->bhij')
+        _test_fp32(model_from_vit_v2, input1, input2, bias)
+
+        bias = torch.randn(8, 1, 1, 49)
+        input1 = torch.randn(8, 6, 49, 32)
+        input2 = torch.randn(8, 6, 49, 32)
+        model_from_vit_alphafold2_v1 = EinsumAdd('bhid,bhjd->bhij')
+        _test_fp32(model_from_vit_alphafold2_v1, input1, input2, bias)
+
+        bias = torch.randn(1, 1, 32)
+        input1 = torch.randn( 6, 50, 32)
+        input2 = torch.randn( 32, 32)
+        model_from_vit_alphafold2_v2 = EinsumAdd('bsh,ho->bso')
+        _test_fp32(model_from_vit_alphafold2_v2, input1, input2, bias)
+
+        bias = torch.randn(6, 1, 50)
+        input1 = torch.randn( 6, 50, 32)
+        input2 = torch.randn( 6, 32, 50)
+        model_from_vit_alphafold2_v3 = EinsumAdd('bsh,bho->bso')
+        _test_fp32(model_from_vit_alphafold2_v3, input1, input2, bias)
+
+
     def test_ipex_softmax(self):
         self._test_output(
             AtenSoftmaxRepalce(),

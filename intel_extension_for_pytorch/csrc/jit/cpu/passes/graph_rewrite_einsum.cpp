@@ -16,8 +16,9 @@ auto ipex_einsum_filter =
       auto equation =
           getIValue("equation", match_vmap, vmap).value().toStringView();
       int num_ops = std::count(equation.begin(), equation.end(), ',') + 1;
-      if (num_ops != 2)
+      if (num_ops != 2) {
         return false; // only process the 2 operands
+      }
       return true;
     };
 
