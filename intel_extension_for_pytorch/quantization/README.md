@@ -100,7 +100,7 @@ or define your own qconfig as:
 ```python
 from torch.ao.quantization import MinMaxObserver, PlaceholderObserver, QConfig
 dynamic_qconfig = QConfig(activation = PlaceholderObserver.with_args(dtype=torch.float, compute_dtype=torch.quint8),
-                          weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
+                          weight = MinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric))
 ```
 
 Note: For weight observer, it only supports dtype **torch.qint8**, and the qscheme only can be **torch.per_tensor_symmetric** or **torch.per_channel_symmetric**. For activation observer, it only supports dtype **torch.float**, and the compute_dtype can be **torch.quint8** or **torch.qint8**.

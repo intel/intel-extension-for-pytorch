@@ -8,7 +8,7 @@ import torch.fx.experimental.optimization as optimization
 
 import intel_extension_for_pytorch._C as core
 from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model 
-from ... import nn
+from .. import nn
 
 def prepare(
     model,
