@@ -1,4 +1,5 @@
 import torch
+import torch.fx.experimental.optimization as optimization
 import intel_extension_for_pytorch as ipex
 import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.nn.utils._weight_prepack import _IPEXLinear as _IPEXLinear, _IPEXConv2d as _IPEXConv2d
@@ -45,6 +46,7 @@ class ConvTranspose2d(torch.nn.Module):
     def __init__(self, ):
         super(ConvTranspose2d, self).__init__()
         self.conv_transpose2d = torch.nn.ConvTranspose2d(5, 5, (3 ,3))
+        self.input1 = torch.randn(5, 5, 3, 3)
 
     def forward(self, x):
         x = self.conv_transpose2d(x)
@@ -267,17 +269,36 @@ class TestOptimizeCases(TestCase):
                 self.assertEqual(opt_M.l2.batch_size_collapsed, 3)
 
     def test_traced_model_serialization(self):
-        for module in [ConvBatchNorm, OneLayerMLP]:
+        for module in [ConvBatchNorm, OneLayerMLP, ConvTranspose2d]:
             for dtype in [torch.float, torch.bfloat16]:
                 M = module().eval()
-                opt_M = ipex.optimize(M, dtype=dtype)
+                input = M.input1.to(dtype)
+                opt_M = ipex.optimize(M, dtype=dtype, auto_kernel_selection=True)
                 with torch.no_grad():
-                    traced_M = torch.jit.trace(M, M.input1).eval()
+                    traced_M = torch.jit.trace(opt_M, input).eval()
                     traced_M.save('traced_m.pt')
                     loaded_M = torch.jit.load('traced_m.pt')
-                    self.assertEqual(traced_M(M.input1), loaded_M(M.input1))
+                    self.assertEqual(traced_M(input), loaded_M(input))
                     os.remove('traced_m.pt')
 
+    def test_optimized_model_with_fx(self):
+        for module in [ConvBatchNorm, OneLayerMLP, ConvTranspose2d]:
+            for dtype in [torch.float, torch.bfloat16]:
+                M = module().eval()
+                input = M.input1.to(dtype)
+                opt_M = ipex.optimize(M, dtype=dtype, auto_kernel_selection=True)
+                ref_out = opt_M(input)
+                fx_M = optimization.fuse(opt_M)
+                fx_out = fx_M(input)
+                self.assertEqual(ref_out, fx_out)
+                with torch.no_grad():
+                    traced_M = torch.jit.trace(fx_M, input).eval()
+                    traced_M = torch.jit.freeze(traced_M)
+                    # do graph opt
+                    traced_M(input)
+                    # get optimized results
+                    out = traced_M(input)
+                    self.assertEqual(ref_out, out)
 
 if __name__ == '__main__':
     test = unittest.main()
