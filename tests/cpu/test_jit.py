@@ -633,9 +633,48 @@ class NotChannelShuffle(nn.Module):
         x = x.view(batchsize, -1, width, height)
         return x
 
-class MatmulDiv(nn.Module):
+class MatmulDivOutplaceOutModifiedByOtherOP_v1(nn.Module):
+    def __init__(self, div_scalar=False, with_out=True):
+        super(MatmulDivOutplaceOutModifiedByOtherOP_v1, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+        mm_out = torch.empty(mm_res_shape, dtype=x.dtype)
+        mm_res = torch.matmul(x, y, out=mm_out)
+        if self.div_scalar:
+            div_res = mm_res.div(2.0)
+        else:
+            div_res = mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+        mm_out.add_(5)
+        return div_res
+
+class MatmulDivOutplaceOutModifiedByOtherOP_v2(nn.Module):
+    def __init__(self, div_scalar=False, with_out=True):
+        super(MatmulDivOutplaceOutModifiedByOtherOP_v2, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+        mm_out = torch.empty(mm_res_shape, dtype=x.dtype)
+        mm_res = torch.matmul(x, y, out=mm_out)
+        if self.div_scalar:
+            div_res = mm_res.div(2.0)
+        else:
+            div_res = mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+        mm_out.add_(5)
+        div_out_equal = (mm_out == div_res)
+        return div_res + div_out_equal
+
+class MatmulDivOutplace(nn.Module):
     def __init__(self, div_scalar=False, with_out=False):
-        super(MatmulDiv, self).__init__()
+        super(MatmulDivOutplace, self).__init__()
         self.div_scalar = div_scalar
         self.with_out = with_out
 
@@ -652,6 +691,26 @@ class MatmulDiv(nn.Module):
             return mm_res.div(2.0)
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+
+class MatmulDivInplace(nn.Module):
+    def __init__(self, div_scalar=False, with_out=False):
+        super(MatmulDivInplace, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        mm_res = None
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        if self.with_out:
+            mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+            torch.matmul(x, y, out=mm_res)
+        else:
+            mm_res = torch.matmul(x, y)
+        if self.div_scalar:
+            return mm_res.div_(2.0)
+        else:
+            return mm_res.div_(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
 class BmmAdd(nn.Module):
     def __init__(self):
@@ -2644,49 +2703,109 @@ class Tester(TestCase):
         inputs = [torch.randn(10, 3, 4), torch.randn(3, 4)]
         for x in inputs:
             self._test_output(
-                MatmulDiv(div_scalar=True, with_out=True),
+                MatmulDivOutplace(div_scalar=True, with_out=True),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output(
-                MatmulDiv(div_scalar=True, with_out=False),
+                MatmulDivOutplace(div_scalar=True, with_out=False),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output(
-                MatmulDiv(div_scalar=False, with_out=False),
+                MatmulDivOutplace(div_scalar=False, with_out=False),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output(
-                MatmulDiv(div_scalar=False, with_out=True),
+                MatmulDivOutplace(div_scalar=False, with_out=True),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=True, with_out=True),
+                MatmulDivOutplace(div_scalar=True, with_out=True),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-2)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=True, with_out=False),
+                MatmulDivOutplace(div_scalar=True, with_out=False),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-2)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=False, with_out=True),
+                MatmulDivOutplace(div_scalar=False, with_out=True),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-3)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=False, with_out=False),
+                MatmulDivOutplace(div_scalar=False, with_out=False),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-3)
+            self._test_output(
+                MatmulDivInplace(div_scalar=True, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDivInplace(div_scalar=True, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDivInplace(div_scalar=False, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDivInplace(div_scalar=False, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=True, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=True, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=False, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=False, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
+            # When the div is outplace and out parameter be modified with an inplace op not in this pattern,
+            # but we didn't observe it's value.
+            self._test_output(
+                MatmulDivOutplaceOutModifiedByOtherOP_v1(div_scalar=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            # When the div is outplace and out parameter be modified with an inplace op not in this pattern,
+            # and we observe it's value by some other op("==" -> aten::equl). In this case, jit.trace will treat 
+            # out parameter that will modified by other ops as output of matmul, thus will not be matched by
+            # our pattern, and we can't observe our fused op's side effect after we modified out param by an inplace op.
+            self._test_output(
+                MatmulDivOutplaceOutModifiedByOtherOP_v2(div_scalar=False),
+                x,
+                kind_in_graph=None,
+                kind_not_in_graph="ipex::matmul_div")
 
     def test_bmm_add(self):
         M = torch.randn(10, 3, 5)

@@ -56,6 +56,7 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
+void FuseMatmulDiv(std::shared_ptr<Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
