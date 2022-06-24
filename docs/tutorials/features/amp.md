@@ -87,7 +87,7 @@ If an op is unlisted, we assume it's numerically stable in `bfloat16`. If you be
 
 #### Ops that can autocast to `bfloat16`
 
-`conv1d`, `conv2d`, `conv3d`, `bmm`, `mm`, `baddbmm`, `addmm`, `addbmm`, `conv_transpose1d`, `conv_transpose2d`, `conv_transpose3d`, `linear`, `matmul`, `conv_tbc`, `group_norm`
+`conv1d`, `conv2d`, `conv3d`, `bmm`, `mm`, `baddbmm`, `addmm`, `addbmm`, `conv_transpose1d`, `conv_transpose2d`, `conv_transpose3d`, `linear`, `matmul`, `conv_tbc`, `group_norm`, `_native_multi_head_attention`
 
 #### Ops that can autocast to `float32`
 

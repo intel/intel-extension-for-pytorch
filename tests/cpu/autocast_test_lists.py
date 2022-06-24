@@ -83,6 +83,16 @@ class AutocastCPUTestLists(object):
             ("addbmm", mat0_fp32 + (torch.randn((n, n, n), device=dev, dtype=torch.float32),
                                     torch.randn((n, n, n), device=dev, dtype=torch.float32))),
         ]
+        self.torch_bf16_multi_output = [
+            ("_native_multi_head_attention", (torch.randn((1, 1, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((1, 1, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((1, 1, 768), device=dev, dtype=torch.float32),
+                                              768, 12, torch.randn((2304, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((2304), device=dev, dtype=torch.float32),
+                                              torch.randn((768, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((768), device=dev, dtype=torch.float32),
+                                              None, False, True)),
+        ]
         self.torch_fp32 = [
         ]
         self.nn_bf16 = [
