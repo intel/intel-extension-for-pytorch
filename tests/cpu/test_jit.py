@@ -589,7 +589,7 @@ class ConvTransposeSigmoidMul(nn.Module):
         a1 = self.conv_transpose(x)
         b1 = torch.sigmoid(a1)
         c1 = self.mul_op(a1, b1)
-        return c1    
+        return c1
 
 class ChannelShuffle_with_Static_Shape(nn.Module):
     def __init__(self, batchsize, num_channels, height, width, groups):
@@ -992,10 +992,10 @@ class Tester(TestCase):
             trace_graph = tr_model.graph_for(input)
             res_jit = tr_model(input)
             self.assertEqual(res_ref, res_jit)
-            
+
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-            
+
             if kind_not_in_graph is not None:
                 self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
@@ -1054,8 +1054,8 @@ class Tester(TestCase):
             traced_model = torch.jit.trace(model, x).eval()
             traced_model = torch.jit.freeze(traced_model)
             tresult = traced_model(x)
-            trace_graph = traced_model.graph_for(x)                
-            
+            trace_graph = traced_model.graph_for(x)
+
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
@@ -1088,7 +1088,7 @@ class Tester(TestCase):
         self.assertTrue(all(n.kind() != pack_node for n in freeze_graph.nodes()))
 # for non-freeze model, since op-ctx dose not have value, cannot re-pack for this path
         self.assertTrue(any(n.kind() == imperative_node for n in trace_graph.nodes()))
-        
+
 
     def test_concat_linear(self):
         def check_op_count(graph_str, op_names=[]):
@@ -1459,7 +1459,7 @@ class Tester(TestCase):
             print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
             torch.manual_seed(rand_seed)
         else:
-            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))
             torch.manual_seed(seed)
 
         for dim in [2, 3]:
@@ -1502,7 +1502,7 @@ class Tester(TestCase):
             print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
             torch.manual_seed(rand_seed)
         else:
-            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))
             torch.manual_seed(seed)
 
         for dim in [2, 3]:
@@ -1538,7 +1538,7 @@ class Tester(TestCase):
         self._test_conv_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
         self._test_conv_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654064339261196288)
 
-    def test_conv_non_unary_fusion(self):        
+    def test_conv_non_unary_fusion(self):
         self._test_conv_unary_fusion(non_unary_PyTorch_op_to_IPEX_op_map)
 
     def test_conv_fusion_unsupported_case(self):
@@ -1548,7 +1548,7 @@ class Tester(TestCase):
         out_channels = 16
         in_channels = 3
         kernel_size = 3
-        image_size = 16      
+        image_size = 16
         for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
             input_size = [batch_size, in_channels, image_size, image_size]
 
@@ -1560,7 +1560,7 @@ class Tester(TestCase):
 
             x = torch.randn(input_size)
             m = ConvEltwise(eltwise, dim, in_channels, out_channels, kernel_size, image_size, **op_input_list)
-            
+
             self._test_fusion_unsupported_case(
                 m,
                 x,
@@ -1640,7 +1640,7 @@ class Tester(TestCase):
             if use_channels_last:
                 x = x.to(memory_format=torch.channels_last)
                 model = model.to(memory_format=torch.channels_last)
-            
+
             model = ipex.optimize(model, dtype=dtype, conv_bn_folding=False)
 
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype), torch.no_grad():
@@ -2345,7 +2345,7 @@ class Tester(TestCase):
         self._test_conv_transpose_unary_fusion(unary_PyTorch_op_to_IPEX_op_map)
         self._test_conv_transpose_unary_fusion(PyTorch_op_to_IPEX_op_fixed_seed_map, 1654583254233936896)
 
-    def test_conv_transpose_non_unary_fusion(self):        
+    def test_conv_transpose_non_unary_fusion(self):
         self._test_conv_transpose_unary_fusion(non_unary_PyTorch_op_to_IPEX_op_map)
 
     def test_conv_transpose_fusion_unsupported_case(self):
@@ -2356,7 +2356,7 @@ class Tester(TestCase):
         in_channels = 3
         kernel_size = 3
         image_size = 8
-        
+
         for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
             input_size = [batch_size, in_channels, image_size, image_size]
 
@@ -2405,7 +2405,7 @@ class Tester(TestCase):
                 #     x,
                 #     kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
                 #     kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
-                #     prec=prec)        
+                #     prec=prec)
 
     def test_linear_auto_kernel_selection_fp32(self):
         x = torch.rand(32, 3)
@@ -2559,22 +2559,22 @@ class Tester(TestCase):
             print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
             torch.manual_seed(rand_seed)
         else:
-            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))     
-            torch.manual_seed(seed)         
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, seed))
+            torch.manual_seed(seed)
 
         for bias in [True, False]:
             for eltwise in op_list:
                 input_size = [batch_size, in_channels]
-                
+
                 unary_fusion_op = op_list[eltwise]
                 ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
                 bf16_supported = unary_fusion_op.bf16_supported
                 prec = unary_fusion_op.prec
                 op_input_list = unary_fusion_op.op_input_list
-                
+
                 x = torch.randn(input_size)
                 m = LinearEltwise(eltwise, in_channels, out_channels, bias, **op_input_list)
-                
+
                 self._test_output(
                     m,
                     x,
@@ -2583,7 +2583,7 @@ class Tester(TestCase):
                     m,
                     x,
                     kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
-                    kind_not_in_graph="ipex_prepack::linear_prepack")                
+                    kind_not_in_graph="ipex_prepack::linear_prepack")
                 if bf16_supported:
                     self._test_output_bf16(
                         m,
@@ -2603,17 +2603,17 @@ class Tester(TestCase):
         batch_size = 3
         out_channels = 32
         in_channels = 3
-        bias = False       
+        bias = False
 
         for eltwise in unsupported_PyTorch_op_to_IPEX_op_map:
             input_size = [batch_size, in_channels]
-            
+
             unary_fusion_op = unsupported_PyTorch_op_to_IPEX_op_map[eltwise]
             ipex_eltwise_op = unary_fusion_op.ipex_eltwise_op
             bf16_supported = unary_fusion_op.bf16_supported
             prec = unary_fusion_op.prec
             op_input_list = unary_fusion_op.op_input_list
-            
+
             x = torch.randn(input_size)
             m = LinearEltwise(eltwise, in_channels, out_channels, bias, **op_input_list)
 
@@ -2839,7 +2839,7 @@ class Tester(TestCase):
         input2 = torch.randn(768, 2304)
         model_v1 = EinsumAdd('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias)
-       
+
         bias = torch.randn(1, 1, 1, 4)
         input1 = torch.randn(12, 1, 4, 16)
         input2 = torch.randn(12, 4, 4, 16)
@@ -2851,7 +2851,7 @@ class Tester(TestCase):
         input2 = torch.randn(768, 2304)
         model_v1 = EinsumAddInplace('bsh,ho->bso')
         _test_fp32(model_v1, input1, input2, bias)
-        
+
         input1 = torch.randn(8, 3, 768)
         input2 = torch.randn(768, 2304)
         model = EinsumAddScalar('bsh,ho->bso').eval()
@@ -2876,7 +2876,7 @@ class Tester(TestCase):
         input4 = torch.randn(2, 4, 128, 768)
         model_v2 = EinsumAdd("bnqd,bnkd->bnqk")
         _test_fp32(model_v2, input3, input4, bias1)
-        
+
         bias1 = torch.randn(8, 1, 1, 128)
         input3 = torch.randn(8, 4, 128, 768)
         input4 = torch.randn(8, 4, 128, 768)
@@ -2900,34 +2900,34 @@ class Tester(TestCase):
         input2 = torch.randn(1024, 768)
         model_v2 = EinsumAdd("mc,cn->mn")
         _test_fp32(model_v2, input1, input2, bias1)
-        
+
         bias1 = torch.randn(1024)
         input1 = torch.randn(1024, 1024)
         input2 = torch.randn(1024, 1024)
         model_v2 = EinsumAdd("mc,cn->nm")
         _test_fp32(model_v2, input1, input2, bias1)
-        
+
         bias1 = torch.randn(768)
         input1 = torch.randn(2, 128, 1024)
         input2 = torch.randn(1024, 23, 768)
         model_v2 = EinsumAdd("bqc,chv->bqhv")
         _test_fp32(model_v2, input1, input2, bias1)
-        
+
         bias = torch.randn(768)
         input1 = torch.randn(2, 128, 16, 64)
         input2 = torch.randn(16,64, 768)
         model = EinsumAdd("bqhc,hco->bqo")
         _test_fp32(model, input1, input2, bias)
-        
+
         bias = torch.randn(8)
         input1 = torch.randn(8)
         input2 = torch.randn(8)
         model = EinsumAdd("i,i->")
         _test_fp32(model, input1, input2, bias)
-       
-        #the output of torch.einsum("ij,j") is tensor([]) 
+
+        #the output of torch.einsum("ij,j") is tensor([])
         bias = torch.randn(1)
-        input1 = torch.randn(0, 3) 
+        input1 = torch.randn(0, 3)
         input2 = torch.randn(3)
         model = EinsumAdd(("ij,j"))
         _test_fp32(model, input1, input2, bias)
@@ -3042,7 +3042,7 @@ class Tester(TestCase):
                 x1 = self.eltwise(x1, **self.params_dict)
                 return x1
 
-        for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu']:
+        for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu']:
             eltwise_fn_name = eltwise + '_'
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
 #use torch.sigmoid_(x)
@@ -3136,6 +3136,22 @@ class Tester(TestCase):
             kind_in_graph="ipex_prepack::convolution_relu_run",
             kind_not_in_graph="aten::mul",
             prec=0.1)
+
+    def test_hardsigmoid_mul(self):
+        class HardsigmoidMul(nn.Module):
+            def __init__(self) -> None:
+                super(HardsigmoidMul, self).__init__()
+                self.hard_sigmoid = nn.Hardsigmoid()
+
+            def forward(self, x):
+                return self.hard_sigmoid(x) * x
+
+        model = HardsigmoidMul().eval()
+        self._test_output(
+            model,
+            torch.randn(2, 3, 4, 5),
+            kind_in_graph="ipex::hardsigmoid",
+            kind_not_in_graph="aten::hardsigmoid")
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

@@ -162,6 +162,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseLinearAddRelu(graph);
   GRAPH_DUMP("After fuseLinearAddRelu.", graph);
 
+  GRAPH_DEBUG("Before replacing hardsigmoid", graph);
+  graph_rewrite::ReplaceHardsigmoidWithIPEX(graph);
+  GRAPH_DEBUG("After replacing hardsigmoid", graph);
+
   graph_rewrite::FuseLinearSwishCustomized(graph);
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);

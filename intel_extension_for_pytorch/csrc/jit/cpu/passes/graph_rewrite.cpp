@@ -610,11 +610,11 @@ void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph) {
 // %y, %hy, %cy = aten::lstm(%ret, ...)
 void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph) {
   const static std::string op_list_construct_same_states = R"(
-%hx.1 = aten::zeros(%sizes, %scalar_type, %layout, %device, %pin_memory) 
+%hx.1 = aten::zeros(%sizes, %scalar_type, %layout, %device, %pin_memory)
 %state : Tensor[] = prim::ListConstruct(%hx.1, %hx.1) )";
 
   const static std::string op_list_construct_diff_states = R"(
-%hx.1 = aten::zeros(%sizes, %scalar_type, %layout, %device, %pin_memory) 
+%hx.1 = aten::zeros(%sizes, %scalar_type, %layout, %device, %pin_memory)
 %hx = aten::zeros(%sizes, %scalar_type, %layout, %device, %pin_memory)
 %state : Tensor[] = prim::ListConstruct(%hx.1, %hx) )";
 
@@ -705,7 +705,7 @@ void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph) {
       std::string QLstmPattern = complete_header + R"(
               %input : Tensor = aten::dequantize(%quantized_input) )" +
           weight_pattern + complete_LC + R"(
-              %output, %hy, %cy = aten::lstm(%input, %h, %weights, %has_biases, %num_layers, %dropout_p, %train, %bidirectional, %batch_fist) 
+              %output, %hy, %cy = aten::lstm(%input, %h, %weights, %has_biases, %num_layers, %dropout_p, %train, %bidirectional, %batch_fist)
               %quantized_output = aten::quantize_per_tensor(%output, %scale, %zp, %dtype)
               return (%quantized_output, %hy, %cy) )";
 
@@ -873,6 +873,23 @@ void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter ls_fusion;
   ls_fusion.RegisterRewritePattern(linear_swish, linear_swish_fusion);
   ls_fusion.runOnGraph(graph);
+}
+
+void ReplaceHardsigmoidWithIPEX(std::shared_ptr<Graph>& graph) {
+  std::string aten_hardsigmoid = R"(
+      graph(%x):
+        %res = aten::hardsigmoid(%x)
+        return (%res) )";
+
+  std::string ipex_hardsigmoid = R"(
+      graph(%x):
+        %res = ipex::hardsigmoid(%x)
+        return (%res) )";
+
+  SubgraphRewriter hardsigmoid_replacement;
+  hardsigmoid_replacement.RegisterRewritePattern(
+      aten_hardsigmoid, ipex_hardsigmoid);
+  hardsigmoid_replacement.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

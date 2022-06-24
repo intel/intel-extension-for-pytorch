@@ -9,6 +9,7 @@
 #include "csrc/jit/cpu/kernels/ConvTransposePacked.h"
 #include "csrc/jit/cpu/kernels/Einsum.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
+#include "csrc/jit/cpu/kernels/Hardsigmoid.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
 #include "csrc/jit/cpu/kernels/LinearSwishCustomized.h"
@@ -1140,7 +1141,19 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::hardsigmoid(Tensor input) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result =
+                dil_hardsigmoid((std::move(peek(stack, 0, 1))).toTensor());
 
+            drop(stack, 1);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 });
 } // namespace jit
 } // namespace torch

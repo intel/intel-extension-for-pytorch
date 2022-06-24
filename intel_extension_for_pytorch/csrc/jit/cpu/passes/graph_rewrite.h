@@ -46,6 +46,14 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
 void fuseBottleneck(std::shared_ptr<Graph>& graph);
 
+// This graph pass is to replace at::hardsigmoid with IPEX hardsigmoid.
+// Because NNC pulls aten::hardsigmoidn into its fusion group while its
+// performance might not be good engouh if the mout outer loop is small. Besides
+// that, IPEX will use oneDNN post-op to fuse hard sigmoid. Hence, this graph
+// pass is a workaround for this release and will be removed in the next major
+// release.
+void ReplaceHardsigmoidWithIPEX(std::shared_ptr<Graph>& graph);
+
 void RecordAtenLinearNodes(
     std::shared_ptr<Graph>& graph,
     std::unordered_set<Node*>& aten_linear);
