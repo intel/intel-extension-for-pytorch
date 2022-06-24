@@ -43,3 +43,6 @@ supported:
   - transpose_
   - as_strided_
   - _reshape_alias
+  - sigmoid
+  - sigmoid_
+  - sigmoid.out
