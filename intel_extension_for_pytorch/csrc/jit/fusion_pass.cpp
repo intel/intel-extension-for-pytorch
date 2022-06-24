@@ -227,6 +227,30 @@ bool isQuantized(const std::shared_ptr<Graph>& graph) {
   return checkQuantization(graph->block());
 }
 
+FusionBehavior getCurrentBehavior(size_t remaining_depth) {
+  size_t curr_depth = 0;
+  FusionStrategy fusion_strategy_ = getFusionStrategy();
+  for (int i = static_cast<int>(fusion_strategy_.size()) - 1; i >= 0; i--) {
+    curr_depth += fusion_strategy_[i].second;
+    if (remaining_depth <= curr_depth) {
+      return fusion_strategy_[i].first;
+    }
+  }
+  // should never get here
+  TORCH_WARN("Stratgy changed mid-invocation, NYI");
+  return FusionBehavior::STATIC;
+}
+
+size_t getInstantiatedBailoutDepth() {
+  // Initialize bailout_depth from command-line flag.
+  size_t depth = 0;
+  FusionStrategy fusion_strategy_ = getFusionStrategy();
+  for (const auto& pair : fusion_strategy_) {
+    depth += pair.second;
+  }
+  return depth;
+}
+
 void FusionPass(std::shared_ptr<Graph>& graph) {
   GRAPH_DUMP(
       "Before RemoveProfileNodesAndSpecializeTypes. Beginning of "
@@ -260,7 +284,15 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   BatchMM(graph);
 
   if (tensorExprFuserEnabled()) {
-    FuseTensorExprs(graph, getFusionGroupInlining() ? 2 : 1);
+    auto min_size = getFusionGroupInlining() ? 2 : 1;
+    // Here we always get the first valid behavior per the global fusion
+    // strategies configured by PyTorch (`getInstantiatedBailoutDepth` always
+    // returns the maximum configured depth). This is because IPEX TE fusion is
+    // only called the first time of the compilation while the later
+    // re-compilations are triggered from inside PyTorch.
+    bool dyn_shapes = getCurrentBehavior(getInstantiatedBailoutDepth()) ==
+        FusionBehavior::DYNAMIC;
+    FuseTensorExprs(graph, min_size, /* composed op*/ false, dyn_shapes);
   }
 
   // Apply IPEX inplace optimization/replacement

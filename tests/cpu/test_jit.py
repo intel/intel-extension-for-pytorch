@@ -917,6 +917,13 @@ class EinsumAddInplaceV1(nn.Module):
     def forward(self, input1, input2, bias):
         return bias.add_(torch.einsum(self.equation, input1, input2))
 
+class AddMulDiv(nn.Module):
+    def __init__(self):
+        super(AddMulDiv, self).__init__()
+
+    def forward(self, input):
+        return torch.div(torch.mul(input, torch.add(input, 3)), 6)
+
 class Tester(TestCase):
     @contextlib.contextmanager
     def _texpr_enable(self, strategy):
@@ -3136,6 +3143,18 @@ class Tester(TestCase):
             kind_in_graph="ipex_prepack::convolution_relu_run",
             kind_not_in_graph="aten::mul",
             prec=0.1)
+
+    def test_TEfusion_with_dynamic_input(self):
+        model = AddMulDiv().eval()
+        with torch.no_grad():
+            traced_model = torch.jit.trace(model, torch.randn(11, 3, 20, 20)).eval()
+            traced_model = torch.jit.freeze(traced_model)
+
+        for i in range(5):
+            input = torch.randn(i, 3, 20, 20)
+            tresult = traced_model(input)
+            result = model(input)
+            self.assertEqual(tresult, result)
 
     def test_hardsigmoid_mul(self):
         class HardsigmoidMul(nn.Module):
