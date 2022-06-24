@@ -1,6 +1,10 @@
-# Intel® Extension for PyTorch* GPU
+# Intel® Extension for PyTorch\* GPU
 
-*  Intel® Extension for PyTorch* GPU is a directed optimized solution for PyTorch end-users to run PyTorch workloads on Intel Graphics cards. The latest release version is 1.10.0+gpu.
+Intel® Extension for PyTorch\* extends [PyTorch\*](https://github.com/pytorch/pytorch) with optimizations for extra performance boost on Intel hardware. It is a heterogeneous, high performance deep learning implementation for Intel® XPU (GPU, CPU, etc.) devices. This repo introduces optimized GPU solution for PyTorch end-users to get up-to-date features and optimizations on Intel Graphics cards. Eventually, it will be merged with CPU solution and released in the same public repo: https://github.com/intel/intel-extension-for-pytorch/.
+
+Intel® Extension for PyTorch\* is loaded as a Python module for Python programs or linked as a C++ library for C++ programs. Users can enable it dynamically in script by importing intel_extension_for_pytorch. It covers optimizations for both imperative mode and graph mode. Optimized operators and kernels are registered to XPU backend through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel hardware. In graph mode, further operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.
+
+The latest release version for GPU solution of Intel® Extension for PyTorch\* is 1.10.0+gpu.
 
 # Table of Contents
 - [Intel® Extension for PyTorch* GPU](#intel-extension-for-pytorch-gpu)
@@ -284,10 +288,10 @@ The following lauch options are supported in Intel® Extension for PyTorch* GPU.
 | **Launch Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
 | IPEX_SHOW_OPTION | 0 | Show all available launch option values. |
-| IPEX_VERBOSE | 0 | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU <br> customized kernel. |
+| IPEX_VERBOSE | 0 | Verbose level in integer. Provide verbose output for Intel® Extension for PyTorch* GPU customized kernel. |
 | IPEX_TILE_AS_DEVICE | 1 | Device partition. If set to 0, tile partition will be disabled and map device to physical device. |
-| IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking <br> wait for the completion of submitted kernel. |
-| IPEX_XPU_ONEDNN_LAYOUT | 0 | [EXPERIMENTAL] Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use <br> blocked layouts querying from oneDNN.  |
+| IPEX_XPU_SYNC_MODE | 0 | Kernel Execution mode. If set to 1, use synchronized execution mode and perform blocking wait for the completion of submitted kernel. |
+| IPEX_XPU_ONEDNN_LAYOUT | 0 | [EXPERIMENTAL] Enable oneDNN specific layouts. If set to 1, Intel® Extension for PyTorch* GPU tries to use blocked layouts querying from oneDNN.  |
 
 Examples to config the launch options:</br>
 
