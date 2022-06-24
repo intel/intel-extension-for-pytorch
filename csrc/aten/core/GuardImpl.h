@@ -31,9 +31,31 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
 
   Stream getStream(Device d) const noexcept override;
 
+  Stream getStreamFromGlobalPool(Device, bool isHighPriority = false)
+      const override;
+
   Stream exchangeStream(Stream s) const noexcept override;
 
+  void destroyEvent(void* event, const DeviceIndex device_index)
+      const noexcept override;
+
+  void record(
+      void** event,
+      const Stream& stream,
+      const DeviceIndex device_index,
+      const c10::EventFlag flag) const override;
+
+  void block(void* event, const Stream& stream) const override;
+
+  bool queryEvent(void* event) const override;
+
   DeviceIndex deviceCount() const noexcept override;
+
+  bool queryStream(const Stream& stream) const override;
+
+  void synchronizeStream(const Stream& stream) const override;
+
+  void recordDataPtrOnStream(const c10::DataPtr&, const Stream&) const override;
 };
 } // namespace impl
 } // namespace dpcpp
