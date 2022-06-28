@@ -51,10 +51,11 @@ namespace cpu {
 enum class CPUCapability {
   DEFAULT = 0,
   AVX2 = 1,
-  AVX512 = 2,
-  AVX512_VNNI = 3,
-  AVX512_BF16 = 4,
-  AMX = 5,
+  AVX2_VNNI = 2,
+  AVX512 = 3,
+  AVX512_VNNI = 4,
+  AVX512_BF16 = 5,
+  AMX = 6,
   NUM_OPTIONS
 };
 
@@ -93,6 +94,10 @@ struct TORCH_API DispatchStubImpl {
       ,
       void* AVX512
 #endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+      ,
+      void* AVX2_VNNI
+#endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
       ,
       void* AVX2
@@ -121,6 +126,10 @@ struct TORCH_API DispatchStubImpl {
 #ifdef HAVE_AVX512_CPU_DEFINITION
       ,
       void* AVX512
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+      ,
+      void* AVX2_VNNI
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
       ,
@@ -170,6 +179,10 @@ struct DispatchStub<rT (*)(Args...), T> {
             ,
         reinterpret_cast<void*>(AVX512)
 #endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+            ,
+        reinterpret_cast<void*>(AVX2_VNNI)
+#endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
             ,
         reinterpret_cast<void*>(AVX2)
@@ -204,6 +217,9 @@ struct DispatchStub<rT (*)(Args...), T> {
 #endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
   static FnPtr AVX512;
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+  static FnPtr AVX2_VNNI;
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
   static FnPtr AVX2;

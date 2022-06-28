@@ -17,6 +17,8 @@ const char* CPUCapabilityToString(CPUCapability isa) {
       return "DEFAULT";
     case CPUCapability::AVX2:
       return "AVX2";
+    case CPUCapability::AVX2_VNNI:
+      return "AVX2_VNNI";
     case CPUCapability::AVX512:
       return "AVX512";
     case CPUCapability::AVX512_VNNI:
@@ -46,7 +48,9 @@ CPUCapability _get_highest_cpu_support_isa_level() {
   } else if (CPUFeature::get_instance().isa_level_avx512_core()) {
     return CPUCapability::AVX512;
   }
-  if (CPUFeature::get_instance().cpuid_avx2()) {
+  if (CPUFeature::get_instance().isa_level_avx2_vnni()) {
+    return CPUCapability::AVX2_VNNI;
+  } else if (CPUFeature::get_instance().isa_level_avx2()) {
     return CPUCapability::AVX2;
   }
 
@@ -65,6 +69,9 @@ CPUCapability _get_highest_binary_support_isa_level() {
 #endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
   return CPUCapability::AVX512;
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+  return CPUCapability::AVX2_VNNI;
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
   return CPUCapability::AVX2;
@@ -95,6 +102,8 @@ static CPUCapability compute_cpu_capability() {
       manual_setup_isa_level = CPUCapability::AVX512_VNNI;
     } else if (strcmp(envar, "avx512") == 0) {
       manual_setup_isa_level = CPUCapability::AVX512;
+    } else if (strcmp(envar, "avx2_vnni") == 0) {
+      manual_setup_isa_level = CPUCapability::AVX2_VNNI;
     } else if (strcmp(envar, "avx2") == 0) {
       manual_setup_isa_level = CPUCapability::AVX2;
     } else if (strcmp(envar, "default") == 0) {
@@ -143,6 +152,10 @@ void* DispatchStubImpl::get_call_ptr(
     ,
     void* AVX512
 #endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+    ,
+    void* AVX2_VNNI
+#endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
     ,
     void* AVX2
@@ -171,6 +184,10 @@ void* DispatchStubImpl::get_call_ptr(
 #ifdef HAVE_AVX512_CPU_DEFINITION
             ,
             AVX512
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+            ,
+            AVX2_VNNI
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
             ,
@@ -214,6 +231,10 @@ void* DispatchStubImpl::choose_cpu_impl(
 #ifdef HAVE_AVX512_CPU_DEFINITION
     ,
     void* AVX512
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+    ,
+    void* AVX2_VNNI
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
     ,
@@ -276,6 +297,12 @@ void* DispatchStubImpl::choose_cpu_impl(
     } else {
       return AVX512;
     }
+  }
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+  if (capability >= static_cast<int>(CPUCapability::AVX2_VNNI)) {
+    TORCH_INTERNAL_ASSERT(AVX2_VNNI, "DispatchStub: missing AVX2_VNNI kernel");
+    return AVX2_VNNI;
   }
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
