@@ -886,19 +886,6 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
-        "ipex::linear_swish_customized(Tensor x, Tensor weight, Tensor ? bias) -> Tensor",
-        [](Stack& stack) {
-          auto result = dil_linear_swish_customized(
-              peek(stack, 0, 3).toTensor(),
-              peek(stack, 1, 3).toTensor(),
-              toOptionalTensor(std::move(peek(stack, 2, 3))));
-          drop(stack, 3);
-
-          pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
         "ipex::softmax(Tensor self, int dim, ScalarType ? dtype) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {

@@ -1369,6 +1369,16 @@ class Tester(TestCase):
 
             self.assertEqual(res_ref, res_jit)
 
+            # non 512 bit align shape
+            mat3 = torch.randn(10000, 1019)
+            pattern_3 = LinearSwishNaive(1019, 1019)
+            pattern3_jit = torch.jit.trace(pattern_3, (mat3))
+            pattern3_jit.eval()
+            res_ref = pattern_3(mat3)
+            res_jit = pattern3_jit(mat3)
+
+            self.assertEqual(res_ref, res_jit)
+
             def _test_pure_bf16(model, trace_model, mat1, prec=5e-2):
                 model = model.to(torch.bfloat16)
                 trace_model = trace_model.to(torch.bfloat16)
@@ -1379,6 +1389,7 @@ class Tester(TestCase):
 
             _test_pure_bf16(pattern_1, pattern1_jit, mat1)
             _test_pure_bf16(pattern_2, pattern2_jit, mat2)
+            _test_pure_bf16(pattern_3, pattern3_jit, mat3)
 
     def test_distil_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
