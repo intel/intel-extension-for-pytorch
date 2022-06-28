@@ -1019,6 +1019,50 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::matmul'])
         self.checkPatterns(graph, patterns)
 
+    def test_lift_up_quant_unsupported(self):
+        # Original graph:
+        #          |
+        #        view
+        #      /  (f32)\   /(f32)
+        #   quant       add
+        #     |
+
+        # Lifting up in this case will raise: 
+        # promoteTypes with quantized numbers is not handled in aten::add;
+        #          |
+        #        quant
+        #          |
+        #         view
+        #         (int8)\  /(f32)
+        #                add
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(3, 8, 1)
+                self.conv2 = nn.Conv2d(8, 8, 1)
+
+            def forward(self, x, y):
+                x = self.conv1(x)
+                z1 = x.permute(0, 3, 1, 2)
+                z2 = self.conv2(z1)
+                z = z1 + y
+                output = z2 + z
+                return output
+        
+        x = torch.randn(1, 3, 8, 8)
+        y = torch.randn(1, 8, 8, 8)
+        m = M()
+
+        patterns = [
+            ["aten::dequantize", "aten::_convolution"],
+            ["aten::dequantize", "aten::_convolution", "aten::add"],
+        ]
+
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
+        self.checkPatterns(graph, patterns)        
+
     def test_wildcard(self):
         class M(nn.Module):
             def __init__(self):
