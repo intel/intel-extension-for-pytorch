@@ -71,6 +71,12 @@ void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
 void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<Graph>& graph);
+
+// This code will be removed after the official PyTorch NNC fully support
+// BFloat16.
+void replaceAtenToWithIPEXTo(std::shared_ptr<Graph>& graph);
+void replaceIPEXToWithAtenTo(std::shared_ptr<Graph>& graph);
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

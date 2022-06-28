@@ -1154,6 +1154,46 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::to_dtype(Tensor(a) self, ScalarType dtype, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor(a)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = at::native::to(
+                (std::move(peek(stack, 0, 5))).toTensor(),
+                (std::move(peek(stack, 1, 5))).toScalarType(),
+                (std::move(peek(stack, 2, 5))).toBool(),
+                (std::move(peek(stack, 3, 5))).toBool(),
+                (std::move(peek(stack, 4, 5))).toOptional<at::MemoryFormat>());
+            drop(stack, 5);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::to_dtype(Tensor(a) self, int? dtype, bool non_blocking=False, bool copy=False) -> Tensor(a|b)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            const auto& input = (std::move(peek(stack, 0, 4))).toTensor();
+            const auto dtype =
+                (std::move(peek(stack, 1, 4))).toOptional<at::ScalarType>();
+            const auto copy = (std::move(peek(stack, 3, 4))).toBool();
+            at::Tensor result;
+            if (!dtype && !copy) {
+              result = input;
+            } else {
+              TORCH_CHECK(
+                  dtype,
+                  "dtype cannot be None when copy is True for ipex::to.prim_dtype");
+              result = at::native::to(
+                  input, *dtype, (std::move(peek(stack, 2, 4))).toBool(), copy);
+            }
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 });
 } // namespace jit
 } // namespace torch

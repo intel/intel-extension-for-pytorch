@@ -67,6 +67,7 @@ import intel_extension_for_pytorch._C as core
 
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.testing import FileCheck
 
 from common_utils import TestCase
 
@@ -3171,6 +3172,34 @@ class Tester(TestCase):
             torch.randn(2, 3, 4, 5),
             kind_in_graph="ipex::hardsigmoid",
             kind_not_in_graph="aten::hardsigmoid")
+
+    # This test case will be removed after offical PyTorch NNC support bfloat16.
+    def test_TEfusion_with_to_dtype(self):
+        class TestTo(torch.nn.Module):
+            def __init__(self, dtype):
+                 super(TestTo, self).__init__()
+                 self.dtype = dtype
+
+            def forward(self, x):
+                return (x + 1).to(self.dtype)
+
+        X = torch.randn((5, 5))
+        with torch.no_grad():
+            # to(torch.bfloat16)
+            m = TestTo(torch.bfloat16).eval()
+            m = torch.jit.trace(m, X)
+            torch.jit.freeze(m)
+            out = m(X)
+            graph = m.graph_for(X)
+            FileCheck().check_not("prim::TensorExprGroup").run(graph)
+            # to(torch.long)
+            m = TestTo(torch.long).eval()
+            m = torch.jit.trace(m, X)
+            torch.jit.freeze(m)
+            out = m(X)
+            graph = m.graph_for(X)
+            FileCheck().check("prim::TensorExprGroup").run(graph)
+
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

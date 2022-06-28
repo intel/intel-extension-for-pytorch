@@ -284,6 +284,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   BatchMM(graph);
 
   if (tensorExprFuserEnabled()) {
+    graph_rewrite::replaceAtenToWithIPEXTo(graph);
     auto min_size = getFusionGroupInlining() ? 2 : 1;
     // Here we always get the first valid behavior per the global fusion
     // strategies configured by PyTorch (`getInstantiatedBailoutDepth` always
@@ -293,6 +294,7 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
     bool dyn_shapes = getCurrentBehavior(getInstantiatedBailoutDepth()) ==
         FusionBehavior::DYNAMIC;
     FuseTensorExprs(graph, min_size, /* composed op*/ false, dyn_shapes);
+    graph_rewrite::replaceIPEXToWithAtenTo(graph);
   }
 
   // Apply IPEX inplace optimization/replacement
