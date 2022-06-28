@@ -28,21 +28,22 @@ class TestLauncher(TestCase):
 
     def test_memory_allocator_setup(self):
        launcher = Launcher()
-    
+
        # tcmalloc
-       launcher.set_memory_allocator(enable_tcmalloc=True)
        find_tcmalloc = self.find_lib("tcmalloc")
-       ld_preload_in_os = "LD_PRELOAD" in os.environ
-       tcmalloc_enabled = "libtcmalloc.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
+       cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--enable_tcmalloc", "--no_python", "ls"]
+       r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+       tcmalloc_enabled = "libtcmalloc.so" in str(r.stdout, "utf-8").split("INFO - LD_PRELOAD=", 1)[1] 
        self.assertEqual(find_tcmalloc, tcmalloc_enabled)
-       
-       # jemalloc 
-       launcher.set_memory_allocator(enable_tcmalloc=False, enable_jemalloc=True)
+
+       # jemalloc
        find_jemalloc = self.find_lib("jemalloc")
-       jemalloc_enabled = "libjemalloc.so" in os.environ["LD_PRELOAD"] if ld_preload_in_os else False
+       cmd = ["python", "-m", "intel_extension_for_pytorch.cpu.launch", "--enable_jemalloc", "--no_python", "ls"]
+       r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+       jemalloc_enabled = "libjemalloc.so" in str(r.stdout, "utf-8").split("INFO - LD_PRELOAD=", 1)[1] 
        self.assertEqual(find_jemalloc, jemalloc_enabled)
        if jemalloc_enabled:
-           self.assertEqual(jemalloc_enabled, "MALLOC_CONF" in os.environ)
+           self.assertEqual(jemalloc_enabled, "MALLOC_CONF" in str(r.stdout, "utf-8"))
 
     def test_mpi_pin_domain_and_ccl_worker_affinity(self):
        launcher = DistributedTrainingLauncher()
