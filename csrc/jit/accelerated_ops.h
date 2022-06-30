@@ -11,6 +11,7 @@ namespace jit {
 namespace xpu {
 static auto reorder_sym = Symbol::fromQualString("xpu::reorder");
 static auto batch_norm_sym = Symbol::fromQualString("xpu::batch_norm");
+static auto pad_conv2d_sym = Symbol::fromQualString("xpu::pad_conv2d");
 static auto conv2d_relu_sym = Symbol::fromQualString("xpu::conv2d_relu");
 static auto conv2d_sum_sym = Symbol::fromQualString("xpu::conv2d_sum");
 static auto conv2d_relu_sum_sym =

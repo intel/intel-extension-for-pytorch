@@ -188,6 +188,32 @@ at::Tensor conv2d_relu(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
 
+at::Tensor pad_conv2d(
+    const at::Tensor& input,
+    at::IntArrayRef pad_nd,
+    Scalar value,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  RECORD_FUNCTION(
+      "pad_conv2d", std::vector<c10::IValue>({input, weight, bias}));
+  return at::AtenIpexTypeXPU::pad_convolution(
+      input,
+      pad_nd,
+      value,
+      weight,
+      bias,
+      stride,
+      padding,
+      dilation,
+      false,
+      {{0, 0}},
+      groups);
+}
+
 at::Tensor conv2d_sigmoid(
     const at::Tensor& input,
     const at::Tensor& weight,

@@ -73,6 +73,17 @@ at::Tensor conv2d_relu(
     at::IntArrayRef dilation,
     int64_t groups);
 
+at::Tensor pad_conv2d(
+    const at::Tensor& input,
+    at::IntArrayRef pad_nd,
+    Scalar value,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups);
+
 at::Tensor conv2d_sigmoid(
     const at::Tensor& input,
     const at::Tensor& weight,

@@ -23,7 +23,8 @@ Tensor dpcpp_convolution_backward_input(
     IntArrayRef input_size,
     const at::Tensor& grad_output,
     const at::Tensor& weight,
-    IntArrayRef padding,
+    IntArrayRef padding_front_top_left,
+    IntArrayRef padding_back_bottom_right,
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
@@ -69,7 +70,8 @@ Tensor dpcpp_convolution_backward_input(
   output_tz[0] = grad_input.size(0); // set n
 
   memory::dims _stride = stride.vec();
-  memory::dims _padding = padding.vec();
+  memory::dims _padding_front_top_left = padding_front_top_left.vec();
+  memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
   // Master weight
@@ -100,8 +102,8 @@ Tensor dpcpp_convolution_backward_input(
       output_md,
       _stride,
       _dilation,
-      _padding,
-      _padding);
+      _padding_front_top_left,
+      _padding_back_bottom_right);
 
   auto conv_forward_pd =
       convolution_forward::primitive_desc(conv_forward_desc, engine);
@@ -113,8 +115,8 @@ Tensor dpcpp_convolution_backward_input(
       output_md,
       _stride,
       _dilation,
-      _padding,
-      _padding);
+      _padding_front_top_left,
+      _padding_back_bottom_right);
 
 #ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
@@ -540,7 +542,8 @@ Tensor _convolution_out(
     bool transposed_,
     IntArrayRef output_padding_,
     int64_t groups_,
-    ConvAttr attr) {
+    ConvAttr attr,
+    IntArrayRef pad_nd = IntArrayRef({})) {
   auto output = output_r;
   auto ndim = input_r.ndimension();
   TORCH_CHECK(
@@ -564,7 +567,30 @@ Tensor _convolution_out(
 
   ConvParams params;
   params.stride = expand_param_if_needed(stride_, "stride", dim);
+  // PyTorch default Conv padding should be a single integer value
+  // or a list of values to match the conv dimensions
+  // conv2d, the number of padding values should be 1 or 2
+  // conv3d, the number of padding values should be 1 or 3
+  // the padding value will be padded into both side of Conv input (D, H, W)
   params.padding = expand_param_if_needed(padding_, "padding", dim);
+
+  // oneDNN supports padding the two sides of src with different values
+  // the padding order should be front_top_left and back_bottom_right
+  auto padding_front_top_left = params.padding;
+  auto padding_back_bottom_right = params.padding;
+
+  // PyTorch constant_pad_nd:
+  // can pad different value to the two sides of Conv input (W, H, D)
+  // (padding_left, padding_right,
+  //  padding_top, padding_bottom,
+  //  padding_front, padding_back)
+  if (pad_nd.vec().size() > 0) {
+    for (int i = 0; i < dim; ++i) {
+      padding_front_top_left[i] += pad_nd[2 * dim - 2 * i - 2]; // 4, 2, 0
+      padding_back_bottom_right[i] += pad_nd[2 * dim - 2 * i - 1]; // 5, 3, 1
+    }
+  }
+
   params.dilation = expand_param_if_needed(dilation_, "dilation", dim);
   params.transposed = transposed_;
   params.output_padding =
@@ -576,6 +602,9 @@ Tensor _convolution_out(
   Tensor output_;
 
   if (transposed_) {
+    // TODO::
+    // currently only support deconvolution padding with the same value on two
+    // side need to check deconvolution support different padding values or not
     output_ = xpu::oneDNN::deconvolution(
         input,
         weight,
@@ -591,7 +620,8 @@ Tensor _convolution_out(
         input,
         weight,
         bias,
-        params.padding,
+        padding_front_top_left,
+        padding_back_bottom_right,
         params.stride,
         params.dilation,
         params.groups,
@@ -625,6 +655,52 @@ Tensor _convolution(
       output_padding_,
       groups_,
       attr);
+}
+
+Tensor pad_convolution(
+    const Tensor& input_r,
+    IntArrayRef pad_nd,
+    Scalar value,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_) {
+  // oneDNN only support padding value with 0
+  if (value.to<float>() != 0.0) {
+    auto padded_input = at::constant_pad_nd(input_r, pad_nd, value);
+    Tensor output_r;
+    return _convolution_out(
+        output_r,
+        padded_input,
+        weight_r,
+        bias_r,
+        stride_,
+        padding_,
+        dilation_,
+        transposed_,
+        output_padding_,
+        groups_,
+        ConvAttr());
+  }
+
+  Tensor output_r;
+  return _convolution_out(
+      output_r,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      ConvAttr(),
+      pad_nd);
 }
 
 Tensor convolution_sum(
@@ -844,6 +920,7 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
           grad_output_,
           weight,
           padding,
+          padding,
           stride,
           dilation,
           groups,
@@ -868,6 +945,7 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
               grad_output_,
               input_,
               weight.sizes(),
+              padding,
               padding,
               stride,
               dilation,

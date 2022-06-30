@@ -380,7 +380,6 @@ class OpFuser {
     for (auto* v : node->inputs()) {
       auto prev = v->node();
       auto fuseRule = isFusable(node, prev);
-
       // We can fuse only one path
       if (fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
         pos = fuseNodes(node, v, fuseRule.value());
@@ -416,6 +415,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("quantized::add_relu")},
      xpu::q_conv2d_sum_relu_sym},
+    // SSD-MobileBet: pad + conv
+    {{aten::constant_pad_nd, aten::conv2d}, xpu::pad_conv2d_sym},
     // SSD-MobileNet INT8: conv + leaky_relu_
     {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("aten::leaky_relu_")},

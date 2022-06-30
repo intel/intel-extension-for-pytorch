@@ -88,7 +88,8 @@ static inline memory::dims conv_dst_tz(
     int64_t ndim,
     IntArrayRef src_tz,
     IntArrayRef wgh_tz,
-    IntArrayRef padding,
+    IntArrayRef padding_front_top_left,
+    IntArrayRef padding_back_bottom_right,
     IntArrayRef stride,
     IntArrayRef dilation) {
   bool has_dilation = dilation.size() > 0;
@@ -98,7 +99,12 @@ static inline memory::dims conv_dst_tz(
   for (size_t d = 2; d < ndim; ++d) {
     auto dilate = has_dilation ? dilation[d - 2] : 1;
     auto kernel = dilate * (wgh_tz[d] - 1) + 1;
-    dst_tz[d] = (src_tz[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
+    dst_tz[d] =
+        (src_tz[d] +
+         (padding_front_top_left[d - 2] + padding_back_bottom_right[d - 2]) -
+         kernel) /
+            stride[d - 2] +
+        1;
   }
   return dst_tz;
 }
@@ -198,7 +204,8 @@ static at::Tensor convolution(
     const at::Tensor& src,
     const at::Tensor& wgh,
     const at::Tensor& bia,
-    IntArrayRef padding,
+    IntArrayRef padding_front_top_left,
+    IntArrayRef padding_back_bottom_right,
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
@@ -207,14 +214,19 @@ static at::Tensor convolution(
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
   auto ndim = src.ndimension();
-  auto dst_tz =
-      conv_dst_tz(ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
+  auto dst_tz = conv_dst_tz(
+      ndim,
+      src.sizes(),
+      wgh.sizes(),
+      padding_front_top_left,
+      padding_back_bottom_right,
+      stride,
+      dilation);
   if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
-      dst_opt = attr.with_relu() && attr.alpha_ <= 0.0
-          ? device(kXPU).dtype(kQUInt8)
-          : device(kXPU).dtype(kQInt8);
+      dst_opt = attr.with_relu() ? device(kXPU).dtype(kQUInt8)
+                                 : device(kXPU).dtype(kQInt8);
     }
     if (onednn_conv_use_channels_last(src, wgh)) {
       TORCH_CHECK(
@@ -266,7 +278,8 @@ static at::Tensor convolution(
   memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
   memory::dims bia_tz = {oc};
   memory::dims _stride = stride.vec();
-  memory::dims _padding = padding.vec();
+  memory::dims _padding_front_top_left = padding_front_top_left.vec();
+  memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
   // plain combination
@@ -294,8 +307,8 @@ static at::Tensor convolution(
       dst_md,
       _stride,
       _dilation,
-      _padding,
-      _padding);
+      _padding_front_top_left,
+      _padding_back_bottom_right);
   float src_scale;
   std::vector<float> wgh_scales, conv_scale = {1};
   primitive_attr pattr;
@@ -343,8 +356,8 @@ static at::Tensor convolution(
       dst_data_t,
       _stride,
       _dilation,
-      _padding,
-      _padding,
+      _padding_front_top_left,
+      _padding_back_bottom_right,
       attr,
       conv_scale,
       conv_zero_point);
@@ -575,7 +588,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     const at::Tensor& diff_dst,
     const at::Tensor& src,
     IntArrayRef diff_wgh_aten_tz,
-    IntArrayRef padding,
+    IntArrayRef padding_front_top_left,
+    IntArrayRef padding_back_bottom_right,
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
@@ -630,7 +644,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   dst_tz[0] = src.size(0); // set n
 
   memory::dims _stride = stride.vec();
-  memory::dims _padding = padding.vec();
+  memory::dims _padding_front_top_left = padding_front_top_left.vec();
+  memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
   auto src_md = memory::desc(src_tz, src_dt, src_fmt);
@@ -650,8 +665,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                        dst_md,
                                        _stride,
                                        _dilation,
-                                       _padding,
-                                       _padding)
+                                       _padding_front_top_left,
+                                       _padding_back_bottom_right)
                                  : convolution_forward::desc(
                                        prop_kind::forward,
                                        algorithm::convolution_direct,
@@ -660,8 +675,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                        dst_md,
                                        _stride,
                                        _dilation,
-                                       _padding,
-                                       _padding);
+                                       _padding_front_top_left,
+                                       _padding_back_bottom_right);
 
   auto conv_fwd_pd = convolution_forward::primitive_desc(conv_fwd_desc, engine);
 
@@ -680,8 +695,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                          dst_md,
                                          _stride,
                                          _dilation,
-                                         _padding,
-                                         _padding)
+                                         _padding_front_top_left,
+                                         _padding_back_bottom_right)
                                    : convolution_backward_weights::desc(
                                          algorithm::convolution_direct,
                                          src_md,
@@ -689,8 +704,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                          dst_md,
                                          _stride,
                                          _dilation,
-                                         _padding,
-                                         _padding);
+                                         _padding_front_top_left,
+                                         _padding_back_bottom_right);
 
 #ifdef USE_SCRATCHPAD_MODE
   primitive_attr attr;
@@ -805,10 +820,13 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   }
 
   if (diff_wgh_m.get_desc() != diff_wgh_usr_m.get_desc()) {
-    // diff_wgh_ contains the result of gw backward, while it is blk format.
-    // In training mode, plain gw output is expected for sgd update regardless
-    // of onednn_layout_enabled or not. Thus, we need one additional reorder
-    // here to make diff_wgh plain.
+    // diff_wgh_ contains the result of gw
+    // backward, while it is blk format. In
+    // training mode, plain gw output is
+    // expected for sgd update regardless of
+    // onednn_layout_enabled or not. Thus, we
+    // need one additional reorder here to make
+    // diff_wgh plain.
     xpu::oneDNN::reorder(diff_wgh_, diff_wgh);
   }
 

@@ -122,6 +122,19 @@ at::Tensor convolution_sigmoid(
     at::Scalar alpha = 0.f,
     at::Scalar beta = 0.f);
 
+at::Tensor pad_convolution(
+    const at::Tensor& input,
+    at::IntArrayRef pad_nd,
+    Scalar value,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool transposed,
+    at::IntArrayRef output_padding,
+    int64_t groups);
+
 at::Tensor matmul_add(
     at::Tensor& accumu,
     const at::Tensor& m1,

@@ -91,6 +91,15 @@ class Conv2dSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
 
+class PadConv2d(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(PadConv2d, self).__init__()
+        self.pad = nn.ConstantPad2d((0, 1, 0, 2), 0.0)
+        self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        x = self.pad(x)
+        return self.conv(x)
 
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -349,6 +358,25 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
+
+    def test_pad_conv_fusion(self, dtype=torch.float):
+        x = torch.randn([1, 2, 3, 3], device=cpu_device)
+
+        model = PadConv2d(2, 2, kernel_size=1, stride=1, padding=(1, 2), bias=True)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.script(model)
+        # modelJit.to("xpu")
+        with torch.no_grad():
+            # print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
 
     def test_linear_relu(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)
