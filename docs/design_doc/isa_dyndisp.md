@@ -7,10 +7,12 @@ This document explains the dynamic kernel dispatch mechanism based on CPU ISA. I
 IPEX dyndisp is forked from **PyTorch:** `ATen/native/DispatchStub.h` and `ATen/native/DispatchStub.cpp`. Besides that, IPEX add more CPU ISA level support, such as `AVX512_VNNI`, `AVX512_BF16` and `AMX`.
 
 PyTorch & IPEX CPU ISA support statement:
- | | DEFAULT | AVX2 | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX |
- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
- | PyTorch | ✔ | ✔ | ✔ | ✘ | ✘ | ✘ |
- | IPEX | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ |
+ | | DEFAULT | AVX2 | AVX2_VNNI | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX |
+ | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+ | PyTorch | ✔ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ |
+ | IPEX-1.11 | ✘ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ |
+ | IPEX-1.12 | ✘ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ |
+ | IPEX-1.13 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 \* Current IPEX DEFAULT level implemented as same as AVX2 level.
 
@@ -21,6 +23,7 @@ PyTorch & IPEX CPU ISA support statement:
  | AVX512 | GCC 9.2+ |
  | AVX512_VNNI | GCC 9.2+ |
  | AVX512_BF16 | GCC 10.3+ |
+ | AVX2_VNNI | GCC 11.2+ |
  | AMX | GCC 11.2+ |
 
 \* Detailed compiler check, please check with `cmake/Modules/FindAVX.cmake` 
