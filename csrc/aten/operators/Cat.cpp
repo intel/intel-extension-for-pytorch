@@ -6,6 +6,8 @@
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <runtime/CachingHostAllocator.h>
+#include <runtime/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
@@ -26,7 +28,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 constexpr int CAT_ARRAY_BATCH_SIZE = 1024;
-constexpr int CAT_ARRAY_MAX_INPUT_DIMS = 3;
+constexpr int CAT_ARRAY_MAX_INPUT_DIMS = 4;
 
 // Similar to any other IndexToOffset calculation for copying along a given
 // dimension.
@@ -100,19 +102,27 @@ void CatArrayBatchedCopy(
   // Get grid where x dim fills half gpu and y dim is number of tensors.
   // This will have cating two tensors fill the entire grid, but prevent
   // many threads from needlessly load meta data if their sizes is small.
-
-  auto numCU = dpcppMaxComputeUnitSize(dev_id);
   auto numWI = dpcppMaxWorkGroupSize(dev_id);
-  DPCPP::range<2> global_range(numCU * numWI / 2, batchCounter);
-  DPCPP::range<2> local_range(numWI, 1);
+
+  // We set limited numWG to prevent over schedule.
+  // numWG = 512 EUs * 8 threads * SIMD lanes 32 / max_compute_units
+  // (1024 on PVC).
+  // When input tensors less than 32, we choose 128 numWG to handle a tensor,
+  // then we have one tile per tensor.
+  // When input tensors more than 32, we choose 64 numWG to handle a tensor,
+  // half tile per tensor, the other half is occupied by next input tensor.
+  int64_t numWG;
+  if (batchCounter > 32)
+    numWG = 64;
+  else
+    numWG = 128;
+  DPCPP::range<2> global_range(batchCounter, numWG * numWI);
+  DPCPP::range<2> local_range(1, numWI);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      IndexType wg = item.get_group(0);
-      IndexType wg_size = item.get_local_range(0);
-      IndexType wi = item.get_local_id(0);
-      IndexType tid = wg * wg_size + wi;
-      IndexType in = item.get_group(1);
+      IndexType tid = item.get_global_id(1);
+      IndexType in = item.get_group(0);
 
       IndexType nElements = inputs[in].nElements;
 
@@ -124,7 +134,7 @@ void CatArrayBatchedCopy(
       IndexType dimSize = inputs[in].dimSize;
       IndexType dataOffset = offset * dimStride;
 
-      IndexType stride = item.get_group_range(0) * wg_size;
+      IndexType stride = item.get_global_range(1);
 
       while (tid < nElements) {
         IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
@@ -171,12 +181,9 @@ void parallel_cat(
   for (int i = 0; i < inputs.size(); i += CAT_ARRAY_BATCH_SIZE) {
     // Re-allocate stackInputs every iteration to avoid read-after-write hazard
     {
-      auto stackInputs_storage = at::empty(
-          {tensorMetadataSize},
-          out.options().dtype(at::kByte).device(at::kCPU));
-      auto stackInputs =
-          static_cast<CatArrInputTensor<scalar_t, unsigned int>*>(
-              stackInputs_storage.data_ptr());
+      CatArrInputTensor<scalar_t, unsigned int>* stackInputs;
+      CachingHostAllocator::Instance()->malloc(
+          (void**)&stackInputs, tensorMetadataSize);
       for (batchCounter = 0; batchCounter < CAT_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
            ++batchCounter) {
@@ -191,7 +198,9 @@ void parallel_cat(
         // update offset
         offset += dimSize;
       }
-      d_inputs_storage.copy_(stackInputs_storage);
+      xpu::dpcpp::memcpyHostToDevice(
+          d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
+      CachingHostAllocator::Instance()->release(stackInputs);
     }
 
 #define HANDLE_CASE(DIMS)                            \
@@ -211,6 +220,9 @@ void parallel_cat(
         break;
       case 3:
         HANDLE_CASE(3);
+        break;
+      case 4:
+        HANDLE_CASE(4);
         break;
       default:
         break;
@@ -368,8 +380,14 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
       });
   allSameType = allSameType && (out.scalar_type() == firstType);
 
-  // DNNL cat does not support double datatype now.
-  if (!allSameType || !xpu::oneDNN::cat_valid(tensors)) {
+  bool isBlockfmt =
+      std::any_of(tensors.begin(), tensors.end(), [](const Tensor& t) {
+        return xpu::oneDNN::is_onednn_layout(t);
+      });
+
+  // when satify none of the input tensors is block fmt
+  // cat will go to DPCPP path, all the other cases will go to oneDNN path
+  if (!isBlockfmt) {
     auto atens = at::AtenIpexTypeXPU::to_plain_if_needed(tensors);
     impl::cat(out, at::TensorList(atens), atens.size(), dim, allSameType);
   } else {
