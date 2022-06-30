@@ -159,10 +159,5 @@ inline at::ScalarType promote_type(
   return promote_type(new_current, args...);
 }
 
-template <class Redispatch, Redispatch* F>
-std::string get_op_name() {
-  return "unknow_operator";
-}
-
 } // namespace autocast
 } // namespace torch_ipex

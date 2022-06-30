@@ -82,6 +82,9 @@ class AutocastCPUTestLists(object):
             ("addmm", mat1_fp32 + mat2_fp32 + mat3_fp32),
             ("addbmm", mat0_fp32 + (torch.randn((n, n, n), device=dev, dtype=torch.float32),
                                     torch.randn((n, n, n), device=dev, dtype=torch.float32))),
+            ("group_norm", (torch.randn((4, 8, 10, 10), device=dev, dtype=torch.float32),
+                            4, torch.randn(8, device=dev, dtype=torch.float32),
+                            torch.randn(8, device=dev, dtype=torch.float32), 1e-5)),
         ]
         self.torch_bf16_multi_output = [
             ("_native_multi_head_attention", (torch.randn((1, 1, 768), device=dev, dtype=torch.float32),
@@ -92,6 +95,14 @@ class AutocastCPUTestLists(object):
                                               torch.randn((768, 768), device=dev, dtype=torch.float32),
                                               torch.randn((768), device=dev, dtype=torch.float32),
                                               None, False, True)),
+            ("_native_multi_head_attention", (torch.randn((1, 2, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((1, 2, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((1, 2, 768), device=dev, dtype=torch.float32),
+                                              768, 12, torch.randn((2304, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((2304), device=dev, dtype=torch.float32),
+                                              torch.randn((768, 768), device=dev, dtype=torch.float32),
+                                              torch.randn((768), device=dev, dtype=torch.float32),
+                                              torch.Tensor([[False, True]]), False, True)),
         ]
         self.torch_fp32 = [
         ]

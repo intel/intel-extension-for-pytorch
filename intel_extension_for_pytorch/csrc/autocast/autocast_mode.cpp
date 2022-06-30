@@ -136,10 +136,6 @@ struct CPU_WrapFunction_<
         &CPU_WrapFunction<DtypeCastPolicy::CAST_POLICY, SIG, SIG, &FUNC>:: \
             type::call);                                                   \
   }                                                                        \
-  template <>                                                              \
-  std::string get_op_name<SIG, FUNC>() {                                   \
-    return NAME;                                                           \
-  }
 
 // user_defined_dtype a.k.a WhiteList
 MAKE_REGISTER_FUNC(
