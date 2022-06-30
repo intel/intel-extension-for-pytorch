@@ -13,19 +13,20 @@ FROM ${BASE_IMAGE} AS dev-base
 RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-    ca-certificates \
-    git \
-    curl \
-    vim \
     build-essential \
+    ca-certificates \
     ccache \
-    libgoogle-perftools-dev \
-    numactl \
     cmake \
+    curl \
+    git \
+    google-perftools \
+    libgoogle-perftools-dev \
+    libjemalloc-dev \
     libjpeg-dev \
-    pybind11-dev \
     libpng-dev \
+    numactl \
     pybind11-dev \
+    vim \
     && rm -rf /var/lib/apt/lists/*
 RUN /usr/sbin/update-ccache-symlinks
 RUN mkdir /opt/ccache && ccache --set-config=cache_dir=/opt/ccache
@@ -41,10 +42,10 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
     /opt/conda/bin/conda clean -ya
 
 FROM dev-base AS build
-ARG IPEX_VERSION=v1.11.0
-ARG PYTORCH_VERSION=v1.11.0
-ARG TORCHVISION_VERSION=0.12.0+cpu
-ARG TORCHAUDIO_VERSION=0.11.0+cpu
+ARG IPEX_VERSION=v1.12.0
+ARG PYTORCH_VERSION=v1.12.0
+ARG TORCHVISION_VERSION=0.13.0+cpu
+ARG TORCHAUDIO_VERSION=0.12.0+cpu
 COPY --from=conda /opt/conda /opt/conda
 RUN --mount=type=cache,target=/opt/ccache \
     python -m pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} -f https://download.pytorch.org/whl/torch_stable.html && \
@@ -60,11 +61,11 @@ RUN --mount=type=cache,target=/opt/ccache \
 
 FROM dev-base as dev
 COPY --from=build /opt/conda /opt/conda
-ARG OMP_NUM_THREADS=1
-ENV OMP_NUM_THREADS ${OMP_NUM_THREADS}
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libjemalloc.so /usr/lib/x86_64-linux-gnu/libtcmalloc.so
 ARG KMP_BLOCKTIME=1
 ENV KMP_BLOCKTIME ${KMP_BLOCKTIME}
 ARG KMP_HW_SUBSET=1T
 ENV KMP_HW_SUBSET ${KMP_HW_SUBSET}
-ENV LD_PRELOAD "/opt/conda/lib/libiomp5.so /usr/lib/x86_64-linux-gnu/libtcmalloc.so"
+ENV DNNL_MAX_CPU_ISA="AVX512_CORE_AMX"
+ENV LD_PRELOAD "/usr/lib/x86_64-linux-gnu/libjemalloc.so:/usr/lib/x86_64-linux-gnu/libtcmalloc.so:/opt/conda/lib/libiomp5.so":${LD_PRELOAD}
 ENV LD_LIBRARY_PATH "/opt/conda/lib/python3.8/site-packages/lib/"
