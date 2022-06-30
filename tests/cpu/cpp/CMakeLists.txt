@@ -36,7 +36,7 @@ link_directories(${CPP_TEST_BUILD_DIR}/lib)
 add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_party/googletest)
 
 # Add the Test Files
-set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp)
+set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
 add_executable(${TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 

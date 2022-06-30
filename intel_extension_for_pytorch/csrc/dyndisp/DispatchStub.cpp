@@ -199,15 +199,12 @@ void* DispatchStubImpl::get_call_ptr(
       return fptr;
     }
 
-    case DeviceType::CUDA:
-      TORCH_INTERNAL_ASSERT(
-          cuda_dispatch_ptr, "DispatchStub: missing CUDA kernel");
-      return cuda_dispatch_ptr;
-
-    case DeviceType::HIP:
-      TORCH_INTERNAL_ASSERT(
-          hip_dispatch_ptr, "DispatchStub: missing HIP kernel");
-      return hip_dispatch_ptr;
+      /*
+      case DeviceType::XPU:
+        TORCH_INTERNAL_ASSERT(
+            xpu_dispatch_ptr, "DispatchStub: missing XPU kernel");
+        return xpu_dispatch_ptr;
+      */
 
     default:
       AT_ERROR("DispatchStub: unsupported device type", device_type);

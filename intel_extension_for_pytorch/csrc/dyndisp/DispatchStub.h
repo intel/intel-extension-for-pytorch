@@ -141,12 +141,10 @@ struct TORCH_API DispatchStubImpl {
 // See https://github.com/pytorch/pytorch/issues/22681 for more details.
 #if defined(_MSC_VER) && defined(_DEBUG)
   std::atomic<void*> cpu_dispatch_ptr;
-  void* cuda_dispatch_ptr;
-  void* hip_dispatch_ptr;
+  void* xpu_dispatch_ptr;
 #else
   std::atomic<void*> cpu_dispatch_ptr{nullptr};
-  void* cuda_dispatch_ptr = nullptr;
-  void* hip_dispatch_ptr = nullptr;
+  void* xpu_dispatch_ptr = nullptr;
 #endif
 };
 
@@ -197,12 +195,8 @@ struct DispatchStub<rT (*)(Args...), T> {
     return (*call_ptr)(std::forward<ArgTypes>(args)...);
   }
 
-  void set_cuda_dispatch_ptr(FnPtr fn_ptr) {
-    impl.cuda_dispatch_ptr = reinterpret_cast<void*>(fn_ptr);
-  }
-
-  void set_hip_dispatch_ptr(FnPtr fn_ptr) {
-    impl.hip_dispatch_ptr = reinterpret_cast<void*>(fn_ptr);
+  void set_xpu_dispatch_ptr(FnPtr fn_ptr) {
+    impl.xpu_dispatch_ptr = reinterpret_cast<void*>(fn_ptr);
   }
 
   static FnPtr DEFAULT;
