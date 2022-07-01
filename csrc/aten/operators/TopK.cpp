@@ -268,7 +268,9 @@ DPCPP_DEVICE void countRadixUsingMask(
   }
 
   for (unsigned int i = 0; i < RADIX_SIZE; i++) {
-    DPCPP::atomic<int, dpcpp_local_space> smem_var(smem_acc.get_pointer() + i);
+    DPCPP::
+        atomic_ref<int, dpcpp_mem_odr_rlx, dpcpp_mem_scp_wg, dpcpp_local_space>
+            smem_var(smem_acc[i]);
     smem_var.fetch_add(counts[i]);
   }
 
