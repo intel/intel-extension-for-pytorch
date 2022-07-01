@@ -137,7 +137,7 @@ static inline C10_HOST_DEVICE scalar_t calc_digamma(scalar_t in) {
   }
 
   accscalar_t y = 0;
-  if (x < 1.0e17) {
+  if (x < 1.0e17f) {
     accscalar_t z = 1 / (x * x);
 
     accscalar_t polevl_result = 0;

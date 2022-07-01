@@ -402,7 +402,7 @@ struct TensorDigammaOp {
     }
 
     compute_type y = 0;
-    if (x < 1.0e17) {
+    if (x < 1.0e17f) {
       compute_type z = 1.0 / (x * x);
       compute_type polevl_result = 0;
       for (int i = 0; i <= 6; i++) {
@@ -496,17 +496,17 @@ struct TensorErfinvOp {
     static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(in);
-    if (DPCPP::fabs(x) > 1.0) {
+    if (DPCPP::fabs(x) > 1.0f) {
       out = scalar_cast<T>(NAN);
       return;
     }
-    if (DPCPP::fabs(x) == 1.0) {
+    if (DPCPP::fabs(x) == 1.0f) {
       out = scalar_cast<T>(
           (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
           (std::numeric_limits<double>::infinity()));
       return;
     }
-    if (DPCPP::fabs(x) <= 0.7) {
+    if (DPCPP::fabs(x) <= 0.7f) {
       z = x * x;
       num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
       dem =
