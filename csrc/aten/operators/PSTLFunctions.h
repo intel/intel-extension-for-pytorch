@@ -436,41 +436,6 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
   return std::make_tuple<ForwardIt, ZipForwardIt>(first + M, z_first + M);
 }
 
-template <typename output_t, class InputIt, class OutputIt>
-OutputIt adjacent_difference(InputIt first, InputIt last, OutputIt d_first) {
-  RECORD_FUNCTION("adjacent_difference_1_xpu", {});
-  const auto N = std::distance(first, last);
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto options = map_options<output_t>();
-  Tensor scratchpad = at::empty({N}, options);
-  output_t* scratchpad_ptr = scratchpad.data_ptr<output_t>();
-
-  auto cgf_1 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      if (item_id > 0)
-        scratchpad_ptr[item_id] =
-            static_cast<output_t>(first[item_id] - first[item_id - 1]);
-      else
-        scratchpad_ptr[item_id] = static_cast<output_t>(first[item_id]);
-    };
-
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
-
-  auto cgf_2 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      d_first[item_id] = scratchpad_ptr[item_id];
-    };
-
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
-
-  return d_first + N;
-}
-
 template <
     typename output_t,
     class InputIt,
@@ -481,37 +446,49 @@ OutputIt adjacent_difference(
     InputIt last,
     OutputIt d_first,
     BinaryOperation op) {
-  RECORD_FUNCTION("adjacent_difference_2_xpu", {});
+  RECORD_FUNCTION("adjacent_difference", {});
   const auto N = std::distance(first, last);
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
-  auto options = map_options<output_t>();
-  Tensor scratchpad = at::empty({N}, options);
-  output_t* scratchpad_ptr = scratchpad.data_ptr<output_t>();
+  Tensor scratchpad;
+  OutputIt adiff = d_first;
+  bool is_inplace = (void*)first == (void*)d_first ? true : false;
+  if (is_inplace) {
+    scratchpad = at::empty({N}, map_options<output_t>());
+    adiff = scratchpad.data_ptr<output_t>();
+  }
 
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       if (item_id > 0)
-        scratchpad_ptr[item_id] =
+        adiff[item_id] =
             static_cast<output_t>(op(first[item_id - 1], first[item_id]));
       else
-        scratchpad_ptr[item_id] = static_cast<output_t>(first[item_id]);
+        adiff[item_id] = static_cast<output_t>(first[item_id]);
     };
 
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
-  auto cgf_2 = DPCPP_Q_CGF(__cgh) {
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      d_first[item_id] = scratchpad_ptr[item_id];
-    };
+  if (is_inplace) {
+    auto cgf_2 = DPCPP_Q_CGF(__cgh) {
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+        d_first[item_id] = adiff[item_id];
+      };
 
-    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
+      __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+    };
+    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_2);
+  }
 
   return d_first + N;
+}
+
+template <typename output_t, class InputIt, class OutputIt>
+OutputIt adjacent_difference(InputIt first, InputIt last, OutputIt d_first) {
+  return adjacent_difference<output_t>(
+      first, last, d_first, [](auto l, auto r) { return r - l; });
 }
 
 template <
