@@ -852,14 +852,6 @@ class LinearSwishNaive(nn.Module):
         sigmoid_out = self.sigmoid(linear_out)
         return torch.mul(linear_out, sigmoid_out)
 
-class DisableTexprFuser():
-    def __enter__(self):
-        self.saved = torch._C._jit_texpr_fuser_enabled()
-        torch._C._jit_set_texpr_fuser_enabled(False)
-
-    def __exit__(self, *args, **kwargs):
-        torch._C._jit_set_texpr_fuser_enabled(self.saved)
-
 class Bottleneck_v1(nn.Module):
     def __init__(self):
         super(Bottleneck_v1, self).__init__()
@@ -3068,26 +3060,6 @@ class Tester(TestCase):
                 y_outplace = m_outplace(x)
                 traced_y_outplace = traced_outplace(x)
                 self.assertEqual(y_outplace, traced_y_outplace)
-
-    def test_remove_bailout(self):
-        batch_size = 8
-        out_channels = 32
-        in_channels = 3
-        kernel_size = 3
-        image_size = 64
-        input_size = [batch_size, in_channels, image_size, image_size]
-        x = torch.randn(input_size)
-        with DisableTexprFuser():
-            self._test_output(
-                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="prim::BailOut")
-            self._test_output_bf16(
-                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="prim::BailOut")
 
     @skipIfNoTorchVision
     def test_conv_torchvision_bn_folding(self):
