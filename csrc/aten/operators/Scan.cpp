@@ -24,19 +24,41 @@ template <
     class InputInfo,
     class OutputInfo,
     class BinaryFunction>
-static inline void _scan_kernel(
+static inline void _loop_scan_kernel(
     InputInfo& input_info,
     OutputInfo& output_info,
     int dim_after_collapse,
     T init,
     BinaryFunction func) {
-  auto cfg = ScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
-      input_info, output_info, dim_after_collapse, init, Type, func);
+  auto cfg =
+      LoopScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
+          input_info, output_info, dim_after_collapse, init, Type, func);
+  TORCH_CHECK(1 == cfg.stride_);
+  launch_loop_scan(cfg);
+
+  return;
+}
+
+template <
+    ScanType Type,
+    typename T,
+    class InputInfo,
+    class OutputInfo,
+    class BinaryFunction>
+static inline void _segment_scan_kernel(
+    InputInfo& input_info,
+    OutputInfo& output_info,
+    int dim_after_collapse,
+    T init,
+    BinaryFunction func) {
+  auto cfg =
+      SegmentScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
+          input_info, output_info, dim_after_collapse, init, Type, func);
 
   // 0. recursive convergence
   if (cfg.problem_ <= cfg.problem_wg_range_) {
     cfg.set_carrier(nullptr);
-    launch_group_scan(cfg);
+    launch_segment_scan(cfg);
     return;
   }
 
@@ -47,10 +69,11 @@ static inline void _scan_kernel(
   TensorInfo<T, int64_t> carrier_info =
       getTensorInfo<T, int64_t>(carrier_holder);
   cfg.set_carrier(carrier_info.data);
-  launch_group_scan(cfg);
+  launch_segment_scan(cfg);
 
   // 2. recursion for carrier
-  _scan_kernel<EXCLUSIVE_TYPE>(carrier_info, carrier_info, 1, init, func);
+  _segment_scan_kernel<EXCLUSIVE_TYPE>(
+      carrier_info, carrier_info, 1, init, func);
 
   // 3. accumulate among all chunk
   accumulate_carrier(cfg);
@@ -95,8 +118,17 @@ void scan(
       getTensorInfo<oscalar_t, int64_t>(self);
   output_info.collapseDims(dimension);
 
-  impl::_scan_kernel<Type>(
-      input_info, output_info, dim_after_collapse, init, func);
+  int64_t batch = input_info.outerSize(dim_after_collapse);
+  int64_t stride = input_info.innerSize(dim_after_collapse);
+  int64_t problem = input_info.sizes[dim_after_collapse];
+
+  if (dispatch_to_loop_scan_kernel(problem, stride, batch)) {
+    impl::_loop_scan_kernel<Type>(
+        input_info, output_info, dim_after_collapse, init, func);
+  } else {
+    impl::_segment_scan_kernel<Type>(
+        input_info, output_info, dim_after_collapse, init, func);
+  }
 }
 
 Tensor& cumsum_out(

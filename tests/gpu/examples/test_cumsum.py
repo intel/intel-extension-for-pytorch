@@ -10,7 +10,7 @@ dpcpp_device = torch.device("xpu")
 test_1d_shapes = [1, 2, 7, 8, 9, 15, 16, 17, 63, 64, 65]
 test_2d_shapes = [(1, 7), (7, 1), (2, 7), (2, 8), (2, 9), (7, 1), (7, 2), (8, 2), (9, 2),
                   (3, 15), (3, 16), (3, 17), (15, 3), (16, 3), (17, 3),
-                  (4, 31), (4, 32), (4, 33), (31, 4), (32, 4), (33, 4), (65, 65), (8193, 8193)]
+                  (4, 31), (4, 32), (4, 33), (31, 4), (32, 4), (33, 4), (65, 65), (8193, 65)]
 test_3d_shapes = [(1, 7, 7), (7, 7, 1), (7, 1, 7), (2, 7, 7), (2, 8, 8), (2, 9, 9),
                   (7, 7, 1), (7, 7, 2), (8, 8, 2), (9, 9, 2), (3, 15, 15), (15, 3, 15),
                   (3, 16, 16), (3, 17, 17), (15, 15, 3), (16, 16, 3), (17, 17, 3),
@@ -191,3 +191,15 @@ class TestTorchMethod(TestCase):
         b_cpu = torch.cumsum(a_strided_cpu, dim=0)
         b_xpu = torch.cumsum(a_strided_xpu, dim=0)
         self.assertEqual(b_cpu, b_xpu.to(cpu_device), rtol=1e-5, atol=1e-4)
+
+    def test_scan_single_kernel(self, dtype=torch.float):
+        a_cpu = torch.ones((257, 2049), device=cpu_device).to(dtype)
+        a_xpu = a_cpu.to(dpcpp_device).to(dtype)
+
+        res_cpu = torch.cumsum(a_cpu, dim=1)
+        res_xpu = torch.cumsum(a_xpu, dim=1)
+        if a_cpu.size(0) > 100:
+            atol = 1
+        else:
+            atol = 1e-1
+        self.assertEqual(res_cpu, res_xpu.to(cpu_device).to(torch.float), rtol=10e-4, atol=atol)
