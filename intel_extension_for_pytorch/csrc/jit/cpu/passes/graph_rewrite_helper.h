@@ -5,27 +5,30 @@
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite_helper {
 
 // those code just copy from PyTorch offical and extend
 // replaceConvolutionWithAtenConv to handle conv_transpose3d.
 
-std::string getFuncName(Value* func_value);
-Value* getValue(
+std::string getFuncName(torch::jit::Value* func_value);
+torch::jit::Value* getValue(
     const std::string& name,
-    const std::unordered_map<const Value*, Value*>& match_vmap,
-    const std::unordered_map<std::string, Value*>& vmap);
-c10::optional<IValue> getIValue(
+    const std::unordered_map<const torch::jit::Value*, torch::jit::Value*>&
+        match_vmap,
+    const std::unordered_map<std::string, torch::jit::Value*>& vmap);
+c10::optional<c10::IValue> getIValue(
     const std::string& name,
-    const std::unordered_map<const Value*, Value*>& match_vmap,
-    const std::unordered_map<std::string, Value*>& vmap);
-TORCH_API void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
+    const std::unordered_map<const torch::jit::Value*, torch::jit::Value*>&
+        match_vmap,
+    const std::unordered_map<std::string, torch::jit::Value*>& vmap);
+TORCH_API void replaceConvolutionWithAtenConv(
+    std::shared_ptr<torch::jit::Graph>& graph);
 
 bool isClampFusable(
-    const Match& match,
-    const std::unordered_map<std::string, Value*>& vmap);
+    const torch::jit::Match& match,
+    const std::unordered_map<std::string, torch::jit::Value*>& vmap);
 
 // This struct contains a compiled IR patterns slated for use in the
 // findPatternMatches function. The struct encapsulates the common
@@ -35,16 +38,16 @@ bool isClampFusable(
 // runtime cost
 struct PatternInfo {
   std::string pattern_string;
-  std::unique_ptr<Graph> pattern_graph;
-  std::unordered_map<std::string, Value*> vmap;
-  std::vector<MatchFilter> filters;
+  std::unique_ptr<torch::jit::Graph> pattern_graph;
+  std::unordered_map<std::string, torch::jit::Value*> vmap;
+  std::vector<torch::jit::MatchFilter> filters;
 
   static PatternInfo parse_from_str(
       std::string pattern_string,
-      const std::vector<MatchFilter>& filters = {}) {
+      const std::vector<torch::jit::MatchFilter>& filters = {}) {
     PatternInfo rv{
         std::move(pattern_string),
-        std::make_unique<Graph>(),
+        std::make_unique<torch::jit::Graph>(),
         decltype(vmap){},
         filters};
     parseIR(rv.pattern_string, rv.pattern_graph.get(), rv.vmap);
@@ -54,4 +57,4 @@ struct PatternInfo {
 
 } // namespace graph_rewrite_helper
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

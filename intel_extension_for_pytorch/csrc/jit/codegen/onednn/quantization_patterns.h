@@ -5,14 +5,14 @@
 #include <string>
 #include "csrc/jit/cpu/passes/graph_rewrite.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 
 struct FusionInfo {
   std::string quantized_op_name;
   std::string pattern;
   std::string replacement;
-  std::vector<MatchFilter> filters = {};
+  std::vector<torch::jit::MatchFilter> filters = {};
 };
 
 namespace {
@@ -52,7 +52,7 @@ FusionInfo getIpexFusionInfo(
 
 } // namespace
 
-void IpexQuantFusion(std::shared_ptr<Graph>& graph) {
+void IpexQuantFusion(std::shared_ptr<torch::jit::Graph>& graph) {
   std::vector<FusionInfo> patterns;
   auto adaptive_avg_pool2d_patten = getIpexFusionInfo(
       "aten::adaptive_avg_pool2d",
@@ -67,7 +67,7 @@ void IpexQuantFusion(std::shared_ptr<Graph>& graph) {
   patterns.emplace_back(adaptive_avg_pool2d_patten);
   patterns.emplace_back(flatten_patten);
   for (const auto& info : patterns) {
-    SubgraphRewriter rewriter;
+    torch::jit::SubgraphRewriter rewriter;
     rewriter.RegisterRewritePattern(info.pattern, info.replacement);
     rewriter.runOnGraph(graph, info.filters);
   }
@@ -90,4 +90,4 @@ void IpexQuantFusion(std::shared_ptr<Graph>& graph) {
 }
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
@@ -18,7 +18,7 @@ bool is_llga_fp32_bf16_enabled();
 
 void set_llga_fp32_bf16_enabled(bool new_enabled);
 
-TORCH_API void fuseGraph(std::shared_ptr<Graph>& g);
+TORCH_API void fuseGraph(std::shared_ptr<torch::jit::Graph>& g);
 
 void setLlgaWeightCacheEnabled(bool enabled);
 
@@ -28,7 +28,7 @@ bool getLlgaWeightCacheEnabled();
 } // namespace fuser
 
 struct TORCH_API RegisterLlgaFuseGraph
-    : public PassManager<RegisterLlgaFuseGraph> {
+    : public torch::jit::PassManager<RegisterLlgaFuseGraph> {
   static bool setEnabled(bool enabled) {
     bool oldState = fuser::onednn::getLlgaEnabled();
     fuser::onednn::getLlgaEnabled() = enabled;
@@ -45,7 +45,7 @@ struct TORCH_API RegisterLlgaFuseGraph
   }
 
   // override PassManager::registerPass to register pre-pass
-  static bool registerPass(GraphPass p) {
+  static bool registerPass(torch::jit::GraphPass p) {
     if (!isRegistered()) {
       passID(registerPrePass(std::move(p)), true);
       isRegistered(true);
@@ -57,11 +57,11 @@ struct TORCH_API RegisterLlgaFuseGraph
   // override PassManager::clearPass to clear pre-pass
   static void clearPass() {
     if (isRegistered()) {
-      clearPrePass(passID());
+      torch::jit::clearPrePass(passID());
       isRegistered(true);
     }
   }
 };
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

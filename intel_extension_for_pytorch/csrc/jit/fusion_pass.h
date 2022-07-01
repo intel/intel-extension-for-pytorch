@@ -4,13 +4,13 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <memory>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 
-void FusionPass(std::shared_ptr<Graph>& graph);
-void ApplyInplaceOptimization(std::shared_ptr<Graph>& graph);
-void IPEXFusionPass(std::shared_ptr<Graph>& graph);
-void FoldPrepackingOps(script::Module& m);
+void FusionPass(std::shared_ptr<torch::jit::Graph>& graph);
+void ApplyInplaceOptimization(std::shared_ptr<torch::jit::Graph>& graph);
+void IPEXFusionPass(std::shared_ptr<torch::jit::Graph>& graph);
+void FoldPrepackingOps(torch::jit::script::Module& m);
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

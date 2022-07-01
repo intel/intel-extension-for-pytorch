@@ -1,11 +1,12 @@
 #include <ATen/code_template.h>
 #include "graph_rewrite.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
 using namespace at::jit;
+using namespace torch::jit;
 
 // This code will be removed after the official PyTorch NNC fully support
 // BFloat16.
@@ -83,4 +84,4 @@ void replaceIPEXToWithAtenTo(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

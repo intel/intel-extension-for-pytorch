@@ -5,10 +5,12 @@
 #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
 #include <torch/csrc/jit/runtime/graph_executor.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 using tensor_type_converter_t =
     c10::function_ref<TensorTypePtr(const TensorTypePtr& t)>;
@@ -143,4 +145,4 @@ void prepareFusionGroupAndGuardOutputs(Block* block) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

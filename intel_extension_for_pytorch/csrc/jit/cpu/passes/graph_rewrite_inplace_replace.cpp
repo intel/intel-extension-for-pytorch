@@ -1,7 +1,10 @@
 #include "graph_rewrite_inplace_replace.h"
-namespace torch {
+
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
+
+using namespace torch::jit;
 
 bool hasSideEffectInDefNode(Node* def_node, int position) {
   bool checkresult = false;
@@ -291,4 +294,4 @@ void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

@@ -2,8 +2,10 @@
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/runtime/graph_iterator.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
+
+using namespace torch::jit;
 
 void RemoveRedundantAliases(const std::shared_ptr<Graph>& graph) {
   // DBR quantization uses torch.Tensor.as_subclass frequently. When
@@ -47,4 +49,4 @@ void RemoveRedundantAliases(const std::shared_ptr<Graph>& graph) {
 }
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

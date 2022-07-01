@@ -7,44 +7,41 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
-// those code just copy from PyTorch offical:
-// https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/graph_rewrite_helper.h
+void FuseShuffle(std::shared_ptr<torch::jit::Graph>& graph);
+void FuseMHAScoreCalc(std::shared_ptr<torch::jit::Graph>& graph);
+void FuseLinearSwishCustomized(std::shared_ptr<torch::jit::Graph>& graph);
+void replaceAtenMaxPool2dWithIpexMaxPool2d(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void fuseBmmAdd(std::shared_ptr<torch::jit::Graph>& graph);
 
-Value* getValue(
-    const std::string& name,
-    const std::unordered_map<const Value*, Value*>& match_vmap,
-    const std::unordered_map<std::string, Value*>& vmap);
-c10::optional<IValue> getIValue(
-    const std::string& name,
-    const std::unordered_map<const Value*, Value*>& match_vmap,
-    const std::unordered_map<std::string, Value*>& vmap);
+void replaceOpsWithAtenInplaceOps(std::shared_ptr<torch::jit::Graph>& graph);
+void replaceAtenOpsWithIpexInplaceOps(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void replaceAtenSoftmaxWithIpexSoftmax(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void replaceAtenBatchNormWithIpexBatchNorm(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void replaceAtenLayerNormWithIpexLayerNorm(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void replaceEmbeddingBagWithQEmbeddingBag(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void replaceInteractionWithQInteraction(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void preprocessSizeForQLstm(std::shared_ptr<torch::jit::Graph>& graph);
+void replaceLstmWithQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 
-void FuseShuffle(std::shared_ptr<Graph>& graph);
-void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
-void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph);
-void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
-void fuseBmmAdd(std::shared_ptr<Graph>& graph);
-
-void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph);
-void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph);
-void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph);
-void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph);
-void replaceAtenLayerNormWithIpexLayerNorm(std::shared_ptr<Graph>& graph);
-void replaceEmbeddingBagWithQEmbeddingBag(std::shared_ptr<Graph>& graph);
-void replaceInteractionWithQInteraction(std::shared_ptr<Graph>& graph);
-void preprocessSizeForQLstm(std::shared_ptr<Graph>& graph);
-void replaceLstmWithQLstm(std::shared_ptr<Graph>& graph);
-
-void replaceFrozenIPEXConvWithAtenConv(std::shared_ptr<Graph>& graph);
-void replaceFrozenIPEXLinearWithAtenLinear(std::shared_ptr<Graph>& graph);
-void insertPrePackedConvOp(std::shared_ptr<Graph>& graph);
-void fuseConvWithEltwise(std::shared_ptr<Graph>& graph);
-void fuseConvAddRelu(std::shared_ptr<Graph>& graph);
-void fuseBottleneck(std::shared_ptr<Graph>& graph);
+void replaceFrozenIPEXConvWithAtenConv(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void replaceFrozenIPEXLinearWithAtenLinear(
+    std::shared_ptr<torch::jit::Graph>& graph);
+void insertPrePackedConvOp(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseConvWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseConvAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseBottleneck(std::shared_ptr<torch::jit::Graph>& graph);
 
 // This graph pass is to replace at::hardsigmoid with IPEX hardsigmoid.
 // Because NNC pulls aten::hardsigmoidn into its fusion group while its
@@ -52,31 +49,31 @@ void fuseBottleneck(std::shared_ptr<Graph>& graph);
 // that, IPEX will use oneDNN post-op to fuse hard sigmoid. Hence, this graph
 // pass is a workaround for this release and will be removed in the next major
 // release.
-void ReplaceHardsigmoidWithIPEX(std::shared_ptr<Graph>& graph);
+void ReplaceHardsigmoidWithIPEX(std::shared_ptr<torch::jit::Graph>& graph);
 
 void RecordAtenLinearNodes(
-    std::shared_ptr<Graph>& graph,
-    std::unordered_set<Node*>& aten_linear);
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_set<torch::jit::Node*>& aten_linear);
 void insertPrePackedLinearOp(
-    std::shared_ptr<Graph>& graph,
-    std::unordered_set<Node*>& aten_linear);
-void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
-void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_set<torch::jit::Node*>& aten_linear);
+void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
-void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
-void FuseMatmulDiv(std::shared_ptr<Graph>& graph);
-void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
+void FuseAddLayerNorm(std::shared_ptr<torch::jit::Graph>& graph);
+void FuseMatmulDiv(std::shared_ptr<torch::jit::Graph>& graph);
+void FuseConcatBnRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
-void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
-void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph);
+void insertPrePackedConvTransposeOp(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseConvTransposeWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 
-void FusedEinsumPost(std::shared_ptr<Graph>& graph);
+void FusedEinsumPost(std::shared_ptr<torch::jit::Graph>& graph);
 
 // This code will be removed after the official PyTorch NNC fully support
 // BFloat16.
-void replaceAtenToWithIPEXTo(std::shared_ptr<Graph>& graph);
-void replaceIPEXToWithAtenTo(std::shared_ptr<Graph>& graph);
+void replaceAtenToWithIPEXTo(std::shared_ptr<torch::jit::Graph>& graph);
+void replaceIPEXToWithAtenTo(std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

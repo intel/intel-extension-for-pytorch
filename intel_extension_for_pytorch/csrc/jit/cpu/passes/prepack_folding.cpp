@@ -3,8 +3,10 @@
 
 #include "prepack_folding.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
+
+using namespace torch::jit;
 
 static const std::set<std::string> prepack_foldable_ops = {
     "ipex_prepack::convolution_prepack",
@@ -78,4 +80,4 @@ void PrePackingOpsFolder(std::shared_ptr<Graph>& graph) {
 }
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

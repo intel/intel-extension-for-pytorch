@@ -24,12 +24,12 @@
 #include <torch/csrc/jit/runtime/graph_executor.h>
 #include <torch/csrc/jit/runtime/operator_options.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
-
 namespace fuser {
 namespace onednn {
 
+using namespace torch::jit;
 namespace {
 thread_local bool llga_fp32_bf16_enabled = false;
 }
@@ -116,6 +116,8 @@ bool getLlgaWeightCacheEnabled() {
 } // namespace onednn
 } // namespace fuser
 
+using namespace torch::jit;
+
 Operation createLlgaKernel(const Node* node) {
   auto kernel = std::make_shared<fuser::onednn::LlgaKernel>(node);
   return [kernel](Stack* stack) {
@@ -126,7 +128,7 @@ Operation createLlgaKernel(const Node* node) {
   };
 }
 
-RegisterOperators LLGAFusionGroupOp({
+torch::jit::RegisterOperators LLGAFusionGroupOp({
     torch::jit::Operator(
         Symbol::fromQualString(fuser::onednn::LlgaFusionGroupName()),
         createLlgaKernel,
@@ -181,7 +183,7 @@ Operation createLlgaGuardKernel(const Node* node) {
   };
 }
 
-RegisterOperators LLGAGuardOp({
+torch::jit::RegisterOperators LLGAGuardOp({
     torch::jit::Operator(
         Symbol::fromQualString(fuser::onednn::LlgaGuardName()),
         createLlgaGuardKernel,
@@ -189,4 +191,4 @@ RegisterOperators LLGAGuardOp({
 });
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

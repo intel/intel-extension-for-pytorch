@@ -2,7 +2,7 @@
 
 #include <oneapi/dnnl/dnnl_graph.hpp>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
@@ -24,4 +24,4 @@ struct Stream {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

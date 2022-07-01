@@ -5,7 +5,7 @@
 
 #include "csrc/cpu/ideep/ideep.hpp"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 namespace utils {
@@ -34,4 +34,4 @@ bool is_contiguous(c10::TensorTypePtr tensor);
 } // namespace utils
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

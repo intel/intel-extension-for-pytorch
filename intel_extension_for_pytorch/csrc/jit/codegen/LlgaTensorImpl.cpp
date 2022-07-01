@@ -3,15 +3,18 @@
 
 #include <c10/core/CPUAllocator.h>
 
-namespace at {
+namespace torch_ipex {
+namespace jit {
+namespace fuser {
+namespace onednn {
 
 LlgaTensorImpl::LlgaTensorImpl(
-    Storage&& storage,
+    c10::Storage&& storage,
     const caffe2::TypeMeta& data_type,
     const LlgaTensorDesc& desc)
     : TensorImpl(
           std::move(storage),
-          c10::DispatchKeySet(DispatchKey::MkldnnCPU),
+          c10::DispatchKeySet(c10::DispatchKey::MkldnnCPU),
           data_type),
       desc_(desc) {
   set_sizes_and_strides(desc.sizes(), desc.strides());
@@ -22,7 +25,9 @@ bool LlgaTensorImpl::has_storage() const {
   return true;
 }
 
-Tensor empty_llga(const LlgaTensorDesc& desc, const TensorOptions& options) {
+at::Tensor empty_llga(
+    const LlgaTensorDesc& desc,
+    const at::TensorOptions& options) {
   auto sizes = desc.sizes();
   auto nbytes = desc.storage_size();
 
@@ -38,23 +43,23 @@ Tensor empty_llga(const LlgaTensorDesc& desc, const TensorOptions& options) {
       std::move(storage_impl), options.dtype(), desc);
 }
 
-const LlgaTensorDesc& get_llga_desc(const Tensor& tensor) {
+const LlgaTensorDesc& get_llga_desc(const at::Tensor& tensor) {
   TORCH_INTERNAL_ASSERT(
       tensor.is_mkldnn(), "get_llga_desc expects Mkldnn tensor input");
   return static_cast<LlgaTensorImpl*>(tensor.unsafeGetTensorImpl())->desc();
 }
 
-dnnl::graph::tensor llga_from_aten_tensor(const Tensor& tensor) {
+dnnl::graph::tensor llga_from_aten_tensor(const at::Tensor& tensor) {
   return {
       get_llga_desc(tensor).logical_tensor(),
-      torch::jit::fuser::onednn::Engine::getEngine(),
+      Engine::getEngine(),
       tensor.data_ptr()};
 }
 
-Tensor LlgaTensorImpl::llga_to_aten_tensor(LlgaTensorImpl* llgaImpl) {
+at::Tensor LlgaTensorImpl::llga_to_aten_tensor(LlgaTensorImpl* llgaImpl) {
   auto aten_tensor = at::detail::make_tensor<TensorImpl>(
       std::move(llgaImpl->storage_),
-      c10::DispatchKeySet(DispatchKey::CPU),
+      c10::DispatchKeySet(c10::DispatchKey::CPU),
       llgaImpl->data_type_);
   auto impl = aten_tensor.unsafeGetTensorImpl();
   impl->set_storage_offset(llgaImpl->storage_offset_);
@@ -62,12 +67,12 @@ Tensor LlgaTensorImpl::llga_to_aten_tensor(LlgaTensorImpl* llgaImpl) {
   return aten_tensor;
 }
 
-Tensor LlgaTensorImpl::llga_to_aten_tensor(
+at::Tensor LlgaTensorImpl::llga_to_aten_tensor(
     LlgaTensorImpl* llgaImpl,
-    QuantizerPtr quantizer) {
-  auto aten_tensor = at::detail::make_tensor<QTensorImpl>(
+    at::QuantizerPtr quantizer) {
+  auto aten_tensor = at::detail::make_tensor<at::QTensorImpl>(
       std::move(llgaImpl->storage_),
-      c10::DispatchKeySet(DispatchKey::QuantizedCPU),
+      c10::DispatchKeySet(c10::DispatchKey::QuantizedCPU),
       llgaImpl->data_type_,
       quantizer);
   auto impl = aten_tensor.unsafeGetTensorImpl();
@@ -127,5 +132,7 @@ at::ScalarType LlgaTensorDesc::aten_scalar_type() const {
       TORCH_CHECK(false, "Invalid data type ", static_cast<size_t>(dtype_));
   }
 }
-
-} // namespace at
+} // namespace onednn
+} // namespace fuser
+} // namespace jit
+} // namespace torch_ipex

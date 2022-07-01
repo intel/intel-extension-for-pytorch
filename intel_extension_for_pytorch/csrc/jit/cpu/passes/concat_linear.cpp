@@ -13,12 +13,13 @@
 #include "csrc/jit/cpu/kernels/OpContext.h"
 #include "folding_common_utils.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace {
 
 using Tensor = at::Tensor;
 using namespace torch_ipex::cpu;
+using namespace torch::jit;
 
 class ConcatLinearLayers {
  public:
@@ -288,4 +289,4 @@ TORCH_API bool FrozenConcatLinear(
 }
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex
