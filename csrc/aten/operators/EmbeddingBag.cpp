@@ -7,11 +7,11 @@
 #include <utils/DPCPP.h>
 
 #include "BitonicMergeSort.h"
+#include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
-#include "comm/PSTLFunctions.h"
 
 #include <aten/operators/MemoryAccess.h>
 

@@ -7,8 +7,8 @@
 #include <tuple>
 
 #include "BitonicMergeSort.h"
+#include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
-#include "comm/PSTLFunctions.h"
 #include "comm/RegistrationDeclarations.h"
 
 using namespace xpu::dpcpp;
@@ -19,7 +19,7 @@ namespace impl {
 
 template <typename input_t, typename index_t, typename not_equal_t>
 Tensor compute_inverse(
-    input_t* data,
+    const Tensor& sorted,
     int64_t num_inp,
     const Tensor& sorted_indices,
     const bool return_inverse,
@@ -27,6 +27,7 @@ Tensor compute_inverse(
     not_equal_t not_equal) {
   // inverse indices
   Tensor inverse_indices;
+  input_t* data = sorted.data_ptr<input_t>();
   auto data_begin = data;
   if (!return_inverse) {
     inverse_indices = at::empty({0}, index_options);
@@ -43,8 +44,13 @@ Tensor compute_inverse(
     at::AtenIpexTypeXPU::adjacent_difference<index_t>(
         data_begin, data_begin + num_inp, inv_loc_begin, not_equal);
     inv_loc[0] = 0;
-    at::AtenIpexTypeXPU::inclusive_scan<index_t>(
-        inv_loc_begin, inv_loc_begin + num_inp, inv_loc_begin, (index_t)0);
+    at::AtenIpexTypeXPU::scan<INCLUSIVE_TYPE, index_t, index_t>(
+        inv_loc,
+        inv_loc,
+        /*dim*/ 0,
+        ScalarConvert<float, index_t>::to(0.0),
+        AddOp<index_t>());
+
     at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<index_t, index_t>(
         sorted_indices_ptr,
         inv_loc_ptr,
@@ -131,7 +137,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
 
     scalar_t* output_data = output.data_ptr<scalar_t>();
     inverse_indices = compute_inverse<scalar_t, int64_t>(
-        output_data,
+        output,
         num_inp,
         sorted_indices,
         return_inverse,
@@ -257,12 +263,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   int64_t num_out;
 
   inverse_indices = compute_inverse<int64_t, int64_t>(
-      indices_data,
-      num_inp,
-      indices,
-      return_inverse,
-      index_options,
-      not_equal_comp);
+      indices, num_inp, indices, return_inverse, index_options, not_equal_comp);
 
   std::tie(counts, num_out) = compute_unique<int64_t, int64_t>(
       origin_indices_data,

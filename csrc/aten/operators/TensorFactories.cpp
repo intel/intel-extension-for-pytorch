@@ -11,9 +11,9 @@
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>
 #include "BitonicMergeSort.h"
+#include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-#include "comm/PSTLFunctions.h"
 #include "comm/RegistrationDeclarations.h"
 
 using namespace at::native;

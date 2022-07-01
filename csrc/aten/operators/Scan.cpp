@@ -4,11 +4,11 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
+#include "PSTLFunctions.h"
 #include "Scan.h"
 #include "comm/ATDispatch.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
-#include "comm/PSTLFunctions.h"
 #include "comm/RegistrationDeclarations.h"
 
 using namespace at::detail;
@@ -16,120 +16,6 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-namespace impl {
-
-template <
-    ScanType Type,
-    typename T,
-    class InputInfo,
-    class OutputInfo,
-    class BinaryFunction>
-static inline void _loop_scan_kernel(
-    InputInfo& input_info,
-    OutputInfo& output_info,
-    int dim_after_collapse,
-    T init,
-    BinaryFunction func) {
-  auto cfg =
-      LoopScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
-          input_info, output_info, dim_after_collapse, init, Type, func);
-  TORCH_CHECK(1 == cfg.stride_);
-  launch_loop_scan(cfg);
-
-  return;
-}
-
-template <
-    ScanType Type,
-    typename T,
-    class InputInfo,
-    class OutputInfo,
-    class BinaryFunction>
-static inline void _segment_scan_kernel(
-    InputInfo& input_info,
-    OutputInfo& output_info,
-    int dim_after_collapse,
-    T init,
-    BinaryFunction func) {
-  auto cfg =
-      SegmentScanConfig<InputInfo, OutputInfo, T, BinaryFunction>::make_config(
-          input_info, output_info, dim_after_collapse, init, Type, func);
-
-  // 0. recursive convergence
-  if (cfg.problem_ <= cfg.problem_wg_range_) {
-    cfg.set_carrier(nullptr);
-    launch_segment_scan(cfg);
-    return;
-  }
-
-  // 1. inclusive scan in each chunk
-  Tensor carrier_holder = at::empty(
-      {cfg.batch_, cfg.problem_glb_range_ / cfg.problem_wg_range_, cfg.stride_},
-      map_options<T>());
-  TensorInfo<T, int64_t> carrier_info =
-      getTensorInfo<T, int64_t>(carrier_holder);
-  cfg.set_carrier(carrier_info.data);
-  launch_segment_scan(cfg);
-
-  // 2. recursion for carrier
-  _segment_scan_kernel<EXCLUSIVE_TYPE>(
-      carrier_info, carrier_info, 1, init, func);
-
-  // 3. accumulate among all chunk
-  accumulate_carrier(cfg);
-
-  return;
-}
-
-} // namespace impl
-
-template <
-    ScanType Type,
-    typename scalar_t,
-    typename oscalar_t,
-    class BinaryFunction>
-void scan(
-    Tensor& self,
-    const Tensor& input,
-    int dimension,
-    scalar_t init,
-    BinaryFunction func) {
-  self.resize_as_(input);
-  if (input.dim() == 0) {
-    self.fill_(input);
-    return;
-  } else if (input.numel() == 0) {
-    self.zero_();
-    return;
-  }
-
-  dimension = maybe_wrap_dim(dimension, input.dim());
-  TORCH_CHECK(
-      dimension >= 0 && dimension < input.dim(),
-      "dimension ",
-      dimension,
-      " out of range");
-
-  TensorInfo<scalar_t, int64_t> input_info =
-      getTensorInfo<scalar_t, int64_t>(input);
-  int dim_after_collapse = input_info.collapseDims(dimension);
-
-  TensorInfo<oscalar_t, int64_t> output_info =
-      getTensorInfo<oscalar_t, int64_t>(self);
-  output_info.collapseDims(dimension);
-
-  int64_t batch = input_info.outerSize(dim_after_collapse);
-  int64_t stride = input_info.innerSize(dim_after_collapse);
-  int64_t problem = input_info.sizes[dim_after_collapse];
-
-  if (dispatch_to_loop_scan_kernel(problem, stride, batch)) {
-    impl::_loop_scan_kernel<Type>(
-        input_info, output_info, dim_after_collapse, init, func);
-  } else {
-    impl::_segment_scan_kernel<Type>(
-        input_info, output_info, dim_after_collapse, init, func);
-  }
-}
 
 Tensor& cumsum_out(
     const Tensor& self,

@@ -10,12 +10,12 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
+#include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/Atomics.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
-#include "comm/PSTLFunctions.h"
 
 #include "Indexing.h"
 #include "IndexingUtils.h"

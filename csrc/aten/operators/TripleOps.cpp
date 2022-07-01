@@ -10,8 +10,8 @@
 #include <utils/DPCPP.h>
 
 #include "Loops.h"
+#include "PSTLFunctions.h"
 #include "comm/AccumulateType.h"
-#include "comm/PSTLFunctions.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 

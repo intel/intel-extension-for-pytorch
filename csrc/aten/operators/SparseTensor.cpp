@@ -5,10 +5,10 @@
 #include <runtime/Utils.h>
 
 #include "BitonicMergeSort.h"
+#include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-#include "comm/PSTLFunctions.h"
 
 using namespace xpu::dpcpp;
 using namespace at::sparse;
