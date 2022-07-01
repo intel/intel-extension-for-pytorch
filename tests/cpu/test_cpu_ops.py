@@ -545,6 +545,9 @@ class CPUOPsTester(TestCase):
         helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.bfloat16, prec=0.04)
         helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.bfloat16, prec=0.04)
         helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.bfloat16, prec=0.04)
+        helper(self, (4, 8, 10, 10), 4, torch.channels_last, torch.double)
+        helper(self, (2, 30, 9, 9), 3, torch.channels_last, torch.double)
+        helper(self, (2, 9, 7, 11, 15), 3, torch.channels_last_3d, torch.double)
 
     def test_groupnorm_nwc(self):
         size = (4, 20, 20)
