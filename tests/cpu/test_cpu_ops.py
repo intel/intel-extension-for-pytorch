@@ -146,6 +146,7 @@ class CPUOPsTester(TestCase):
         self.assertEqual(out, ref_out)
         self.assertEqual(input.grad, ref_input.grad)
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_batch_norm(self):
         for dim in [2, 3]:
             m = bn_m[dim](10)
@@ -247,6 +248,7 @@ class CPUOPsTester(TestCase):
                 self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
                 self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
 
+    # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_copy(self):
         x = torch.randn(3, 64, 8, 9)
         y = torch.empty(3, 64, 8, 9)
