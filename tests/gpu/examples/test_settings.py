@@ -21,6 +21,7 @@ class TestVerbose(TestCase):
             with torch.xpu.onednn_verbose(verb):
                 pass
 
+    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_onemkl_verbose(self):
         verb_list = [torch.xpu.OnemklVerbLevel.OFF, torch.xpu.OnemklVerbLevel.ON, torch.xpu.OnemklVerbLevel.ON_SYNC]
         for verb in verb_list:
