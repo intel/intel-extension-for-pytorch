@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
+#include <ATen/DeviceGuard.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/record_function.h>
 #include <intrinsic/intrinsic.h>
@@ -36,6 +37,7 @@ at::Tensor& conv2d_sum(
     at::Scalar alpha) {
   RECORD_FUNCTION(
       "conv2d_sum", std::vector<c10::IValue>({input, weight, bias, accumu}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   at::AtenIpexTypeXPU::convolution_sum(
       input,
       weight,
@@ -64,6 +66,7 @@ at::Tensor& conv2d_sum_relu(
   RECORD_FUNCTION(
       "conv2d_sum_relu",
       std::vector<c10::IValue>({input, weight, bias, accumu}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   at::AtenIpexTypeXPU::convolution_sum_relu(
       input,
       weight,
@@ -86,6 +89,7 @@ at::Tensor q_conv2d_dequantize(
     int64_t output_zero_point) {
   RECORD_FUNCTION(
       "q_conv2d_dequantize", std::vector<c10::IValue>({input, packed_weight}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::q_conv2d_dequantize(
       input, packed_weight, output_scale, output_zero_point);
 }
@@ -94,6 +98,7 @@ at::Tensor softplus_tanh(
     const Tensor& self,
     const Scalar& beta,
     const Scalar& threshold) {
+  const OptionalDeviceGuard device_guard(device_of(self));
   return at::AtenIpexTypeXPU::softplus_tanh(self, beta, threshold);
 }
 
@@ -102,6 +107,7 @@ at::Tensor softplus_tanh_mul(
     const Scalar& beta,
     const Scalar& threshold,
     const Tensor& mul_input) {
+  const OptionalDeviceGuard device_guard(device_of(self));
   return at::AtenIpexTypeXPU::softplus_tanh_mul(
       self, beta, threshold, mul_input);
 }
@@ -113,6 +119,7 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul(
     int64_t output_zero_point,
     const Scalar& beta,
     const Scalar& threshold) {
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::q_conv2d_dequantize_softplus_tanh_mul(
       input, packed_weight, output_scale, output_zero_point, beta, threshold);
 }
@@ -130,6 +137,7 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
   RECORD_FUNCTION(
       "q_conv2d_dequantize_softplus_tanh_mul_quantize",
       std::vector<c10::IValue>({input}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::q_conv2d_dequantize_softplus_tanh_mul_quantize(
       input,
       packed_weight,
@@ -158,6 +166,7 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
   RECORD_FUNCTION(
       "q_conv2d_dequantize_softplus_tanh_mul_quantize_add",
       std::vector<c10::IValue>({input}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::
       q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
           input,
@@ -184,6 +193,7 @@ at::Tensor conv2d_relu(
     int64_t groups) {
   RECORD_FUNCTION(
       "conv2d_relu", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::convolution_relu(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
@@ -200,6 +210,7 @@ at::Tensor pad_conv2d(
     int64_t groups) {
   RECORD_FUNCTION(
       "pad_conv2d", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::pad_convolution(
       input,
       pad_nd,
@@ -224,6 +235,7 @@ at::Tensor conv2d_sigmoid(
     int64_t groups) {
   RECORD_FUNCTION(
       "conv2d_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::convolution_sigmoid(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
@@ -244,6 +256,7 @@ at::Tensor matmul_fusion_variants(
     int fusion_type = 0) {
   RECORD_FUNCTION(
       "matmul_fusion_variants", std::vector<c10::IValue>({tensor1, tensor2}));
+  const OptionalDeviceGuard device_guard(device_of(accumul1));
   auto dim_tensor1 = tensor1.dim();
   auto dim_tensor2 = tensor2.dim();
 
@@ -691,6 +704,7 @@ at::Tensor matmul_fusion_variants_gelu(
     float beta1,
     float beta2,
     bool trans) {
+  const OptionalDeviceGuard device_guard(device_of(accumul1));
   return matmul_fusion_variants(
       accumul1,
       accumul2,
@@ -715,6 +729,7 @@ at::Tensor matmul_fusion_variants_dropout(
     double p,
     bool train,
     bool inplace) {
+  const OptionalDeviceGuard device_guard(device_of(accumul1));
   if (!train) {
     return matmul_fusion_variants(
         accumul1, accumul2, tensor1, tensor2, alpha, beta1, beta2, trans);
@@ -734,12 +749,14 @@ at::Tensor mul_add(
     const at::Tensor& accumu,
     at::Scalar alpha) {
   RECORD_FUNCTION("mul_add", std::vector<c10::IValue>({self, other, accumu}));
+  const OptionalDeviceGuard device_guard(device_of(self));
   return at::AtenIpexTypeXPU::mul_add(self, other, accumu, alpha);
 }
 
 at::Tensor dequant_pixelshuffle(
     const at::Tensor& self,
     int64_t upscale_factor) {
+  const OptionalDeviceGuard device_guard(device_of(self));
   return at::empty_like(self);
 }
 
@@ -749,6 +766,7 @@ at::Tensor dequant_pixelshuffle_quant(
     double scale,
     int64_t zero_pad,
     at::ScalarType dtype) {
+  const OptionalDeviceGuard device_guard(device_of(self));
   return at::pixel_shuffle(self, upscale_factor);
 }
 
@@ -762,6 +780,7 @@ at::Tensor q_conv2d_sum_relu(
     int64_t sum_zpoint) {
   RECORD_FUNCTION(
       "q_conv2d_sum_relu", std::vector<c10::IValue>({input, packed_weight}));
+  const OptionalDeviceGuard device_guard(device_of(accumu));
   return at::AtenIpexTypeXPU::q_conv2d_sum_relu(
       accumu,
       input,
@@ -779,6 +798,7 @@ at::Tensor q_conv2d_sigmoid(
     int64_t output_zpoint) {
   RECORD_FUNCTION(
       "q_conv2d_sigmoid", std::vector<c10::IValue>({input, packed_weight}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::q_conv2d_sigmoid(
       input, packed_weight, output_scale, output_zpoint);
 }
@@ -791,6 +811,7 @@ at::Tensor q_conv2d_leaky_relu(
     Scalar negative_slope) {
   RECORD_FUNCTION(
       "q_conv2d_leaky_relu", std::vector<c10::IValue>({input, packed_weight}));
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::AtenIpexTypeXPU::q_conv2d_leaky_relu(
       input, packed_weight, output_scale, output_zpoint, negative_slope);
 }
@@ -805,6 +826,7 @@ at::Tensor batch_norm(
     double momentum,
     double eps,
     bool use_dnn) {
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::empty_like(input);
 }
 
@@ -813,6 +835,7 @@ at::Tensor fold_weight(
     const at::Tensor& bn_weight,
     const at::Tensor& running_var,
     float eps) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
   return at::empty_like(weight);
 }
 
@@ -824,6 +847,7 @@ at::Tensor fold_bias(
     const at::Tensor& running_mean,
     const at::Tensor& running_var,
     float eps) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
   return at::empty_like(bias);
 }
 
@@ -832,6 +856,7 @@ at::Tensor reorder(
     dnnl::memory::format_tag from,
     dnnl::memory::format_tag to,
     int64_t groups) {
+  const OptionalDeviceGuard device_guard(device_of(input));
   return at::empty_like(input);
 }
 
@@ -841,6 +866,7 @@ at::Tensor trans_addmm(
     const at::Tensor& input,
     at::Scalar beta,
     at::Scalar alpha) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
   return at::AtenIpexTypeXPU::trans_addmm(bias, input, weight, beta, alpha);
 }
 
@@ -850,6 +876,7 @@ at::Tensor trans_addmm_relu(
     const at::Tensor& input,
     at::Scalar beta,
     at::Scalar alpha) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
   return at::AtenIpexTypeXPU::trans_addmm_relu(
       input, weight, bias, beta, alpha);
 }
@@ -860,6 +887,7 @@ at::Tensor trans_addmm_sigmoid(
     const at::Tensor& input,
     at::Scalar beta,
     at::Scalar alpha) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
   return at::AtenIpexTypeXPU::trans_addmm_sigmoid(
       input, weight, bias, beta, alpha);
 }
@@ -873,6 +901,7 @@ at::Tensor trans_addmm_dropout(
     double p,
     bool train,
     bool inplace) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
   if (!train) {
     return at::AtenIpexTypeXPU::trans_addmm(bias, input, weight, beta, alpha);
   } else {
@@ -893,6 +922,7 @@ at::Tensor fusion_amdd(
     float momentum,
     float dampening,
     float lr) {
+  const OptionalDeviceGuard device_guard(device_of(p));
   return at::AtenIpexTypeXPU::fusion_amdd(
       p, d_p, buf, weight_decay, momentum, dampening, lr);
 }
