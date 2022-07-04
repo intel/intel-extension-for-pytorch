@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
+import itertools
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 
@@ -770,25 +771,65 @@ class CPUOPsTester(TestCase):
             self.assertTrue(torch.equal(g, h))
 
     def test_index_select(self):
-        x = torch.randn(3, 64, 8, 9)
-        indices = torch.tensor([0, 2])
-        y = x.index_select(1, indices)
+        for dim in [0, 1]:
+            x = torch.randn(10, 2)
+            indices = torch.tensor([1])
+            y = x.index_select(dim, indices)
 
-        # test bfloat16
-        x2 = x.clone().detach().bfloat16()
-        y2 = x2.index_select(1, indices)
-        self.assertTrue(y2.dtype == torch.bfloat16)
-        self.assertEqual(y2, y, prec=0.01)
+            # test bfloat16
+            x2 = x.clone().detach().bfloat16()
+            y2 = x2.index_select(dim, indices)
+            self.assertTrue(y2.dtype == torch.bfloat16)
+            self.assertEqual(y2, y, prec=0.1)
+
+            # test int32
+            x3 = torch.randint(10, (10, 10), dtype=torch.int32)
+            y3 = x3.index_select(dim, indices)
+            self.assertTrue(y3.dtype == torch.int32)
+
+            # test complex
+            x4 = torch.randn(10, 10, dtype=torch.complex64)
+            y4 = x4.index_select(dim, indices)
+            self.assertTrue(y4.dtype == torch.complex64)
 
     def test_cat(self):
-        x = x = torch.randn(2, 3)
-        y = torch.cat((x, x, x), 0)
+        for dim, size in itertools.product([0, 1], [[2, 1], [2, 2], [5, 10]]):
+            x = torch.randn(size)
+            y = torch.cat([x, x], dim)
 
-        # test bfloat16
-        x2 = x.clone().detach().bfloat16()
-        y2 = torch.cat((x2, x2, x2), 0)
-        self.assertTrue(y2.dtype == torch.bfloat16)
-        self.assertEqual(y2, y, prec=0.01)
+            # test bfloat16
+            x2 = x.clone().detach().bfloat16()
+            y2 = torch.cat([x2, x2], dim)
+            self.assertTrue(y2.dtype == torch.bfloat16)
+            self.assertEqual(y2, y, prec=0.1)
+
+        # long input tensor list
+        x3 = torch.randn(2, 2)
+        input3 = []
+        for i in range(100):
+            input3.append(x3)
+        y3 = torch.cat(input3, 0)
+        self.assertTrue(y3.size() == torch.Size([200, 2]))
+
+        # input tensors have different shapes and strides
+        x4 = torch.randn(4, 2)
+        input4 = []
+        for i in range(10):
+            input4.append(x3)
+        for i in range(10):
+            input4.append(x4)
+        y4 = torch.cat(input4, 0)  
+        self.assertTrue(y4.size() == torch.Size([60, 2]))
+
+        # out is defined
+        y5 = torch.cat([x4, x4], 0, out=torch.empty(0))
+        self.assertEqual(y5, torch.cat([x4, x4], 0))
+
+        # one of input tensors is empty
+        x6 = torch.empty(0)
+        y6 = torch.cat([x4, x4, x6], 0)
+        self.assertTrue(y6.size() == torch.Size([8, 2]))
+
 
 if __name__ == '__main__':
     test = unittest.main()
