@@ -10,14 +10,16 @@ def get_isa_val(isa_name):
         return 0
     elif isa_name == "avx2":
         return 1
-    elif isa_name == "avx512":
+    elif isa_name == "avx2_vnni":
         return 2
-    elif isa_name == "avx512_vnni":
+    elif isa_name == "avx512":
         return 3
-    elif isa_name == "avx512_bf16":
+    elif isa_name == "avx512_vnni":
         return 4
-    elif isa_name == "amx":
+    elif isa_name == "avx512_bf16":
         return 5
+    elif isa_name == "amx":
+        return 6
     else:
         return 100
 
