@@ -208,6 +208,28 @@ class ConvBatchNorm_Fixed(nn.Module):
     def forward(self, x):
         return self.bn(self.conv(x))
 
+class ConvBatchNorm_Fixed2(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvBatchNorm_Fixed2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](out_channels, eps=0.001, track_running_stats=False)
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
+class ConvBatchNorm_Fixed3(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvBatchNorm_Fixed3, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=True, **kwargs)
+        self.bn = bn_module[dim](out_channels, eps=0.001, affine=False)
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
 class BatchNormConv_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(BatchNormConv_Fixed, self).__init__()
@@ -310,6 +332,21 @@ class Conv_Tensor_Binary(nn.Module):
         if dim == 3:
             input_size.append(1)
         self.tensor = torch.randn(input_size)
+
+    def forward(self, x):
+        return self.op(self.conv(x), self.tensor)
+
+class Conv_Tensor_Binary2(nn.Module):
+    def __init__(self, op, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Tensor_Binary2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, **kwargs)
+        self.op = op
+        input_size = [1, out_channels, 1, 1]
+        if dim == 3:
+            input_size.append(1)
+        self.tensor = torch.randn(input_size, dtype=torch.cfloat)
 
     def forward(self, x):
         return self.op(self.conv(x), self.tensor)
@@ -463,6 +500,31 @@ class Linear_Tensor_Binary(nn.Module):
 
     def forward(self, x):
         return self.op(self.linear(x), self.tensor)
+
+class Linear_Tensor_Binary2(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Tensor_Binary2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.tensor([2])
+
+    def forward(self, x):
+        return self.op(self.linear(x), self.tensor)
+
+class Linear_Tensor_Binary3(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Tensor_Binary3, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.randn(out_channels, dtype=torch.cfloat)
+
+    def forward(self, x):
+        return self.op(self.linear(x), self.tensor)
+
 
 class LinearRelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -1636,6 +1698,12 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex::batch_norm",
                 prec=0.02,
                 levels=['O1'])
+            self._test_output(
+                ConvBatchNorm_Fixed2(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex::batch_norm",
+                prec=0.02,
+                levels=['O0'])
 
     def test_output_frozen_conv_bn(self):
         batch_size = 8
@@ -1643,10 +1711,10 @@ class Tester(TestCase):
         in_channels = 3
         kernel_size = 3
         image_size = 16
-        options = itertools.product([torch.float32, torch.bfloat16], [True, False])
-        for dtype, use_channels_last in options:
+        options = itertools.product([torch.float32, torch.bfloat16], [True, False], [ConvBatchNorm_Fixed, ConvBatchNorm_Fixed3])
+        for dtype, use_channels_last, model in options:
             input_size = [batch_size, in_channels, image_size, image_size]
-            model = ConvBatchNorm_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
+            model = model(2, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
             x = torch.randn(input_size, dtype=dtype)
             if use_channels_last:
                 x = x.to(memory_format=torch.channels_last)
@@ -1899,6 +1967,11 @@ class Tester(TestCase):
                 if dim == 3:
                     input_size.append(image_size)
                 x = torch.randn(input_size)
+                self._test_output(
+                    Conv_Tensor_Binary2(torch.add, dim, in_channels, out_channels, kernel_size=kernel_size, stride=1, bias=bias),
+                    x,
+                    kind_in_graph="aten::add")
+
                 self._test_output(
                     Conv_Tensor_Binary(torch.add, dim, in_channels, out_channels, kernel_size=kernel_size, stride=1, bias=bias),
                     x,
@@ -2452,6 +2525,12 @@ class Tester(TestCase):
     def test_output_linear_scalar_binary(self):
         for bias in [True, False]:
             self._test_output(
+                Linear_Scalar_Binary(torch.add, 3, 1, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
                 Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="aten::linear",
@@ -2505,6 +2584,16 @@ class Tester(TestCase):
 
     def test_output_linear_tensor_binary(self):
         for bias in [True, False]:
+            self._test_output(
+                Linear_Tensor_Binary2(torch.add, 3, 2, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::add")
+
+            self._test_output(
+                Linear_Tensor_Binary3(torch.add, 3, 2, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::add")
+
             self._test_output(
                 Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
                 torch.randn(52, 3),
