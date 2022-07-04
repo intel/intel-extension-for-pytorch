@@ -46,3 +46,20 @@ class TestTorchMethod(TestCase):
         inp_xpu = input_cpu.to(dpcpp_device)
         out_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bilinear', align_corners=True)
         self.assertEqual(out_cpu.to(cpu_device), out_xpu.to(cpu_device))
+
+    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
+    def test_gridSampler_2d_Bicubic(self, dtype=torch.float):
+        N = random.randint(2, 8)
+        C = random.randint(2, 6)
+        H = random.randint(2, 8)
+        W = random.randint(2, 8)
+        input_cpu = torch.randn(N, C, H, W, requires_grad=True)
+        grid_cpu = torch.randn(N, H, W, 2, requires_grad=True)
+        out_cpu = F.grid_sample(input_cpu, grid_cpu, mode='bicubic', align_corners=True)
+
+        grid_xpu = grid_cpu.to(dpcpp_device)
+        inp_xpu = input_cpu.to(dpcpp_device)
+        out_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bicubic', align_corners=True)
+        print("out_cpu", out_cpu)
+        print("out_xpu", out_xpu.cpu())
+        self.assertEqual(out_cpu.to(cpu_device), out_xpu.to(cpu_device))
