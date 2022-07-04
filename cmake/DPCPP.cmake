@@ -95,32 +95,42 @@ set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-unnamed-lambda")
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
+set(AOT_CONFIG "")
 # Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
 # allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
 # change below for best outcome: disable, using RPATH, enable, using RUNPATH
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,--disable-new-dtags")
-
+set(LINK_OPTIONS "${LINK_OPTIONS} -Wl,--disable-new-dtags")
+# Fetch max processor count
 include(ProcessorCount)
 ProcessorCount(proc_cnt)
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-max-parallel-link-jobs=${proc_cnt}")
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${SYCL_FLAGS}")
+set(MAX_PROC_CNT "-fsycl-max-parallel-link-jobs=${proc_cnt}")
+# Use auto mode of device code split
+set(DEV_CODE_SPLIT "-fsycl-device-code-split=auto")
+# If FP64 is unsupported on certain GPU arch, warning all kernels with double
+# data type operations, and finish/return WITHOUT any computations.
+set(POISION_FP64 "-Xs '-options -cl-poison-unsupported-fp64-kernels'")
+
 if(BUILD_BY_PER_KERNEL)
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+  set(DEV_CODE_SPLIT "-fsycl-device-code-split=per_kernel")
+  set(LINK_OPTIONS "${LINK_OPTIONS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
 elseif(USE_AOT_DEVLIST)
   set(BACKEND_TARGET "spir64_gen")
   set(SPIRV_TARGET "${BACKEND_TARGET},spir64")
   set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Xsycl-target-backend=${BACKEND_TARGET}")
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST} -options -cl-poison-unsupported-fp64-kernels'")
+  set(AOT_CONFIG "${AOT_CONFIG} -fsycl-targets=${SPIRV_TARGET}")
+  set(AOT_CONFIG "${AOT_CONFIG} -Xsycl-target-backend=${BACKEND_TARGET}")
+  set(AOT_CONFIG "${AOT_CONFIG} '-device ${USE_AOT_DEVLIST}'")
   if(NOT BUILD_SEPARATE_OPS)
     # Use customized link script to workaround huge binary issue for multi-target AOT build
-    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/single_aot.ld")
+    set(LINK_OPTIONS "${LINK_OPTIONS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/single_aot.ld")
   endif()
-else()
-  # Use auto mode of device code split
-  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -fsycl-device-code-split")
 endif()
+
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${SYCL_FLAGS}")
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${MAX_PROC_CNT}")
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${DEV_CODE_SPLIT}")
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${AOT_CONFIG}")
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${POISION_FP64}")
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${LINK_OPTIONS}")
 
 message(STATUS "DPCPP found. Compiling with SYCL support")
