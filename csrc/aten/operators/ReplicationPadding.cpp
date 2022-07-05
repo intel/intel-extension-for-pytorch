@@ -263,13 +263,11 @@ void replication_pad2d_backward_out_template(
   int padR = paddingSize[1];
   int padT = paddingSize[2];
   int padB = paddingSize[3];
-  int planeDim = 0;
   int dimh = 1;
   int dimw = 2;
 
   int numInputDims = input.dim();
   if (numInputDims == 4) {
-    planeDim++;
     dimh++;
     dimw++;
   }
