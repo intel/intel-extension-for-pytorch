@@ -258,6 +258,17 @@ with torch.inference_mode():
   iter_time.append(end - start)
 ```
 
+### Supported torchvision
+Intel® Extension for PyTorch* GPU supports torchvision 0.8.2. For models rely on torchvision, users may follow below steps to install required torchvision package:
+
+```bash
+    Install Private PyTorch
+    Install Intel® Extension for PyTorch* GPU
+    python3 -m pip install pillow
+    python3 -m pip install torchvision==0.8.2 --no-deps
+```
+Please skip the first two steps if Private Pytorch is already installed (follow steps in [Build and Install PyTorch](#build-and-install-pytorch) or through binary) and Intel® Extension for PyTorch* GPU is already installed (follow steps in [Build and Install Intel® Extension for PyTorch* GPU](#build-and-install-intel-extension-for-pytorch-gpu) or through binary).
+
 ## Build Option List
 The following build options are supported in Intel® Extension for PyTorch* GPU.
 
