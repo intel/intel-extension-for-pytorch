@@ -436,20 +436,6 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
   maskedfill_softmax_fusion.runOnGraph(graph, filter_distil_mha);
 }
 
-void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
-  std::string max_pool2d = R"(
-      graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
-        %r = aten::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
-        return (%r) )";
-  std::string ipex_max_pool2d = R"(
-      graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
-        %r = ipex::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
-        return (%r) )";
-  SubgraphRewriter rewriter_max_pool2d;
-  rewriter_max_pool2d.RegisterRewritePattern(max_pool2d, ipex_max_pool2d);
-  rewriter_max_pool2d.runOnGraph(graph);
-}
-
 // ipex::softmax shows better performance than aten::softmax, but compared with
 // ipex::softmax_, it is slower.
 // Like ipex::softmax_, we only do the replacement when the input

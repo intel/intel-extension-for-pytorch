@@ -13,7 +13,6 @@
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
 #include "csrc/jit/cpu/kernels/LinearSwishCustomized.h"
 #include "csrc/jit/cpu/kernels/Matmul.h"
-#include "csrc/jit/cpu/kernels/MaxPool2D.h"
 #include "csrc/jit/cpu/kernels/Mha.h"
 #include "csrc/jit/cpu/kernels/OpContext.h"
 #include "csrc/jit/cpu/kernels/RNN.h"
@@ -708,25 +707,6 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
-            return 0;
-          };
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
-        "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
-        [](const Node* node) -> Operation {
-          return [](Stack* stack) {
-            auto result = dil_max_pool2d(
-                (std::move(peek(stack, 0, 6))).toTensor(),
-                (std::move(peek(stack, 1, 6))).toIntVector(),
-                (std::move(peek(stack, 2, 6))).toIntVector(),
-                (std::move(peek(stack, 3, 6))).toIntVector(),
-                (std::move(peek(stack, 4, 6))).toIntVector(),
-                (std::move(peek(stack, 5, 6))).toBool());
-            drop(stack, 6);
             pack(stack, std::move(result));
             return 0;
           };
