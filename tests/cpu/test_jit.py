@@ -2210,6 +2210,20 @@ class Tester(TestCase):
                 prec=0.1,
                 use_channels_last=[False])
 
+    def test_conv_sum_dynamic_shape(self):
+        m = ConvSum(2, 3, 16, kernel_size=3, stride=1).eval()
+        x1 = torch.randn(1, 3, 56, 56)
+        x2 = torch.randn(2, 3, 56, 56)
+        with torch.no_grad():
+            traced = torch.jit.trace(m, x1)
+            traced = torch.jit.freeze(traced)
+            # apply fusion
+            y = m(x1)
+            y = m(x1)
+            traced_y = traced(x2)
+            eager_y = m(x2)
+            self.assertEqual(eager_y, traced_y)
+
     def test_output_conv_scalar_sum(self):
         batch_size = 8
         out_channels = 32
@@ -2311,6 +2325,19 @@ class Tester(TestCase):
             prec=0.03,
             use_channels_last=[True],
             levels=['O1'])
+        # dynamic shape
+        models = [Bottleneck_v1().eval(), Bottleneck_v2().eval()]
+        x2 = torch.randn(2, 64, 56, 56)
+        with torch.no_grad():
+            for m in models:
+                traced = torch.jit.trace(m, x1)
+                traced = torch.jit.freeze(traced)
+                # apply fusion
+                y = m(x1)
+                y = m(x1)
+                traced_y = traced(x2)
+                eager_y = m(x2)
+                self.assertEqual(eager_y, traced_y)
 
     def test_jit_conv_sum_in_diff_block(self):
         batch_size = 8
