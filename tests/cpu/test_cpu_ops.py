@@ -573,16 +573,21 @@ class CPUOPsTester(TestCase):
         self.assertEqual(y1, y2)
         self.assertEqual(x1.grad, x2.grad)
 
-        # test bfloat16
-        x3 = x.clone().detach().requires_grad_().transpose(1, 2).bfloat16()
-        grad3 = grad.detach().clone()
-        m_bf16 = m.to(torch.bfloat16)
-        y3 = m_bf16(x3)
-        self.assertTrue(y3.dtype == torch.bfloat16)
-        self.assertEqual(y3, y2, prec=0.02)
-        self.assertEqual(x3.grad, x2.grad, prec=0.02)
-        self.assertEqual(m.weight.grad, m_bf16.weight.grad)
-        self.assertEqual(m.bias.grad, m_bf16.bias.grad)
+        # test bfloat16/double
+        for dtype in [torch.bfloat16, torch.double]:
+            prec = None
+            if dtype == torch.bfloat16:
+                prec = 0.02
+            x3 = x.clone().detach().requires_grad_().transpose(1, 2).to(dtype)
+            grad3 = grad.detach().clone()
+            m_dtype = m.to(dtype)
+            y3 = m_dtype(x3)
+            y3.backward(grad3)
+            self.assertTrue(y3.dtype == dtype)
+            self.assertEqual(y3, y2, prec=prec)
+            self.assertEqual(x3.grad, x2.grad, prec=prec)
+            self.assertEqual(m.weight.grad, m_dtype.weight.grad)
+            self.assertEqual(m.bias.grad, m_dtype.bias.grad)
 
     def test_avg_pool2d(self):
         models = [nn.AvgPool2d((3, 2), stride=(2, 1)), nn.AvgPool2d((2, 2), stride=(1, 4), ceil_mode=True, padding=(-2, -2))]
