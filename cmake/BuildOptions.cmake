@@ -85,18 +85,8 @@ if (NOT APPLE)
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-but-set-variable")
   endif()
-
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
 endif()
-
-# The fast-math will be enabled by default in ICX
-# We enable below flags here to be warn about NaN and Infinity,
-# which will be hidden by fast-math by default.
-# The associative-math in fast-math allows floating point
-# operations to be reassociated, which will lead to non-deterministic results.
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-nans")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-associative-math")
 
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer")
 
@@ -104,19 +94,3 @@ set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -v")
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer")
-
-function(append_file_property SRC_FILES PROPERTY FLAGS)
-    foreach(src_file IN LISTS ${SRC_FILES})
-      get_source_file_property(CUR_FLAGS ${src_file} ${PROPERTY})
-      list(REMOVE_ITEM CUR_FLAGS "NOTFOUND")
-      set(CUR_FLAGS "${CUR_FLAGS} ${FLAGS}")
-      set_source_files_properties(${src_file} ${PROPERTY} "${CUR_FLAGS}")
-    endforeach()
-endfunction()
-
-function(append_target_property TARGET PROPERTY FLAGS)
-    get_target_property(CUR_FLAGS ${TARGET} ${PROPERTY})
-    list(REMOVE_ITEM CUR_FLAGS "CUR_FLAGS-NOTFOUND")
-    set(CUR_FLAGS "${CUR_FLAGS} ${FLAGS}")
-    set_target_properties(${TARGET} PROPERTIES ${PROPERTY} "${CUR_FLAGS}")
-endfunction()

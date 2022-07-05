@@ -53,20 +53,8 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_TENSOR_SRCS}
         ${IPEX_UTILS_SRCS})
 
-# WARNING XXX: We assume that kernel codes only are contained in IPEX_ATEN_OPS_SRCS.
-# WARNING XXX: Therefore we only set sycl flags for these C++ files here.
-append_file_property(IPEX_ATEN_OPS_SRCS COMPILE_FLAGS ${IPEX_SYCL_KERNEL_FLAGS})
-
-if("${BUILD_OPT_LEVEL}" STREQUAL "")
-    set(OPT_LEVEL " ")
-elseif("${BUILD_OPT_LEVEL}" STREQUAL "1" OR "${BUILD_OPT_LEVEL}" STREQUAL "0")
-    set(OPT_LEVEL "-O${BUILD_OPT_LEVEL}")
-else()
-    set(OPT_LEVEL " ")
-    message(WARNING "unknown BUILD_OPT_LEVEL ${BUILD_OPT_LEVEL}")
-endif()
-append_file_property(IPEX_ATEN_OPS_SRCS COMPILE_FLAGS ${OPT_LEVEL})
-append_file_property(IPEX_GPU_CORE_SRC COMPILE_FLAGS ${OPT_LEVEL})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${IPEX_SYCL_KERNEL_FLAGS}")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${IPEX_SYCL_LINKER_FLAGS}")
 
 if(BUILD_SEPARATE_OPS)
   set(IPEX_GPU_OP_LIBRARIES)
@@ -74,7 +62,6 @@ if(BUILD_SEPARATE_OPS)
       get_filename_component(obj ${op_src} NAME_WLE REALPATH)
       set(op_lib intel-ext-pt-gpu-op-${obj})
       add_library(${op_lib} SHARED ${op_src})
-      append_target_property(${op_lib} LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS}")
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
       target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
       target_link_libraries(${op_lib} PUBLIC ${TORCH_LIBRARIES})
@@ -85,7 +72,6 @@ else()
 endif()
 
 add_library(intel-ext-pt-gpu SHARED ${IPEX_GPU_CORE_SRC})
-append_target_property(intel-ext-pt-gpu LINK_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${OPT_LEVEL}")
 target_include_directories(intel-ext-pt-gpu PUBLIC ${IPEX_INCLUDE_DIRS})
 target_link_directories(intel-ext-pt-gpu PUBLIC ${SYCL_LIBRARY_DIR})
 
@@ -104,44 +90,48 @@ target_link_libraries(intel-ext-pt-gpu PUBLIC ${TORCH_LIBRARIES})
 endif()
 
 set(IPEX_COMPILE_DEFINITIONS)
-
 if(USE_PERSIST_STREAM)
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_PERSIST_STREAM")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PERSIST_STREAM")
 endif()
 
 if(BUILD_SIMPLE_TRACE)
-  set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};BUILD_SIMPLE_TRACE")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_SIMPLE_TRACE")
 endif()
 
 if(BUILD_INTERNAL_DEBUG)
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};BUILD_INTERNAL_DEBUG")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_INTERNAL_DEBUG")
 endif()
 
 if(BUILD_DOUBLE_KERNEL)
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};BUILD_DOUBLE_KERNEL")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_DOUBLE_KERNEL")
 endif()
 
 if (USE_QUEUE_BARRIER)
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_QUEUE_BARRIER")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_QUEUE_BARRIER")
 endif()
 
 if (USE_PRIMITIVE_CACHE)
-    # Enable FRAMEWORK primitive cache
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_PRIMITIVE_CACHE")
+  # Enable FRAMEWORK primitive cache
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PRIMITIVE_CACHE")
 endif()
 
 if (USE_SCRATCHPAD_MODE)
-    # Enable oneDNN scratchpad user mode
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_SCRATCHPAD_MODE")
+  # Enable oneDNN scratchpad user mode
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_SCRATCHPAD_MODE")
 endif()
 
 if (USE_CHANNELS_LAST_1D)
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_CHANNELS_LAST_1D")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_CHANNELS_LAST_1D")
 endif()
 
 if (USE_MULTI_CONTEXT)
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_MULTI_CONTEXT")
-    message(STATUS "multi context is enabled!")
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_MULTI_CONTEXT")
+  message(STATUS "multi context is enabled!")
+endif()
+
+if (USE_PROFILER)
+  # Enable Profiler
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PROFILER")
 endif()
 
 if (USE_ONEMKL)
@@ -150,7 +140,7 @@ if (USE_ONEMKL)
         set(ONEMKL_INCLUDE_DIR ${ONEMKL_INCLUDE_DIR} PARENT_SCOPE)
         target_link_libraries(intel-ext-pt-gpu PUBLIC ${ONEMKL_SHARED_LIBS})
         target_include_directories(intel-ext-pt-gpu PUBLIC ${ONEMKL_INCLUDE_DIR})
-        set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_ONEMKL")
+        list(APPEND IPEX_COMPILE_DEFINITIONS "USE_ONEMKL")
         if(BUILD_SEPARATE_OPS)
             foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
                 target_link_libraries(${op_lib} PUBLIC ${ONEMKL_SHARED_LIBS})
@@ -175,11 +165,6 @@ if (USE_ITT)
         set(USE_ITT OFF PARENT_SCOPE)
         message(WARNING "Cannot find ITT! Continue to build without ITT!")
     endif()
-endif()
-
-if (USE_PROFILER)
-    # Enable Profiler
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_PROFILER")
 endif()
 
 # XXX: Try to find ITT & oneMKL support before oneDNN settings

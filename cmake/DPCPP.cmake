@@ -90,47 +90,59 @@ find_library(OpenCL_LIBRARY
 set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
 set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} ${SYCL_FLAGS}")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -D__STRICT_ANSI__")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-unnamed-lambda")
+
+# The fast-math will be enabled by default in ICX
+# We enable below flags here to be warn about NaN and Infinity,
+# which will be hidden by fast-math by default.
+# The associative-math in fast-math allows floating point
+# operations to be reassociated, which will lead to non-deterministic results.
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fhonor-nans")
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fhonor-infinities")
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-associative-math")
+
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
 
-set(AOT_CONFIG "")
-# Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
-# allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
-# change below for best outcome: disable, using RPATH, enable, using RUNPATH
-set(LINK_OPTIONS "${LINK_OPTIONS} -Wl,--disable-new-dtags")
-# Fetch max processor count
-include(ProcessorCount)
-ProcessorCount(proc_cnt)
-set(MAX_PROC_CNT "-fsycl-max-parallel-link-jobs=${proc_cnt}")
-# Use auto mode of device code split
-set(DEV_CODE_SPLIT "-fsycl-device-code-split=auto")
-# If FP64 is unsupported on certain GPU arch, warning all kernels with double
-# data type operations, and finish/return WITHOUT any computations.
-set(POISION_FP64 "-Xs '-options -cl-poison-unsupported-fp64-kernels'")
-
-if(BUILD_BY_PER_KERNEL)
-  set(DEV_CODE_SPLIT "-fsycl-device-code-split=per_kernel")
-  set(LINK_OPTIONS "${LINK_OPTIONS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
-elseif(USE_AOT_DEVLIST)
-  set(BACKEND_TARGET "spir64_gen")
-  set(SPIRV_TARGET "${BACKEND_TARGET},spir64")
-  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${SPIRV_TARGET}")
-  set(AOT_CONFIG "${AOT_CONFIG} -fsycl-targets=${SPIRV_TARGET}")
-  set(AOT_CONFIG "${AOT_CONFIG} -Xsycl-target-backend=${BACKEND_TARGET}")
-  set(AOT_CONFIG "${AOT_CONFIG} '-device ${USE_AOT_DEVLIST}'")
-  if(NOT BUILD_SEPARATE_OPS)
-    # Use customized link script to workaround huge binary issue for multi-target AOT build
-    set(LINK_OPTIONS "${LINK_OPTIONS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/single_aot.ld")
+# Set compilation optimization level
+if (BUILD_OPT_LEVEL)
+  if("${BUILD_OPT_LEVEL}" STREQUAL "1" OR "${BUILD_OPT_LEVEL}" STREQUAL "0")
+    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -O${BUILD_OPT_LEVEL}")
+  else()
+    message(WARNING "UNKNOWN BUILD_OPT_LEVEL ${BUILD_OPT_LEVEL}")
   endif()
 endif()
 
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${SYCL_FLAGS}")
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${MAX_PROC_CNT}")
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${DEV_CODE_SPLIT}")
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${AOT_CONFIG}")
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${POISION_FP64}")
-set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} ${LINK_OPTIONS}")
+# Fetch max processor count
+include(ProcessorCount)
+ProcessorCount(proc_cnt)
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-max-parallel-link-jobs=${proc_cnt}")
+
+# If FP64 is unsupported on certain GPU arch, warning all kernels with double
+# data type operations, and finish/return WITHOUT any computations.
+set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-options -cl-poison-unsupported-fp64-kernels'")
+
+if(BUILD_BY_PER_KERNEL)
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-device-code-split=per_kernel")
+endif()
+
+# Set AOT targt list
+if(USE_AOT_DEVLIST)
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=spir64_gen,spir64")
+  set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -Xs '-device ${USE_AOT_DEVLIST}'")
+endif()
+
+# Since 2016 Debian start using RUNPATH instead of normally RPATH, which gave the annoy effect that
+# allow LD_LIBRARY_PATH to override dynamic linking path. Depends on intention of linking priority,
+# change below for best outcome: disable, using RPATH, enable, using RUNPATH
+set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,--disable-new-dtags")
+
+if(BUILD_BY_PER_KERNEL)
+  set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+elseif(USE_AOT_DEVLIST)
+  if(NOT BUILD_SEPARATE_OPS)
+    # Use customized link script to workaround huge binary issue for multi-target AOT build
+    set(IPEX_SYCL_LINKER_FLAGS "${IPEX_SYCL_LINKER_FLAGS} -Wl,-T ${PROJECT_SOURCE_DIR}/cmake/single_aot.ld")
+  endif()
+endif()
 
 message(STATUS "DPCPP found. Compiling with SYCL support")
