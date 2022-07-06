@@ -122,10 +122,6 @@ void InitIpexModuleBindings(py::module m) {
     return AutoOptConfig::singleton().get_jit_fuse();
   });
 
-  // extend OPs
-  m.def(
-      "embedding_bag_fast_path_sum", &torch_ipex::embedding_bag_fast_path_sum);
-
   // runtime
   py::class_<torch_ipex::runtime::FutureTensor>(m, "FutureTensor")
       .def("get", &torch_ipex::runtime::FutureTensor::get);

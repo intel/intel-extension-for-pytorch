@@ -1,19 +1,19 @@
-#include <csrc/aten/cpu/EmbeddingBag.h>
-#include "csrc/autocast/autocast_mode.h"
-#include "csrc/cpu/vec/vec.h"
-#include "csrc/jit/cpu/kernels/Embeddingbag.h"
-#include "csrc/utils/rw_lock.h"
-
+#include <ATen/AccumulateType.h>
 #include <ATen/Parallel.h>
 #include <ATen/Tensor.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Optional.h>
+#include <csrc/aten/cpu/EmbeddingBag.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/csrc/autograd/function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 #include <algorithm>
+#include "csrc/aten/cpu/utils/csr2csc.h"
+#include "csrc/autocast/autocast_mode.h"
+#include "csrc/cpu/vec/vec.h"
+#include "csrc/jit/cpu/kernels/Embeddingbag.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -88,12 +88,20 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(
   at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
     for (int64_t i = start; i < end; i++) {
       auto* out_data_ptr = &output_data[i * ddim];
-      zero_ker((T*)out_data_ptr, ddim);
       auto inputs_start = offsets_data[i];
       auto inputs_end = offsets_data[i + 1];
-      for (int64_t s = inputs_start; s < inputs_end; s++) {
-        T* select_data_ptr = &src_data[indices_accessor[s] * ddim];
-        add_ker((T*)out_data_ptr, (T*)select_data_ptr, ddim);
+      if (inputs_end - inputs_start == 1) {
+        T* select_data_ptr = &src_data[indices_accessor[inputs_start] * ddim];
+        move_ker(out_data_ptr, select_data_ptr, ddim);
+      } else {
+        using acc_t = acc_type<T, true>;
+        acc_t temp_out[ddim];
+        zero_ker(temp_out, ddim);
+        for (int64_t s = inputs_start; s < inputs_end; s++) {
+          T* select_data_ptr = &src_data[indices_accessor[s] * ddim];
+          add_ker(temp_out, select_data_ptr, ddim);
+        }
+        move_ker(out_data_ptr, temp_out, ddim);
       }
     }
   });
@@ -295,43 +303,6 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(
   });
 
   return index_grad_weight;
-}
-
-bool embedding_bag_backward_fast_path_sum(
-    const at::Tensor grad,
-    const at::Tensor indices,
-    const at::Tensor offset2bag,
-    const at::Tensor per_sample_weights,
-    bool scale_grad_by_freq,
-    int64_t mode) {
-  if ((grad.scalar_type() != at::kFloat) &&
-      (grad.scalar_type() != at::kBFloat16))
-    return false;
-  if ((mode != MODE_SUM) || (grad.stride(1) != 1))
-    return false;
-  if ((indices.numel() == 0) || (offset2bag.numel() != 0))
-    return false;
-  if (per_sample_weights.defined() || scale_grad_by_freq)
-    return false;
-
-  return true;
-}
-
-at::Tensor embedding_bag_get_offset2bag(
-    const at::Tensor indices,
-    const at::Tensor& offsets,
-    const at::Tensor& offset2bag) {
-  int64_t indices_numel = indices.numel();
-  at::Tensor offset2bag_;
-  if (indices_numel != 0 && offset2bag.numel() == 0) {
-    offset2bag_ =
-        at::native::full({indices.sizes()[0] + 1}, 0, indices.scalar_type());
-    make_offset2bag(offsets, indices, offset2bag_);
-    offset2bag_.resize_({indices.sizes()[0]});
-  } else {
-    offset2bag_ = offset2bag;
-  }
-  return offset2bag_;
 }
 
 at::Tensor embedding_bag_backward_kernel_impl(
