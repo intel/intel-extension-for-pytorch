@@ -98,8 +98,6 @@ ideep::tensor::data_type get_mkldnn_dtype(at::ScalarType type) {
   switch (type) {
     case at::ScalarType::Float:
       return ideep::tensor::data_type::f32;
-    case at::ScalarType::QInt32:
-      return ideep::tensor::data_type::s32;
     case at::ScalarType::QInt8:
       return ideep::tensor::data_type::s8;
     case at::ScalarType::QUInt8:
@@ -208,19 +206,6 @@ at::Tensor mkldnn_to_dense(
             ideep::tensor::data_type::bf16);
   cpu_tensor.as_strided_(dims, pub_tensor.get_strides());
   return cpu_tensor;
-}
-
-// Helper function for getting an ideep tensor out of an aten Tensor.
-// Note in case the aten Tensor is a dense tensor, the returned ideep
-// tensor is just a view of the storage of the aten dense tensor, so
-// caller needs to make sure the aten dense tensor's lifetime is
-// longer than the ideep tensor.
-ideep::tensor itensor_from_tensor(const at::Tensor& tensor) {
-  if (tensor.is_mkldnn()) {
-    return itensor_from_mkldnn(tensor);
-  } else {
-    return itensor_view_from_dense(tensor);
-  }
 }
 
 // Init a aten tensor according to ideep tensor's desc.

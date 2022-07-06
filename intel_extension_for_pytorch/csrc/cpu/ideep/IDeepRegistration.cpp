@@ -14,17 +14,3 @@ RegisterEngineAllocator cpu_alloc(
     [](void* p) {
       c10::GetAllocator(c10::DeviceType::CPU)->raw_deallocate(p);
     });
-
-namespace torch_ipex {
-namespace cpu {
-namespace mkldnn {
-
-void clear_computation_cache() {
-  // Reset computation_cache for forward convolutions
-  // As it also caches max number of OpenMP workers
-  ideep::convolution_forward::t_store().clear();
-}
-
-} // namespace mkldnn
-} // namespace cpu
-} // namespace torch_ipex

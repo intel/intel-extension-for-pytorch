@@ -76,7 +76,7 @@ at::Tensor conv_transpose_kernel_impl(
       dilation,
       groups);
   auto output = at::empty({0}, input.options());
-  const ideep::tensor x = itensor_from_tensor(input);
+  const ideep::tensor x = itensor_view_from_dense(input);
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> bias_maybe_owned =
       at::borrow_from_optional_tensor(bias_opt);
@@ -89,10 +89,10 @@ at::Tensor conv_transpose_kernel_impl(
   ideep::tensor y;
   if (is_channels_last) {
     output.resize_(output_sizes, memory_format);
-    y = itensor_from_tensor(output);
+    y = itensor_view_from_dense(output);
   }
   if (bias.defined()) {
-    const ideep::tensor b = itensor_from_tensor(bias);
+    const ideep::tensor b = itensor_view_from_dense(bias);
     ideep::convolution_transpose_forward::compute(
         x,
         w,
@@ -187,12 +187,12 @@ at::Tensor conv_transpose_backward_input(
   bool is_channels_last = memory_format == at::MemoryFormat::ChannelsLast ||
       memory_format == at::MemoryFormat::ChannelsLast3d;
 
-  auto grad_y = itensor_from_tensor(grad_output);
+  auto grad_y = itensor_view_from_dense(grad_output);
 
   ideep::tensor grad_x;
   if (is_channels_last) {
     grad_input.resize_(input_size, memory_format);
-    grad_x = itensor_from_tensor(grad_input);
+    grad_x = itensor_view_from_dense(grad_input);
   }
 
   ideep::convolution_transpose_backward_data::compute(
@@ -227,9 +227,8 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
     int64_t groups,
     at::IntArrayRef dilation,
     bool bias_defined) {
-
-  auto grad_y = itensor_from_tensor(grad_output);
-  auto x = itensor_from_tensor(input);
+  auto grad_y = itensor_view_from_dense(grad_output);
+  auto x = itensor_view_from_dense(input);
 
   auto grad_weight = at::empty_like(weight, grad_output.options());
   at::Tensor grad_bias;
