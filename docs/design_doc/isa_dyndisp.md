@@ -1,10 +1,10 @@
-# IPEX CPU ISA Dynamic Dispatch Design Doc
+# Intel® Extension for PyTorch\* CPU ISA Dynamic Dispatch Design Doc
 
-This document explains the dynamic kernel dispatch mechanism based on CPU ISA. It is an extension to the similar mechanism in PyTorch.
+This document explains the dynamic kernel dispatch mechanism for Intel® Extension for PyTorch\* (IPEX) based on CPU ISA. It is an extension to the similar mechanism in PyTorch.
 
 ## Overview
----
-IPEX dyndisp is forked from **PyTorch:** `ATen/native/DispatchStub.h` and `ATen/native/DispatchStub.cpp`. Besides that, IPEX add more CPU ISA level support, such as `AVX512_VNNI`, `AVX512_BF16` and `AMX`.
+
+IPEX dyndisp is forked from **PyTorch:** `ATen/native/DispatchStub.h` and `ATen/native/DispatchStub.cpp`. IPEX adds additional CPU ISA level support, such as `AVX512_VNNI`, `AVX512_BF16` and `AMX`.
 
 PyTorch & IPEX CPU ISA support statement:
  | | DEFAULT | AVX2 | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX |
@@ -23,19 +23,19 @@ PyTorch & IPEX CPU ISA support statement:
  | AVX512_BF16 | GCC 10.3+ |
  | AMX | GCC 11.2+ |
 
-\* Detailed compiler check, please check with `cmake/Modules/FindAVX.cmake` 
+\* Check with `cmake/Modules/FindAVX.cmake` for detailed compiler checks.
 
 ## Dynamic Dispatch Design
----
-Dynamic dispatch major mechanism is to copy the kernel implementation source file to multiple folders for each ISA level. And then build each file using its ISA specific parameters. Each generated object file will contains its function body(**Kernel Implementation**). 
 
-Kernel Implementation use anonymous namespace so that different cpu versions won't conflict.
+Dynamic dispatch copies the kernel implementation source files to multiple folders for each ISA level. It then builds each file using its ISA specific parameters. Each generated object file will contain its function body (**Kernel Implementation**).
 
-**Kernel Stub** is a "virtual function" with polymorphic kernel implementations w.r.t. ISA levels.
+Kernel Implementation uses an anonymous namespace so that different CPU versions won't conflict.
 
-At the runtime, **Dispatch Stub implementation** will check CPUIDs and OS status to determins which ISA level pointer to best matching function body.
+**Kernel Stub** is a "virtual function" with polymorphic kernel implementations pertaining to ISA levels.
 
-### Code Folder Struct  
+At the runtime, **Dispatch Stub implementation** will check CPUIDs and OS status to determins which ISA level pointer best matches the function body.
+
+### Code Folder Struct
 >#### **Kernel implementation:** `intel_extension_for_pytorch/csrc/aten/cpu/kernels/xyzKrnl.cpp`
 >#### **Kernel Stub:** `intel_extension_for_pytorch/csrc/aten/cpu/xyz.cpp` and `intel_extension_for_pytorch/csrc/aten/cpu/xyz.h`
 >#### **Dispatch Stub implementation:** `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.cpp` and `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h`
@@ -46,8 +46,10 @@ IPEX build system will generate code for each ISA level with specifiy complier p
 The CodeGen will copy each cpp files from **Kernel implementation**, and then add ISA level as new file suffix.
 
 > **Sample:**
+>
 > ----
-> **Origin file:** 
+>
+> **Origin file:**
 >
 > `intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp`
 >
@@ -64,7 +66,9 @@ The CodeGen will copy each cpp files from **Kernel implementation**, and then ad
 > AVX512_BF16: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_BF16.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -DCPU_CAPABILITY=AVX512_BF16 -DCPU_CAPABILITY_AVX512_BF16`
 >
 > AMX: `build/Release/intel_extension_for_pytorch/csrc/aten/cpu/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -DCPU_CAPABILITY=AMX -DCPU_CAPABILITY_AMX`
+
 ---
+
 >**Note:**
 >1. DEFAULT level kernels is not fully implemented in IPEX. In order to align to PyTorch, we build default use AVX2 parameters in stead of that. So, IPEX minimal required executing machine support AVX2.
 >2. `-D__AVX__` and `-D__AVX512F__` is defined for depends library [sleef](https://sleef.org/) .
@@ -73,12 +77,12 @@ The CodeGen will copy each cpp files from **Kernel implementation**, and then ad
 >5. Higher ISA level is compatible to lower ISA levels, so it needs to contains level ISA feature definitions. Such as AVX512_BF16 need contains `-DCPU_CAPABILITY_AVX512` `-DCPU_CAPABILITY_AVX512_VNNI`. But AVX512 don't contains AVX2 definitions, due to there are different vec register width.
 
 ## Add Custom Kernel
----
-If you want to add new custom kernel, and the kernel using CPU ISA instruction. Please reference to below steps. 
 
-1. Please add CPU ISA related kernel implementation to the folder:  `intel_extension_for_pytorch/csrc/aten/cpu/kernels/NewKernelKrnl.cpp`
-2. Please add kernel stub to the folder: `intel_extension_for_pytorch/csrc/aten/cpu/NewKernel.cpp`
-3. Please include header file: `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h`, and reference to the comment in the header file.
+If you want to add a new custom kernel, and the kernel uses CPU ISA instructions, refer to these tips:
+
+1. Add CPU ISA related kernel implementation to the folder:  `intel_extension_for_pytorch/csrc/aten/cpu/kernels/NewKernelKrnl.cpp`
+2. Add kernel stub to the folder: `intel_extension_for_pytorch/csrc/aten/cpu/NewKernel.cpp`
+3. Include header file: `intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h`, and reference to the comment in the header file.
 ```c++
 // Implements instruction set specific function dispatch.
 //
@@ -111,9 +115,9 @@ If you want to add new custom kernel, and the kernel using CPU ISA instruction. 
 
 >**Note:**
 >
->1. Some kernel only call **oneDNN** or **iDeep** implementation, or other backend implementation. Which is not need to add kernel implementation. (Refer: `BatchNorm.cpp`)
->2. Vec related header file must be included in kernel implementation file, but can not be included in kernel stub. Kernel stub is common code for all ISA level, and can't pass ISA related compiler parameters.
->3. More intrinsics please check at [Intel® Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html).
+>1. Some kernels only call **oneDNN** or **iDeep** implementation, or other backend implementation, which is not needed to add kernel implementations. (Refer: `BatchNorm.cpp`)
+>2. Vec related header file must be included in kernel implementation files, but can not be included in kernel stub. Kernel stub is common code for all ISA level, and can't pass ISA related compiler parameters.
+>3. For more intrinsics, check the [Intel® Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html).
 
 ### ISA intrinics specific kernel example:
 
@@ -163,7 +167,7 @@ void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
 ```
 Macro `CPU_CAPABILITY_AVX512` and `CPU_CAPABILITY_AVX512_BF16` are defined by compiler check, it is means that current compiler havs capability to generate defined ISA level code.
 
-Because of `AVX512_BF16` is higher level than `AVX512`, and it compatible to `AVX512`. `CPU_CAPABILITY_AVX512_BF16` can be contained in `CPU_CAPABILITY_AVX512` region. 
+Because of `AVX512_BF16` is higher level than `AVX512`, and it compatible to `AVX512`. `CPU_CAPABILITY_AVX512_BF16` can be contained in `CPU_CAPABILITY_AVX512` region.
 ```c++
 //csrc/aten/cpu/kernels/CvtFp32ToBf16Krnl.cpp
 
@@ -247,7 +251,7 @@ REGISTER_DISPATCH(cvt_fp32_to_bf16_kernel_stub, &cvt_fp32_to_bf16_kernel_impl);
 ```
 
 ### Vec specific kernel example:
-This example show get data type size and Its Vec size. In different ISA, Vec has different register width, and it has different Vec size also. 
+This example shows how to get the data type size and its Vec size. In different ISA, Vec has a different register width and a different Vec size.
 
 ```c++
 //csrc/aten/cpu/GetVecLength.h
@@ -354,8 +358,8 @@ REGISTER_DISPATCH(
 
 ```
 ## Private Debug APIs
----
-Here three ISA related private APIs could do same debug work. Which contains: 
+
+Here are three ISA-related private APIs that can help debugging::
 1. Query current ISA level.
 2. Query max CPU supported ISA level.
 3. Query max binary supported ISA level.
@@ -363,10 +367,10 @@ Here three ISA related private APIs could do same debug work. Which contains:
 >
 >1. Max CPU supported ISA level only depends on CPU features.
 >2. Max binary supported ISA level only depends on built complier version.
->3. Current ISA level, it is equal minimal of `max CPU ISA level` and `max binary ISA level`.
+>3. Current ISA level, it is the smaller of `max CPU ISA level` and `max binary ISA level`.
 
 ### Example:
-```cmd
+```bash
 python
 Python 3.9.7 (default, Sep 16 2021, 13:09:58)
 [GCC 7.5.0] :: Anaconda, Inc. on linux
@@ -382,10 +386,10 @@ Type "help", "copyright", "credits" or "license" for more information.
 ```
 
 ## Select ISA level manually.
----
-By default, IPEX dispatches to the kernels with maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable `ATEN_CPU_CAPABILITY` (same environment variable from PyTorch). The available values are {`avx2`, `avx512`, `avx512_vnni`, `avx512_bf16`, `amx`}. The effective ISA level would be the minimal level between `ATEN_CPU_CAPABILITY` and the maximum level supported by the hardware.
+
+By default, IPEX dispatches to the kernels with the maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable `ATEN_CPU_CAPABILITY` (same environment variable as PyTorch). The available values are {`avx2`, `avx512`, `avx512_vnni`, `avx512_bf16`, `amx`}. The effective ISA level would be the minimal level between `ATEN_CPU_CAPABILITY` and the maximum level supported by the hardware.
 ### Example:
-```cmd
+```bash
 $ python -c 'import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())'
 AMX
 $ ATEN_CPU_CAPABILITY=avx2 python -c 'import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())'
@@ -393,13 +397,13 @@ AVX2
 ```
 >**Note:**
 >
->`core._get_current_isa_level()` is an IPEX internal function used for checking the current effective ISA level. It is used for debugging purpose only and subjects to change.
+>`core._get_current_isa_level()` is an IPEX internal function used for checking the current effective ISA level. It is used for debugging purpose only and subject to change.
 
 ## CPU feature check
----
+
 An addtional CPU feature check tool in the subfolder: `tests/cpu/isa`
 
-```cmd
+```bash
 $ cmake .
 -- The C compiler identification is GNU 11.2.1
 -- The CXX compiler identification is GNU 11.2.1

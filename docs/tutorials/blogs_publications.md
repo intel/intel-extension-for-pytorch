@@ -1,6 +1,7 @@
 Blogs & Publications
 ====================
 
+* [Accelerating PyTorch with Intel® Extension for PyTorch\*](https://medium.com/pytorch/accelerating-pytorch-with-intel-extension-for-pytorch-3aef51ea3722)
 * [Intel and Facebook Accelerate PyTorch Performance with 3rd Gen Intel® Xeon® Processors and Intel® Deep Learning Boost’s new BFloat16 capability](https://www.intel.com/content/www/us/en/artificial-intelligence/posts/intel-facebook-boost-bfloat16.html)
 * [Accelerate PyTorch with the extension and oneDNN using Intel BF16 Technology](https://medium.com/pytorch/accelerate-pytorch-with-ipex-and-onednn-using-intel-bf16-technology-dca5b8e6b58f)
   * *Note*: APIs mentioned in it are deprecated.

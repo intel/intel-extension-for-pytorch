@@ -3,23 +3,23 @@ Channels Last
 
 ## What is Channels Last
 
-**NB**: **Memory format** refers to data representation that describes how multidimensional arrays (nD) are stored in linear (1D) memory address space. **Memory format** has the same semantic with **layout** in oneDNN. **Layout** in PyTorch has other semantic ofdescribing **dense** or **sparse** with the attributes: 'torch.strided', 'torch.sparse_coo'.
+**Note**: In PyTorch, **memory format** refers to data representation that describes how multidimensional arrays (nD) are stored in linear (1D) memory address space. **Memory format** has the same semantic meaning as **layout** in oneDNN. **Layout** in PyTorch has other semantic of describing **dense** or **sparse** with the attributes: 'torch.strided', 'torch.sparse_coo'.
 
-On CNN models, the canonical order of tensor dimensions are assigned with semantic meaning. For example the input tensor of 2D convolution is of NCHW by default on PyTorch - <batch_size, channels, height, width>. NHWC is an alternative way of describing the tensor dimensions - <batch_size, height, width, channels>.
+On CNN models, the canonical order of tensor dimensions is assigned with semantic meaning. For example the input tensor of 2D convolution is of NCHW by default on PyTorch - <batch_size, channels, height, width>. NHWC is an alternative way of describing the tensor dimensions - <batch_size, height, width, channels>.
 
-Take a look at the following image of illustrating NCHW and NHWC when N=1. Actually when N=1, NHWC has the same format with BMP file image.
+Look at the following image of illustrating NCHW and NHWC when N=1. Actually when N=1, NHWC has the same format with BMP file image.
 ![fig-1-memory-layout](../../../images/channels_last/figure1_memory_layout.png)
 
-PyTorch refers NCHW as `torch.contiguous_format` which is the default memory format and NHWC as `torch.channels_last` which is an new feature from 1.5 release.
+PyTorch refers to NCHW as `torch.contiguous_format` (the default memory format) and to NHWC as `torch.channels_last`, which is a new feature as of the 1.5 release.
 
-TensorFlow takes NHWC as the default memory format and from the performance point of view NHWC has advantage over NCHW. On CPU platforms, we propose to optimize Channels Last memory path out of the following reasones:
-* **Performance** - NHWC performance is not as good as blocked memory format (nChw16c), but it is close and much better than NCHW.
-* **User Experience** - Operator coverage of NHWC would be higher than blocked memory format (`to_mkldnn()` method) so user experience is better. To be specific, it would be very difficult to enable operator that manipulates `dim` on blocked format such as `sum(dim=?)` so you need to convert tensor from blocked memory format back to NHWC by `to_dense()` before feeding it into `sum()`. But it is naturally supported on Channels Last memory format already.
+TensorFlow uses NHWC as the default memory format because NHWC has a performance advantage over NCHW. On CPU platforms, we propose to optimize Channels Last memory path for ihe following reasons:
+* **Performance** - NHWC performance is not as good as blocked memory format (nChw16c), but it is close, and much better performance than NCHW.
+* **User Experience** - Operator coverage of NHWC would be higher than blocked memory format (`to_mkldnn()` method), so user experience is better. To be specific, it is difficult to enable operators that manipulates `dim` on blocked format such as `sum(dim=?)`. You would need to convert tensor from blocked memory format back to NHWC using `to_dense()`, before feeding it into `sum()`. This is naturally supported on Channels Last memory format already.
 * **Upstream** - Will be easier since CPU doesn't hold secret ingredient and both inference and training will be covered.
 
 ## Memory Format Is All That Matters
 
-On CNN models, memory format is all most the foundation of any upper level design. One imporant fact is that converting memory format could be very expensive. Thus, in case that multiple CNN operators are performed in sequence, e.g. `Conv2d -> ReLU -> Conv2d`, it's beneficial to transform them from different memory formats once, do computation and reorder them back.
+On CNN models, memory format is almost the foundation of any upper level design. One important fact is that converting memory format could be very expensive. Thus, in case that multiple CNN operators are performed in sequence, e.g. `Conv2d -> ReLU -> Conv2d`, it's beneficial to transform them from different memory formats once, do computation and reorder them back.
 
 On PyTorch, you can use 3 types of memory formats on CNN models:
 
@@ -68,7 +68,7 @@ output = model(input)
 Better to explain the concepts here with a diagram, the **dotted lines** indicate simple memory view, no hard copy.
 ![fig-2(1)-pt-conv-layout-path-dispatch](../../../images/channels_last/figure2_dispatch.png)
 
-**Conclusion** is that NHWC path saves the reorders from feature maps compared with NCHW path, but still weight reorder is necessary since oneDNN requires weights to be in blocked memory format. From performance perspective, when `batch_size=N`, weight reorder is minimum compared to feature map reorder. But when `batch_size=1`, weight reoder is usually not negligible. So whether to enable weight prepacking on channels last memory format needs further discussion.
+**Conclusion** is that NHWC path saves the reorders from feature maps compared with NCHW path, but still weight reorder is necessary since oneDNN requires weights to be in blocked memory format. From performance perspective, when `batch_size=N`, weight reorder is minimum compared to feature map reorder. But when `batch_size=1`, weight reorder is usually not negligible. So whether to enable weight prepacking on channels last memory format needs further discussion.
 
 ## PyTorch Strided Layout
 
@@ -83,11 +83,11 @@ offset(n,c,h,w) = stride_n * n + stride_c * c + stride_h * h + stride_w * w
                 = CHW * n + HW * c + W * h + 1 * w
 ```
 
-One merit of introducing **stride** is it will be able to express noncontiguous tensors, e.g. a slice of big tensor. For example, the 'Xs' in the following image has a stride of <n1+n2, 1>.
+One merit of introducing **stride** is that it can express noncontiguous tensors, e.g. a slice of big tensor. For example, the 'Xs' in the following image have a stride of <n1+n2, 1>.
 
 ![fig-3-pytorch-strided-layout](../../../images/channels_last/figure3_strided_layout.png)
 
-Keep in mind that PyTorch Tensor does not have an attribute so called 'memory_format' or something else. The memory format expression completely relies on **size** and **stride**, design principle can be found at reference: [RFC: Memory format (aka layout aka NHWC) support](https://github.com/pytorch/pytorch/issues/19092). So no matter what the tensor's memory format is, we need a logical canonical order for the dimensions - that is **NCHW** on PyTorch. Thus, **size** and **stride** are ALWAYS described in the order of **NCHW**. OK let's take a look at the Channels Last case of the previous question:
+Keep in mind that PyTorch Tensor does not have an attribute called 'memory_format' or something else. The memory format expression completely relies on **size** and **stride**. The design principle can be found at reference: [RFC: Memory format (aka layout aka NHWC) support](https://github.com/pytorch/pytorch/issues/19092). No matter what the tensor's memory format is, we need a logical canonical order for the dimensions - that is **NCHW** on PyTorch. Thus, **size** and **stride** are ALWAYS described in the order of **NCHW**. Let's now look at the Channels Last case of the previous question:
 ```
 tensor: <N, C, H, W>
 index: <n, c, h, w>
@@ -129,7 +129,7 @@ input = input.to(memory_format=torch.channels_last)
 Detailed operator coverage information has been listed at reference [Operators-with-Channels-Last-support](https://github.com/pytorch/pytorch/wiki/Operators-with-Channels-Last-support). In brief, ImageNet training topologies on GPU already have full support on Channels Last memory format, while CPU doesn't.
 
 Some spontaneous questions:
-* **How to tell whether this model or operator support Channels Last?** - This requires mannual memory format check, aka. 'torch.channels_last' input and weight shall NOT generate 'torch.contiguous_format' output.
+* **How to tell whether this model or operator support Channels Last?** - This requires manual memory format check, aka. 'torch.channels_last' input and weight shall NOT generate 'torch.contiguous_format' output.
 * **What if the model comprises of operator not supported Channels Last?** - No errors messages will be shown, the NHWC tensor will be handled by the operator as a non-contiguous NCHW tensor, so result might not be correct depending on the algorithm of this operator.
 
 ## Writing Channels Last Kernels
@@ -146,11 +146,11 @@ The general guideline has been listed under reference [Writing-memory-format-awa
 
 ### c. Register oneDNN Kernel on Channels Last
 
-Essence of registering an oneDNN kernel under Channels Last memory format on CPU is no differenct from [cuDNN](https://github.com/pytorch/pytorch/pull/23861): Only very few upper level change is needed such as accommodate 'contiguous()' to 'contiguous(suggested_memory_format)'. The automatic reorder of oneDNN weight shall been hided in ideep.
+Registering a oneDNN kernel under Channels Last memory format on CPU is no different from [cuDNN](https://github.com/pytorch/pytorch/pull/23861): Only very few upper level changes are needed, such as accommodate 'contiguous()' to 'contiguous(suggested_memory_format)'. The automatic reorder of oneDNN weight shall been hidden in ideep.
 
 ## oneDNN NHWC APIs
 
-Compared to NCHW interfaces, 2 parts need to be addressed on NHWC inferfaces:
+Compared to NCHW interfaces, 2 parts need to be addressed on NHWC interfaces:
 
 ### a. Create NHWC Memory
 
@@ -185,6 +185,6 @@ auto src_mem = memory(src_md, src_data_ptr, engine);
 * **Scenarios** - cover both training and inference;
 * **Models** - ResNet50 and ResNext101, extended targets: torchvision models, detectron2;
 * **Performance Targets** - training >0.8x blocked; inference throughput > 0.8x blocked; inference latency? (need further discussion)
-* **Operator Converage** - No less than GPU path;
-* **BFloat16** - This part shall align with big picture of BFloat16 integration (need further discussion);
+* **Operator Coverage** - No less than GPU path;
+* **BFloat16** - This part shall align with BFloat16 integration (need further discussion);
 * **int8** - Need further discussion.

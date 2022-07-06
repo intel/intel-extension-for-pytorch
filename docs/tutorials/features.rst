@@ -4,32 +4,39 @@ Features
 Ease-of-use Python API
 ----------------------
 
-Intel® Extension for PyTorch\* provides simple frontend Python APIs and utilities for users to get performance optimizations such as graph optimization and operator optimization with minor code changes. Typically, only two to three clauses are required to be added to the original code.
+With only two or three clauses added to your original code, Intel® Extension for PyTorch\* provides simple frontend Python APIs and utilities to get performance optimizations such as graph optimization and operator optimization.
 
-Please check `API Documentation <api_doc.html>`_ page for details of API functions. Examples are available in `Examples <examples.html>`_ page.
+Check the `API Documentation`_ for details of API functions. `Examples <examples.md>`_ are also available.
 
 .. note::
 
-   Please check the following table for package name of Intel® Extension for PyTorch\* from version to version when you do the package importing in Python scripts.
+  The package name used when you import Intel® Extension for PyTorch\* changed
+  from ``intel_pytorch_extension`` (for versions 1.2.0 through 1.9.0) to
+  ``intel_extension_for_pytorch`` (for versions 1.10.0 and later). Use the
+  correct package name depending on the version you are using.
 
-   .. list-table::
-      :widths: auto
-      :align: center
-      :header-rows: 1
-   
-      * - version
-        - package name
-      * - 1.2.0 ~ 1.9.0
-        - intel_pytorch_extension
-      * - 1.10.0 ~
-        - intel_extension_for_pytorch
+Here are detailed discussions of specific feature topics, summarized in the rest
+of this document:
+
+ISA Dynamic Dispatching
+-----------------------
+
+Intel® Extension for PyTorch\* features dynamic dispatching functionality to automatically adapt execution binaries to the most advanced instruction set available on your machine.
+
+For more detailed information, check `ISA Dynamic Dispatching <features/isa_dynamic_dispatch.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/isa_dynamic_dispatch
 
 Channels Last
 -------------
 
-Comparing to the default NCHW memory format, channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch\*, NHWC memory format has been enabled for most key CPU operators, though not all of them have been merged to PyTorch master branch yet. They are expected to be fully landed in PyTorch upstream soon.
+Compared with the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch\*, NHWC memory format has been enabled for most key CPU operators, though not all of them have been accepted and merged into the PyTorch master branch yet.
 
-Check more detailed information for `Channels Last <features/nhwc.html>`_.
+For more detailed information, check `Channels Last <features/nhwc.md>`_.
 
 .. toctree::
    :hidden:
@@ -37,14 +44,15 @@ Check more detailed information for `Channels Last <features/nhwc.html>`_.
 
    features/nhwc
 
+
 Auto Mixed Precision (AMP)
 --------------------------
 
-Low precision data type BFloat16 has been natively supported on the 3rd Generation Xeon®  Scalable Processors (aka Cooper Lake) with AVX512 instruction set and will be supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set with further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators have been massively enabled in Intel® Extension for PyTorch\*, and partially upstreamed to PyTorch master branch. Most of these optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.
+Low precision data type BFloat16 has been natively supported on 3rd Generation Xeon® Scalable Processors (aka Cooper Lake) with AVX512 instruction set. It will also be supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set providing further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators has been enabled in Intel® Extension for PyTorch\*, and partially upstreamed to PyTorch master branch. These optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.
 
-Check more detailed information for `Auto Mixed Precision (AMP) <features/amp.html>`_.
+For more detailed information, check `Auto Mixed Precision (AMP) <features/amp.md>`_.
 
-Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with `AVX512 BFloat16 instruction <https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html>`_, there will be further performance boost.
+Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with `AVX512 BFloat16 instruction <https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html>`_, there will be an additional performance boost.
 
 .. toctree::
    :hidden:
@@ -55,9 +63,10 @@ Bfloat16 computation can be conducted on platforms with AVX512 instruction set. 
 Graph Optimization
 ------------------
 
-To optimize performance further with torchscript, Intel® Extension for PyTorch\* supports fusion of frequently used operator patterns, like Conv2D+ReLU, Linear+ReLU, etc.  The benefit of the fusions are delivered to users in a transparant fashion.
+To further optimize TorchScript performance, Intel® Extension for PyTorch\* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
+For more detailed information, check `Graph Optimization <features/graph_optimization.md>`_.
 
-Check more detailed information for `Graph Optimization <features/graph_optimization.html>`_.
+Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend you take advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_. You may wish to run with the `torch.jit.trace()` function first, since it generally works better with Intel® Extension for PyTorch* than using the `torch.jit.script()` function. More detailed information can be found at the `pytorch.org website <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules>`_.
 
 .. toctree::
    :hidden:
@@ -68,7 +77,7 @@ Check more detailed information for `Graph Optimization <features/graph_optimiza
 Operator Optimization
 ---------------------
 
-Intel® Extension for PyTorch\* also optimizes operators and implements several customized operators for performance boost. A few  ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch\* via ATen registration mechanism. Moreover, some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch\* also optimized these customized operators.
+Intel® Extension for PyTorch\* also optimizes operators and implements several customized operators for performance boosts. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch\* via the ATen registration mechanism. Some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch\* also optimized these customized operators.
 
 .. currentmodule:: intel_extension_for_pytorch.nn
 .. autoclass:: FrozenBatchNorm2d
@@ -79,32 +88,33 @@ Intel® Extension for PyTorch\* also optimizes operators and implements several 
 Optimizer Optimization
 ----------------------
 
-Optimizers are one of key parts of the training workloads. Intel Extension for PyTorch brings two types of optimizations to optimizers:
+Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch\* brings two types of optimizations to optimizers:
 1.	Operator fusion for the computation in the optimizers.
 2.	SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
 
 
-Check more detailed information for `Split SGD <features/split_sgd.html>`_ and `Optimizer Fusion <features/optimizer_fusion.html>`_.
+For more detailed information, check `Optimizer Fusion <features/optimizer_fusion.md>`_ and `Split SGD <features/split_sgd.md>`_ 
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
-   features/split_sgd
    features/optimizer_fusion
+   features/split_sgd
 
-Runtime Extension (Experimental)
+
+Runtime Extension
 --------------------------------
 
-Intel® Extension for PyTorch* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides
+Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs for users to get finer-grained control of the thread runtime and provides:
 
-1. Multi-stream inference via the Python frontend module MultiStreamModule.
-2. Spawn asynchronous tasks from both Python and C++ frontend.
-3. Configure core bindings for OpenMP threads from both Python and C++ frontend.
+- Multi-stream inference via the Python frontend module MultiStreamModule.
+- Spawn asynchronous tasks from both Python and C++ frontend.
+- Program core bindings for OpenMP threads from both Python and C++ frontend.
 
-Please **note**: Intel® Extension for PyTorch* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at `API Documentation page <api_doc.html>`_.
+.. note:: Intel® Extension for PyTorch* Runtime extension is still in the experimental stage. The API is subject to change. More detailed descriptions are available in the `API Documentation <api_doc.html>`_.
 
-Check more detailed information for `Runtime Extension <features/runtime_extension.html>`_.
+For more detailed information, check `Runtime Extension <features/runtime_extension.md>`_.
 
 .. toctree::
    :hidden:
@@ -112,14 +122,12 @@ Check more detailed information for `Runtime Extension <features/runtime_extensi
 
    features/runtime_extension
 
-INT8 Quantization (Experimental)
+INT8 Quantization
 --------------------------------
 
-Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models. The quantized model is then optimized with the `oneDNN graph <https://spec.oneapi.io/onednn-graph/latest/introduction.html>`_ fusion pass to deliver good performance.
+Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.
 
-Check more detailed information for `INT8 <features/int8.html>`_.
-
-oneDNN provides an evaluation feature called `oneDNN Graph Compiler <https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler>`_. Please refer to `oneDNN build instruction <https://github.com/oneapi-src/oneDNN/blob/dev-graph-preview4/doc/build/build_options.md#build-graph-compiler>`_ to try this feature. You can find oneDNN in `third_party/llga`.
+Check more detailed information for `INT8 Quantization <features/int8.md>`_.
 
 .. toctree::
    :hidden:

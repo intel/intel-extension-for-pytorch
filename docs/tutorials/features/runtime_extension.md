@@ -1,31 +1,31 @@
-Runtime Extension (Experimental)
-================================
+Runtime Extension
+=================
 
-Intel® Extension for PyTorch\* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides
+Intel® Extension for PyTorch\* Runtime Extension provides a couple of PyTorch frontend APIs for users to get finer-grained control of the thread runtime. It provides:
 
 1. Multi-stream inference via the Python frontend module `intel_extension_for_pytorch.cpu.runtime.MultiStreamModule`.
 2. Spawn asynchronous tasks via the Python frontend module `intel_extension_for_pytorch.cpu.runtime.Task`.
-3. Configure core bindings for OpenMP threads via the Python frontend `intel_extension_for_pytorch.cpu.runtime.pin`.
+3. Program core bindings for OpenMP threads via the Python frontend `intel_extension_for_pytorch.cpu.runtime.pin`.
 
-Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **Experimental** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
+**note**: Intel® Extension for PyTorch\* Runtime extension is in the **experimental** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.rst).
 
 ## Requirements
 
-Intel® Extension for PyTorch\* Runtime Extension relies on `intel omp` to bind threads to cores. If you want to use it in your application, please start model script with extra flag: `LD_PRELOAD=$LD_PRELOAD:$PATH/libiomp5.so python model_script.py`.
+Intel® Extension for PyTorch\* Runtime Extension relies on `intel omp` to bind threads to cores. If you want to use it in your application, start model script with an extra flag: `LD_PRELOAD=$LD_PRELOAD:$PATH/libiomp5.so python model_script.py`.
 
 ## Use Cases
 
-### Example of Multi Stream Module
+### Example of MultiStream Module
 
-Runtime extension supports weight-sharing multi-stream inference for throughput mode on CPU. You just need to convert the original model into multi stream model and run the new multi stream model as normal. The detailed description of parameters to create `MultiStreamModule` is available at [API Documentation page](../api_doc.html).
+Runtime extension supports weight-sharing multi-stream inference for throughput mode on CPU. You need to convert the original model into multi-stream model and run the new multi-stream model as normal. The detailed description of parameters to create `MultiStreamModule` is available at [API Documentation page](../api_doc.rst).
 
-`MultiStreamModule` targets to improve performance of inference in throughput mode. We recommend creating a `MultiStreamModule` object with the `num_streams` parameter set to "AUTO" to heuristically decide the number of streams. Usually, it provides reasonable performance. However, it may still not be optimal for some cases (refer to the section [Performance recipes](#performance-recipes) for details) where manual tuning for the number of streams is needed.
+`MultiStreamModule` can improve performance for inference in throughput mode. We suggest creating `MultiStreamModule` with `num_streams` of "AUTO", which heuristically decides the number of streams. Usually, it provides a reasonable performance. However, it may not be optimal for some cases (refer to the section [Performance recipes](#performance-recipes) for details). Manual tuning for number of streams is needed.
 
 The `MultiStreamModule` creates number of streams based on input parameter `num_streams` and bind cores to stream based on input parameter `cpu_pool`. If the number of cores inside `cpu_pool` is divisible by `num_streams`, the cores will be allocated equally to each stream. If the number of cores inside `cpu_pool` is not divisible by `num_streams` with remainder N, one extra core will be allocated to the first N streams. We suggest to set the `num_streams` as divisor of core number inside `cpu_pool`.
 
 If the inputs' batchsize is larger than and divisible by ``num_streams``, the batchsize will be allocated equally to each stream. If batchsize is not divisible by ``num_streams`` with remainder N, one extra piece will be allocated to the first N streams. If the inputs' batchsize is less than ``num_streams``, only the first batchsize's streams are used with mini batch as one. We suggest to set inputs' batchsize larger than and divisible by ``num_streams``. When creating `MultiStreamModule`, if you leave num of streams as "AUTO", we suggest to set inputs' batchsize larger than and divisible by number of cores.
 
-Firstly, creating some ExampleNets which will be used by below examples:
+Let's create some ExampleNets that will be used by further examples:
 ```
 class ExampleNet1(torch.nn.Module):
     def __init__(self):
@@ -95,9 +95,9 @@ cpu_pool = intel_extension_for_pytorch.cpu.runtime.CPUPool(node_id=0)
 # Create the input hint object
 input_hint = intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint(0, 0)
 # Create the output hint object
-# When python module has multi output tensors, it will be auto pack into a tuple, So we pass a tuple(0, 0) to create the output_hint
+# When Python module has multi output tensors, it will be auto pack into a tuple, So we pass a tuple(0, 0) to create the output_hint
 output_hint = intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint((0, 0))
-multi_Stream_model = intel_extension_for_pytorch.cpu.runtime.MultiStreamModule(traced_model2, 
+multi_Stream_model = intel_extension_for_pytorch.cpu.runtime.MultiStreamModule(traced_model2,
                                                                             num_streams=2,
                                                                             cpu_pool=cpu_pool,
                                                                             input_split_hint=input_hint,
@@ -108,29 +108,29 @@ with torch.no_grad():
 ```
 
 #### Performance recipes
-There are 2 motivations to use the `MultiStreamModule`:
+There are two motivations to use the `MultiStreamModule`:
 1. Better cache locality: With `MultiStreamModule`, the activations will be limited in the CPU cores allocated to this stream instead of the whole cpu_pool.
 2. Reduce the OMP sync overhead: if one CPU core allocated to one stream, the whole execution needs to do OMP sync once after all streams finish execution instead of sync per layer.
 
-Thus, `MultiStreamModule` may benefit performance for inference in throughput mode. However, the end-to-end performance is still subject to:
-1. The kernels' efficiency which are different under different OMP threads' number.
+Thus, `MultiStreamModule` may benefit performance for inference in throughput mode. However, the end-to-end performance is impacted by these issues:
+1. The kernels' efficiency, which are different under different OMP threads' number.
 2. The overhead of inputs' auto split and outputs' auto concat for each stream.
 3. The overhead of pthread (stream async execution) wakes up and threads' synchronization after stream execution.
 
-Below are some performance receipts we suggest to use for better multi stream performance.
+Here are some performance receipes that we recommend for better multi-stream performance.
 
-* When creating `MultiStreamModule` with `torch.nn.Module` as imperative path module, each stream inside `MultiStreamModule` suffers the GIL issue when do inference together which hurts end-to-end performance. As the results, we suggest to create `MultiStreamModule` with the `torch.jit.ScriptModule`.
+* When creating `MultiStreamModule` with `torch.nn.Module` as imperative path module, each stream inside `MultiStreamModule` suffers the GIL issue when doing inference together. This hurts end-to-end performance. We recommend creating `MultiStreamModule` with the `torch.jit.ScriptModule`.
 
-* For convolution network, `intel_extension_for_pytorch` has the quick path getting convolution primitive to mitigate overhead when `OMP_NUM_THREADS` is same between the phase of `torch.jit.trace` and model execution. To use this quick path for better performance, we suggest to set the `OMP_NUM_THREADS` environment before launch the model script. The suggested value of `OMP_NUM_THREADS` should equal to the threads number used by each stream. For example, creating `MultiStreamModule` as stream number of `s1`, CPUPool with core number `c1`, each stream will allocate threads number as `c1/s1`. Then we should set `OMP_NUM_THREADS` as this value.
+* For convolution network, `intel_extension_for_pytorch` has the quick path getting convolution primitive to mitigate overhead when `OMP_NUM_THREADS` is the same between the `torch.jit.trace` and model execution phases. To use this quick path for better performance, we recommend setting the `OMP_NUM_THREADS` environment before launching the model script. The recommended value of `OMP_NUM_THREADS` should equal the threads number used by each stream. For example, creating `MultiStreamModule` as stream number `s1` and CPUPool with core number `c1`, each stream will allocate threads number as `c1/s1`. We recommend setting `OMP_NUM_THREADS` as this value.
 
-* `Numactl` and the threads management in `MultiStreamModule` works in different levels. `MultiStreamModule` has the thread affinity setting for each stream which works in the thread level. However, for the python modules outside the stream, such as the dataloader, are out of radar for `MultiStreamModule`. As the result, we suggest to use `numactl -C core_ids -m node_id` for the process level core and memory resource management. For the core resource setting by `numactl`, suggest to set the same or superset of the core resource to create `CPUPool`. Otherwise, the behavior is undefined in current implementation.
+* `Numactl` and the threads management in `MultiStreamModule` work at different levels. `MultiStreamModule` has the thread affinity setting for each stream, which works in the thread level. However, for the Python modules outside the stream, such as the dataloader, are out of view for `MultiStreamModule`. As the result, we recommend using `numactl -C core_ids -m node_id` for the process level core and memory resource management. For the core resource setting by `numactl`, set it the same or superset of the core resource to create `CPUPool`. Otherwise, the behavior is undefined in current implementation.
 
 #### Known issues
-* Int8 data type does not support dynamic shape well. To avoid the performance issue, we suggest setting the batchsize to do `jit.trace` with same mini batchsize used by each stream. For example, creating `MultiStreamModule` as stream number of `s1`, input global batchsize as `gb`, each stream will inference with mini-batchsize as `gb/s1`. Then we should use this mini-batchsize value to do `jit.trace`. To be aware of the `num_streams` value, we suggest creating `MultiStreamModule` with `num_streams` setting explicitly instead of "AUTO". Due to the same limitation, the behavior that each stream inference with different mini batchsize of int8 data type is undefined and not supported.
+* Intel® Extension for PyTorch\* runtime extension feature with Int8 data type does not support dynamic shape well. To avoid performance issues, we recommend setting the batchsize to do `jit.trace` with same mini batchsize used by each stream. For example, creating `MultiStreamModule` as stream number of `s1` and input global batchsize as `gb`, each stream will inference with mini-batchsize of `gb/s1`. We should use this mini-batchsize value to do `jit.trace`. To be aware of the `num_streams` value, we recommend creating `MultiStreamModule` with `num_streams` setting explicitly instead of "AUTO". Due to the same limitation, the behavior that each stream inference with different mini batchsize of int8 data type is undefined and not supported.
 
 ### Example of asynchronous task
 
-Here is an example about how to use the asynchronous task. With the support of runtime API, you can run 2 modules simultaneously. Each module runs on the corresponding cpu pool.
+Here is an example for using asynchronous tasks. With the support of a runtime API, you can run 2 modules simultaneously. Each module runs on the corresponding cpu pool.
 
 ```
 # Create the cpu pool and numa aware memory allocator
@@ -161,12 +161,12 @@ with intel_extension_for_pytorch.cpu.runtime.pin(cpu_pool):
 
 ### How the core binding is implemented
 
-The Runtime Extension relies on the `kmp_*` API inside `iomp` share library to fulfill the core binding. The idea is that during the initialization of async threads, `kmp_*` API functions are invoked internally to start up an openmp group with specified number of worker threads. Each worker thread is then bound to the designated physical core(s) inside this openmp group. After initialization, any time you submit a task, the openmp group will serve the requested task.
+The Runtime Extension relies on the `kmp_*` API inside `iomp` share library to fulfill the core binding. During the initialization of async threads, `kmp_*` API functions are invoked internally to start up an OpenMP group with specified number of worker threads. Each worker thread is then bound to the designated physical core(s) inside this OpenMP group. After initialization, when you submit a task, the OpenMP group will serve the requested task.
 
 ### Design of Task
 
-Task is an abstraction of computation based on PyTorch module and is scheduled asynchronously. When a task created with specific `nn.Module` or `jit module`, a sub-thread which is bound to this task initialized. During the initialization, an openmp worker group is created and bound to this sub-thread. After initialization, the sub-thread spins to wait input. When the main thread submits an input to this task, the sub-thread will wake up and execute the input. The main thread returns a `FutureTensor` and not block until an explicit `FutureTensor.get()` invoking to get the results executed in sub-thread.
+Task is an abstraction of computation based on PyTorch module and is scheduled asynchronously. When a task is created with specific `nn.Module` or `jit module`, a sub-thread is initialized and bound to this task. During the initialization, an OpenMP worker group is created and bound to this sub-thread. After initialization, the sub-thread waits for input. When the main thread submits an input to this task, the sub-thread will wake up and execute the input. The main thread returns a `FutureTensor` and is not block until an explicit `FutureTensor.get()` is invoked to get the results executed in the sub-thread.
 
 ### IOMP preload or load during the runtime
 
-Since Runtime Extension rely on the APIs from IOMP, we need to preload IOMP before executing the application. And we want Intel® Extension for PyTorch\* default build with Runtime API enabled, which means it should work fine w/o loading IOMP if user didn't use the runtime API. Here we choose to `dlopen` IOMP library during runtime. And we ensure the IOMP symbols initialized once globally.
+Since Runtime Extension relies on the APIs from IOMP, we need to preload IOMP before executing the application. We want Intel® Extension for PyTorch\* built with Runtime API enabled. This means it should work fine without loading IOMP if the user didn't use the runtime API. Here we choose to `dlopen` IOMP library during runtime and we ensure the IOMP symbols are initialized once globally.

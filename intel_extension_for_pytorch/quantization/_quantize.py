@@ -7,7 +7,7 @@ from torch.ao.quantization import PlaceholderObserver
 import torch.fx.experimental.optimization as optimization
 
 import intel_extension_for_pytorch._C as core
-from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model 
+from ._quantize_utils import auto_prepare, auto_convert, copy_prepared_model
 from .. import nn
 
 def prepare(
@@ -17,12 +17,14 @@ def prepare(
     inplace=False):
     r"""
     Prepare an FP32 torch.nn.Module model to do calibration or to convert to quantized model.
+
     Args:
         model (torch.nn.Module): The FP32 model to be prepared.
         configure (torch.quantization.qconfig.QConfig): The observer settings about activation and weight.
         example_inputs (tuple or torch.Tensor): A tuple of example inputs that
-            will be passed to the function while running to init quantization state. 
+            will be passed to the function while running to init quantization state.
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
+
     Returns:
         torch.nn.Module
     """
@@ -53,9 +55,11 @@ def convert(
     r"""
     Convert an FP32 prepared model to a model which will automatically insert fake quant
     before a quantizable module or operator.
+
     Args:
         model (torch.nn.Module): The FP32 model to be convert.
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
+
     Returns:
         torch.torch.nn.Module
     """
