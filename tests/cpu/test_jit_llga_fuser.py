@@ -3,7 +3,7 @@ import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
+from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env, get_eltwise_fn
 from torch.testing._internal.common_utils import TEST_SCIPY
 
 
@@ -17,17 +17,6 @@ except ImportError:
 except RuntimeError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, 'no torchvision')
-
-
-def get_eltwise_fn(name):
-    if hasattr(torch, name):
-        return getattr(torch, name)
-    elif hasattr(F, name):
-        return getattr(F, name)
-    else:
-        if name == 'hardswish_':
-            return torch.nn.Hardswish(inplace=True);
-        raise NameError('Eltwise function %s not found' % name)
 
 
 class TestOp(JitLlgaTestCase):
@@ -476,7 +465,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 return x
 
         for eltwise in ['relu', 'leaky_relu', 'sigmoid', 'round', 'abs', 'square',
-                        'abs', 'round', 'exp', 'hardswish', 'tanh', 'hardtanh']:
+                        'abs', 'round', 'exp', 'hardswish', 'tanh', 'hardtanh', 'mish']:
             for inplace in [False, True]:
                 eltwise_fn_name = eltwise + '_' if inplace else eltwise
                 eltwise_fn = get_eltwise_fn(eltwise_fn_name)

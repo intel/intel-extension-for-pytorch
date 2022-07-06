@@ -229,6 +229,8 @@ Operator LlgaGraphHelper::createOperator(Node* node) const {
     return makeEltwiseOp(node, opkind::Sigmoid);
   } else if (nodeKind == Symbol::aten("gelu")) {
     return makeEltwiseOp(node, opkind::GELU);
+  } else if (nodeKind == Symbol::aten("mish")) {
+    return makeEltwiseOp(node, opkind::Mish);
   } else if (nodeKind == Symbol::aten("round")) {
     return makeEltwiseOp(node, opkind::Round);
   } else if (nodeKind == Symbol::aten("exp")) {

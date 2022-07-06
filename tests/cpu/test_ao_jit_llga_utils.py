@@ -20,6 +20,18 @@ default_static_qconfig = QConfig(
         activation= MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
         weight= PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
 
+def get_eltwise_fn(name):
+    if hasattr(torch, name):
+        return getattr(torch, name)
+    elif hasattr(torch.nn.functional, name):
+        return getattr(torch.nn.functional, name)
+    else:
+        if name == 'hardswish_':
+            return torch.nn.Hardswish(inplace=True);
+        elif name == 'mish_':
+            return torch.nn.Mish(inplace=True)
+        raise NameError('Eltwise function %s not found' % name)
+
 # For fp32 and bf16 LLGA UT only
 def llga_fp32_bf16_test_env(func):
     @wraps(func)
