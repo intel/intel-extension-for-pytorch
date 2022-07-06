@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features &mdash; intel_extension_for_pytorch 1.12.0+cpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="ISA Dynamic Dispatching" href="features/isa_dynamic_dispatch.html" />
+    <link rel="prev" title="Welcome to Intel® Extension for PyTorch* Documentation" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../versions.html">1.12.0+cpu ▼</a>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Features</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#ease-of-use-python-api">Ease-of-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#isa-dynamic-dispatching">ISA Dynamic Dispatching</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#channels-last">Channels Last</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/nhwc.html">Channels Last</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/amp.html">Auto Mixed Precision (AMP)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-optimization">Graph Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/graph_optimization.html">Graph Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optimizer-optimization">Optimizer Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/optimizer_fusion.html">Optimizer Fusion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/split_sgd.html">Split SGD</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#runtime-extension">Runtime Extension</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/runtime_extension.html">Runtime Extension</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#int8-quantization">INT8 Quantization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/int8.html">Intel® Extension for PyTorch* optimizations for quantization</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Features</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/features.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Permalink to this headline"></a></h1>
+<section id="ease-of-use-python-api">
+<h2>Ease-of-use Python API<a class="headerlink" href="#ease-of-use-python-api" title="Permalink to this headline"></a></h2>
+<p>With only two or three clauses added to your original code, Intel® Extension for PyTorch* provides simple frontend Python APIs and utilities to get performance optimizations such as graph optimization and operator optimization.</p>
+<p>Check the <a class="reference external" href="api_doc.html">API Documentation</a> for details of API functions. <a class="reference external" href="examples.html">Examples</a> are also available.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The package name used when you import Intel® Extension for PyTorch* changed
+from <code class="docutils literal notranslate"><span class="pre">intel_pytorch_extension</span></code> (for versions 1.2.0 through 1.9.0) to
+<code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> (for versions 1.10.0 and later). Use the
+correct package name depending on the version you are using.</p>
+</div>
+<p>Here are detailed discussions of specific feature topics, summarized in the rest
+of this document:</p>
+</section>
+<section id="isa-dynamic-dispatching">
+<h2>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Permalink to this headline"></a></h2>
+<p>Intel® Extension for PyTorch* features dynamic dispatching functionality to automatically adapt execution binaries to the most advanced instruction set available on your machine.</p>
+<p>For more detailed information, check <a class="reference external" href="features/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="channels-last">
+<h2>Channels Last<a class="headerlink" href="#channels-last" title="Permalink to this headline"></a></h2>
+<p>Compared with the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch*, NHWC memory format has been enabled for most key CPU operators, though not all of them have been accepted and merged into the PyTorch master branch yet.</p>
+<p>For more detailed information, check <a class="reference external" href="features/nhwc.html">Channels Last</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="auto-mixed-precision-amp">
+<h2>Auto Mixed Precision (AMP)<a class="headerlink" href="#auto-mixed-precision-amp" title="Permalink to this headline"></a></h2>
+<p>Low precision data type BFloat16 has been natively supported on 3rd Generation Xeon® Scalable Processors (aka Cooper Lake) with AVX512 instruction set. It will also be supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set providing further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators has been enabled in Intel® Extension for PyTorch*, and partially upstreamed to PyTorch master branch. These optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.</p>
+<p>For more detailed information, check <a class="reference external" href="features/amp.html">Auto Mixed Precision (AMP)</a>.</p>
+<p>Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html">AVX512 BFloat16 instruction</a>, there will be an additional performance boost.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="graph-optimization">
+<h2>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Permalink to this headline"></a></h2>
+<p>To further optimize TorchScript performance, Intel® Extension for PyTorch* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
+For more detailed information, check <a class="reference external" href="features/graph_optimization.html">Graph Optimization</a>.</p>
+<p>Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend you take advantage of Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a>. You may wish to run with the <cite>torch.jit.trace()</cite> function first, since it generally works better with Intel® Extension for PyTorch* than using the <cite>torch.jit.script()</cite> function. More detailed information can be found at the <a class="reference external" href="https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules">pytorch.org website</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="operator-optimization">
+<h2>Operator Optimization<a class="headerlink" href="#operator-optimization" title="Permalink to this headline"></a></h2>
+<p>Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance boosts. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via the ATen registration mechanism. Some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.nn.FrozenBatchNorm2d">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">ipex.nn.</span></span><span class="sig-name descname"><span class="pre">FrozenBatchNorm2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_features</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span> <span class="n"><span class="pre">float</span></span> <span class="o"><span class="pre">=</span></span> <span class="default_value"><span class="pre">1e-05</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.FrozenBatchNorm2d" title="Permalink to this definition"></a></dt>
+<dd><p>BatchNorm2d where the batch statistics and the affine parameters are fixed</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>num_features</strong> (<em>int</em>) – <span class="math notranslate nohighlight">\(C\)</span> from an expected input of size <span class="math notranslate nohighlight">\((N, C, H, W)\)</span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape</dt><dd><ul class="simple">
+<li><p>Input: <span class="math notranslate nohighlight">\((N, C, H, W)\)</span></p></li>
+<li><p>Output: <span class="math notranslate nohighlight">\((N, C, H, W)\)</span> (same shape as input)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.nn.functional.interaction">
+<span class="sig-prename descclassname"><span class="pre">ipex.nn.functional.</span></span><span class="sig-name descname"><span class="pre">interaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.functional.interaction" title="Permalink to this definition"></a></dt>
+<dd><p>Get the interaction feature beyond different kinds of features (like gender
+or hobbies), used in DLRM model.</p>
+<p>For now, we only optimized “dot” interaction at <a class="reference external" href="https://github.com/facebookresearch/dlrm/blob/main/dlrm_s_pytorch.py#L475-L495">DLRM Github repo</a>.
+Through this, we use the dot product to represent the interaction feature
+between two features.</p>
+<p>For example, if feature 1 is “Man” which is represented by [0.1, 0.2, 0.3],
+and feature 2 is “Like play football” which is represented by [-0.1, 0.3, 0.2].</p>
+<p>The dot interaction feature is
+([0.1, 0.2, 0.3] * [-0.1, 0.3, 0.2]^T) =  -0.1 + 0.6 + 0.6 = 1.1</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>*args</strong> – Multiple tensors which represent different features</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape</dt><dd><ul class="simple">
+<li><p>Input: <span class="math notranslate nohighlight">\(N * (B, D)\)</span>, where N is the number of different kinds of features, B is the batch size, D is feature size</p></li>
+<li><p>Output: <span class="math notranslate nohighlight">\((B, D + N * ( N - 1 ) / 2)\)</span></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="optimizer-optimization">
+<h2>Optimizer Optimization<a class="headerlink" href="#optimizer-optimization" title="Permalink to this headline"></a></h2>
+<p>Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:
+1.      Operator fusion for the computation in the optimizers.
+2.      SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.</p>
+<p>For more detailed information, check <a class="reference external" href="features/optimizer_fusion.html">Optimizer Fusion</a> and <a class="reference external" href="features/split_sgd.md">Split SGD</a></p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="runtime-extension">
+<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Permalink to this headline"></a></h2>
+<p>Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs for users to get finer-grained control of the thread runtime and provides:</p>
+<ul class="simple">
+<li><p>Multi-stream inference via the Python frontend module MultiStreamModule.</p></li>
+<li><p>Spawn asynchronous tasks from both Python and C++ frontend.</p></li>
+<li><p>Program core bindings for OpenMP threads from both Python and C++ frontend.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Intel® Extension for PyTorch* Runtime extension is still in the experimental stage. The API is subject to change. More detailed descriptions are available in the <a class="reference external" href="api_doc.html">API Documentation</a>.</p>
+</div>
+<p>For more detailed information, check <a class="reference external" href="features/runtime_extension.html">Runtime Extension</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="int8-quantization">
+<h2>INT8 Quantization<a class="headerlink" href="#int8-quantization" title="Permalink to this headline"></a></h2>
+<p>Intel® Extension for PyTorch* has built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.</p>
+<p>Check more detailed information for <a class="reference external" href="features/int8.html">INT8 Quantization</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="Welcome to Intel® Extension for PyTorch* Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="features/isa_dynamic_dispatch.html" class="btn btn-neutral float-right" title="ISA Dynamic Dispatching" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

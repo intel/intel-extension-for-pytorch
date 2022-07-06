@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contribution &mdash; intel_extension_for_pytorch 1.12.0+cpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="License" href="license.html" />
+    <link rel="prev" title="Blogs &amp; Publications" href="blogs_publications.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> intel_extension_for_pytorch
+          </a>
+              <div class="version">
+                <a href="../../versions.html">1.12.0+cpu ▼</a>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Contribution</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#contributing-to-intel-extension-for-pytorch">Contributing to Intel® Extension for PyTorch*</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#developing-intel-extension-for-pytorch">Developing Intel® Extension for PyTorch*</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tips-and-debugging">Tips and Debugging</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#unit-testing">Unit testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#python-unit-testing">Python Unit Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#better-local-unit-tests-with-pytest">Better local unit tests with <code class="docutils literal notranslate"><span class="pre">pytest</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#local-linting">Local linting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#c-unit-testing">C++ Unit Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#writing-documentation">Writing documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#building-documentation">Building documentation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#tips">Tips</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">intel_extension_for_pytorch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Contribution</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/contribution.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="contribution">
+<h1>Contribution<a class="headerlink" href="#contribution" title="Permalink to this headline"></a></h1>
+<section id="contributing-to-intel-extension-for-pytorch">
+<h2>Contributing to Intel® Extension for PyTorch*<a class="headerlink" href="#contributing-to-intel-extension-for-pytorch" title="Permalink to this headline"></a></h2>
+<p>Thank you for your interest in contributing to Intel® Extension for PyTorch*. Before you begin writing code, it is important that you share your intention to contribute with the team, based on the type of contribution:</p>
+<ol class="simple">
+<li><p>You want to propose a new feature and implement it.</p>
+<ul class="simple">
+<li><p>Post about your intended feature in a <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues">GitHub issue</a>, and we shall discuss the design and implementation. Once we agree that the plan looks good, go ahead and implement it.</p></li>
+</ul>
+</li>
+<li><p>You want to implement a feature or bug-fix for an outstanding issue.</p>
+<ul class="simple">
+<li><p>Search for your issue in the <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues">GitHub issue list</a>.</p></li>
+<li><p>Pick an issue and comment that you’d like to work on the feature or bug-fix.</p></li>
+<li><p>If you need more context on a particular issue, ask and we shall provide.</p></li>
+</ul>
+</li>
+</ol>
+<p>Once you implement and test your feature or bug-fix, submit a Pull Request to https://github.com/intel/intel-extension-for-pytorch.</p>
+</section>
+<section id="developing-intel-extension-for-pytorch">
+<h2>Developing Intel® Extension for PyTorch*<a class="headerlink" href="#developing-intel-extension-for-pytorch" title="Permalink to this headline"></a></h2>
+<p>A full set of instructions on installing Intel® Extension for PyTorch* from source is in the <a class="reference external" href="instalation.md#install-via-source-compilation">Installation document</a>.</p>
+<p>To develop on your machine, here are some tips:</p>
+<ol>
+<li><p>Uninstall all existing Intel® Extension for PyTorch* installs. You may need to run <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">uninstall</span> <span class="pre">intel_extension_for_pytorch</span></code> multiple times. You’ll know <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> is fully uninstalled when you see <code class="docutils literal notranslate"><span class="pre">WARNING:</span> <span class="pre">Skipping</span> <span class="pre">intel_extension_for_pytorch</span> <span class="pre">as</span> <span class="pre">it</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">installed</span></code>. (You should only have to <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">uninstall</span></code> a few times, but you can always <code class="docutils literal notranslate"><span class="pre">uninstall</span></code> with <code class="docutils literal notranslate"><span class="pre">timeout</span></code> or in a loop if you’re feeling lazy.)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>yes <span class="p">|</span> pip uninstall intel_extension_for_pytorch
+</pre></div>
+</div>
+</li>
+<li><p>Clone a copy of Intel® Extension for PyTorch* from source:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/intel/intel-extension-for-pytorch.git
+<span class="nb">cd</span> intel-extension-for-pytorch
+</pre></div>
+</div>
+<p>If you already have Intel® Extension for PyTorch* from source, update it:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git pull --rebase
+git submodule sync --recursive
+git submodule update --init --recursive --jobs <span class="m">0</span>
+</pre></div>
+</div>
+<p>If you want to have no-op incremental rebuilds (which are fast), see the section below titled “Make no-op build fast.”</p>
+</li>
+<li><p>Install Intel® Extension for PyTorch* in <code class="docutils literal notranslate"><span class="pre">develop</span></code> mode:</p>
+<p>Replace:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python setup.py install
+</pre></div>
+</div>
+<p>with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python setup.py develop
+</pre></div>
+</div>
+<p>This mode will symlink the Python files from the current local source tree into the Python install. After than, if you modify a Python file, you do not need to reinstall PyTorch again. This is especially useful if you are only changing Python files.</p>
+<p>For example:</p>
+<ul class="simple">
+<li><p>Install local Intel® Extension for PyTorch* in <code class="docutils literal notranslate"><span class="pre">develop</span></code> mode</p></li>
+<li><p>modify your Python file <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/__init__.py</span></code> (for example)</p></li>
+<li><p>test functionality</p></li>
+<li><p>modify your Python file <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/__init__.py</span></code></p></li>
+<li><p>test functionality</p></li>
+<li><p>modify your Python file <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch/__init__.py</span></code></p></li>
+<li><p>test functionality</p></li>
+</ul>
+</li>
+</ol>
+<p>You do not need to repeatedly install after modifying Python files (<code class="docutils literal notranslate"><span class="pre">.py</span></code>). However, you would need to reinstall if you modify a Python interface (<code class="docutils literal notranslate"><span class="pre">.pyi</span></code>, <code class="docutils literal notranslate"><span class="pre">.pyi.in</span></code>) or non-Python files (<code class="docutils literal notranslate"><span class="pre">.cpp</span></code>, <code class="docutils literal notranslate"><span class="pre">.cc</span></code>, <code class="docutils literal notranslate"><span class="pre">.cu</span></code>, <code class="docutils literal notranslate"><span class="pre">.h</span></code>, etc.).</p>
+<p>If you want to reinstall, make sure that you uninstall Intel® Extension for PyTorch* first by running <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">uninstall</span> <span class="pre">intel_extension_for_pytorch</span></code> until you see <code class="docutils literal notranslate"><span class="pre">WARNING:</span> <span class="pre">Skipping</span> <span class="pre">intel_extension_for_pytorch</span> <span class="pre">as</span> <span class="pre">it</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">installed</span></code>; next run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">setup.py</span> <span class="pre">clean</span></code>. After that, you can install in <code class="docutils literal notranslate"><span class="pre">develop</span></code> mode again.</p>
+<section id="tips-and-debugging">
+<h3>Tips and Debugging<a class="headerlink" href="#tips-and-debugging" title="Permalink to this headline"></a></h3>
+<ul>
+<li><p>Cmake must be installed before installing Intel® Extension for PyTorch*. If youre developing on MacOS or Linux, We recommend installing Cmake with <a class="reference external" href="https://brew.sh/">Homebrew</a> with <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">cmake</span></code>.</p></li>
+<li><p>Our <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> requires Python &gt;= 3.6</p></li>
+<li><p>If you run into errors when running <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">setup.py</span> <span class="pre">develop</span></code>, here are some debugging steps:</p>
+<ol>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">printf</span> <span class="pre">'#include</span> <span class="pre">&lt;stdio.h&gt;\nint</span> <span class="pre">main()</span> <span class="pre">{</span> <span class="pre">printf(&quot;Hello</span> <span class="pre">World&quot;);}'|clang</span> <span class="pre">-x</span> <span class="pre">c</span> <span class="pre">-;</span> <span class="pre">./a.out</span></code> to make sure your CMake works and can compile this simple Hello World program without errors.</p></li>
+<li><p>Remove your <code class="docutils literal notranslate"><span class="pre">build</span></code> directory. The <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> script compiles binaries into the <code class="docutils literal notranslate"><span class="pre">build</span></code> folder and caches many details along the way. This saves time the next time you build. If you’re running into issues, you can always <code class="docutils literal notranslate"><span class="pre">rm</span> <span class="pre">-rf</span> <span class="pre">build</span></code> from the toplevel <code class="docutils literal notranslate"><span class="pre">pytorch</span></code> directory and start over.</p></li>
+<li><p>If you have made edits to the Intel® Extension for PyTorch* repo, commit any change you’d like to keep and clean the repo with the following commands (note that clean <em>really</em> removes all untracked files and changes.):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git submodule deinit -f .
+git clean -xdf
+python setup.py clean
+git submodule update --init --recursive --jobs <span class="m">0</span> <span class="c1"># very important to sync the submodules</span>
+python setup.py develop                          <span class="c1"># then try running the command again</span>
+</pre></div>
+</div>
+</li>
+<li><p>The main step within <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">setup.py</span> <span class="pre">develop</span></code> is running <code class="docutils literal notranslate"><span class="pre">make</span></code> from the <code class="docutils literal notranslate"><span class="pre">build</span></code> directory. If you want to experiment with some environment variables, you can pass them into the command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">ENV_KEY1</span><span class="o">=</span>ENV_VAL1<span class="o">[</span>, <span class="nv">ENV_KEY2</span><span class="o">=</span>ENV_VAL2<span class="o">]</span>* python setup.py develop
+</pre></div>
+</div>
+</li>
+</ol>
+</li>
+</ul>
+</section>
+</section>
+<section id="unit-testing">
+<h2>Unit testing<a class="headerlink" href="#unit-testing" title="Permalink to this headline"></a></h2>
+<section id="python-unit-testing">
+<h3>Python Unit Testing<a class="headerlink" href="#python-unit-testing" title="Permalink to this headline"></a></h3>
+<p>All PyTorch test suites are located in the <code class="docutils literal notranslate"><span class="pre">test</span></code> folder and start with <code class="docutils literal notranslate"><span class="pre">test_</span></code>. Run individual test suites using the command <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">test/cpu/FILENAME.py</span></code>, where <code class="docutils literal notranslate"><span class="pre">FILENAME</span></code> represents the file containing the test suite you wish to run.</p>
+<p>For example, to run all the TorchScript JIT tests (located at <code class="docutils literal notranslate"><span class="pre">test/cpu/test_jit.py</span></code>), you would run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python test/cpu/test_jit.py
+</pre></div>
+</div>
+<p>You can narrow down what you’re testing even further by specifying the name of an individual test with <code class="docutils literal notranslate"><span class="pre">TESTCLASSNAME.TESTNAME</span></code>. Here, <code class="docutils literal notranslate"><span class="pre">TESTNAME</span></code> is the name of the test you want to run, and <code class="docutils literal notranslate"><span class="pre">TESTCLASSNAME</span></code> is the name of the class in which it is defined.</p>
+<p>Let’s say you want to run <code class="docutils literal notranslate"><span class="pre">test_Sequential</span></code>, which is defined as part of the <code class="docutils literal notranslate"><span class="pre">TestJit</span></code> class in <code class="docutils literal notranslate"><span class="pre">test/cpu/test_jit.py</span></code>. Your command would be:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python test/test_jit.py TestJit.test_Sequential
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">expecttest</span></code> and <code class="docutils literal notranslate"><span class="pre">hypothesis</span></code> libraries must be installed to run the tests. <code class="docutils literal notranslate"><span class="pre">mypy</span></code> is an optional dependency, and <code class="docutils literal notranslate"><span class="pre">pytest</span></code> may help run tests more selectively. All these packages can be installed with <code class="docutils literal notranslate"><span class="pre">conda</span></code> or <code class="docutils literal notranslate"><span class="pre">pip</span></code>.</p>
+</section>
+<section id="better-local-unit-tests-with-pytest">
+<h3>Better local unit tests with <code class="docutils literal notranslate"><span class="pre">pytest</span></code><a class="headerlink" href="#better-local-unit-tests-with-pytest" title="Permalink to this headline"></a></h3>
+<p>We don’t officially support <code class="docutils literal notranslate"><span class="pre">pytest</span></code>, but it works well with our <code class="docutils literal notranslate"><span class="pre">unittest</span></code> tests and offers a number of useful features for local developing. Install it via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pytest</span></code>.</p>
+<p>If you want to run only tests that contain a specific substring, you can use the <code class="docutils literal notranslate"><span class="pre">-k</span></code> flag:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest test/cpu/test_nn.py -k Loss -v
+</pre></div>
+</div>
+<p>The above is an example of testing a change to all Loss functions: this command runs tests such as <code class="docutils literal notranslate"><span class="pre">TestNN.test_BCELoss</span></code> and <code class="docutils literal notranslate"><span class="pre">TestNN.test_MSELoss</span></code> and can be useful to save keystrokes.</p>
+</section>
+<section id="local-linting">
+<h3>Local linting<a class="headerlink" href="#local-linting" title="Permalink to this headline"></a></h3>
+<p>You can run the same linting steps that are used in CI locally via <code class="docutils literal notranslate"><span class="pre">make</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Lint all files</span>
+make lint -j <span class="m">6</span>  <span class="c1"># run lint (using 6 parallel jobs)</span>
+
+<span class="c1"># Lint only the files you have changed</span>
+make quicklint -j <span class="m">6</span>
+</pre></div>
+</div>
+<p>These jobs may require extra dependencies that aren’t dependencies of Intel® Extension for PyTorch* itself, so you can install them via this command, which you should only have to run once:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make setup_lint
+</pre></div>
+</div>
+<p>To run a specific linting step, use one of these targets or see the Makefile for a complete list of options.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check for tabs, trailing newlines, etc.</span>
+make quick_checks
+
+make flake8
+
+make mypy
+
+make cmakelint
+
+make clang-tidy
+</pre></div>
+</div>
+<p>To run a lint only on changes, add the <code class="docutils literal notranslate"><span class="pre">CHANGED_ONLY</span></code> option:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make &lt;name of lint&gt; <span class="nv">CHANGED_ONLY</span><span class="o">=</span>--changed-only
+</pre></div>
+</div>
+</section>
+<section id="c-unit-testing">
+<h3>C++ Unit Testing<a class="headerlink" href="#c-unit-testing" title="Permalink to this headline"></a></h3>
+<p>Intel® Extension for PyTorch* offers tests located in the <code class="docutils literal notranslate"><span class="pre">test/cpp</span></code> folder. These tests are written in C++ and use the Google Test testing framework. After compiling Intel® Extension for PyTorch* from source, the test runner binaries will be written to the <code class="docutils literal notranslate"><span class="pre">build/bin</span></code> folder. The command to run one of these tests is <code class="docutils literal notranslate"><span class="pre">./build/bin/FILENAME</span> <span class="pre">--gtest_filter=TESTSUITE.TESTNAME</span></code>, where <code class="docutils literal notranslate"><span class="pre">TESTNAME</span></code> is the name of the test you’d like to run and <code class="docutils literal notranslate"><span class="pre">TESTSUITE</span></code> is the suite that test is defined in.</p>
+<p>For example, if you wanted to run the test <code class="docutils literal notranslate"><span class="pre">MayContainAlias</span></code>, which is part of the test suite <code class="docutils literal notranslate"><span class="pre">ContainerAliasingTest</span></code> in the file <code class="docutils literal notranslate"><span class="pre">test/cpp/jit/test_alias_analysis.cpp</span></code>, the command would be:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./build/bin/test_jit --gtest_filter<span class="o">=</span>ContainerAliasingTest.MayContainAlias
+</pre></div>
+</div>
+</section>
+</section>
+<section id="writing-documentation">
+<h2>Writing documentation<a class="headerlink" href="#writing-documentation" title="Permalink to this headline"></a></h2>
+<p>So you want to write some documentation for your code contribution and don’t know where to start?</p>
+<p>Intel® Extension for PyTorch* uses <a class="reference external" href="http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html">Google style</a> for formatting docstrings. Length of line inside docstrings block must be limited to 80 characters to fit into Jupyter documentation popups.</p>
+<section id="building-documentation">
+<h3>Building documentation<a class="headerlink" href="#building-documentation" title="Permalink to this headline"></a></h3>
+<p>To build the documentation:</p>
+<ol>
+<li><p>Build and install Intel® Extension for PyTorch* (as discussed above)</p></li>
+<li><p>Install the prerequisites:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> docs
+pip install -r requirements.txt
+</pre></div>
+</div>
+</li>
+<li><p>Generate the documentation HTML files. The generated files will be in <code class="docutils literal notranslate"><span class="pre">docs/_build/html</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make clean
+make html
+</pre></div>
+</div>
+</li>
+</ol>
+<section id="tips">
+<h4>Tips<a class="headerlink" href="#tips" title="Permalink to this headline"></a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">.rst</span></code> source files live in <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/master/docs/tutorials">docs/tutorials</a>. Some of the <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files pull in docstrings from Intel® Extension for PyTorch* Python code (for example, via the <code class="docutils literal notranslate"><span class="pre">autofunction</span></code> or <code class="docutils literal notranslate"><span class="pre">autoclass</span></code> directives). To shorten doc build times, it is helpful to remove the files you are not working on, only keeping the base <code class="docutils literal notranslate"><span class="pre">index.rst</span></code> file and the files you are editing. The Sphinx build will produce missing file warnings but will still complete.</p>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="blogs_publications.html" class="btn btn-neutral float-left" title="Blogs &amp; Publications" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="license.html" class="btn btn-neutral float-right" title="License" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Intel(R).</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
