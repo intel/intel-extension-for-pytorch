@@ -9,11 +9,11 @@ Highlights include:
 - Automatic INT8 quantization became a stable feature baking into a well-tuned default quantization recipe, supporting both static and dynamic quantization and a wide range of calibration algorithms.
 - Runtime Extension, featured MultiStreamModule, became a stable feature, could further enhance throughput in offline inference scenario.
 - More optimizations in graph and operations to improve performance of broad set of models, examples include but not limited to wave2vec, T5, Albert etc.
-- We provide a pre-built experimental binary with oneDNN Graph Compiler tuned on, which would deliver additional performance gain for Bert, Albert, Roberta in INT8 inference.
+- Pre-built experimental binary with oneDNN Graph Compiler tuned on would deliver additional performance gain for Bert, Albert, Roberta in INT8 inference.
 
 ### Highlights
 
-- Finalize the quantization feature from experimental to golden. We facilitate the user experience to be fully compatible with that of PyTorch. In this release, the extension supports PyTorch calibration algorithm directly and uses `Histogram` for calibration by default. Comparing to the previous version, changes are listed as following. Refer to [tutorial page](features/int8.md) for more details.
+- Matured automatic INT8 quantization feature baking into a well-tuned default quantization recipe. We facilitated the user experience and provided a wide range of calibration algorithms like Histogram, MinMax, MovingAverageMinMax, etc. Meanwhile, We polished the static quantization with better flexibility and enabled dynamic quantization as well. Compared to the previous version, the brief changes are as follows. Refer to [tutorial page](features/int8.md) for more details.
 
   <table align="center">
   <tbody>
@@ -64,7 +64,7 @@ Highlights include:
   </tbody>
   </table>
 
-- Improve runtime performance and user experience. In this release, we enhance the heuristic rule to make the Runtime Extension feature benefit OOB models in most situations. Meanwhile, we also provide `ipex.cpu.runtime.MultiStreamModuleHint` to customize how to distribute input into streams and then concatenate outputs from each steam.
+- Runtime Extension, featured MultiStreamModule, became a stable feature. In this release, we enhanced the heuristic rule to further enhance throughput in offline inference scenario. Meanwhile, we also provide the `ipex.cpu.runtime.MultiStreamModuleHint` to custom how to split the input into streams and concat the output for each steam.
 
   <table align="center">
   <tbody>
@@ -104,7 +104,7 @@ Highlights include:
   </tbody>
   </table>
 
-- Polish `ipex.optimize` to take input shape information. With additional shape information, it is possible to choose the optimal memory layout to improve kernel efficiency.
+- Polished the `ipex.optimize` to accept the input shape information which would conclude the optimal memory layout for better kernel efficiency.
 
   <table align="center">
   <tbody>
@@ -139,19 +139,20 @@ Highlights include:
   </tbody>
   </table>
 
-- Fuse Adam to improve training performance [#822](https://github.com/intel/intel-extension-for-pytorch/commit/d3f714e54dc8946675259ea7a445b26a2460b523)
-- Support Deconv3D to serve most models like xxx and implement most fusions like Conv
-- Enable LSTM to support static and dynamic quantization [#692](https://github.com/intel/intel-extension-for-pytorch/commit/2bf8dba0c380a26bbb385e253adbfaa2a033a785)
-- Enable Linear to support dynamic quantization [#787](https://github.com/intel/intel-extension-for-pytorch/commit/ff231fb55e33c37126a0ef7f0e739cd750d1ef6c)
-- Add more optimizations, including more custom operators and fusions.
-  - Fuse `Add` + `Swish` to accelerate FSI Riskful model [#551](https://github.com/intel/intel-extension-for-pytorch/commit/cc855ff2bafd245413a6111f3d21244d0bcbb6f6)
-  - Fuse `Conv` + `LeakyReLU` [#589](https://github.com/intel/intel-extension-for-pytorch/commit/dc6ed1a5967c644b03874fd1f8a503f0b80be6bd)
-  - Fuse `BMM` + `Add` [#407](https://github.com/intel/intel-extension-for-pytorch/commit/d1379aa565cc84b4a61b537ba2c9a046b7652f1a)
+- Provided more optimizations in graph and operations
+  - Fuse Adam to improve training performance [#822](https://github.com/intel/intel-extension-for-pytorch/commit/d3f714e54dc8946675259ea7a445b26a2460b523)
   - Enable Normalization operators to support channels-last 3D [#642](https://github.com/intel/intel-extension-for-pytorch/commit/ae268ac1760d598a29584de5c99bfba46c6554ae)
-  - Fuse `Concat` + `BN` + `ReLU` [#647](https://github.com/intel/intel-extension-for-pytorch/commit/cad3f82f6b7efed0c08b2f0c11117a4720f58df4)
-  - Optimize `Convolution1D` to support channels last memory layout and fuse `GeLU` as its post operation. [#657](https://github.com/intel/intel-extension-for-pytorch/commit/a0c063bdf4fd1a7e66f8a23750ac0c2fe471a559)
-  - Fuse `Einsum` + `Add` to boost Alphafold2 [#674](https://github.com/intel/intel-extension-for-pytorch/commit/3094f346a67c81ad858ad2a80900fab4c3b4f4e9)
-  - Fuse `Linear` + `Tanh` [#711](https://github.com/intel/intel-extension-for-pytorch/commit/b24cc530b1fd29cb161a76317891e361453333c9)
+  - Support Deconv3D to serve most models and implement most fusions like Conv
+  - Enable LSTM to support static and dynamic quantization [#692](https://github.com/intel/intel-extension-for-pytorch/commit/2bf8dba0c380a26bbb385e253adbfaa2a033a785)
+  - Enable Linear to support dynamic quantization [#787](https://github.com/intel/intel-extension-for-pytorch/commit/ff231fb55e33c37126a0ef7f0e739cd750d1ef6c)
+  - Fusions.
+    - Fuse `Add` + `Swish` to accelerate FSI Riskful model [#551](https://github.com/intel/intel-extension-for-pytorch/commit/cc855ff2bafd245413a6111f3d21244d0bcbb6f6)
+    - Fuse `Conv` + `LeakyReLU` [#589](https://github.com/intel/intel-extension-for-pytorch/commit/dc6ed1a5967c644b03874fd1f8a503f0b80be6bd)
+    - Fuse `BMM` + `Add` [#407](https://github.com/intel/intel-extension-for-pytorch/commit/d1379aa565cc84b4a61b537ba2c9a046b7652f1a)
+    - Fuse `Concat` + `BN` + `ReLU` [#647](https://github.com/intel/intel-extension-for-pytorch/commit/cad3f82f6b7efed0c08b2f0c11117a4720f58df4)
+    - Optimize `Convolution1D` to support channels last memory layout and fuse `GeLU` as its post operation. [#657](https://github.com/intel/intel-extension-for-pytorch/commit/a0c063bdf4fd1a7e66f8a23750ac0c2fe471a559)
+    - Fuse `Einsum` + `Add` to boost Alphafold2 [#674](https://github.com/intel/intel-extension-for-pytorch/commit/3094f346a67c81ad858ad2a80900fab4c3b4f4e9)
+    - Fuse `Linear` + `Tanh` [#711](https://github.com/intel/intel-extension-for-pytorch/commit/b24cc530b1fd29cb161a76317891e361453333c9)
 
 ### Known Issues
 - `RuntimeError: Overflow when unpacking long` when a tensor's min max value exceeds int range while performing int8 calibration. Please customize QConfig to use min-max calibration method.
