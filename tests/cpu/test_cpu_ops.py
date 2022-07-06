@@ -777,25 +777,25 @@ class CPUOPsTester(TestCase):
 
     def test_index_select(self):
         for dim in [0, 1]:
-            x = torch.randn(10, 2)
-            indices = torch.tensor([1])
-            y = x.index_select(dim, indices)
+            for index_datatype in [torch.int32, torch.int64]:
+                indices = torch.tensor([1], dtype=index_datatype)
 
-            # test bfloat16
-            x2 = x.clone().detach().bfloat16()
-            y2 = x2.index_select(dim, indices)
-            self.assertTrue(y2.dtype == torch.bfloat16)
-            self.assertEqual(y2, y, prec=0.1)
+                # test floating types
+                for datatype in [torch.float32, torch.bfloat16, torch.double, torch.float16, torch.complex64, torch.complex128]:
+                    x1 = torch.randn((10, 2), dtype=datatype)
+                    y1 = x1.index_select(dim, indices)
+                    self.assertTrue(y1.dtype == datatype)
 
-            # test int32
-            x3 = torch.randint(10, (10, 10), dtype=torch.int32)
-            y3 = x3.index_select(dim, indices)
-            self.assertTrue(y3.dtype == torch.int32)
+                # test integer types
+                for datatype in [torch.int32, torch.int64, torch.int16, torch.int8, torch.uint8]:
+                    x2 = torch.randint(10, (10, 10), dtype=datatype)
+                    y2 = x2.index_select(dim, indices)
+                    self.assertTrue(y2.dtype == datatype)
 
-            # test complex
-            x4 = torch.randn(10, 10, dtype=torch.complex64)
-            y4 = x4.index_select(dim, indices)
-            self.assertTrue(y4.dtype == torch.complex64)
+                # test bool
+                x3 = torch.randint(1, (10, 10), dtype=torch.bool)
+                y3 = x3.index_select(dim, indices)
+                self.assertTrue(y3.dtype == torch.bool)
 
     def test_cat(self):
         for dim, size in itertools.product([0, 1], [[2, 1], [2, 2], [5, 10]]):
@@ -803,10 +803,16 @@ class CPUOPsTester(TestCase):
             y = torch.cat([x, x], dim)
 
             # test bfloat16
-            x2 = x.clone().detach().bfloat16()
+            x1 = x.clone().detach().bfloat16()
+            y1 = torch.cat([x1, x1], dim)
+            self.assertTrue(y1.dtype == torch.bfloat16)
+            self.assertEqual(y1, y, prec=0.1)
+
+            # test double
+            x2 = x.clone().detach().double()
             y2 = torch.cat([x2, x2], dim)
-            self.assertTrue(y2.dtype == torch.bfloat16)
-            self.assertEqual(y2, y, prec=0.1)
+            self.assertTrue(y2.dtype == torch.double)
+            self.assertEqual(y2, y)
 
         # long input tensor list
         x3 = torch.randn(2, 2)
