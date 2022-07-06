@@ -46,7 +46,7 @@ user_model.eval()
 example_inputs = ..
 prepared_model = prepare(user_model, qconfig, example_inputs=example_inputs, inplace=False)
 
-for data in calibration_data_set:
+for x in calibration_data_set:
     prepared_model(x)
 
 # Optional, if you want to tuning(performance or accuracy), you can save the qparams as json file which
@@ -66,8 +66,8 @@ convert_model = convert(prepared_model)
 with torch.no_grad():
     traced_model = torch.jit.trace(convert_model, example_input)
     traced_model = torch.jit.freeze(traced_model)
-# for inference 
-y = traced_model(x)
+    # for inference 
+    y = traced_model(x)
 
 # or save the model to deploy
 
@@ -121,6 +121,7 @@ prepared_model = prepare(user_model, dynamic_qconfig, example_inputs=example_inp
 ```python
 # make sure the example_inputs's size is same as the real input's size
 convert_model = convert(prepared_model)
+
 # Optional: convert the model to traced model
 #with torch.no_grad():
 #    traced_model = torch.jit.trace(convert_model, example_input)

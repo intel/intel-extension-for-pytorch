@@ -20,13 +20,13 @@ python -m pip install intel_extension_for_pytorch -f https://software.intel.com/
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
 
-More installation methods can be found at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/1.11.200/tutorials/installation.html)
+More installation methods can be found at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/1.12.0/tutorials/installation.html)
 
 ## Getting Started
 
 Minor code changes are required for users to get start with Intel® Extension for PyTorch\*. Both PyTorch imperative mode and TorchScript mode are supported. You just need to import Intel® Extension for PyTorch\* package and apply its optimize function against the model object. If it is a training workload, the optimize function also needs to be applied against the optimizer object.
 
-The following code snippet shows an inference code with FP32 data type. More examples, including training and C++ examples, are available at [Example page](https://intel.github.io/intel-extension-for-pytorch/1.11.200/tutorials/examples.html).
+The following code snippet shows an inference code with FP32 data type. More examples, including training and C++ examples, are available at [Example page](https://intel.github.io/intel-extension-for-pytorch/1.12.0/tutorials/examples.html).
 
 ```python
 import torch
@@ -47,7 +47,7 @@ with torch.no_grad():
 
 ## Model Zoo
 
-Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.11-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r1.11-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
+Use cases that had already been optimized by Intel engineers are available at [Model Zoo for Intel® Architecture](https://github.com/IntelAI/models/tree/pytorch-r1.12-models). A bunch of PyTorch use cases for benchmarking are also available on the [Github page](https://github.com/IntelAI/models/tree/pytorch-r1.12-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-box by simply running scipts in the Model Zoo.
 
 ## License
 

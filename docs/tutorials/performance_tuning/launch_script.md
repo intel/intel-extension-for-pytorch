@@ -3,12 +3,12 @@ Launch Script Usage Guide
 
 ## Overview
 
-As introduced in [Performance Tuning Guide](tuning_guide.md), there are several factors that influence performance very much. Setting those configurations properly contributes to performance boost. However, there is no unified configuration that is optimal to all topologies. Users need to try different combinations by themselves. A *launch* script is provided to automate these configuration settings to free users from this complicated work. This guide helps you to learn some most frequent usage examples. They covers optimized configurations in most cases.
+As introduced in the [Performance Tuning Guide](tuning_guide.md), there are several factors that influence performance. Setting configuration options properly contributes to a performance boost. However, there is no unified configuration that is optimal to all topologies. Users need to try different combinations by themselves. A *launch* script is provided to automate these configuration settings to free users from this complicated work. This guide helps you to learn some common usage examples that cover many optimized configuration cases.
 
-The configurations are mainly around the following perspectives. Italic values are default if applicable.
-1. OpenMP library: [*Intel OpenMP library* | GNU OpenMP library]
-2. Memory allocator: [PyTorch default memory allocator | Jemalloc | *TCMalloc*]
-3. Number of instances: [*Single instance* | Multiple instances]
+The configurations are mainly around the following perspectives.
+1. OpenMP library: [**Intel OpenMP library** (default) | GNU OpenMP library]
+2. Memory allocator: [PyTorch default memory allocator | Jemalloc | **TCMalloc** (default)]
+3. Number of instances: [**Single instance** (default) | Multiple instances]
 
 ## Usage of launch script
 
@@ -17,7 +17,7 @@ The *launch* script is provided as a module of *intel_extension_for_pytorch*. Yo
 python -m intel_extension_for_pytorch.cpu.launch [knobs] <your_pytorch_script> [args]
 ```
 
-Available knobs are listed below:
+Available option settings (knobs) are listed below:
 
 | knob | type | default value | help |
 | :-- | :--: | :--: | :-- |
@@ -43,13 +43,15 @@ Available knobs are listed below:
 
 **Note:** ```--latency_mode``` and ```--throughput_mode``` are exclusive knobs to ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core```. I.e., setting either of ```--latency_mode``` or ```--throughput_mode``` overwrites settings of ```--ninstances```, ```--ncore_per_instance```, ```--node_id``` and ```--use_logical_core``` if they are explicitly set in command line. ```--latency_mode``` and ```--throughput_mode``` are mutually exclusive.
 
-```--skip_cross_node_cores``` is exclusive knob to ```--ninstances```. I.e., setting ```--skip_cross_node_cores``` overwrites setting of ```--ninstances``` if it is explicitly set in command line. 
+```--skip_cross_node_cores``` is exclusive knob to ```--ninstances```. Setting ```--skip_cross_node_cores``` overwrites setting of ```--ninstances``` if it is explicitly set on the command line.
 
-The *launch* script respects existing environment variables when it get launched, expect for *LD_PRELOAD*. If you have your favorite values for certain environment variables, you can set them before running the *launch* script. A typical usage scenario is as the following. Intel OpenMP library uses an environment variable *KMP_AFFINITY* to control its behavior. Different settings result in different performance numbers. By default, if you enable Intel OpenMP library, the *launch* script will set *KMP_AFFINITY* to "granularity=fine,compact,1,0". If you want to try with other values, you can use *export* command on Linux to set *KMP_AFFINITY* before you run the *launch* script. In this case, the script will not set the default value but take the existing value of *KMP_AFFINITY*, and print a message to stdout.
+The *launch* script respects existing environment variables when it get launched, except for *LD_PRELOAD*. If you have your favorite values for certain environment variables, you can set them before running the *launch* script. Intel OpenMP library uses an environment variable *KMP_AFFINITY* to control its behavior. Different settings result in different performance numbers. By default, if you enable Intel OpenMP library, the *launch* script will set *KMP_AFFINITY* to "granularity=fine,compact,1,0". If you want to try with other values, you can use *export* command on Linux to set *KMP_AFFINITY* before you run the *launch* script. In this case, the script will not set the default value but take the existing value of *KMP_AFFINITY*, and print a message to stdout.
 
-Execution via the *launch* script can dump logs into files under a designated log directory so that it will be convenient to do some investigations afterward. By default, it is disabled to avoid undesired log files. You can enable logging by setting knob ```--log_path``` to be 1 directory to save log files. It can be absolute path or relative path. 2 types of files will be generated. One file (```<prefix>_timestamp_instances.log```) contains command and information when the script was launched. Another type of files (```<prefix>_timestamp_instance_N_core#-core#....log```) contain stdout print of each instance.
+Execution via the *launch* script can dump logs into files under a designated log directory so you can do some investigations afterward. By default, it is disabled to avoid undesired log files. You can enable logging by setting knob ```--log_path``` to be:
+* directory to save log files. It can be an absolute path or relative path.
+* types of log files to generate. One file (```<prefix>_timestamp_instances.log```) contains command and information when the script was launched. Another type of file (```<prefix>_timestamp_instance_N_core#-core#....log```) contain stdout print of each instance.
 
-E.g.
+For example:
 ```
 run_20210712212258_instances.log
 run_20210712212258_instance_0_cores_0-43.log
@@ -77,7 +79,7 @@ Example script [resnet50.py](../examples/resnet50.py) will be used in this guide
   - [Intel OpenMP library](#intel-openmp-library)
   - [GNU OpenMP library](#gnu-openmp-library)
 
-__Note:__ GIF files below intend to show CPU usage ONLY. Please do NOT induct performance numbers.
+__Note:__ GIF files below illustrate CPU usage ONLY. Do NOT infer performance numbers.
 
 ### Single instance for inference
 
@@ -165,7 +167,7 @@ If you check your log directory, you will find directory structure as below.
 └── logs
     ├── run_20210712214504_instances.log
     └── run_20210712214504_instance_0_cores_22-43.log
-    
+
 ```
 
 The ```run_20210712214504_instances.log``` contains information and command that were used for this execution launch.
@@ -338,9 +340,9 @@ $ cat logs/run_20210712221305_instances.log
 2021-07-12 22:13:05,476 - __main__ - INFO - numactl -C 22-32 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_2_cores_22-32.log
 2021-07-12 22:13:05,479 - __main__ - INFO - numactl -C 33-43 -m 1 <VIRTUAL_ENV>/bin/python resnet50.py 2>&1 | tee ./logs/run_20210712221305_instance_3_cores_33-43.log
 ```
-#### VIII. Your designated number of instances and instance index 
+#### VIII. Your designated number of instances and instance index
 
-Launcher by default runs all `ninstances` for multi-instance inference/training as shown above. You can specify `instance_idx` to independely run that instance only among `ninstances`
+Launcher by default runs all `ninstances` for multi-instance inference/training as shown above. You can specify `instance_idx` to independently run that instance only among `ninstances`
 
 ```
 python -m intel_extension_for_pytorch.cpu.launch --ninstances 4 --instance_idx 0 --log_path ./logs resnet50.py
