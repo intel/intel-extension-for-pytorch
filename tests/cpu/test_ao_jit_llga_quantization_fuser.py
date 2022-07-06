@@ -481,6 +481,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
                 self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
                 self.eltwise = eltwise_fn
                 self.adaptive_avg_pool_2d = nn.AdaptiveAvgPool2d((5, 7))
 
@@ -489,23 +491,28 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.eltwise(x)
                 x = self.conv2(x)
                 x = self.eltwise(x)
+                y = self.conv3(y)
+                y = self.eltwise(y)
+                y = self.conv4(y)
+                y = self.eltwise(y)
                 x = torch.add(x, y)
                 x = self.adaptive_avg_pool_2d(x)
                 return x
 
-                eltwise_fn_name = 'relu'
-                eltwise_fn = get_eltwise_fn(eltwise_fn_name)
+        eltwise_fn_name = 'relu'
+        eltwise_fn = get_eltwise_fn(eltwise_fn_name)
 
-                m = M(eltwise_fn)
-                x = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
-                y = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
-                for qconfig in static_qconfig:
-                # Simply test if the output is accurate
-                # The output of the second partition is input to adaptive_avg_pool2d, which is
-                # unsupported by LLGA. In resnext101 32x16d, we encountered an accuracy issue
-                    graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1,
-                                                    qconfig=qconfig)
-                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        m = M(eltwise_fn)
+        x = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
+        y = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
+        for qconfig in static_qconfig:
+            # The output of the fourth partition is input to adaptive_avg_pool2d, which is
+            # unsupported by LLGA. In resnext101 32x16d, we had encountered an accuracy issue.
+            # The UT checks that the input to adaptive_avg_pool_2d has not been wrapped by
+            # LlgaTensorImpl (assertEqual would fail in that case).
+            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1,
+                                            qconfig=qconfig)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
 
 
     def test_conv2d_bn(self):

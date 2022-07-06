@@ -529,6 +529,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
                 self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
+                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
                 self.eltwise = eltwise_fn
                 self.adaptive_avg_pool_2d = nn.AdaptiveAvgPool2d((5, 7))
 
@@ -537,6 +539,10 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.eltwise(x)
                 x = self.conv2(x)
                 x = self.eltwise(x)
+                y = self.conv3(y)
+                y = self.eltwise(y)
+                y = self.conv4(y)
+                y = self.eltwise(y)
                 x = torch.add(x, y)
                 x = self.adaptive_avg_pool_2d(x)
                 return x
@@ -549,10 +555,12 @@ class TestFusionPattern(JitLlgaTestCase):
             x = torch.rand(1, 32, 28, 28, dtype=data_type).to(memory_format=torch.channels_last)
             y = torch.rand(1, 32, 28, 28, dtype=data_type).to(memory_format=torch.channels_last)
             # Simply test if the output is accurate
-            # The output of the second partition is input to adaptive_avg_pool2d, which is
-            # unsupported by LLGA. In resnext101 32x16d, we encountered an accuracy issue.
+            # The output of the fourth partition is input to adaptive_avg_pool2d, which is
+            # unsupported by LLGA. In resnext101 32x16d, we had encountered an accuracy issue.
+            # The UT checks that the input to adaptive_avg_pool_2d has not been wrapped by
+            # LlgaTensorImpl (assertEqual would fail in that case).
             graph, _ = self.checkTrace(m, [x, y])
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
 
     @llga_fp32_bf16_test_env
     def test_conv2d_bn(self):
