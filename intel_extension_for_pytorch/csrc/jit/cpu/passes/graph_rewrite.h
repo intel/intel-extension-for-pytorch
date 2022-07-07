@@ -60,6 +60,7 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
 void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph);
+void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite

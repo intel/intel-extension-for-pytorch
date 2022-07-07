@@ -17,7 +17,7 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
     for (Block* block : n->blocks()) {
       insertPrePackedConvTransposeOpForATen(block);
     }
-    // TODO: add conv_transpose3d
+    // TODO: add conv_transpose1d
     if (n->kind() == aten::conv_transpose2d ||
         n->kind() == aten::conv_transpose3d) {
       WithInsertPoint guard(n);
@@ -270,6 +270,54 @@ void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
     }
   }
   rewriter_swish.runOnGraph(graph);
+}
+
+void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph) {
+  SubgraphRewriter rewriter_add_accumu_on_the_right,
+      rewriter_add_accumu_on_the_left;
+  // TODO: add_
+  std::array<std::string, 2> add_operators = {"add", "add_"};
+
+  // ConvTranspose  accumu
+  //       \        /
+  //          add
+  // output = ConvTranspose + alpha * accumu
+  auto conv_transpose_add_accumu_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %x = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = aten::${add}(%x, %accumu, %alpha)
+        return (%res))");
+
+  //  accumu     ConvTranspose
+  //   \        /
+  //       add
+  // output = accumu + alpha * ConvTranspose, alpha need to be one or none.
+  auto conv_transpose_add_accumu_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %x = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = aten::${add}(%accumu, %x, %alpha)
+        return (%res))");
+
+  std::string conv_transpose_add_fused = R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %res = ipex_prepack::conv_transpose_add_run(%input, %accumu, %alpha, %packed_weight)
+        return (%res))";
+
+  for (const auto& add : add_operators) {
+    TemplateEnv env;
+    env.s("add", add);
+    rewriter_add_accumu_on_the_right.RegisterRewritePattern(
+        conv_transpose_add_accumu_on_the_right_rstring.format(env),
+        conv_transpose_add_fused);
+    rewriter_add_accumu_on_the_left.RegisterRewritePattern(
+        conv_transpose_add_accumu_on_the_left_rstring.format(env),
+        conv_transpose_add_fused);
+  }
+
+  rewriter_add_accumu_on_the_right.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_right);
+  rewriter_add_accumu_on_the_left.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_left);
 }
 
 } // namespace graph_rewrite

@@ -217,6 +217,14 @@ at::Tensor IpexConvTransposeOpContext::run(
   return torch_ipex::cpu::detail::conv_transpose::run(op_context_, input, attr);
 }
 
+at::Tensor& IpexConvTransposeOpContext::run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const ideep::attr_t& attr) {
+  return torch_ipex::cpu::detail::conv_transpose::run(
+      op_context_, input, accumu, attr);
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexConvTransposeOpContext::
     run_backward(
         const at::Tensor& input,

@@ -298,6 +298,10 @@ class ConvTransposeOpContext : public torch::jit::CustomClassHolder {
   virtual at::Tensor run(
       const at::Tensor& input,
       const ideep::attr_t& attr) = 0;
+  virtual at::Tensor& run(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const ideep::attr_t& attr) = 0;
 
   // Runing backward for conv_transpose by given grad_output, input and
   // grad_masks. Will using the mkldnn_weight stored in the context
@@ -347,6 +351,11 @@ class IpexConvTransposeOpContext final : public ConvTransposeOpContext {
 
   virtual at::Tensor run(const at::Tensor& input, const ideep::attr_t& attr)
       override;
+
+  virtual at::Tensor& run(
+      const at::Tensor& input,
+      at::Tensor& accumu,
+      const ideep::attr_t& attr) override;
 
   virtual std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
       const at::Tensor& input,

@@ -278,7 +278,8 @@ void fuseConvWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
+  SubgraphRewriter rewriter_add_accumu_on_the_right,
+      rewriter_add_accumu_on_the_left, rewriter_add_relu;
   std::array<std::string, 2> add_operators = {"add", "add_"};
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
@@ -286,7 +287,7 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
   //   \   /
   //    add
   // output = conv_output + alpha*Y
-  auto conv_add_rstring_v1 = CodeTemplate(R"(
+  auto conv_add_accumu_on_the_right_rstring = CodeTemplate(R"(
     graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last, %input_size:int[]):
         %packed_weight = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups, %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
@@ -296,7 +297,7 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
   //   \   /
   //    add
   // output = Y + alpha*conv_output, alpha need to one or none.
-  auto conv_add_rstring_v2 = CodeTemplate(R"(
+  auto conv_add_accumu_on_the_left_rstring = CodeTemplate(R"(
     graph(%input, %weight, %bias, %accumu, %alpha, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %weight_is_channels_last:bool, %input_size:int[]):
         %packed_weight = ipex_prepack::convolution_prepack(%weight, %bias, %stride, %padding, %dilation, %groups,  %weight_is_channels_last, %input_size)
         %x = ipex_prepack::convolution_run(%input, %packed_weight)
@@ -323,10 +324,10 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
   for (const auto& add : add_operators) {
     TemplateEnv env;
     env.s("add", add);
-    rewriter_add_v1.RegisterRewritePattern(
-        conv_add_rstring_v1.format(env), conv_add_fused);
-    rewriter_add_v2.RegisterRewritePattern(
-        conv_add_rstring_v2.format(env), conv_add_fused);
+    rewriter_add_accumu_on_the_right.RegisterRewritePattern(
+        conv_add_accumu_on_the_right_rstring.format(env), conv_add_fused);
+    rewriter_add_accumu_on_the_left.RegisterRewritePattern(
+        conv_add_accumu_on_the_left_rstring.format(env), conv_add_fused);
   }
 
   // fused_conv_add+relu
@@ -337,8 +338,10 @@ void fuseConvAddRelu(std::shared_ptr<Graph>& graph) {
         conv_add_relu_rstring.format(env), conv_add_relu_fused);
   }
 
-  rewriter_add_v1.runOnGraph(graph, fuse_add_filter_v1);
-  rewriter_add_v2.runOnGraph(graph, fuse_add_filter_v2);
+  rewriter_add_accumu_on_the_right.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_right);
+  rewriter_add_accumu_on_the_left.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_left);
   rewriter_add_relu.runOnGraph(graph);
 }
 

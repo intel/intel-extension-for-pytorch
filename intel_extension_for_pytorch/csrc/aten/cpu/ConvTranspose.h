@@ -21,6 +21,19 @@ at::Tensor conv_transpose_kernel_impl(
     at::IntArrayRef origin_weight_dims,
     const ideep::attr_t& attr);
 
+void conv_transpose_out_kernel_impl(
+    const at::Tensor& input,
+    const ideep::tensor& w,
+    const c10::optional<at::Tensor>& bias_opt,
+    at::Tensor& output,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    at::IntArrayRef origin_weight_dims,
+    const ideep::attr_t& attr);
+
 at::Tensor conv_transpose(
     const at::Tensor& input,
     const at::Tensor& weight,
