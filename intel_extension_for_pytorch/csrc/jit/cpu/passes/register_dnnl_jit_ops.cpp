@@ -605,6 +605,26 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_add_relu_run(Tensor input, Tensor(a!) accumu, *, "
+        "Scalar? alpha, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto output = (std::move(peek(stack, 1, 4))).toTensor();
+            auto result = linear_add_relu_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                output,
+                (std::move(peek(stack, 2, 4))).toOptional<at::Scalar>(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 
     // ConvTranspose fusion run OP
     CreateConvTransposeUnaryPostOpRun(run),
