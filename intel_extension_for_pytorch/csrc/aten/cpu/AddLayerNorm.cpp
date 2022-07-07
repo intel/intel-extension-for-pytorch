@@ -48,12 +48,9 @@ at::Tensor dil_add_layernorm(
       break;
     }
   }
-  // Only support 64byte aligned
-  bool aligned_64_bytes = a.size(a.ndimension() - 1) % 16 == 0 &&
-      b.size(b.ndimension() - 1) % 16 == 0;
   // Only support contiguous tensor
   bool is_contiguous = a.is_contiguous() && b.is_contiguous();
-  if (no_broadcast && aligned_64_bytes && is_contiguous && alpha == 1.0f) {
+  if (no_broadcast && is_contiguous && alpha == 1.0f) {
     return AddLayerNorm(
         a, b, alpha, normalized_shape, weight_opt, bias_opt, eps);
   } else {

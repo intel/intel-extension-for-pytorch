@@ -385,14 +385,6 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
           return false;
         }
 
-        // Only support 64byte aligned
-        auto qk_tensor = *qk_value;
-        bool aligned_64_bytes =
-            qk_tensor.sizes()[qk_value->dim().value() - 1].value() % 16 == 0;
-        if (!aligned_64_bytes) {
-          return false;
-        }
-
         // Only support when expand from the mid dims shape (bs :: seq_length)
         auto mask_reshape_node = mask_node->input(1)->node();
         for (int i = 1; i < qk_value->dim().value() - 1; i++) {

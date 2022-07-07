@@ -18,7 +18,6 @@ using namespace torch_ipex::cpu::kernel;
  * There are some assumptions for this operator.
  * - The reduce dimension for softmax is the last dimension
  * - The reduce dimension for softmax is the leading dimension
- * - The elements number of the reduce dimension for softmax is n*16
  * - The input tensors are contiguous
  * - The number of the input tensor dimension should be >=2
  * - The mask b can be expand_as a with the mask_reshape (bs :: seq_length),

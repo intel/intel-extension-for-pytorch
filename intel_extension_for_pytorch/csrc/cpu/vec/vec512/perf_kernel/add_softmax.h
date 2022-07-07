@@ -98,7 +98,7 @@ inline void _dil_div_add_reduce_max_fusion_kernel(
     vec_b = _loadu(b + i);
     vec_out = _mm512_fmadd_ps(vec_a, vec_r_dim_per_head, vec_b);
     vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
-    _mm512_store_ps(out + i, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
   }
 
   if (i < size) {
@@ -107,7 +107,7 @@ inline void _dil_div_add_reduce_max_fusion_kernel(
     vec_b = _maskz_loadu(b + i, mask);
     vec_out = _mm512_fmadd_ps(vec_a, vec_r_dim_per_head, vec_b);
     vec_ps_min = _mm512_mask_max_ps(vec_ps_min, mask, vec_out, vec_ps_min);
-    _mm512_mask_store_ps(out + i, mask, vec_out);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
   }
 
   // NOTE: _mm512_reduce_max_ps is sequence instruction
@@ -134,22 +134,22 @@ inline void _dil_maskedfill_div_max_fusion_kernel(
 
   int i = 0;
   for (; i <= size - 16; i += 16) {
-    vec_a = _load_f32_data(a + i);
-    vec_b = _load_f32_data(b + i);
+    vec_a = _loadu(a + i);
+    vec_b = _loadu(b + i);
     __mmask16 fill_mask = _mm512_cmp_ps_mask(vec_b, mask_c, 12);
     vec_out = _mm512_mask_div_ps(vec_fill, fill_mask, vec_a, vec_dim_per_head);
     vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
-    _mm512_store_ps(out + i, vec_out);
+    _mm512_storeu_ps(out + i, vec_out);
   }
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
-    vec_a = _maskz_load_f32_data(a + i, mask);
-    vec_b = _maskz_load_f32_data(b + i, mask);
+    vec_a = _maskz_loadu(a + i, mask);
+    vec_b = _maskz_loadu(b + i, mask);
     __mmask16 fill_mask = _mm512_cmp_ps_mask(vec_b, mask_c, 12);
     vec_out = _mm512_mask_div_ps(vec_fill, fill_mask, vec_a, vec_dim_per_head);
     vec_ps_min = _mm512_max_ps(vec_ps_min, vec_out);
-    _mm512_mask_store_ps(out + i, mask, vec_out);
+    _mm512_mask_storeu_ps(out + i, mask, vec_out);
   }
 
   // NOTE: _mm512_reduce_max_ps is sequence instruction
