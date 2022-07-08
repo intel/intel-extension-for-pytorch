@@ -29,8 +29,6 @@ bool any_variable_defined(const variable_list& variables) {
 }
 
 variable_list BmmBackward0::apply(variable_list&& grads) {
-  bool useOneDNN =
-      (torch_ipex::getFP32MathModeCpu() == torch_ipex::FP32MathMode::BF32);
   std::lock_guard<std::mutex> lock(mutex_);
 
   IndexRangeGenerator gen;
@@ -44,24 +42,16 @@ variable_list BmmBackward0::apply(variable_list&& grads) {
   if (should_compute_output({mat2_ix})) {
     at::Tensor grad_result = Tensor();
     if (any_grad_defined) {
-      if (useOneDNN) {
-        grad_result =
-            torch_ipex::cpu::matmul_onednn(self.transpose(1, 2).conj(), grad);
-      } else {
-        grad_result = self.transpose(1, 2).conj().bmm(grad);
-      }
+      grad_result =
+          torch_ipex::cpu::matmul_onednn(self.transpose(1, 2).conj(), grad);
     }
     copy_range(grad_inputs, mat2_ix, grad_result);
   }
   if (should_compute_output({self_ix})) {
     at::Tensor grad_result = Tensor();
     if (any_grad_defined) {
-      if (useOneDNN) {
-        grad_result =
-            torch_ipex::cpu::matmul_onednn(grad, mat2.transpose(1, 2).conj());
-      } else {
-        grad_result = grad.bmm(mat2.transpose(1, 2).conj());
-      }
+      grad_result =
+          torch_ipex::cpu::matmul_onednn(grad, mat2.transpose(1, 2).conj());
     }
     copy_range(grad_inputs, self_ix, grad_result);
   }

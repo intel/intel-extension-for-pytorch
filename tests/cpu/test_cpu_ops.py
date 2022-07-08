@@ -6,6 +6,7 @@ import random
 import itertools
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+import torch.autograd.functional as autogradF
 
 try:
     import torchvision
@@ -590,11 +591,7 @@ class CPUOPsTester(TestCase):
             self.assertEqual(m.bias.grad, m_dtype.bias.grad)
 
     def test_avg_pool2d(self):
-        models = [nn.AvgPool2d((3, 2), stride=(2, 1)), nn.AvgPool2d((2, 2), stride=(1, 4), ceil_mode=True, padding=(-2, -2))]
-        inputs = [torch.randn(20, 16, 50, 32), torch.randn(3, 16, 16, 8)]
-        for i in range(len(models)):
-            m = models[i]
-            x = inputs[i]
+        def helper(self, m, x):
             x1 = x.clone().detach().requires_grad_()
             y1 = m(x1)
             y1.backward(y1.data)
@@ -608,31 +605,36 @@ class CPUOPsTester(TestCase):
             self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
             self.assertEqual(x1.grad, x2.grad)
 
-            # test bfloat16
-            x3 = x.clone().detach().bfloat16().requires_grad_()
-            y3 = m(x3)
-            y3.backward(y3.data)
-            self.assertTrue(y3.dtype == torch.bfloat16)
-            self.assertEqual(y1, y3, prec=0.01)
-            self.assertTrue(x3.grad.dtype == torch.bfloat16)
-            self.assertEqual(x1.grad, x3.grad, prec=0.01)
-
-            # test autocast
-            with torch.cpu.amp.autocast():
-                for datatype in (torch.bfloat16, torch.float32):
-                    x4 = x.clone().detach().to(datatype).requires_grad_()
-                    y4 = m(x4)
+            for dtype in [torch.bfloat16, torch.double, torch.int64]:
+                x3 = x.clone().detach().to(dtype)
+                x4 = x.clone().detach().to(dtype).to(memory_format=torch.channels_last)
+                if dtype != torch.int64:
+                    x3 = x3.requires_grad_()
+                    x4 = x4.requires_grad_()
+                y3 = m(x3)
+                y4 = m(x4)
+                self.assertTrue(y3.dtype == dtype)
+                self.assertTrue(y4.dtype == dtype)
+                self.assertEqual(y3, y4)
+                self.assertTrue(y4.is_contiguous(memory_format=torch.channels_last))
+                if dtype != torch.int64:
+                    y3.backward(y3.data)
+                    self.assertTrue(x3.grad.dtype == dtype)
+                    if dtype == torch.bfloat16:
+                        self.assertEqual(y1, y3, prec=0.01)
+                        self.assertEqual(x1.grad, x3.grad, prec=0.01)
+                if dtype != torch.int64:
                     y4.backward(y4.data)
-                    self.assertTrue(y4.dtype == datatype)
-                    self.assertTrue(x4.grad.dtype == datatype)
+                    self.assertEqual(x3.grad, x4.grad)
+                    self.assertTrue(x4.grad.dtype == dtype)
+                    self.assertTrue(x4.grad.is_contiguous(memory_format=torch.channels_last))
 
-                    x5 = x.clone().detach().to(datatype).to(memory_format=torch.channels_last).requires_grad_()
-                    y5 = m(x5)
-                    y5.backward(y5.data)
-                    self.assertTrue(y5.dtype == datatype)
-                    self.assertTrue(x5.grad.dtype == datatype)
-                    self.assertTrue(y5.is_contiguous(memory_format=torch.channels_last))
-                    self.assertTrue(x5.grad.is_contiguous(memory_format=torch.channels_last))
+        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1)), torch.randn(20, 16, 50, 32))
+        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1)), torch.randn(10, 8, 25, 16))
+        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=False), torch.randn(20, 16, 50, 32))
+        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100), torch.randn(20, 16, 50, 32))
+        helper(self, nn.AvgPool2d((3, 2), stride=(2, 1), count_include_pad=True, divisor_override=100), torch.randn(10, 8, 25, 16))
+        helper(self, nn.AvgPool2d((2, 2), stride=(1, 4), ceil_mode=True, padding=(-2, -2)), torch.randn(3, 16, 16, 8))
 
     # Keep this UT temporarily to make sure the OP behavior in PyTorch is as expected.
     def test_adaptive_max_pool2d(self):
@@ -684,31 +686,55 @@ class CPUOPsTester(TestCase):
             input = input.contiguous(memory_format=torch.channels_last_3d)
             if not contig:
                 input = input[:, ::2, :, :, :]
-            input.requires_grad_(True)
             pool = torch.nn.AvgPool3d(kernel_size=kernel_size, count_include_pad=count_include_pad,
                                       divisor_override=divisor_override)
-
-            ref_input = input.detach().clone().contiguous().requires_grad_(True)
-            ref_pool = torch.nn.AvgPool3d(kernel_size=kernel_size, count_include_pad=count_include_pad,
-                                          divisor_override=divisor_override)
+            ref_input = input.detach().clone().contiguous()
+            if dtype != torch.int64:
+                input = input.requires_grad_()
+                ref_input = ref_input.requires_grad_()
 
             out = pool(input)
-            out.backward(out.data)
-            ref_out = ref_pool(ref_input)
-            ref_out.backward(ref_out.data)
+            ref_out = pool(ref_input)
 
             self.assertTrue(out.is_contiguous(memory_format=torch.channels_last_3d))
             self.assertTrue(ref_out.is_contiguous())
-            self.assertEqual(out, ref_out)
-            self.assertEqual(input.grad, ref_input.grad)
 
-        for dtype in [torch.float32, torch.double]:
+            if dtype != torch.int64:
+                out.backward(out.data)
+                ref_out.backward(ref_out.data)
+                self.assertEqual(out, ref_out)
+                self.assertEqual(input.grad, ref_input.grad)
+
+        for dtype in [torch.int64, torch.float32, torch.double]:
             for contig in [True, False]:
                 for count_include_pad in [True, False]:
                     helper(4, 8, 10, 10, 10, (3, 2, 3), dtype, contig, count_include_pad=count_include_pad)
                     helper(4, 8, 18, 9, 14, (2, 3, 2), dtype, contig, count_include_pad=count_include_pad)
                     helper(4, 8, 7, 8, 9, (2, 2, 2), dtype, contig,
                            count_include_pad=count_include_pad, divisor_override=100)
+
+    def test_avg_pool(self):
+        def helper(input, kernel_size):
+            if input.ndim == 4:
+                pool = torch.nn.AvgPool3d(kernel_size=kernel_size)
+                input = input.contiguous(memory_format=torch.channels_last).requires_grad_()
+                self.assertRaises(RuntimeError, lambda: pool(input))
+                ref_input = input.detach().clone().contiguous().requires_grad_(True)
+                ref_out = pool(ref_input)
+                ref_out.backward(ref_out.data)
+            elif input.ndim == 3:
+                pool = torch.nn.AvgPool2d(kernel_size=kernel_size)
+                input = input.requires_grad_()
+                out = pool(input)
+                input2 = input.detach().clone().to(torch.bfloat16).requires_grad_()
+                out2 = pool(input2)
+                out.backward(out.data)
+                out2.backward(out2.data)
+                self.assertEqual(out, out2, 0.01)
+                self.assertEqual(input.grad, input2.grad, 0.01)
+
+        helper(torch.rand(4, 8, 10, 10), (3, 2, 3))
+        helper(torch.rand(4, 8, 10), (3, 2))
 
     @skipIfNoTorchVision
     def test_torchvision_nms(self):
@@ -730,22 +756,37 @@ class CPUOPsTester(TestCase):
             self.assertEqual(y1, y2)
 
     def test_sum(self):
-        dtypes = [torch.float32, torch.double, torch.bfloat16, torch.float16]
+        def helper(self, x1, x2, dim, keepdim, dtype):
+            y1 = torch.sum(x1, dim=dim, keepdim=keepdim, dtype=dtype)
+            y2 = torch.sum(x2, dim=dim, keepdim=keepdim, dtype=dtype)
+            self.assertEqual(y1, y2, prec=2e-4)
 
+        dtypes = [torch.float32, torch.double, torch.bfloat16, torch.float16, torch.complex64, torch.complex128]
         x1 = torch.randn((1, 128, 56, 56)).to(memory_format=torch.channels_last)
         x1 = x1.reshape([1, 2, 64, 56, 56])
-        x2 = x1.contiguous()
-        for dtype in dtypes:
-            y1 = torch.sum(x1, dim=(1), keepdim=False, dtype=dtype)
-            y2 = torch.sum(x2, dim=(1), keepdim=False, dtype=dtype)
-            self.assertEqual(y1, y2, prec=1e-4)
-
+        x2 = x1.detach().clone().contiguous()
         x3 = torch.randn((1, 64, 100, 13, 24)).to(memory_format=torch.channels_last_3d)
-        x4 = x3.contiguous()
+        x4 = x3.detach().clone().contiguous()
+        x5 = torch.randn((1, 10, 16, 16)).to(memory_format=torch.channels_last)
+        x6 = x5.detach().clone().contiguous()
+        x7 = torch.randn((1, 1, 1, 1)).to(memory_format=torch.channels_last)
+        x8 = x7.detach().clone().contiguous()
+        x9 = torch.randn((1, 10, 256, 256)).to(memory_format=torch.channels_last)
+        x10 = x9.detach().clone().contiguous()
+        x11 = torch.randn((224, 1, 224)).unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        x12 = x11.detach().clone().contiguous()
+        x13 = torch.randn((3, 1, 224)).unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+        x14 = x13.detach().clone().contiguous()
         for dtype in dtypes:
-            y3 = torch.sum(x3, dim=(3, 4), keepdim=False, dtype=dtype)
-            y4 = torch.sum(x4, dim=(3, 4), keepdim=False, dtype=dtype)
-            self.assertEqual(y3, y4, prec=1e-4)
+            for dim in [(1), (-1, -2)]:
+                for keepdim in [True, False]:
+                    helper(self, x1, x2, dim, keepdim, dtype)
+                    helper(self, x3, x4, dim, keepdim, dtype)
+                    helper(self, x5, x6, dim, keepdim, dtype)
+                    helper(self, x7, x8, dim, keepdim, dtype)
+                    helper(self, x9, x10, dim, keepdim, dtype)
+                    helper(self, x11, x12, dim, keepdim, dtype)
+                    helper(self, x13, x14, dim, keepdim, dtype)
 
         a = torch.randn([3, 2, 3])
         mask = a.ge(0.5)
@@ -753,27 +794,61 @@ class CPUOPsTester(TestCase):
         self.assertTrue(s.dtype != torch.bool)
 
         # add ut for special case - not a true reduction in sumkernel
-        x5 = torch.rand(789, 357)
-        x6 = x5.transpose(0, 1)
-        y5 = torch.mvlgamma(x5, p=1)
-        y6 = torch.mvlgamma(x6, p=1).transpose(0, 1)
+        for dtype in [torch.float32, torch.bfloat16, torch.double]:
+            x5 = torch.rand(789, 357).to(dtype)
+            x6 = x5.detach().clone().transpose(0, 1)
+            y5 = torch.mvlgamma(x5, p=1)
+            y6 = torch.mvlgamma(x6, p=1).transpose(0, 1)
+            self.assertEqual(y5, y6)
+
+        x5 = torch.rand(789, 357).to(torch.float16)
+        x6 = x5.detach().clone().transpose(0, 1)
+        y5 = torch.arange(0, 0.5, 0.5).to(torch.float16).add(x5.unsqueeze(-1)).sum(-1)
+        y6 = torch.arange(0, 0.5, 0.5).to(torch.float16).add(x6.unsqueeze(-1)).sum(-1).transpose(0, 1)
         self.assertEqual(y5, y6)
-    
+
     def test_matmul(self):
-        dtypes = [torch.float32, torch.bfloat16]
-        for dtype in dtypes:
-            a = torch.randn(2, 3, dtype=dtype)
-            b = torch.randn(3, 4, dtype=dtype)
-            c = torch.zeros(2, 4, dtype=dtype)
-            torch.mm(a, b, out=c)
-            d = torch.mm(a, b)
-            self.assertTrue(torch.equal(c, d))
-            e = torch.randn(10, 3, 4, dtype=dtype)
-            f = torch.randn(10, 4, 5, dtype=dtype)
-            g = torch.zeros(10, 3, 5, dtype=dtype)
-            torch.bmm(e, f, out=g)
-            h = torch.bmm(e, f)
-            self.assertTrue(torch.equal(g, h))
+        def helper(a, b, c, op):
+            dtypes = [torch.float32, torch.bfloat16]
+            for dtype in dtypes:
+                a = a.to(dtype)
+                b = b.to(dtype)
+                c = c.to(dtype)
+                op(a, b, out=c)
+                d = op(a, b)
+                self.assertTrue(torch.equal(c, d))
+                ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
+                op(a, b, out=c)
+                d = op(a, b)
+                self.assertTrue(torch.equal(c, d))
+                e = a.clone().requires_grad_()
+                f = b.clone().requires_grad_()
+                g = op(e, f)
+                g.backward(g.data)
+                h = op(a, f)
+                h.backward(h.data)
+                ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32, device="cpu")
+
+        helper(torch.randn(2, 3), torch.randn(3, 4), torch.zeros(2, 4), torch.mm)
+        helper(torch.randn(2, 3), torch.randn(3, 4), torch.zeros(2, 4), torch.matmul)
+        helper(torch.randn(10, 3, 4), torch.randn(10, 4, 5), torch.zeros(10, 3, 5), torch.bmm)
+        helper(torch.randn(10, 3, 4, 5), torch.randn(10, 3, 5, 5), torch.zeros(10, 3, 4, 5), torch.matmul)
+        helper(torch.randn(1), torch.randn(1), torch.zeros(1), torch.matmul)
+        helper(torch.randn(2, 3), torch.randn(3), torch.zeros(2, 3), torch.matmul)
+        helper(torch.randn(2, 3, 4), torch.randn(4), torch.zeros(2, 3, 4), torch.matmul)
+        helper(torch.randn(3), torch.randn(3, 1), torch.zeros(3), torch.matmul)
+        helper(torch.randn(2, 3), torch.randn(1, 3, 3), torch.zeros(1, 2, 3), torch.matmul)
+        helper(torch.randn(3), torch.randn(1, 3, 3), torch.zeros(1, 3), torch.matmul)
+
+        def f(x, y, z):
+            return ((x.relu() * x) @ y.sin() @ z).sum()
+
+        x = torch.randn(2, 3)
+        y = torch.randn(3, 5)
+        z = torch.randn(5, 5)
+        ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
+        result_forward_mode = autogradF.hessian(f, (x, y, z), outer_jacobian_strategy="forward-mode", vectorize=True)
+        ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32, device="cpu")
 
     def test_index_select(self):
         for dim in [0, 1]:

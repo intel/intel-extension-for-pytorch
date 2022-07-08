@@ -29,9 +29,6 @@ struct IndexRangeGenerator {
 struct TORCH_API BmmBackward0 : public TraceableFunction {
   using TraceableFunction::TraceableFunction;
   variable_list apply(variable_list&& grads) override;
-  std::string name() const override {
-    return "BmmBackward0";
-  }
   void release_variables() override {
     std::lock_guard<std::mutex> lock(mutex_);
     self_.reset_data();

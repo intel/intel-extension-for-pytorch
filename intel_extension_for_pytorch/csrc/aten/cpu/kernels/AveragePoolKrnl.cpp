@@ -690,8 +690,44 @@ void avg_pool2d_kernel_impl(
                   /* padD */ 0,
                   count_include_pad,
                   divisor_override);
-            } else {
-              cpu_avg_pool<scalar_t, scalar_t, /* is_3d */ false>(
+            } else if (input.scalar_type() == at::ScalarType::Long) {
+              cpu_avg_pool<
+                  long,
+                  /*accscalar_t*/ long,
+                  /* is_3d */ false>(
+                  output,
+                  input,
+                  kW,
+                  kH,
+                  /* kD */ 1,
+                  dW,
+                  dH,
+                  /* dD */ 1,
+                  padW,
+                  padH,
+                  /* padD */ 0,
+                  count_include_pad,
+                  divisor_override);
+            } else if (input.scalar_type() == at::ScalarType::Double) {
+              cpu_avg_pool<
+                  double,
+                  /*accscalar_t*/ double,
+                  /* is_3d */ false>(
+                  output,
+                  input,
+                  kW,
+                  kH,
+                  /* kD */ 1,
+                  dW,
+                  dH,
+                  /* dD */ 1,
+                  padW,
+                  padH,
+                  /* padD */ 0,
+                  count_include_pad,
+                  divisor_override);
+            } else if (input.scalar_type() == at::ScalarType::Float) {
+              cpu_avg_pool<float, float, /* is_3d */ false>(
                   output,
                   input,
                   kW,
@@ -753,8 +789,7 @@ void avg_pool2d_backward_kernel_impl(
     c10::optional<int64_t> divisor_override) {
   switch (grad_output.suggest_memory_format()) {
     case at::MemoryFormat::Contiguous: {
-      AT_DISPATCH_FLOATING_TYPES_AND2(
-          at::ScalarType::Long,
+      AT_DISPATCH_FLOATING_TYPES_AND(
           at::ScalarType::BFloat16,
           grad_output.scalar_type(),
           "avg_pool2d_backward",
@@ -777,8 +812,7 @@ void avg_pool2d_backward_kernel_impl(
       break;
     }
     case at::MemoryFormat::ChannelsLast: {
-      AT_DISPATCH_FLOATING_TYPES_AND2(
-          at::ScalarType::Long,
+      AT_DISPATCH_FLOATING_TYPES_AND(
           at::ScalarType::BFloat16,
           grad_output.scalar_type(),
           "avg_pool2d_backward_channels_last",
@@ -825,20 +859,52 @@ void avg_pool3d_kernel_impl(
     case at::MemoryFormat::Contiguous: {
       AT_DISPATCH_FLOATING_TYPES_AND(
           at::ScalarType::Long, input.scalar_type(), "avg_pool3d", [&] {
-            cpu_avg_pool<scalar_t, /*accscalar_t*/ float, /* is_3d */ true>(
-                output,
-                input,
-                kW,
-                kH,
-                kD,
-                dW,
-                dH,
-                dD,
-                padW,
-                padH,
-                padD,
-                count_include_pad,
-                divisor_override);
+            if (input.scalar_type() == at::ScalarType::Float) {
+              cpu_avg_pool<float, /*accscalar_t*/ float, /* is_3d */ true>(
+                  output,
+                  input,
+                  kW,
+                  kH,
+                  kD,
+                  dW,
+                  dH,
+                  dD,
+                  padW,
+                  padH,
+                  padD,
+                  count_include_pad,
+                  divisor_override);
+            } else if (input.scalar_type() == at::ScalarType::Double) {
+              cpu_avg_pool<double, /*accscalar_t*/ double, /* is_3d */ true>(
+                  output,
+                  input,
+                  kW,
+                  kH,
+                  kD,
+                  dW,
+                  dH,
+                  dD,
+                  padW,
+                  padH,
+                  padD,
+                  count_include_pad,
+                  divisor_override);
+            } else if (input.scalar_type() == at::ScalarType::Long) {
+              cpu_avg_pool<long, /*accscalar_t*/ long, /* is_3d */ true>(
+                  output,
+                  input,
+                  kW,
+                  kH,
+                  kD,
+                  dW,
+                  dH,
+                  dD,
+                  padW,
+                  padH,
+                  padD,
+                  count_include_pad,
+                  divisor_override);
+            }
           });
       break;
     }
@@ -888,11 +954,8 @@ void avg_pool3d_backward_kernel_impl(
     c10::optional<int64_t> divisor_override) {
   switch (grad_output.suggest_memory_format()) {
     case at::MemoryFormat::Contiguous: {
-      AT_DISPATCH_FLOATING_TYPES_AND(
-          at::ScalarType::Long,
-          grad_output.scalar_type(),
-          "avg_pool3d_backward",
-          [&] {
+      AT_DISPATCH_FLOATING_TYPES(
+          grad_output.scalar_type(), "avg_pool3d_backward", [&] {
             cpu_avg_pool_backward<scalar_t, /* is_3d */ true>(
                 grad_input,
                 grad_output,
@@ -911,11 +974,8 @@ void avg_pool3d_backward_kernel_impl(
       break;
     }
     case at::MemoryFormat::ChannelsLast3d: {
-      AT_DISPATCH_FLOATING_TYPES_AND(
-          at::ScalarType::Long,
-          grad_output.scalar_type(),
-          "avg_pool3d_backward_channels_last",
-          [&] {
+      AT_DISPATCH_FLOATING_TYPES(
+          grad_output.scalar_type(), "avg_pool3d_backward_channels_last", [&] {
             cpu_avg_pool_backward_channels_last<scalar_t, /* is_3d */ true>(
                 grad_input,
                 grad_output,
