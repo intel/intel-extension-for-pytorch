@@ -107,10 +107,10 @@ class TestFusedSteps(TestCase):
         non_fused = bench.custom_op_bench.optimizer.non_fused_lamb
 
         # fused fp32 args
-        param = torch.randn(80, 100)
-        grad = torch.randn(80, 100)
-        exp_avg = torch.randn(80, 100).abs()
-        exp_avg_sq = torch.randn(80, 100).abs()
+        param = torch.randn(31, 33)
+        grad = torch.randn(31, 33)
+        exp_avg = torch.randn(31, 33).abs()
+        exp_avg_sq = torch.randn(31, 33).abs()
         trail = torch.Tensor()
 
         # fused bf16 params (master weight split)
@@ -171,16 +171,37 @@ class TestFusedSteps(TestCase):
         self.assertEqual(exp_avg, exp_avg5)
         self.assertEqual(exp_avg_sq, exp_avg_sq5)
 
+        # fused double args
+        param = torch.randn(31, 33).double()
+        grad = torch.randn(31, 33).double()
+        exp_avg = torch.randn(31, 33).double().abs()
+        exp_avg_sq = torch.randn(31, 33).double().abs()
+        trail = torch.Tensor()
+
+        # non-fused double params
+        param2 = param.clone()
+        grad2 = grad.clone()
+        exp_avg2 = exp_avg.clone()
+        exp_avg_sq2 = exp_avg_sq.clone()
+
+        fused(param, exp_avg, exp_avg_sq, grad, trail, step, beta1, beta2, learning_rate, weight_decay, eps)
+        non_fused(param2, exp_avg2, exp_avg_sq2, grad2, step, beta1, beta2, learning_rate, weight_decay, eps)
+
+        # compare fused and non-fused for double
+        self.assertEqual(param, param2)
+        self.assertEqual(exp_avg, exp_avg2)
+        self.assertEqual(exp_avg_sq, exp_avg_sq2)
+
     def test_adam_step(self):
         fused = torch.ops.torch_ipex.adam_fused_step
         non_fused = bench.custom_op_bench.optimizer.non_fused_adam
 
         # fused fp32 args
-        param = torch.randn(80, 100)
-        grad = torch.randn(80, 100)
-        exp_avg = torch.randn(80, 100).abs()
-        exp_avg_sq = torch.randn(80, 100).abs()
-        max_exp_avg_sq = torch.randn(80, 100).abs()
+        param = torch.randn(31, 33)
+        grad = torch.randn(31, 33)
+        exp_avg = torch.randn(31, 33).abs()
+        exp_avg_sq = torch.randn(31, 33).abs()
+        max_exp_avg_sq = torch.randn(31, 33).abs()
         trail = torch.Tensor()
 
         # fused bf16 params (master weight split)
@@ -249,14 +270,38 @@ class TestFusedSteps(TestCase):
         self.assertEqual(exp_avg_sq, exp_avg_sq5)
         self.assertEqual(max_exp_avg_sq, max_exp_avg_sq5)
 
+        # fused double args
+        param = torch.randn(31, 33).double()
+        grad = torch.randn(31, 33).double()
+        exp_avg = torch.randn(31, 33).double().abs()
+        exp_avg_sq = torch.randn(31, 33).double().abs()
+        max_exp_avg_sq = torch.randn(31, 33).double().abs()
+        trail = torch.Tensor()
+
+        # non-fused double params
+        param2 = param.clone()
+        grad2 = grad.clone()
+        exp_avg2 = exp_avg.clone()
+        exp_avg_sq2 = exp_avg_sq.clone()
+        max_exp_avg_sq2 = max_exp_avg_sq.clone()
+
+        fused(param, exp_avg, exp_avg_sq, max_exp_avg_sq, grad, trail, amsgrad, step, beta1, beta2, learning_rate, weight_decay, eps)
+        non_fused(param2, exp_avg2, exp_avg_sq2, max_exp_avg_sq2, grad2, amsgrad, step, beta1, beta2, learning_rate, weight_decay, eps)
+
+        # compare fused and non-fused for double
+        self.assertEqual(param, param2)
+        self.assertEqual(exp_avg, exp_avg2)
+        self.assertEqual(exp_avg_sq, exp_avg_sq2)
+        self.assertEqual(max_exp_avg_sq, max_exp_avg_sq2)
+
     def test_adagrad_step(self):
         fused = torch.ops.torch_ipex.adagrad_fused_step
         non_fused = bench.custom_op_bench.optimizer.non_fused_adagrad
 
         # fused fp32 args
-        param = torch.randn(80, 100)
-        grad = torch.randn(80, 100)
-        state_sum = torch.randn(80, 100).abs()
+        param = torch.randn(31, 33)
+        grad = torch.randn(31, 33)
+        state_sum = torch.randn(31, 33).abs()
         trail = torch.Tensor()
 
         # fused bf16 args( master weight split )
@@ -307,14 +352,31 @@ class TestFusedSteps(TestCase):
         self.assertEqual(param, param5)
         self.assertEqual(state_sum, state_sum5)
 
+        # fused double args
+        param = torch.randn(31, 33).double()
+        grad = torch.randn(31, 33).double()
+        state_sum = torch.randn(31, 33).double().abs()
+
+        # non-fused double params
+        param2 = param.clone()
+        grad2 = grad.clone()
+        state_sum2 = state_sum.clone()
+
+        fused(param, grad, state_sum, trail, step, learning_rate, weight_decay, lr_decay, eps)
+        non_fused(param2, grad2, state_sum2, step, learning_rate, weight_decay, lr_decay, eps)
+
+        # compare fused and non-fused for double
+        self.assertEqual(param, param2)
+        self.assertEqual(state_sum, state_sum2)
+
     def test_sgd_step(self):
         fused = torch.ops.torch_ipex.sgd_fused_step
         non_fused = bench.custom_op_bench.optimizer.non_fused_sgd
 
         # fused fp32 args
-        param = torch.randn(80, 100)
-        grad = torch.randn(80, 100)
-        momentum_buf = torch.randn(80, 100)
+        param = torch.randn(31, 33)
+        grad = torch.randn(31, 33)
+        momentum_buf = torch.randn(31, 33)
         trail = torch.Tensor()
 
         # fused bf16 args ( master weight split )
@@ -366,6 +428,23 @@ class TestFusedSteps(TestCase):
         self.assertEqual(param, param5)
         self.assertEqual(momentum_buf, momentum_buf5)
 
+        # fused double args
+        param = torch.randn(31, 33).double()
+        grad = torch.randn(31, 33).double()
+        momentum_buf = torch.randn(31, 33).double().abs()
+
+        # non-fused double params
+        param2 = param.clone()
+        grad2 = grad.clone()
+        momentum_buf2 = momentum_buf.clone()
+
+        fused(param, grad, momentum_buf, trail, momentum, learning_rate, weight_decay, dampening, nesterov)
+        non_fused(param2, grad2, momentum_buf2, momentum, learning_rate, weight_decay, dampening, nesterov)
+
+        # compare fused and non-fused for double
+        self.assertEqual(param, param2)
+        self.assertEqual(momentum_buf, momentum_buf2)
+
     def _test_packed_add(self, param, grad, param2, trail, grad2):
         packed_add = torch.ops.torch_ipex.packed_add
         learning_rate = 0.1
@@ -377,8 +456,8 @@ class TestFusedSteps(TestCase):
     def test_packed_add(self):
         # contiguous case
         # fp32 args
-        param = torch.randn(80, 100)
-        grad = torch.randn(80, 100)
+        param = torch.randn(31, 33)
+        grad = torch.randn(31, 33)
         # bf16 args
         param2, trail = torch.ops.torch_ipex.split_float_bfloat16(param)
         grad2 = grad.bfloat16()
@@ -386,8 +465,8 @@ class TestFusedSteps(TestCase):
 
         # transposed case
         # fp32 args
-        param = torch.randn(80, 100).t().contiguous().t()
-        grad = torch.randn(80, 100).t().contiguous().t()
+        param = torch.randn(31, 33).t().contiguous().t()
+        grad = torch.randn(31, 33).t().contiguous().t()
         # bf16 args
         param2, trail = torch.ops.torch_ipex.split_float_bfloat16(param)
         grad2 = grad.bfloat16().t().contiguous().t()
@@ -395,8 +474,8 @@ class TestFusedSteps(TestCase):
 
         # sliced-out case
         # fp32 args
-        base_param = torch.randn(80, 100)
-        base_grad = torch.randn(80, 100)
+        base_param = torch.randn(31, 33)
+        base_grad = torch.randn(31, 33)
         param = base_param[10:20, 10:20]
         grad = base_grad[10:20, 10:20]
         # bf16 args
