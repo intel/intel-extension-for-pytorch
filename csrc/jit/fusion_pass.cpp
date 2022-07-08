@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
+#include <torch/csrc/jit/passes/tensorexpr_fuser.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <iostream>
 #include <string>
@@ -499,7 +500,9 @@ RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
 }
 
 static RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
+  RemoveProfileNodesAndSpecializeTypes(g);
   xpu::FusionPass(g);
+  RemoveTensorTypeSpecializations(g);
 });
 
 } // namespace jit
