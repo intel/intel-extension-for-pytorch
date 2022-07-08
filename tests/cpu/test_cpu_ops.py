@@ -739,13 +739,19 @@ class CPUOPsTester(TestCase):
     @skipIfNoTorchVision
     def test_torchvision_nms(self):
         num_boxes = 50
-        boxes = torch.rand(num_boxes, 4)
+        boxes = torch.randn(num_boxes, 4)
         boxes[:, 2:] += boxes[:, :2]
         scores = torch.randn(num_boxes)
         y1 = torchvision.ops.nms(boxes, scores, 0.5)
+
+        # test autocast
         with torch.cpu.amp.autocast():
             y2 = torchvision.ops.nms(boxes.bfloat16(), scores.bfloat16(), 0.5)
             self.assertEqual(y1, y2)
+
+        # test double
+        y3 = torchvision.ops.nms(boxes.double(), scores.double(), 0.5)
+        self.assertEqual(y1, y3)
 
     def test_mean(self):
         x = torch.randn(1, 64, 100, 13, 24, requires_grad=True)
