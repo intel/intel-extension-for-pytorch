@@ -60,31 +60,32 @@ class FrozenBNTester(TestCase):
         m.running_var = running_var
         m1.running_mean = running_mean
         m1.running_var = running_var
-        input = torch.randn(20, 100, 35, 45).bfloat16()
-        x = input.clone().detach().requires_grad_()
-        x1 = input.clone().detach().requires_grad_()
-        y = m(x)
-        y1 = m1(x1)
-        self.assertTrue(y.dtype == torch.bfloat16)
-        self.assertEqual(y, y1, prec=0.1)
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            input = torch.randn(20, 100, 35, 45).bfloat16()
+            x = input.clone().detach().requires_grad_()
+            x1 = input.clone().detach().requires_grad_()
+            y = m(x)
+            y1 = m1(x1)
+            self.assertTrue(y.dtype == torch.bfloat16)
+            self.assertEqual(y, y1, prec=0.1)
 
-        # backward
-        y.mean().backward()
-        y1.mean().backward()
-        self.assertTrue(x.grad.dtype == torch.bfloat16)
-        self.assertEqual(x.grad, x1.grad)
+            # backward
+            y.mean().backward()
+            y1.mean().backward()
+            self.assertTrue(x.grad.dtype == torch.bfloat16)
+            self.assertEqual(x.grad, x1.grad)
 
-        # test channels last
-        x2 = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
-        y2 = m(x2)
-        self.assertTrue(y2.dtype == torch.bfloat16)
-        self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
-        self.assertEqual(y2, y1, prec=0.1)
+            # test channels last
+            x2 = input.clone().detach().to(memory_format=torch.channels_last).requires_grad_()
+            y2 = m(x2)
+            self.assertTrue(y2.dtype == torch.bfloat16)
+            self.assertTrue(y2.is_contiguous(memory_format=torch.channels_last))
+            self.assertEqual(y2, y1, prec=0.1)
 
-        y2.mean().backward()
-        self.assertTrue(x2.grad.dtype == torch.bfloat16)
-        self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
-        self.assertEqual(x2.grad, x1.grad)
+            y2.mean().backward()
+            self.assertTrue(x2.grad.dtype == torch.bfloat16)
+            self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
+            self.assertEqual(x2.grad, x1.grad)
 
 
 if __name__ == '__main__':

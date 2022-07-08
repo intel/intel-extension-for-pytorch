@@ -32,8 +32,6 @@ at::Tensor mkldnn_to_dense(
     const at::Tensor& self,
     c10::optional<at::ScalarType> dtype = c10::nullopt);
 
-ideep::tensor itensor_from_tensor(const at::Tensor& tensor);
-
 at::Tensor empty_aten_tensor_from_desc(
     const ideep::tensor::desc& desc,
     const at::TensorOptions& options);

@@ -24,8 +24,8 @@
 #include "intel_extension_for_pytorch/csrc/jit/auto_opt_config.h"
 #include "intel_extension_for_pytorch/csrc/utils/env_settings.h"
 #include "intel_extension_for_pytorch/csrc/utils/fpmath_mode.h"
+#include "intel_extension_for_pytorch/csrc/utils/onednn_utils.h"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
-#include "intel_extension_for_pytorch/csrc/utils/verbose.hpp"
 
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
@@ -73,7 +73,11 @@ void InitIpexModuleBindings(py::module m) {
     EnvSettings::get_instance().set_settings_profile_op(b_enable);
   });
 
-  m.def("mkldnn_set_verbose", &torch_ipex::verbose::_mkldnn_set_verbose);
+  m.def("mkldnn_set_verbose", &torch_ipex::utils::onednn_set_verbose);
+  m.def("onednn_has_bf16_support", []() {
+    return torch_ipex::utils::onednn_has_bf16_type_support();
+  });
+
   // ipex amp autocast
   m.def("get_autocast_dtype", []() {
     at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
@@ -117,10 +121,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_opt", []() {
     return AutoOptConfig::singleton().get_jit_fuse();
   });
-
-  // extend OPs
-  m.def(
-      "embedding_bag_fast_path_sum", &torch_ipex::embedding_bag_fast_path_sum);
 
   // runtime
   py::class_<torch_ipex::runtime::FutureTensor>(m, "FutureTensor")

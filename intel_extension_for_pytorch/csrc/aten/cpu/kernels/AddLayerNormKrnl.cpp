@@ -95,11 +95,11 @@ at::Tensor add_layer_norm_kernel_impl(
   } else if (
       a.scalar_type() == at::kBFloat16 && b.scalar_type() == at::kBFloat16) {
     if (weight.defined() && weight.scalar_type() == at::kBFloat16) {
-          AddLayerNormKernelImpl<at::BFloat16, at::BFloat16>(
-              X, b, alpha, weight, bias, M, N, eps, Y);
+      AddLayerNormKernelImpl<at::BFloat16, at::BFloat16>(
+          X, b, alpha, weight, bias, M, N, eps, Y);
     } else {
-          AddLayerNormKernelImpl<at::BFloat16, float>(
-              X, b, alpha, weight, bias, M, N, eps, Y);
+      AddLayerNormKernelImpl<at::BFloat16, float>(
+          X, b, alpha, weight, bias, M, N, eps, Y);
     }
   }
   return Y;

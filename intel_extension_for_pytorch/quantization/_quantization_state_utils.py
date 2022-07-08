@@ -25,10 +25,10 @@ functions_supported_by_quantization =set([
     F.conv3d,
     torch.conv2d,
     torch.conv3d,
-    F.conv_transpose2d,
-    F.conv_transpose3d,
-    torch.conv_transpose2d,
-    torch.conv_transpose3d,
+    #F.conv_transpose2d,   #TODO
+    #F.conv_transpose3d,   #TODO
+    #torch.conv_transpose2d,  #TODO
+    #torch.conv_transpose3d,  #TODO
     torch.relu,
     F.relu,
     #torch.sigmoid,  # TODO
@@ -37,6 +37,7 @@ functions_supported_by_quantization =set([
     F.linear,
     torch._C._nn.linear,
     torch.matmul,
+    torch.Tensor.matmul,
     F.embedding_bag,
     torch.embedding_bag,
     ])
@@ -50,8 +51,8 @@ functions_supported_by_quantization_ipex = set([
 module_types_supported_by_quantization = set([
     torch.nn.Conv2d,
     torch.nn.Conv3d,
-    torch.nn.ConvTranspose2d,
-    torch.nn.ConvTranspose3d,
+    #torch.nn.ConvTranspose2d,
+    #torch.nn.ConvTranspose3d,
     torch.nn.Linear,
     torch.nn.MaxPool2d,
     torch.nn.MaxPool3d,
@@ -90,10 +91,10 @@ conv_linear_ops = [
     str(F.conv3d),
     str(torch.conv2d),
     str(torch.conv3d),
-    str(F.conv_transpose2d),
-    str(F.conv_transpose3d),
-    str(torch.conv_transpose2d),
-    str(torch.conv_transpose3d),
+    #str(F.conv_transpose2d),
+    #str(F.conv_transpose3d),
+    #str(torch.conv_transpose2d),
+    #str(torch.conv_transpose3d),
     str(F.linear), 
     str(torch._C._nn.linear),
     ]
@@ -102,8 +103,8 @@ conv_linear_modules = [
     #str(torch.nn.Conv1d) # it will be enabled at next step.
     str(torch.nn.Conv2d),
     str(torch.nn.Conv3d),
-    str(torch.nn.ConvTranspose2d),
-    str(torch.nn.ConvTranspose3d),
+    #str(torch.nn.ConvTranspose2d),
+    #str(torch.nn.ConvTranspose3d),
     str(torch.nn.Linear),
     ]
 
@@ -348,8 +349,8 @@ def iterate_and_apply_convert(
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
             else:
-                # white list, conv, linear, matmul, we alsy covert it's input to bflat16 firstly, and then inser q+dq
-                if str(op) in conv_linear_ops + [str(torch.matmul)] + embedding_op or str(type(op)) in conv_linear_modules:
+                # white list, conv, linear, matmul, we always convert it's input to bflat16 firstly, and then inser q+dq
+                if str(op) in conv_linear_ops + [str(torch.matmul), str(torch.Tensor.matmul)] + embedding_op or str(type(op)) in conv_linear_modules:
                     if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
                         if args.dtype == torch.float32:
                             args = args.to(torch.bfloat16)

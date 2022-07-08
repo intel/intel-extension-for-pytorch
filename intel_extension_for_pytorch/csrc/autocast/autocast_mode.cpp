@@ -126,6 +126,7 @@ struct CPU_WrapFunction_<
   }
 };
 
+#define TUPLE_TWO_TENSORS std::tuple<Tensor, Tensor>
 #define ADD_NS(RAW_OP) at::RAW_OP
 
 #define MAKE_REGISTER_FUNC(FUNC, NAME, SIG, CAST_POLICY)                   \
@@ -135,10 +136,6 @@ struct CPU_WrapFunction_<
         &CPU_WrapFunction<DtypeCastPolicy::CAST_POLICY, SIG, SIG, &FUNC>:: \
             type::call);                                                   \
   }                                                                        \
-  template <>                                                              \
-  std::string get_op_name<SIG, FUNC>() {                                   \
-    return NAME;                                                           \
-  }
 
 // user_defined_dtype a.k.a WhiteList
 MAKE_REGISTER_FUNC(
@@ -153,8 +150,27 @@ MAKE_REGISTER_FUNC(
         bool),
     user_defined_dtype)
 
+MAKE_REGISTER_FUNC(
+    ADD_NS(_native_multi_head_attention),
+    "_native_multi_head_attention",
+    TUPLE_TWO_TENSORS(
+        const Tensor&,
+        const Tensor&,
+        const Tensor&,
+        int64_t,
+        int64_t,
+        const Tensor&,
+        const Tensor&,
+        const Tensor&,
+        const Tensor&,
+        const c10::optional<Tensor>&,
+        bool,
+        bool),
+    user_defined_dtype)
+
 // fp32 cast policy a.k.a BlackList
 MAKE_REGISTER_FUNC(ADD_NS(mish), "mish", Tensor(const Tensor&), fp32)
 
+#undef TUPLE_TWO_TENSORS
 } // namespace autocast
 } // namespace torch_ipex

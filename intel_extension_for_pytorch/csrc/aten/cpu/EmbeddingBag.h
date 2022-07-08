@@ -2,17 +2,7 @@
 #include <intel_extension_for_pytorch/csrc/dyndisp/DispatchStub.h>
 #include <torch/extension.h>
 
-const int MODE_SUM = 0;
-const int MODE_MEAN = 1;
-const int MODE_MAX = 2;
-
 namespace torch_ipex {
-
-bool embedding_bag_fast_path_sum(
-    const at::Tensor weight,
-    const c10::optional<at::Tensor> per_sample_weights,
-    int64_t mode,
-    const c10::optional<int64_t> padding_idx);
 
 at::Tensor embedding_bag(
     const at::Tensor& weight,

@@ -114,6 +114,8 @@ unary_PyTorch_op_to_IPEX_op_map = {
     torch.nn.Hardswish(inplace=False): EltwiseFusionOp("hardswish"),
     torch.square: EltwiseFusionOp("square", prec=0.035),
     torch.square_: EltwiseFusionOp("square", prec=0.035),
+    torch.nn.Hardsigmoid(inplace=True): EltwiseFusionOp("hardsigmoid"),
+    torch.nn.Hardsigmoid(inplace=False): EltwiseFusionOp("hardsigmoid"),
 }
 
 non_unary_PyTorch_op_to_IPEX_op_map = {
@@ -195,6 +197,45 @@ class ConvTransposeEltwise(nn.Module):
         b = self.eltwise(a, **self.kwargs)
         return b
 
+class ConvTransposeSumAccumuOnRight(nn.Module):
+    def __init__(self, dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeSumAccumuOnRight, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.convtranspose1 = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.add_func = add_func
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = self.convtranspose(x)
+        b = F.relu(self.convtranspose1(x))
+        return self.add_func(a, b, self.kwargs)
+
+class ConvTransposeSumAccumuOnLeft(nn.Module):
+    def __init__(self, dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeSumAccumuOnLeft, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.convtranspose1 = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.add_func = add_func
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = F.relu(self.convtranspose(x))
+        b = self.convtranspose1(x)
+        return self.add_func(a, b, self.kwargs)
+
+class ConvTransposeSumBroadcast(nn.Module):
+    def __init__(self, dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeSumBroadcast, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, 1, kernel_size, image_size)
+        self.convtranspose1 = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.add_func = add_func
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = F.relu(self.convtranspose(x))
+        b = self.convtranspose1(x)
+        return self.add_func(a, b, self.kwargs)
+
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvBatchNorm_Fixed, self).__init__()
@@ -202,6 +243,28 @@ class ConvBatchNorm_Fixed(nn.Module):
         torch.manual_seed(seed)
         self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
         self.bn = bn_module[dim](out_channels, eps=0.001)
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
+class ConvBatchNorm_Fixed2(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvBatchNorm_Fixed2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](out_channels, eps=0.001, track_running_stats=False)
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
+class ConvBatchNorm_Fixed3(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvBatchNorm_Fixed3, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=True, **kwargs)
+        self.bn = bn_module[dim](out_channels, eps=0.001, affine=False)
 
     def forward(self, x):
         return self.bn(self.conv(x))
@@ -308,6 +371,21 @@ class Conv_Tensor_Binary(nn.Module):
         if dim == 3:
             input_size.append(1)
         self.tensor = torch.randn(input_size)
+
+    def forward(self, x):
+        return self.op(self.conv(x), self.tensor)
+
+class Conv_Tensor_Binary2(nn.Module):
+    def __init__(self, op, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Tensor_Binary2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, **kwargs)
+        self.op = op
+        input_size = [1, out_channels, 1, 1]
+        if dim == 3:
+            input_size.append(1)
+        self.tensor = torch.randn(input_size, dtype=torch.cfloat)
 
     def forward(self, x):
         return self.op(self.conv(x), self.tensor)
@@ -462,6 +540,31 @@ class Linear_Tensor_Binary(nn.Module):
     def forward(self, x):
         return self.op(self.linear(x), self.tensor)
 
+class Linear_Tensor_Binary2(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Tensor_Binary2, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.tensor([2])
+
+    def forward(self, x):
+        return self.op(self.linear(x), self.tensor)
+
+class Linear_Tensor_Binary3(nn.Module):
+    def __init__(self, op, in_channels, out_channels, **kwargs):
+        super(Linear_Tensor_Binary3, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.op = op
+        self.tensor = torch.randn(out_channels, dtype=torch.cfloat)
+
+    def forward(self, x):
+        return self.op(self.linear(x), self.tensor)
+
+
 class LinearRelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearRelu, self).__init__()
@@ -494,6 +597,22 @@ class LinearAdd(nn.Module):
     def forward(self, x):
         x1 = x.clone()
         return torch.add(self.linear(x),self.linear1(x1))
+
+class LinearAddRelu(nn.Module):
+    def __init__(self, in_channels, mid_channels, out_channels, inplace, **kwargs):
+        super(LinearAddRelu, self).__init__()
+        self.linear = nn.Linear(in_channels, mid_channels, bias=False, **kwargs)
+        self.linear1 = nn.Linear(
+            mid_channels, out_channels, bias=False, **kwargs)
+        self.linear2 = nn.Linear(in_channels, out_channels, bias=False, **kwargs)
+        self.inplace = inplace
+
+    def forward(self, x):
+        a = self.linear(x)
+        a = F.relu(a, inplace=self.inplace)
+        a = self.linear1(a)
+        b = self.linear2(x)
+        return F.relu(a.add_(b), inplace=self.inplace)
 
 class Linear_Reshape_Relu(nn.Module):
     def __init__(self, in_channels, out_channels,dest_shape, **kwargs):
@@ -633,9 +752,48 @@ class NotChannelShuffle(nn.Module):
         x = x.view(batchsize, -1, width, height)
         return x
 
-class MatmulDiv(nn.Module):
+class MatmulDivOutplaceOutModifiedByOtherOP_v1(nn.Module):
+    def __init__(self, div_scalar=False, with_out=True):
+        super(MatmulDivOutplaceOutModifiedByOtherOP_v1, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+        mm_out = torch.empty(mm_res_shape, dtype=x.dtype)
+        mm_res = torch.matmul(x, y, out=mm_out)
+        if self.div_scalar:
+            div_res = mm_res.div(2.0)
+        else:
+            div_res = mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+        mm_out.add_(5)
+        return div_res
+
+class MatmulDivOutplaceOutModifiedByOtherOP_v2(nn.Module):
+    def __init__(self, div_scalar=False, with_out=True):
+        super(MatmulDivOutplaceOutModifiedByOtherOP_v2, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+        mm_out = torch.empty(mm_res_shape, dtype=x.dtype)
+        mm_res = torch.matmul(x, y, out=mm_out)
+        if self.div_scalar:
+            div_res = mm_res.div(2.0)
+        else:
+            div_res = mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+        mm_out.add_(5)
+        div_out_equal = (mm_out == div_res)
+        return div_res + div_out_equal
+
+class MatmulDivOutplace(nn.Module):
     def __init__(self, div_scalar=False, with_out=False):
-        super(MatmulDiv, self).__init__()
+        super(MatmulDivOutplace, self).__init__()
         self.div_scalar = div_scalar
         self.with_out = with_out
 
@@ -652,6 +810,26 @@ class MatmulDiv(nn.Module):
             return mm_res.div(2.0)
         else:
             return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+
+class MatmulDivInplace(nn.Module):
+    def __init__(self, div_scalar=False, with_out=False):
+        super(MatmulDivInplace, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        mm_res = None
+        y = torch.transpose(x, -1, -2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        if self.with_out:
+            mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+            torch.matmul(x, y, out=mm_res)
+        else:
+            mm_res = torch.matmul(x, y)
+        if self.div_scalar:
+            return mm_res.div_(2.0)
+        else:
+            return mm_res.div_(torch.ones(mm_res_shape,dtype=x.dtype)+1)
 
 class BmmAdd(nn.Module):
     def __init__(self):
@@ -743,8 +921,9 @@ class AddLayerNorm(torch.nn.Module):
         super(AddLayerNorm, self).__init__()
         self.layernorm = torch.nn.LayerNorm(dim)
     def forward(self, x, y):
-        x = torch.add(x,y)
-        return self.layernorm(x)
+        z = torch.add(x,y)
+        return self.layernorm(z)
+
 
 class AddLayerNorm_v1(torch.nn.Module):
     def __init__(self, dim=32):
@@ -753,6 +932,14 @@ class AddLayerNorm_v1(torch.nn.Module):
     def forward(self, x, y, z):
         x = x + y + z
         return self.layernorm(x)
+
+class AddLayerNorm_v2(torch.nn.Module):
+    def __init__(self, dim=32):
+        super(AddLayerNorm_v2, self).__init__()
+        self.dim = dim
+    def forward(self, x, y, w):
+        z = torch.add(x,y)
+        return torch.nn.functional.layer_norm(z, [self.dim,], weight=w)
 
 class ConcatBnRelu(torch.nn.Module):
     def __init__(self, dim, cat_dim, in_channels, **kwargs):
@@ -790,14 +977,6 @@ class LinearSwishNaive(nn.Module):
         linear_out = self.linear(input)
         sigmoid_out = self.sigmoid(linear_out)
         return torch.mul(linear_out, sigmoid_out)
-
-class DisableTexprFuser():
-    def __enter__(self):
-        self.saved = torch._C._jit_texpr_fuser_enabled()
-        torch._C._jit_set_texpr_fuser_enabled(False)
-
-    def __exit__(self, *args, **kwargs):
-        torch._C._jit_set_texpr_fuser_enabled(self.saved)
 
 class Bottleneck_v1(nn.Module):
     def __init__(self):
@@ -857,6 +1036,13 @@ class EinsumAddInplaceV1(nn.Module):
         self.equation = equation
     def forward(self, input1, input2, bias):
         return bias.add_(torch.einsum(self.equation, input1, input2))
+
+class AddMulDiv(nn.Module):
+    def __init__(self):
+        super(AddMulDiv, self).__init__()
+
+    def forward(self, input):
+        return torch.div(torch.mul(input, torch.add(input, 3)), 6)
 
 class Tester(TestCase):
     @contextlib.contextmanager
@@ -1087,54 +1273,58 @@ class Tester(TestCase):
             self.assertEqual(linear_count_ori, 2)
 
     def test_add_layernorm(self):
-        bs = 56
-        seq_len = 384
-        dim = 768
-        a = torch.randn(bs, seq_len, dim)
-        b = torch.randn(bs, seq_len, dim)
-        model = AddLayerNorm(dim)
-        pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
-        torch._C._jit_set_texpr_fuser_enabled(False)
-        jit_model = torch.jit.trace(model,(a, b))
-        trace_graph = jit_model.graph_for(a, b)
-        jit_res = jit_model(a, b)
-        ori_res = model(a, b)
-        self.assertEqual(jit_res, ori_res)
-        node = "ipex::add_layernorm"
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+        for dim in [768, 100]:
+            with torch.no_grad():
+                bs = 56
+                seq_len = 384
+                a = torch.randn(bs, seq_len, dim)
+                b = torch.randn(bs, seq_len, dim)
+                w = torch.ones(dim)
+                model = AddLayerNorm(dim)
+                pre_te_enable_status = torch._C._jit_texpr_fuser_enabled()
+                torch._C._jit_set_texpr_fuser_enabled(False)
+                jit_model = torch.jit.trace(model,(a, b))
+                trace_graph = jit_model.graph_for(a, b)
+                jit_res = jit_model(a, b)
+                ori_res = model(a, b)
+                self.assertEqual(jit_res, ori_res)
+                node = "ipex::add_layernorm"
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
-        # not contiguous
-        a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
-        b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
-        ori_res = model(a_not_cont, b_not_cont)
-        jit_model = torch.jit.trace(model,(a, b))
-        trace_graph = jit_model.graph_for(a, b)
-        jit_res = jit_model(a_not_cont, b_not_cont)
-        node = "ipex::add_layernorm"
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-        self.assertEqual(jit_res, ori_res)
+                # not contiguous
+                a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+                b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
+                ori_res = model(a_not_cont, b_not_cont)
+                jit_model = torch.jit.trace(model,(a, b))
+                trace_graph = jit_model.graph_for(a, b)
+                jit_res = jit_model(a_not_cont, b_not_cont)
+                node = "ipex::add_layernorm"
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                self.assertEqual(jit_res, ori_res)
 
-        a_bf16 = a.to(torch.bfloat16)
-        b_bf16 = b.to(torch.bfloat16)
-        with torch.cpu.amp.autocast():
-            ori_res = model(a_bf16, b_bf16)
-            model_jit = jit_model = torch.jit.trace(model,(a, b))
-            trace_graph = jit_model.graph_for(a, b)
-            jit_res = jit_model(a_bf16, b_bf16)
-            node = "ipex::add_layernorm"
-            self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
-            self.assertEqual(jit_res, ori_res, prec=5e-2)
+                a_bf16 = a.to(torch.bfloat16)
+                b_bf16 = b.to(torch.bfloat16)
+                w_bf16 = w.to(torch.bfloat16)
+                model = AddLayerNorm_v2(dim)
+                jit_model = torch.jit.trace(model,(a, b, w))
+                ori_res = model(a_bf16, b_bf16, w)
+                trace_graph = jit_model.graph_for(a_bf16, b_bf16, w_bf16)
+                jit_res = jit_model(a_bf16, b_bf16, w_bf16)
+                node = "ipex::add_layernorm"
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                self.assertEqual(jit_res, ori_res, prec=5e-2)
 
-        model = AddLayerNorm_v1(dim)
-        c = torch.randn(bs, seq_len, dim)
-        jit_model = torch.jit.trace(model,(a, b, c))
-        trace_graph = jit_model.graph_for(a, b, c)
-        jit_res = jit_model(a, b, c)
-        ori_res = model(a, b, c)
-        self.assertEqual(jit_res, ori_res)
-        node = "ipex::add_layernorm"
-        torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
-        self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                model = AddLayerNorm_v1(dim)
+                c = torch.randn(bs, seq_len, dim)
+                jit_model = torch.jit.trace(model,(a, b, c))
+                trace_graph = jit_model.graph_for(a, b, c)
+                
+                jit_res = jit_model(a, b, c)
+                ori_res = model(a, b, c)
+                self.assertEqual(jit_res, ori_res)
+                node = "ipex::add_layernorm"
+                torch._C._jit_set_texpr_fuser_enabled(pre_te_enable_status)
+                self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
     def test_concat_bn_relu(self):
         batch_size = 3
@@ -1301,6 +1491,16 @@ class Tester(TestCase):
 
             self.assertEqual(res_ref, res_jit)
 
+            # non 512 bit align shape
+            mat3 = torch.randn(10000, 1019)
+            pattern_3 = LinearSwishNaive(1019, 1019)
+            pattern3_jit = torch.jit.trace(pattern_3, (mat3))
+            pattern3_jit.eval()
+            res_ref = pattern_3(mat3)
+            res_jit = pattern3_jit(mat3)
+
+            self.assertEqual(res_ref, res_jit)
+
             def _test_pure_bf16(model, trace_model, mat1, prec=5e-2):
                 model = model.to(torch.bfloat16)
                 trace_model = trace_model.to(torch.bfloat16)
@@ -1311,6 +1511,7 @@ class Tester(TestCase):
 
             _test_pure_bf16(pattern_1, pattern1_jit, mat1)
             _test_pure_bf16(pattern_2, pattern2_jit, mat2)
+            _test_pure_bf16(pattern_3, pattern3_jit, mat3)
 
     def test_distil_mha_scores_calculation(self):
         def _check_match_mha(trace_model, mat1, mat2, mask, node = "ipex::distil_mha_scores_calc"):
@@ -1337,56 +1538,57 @@ class Tester(TestCase):
             res_jit = trace_model(qk_bf16, mask_bf16)
             self.assertEqual(res_ref, res_jit, prec=prec)
             _check_match_mha_parts(trace_model, qk_bf16, mask)
+        
+        for sequance_length in [128, 100]:
+            mat1 = torch.randn(56, 12, sequance_length, sequance_length)
+            mat2 = torch.randn(56, 12, sequance_length, sequance_length)
+            mask = torch.randn(56, sequance_length)
+            qk = torch.matmul(mat1,mat2)
+            mask = (mask > 0.5)
 
-        mat1 = torch.randn(56, 12, 384, 384)
-        mat2 = torch.randn(56, 12, 384, 384)
-        mask = torch.randn(56, 384)
-        qk = torch.matmul(mat1,mat2)
-        mask = (mask > 0.5)
+            mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
+                mha_jit.eval()
 
-        mha_v1 = DistilMHAScoresCalculation_v1(4, -1)
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v1, (mat1, mat2, mask))
-            mha_jit.eval()
+                res_ref = mha_v1(mat1, mat2, mask)
+                res_jit = mha_jit(mat1, mat2, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, mask)
+                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
 
-            res_ref = mha_v1(mat1, mat2, mask)
-            res_jit = mha_jit(mat1, mat2, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha(mha_jit, mat1, mat2, mask)
-            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+            mha_v2 = DistilMHAScoresCalculation_v2(4)
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
+                mha_jit.eval()
 
-        mha_v2 = DistilMHAScoresCalculation_v2(4)
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v2, (mat1, mat2, mask))
-            mha_jit.eval()
+                res_ref = mha_v2(mat1, mat2, mask)
+                res_jit = mha_jit(mat1, mat2, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha(mha_jit, mat1, mat2, mask)
+                _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
 
-            res_ref = mha_v2(mat1, mat2, mask)
-            res_jit = mha_jit(mat1, mat2, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha(mha_jit, mat1, mat2, mask)
-            _test_pure_bf16(mha_v1, mha_jit, mat1, mat2, mask)
+            mha_v3 = Maskedfill__softmax()
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v3, (qk, mask))
+                mha_jit.eval()
 
-        mha_v3 = Maskedfill__softmax()
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v3, (qk, mask))
-            mha_jit.eval()
+                res_ref = mha_v3(qk, mask)
+                res_jit = mha_jit(qk, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha_parts(mha_jit, qk, mask)
+                _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
 
-            res_ref = mha_v3(qk, mask)
-            res_jit = mha_jit(qk, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha_parts(mha_jit, qk, mask)
-            _test_pure_bf16_parts(mha_v3, mha_jit, qk, mask)
+            mha_v4 = Maskedfill_softmax()
+            with torch.no_grad():
+                mha_jit = torch.jit.trace(mha_v4, (qk, mask))
+                mha_jit.eval()
 
-        mha_v4 = Maskedfill_softmax()
-        with torch.no_grad():
-            mha_jit = torch.jit.trace(mha_v4, (qk, mask))
-            mha_jit.eval()
-
-            res_ref = mha_v4(qk, mask)
-            res_jit = mha_jit(qk, mask)
-            self.assertEqual(res_ref, res_jit)
-            _check_match_mha_parts(mha_jit, qk, mask)
-            _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
+                res_ref = mha_v4(qk, mask)
+                res_jit = mha_jit(qk, mask)
+                self.assertEqual(res_ref, res_jit)
+                _check_match_mha_parts(mha_jit, qk, mask)
+                _test_pure_bf16_parts(mha_v4, mha_jit, qk, mask)
 
     def _test_conv_unary_fusion(self, op_list, seed=None):
         batch_size = 8
@@ -1506,6 +1708,84 @@ class Tester(TestCase):
                 x,
                 kind_not_in_graph = 'ipex_prepack::convolution_%s_run' % ipex_eltwise_op)
 
+    def _test_conv_transpose_sum(self, module, alpha, supported, test_inplace=True):
+        batch_size = 1
+        out_channels = 3
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        prec = 0.02
+        kwargs = {"alpha": alpha}
+        add_funcs = [lambda a, b, kwargs: torch.add(a, b, **kwargs)]
+        if test_inplace:
+            add_funcs.append(lambda a, b, kwargs: a.add_(b, **kwargs))
+        
+        for dim in [2, 3]:
+            for add_func in add_funcs:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+                ipex_eltwise_op = "add"
+                x = torch.randn(input_size)
+                m = module(dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs)
+                if supported:
+                    self._test_output(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                        prec=prec)
+                else:
+                    self._test_output(
+                        m,
+                        x,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op)
+                    self._test_output_bf16(
+                        m,
+                        x,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                        prec=prec)
+
+    def test_conv_transpose_sum_accumu_on_right(self):
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnRight, 
+            alpha=1,
+            supported=True)
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnRight,
+            alpha=2,
+            supported=True)
+
+    def test_conv_transpose_sum_accumu_on_left(self):
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnLeft,
+            alpha=1,
+            supported=True)
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnLeft,
+            alpha=2,
+            supported=False)
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnLeft,
+            alpha=2.,
+            supported=False)
+
+    def test_conv_transpose_sum_broadcast_unsupported(self):
+        self._test_conv_transpose_sum(
+            ConvTransposeSumBroadcast,
+            alpha=1,
+            supported=False,
+            test_inplace=False) # in-place add does not support shape broadcast
+
     def test_conv_fusion(self):
         batch_size = 8
         out_channels = 16
@@ -1565,6 +1845,12 @@ class Tester(TestCase):
                 kind_not_in_graph="ipex::batch_norm",
                 prec=0.02,
                 levels=['O1'])
+            self._test_output(
+                ConvBatchNorm_Fixed2(dim, in_channels, out_channels, kernel_size=kernel_size, stride=1),
+                x,
+                kind_in_graph="ipex::batch_norm",
+                prec=0.02,
+                levels=['O0'])
 
     def test_output_frozen_conv_bn(self):
         batch_size = 8
@@ -1572,10 +1858,10 @@ class Tester(TestCase):
         in_channels = 3
         kernel_size = 3
         image_size = 16
-        options = itertools.product([torch.float32, torch.bfloat16], [True, False])
-        for dtype, use_channels_last in options:
+        options = itertools.product([torch.float32, torch.bfloat16], [True, False], [ConvBatchNorm_Fixed, ConvBatchNorm_Fixed3])
+        for dtype, use_channels_last, model in options:
             input_size = [batch_size, in_channels, image_size, image_size]
-            model = ConvBatchNorm_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
+            model = model(2, in_channels, out_channels, kernel_size=kernel_size, stride=1).eval()
             x = torch.randn(input_size, dtype=dtype)
             if use_channels_last:
                 x = x.to(memory_format=torch.channels_last)
@@ -1829,6 +2115,11 @@ class Tester(TestCase):
                     input_size.append(image_size)
                 x = torch.randn(input_size)
                 self._test_output(
+                    Conv_Tensor_Binary2(torch.add, dim, in_channels, out_channels, kernel_size=kernel_size, stride=1, bias=bias),
+                    x,
+                    kind_in_graph="aten::add")
+
+                self._test_output(
                     Conv_Tensor_Binary(torch.add, dim, in_channels, out_channels, kernel_size=kernel_size, stride=1, bias=bias),
                     x,
                     kind_in_graph="ipex_prepack::convolution_run",
@@ -2066,6 +2357,20 @@ class Tester(TestCase):
                 prec=0.1,
                 use_channels_last=[False])
 
+    def test_conv_sum_dynamic_shape(self):
+        m = ConvSum(2, 3, 16, kernel_size=3, stride=1).eval()
+        x1 = torch.randn(1, 3, 56, 56)
+        x2 = torch.randn(2, 3, 56, 56)
+        with torch.no_grad():
+            traced = torch.jit.trace(m, x1)
+            traced = torch.jit.freeze(traced)
+            # apply fusion
+            y = m(x1)
+            y = m(x1)
+            traced_y = traced(x2)
+            eager_y = m(x2)
+            self.assertEqual(eager_y, traced_y)
+
     def test_output_conv_scalar_sum(self):
         batch_size = 8
         out_channels = 32
@@ -2167,6 +2472,19 @@ class Tester(TestCase):
             prec=0.03,
             use_channels_last=[True],
             levels=['O1'])
+        # dynamic shape
+        models = [Bottleneck_v1().eval(), Bottleneck_v2().eval()]
+        x2 = torch.randn(2, 64, 56, 56)
+        with torch.no_grad():
+            for m in models:
+                traced = torch.jit.trace(m, x1)
+                traced = torch.jit.freeze(traced)
+                # apply fusion
+                y = m(x1)
+                y = m(x1)
+                traced_y = traced(x2)
+                eager_y = m(x2)
+                self.assertEqual(eager_y, traced_y)
 
     def test_jit_conv_sum_in_diff_block(self):
         batch_size = 8
@@ -2381,6 +2699,12 @@ class Tester(TestCase):
     def test_output_linear_scalar_binary(self):
         for bias in [True, False]:
             self._test_output(
+                Linear_Scalar_Binary(torch.add, 3, 1, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::linear",
+                kind_not_in_graph="aten::add")
+
+            self._test_output(
                 Linear_Scalar_Binary(torch.add, 3, 32, bias=bias),
                 torch.randn(52, 3),
                 kind_in_graph="aten::linear",
@@ -2434,6 +2758,16 @@ class Tester(TestCase):
 
     def test_output_linear_tensor_binary(self):
         for bias in [True, False]:
+            self._test_output(
+                Linear_Tensor_Binary2(torch.add, 3, 2, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::add")
+
+            self._test_output(
+                Linear_Tensor_Binary3(torch.add, 3, 2, bias=bias),
+                torch.randn(52, 3),
+                kind_in_graph="aten::add")
+
             self._test_output(
                 Linear_Tensor_Binary(torch.add, 3, 32, bias=bias),
                 torch.randn(52, 3),
@@ -2566,6 +2900,26 @@ class Tester(TestCase):
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
 
+    def test_output_linear_add_relu(self):
+        for inplace in [True, False]:
+            m = LinearAddRelu(3, 5, 8, inplace)
+            x = torch.randn(2, 3)
+            self._test_output(
+                m,
+                x,
+                kind_in_graph="aten::linear")        
+            self._test_onednn_fp32(
+                m,
+                x,
+                kind_in_graph="ipex_prepack::linear_add_relu_run",
+                kind_not_in_graph="ipex_prepack::linear_add_run")                
+            self._test_output_bf16(
+                m,
+                x,
+                kind_in_graph="ipex_prepack::linear_add_relu_run",
+                kind_not_in_graph="ipex_prepack::linear_add_run",
+                prec=5e-2)
+
     def test_output_linear_reshape_relu(self):
         self._test_output(
             Linear_Reshape_Relu(3, 32,(64,16),bias=True),
@@ -2640,49 +2994,109 @@ class Tester(TestCase):
         inputs = [torch.randn(10, 3, 4), torch.randn(3, 4)]
         for x in inputs:
             self._test_output(
-                MatmulDiv(div_scalar=True, with_out=True),
+                MatmulDivOutplace(div_scalar=True, with_out=True),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output(
-                MatmulDiv(div_scalar=True, with_out=False),
+                MatmulDivOutplace(div_scalar=True, with_out=False),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output(
-                MatmulDiv(div_scalar=False, with_out=False),
+                MatmulDivOutplace(div_scalar=False, with_out=False),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output(
-                MatmulDiv(div_scalar=False, with_out=True),
+                MatmulDivOutplace(div_scalar=False, with_out=True),
                 x,
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=True, with_out=True),
+                MatmulDivOutplace(div_scalar=True, with_out=True),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-2)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=True, with_out=False),
+                MatmulDivOutplace(div_scalar=True, with_out=False),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-2)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=False, with_out=True),
+                MatmulDivOutplace(div_scalar=False, with_out=True),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-3)
             self._test_output_bf16(
-                MatmulDiv(div_scalar=False, with_out=False),
+                MatmulDivOutplace(div_scalar=False, with_out=False),
                 x.to(torch.bfloat16),
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None,
                 prec=5e-3)
+            self._test_output(
+                MatmulDivInplace(div_scalar=True, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDivInplace(div_scalar=True, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDivInplace(div_scalar=False, with_out=False),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output(
+                MatmulDivInplace(div_scalar=False, with_out=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=True, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=True, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-2)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=False, with_out=True),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
+            self._test_output_bf16(
+                MatmulDivInplace(div_scalar=False, with_out=False),
+                x.to(torch.bfloat16),
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None,
+                prec=5e-3)
+            # When the div is outplace and out parameter be modified with an inplace op not in this pattern,
+            # but we didn't observe it's value.
+            self._test_output(
+                MatmulDivOutplaceOutModifiedByOtherOP_v1(div_scalar=True),
+                x,
+                kind_in_graph="ipex::matmul_div",
+                kind_not_in_graph=None)
+            # When the div is outplace and out parameter be modified with an inplace op not in this pattern,
+            # and we observe it's value by some other op("==" -> aten::equl). In this case, jit.trace will treat 
+            # out parameter that will modified by other ops as output of matmul, thus will not be matched by
+            # our pattern, and we can't observe our fused op's side effect after we modified out param by an inplace op.
+            self._test_output(
+                MatmulDivOutplaceOutModifiedByOtherOP_v2(div_scalar=False),
+                x,
+                kind_in_graph=None,
+                kind_not_in_graph="ipex::matmul_div")
 
     def test_bmm_add(self):
         M = torch.randn(10, 3, 5)
@@ -2874,9 +3288,10 @@ class Tester(TestCase):
 
 
     def test_enable_inplace(self):
-        class M(nn.Module):
+        # M_apply_inplace is for testing success inplace replacement condition
+        class M_apply_inplace(nn.Module):
             def __init__(self, eltwise_fn, params_dict={}):
-                super(M, self).__init__()
+                super(M_apply_inplace, self).__init__()
                 self.eltwise = eltwise_fn
                 self.params_dict = params_dict
 
@@ -2888,50 +3303,46 @@ class Tester(TestCase):
                 x1 = self.eltwise(x1, **self.params_dict)
                 return x1
 
+        # M_remain_outplace is for testing failed inplace replacement condition
+        class M_remain_outplace(nn.Module):
+            def __init__(self, eltwise_fn, params_dict={}):
+                super(M_remain_outplace, self).__init__()
+                self.eltwise = eltwise_fn
+                self.params_dict = params_dict
+
+            def forward(self, x):
+                x1 = self.eltwise(x, **self.params_dict)
+                return x1
+
         for eltwise in ['sigmoid', 'tanh', 'celu', 'elu', 'hardsigmoid', 'hardswish', 'hardtanh', 'leaky_relu', 'relu6', 'relu', 'rrelu', 'selu', 'silu']:
             eltwise_fn_name = eltwise + '_'
             if eltwise in ['sigmoid', 'tanh', 'celu', 'relu', 'rrelu', 'selu']:
-#use torch.sigmoid_(x)
                 eltwise_fn_outplace = getattr(torch, eltwise)
-                m_outplace = M(eltwise_fn_outplace)
+                m_inplace = M_apply_inplace(eltwise_fn_outplace)
+                m_outplace = M_remain_outplace(eltwise_fn_outplace)
             else:
-#use F.elu(x, inplace = True)
                 eltwise_fn = getattr(F, eltwise)
-                m = M(eltwise_fn, {"inplace": True})
-                m_outplace = M(eltwise_fn)
+                m_inplace = M_apply_inplace(eltwise_fn)
+                m_outplace = M_remain_outplace(eltwise_fn)
 
             with torch.no_grad():
+                m_inplace.eval()
                 m_outplace.eval()
-                x_outplace = torch.randn(1, 3, 16, 16)
+                x = torch.randn(1, 3, 16, 16)
 
-#test enable inplace
-                traced_outplace = torch.jit.trace(m_outplace, x_outplace)
-                trace_graph_outplace = traced_outplace.graph_for(x_outplace)
-                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_outplace.nodes()))
+                traced_inplace = torch.jit.trace(m_inplace, x)
+                trace_graph_inplace = traced_inplace.graph_for(x)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise_fn_name for n in trace_graph_inplace.nodes()))
+                y_inplace = m_inplace(x)
+                traced_y_inplace = traced_inplace(x)
+                self.assertEqual(y_inplace, traced_y_inplace)
 
-                y_outplace = m_outplace(x_outplace)
-                traced_y_outplace = traced_outplace(x_outplace)
+                traced_outplace = torch.jit.trace(m_outplace, x)
+                trace_graph_outplace = traced_outplace.graph_for(x)
+                self.assertTrue(any(n.kind() == "aten::" + eltwise for n in trace_graph_outplace.nodes()))
+                y_outplace = m_outplace(x)
+                traced_y_outplace = traced_outplace(x)
                 self.assertEqual(y_outplace, traced_y_outplace)
-
-    def test_remove_bailout(self):
-        batch_size = 8
-        out_channels = 32
-        in_channels = 3
-        kernel_size = 3
-        image_size = 64
-        input_size = [batch_size, in_channels, image_size, image_size]
-        x = torch.randn(input_size)
-        with DisableTexprFuser():
-            self._test_output(
-                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="prim::BailOut")
-            self._test_output_bf16(
-                ConvRelu_Fixed(2, in_channels, out_channels, kernel_size=kernel_size, stride=1),
-                x,
-                kind_in_graph="ipex_prepack::convolution_relu_run",
-                kind_not_in_graph="prim::BailOut")
 
     @skipIfNoTorchVision
     def test_conv_torchvision_bn_folding(self):
@@ -2982,6 +3393,18 @@ class Tester(TestCase):
             kind_in_graph="ipex_prepack::convolution_relu_run",
             kind_not_in_graph="aten::mul",
             prec=0.1)
+
+    def test_TEfusion_with_dynamic_input(self):
+        model = AddMulDiv().eval()
+        with torch.no_grad():
+            traced_model = torch.jit.trace(model, torch.randn(11, 3, 20, 20)).eval()
+            traced_model = torch.jit.freeze(traced_model)
+
+        for i in range(5):
+            input = torch.randn(i, 3, 20, 20)
+            tresult = traced_model(input)
+            result = model(input)
+            self.assertEqual(tresult, result)
 
 if __name__ == '__main__':
     torch.manual_seed(2020)

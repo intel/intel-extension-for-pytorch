@@ -6,13 +6,14 @@ from common_utils import TestCase
 class TestCumSum(TestCase):
     # Port from test_torch
     def test_cumsum(self):
-        x = torch.rand(100, 100)
-        res1 = torch.ops.torch_ipex.cumsum(x, 1)
-        res2 = torch.tensor([])
-        torch.ops.torch_ipex.cumsum(x, 1, out=res2)
-        self.assertEqual(res1, res2)
-        torch.ops.torch_ipex.cumsum_(x, 1)
-        self.assertEqual(res1, x)
+        for dtype in [torch.float, torch.double, torch.long]:
+            x = torch.randn(17, 4097).to(dtype)
+            res1 = torch.ops.torch_ipex.cumsum(x, 1)
+            res2 = torch.tensor([]).to(dtype)
+            torch.ops.torch_ipex.cumsum(x, 1, out=res2)
+            self.assertEqual(res1, res2)
+            torch.ops.torch_ipex.cumsum_(x, 1)
+            self.assertEqual(res1, x)
 
         a = torch.tensor([[True, False, True],
                           [False, False, False],

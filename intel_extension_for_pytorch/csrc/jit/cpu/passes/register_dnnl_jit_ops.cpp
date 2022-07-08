@@ -13,7 +13,6 @@
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
 #include "csrc/jit/cpu/kernels/LinearSwishCustomized.h"
 #include "csrc/jit/cpu/kernels/Matmul.h"
-#include "csrc/jit/cpu/kernels/MaxPool2D.h"
 #include "csrc/jit/cpu/kernels/Mha.h"
 #include "csrc/jit/cpu/kernels/OpContext.h"
 #include "csrc/jit/cpu/kernels/RNN.h"
@@ -186,6 +185,7 @@ RegisterOperators op({
     CreateConvUnaryPostOpPrepack(log),
     CreateConvUnaryPostOpPrepack(round),
     CreateConvUnaryPostOpPrepack(sqrt),
+    CreateConvUnaryPostOpPrepack(hardsigmoid),
 
     CreateConvUnaryPostOpRun(run),
     CreateConvUnaryPostOpRun(relu_run),
@@ -200,6 +200,7 @@ RegisterOperators op({
     CreateConvUnaryPostOpRun(log_run),
     CreateConvUnaryPostOpRun(round_run),
     CreateConvUnaryPostOpRun(sqrt_run),
+    CreateConvUnaryPostOpRun(hardsigmoid_run),
 
     CreateConvBinaryPostOpPrepack(add, fuse_sum),
     CreateConvBinaryPostOpPrepack(add_relu, residual),
@@ -492,6 +493,7 @@ RegisterOperators op({
     CreateLinearUnaryPostOpRun(log_run),
     CreateLinearUnaryPostOpRun(round_run),
     CreateLinearUnaryPostOpRun(sqrt_run),
+    CreateLinearUnaryPostOpRun(hardsigmoid_run),
 
     Operator(
         "ipex_prepack::linear_leaky_relu_run(Tensor input, Scalar alpha, "
@@ -603,6 +605,26 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::linear_add_relu_run(Tensor input, Tensor(a!) accumu, *, "
+        "Scalar? alpha, "
+        "__torch__.torch.classes.ipex_prepack.LinearOpContext W_prepack) "
+        "-> Tensor(a!)",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto output = (std::move(peek(stack, 1, 4))).toTensor();
+            auto result = linear_add_relu_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                output,
+                (std::move(peek(stack, 2, 4))).toOptional<at::Scalar>(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<LinearOpContext>());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
 
     // ConvTranspose fusion run OP
     CreateConvTransposeUnaryPostOpRun(run),
@@ -618,6 +640,7 @@ RegisterOperators op({
     CreateConvTransposeUnaryPostOpRun(log_run),
     CreateConvTransposeUnaryPostOpRun(round_run),
     CreateConvTransposeUnaryPostOpRun(sqrt_run),
+    CreateConvTransposeUnaryPostOpRun(hardsigmoid_run),
 
     Operator(
         "ipex_prepack::conv_transpose_gelu_run(Tensor input, str approximate, "
@@ -709,28 +732,30 @@ RegisterOperators op({
           };
         },
         aliasAnalysisFromSchema()),
-
     Operator(
-        "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
-        "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
+        "ipex_prepack::conv_transpose_add_run"
+        "(Tensor input, Tensor(a!) accumu, "
+        "*, Scalar? alpha, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
-            auto result = dil_max_pool2d(
-                (std::move(peek(stack, 0, 6))).toTensor(),
-                (std::move(peek(stack, 1, 6))).toIntVector(),
-                (std::move(peek(stack, 2, 6))).toIntVector(),
-                (std::move(peek(stack, 3, 6))).toIntVector(),
-                (std::move(peek(stack, 4, 6))).toIntVector(),
-                (std::move(peek(stack, 5, 6))).toBool());
-            drop(stack, 6);
+            auto output = (std::move(peek(stack, 1, 4))).toTensor();
+            auto result = conv_transpose_add_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                output,
+                (std::move(peek(stack, 2, 4))).toOptional<at::Scalar>(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 4);
             pack(stack, std::move(result));
             return 0;
           };
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Tensor "
-        "div_input) -> Tensor",
+        "ipex::matmul_div(Tensor left, Tensor right, Tensor(a!) out_opt, Tensor "
+        "div_input) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = dil_matmul_div(
@@ -746,8 +771,8 @@ RegisterOperators op({
         aliasAnalysisFromSchema()),
 
     Operator(
-        "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Scalar "
-        "div_input) -> Tensor",
+        "ipex::matmul_div(Tensor left, Tensor right, Tensor(a!) out_opt, Scalar "
+        "div_input) -> Tensor(a!)",
         [](const Node* node) -> Operation {
           return [](Stack* stack) {
             auto result = dil_matmul_div(
@@ -877,19 +902,6 @@ RegisterOperators op({
               peek(stack, 1, 3).toTensor(),
               toOptionalTensor(std::move(peek(stack, 2, 3))));
           drop(stack, 3);
-          pack(stack, std::move(result));
-        },
-        aliasAnalysisFromSchema()),
-
-    Operator(
-        "ipex::linear_swish_customized(Tensor x, Tensor weight, Tensor ? bias) -> Tensor",
-        [](Stack& stack) {
-          auto result = dil_linear_swish_customized(
-              peek(stack, 0, 3).toTensor(),
-              peek(stack, 1, 3).toTensor(),
-              toOptionalTensor(std::move(peek(stack, 2, 3))));
-          drop(stack, 3);
-
           pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),

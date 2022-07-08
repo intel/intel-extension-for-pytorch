@@ -43,6 +43,7 @@ DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(square);
 DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
 DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
 DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
+DECLARE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(hardsigmoid);
 
 at::Tensor conv_transpose_gelu_run(
     const at::Tensor& input,
@@ -72,6 +73,12 @@ at::Tensor conv_transpose_pow_run(
     at::Scalar exponent,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
 
+at::Tensor conv_transpose_add_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
 ContextConvTranspose create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
@@ -86,6 +93,12 @@ ContextConvTranspose create(
 at::Tensor run(
     const ContextConvTranspose& context,
     const at::Tensor& input,
+    const ideep::attr_t& attr);
+
+at::Tensor& run(
+    const ContextConvTranspose& context,
+    const at::Tensor& input,
+    at::Tensor& accumu,
     const ideep::attr_t& attr);
 
 // Runing backward for ConvTranspose by given grad_output, input and grad_masks.

@@ -3,7 +3,7 @@ import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, get_eltwise_fn
 from torch.testing._internal.common_utils import TEST_SCIPY
 
 import intel_extension_for_pytorch as ipex
@@ -35,13 +35,6 @@ except RuntimeError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, 'no torchvision')
 
-def get_eltwise_fn(name):
-    if hasattr(torch, name):
-        return getattr(torch, name)
-    elif hasattr(F, name):
-        return getattr(F, name)
-    else:
-        raise NameError('Eltwise function %s not found' % name)
 
 class TestOp(JitLlgaTestCase):
     def test_conv_int8_in_f32_out(self):
@@ -368,7 +361,8 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.conv2(x)
                 return x
 
-        for eltwise in ['relu', 'leaky_relu']: # TODO: ['sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']
+        for eltwise in ['relu', 'leaky_relu', 'sigmoid', 'round', 'abs', 'square',
+                        'abs', 'round', 'exp', 'hardswish', 'tanh', 'hardtanh', 'mish']:
             for inplace in [False, True]:
                 for memory_format in [torch.contiguous_format, torch.channels_last]:
                     eltwise_fn_name = eltwise + '_' if inplace else eltwise
@@ -387,6 +381,91 @@ class TestFusionPattern(JitLlgaTestCase):
                         self.assertFused(graph, ['aten::_convolution', 'aten::' + eltwise, 'aten::quantize_per_channel', 'aten::dequantize'])
                         self.checkPatterns(graph, patterns)
 
+    def test_conv2d_clamp(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv5 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = torch.clamp(x, min=float('-inf'))
+                x = self.conv2(x)
+                x = torch.clamp(x, min=-5)
+                x = self.conv3(x)
+                x = torch.clamp(x, min=0, max=float('inf'))
+                x = self.conv4(x)
+                x = torch.clamp(x, min=1, max=5)
+                x = self.conv5(x)
+                x = torch.clamp(x, max=2)
+                return x
+
+        for inplace in [False, True]:
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+                m = M()
+                for qconfig in static_qconfig:
+                    graph = self.checkQuantizeTrace(m, [x], atol=2e-1, qconfig=qconfig)
+                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
+                    self.assertFused(graph, ['aten::_convolution', 'aten::' + "clamp", 'aten::quantize_per_channel', 'aten::dequantize'])
+
+    def test_conv2d_silu(self):
+        class M(nn.Module):
+            def __init__(self, inplace):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.eltwise = nn.SiLU(inplace=inplace)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.eltwise(x)
+                x = self.conv2(x)
+                return x        
+        for inplace in [False, True]:
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                m = M(inplace)
+                x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+
+                graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+
+                silu_op = 'aten::silu_' if inplace else 'aten::silu'
+                
+                # oneDNN graph does not have silu OP. The bridge will convert silu to sigmoid - mul
+                patterns = [
+                    ["aten::dequantize", "aten::_convolution", 'aten::sigmoid', 'aten::mul', "aten::quantize_per_tensor"], # inplace op will become outplace op on the JIT graph
+                    ["aten::dequantize", "aten::_convolution"]
+                ]                
+
+                self.assertFused(graph, ['aten::_convolution', silu_op, 'aten::dequantize'])
+                self.checkPatterns(graph, patterns)                
+
+    def test_deconv_silu(self):
+        class M(nn.Module):
+            def __init__(self, inplace):
+                super(M, self).__init__()
+                self.deconv = nn.ConvTranspose2d(3, 2, 3, stride=2)
+                self.eltwise = nn.SiLU(inplace=inplace)
+
+            def forward(self, x):
+                x = self.deconv(x)
+                x = self.eltwise(x)
+                return x        
+        
+        for inplace in [False, True]:
+            m = M(inplace)
+            x = torch.rand(1, 3, 28, 28)
+            silu_op = 'aten::silu_' if inplace else 'aten::silu'
+            graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+            # TODO: deconv is unsupported in the bridge, thus conv-silu will be fused by IPEX
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+            self.assertGraphContainsExactly(graph, silu_op, 1)         
+
     def test_ensure_tensor_is_rewrapped(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn):
@@ -398,26 +477,26 @@ class TestFusionPattern(JitLlgaTestCase):
 
             def forward(self, x, y):
                 x = self.conv1(x)
-                x = self.eltwise(x)
-                x = self.conv2(x)
-                x = self.eltwise(x)
+                y = self.conv2(y)
+                y = self.eltwise(y)
                 x = torch.add(x, y)
                 x = self.adaptive_avg_pool_2d(x)
                 return x
 
-                eltwise_fn_name = 'relu'
-                eltwise_fn = get_eltwise_fn(eltwise_fn_name)
+        eltwise_fn_name = 'relu'
+        eltwise_fn = get_eltwise_fn(eltwise_fn_name)
 
-                m = M(eltwise_fn)
-                x = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
-                y = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
-                for qconfig in static_qconfig:
-                # Simply test if the output is accurate
-                # The output of the second partition is input to adaptive_avg_pool2d, which is
-                # unsupported by LLGA. In resnext101 32x16d, we encountered an accuracy issue
-                    graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1,
-                                                    qconfig=qconfig)
-                    self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        m = M(eltwise_fn)
+        x = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
+        y = torch.rand(1, 32, 28, 28).to(memory_format=torch.channels_last)
+        for qconfig in static_qconfig:
+            # The output of the fourth partition is input to adaptive_avg_pool2d, which is
+            # unsupported by LLGA. In resnext101 32x16d, we had encountered an accuracy issue.
+            # The UT checks that the input to adaptive_avg_pool_2d has not been wrapped by
+            # LlgaTensorImpl (assertEqual would fail in that case).
+            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1,
+                                            qconfig=qconfig)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
 
     def test_conv2d_bn(self):
@@ -504,6 +583,88 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
                 self.assertFused(graph, ['aten::' + eltwise])
                 self.checkPatterns(graph, patterns)
+
+    def test_linear_silu(self):
+        class M(nn.Module):
+            def __init__(self, inplace):
+                super(M, self).__init__()
+                self.linear = nn.Linear(28, 64)
+                self.eltwise = nn.SiLU(inplace=inplace)
+
+            def forward(self, x):
+                x = self.linear(x)
+                x = self.eltwise(x)
+                return x
+        for inplace in [False, True]:
+            m = M(inplace)
+            x = torch.rand(1, 28, requires_grad=False)
+
+            silu_op = 'aten::silu_' if inplace else 'aten::silu'
+
+            patterns = [
+                ["aten::dequantize", "aten::linear", "aten::sigmoid", "aten::mul"],
+            ]
+            graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.assertFused(graph, ['aten::linear', silu_op, 'aten::dequantize'])
+            self.checkPatterns(graph, patterns)
+
+    def test_conv_relu_sigmoid_mul(self):
+        #        dequant
+        #           |
+        #         conv
+        #           |
+        #         relu
+        #          /  |
+        #       quant |
+        #        /    |
+        #     dequant | 
+        #       |     |
+        #     conv    |
+        #       |     |
+        #     relu    |
+        #       |     |
+        #     quant   |
+        #       |     |
+        #    dequant  |
+        #       |     |
+        #     conv    |
+        #       |     |
+        #    sigmoid  |
+        #         \   /
+        #          mul
+
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                
+                # The output y of relu is used by mul
+                y = x.relu()
+                
+                z = self.conv2(y)
+                z = z.relu()
+                z = self.conv3(z)
+                z = z.sigmoid()
+                z = z.mul(y)
+                return z
+        
+        x = torch.rand(1, 32,16, 16, requires_grad=False)
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
+        patterns = [
+            ["aten::dequantize", "aten::_convolution", "aten::relu"],
+            ["aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::_convolution", "aten::sigmoid", "aten::mul"],
+        ] 
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::sigmoid','aten::mul'])
+        self.checkPatterns(graph, patterns)     
 
     def test_conv_eltwise_tensor_method(self):
         class ConvSigmoid(nn.Module):
@@ -681,7 +842,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ["aten::dequantize", "aten::linear"]
         ]
         for qconfig in static_qconfig:
-            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, qconfig=qconfig)
+            graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
             self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
@@ -732,7 +893,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ["aten::dequantize", "aten::to", "aten::linear", "aten::to", "aten::quantize_per_tensor"],
             ["aten::dequantize", "aten::to", "aten::linear", "aten::add"]
         ]
-        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, int8_bf16=True)
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, int8_bf16=True)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
         self.assertFused(graph, ['aten::linear', 'aten::add', 'aten::dequantize'])
         self.checkPatterns(graph, patterns)
@@ -868,6 +1029,50 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::dequantize', 'aten::linear', 'aten::matmul'])
         self.checkPatterns(graph, patterns)
 
+    def test_lift_up_quant_unsupported(self):
+        # Original graph:
+        #          |
+        #        view
+        #      /  (f32)\   /(f32)
+        #   quant       add
+        #     |
+
+        # Lifting up in this case will raise: 
+        # promoteTypes with quantized numbers is not handled in aten::add;
+        #          |
+        #        quant
+        #          |
+        #         view
+        #         (int8)\  /(f32)
+        #                add
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(3, 8, 1)
+                self.conv2 = nn.Conv2d(8, 8, 1)
+
+            def forward(self, x, y):
+                x = self.conv1(x)
+                z1 = x.permute(0, 3, 1, 2)
+                z2 = self.conv2(z1)
+                z = z1 + y
+                output = z2 + z
+                return output
+        
+        x = torch.randn(1, 3, 8, 8)
+        y = torch.randn(1, 8, 8, 8)
+        m = M()
+
+        patterns = [
+            ["aten::dequantize", "aten::_convolution"],
+            ["aten::dequantize", "aten::_convolution", "aten::add"],
+        ]
+
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
+        self.checkPatterns(graph, patterns)        
+
     def test_wildcard(self):
         class M(nn.Module):
             def __init__(self):
@@ -986,6 +1191,49 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
         # single aten::to won't be rewritten by llga backend
         self.assertFused(graph, ['aten::dequantize', 'aten::matmul', 'aten::div'])
+        self.checkPatterns(graph, patterns)
+
+    def test_bmm_method_bf16(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                mm_res = x.matmul(y)
+                return mm_res
+
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
+        patterns = [
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        # single aten::to won't be rewritten by llga backend
+        self.assertFused(graph, ['aten::dequantize', 'aten::matmul'])
+        self.checkPatterns(graph, patterns)
+
+    def test_bmm_method_fp32(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y):
+                mm_res = x.matmul(y)
+                return mm_res
+
+        x = torch.randn(1, 16, 384, 64) * 0.1
+        y = torch.randn(1, 1, 64, 384) * 0.1
+        patterns = [
+            ["aten::dequantize", "aten::matmul"],
+        ]
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertFused(graph, ['aten::dequantize', 'aten::matmul'])
         self.checkPatterns(graph, patterns)
 
     def test_strided_bmm_div_int8_in_bf16_out(self):

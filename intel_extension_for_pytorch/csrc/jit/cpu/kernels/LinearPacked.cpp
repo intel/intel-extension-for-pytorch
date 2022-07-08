@@ -55,6 +55,7 @@ DEFINE_LINEAR_UNARY_ELTWISE_RUN(square);
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(log);
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(round);
 DEFINE_LINEAR_UNARY_ELTWISE_RUN(sqrt);
+DEFINE_LINEAR_UNARY_ELTWISE_RUN(hardsigmoid);
 
 at::Tensor linear_leaky_relu_run(
     const at::Tensor& input,
@@ -139,6 +140,18 @@ at::Tensor linear_add_run(
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
+}
+
+at::Tensor linear_add_relu_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<LinearOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::linear_add_relu_run", c10::ArrayRef<c10::IValue>({}));
+
+  auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
+  return op_context->run(input, accumu, ideep::attr_t::residual(scale));
 }
 
 ContextLinear create(

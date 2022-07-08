@@ -26,7 +26,6 @@ c10::optional<IValue> getIValue(
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph);
 void FuseLinearSwishCustomized(std::shared_ptr<Graph>& graph);
-void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph);
 void fuseBmmAdd(std::shared_ptr<Graph>& graph);
 
 void replaceOpsWithAtenInplaceOps(std::shared_ptr<Graph>& graph);
@@ -56,10 +55,12 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph);
 
 void FuseAddLayerNorm(std::shared_ptr<Graph>& graph);
+void FuseMatmulDiv(std::shared_ptr<Graph>& graph);
 void FuseConcatBnRelu(std::shared_ptr<Graph>& graph);
 
 void insertPrePackedConvTransposeOp(std::shared_ptr<Graph>& graph);
 void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph);
+void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<Graph>& graph);
 } // namespace graph_rewrite

@@ -35,6 +35,7 @@ DECLARE_LINEAR_UNARY_ELTWISE_RUN(square);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(log);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(round);
 DECLARE_LINEAR_UNARY_ELTWISE_RUN(sqrt);
+DECLARE_LINEAR_UNARY_ELTWISE_RUN(hardsigmoid);
 
 at::Tensor linear_leaky_relu_run(
     const at::Tensor& input,
@@ -65,6 +66,12 @@ at::Tensor linear_gelu_run(
     const c10::intrusive_ptr<LinearOpContext>& op_context);
 
 at::Tensor linear_add_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
+at::Tensor linear_add_relu_run(
     const at::Tensor& input,
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,

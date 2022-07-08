@@ -5,7 +5,7 @@ except ImportError:
     pass  # skip if torchvision is not available
 
 from .version import __version__
-from .utils import _cpu_isa
+from .utils import _cpu_isa, _custom_fx_tracer
 _cpu_isa.check_minimal_isa_support()
 
 torch_version = ''
@@ -26,7 +26,6 @@ from . import quantization
 from . import nn
 from . import jit
 from . import profiler
-from . import ao
 from . import autocast
 
 from .utils.verbose import verbose

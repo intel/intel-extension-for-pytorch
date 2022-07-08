@@ -20,6 +20,18 @@ default_static_qconfig = QConfig(
         activation= MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8),
         weight= PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
 
+def get_eltwise_fn(name):
+    if hasattr(torch, name):
+        return getattr(torch, name)
+    elif hasattr(torch.nn.functional, name):
+        return getattr(torch.nn.functional, name)
+    else:
+        if name == 'hardswish_':
+            return torch.nn.Hardswish(inplace=True);
+        elif name == 'mish_':
+            return torch.nn.Mish(inplace=True)
+        raise NameError('Eltwise function %s not found' % name)
+
 # For fp32 and bf16 LLGA UT only
 def llga_fp32_bf16_test_env(func):
     @wraps(func)
@@ -106,10 +118,9 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, remove_dropout=False, x_var=None,
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, x_var=None,
             qconfig=default_static_qconfig, int8_bf16=False, freeze=True):
-
-        graph, traced_model, fp32_model = self.prepareModel(model, x, remove_dropout, qconfig, int8_bf16, freeze=freeze)
+        graph, traced_model, fp32_model = self.prepareModel(model, x, qconfig, int8_bf16, freeze=freeze)
         with torch.no_grad():
             y = fp32_model(*x)
             y = y.to(torch.bfloat16) if int8_bf16 else y
@@ -125,15 +136,13 @@ class JitLlgaTestCase(JitTestCase):
 
             return graph
 
-    def prepareModel(self, model, x, remove_dropout=False, qconfig=default_static_qconfig,
-            int8_bf16=False, prepare_inplace=True, convert_inplace=True, freeze=True):
+    def prepareModel(self, model, x, qconfig=default_static_qconfig, int8_bf16=False,
+            prepare_inplace=True, convert_inplace=True, freeze=True):
 
         model.eval()
         fp32_model = copy.deepcopy(model)
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
-            # fold conv bn
-            if remove_dropout:
-                ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
+            ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
             model = ipex.quantization.prepare(model, qconfig, x, inplace=prepare_inplace)
             # do calibration
             y = model(*x)

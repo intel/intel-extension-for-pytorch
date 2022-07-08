@@ -205,73 +205,40 @@ at::Tensor& index_select_out_cpu_(
     // explicitly capture all required variables to work around windows build
     // TODO: fix this when windows can correctly capture variables in nested
     // lambda
-    if (self.is_quantized()) {
-      AT_DISPATCH_QINT_TYPES(
-          self.scalar_type(),
-          "index_select_quant",
-          [&index_contig, &self, &result, &dim, &numel] {
-            auto self_stride = self.dim() == 0 ? 1 : self.stride(dim);
-            auto result_stride = result.dim() == 0 ? 1 : result.stride(dim);
-            auto self_data_ptr = self.data_ptr<scalar_t>();
-            auto result_data_ptr = result.data_ptr<scalar_t>();
-            auto self_numel = self.numel();
-            AT_DISPATCH_INDEX_TYPES(
-                index_contig.scalar_type(),
-                "index_select_out_cpu_quant_",
-                [&index_contig,
-                 &numel,
-                 &self_numel,
-                 &self_data_ptr,
-                 &self_stride,
-                 &result_data_ptr,
-                 &result_stride] {
-                  auto index_data = index_contig.data_ptr<index_t>();
-                  for (const auto i : c10::irange(numel)) {
-                    auto self_i = index_data[i];
-                    TORCH_CHECK_INDEX(
-                        (self_i >= 0) && (self_i < self_numel),
-                        "index out of range in self");
-                    scalar_t* self_ip = self_data_ptr + self_i * self_stride;
-                    *(result_data_ptr + i * result_stride) = *self_ip;
-                  }
-                });
-          });
-    } else {
-      AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-          at::ScalarType::Half,
-          at::ScalarType::Bool,
-          at::ScalarType::BFloat16,
-          self.scalar_type(),
-          "index_select",
-          [&index_contig, &self, &result, &dim, &numel] {
-            auto self_stride = self.dim() == 0 ? 1 : self.stride(dim);
-            auto result_stride = result.dim() == 0 ? 1 : result.stride(dim);
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+        at::ScalarType::Half,
+        at::ScalarType::Bool,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "index_select",
+        [&index_contig, &self, &result, &dim, &numel] {
+          auto self_stride = self.dim() == 0 ? 1 : self.stride(dim);
+          auto result_stride = result.dim() == 0 ? 1 : result.stride(dim);
 
-            auto self_data_ptr = self.data_ptr<scalar_t>();
-            auto result_data_ptr = result.data_ptr<scalar_t>();
-            auto self_numel = self.numel();
-            AT_DISPATCH_INDEX_TYPES(
-                index_contig.scalar_type(),
-                "index_select_out_cpu_",
-                [&index_contig,
-                 &numel,
-                 &self_numel,
-                 &self_data_ptr,
-                 &self_stride,
-                 &result_data_ptr,
-                 &result_stride] {
-                  auto index_data = index_contig.data_ptr<index_t>();
-                  for (const auto i : c10::irange(numel)) {
-                    auto self_i = index_data[i];
-                    TORCH_CHECK_INDEX(
-                        (self_i >= 0) && (self_i < self_numel),
-                        "index out of range in self");
-                    scalar_t* self_ip = self_data_ptr + self_i * self_stride;
-                    *(result_data_ptr + i * result_stride) = *self_ip;
-                  }
-                });
-          });
-    }
+          auto self_data_ptr = self.data_ptr<scalar_t>();
+          auto result_data_ptr = result.data_ptr<scalar_t>();
+          auto self_numel = self.numel();
+          AT_DISPATCH_INDEX_TYPES(
+              index_contig.scalar_type(),
+              "index_select_out_cpu_",
+              [&index_contig,
+               &numel,
+               &self_numel,
+               &self_data_ptr,
+               &self_stride,
+               &result_data_ptr,
+               &result_stride] {
+                auto index_data = index_contig.data_ptr<index_t>();
+                for (const auto i : c10::irange(numel)) {
+                  auto self_i = index_data[i];
+                  TORCH_CHECK_INDEX(
+                      (self_i >= 0) && (self_i < self_numel),
+                      "index out of range in self");
+                  scalar_t* self_ip = self_data_ptr + self_i * self_stride;
+                  *(result_data_ptr + i * result_stride) = *self_ip;
+                }
+              });
+        });
   }
 
   return result;

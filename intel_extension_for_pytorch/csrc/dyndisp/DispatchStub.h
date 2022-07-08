@@ -51,10 +51,11 @@ namespace cpu {
 enum class CPUCapability {
   DEFAULT = 0,
   AVX2 = 1,
-  AVX512 = 2,
-  AVX512_VNNI = 3,
-  AVX512_BF16 = 4,
-  AMX = 5,
+  AVX2_VNNI = 2,
+  AVX512 = 3,
+  AVX512_VNNI = 4,
+  AVX512_BF16 = 5,
+  AMX = 6,
   NUM_OPTIONS
 };
 
@@ -93,6 +94,10 @@ struct TORCH_API DispatchStubImpl {
       ,
       void* AVX512
 #endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+      ,
+      void* AVX2_VNNI
+#endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
       ,
       void* AVX2
@@ -122,6 +127,10 @@ struct TORCH_API DispatchStubImpl {
       ,
       void* AVX512
 #endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+      ,
+      void* AVX2_VNNI
+#endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
       ,
       void* AVX2
@@ -132,12 +141,10 @@ struct TORCH_API DispatchStubImpl {
 // See https://github.com/pytorch/pytorch/issues/22681 for more details.
 #if defined(_MSC_VER) && defined(_DEBUG)
   std::atomic<void*> cpu_dispatch_ptr;
-  void* cuda_dispatch_ptr;
-  void* hip_dispatch_ptr;
+  void* xpu_dispatch_ptr;
 #else
   std::atomic<void*> cpu_dispatch_ptr{nullptr};
-  void* cuda_dispatch_ptr = nullptr;
-  void* hip_dispatch_ptr = nullptr;
+  void* xpu_dispatch_ptr = nullptr;
 #endif
 };
 
@@ -170,6 +177,10 @@ struct DispatchStub<rT (*)(Args...), T> {
             ,
         reinterpret_cast<void*>(AVX512)
 #endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+            ,
+        reinterpret_cast<void*>(AVX2_VNNI)
+#endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
             ,
         reinterpret_cast<void*>(AVX2)
@@ -184,12 +195,8 @@ struct DispatchStub<rT (*)(Args...), T> {
     return (*call_ptr)(std::forward<ArgTypes>(args)...);
   }
 
-  void set_cuda_dispatch_ptr(FnPtr fn_ptr) {
-    impl.cuda_dispatch_ptr = reinterpret_cast<void*>(fn_ptr);
-  }
-
-  void set_hip_dispatch_ptr(FnPtr fn_ptr) {
-    impl.hip_dispatch_ptr = reinterpret_cast<void*>(fn_ptr);
+  void set_xpu_dispatch_ptr(FnPtr fn_ptr) {
+    impl.xpu_dispatch_ptr = reinterpret_cast<void*>(fn_ptr);
   }
 
   static FnPtr DEFAULT;
@@ -204,6 +211,9 @@ struct DispatchStub<rT (*)(Args...), T> {
 #endif
 #ifdef HAVE_AVX512_CPU_DEFINITION
   static FnPtr AVX512;
+#endif
+#ifdef HAVE_AVX2_VNNI_CPU_DEFINITION
+  static FnPtr AVX2_VNNI;
 #endif
 #ifdef HAVE_AVX2_CPU_DEFINITION
   static FnPtr AVX2;

@@ -204,57 +204,6 @@ at::Tensor group_norm(
       at::native_group_norm(X, gamma, beta, N, C, HxW, num_groups, eps));
 }
 
-// Ported from pytorch/xla repo
-std::tuple<at::Tensor, at::Tensor, at::Tensor> math_group_norm(
-    const at::Tensor& input,
-    const c10::optional<at::Tensor>& weight_opt,
-    const c10::optional<at::Tensor>& bias_opt,
-    int64_t N,
-    int64_t C,
-    int64_t HxW,
-    int64_t group,
-    double eps) {
-#if defined(IPEX_DISP_OP)
-  printf("torch_ipex::math_group_norm\n");
-#endif
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::math_group_norm", c10::ArrayRef<c10::IValue>({}));
-
-  // See [Note: hacky wrapper removal for optional tensor]
-  c10::MaybeOwned<at::Tensor> weight_maybe_owned =
-      at::borrow_from_optional_tensor(weight_opt);
-  const at::Tensor& weight = *weight_maybe_owned;
-  const at::Tensor& bias =
-      c10::value_or_else(bias_opt, [] { return at::Tensor(); });
-
-  auto input_shape = input.sizes();
-  at::Tensor input_reshaped = input.view({1, N * group, N ? -1 : 1});
-  auto outputs = at::native_batch_norm(
-      input_reshaped,
-      /*weight=*/{},
-      /*bias=*/{},
-      /*running_mean=*/{},
-      /*running_var=*/{},
-      /*training=*/true,
-      /*momentum=*/0,
-      eps);
-  at::Tensor out = std::get<0>(outputs);
-  out = out.view(input_shape);
-  std::vector<int64_t> affine_param_shape(input.dim(), 1);
-  affine_param_shape[1] = C;
-  if (weight.defined() && bias.defined()) {
-    out = bias.view(affine_param_shape)
-              .addcmul(out, weight.view(affine_param_shape), 1);
-  } else if (weight.defined()) {
-    out = out.mul(weight.view(affine_param_shape));
-  } else if (bias.defined()) {
-    out = out.add(bias.view(affine_param_shape));
-  }
-  at::Tensor mean = std::get<1>(outputs).view({N, group});
-  at::Tensor rstd = std::get<2>(outputs).view({N, group});
-  return std::make_tuple(out, mean, rstd);
-}
-
 IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::group_norm"),

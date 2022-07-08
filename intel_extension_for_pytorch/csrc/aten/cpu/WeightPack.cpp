@@ -38,51 +38,6 @@ void write_cached_weights(const at::Tensor& weight, ideep::tensor& result) {
 
 } // namespace
 
-// Get the convolution's expected ideep weight tensor desc.
-ideep::tensor::desc get_conv_expected_weights_desc(
-    const ideep::tensor::dims& weights_dims,
-    ideep::tensor::data_type w_dtype,
-    const ideep::tensor::dims& strides,
-    const ideep::tensor::dims& padding_l,
-    const ideep::tensor::dims& padding_r,
-    const ideep::tensor::dims& dilates,
-    int groups,
-    bool channels_last,
-    ideep::algorithm aalgorithm,
-    ideep::data_type x_dtype,
-    const ideep::dims& src_dims,
-    const ideep::attr_t& attr) {
-  if (channels_last) {
-    return ideep::convolution_forward::expected_weights_desc<true>(
-        weights_dims,
-        w_dtype,
-        strides,
-        padding_l,
-        padding_r,
-        dilates,
-        groups,
-        aalgorithm,
-        ideep::prop_kind::forward,
-        x_dtype,
-        src_dims,
-        attr);
-  } else {
-    return ideep::convolution_forward::expected_weights_desc<false>(
-        weights_dims,
-        w_dtype,
-        strides,
-        padding_l,
-        padding_r,
-        dilates,
-        groups,
-        aalgorithm,
-        ideep::prop_kind::forward,
-        x_dtype,
-        src_dims,
-        attr);
-  }
-}
-
 bool is_packed(const at::Tensor& weight) {
   auto cached_weight = read_cached_weights(weight);
   return !cached_weight.is_empty();

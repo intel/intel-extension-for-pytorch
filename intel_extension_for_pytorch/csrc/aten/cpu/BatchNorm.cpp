@@ -36,6 +36,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_forward(
   if (is_channels_last) {
     y = itensor_view_from_dense(output);
   }
+  // We will re-open train= true path when OneDNN batch_norm have
+  // a better performance than Aten.
+  /*
   if (train) {
     // TODO: enable 3d batchnorm.
     TORCH_CHECK(
@@ -71,33 +74,34 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_forward(
           saved_var);
     }
   } else {
+  */
+  TORCH_CHECK(!train, "batch_norm_forward: only support train=false");
+  TORCH_CHECK(
+      input.dim() == 4 || input.dim() == 5,
+      "batch_norm: currently mkldnn inference only support 2d and 3d "
+      "batchnorm");
+  if (use_running_stat) {
+    ideep::tensor m = itensor_view_from_dense(running_mean);
+    ideep::tensor v = itensor_view_from_dense(running_var);
+    ideep::batch_normalization_forward_inference::compute(
+        x, m, v, w, b, y, eps);
+  } else {
+    // TODO: keep running estimates.
     TORCH_CHECK(
-        input.dim() == 4 || input.dim() == 5,
-        "batch_norm: currently mkldnn inference only support 2d and 3d "
-        "batchnorm");
-    if (use_running_stat) {
-      ideep::tensor m = itensor_view_from_dense(running_mean);
-      ideep::tensor v = itensor_view_from_dense(running_var);
-      ideep::batch_normalization_forward_inference::compute(
-          x, m, v, w, b, y, eps);
-    } else {
-      // TODO: keep running estimates.
-      TORCH_CHECK(
-          false,
-          "mkldnn_batch_norm: mkldnn inference is not keep running estimates.");
-    }
+        false,
+        "mkldnn_batch_norm: mkldnn inference is not keep running estimates.");
+  }
 
-    if (is_channels_last) {
-      return std::make_tuple(output, running_mean, running_var);
-    } else {
-      return std::make_tuple(
-          mkldnn_to_dense(new_with_itensor_mkldnn(
-              std::move(y),
-              optTypeMetaToScalarType(input.options().dtype_opt()),
-              input.options().device_opt())),
-          running_mean,
-          running_var);
-    }
+  if (is_channels_last) {
+    return std::make_tuple(output, running_mean, running_var);
+  } else {
+    return std::make_tuple(
+        mkldnn_to_dense(new_with_itensor_mkldnn(
+            std::move(y),
+            optTypeMetaToScalarType(input.options().dtype_opt()),
+            input.options().device_opt())),
+        running_mean,
+        running_var);
   }
 }
 
@@ -129,23 +133,26 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward(
   }
   gradw = itensor_view_from_dense(grad_weight);
   gradb = itensor_view_from_dense(grad_bias);
+  /*
   if (train) {
     ideep::batch_normalization_backward::compute(
         x, m, v, grady, w, gradx, gradw, gradb, eps);
   } else {
-    ideep::batch_normalization_backward::compute(
-        x,
-        m,
-        v,
-        grady,
-        w,
-        gradx,
-        gradw,
-        gradb,
-        eps,
-        ideep::tensor(),
-        ideep::batch_normalization_flag::use_global_stats);
-  }
+  */
+  TORCH_CHECK(!train, "batch_norm_forward: only support train=false");
+
+  ideep::batch_normalization_backward::compute(
+      x,
+      m,
+      v,
+      grady,
+      w,
+      gradx,
+      gradw,
+      gradb,
+      eps,
+      ideep::tensor(),
+      ideep::batch_normalization_flag::use_global_stats);
 
   if (is_channels_last) {
     return std::make_tuple(
@@ -242,6 +249,7 @@ torch::autograd::variable_list IPEXBatchNormOp::backward(
       at::Tensor()};
 }
 
+/*
 at::Tensor batch_norm(
     const at::Tensor& input,
     const c10::optional<at::Tensor>& weight_opt,
@@ -284,6 +292,7 @@ at::Tensor batch_norm(
         cudnn_enabled);
   }
 }
+*/
 
 at::Tensor frozen_batch_norm(
     const at::Tensor& input,

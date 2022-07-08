@@ -41,10 +41,10 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
     /opt/conda/bin/conda clean -ya
 
 FROM dev-base AS build
-ARG IPEX_VERSION=v1.11.0
-ARG PYTORCH_VERSION=v1.11.0
-ARG TORCHVISION_VERSION=0.12.0+cpu
-ARG TORCHAUDIO_VERSION=0.11.0+cpu
+ARG IPEX_VERSION=v1.12.0
+ARG PYTORCH_VERSION=v1.12.0
+ARG TORCHVISION_VERSION=0.13.0+cpu
+ARG TORCHAUDIO_VERSION=0.12.0+cpu
 COPY --from=conda /opt/conda /opt/conda
 RUN --mount=type=cache,target=/opt/ccache \
     python -m pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} -f https://download.pytorch.org/whl/torch_stable.html && \

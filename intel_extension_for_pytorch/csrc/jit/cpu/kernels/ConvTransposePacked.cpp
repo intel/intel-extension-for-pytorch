@@ -67,6 +67,7 @@ DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(square);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(log);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(round);
 DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(sqrt);
+DEFINE_CONV_TRANSPOSE_UNARY_ELTWISE_RUN(hardsigmoid);
 
 at::Tensor conv_transpose_gelu_run(
     const at::Tensor& input,
@@ -138,6 +139,17 @@ at::Tensor conv_transpose_pow_run(
   auto exponent_value = exponent.to<float>();
   return op_context->run(
       input, ideep::attr_t::fuse_pow(1.0, 1.0, exponent_value));
+}
+
+at::Tensor conv_transpose_add_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_add_run", c10::ArrayRef<c10::IValue>({}));
+  auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
+  return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
 }
 
 ContextConvTranspose create(
@@ -241,6 +253,45 @@ at::Tensor run(
       context.dilation_,
       context.origin_weight_dims_,
       attr);
+}
+
+at::Tensor& run(
+    const ContextConvTranspose& context,
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const ideep::attr_t& attr) {
+  bool use_channels_last =
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast ||
+      input.suggest_memory_format() == at::MemoryFormat::ChannelsLast3d ||
+      context.weight_is_channels_last_;
+  auto memory_format = at::MemoryFormat::Contiguous;
+  if (use_channels_last) {
+    // TODO: support ConvTranspose1d
+    if (input.dim() == 4) {
+      memory_format = at::MemoryFormat::ChannelsLast;
+    } else if (input.dim() == 5) {
+      memory_format = at::MemoryFormat::ChannelsLast3d;
+    }
+  }
+
+  auto input_ = input.contiguous(memory_format);
+  // always align accumu format with inputs' format.
+  accumu = accumu.contiguous(memory_format);
+
+  conv_transpose_out_kernel_impl(
+      input_,
+      context.weight_packed_,
+      context.bias_,
+      accumu,
+      context.stride_,
+      context.padding_,
+      context.output_padding_,
+      context.groups_,
+      context.dilation_,
+      context.origin_weight_dims_,
+      attr);
+
+  return accumu;
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(

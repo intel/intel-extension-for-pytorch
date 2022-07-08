@@ -3,7 +3,7 @@ import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
+from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env, get_eltwise_fn
 from torch.testing._internal.common_utils import TEST_SCIPY
 
 
@@ -17,15 +17,6 @@ except ImportError:
 except RuntimeError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, 'no torchvision')
-
-
-def get_eltwise_fn(name):
-    if hasattr(torch, name):
-        return getattr(torch, name)
-    elif hasattr(F, name):
-        return getattr(F, name)
-    else:
-        raise NameError('Eltwise function %s not found' % name)
 
 
 class TestOp(JitLlgaTestCase):
@@ -218,8 +209,8 @@ class TestOp(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.pool1 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
-                self.pool2 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+                self.pool1 = nn.AdaptiveAvgPool2d((5,7))
+                self.pool2 = nn.AdaptiveAvgPool2d((5,7))
 
             def forward(self, x):
                 x1 = self.pool1(x)
@@ -229,7 +220,9 @@ class TestOp(JitLlgaTestCase):
         m = M()
         x = torch.randn(1, 3, 4, 4)
         graph, _ = self.checkTrace(m, [x])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        self.assertGraphContainsExactly(graph, "aten::adaptive_avg_pool2d", 1)
+        self.assertFused(graph, 'aten::add')
 
     @llga_fp32_bf16_test_env
     @unittest.skipIf(True, 'Disable mul due to bad performance')
@@ -471,9 +464,9 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.eltwise(x)
                 return x
 
-        # for eltwise in ['relu', 'sigmoid', 'sqrt', 'abs', 'square', 'hardtanh']:
-        for eltwise in ['relu']:
-            for inplace in [True, False]:
+        for eltwise in ['relu', 'leaky_relu', 'sigmoid', 'round', 'abs', 'square',
+                        'abs', 'round', 'exp', 'hardswish', 'tanh', 'hardtanh', 'mish']:
+            for inplace in [False, True]:
                 eltwise_fn_name = eltwise + '_' if inplace else eltwise
                 eltwise_fn = get_eltwise_fn(eltwise_fn_name)
 
@@ -487,12 +480,46 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ['aten::' + eltwise])
 
     @llga_fp32_bf16_test_env
+    def test_conv2d_clamp(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+                self.conv5 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
+
+            def forward(self, x):
+                x = self.conv1(x)
+                x = torch.clamp(x, min=float('-inf'))
+                x = self.conv2(x)
+                x = torch.clamp(x, min=-5)
+                x = self.conv3(x)
+                x = torch.clamp(x, min=0, max=float('inf'))
+                x = self.conv4(x)
+                x = torch.clamp(x, min=1, max=5)
+                x = self.conv5(x)
+                x = torch.clamp(x, max=2)
+                return x
+
+        for inplace in [False, True]:
+            for memory_format in [torch.contiguous_format, torch.channels_last]:
+                x = torch.rand(1, 32, 28, 28).to(memory_format=memory_format)
+                m = M()
+                graph, _ = self.checkTrace(m, [x])
+                self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 5)
+                self.assertFused(graph, ['aten::_convolution', "aten::clamp"])
+
+    @llga_fp32_bf16_test_env
     def test_ensure_tensor_is_rewrapped(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, data_type):
                 super(M, self).__init__()
                 self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
                 self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
+                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
+                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True, dtype=data_type)
                 self.eltwise = eltwise_fn
                 self.adaptive_avg_pool_2d = nn.AdaptiveAvgPool2d((5, 7))
 
@@ -501,6 +528,10 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.eltwise(x)
                 x = self.conv2(x)
                 x = self.eltwise(x)
+                y = self.conv3(y)
+                y = self.eltwise(y)
+                y = self.conv4(y)
+                y = self.eltwise(y)
                 x = torch.add(x, y)
                 x = self.adaptive_avg_pool_2d(x)
                 return x
@@ -513,10 +544,12 @@ class TestFusionPattern(JitLlgaTestCase):
             x = torch.rand(1, 32, 28, 28, dtype=data_type).to(memory_format=torch.channels_last)
             y = torch.rand(1, 32, 28, 28, dtype=data_type).to(memory_format=torch.channels_last)
             # Simply test if the output is accurate
-            # The output of the second partition is input to adaptive_avg_pool2d, which is
-            # unsupported by LLGA. In resnext101 32x16d, we encountered an accuracy issue.
+            # The output of the fourth partition is input to adaptive_avg_pool2d, which is
+            # unsupported by LLGA. In resnext101 32x16d, we had encountered an accuracy issue.
+            # The UT checks that the input to adaptive_avg_pool_2d has not been wrapped by
+            # LlgaTensorImpl (assertEqual would fail in that case).
             graph, _ = self.checkTrace(m, [x, y])
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
 
     @llga_fp32_bf16_test_env
     def test_conv2d_bn(self):
@@ -578,6 +611,25 @@ class TestFusionPattern(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
             self.assertFused(graph, ['aten::batch_norm', 'aten::' + eltwise])
+
+    @llga_fp32_bf16_test_env
+    def test_avg_pool2d_add(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.pool1 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+                self.pool2 = nn.AvgPool2d(3, stride=1, padding=1, count_include_pad=False)
+
+            def forward(self, x):
+                x1 = self.pool1(x)
+                x2 = self.pool2(x)
+                return x1 + x2
+
+        m = M()
+        x = torch.randn(1, 3, 4, 4)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)        
+        self.assertFused(graph, ['aten::avg_pool2d', 'aten::add'])
 
     @unittest.skip("Semi-Compiler unit-test")
     @llga_fp32_bf16_test_env

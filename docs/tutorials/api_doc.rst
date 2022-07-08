@@ -13,8 +13,7 @@ Quantization
 ************
 
 .. automodule:: intel_extension_for_pytorch.quantization
-.. autofunction:: QuantConf
-.. autoclass:: calibrate
+.. autofunction:: prepare
 .. autofunction:: convert
 
 CPU Runtime

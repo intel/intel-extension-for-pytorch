@@ -313,7 +313,9 @@ struct convolution_forward
         aprop_kind == prop_kind::forward_inference) {
       apkind = prop_kind::forward;
     }
-
+    attr_t op_attr = attr;
+    op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    op_attr.set_fpmath_mode();
     auto pd = get_primitive_desc</*with_bias=*/false>(
         src_query,
         weights_desc,
@@ -323,7 +325,7 @@ struct convolution_forward
         dilates_,
         padding_l,
         padding_r,
-        attr_t(),
+        op_attr,
         aalgorithm,
         apkind);
 

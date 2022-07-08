@@ -1,3 +1,4 @@
+#include "csrc/cpu/ideep/ideep.hpp"
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 #include "utils.h"
@@ -16,7 +17,7 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
     for (Block* block : n->blocks()) {
       insertPrePackedConvTransposeOpForATen(block);
     }
-    // TODO: add conv_transpose3d
+    // TODO: add conv_transpose1d
     if (n->kind() == aten::conv_transpose2d ||
         n->kind() == aten::conv_transpose3d) {
       WithInsertPoint guard(n);
@@ -35,19 +36,19 @@ void insertPrePackedConvTransposeOpForATen(Block* b) {
       }
       IValue input_size_value(input_size_option.value());
 
-      auto weight_size_option = n->inputs()
-                                    .at(1)
-                                    ->type()
-                                    ->cast<TensorType>()
-                                    ->sizes()
-                                    .concrete_sizes();
+      auto weight_tensor_type = n->inputs().at(1)->type()->cast<TensorType>();
+      auto weight_size_option = weight_tensor_type->sizes().concrete_sizes();
       // weight has not shape info, will not do weight prapacked.
       if (!(weight_size_option.has_value() &&
             (weight_size_option.value().size() == 4 ||
              weight_size_option.value().size() == 5))) {
         continue;
       }
-
+      const auto dtype = weight_tensor_type->scalarType();
+      if (dtype.has_value() && *dtype == at::ScalarType::BFloat16 &&
+          !ideep::has_bf16_type_support()) {
+        continue;
+      }
       // # padding - output_padding + stride <= 0 unsupported in mkldnn
       auto stride = toIValue(n->input(3))->toIntList();
       auto padding = toIValue(n->input(4))->toIntList();
@@ -269,6 +270,54 @@ void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
     }
   }
   rewriter_swish.runOnGraph(graph);
+}
+
+void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph) {
+  SubgraphRewriter rewriter_add_accumu_on_the_right,
+      rewriter_add_accumu_on_the_left;
+  // TODO: add_
+  std::array<std::string, 2> add_operators = {"add", "add_"};
+
+  // ConvTranspose  accumu
+  //       \        /
+  //          add
+  // output = ConvTranspose + alpha * accumu
+  auto conv_transpose_add_accumu_on_the_right_rstring = CodeTemplate(R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %x = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = aten::${add}(%x, %accumu, %alpha)
+        return (%res))");
+
+  //  accumu     ConvTranspose
+  //   \        /
+  //       add
+  // output = accumu + alpha * ConvTranspose, alpha need to be one or none.
+  auto conv_transpose_add_accumu_on_the_left_rstring = CodeTemplate(R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %x = ipex_prepack::conv_transpose_run(%input, %packed_weight)
+        %res = aten::${add}(%accumu, %x, %alpha)
+        return (%res))");
+
+  std::string conv_transpose_add_fused = R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %res = ipex_prepack::conv_transpose_add_run(%input, %accumu, %alpha, %packed_weight)
+        return (%res))";
+
+  for (const auto& add : add_operators) {
+    TemplateEnv env;
+    env.s("add", add);
+    rewriter_add_accumu_on_the_right.RegisterRewritePattern(
+        conv_transpose_add_accumu_on_the_right_rstring.format(env),
+        conv_transpose_add_fused);
+    rewriter_add_accumu_on_the_left.RegisterRewritePattern(
+        conv_transpose_add_accumu_on_the_left_rstring.format(env),
+        conv_transpose_add_fused);
+  }
+
+  rewriter_add_accumu_on_the_right.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_right);
+  rewriter_add_accumu_on_the_left.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_left);
 }
 
 } // namespace graph_rewrite

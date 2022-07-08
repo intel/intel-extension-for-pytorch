@@ -218,6 +218,43 @@ void FuseAddLayerNorm(std::shared_ptr<Graph>& graph) {
   rewriter_aten.runOnGraph(graph);
 }
 
+void FuseMatmulDiv(std::shared_ptr<Graph>& graph) {
+  const std::string div_str = R"(div)";
+  const std::string div_inplace_str = R"(div_)";
+  std::vector<std::string> div_ops = {div_str, div_inplace_str};
+
+  auto aten_pattern = at::jit::CodeTemplate(R"(
+      graph(%x, %y, %z):
+        %mm_res = aten::matmul(%x, %y)
+        %div_res = aten::${div_op}(%mm_res, %z)
+        return (%div_res) )");
+
+  auto aten_pattern_with_out = at::jit::CodeTemplate(R"(
+      graph(%x, %y, %z, %out):
+        %mm_res = aten::matmul(%x, %y, %out)
+        %div_res = aten::${div_op}(%mm_res, %z)
+        return (%div_res) )");
+
+  std::string fused_matmul_div = R"(
+      graph(%x, %y, %z):
+        %r = ipex::matmul_div(%x, %y, %z)
+        return (%r) )";
+  std::string fused_matmul_div_with_out = R"(
+      graph(%x, %y, %z, %out):
+        %r = ipex::matmul_div(%x, %y, %out, %z)
+        return (%r) )";
+  for (auto const& it : div_ops) {
+    at::jit::TemplateEnv env;
+    env.s("div_op", it);
+
+    SubgraphRewriter rewriter;
+    rewriter.RegisterRewritePattern(aten_pattern.format(env), fused_matmul_div);
+    rewriter.RegisterRewritePattern(
+        aten_pattern_with_out.format(env), fused_matmul_div_with_out);
+    rewriter.runOnGraph(graph);
+  }
+}
+
 // MHA fusion covers aten::softmax, ipex::softmax and ipex::softmax_:
 // (1) MHA obviously shows better performance than aten div/matmul/add/softmax.
 // (2) MHA also shows better performance than aten add + matmul_div fusion
@@ -348,14 +385,6 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
           return false;
         }
 
-        // Only support 64byte aligned
-        auto qk_tensor = *qk_value;
-        bool aligned_64_bytes =
-            qk_tensor.sizes()[qk_value->dim().value() - 1].value() % 16 == 0;
-        if (!aligned_64_bytes) {
-          return false;
-        }
-
         // Only support when expand from the mid dims shape (bs :: seq_length)
         auto mask_reshape_node = mask_node->input(1)->node();
         for (int i = 1; i < qk_value->dim().value() - 1; i++) {
@@ -397,20 +426,6 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
   mha_fusion.runOnGraph(graph);
   distil_mha_fusion.runOnGraph(graph, filter_distil_mha);
   maskedfill_softmax_fusion.runOnGraph(graph, filter_distil_mha);
-}
-
-void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
-  std::string max_pool2d = R"(
-      graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
-        %r = aten::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
-        return (%r) )";
-  std::string ipex_max_pool2d = R"(
-      graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
-        %r = ipex::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
-        return (%r) )";
-  SubgraphRewriter rewriter_max_pool2d;
-  rewriter_max_pool2d.RegisterRewritePattern(max_pool2d, ipex_max_pool2d);
-  rewriter_max_pool2d.runOnGraph(graph);
 }
 
 // ipex::softmax shows better performance than aten::softmax, but compared with

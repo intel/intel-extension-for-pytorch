@@ -68,6 +68,7 @@ DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(square);
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(log);
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(round);
 DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(sqrt);
+DEFINE_CONVOLUTION_UNARY_ELTWISE_RUN(hardsigmoid);
 
 at::Tensor convolution_leaky_relu_run(
     const at::Tensor& input,
@@ -366,32 +367,7 @@ ContextConvolution create(
   }
   auto weight_ = weight;
   weight_ = weight.contiguous(memory_format);
-
   auto w = itensor_view_from_dense(weight_);
-  ideep::tensor::desc ori_desc(w.get_desc());
-  ideep::data_type dtype = w.get_data_type();
-  auto expected_desc = get_conv_expected_weights_desc(
-      w.get_dims(),
-      dtype,
-      {stride_expanded.begin(), stride_expanded.end()},
-      {padding_expanded.begin(), padding_expanded.end()},
-      {padding_expanded.begin(), padding_expanded.end()},
-      {dilation_expanded.begin(), dilation_expanded.end()},
-      groups,
-      weight_is_channels_last_,
-      ideep::algorithm::convolution_direct,
-      ideep::data_type::f32,
-      input_size);
-  auto at_weight = empty_aten_tensor_from_desc(expected_desc, weight.options());
-  ideep::tensor packed_weight;
-  if (ideep::data_type::f32 == dtype) {
-    packed_weight.init(expected_desc, at_weight.template data_ptr<float>());
-  } else {
-    packed_weight.init(
-        expected_desc, at_weight.template data_ptr<c10::BFloat16>());
-  }
-  packed_weight.feed_from(w);
-
   ideep::convolution_forward_params conv_params;
   std::vector<int64_t> output_sizes = calc_conv_output_size(
       input_size,
@@ -414,7 +390,7 @@ ContextConvolution create(
     ideep::convolution_forward::prepare(
         conv_params,
         src,
-        packed_weight,
+        w,
         mkldnn_bias,
         {output_sizes.begin(), output_sizes.end()},
         dst,
@@ -433,7 +409,7 @@ ContextConvolution create(
     ideep::convolution_forward::prepare(
         conv_params,
         src,
-        packed_weight,
+        w,
         {output_sizes.begin(), output_sizes.end()},
         dst,
         {stride_expanded.begin(), stride_expanded.end()},
@@ -448,6 +424,20 @@ ContextConvolution create(
         ideep::algorithm::convolution_direct,
         ideep::prop_kind::forward_inference);
   }
+  ideep::tensor::desc ori_desc(w.get_desc());
+  ideep::data_type dtype = w.get_data_type();
+  auto expected_desc =
+      ideep::tensor::desc(conv_params.pd.weights_desc(), groups);
+  auto at_weight = empty_aten_tensor_from_desc(expected_desc, weight.options());
+  ideep::tensor packed_weight;
+  if (ideep::data_type::f32 == dtype) {
+    packed_weight.init(expected_desc, at_weight.template data_ptr<float>());
+  } else {
+    packed_weight.init(
+        expected_desc, at_weight.template data_ptr<c10::BFloat16>());
+  }
+  packed_weight.feed_from(w);
+
   return ContextConvolution{
       std::move(ori_desc),
       std::move(packed_weight),

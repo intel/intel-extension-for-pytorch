@@ -1,6 +1,229 @@
 Releases
 =============
 
+## 1.12.0
+
+We are excited to bring you the release of Intel® Extension for PyTorch\* 1.12.0-cpu, by tightly following PyTorch [1.12](https://github.com/pytorch/pytorch/releases/tag/v1.12.0) release. In this release, we matured the automatic int8 quantization and made it a stable feature. We stabilized runtime extension and brought about a MultiStreamModule feature to further boost throughput in offline inference scenario. We also brought about various enhancements in operation and graph which are positive for performance of broad set of workloads.
+
+Highlights include:
+- Automatic INT8 quantization became a stable feature baking into a well-tuned default quantization recipe, supporting both static and dynamic quantization and a wide range of calibration algorithms.
+- Runtime Extension, featured MultiStreamModule, became a stable feature, could further enhance throughput in offline inference scenario.
+- More optimizations in graph and operations to improve performance of broad set of models, examples include but not limited to wave2vec, T5, Albert etc.
+- Pre-built experimental binary with oneDNN Graph Compiler tuned on would deliver additional performance gain for Bert, Albert, Roberta in INT8 inference.
+
+### Highlights
+
+- Matured automatic INT8 quantization feature baking into a well-tuned default quantization recipe. We facilitated the user experience and provided a wide range of calibration algorithms like Histogram, MinMax, MovingAverageMinMax, etc. Meanwhile, We polished the static quantization with better flexibility and enabled dynamic quantization as well. Compared to the previous version, the brief changes are as follows. Refer to [tutorial page](features/int8.md) for more details.
+
+  <table align="center">
+  <tbody>
+  <tr>
+  <td>v1.11.0-cpu</td>
+  <td>v1.12.0-cpu</td>
+  </tr>
+  <tr>
+  <td valign="top">
+  
+  ```python
+  import intel_extension_for_pytorch as ipex
+  # Calibrate the model
+  qconfig = ipex.quantization.QuantConf(qscheme=torch.per_tensor_affine)
+  for data in calibration_data_set:
+      with ipex.quantization.calibrate(qconfig):
+          model_to_be_calibrated(x)
+  qconfig.save('qconfig.json')
+  # Convert the model to jit model
+  conf = ipex.quantization.QuantConf('qconfig.json')
+  with torch.no_grad():
+      traced_model = ipex.quantization.convert(model, conf, example_input)
+  # Do inference 
+  y = traced_model(x)
+  ```
+  
+  </td>
+  <td valign="top">
+  
+  ```python
+  import intel_extension_for_pytorch as ipex
+  # Calibrate the model
+  qconfig = ipex.quantization.default_static_qconfig # Histogram calibration algorithm and 
+  calibrated_model = ipex.quantization.prepare(model_to_be_calibrated, qconfig, example_inputs=example_inputs)
+  for data in calibration_data_set:
+      calibrated_model(data)
+  # Convert the model to jit model
+  quantized_model = ipex.quantization.convert(calibrated_model)
+  with torch.no_grad():
+      traced_model = torch.jit.trace(quantized_model, example_input)
+      traced_model = torch.jit.freeze(traced_model)
+  # Do inference 
+  y = traced_model(x)
+  ```
+  
+  </td>
+  </tr>
+  </tbody>
+  </table>
+
+- Runtime Extension, featured MultiStreamModule, became a stable feature. In this release, we enhanced the heuristic rule to further enhance throughput in offline inference scenario. Meanwhile, we also provide the `ipex.cpu.runtime.MultiStreamModuleHint` to custom how to split the input into streams and concat the output for each steam.
+
+  <table align="center">
+  <tbody>
+  <tr>
+  <td>v1.11.0-cpu</td>
+  <td>v1.12.0-cpu</td>
+  </tr>
+  <tr>
+  <td valign="top">
+  
+  ```python
+  import intel_extension_for_pytorch as ipex
+  # Create CPU pool
+  cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+  # Create multi-stream model
+  multi_Stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=2, cpu_pool=cpu_pool)
+  ```
+  
+  </td>
+  <td valign="top">
+  
+  ```python
+  import intel_extension_for_pytorch as ipex
+  # Create CPU pool
+  cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+  # Optional
+  multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(0)
+  multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint(0)
+  # Create multi-stream model
+  multi_Stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=2, cpu_pool=cpu_pool,
+    multi_stream_input_hint,   # optional
+    multi_stream_output_hint ) # optional
+  ```
+  
+  </td>
+  </tr>
+  </tbody>
+  </table>
+
+- Polished the `ipex.optimize` to accept the input shape information which would conclude the optimal memory layout for better kernel efficiency.
+
+  <table align="center">
+  <tbody>
+  <tr>
+  <td>v1.11.0-cpu</td>
+  <td>v1.12.0-cpu</td>
+  </tr>
+  <tr>
+  <td valign="top">
+  
+  ```python
+  import intel_extension_for_pytorch as ipex
+  model = ...
+  model.load_state_dict(torch.load(PATH))
+  model.eval()
+  optimized_model = ipex.optimize(model, dtype=torch.bfloat16)
+  ```
+  
+  </td>
+  <td valign="top">
+  
+  ```python
+  import intel_extension_for_pytorch as ipex
+  model = ...
+  model.load_state_dict(torch.load(PATH))
+  model.eval()
+  optimized_model = ipex.optimize(model, dtype=torch.bfloat16, sample_input=input)
+  ```
+  
+  </td>
+  </tr>
+  </tbody>
+  </table>
+
+- Provided more optimizations in graph and operations
+  - Fuse Adam to improve training performance [#822](https://github.com/intel/intel-extension-for-pytorch/commit/d3f714e54dc8946675259ea7a445b26a2460b523)
+  - Enable Normalization operators to support channels-last 3D [#642](https://github.com/intel/intel-extension-for-pytorch/commit/ae268ac1760d598a29584de5c99bfba46c6554ae)
+  - Support Deconv3D to serve most models and implement most fusions like Conv
+  - Enable LSTM to support static and dynamic quantization [#692](https://github.com/intel/intel-extension-for-pytorch/commit/2bf8dba0c380a26bbb385e253adbfaa2a033a785)
+  - Enable Linear to support dynamic quantization [#787](https://github.com/intel/intel-extension-for-pytorch/commit/ff231fb55e33c37126a0ef7f0e739cd750d1ef6c)
+  - Fusions.
+    - Fuse `Add` + `Swish` to accelerate FSI Riskful model [#551](https://github.com/intel/intel-extension-for-pytorch/commit/cc855ff2bafd245413a6111f3d21244d0bcbb6f6)
+    - Fuse `Conv` + `LeakyReLU` [#589](https://github.com/intel/intel-extension-for-pytorch/commit/dc6ed1a5967c644b03874fd1f8a503f0b80be6bd)
+    - Fuse `BMM` + `Add` [#407](https://github.com/intel/intel-extension-for-pytorch/commit/d1379aa565cc84b4a61b537ba2c9a046b7652f1a)
+    - Fuse `Concat` + `BN` + `ReLU` [#647](https://github.com/intel/intel-extension-for-pytorch/commit/cad3f82f6b7efed0c08b2f0c11117a4720f58df4)
+    - Optimize `Convolution1D` to support channels last memory layout and fuse `GeLU` as its post operation. [#657](https://github.com/intel/intel-extension-for-pytorch/commit/a0c063bdf4fd1a7e66f8a23750ac0c2fe471a559)
+    - Fuse `Einsum` + `Add` to boost Alphafold2 [#674](https://github.com/intel/intel-extension-for-pytorch/commit/3094f346a67c81ad858ad2a80900fab4c3b4f4e9)
+    - Fuse `Linear` + `Tanh` [#711](https://github.com/intel/intel-extension-for-pytorch/commit/b24cc530b1fd29cb161a76317891e361453333c9)
+
+### Known Issues
+- `RuntimeError: Overflow when unpacking long` when a tensor's min max value exceeds int range while performing int8 calibration. Please customize QConfig to use min-max calibration method.
+- Calibrating with quantize_per_tensor, when benchmarking with 1 OpenMP\* thread, results might be incorrect with large tensors (find more detailed info [here](https://github.com/pytorch/pytorch/issues/80501). Editing your code following the pseudocode below can workaround this issue, if you do need to explicitly set OMP_NUM_THREAEDS=1 for benchmarking. However, there could be a performance regression if oneDNN graph compiler prototype feature is utilized.
+
+  Workaround pseudocode:
+  ```
+  # perform convert/trace/freeze with omp_num_threads > 1(N)
+  torch.set_num_threads(N)
+  prepared_model = prepare(model, input)
+  converted_model = convert(prepared_model)
+  traced_model = torch.jit.trace(converted_model, input)
+  freezed_model = torch.jit.freeze(traced_model)
+  # run freezed model to apply optimization pass
+  freezed_model(input)
+
+  # benchmarking with omp_num_threads = 1
+  torch.set_num_threads(1)
+  run_benchmark(freezed_model, input)
+  ```
+- Low performance with INT8 support for dynamic shapes
+  The support for dynamic shapes in Intel® Extension for PyTorch\* INT8 integration is still work in progress. When the input shapes are dynamic, for example inputs of variable image sizes in an object detection task or of variable sequence lengths in NLP tasks, the Intel® Extension for PyTorch\* INT8 path may slow down the model inference. In this case, use stock PyTorch INT8 functionality.
+  **Note**: Using Runtime Extension feature if batch size cannot be divided by number of streams, because mini batch size on each stream are not equivalent, scripts run into this issues.
+- BF16 AMP(auto-mixed-precision) runs abnormally with the extension on the AVX2-only machine if the topology contains `Conv`, `Matmul`, `Linear`, and `BatchNormalization`
+- Runtime extension of MultiStreamModule doesn't support DLRM inference, since the input of DLRM (EmbeddingBag specifically) can't be simplely batch split.
+- Runtime extension of MultiStreamModule has poor performance of RNNT Inference comparing with native throughput mode. Only part of the RNNT models (joint_net specifically) can be jit traced into graph. However, in one batch inference, `joint_net` is invoked multi times. It increases the overhead of MultiStreamModule as input batch split, thread synchronization and output concat.
+- Incorrect Conv and Linear result if the number of OMP threads is changed at runtime
+  The oneDNN memory layout depends on the number of OMP threads, which requires the caller to detect the changes for the # of OMP threads while this release has not implemented it yet.
+- Low throughput with DLRM FP32 Train
+  A 'Sparse Add' [PR](https://github.com/pytorch/pytorch/pull/23057) is pending on review. The issue will be fixed when the PR is merged.
+- If inference is done with a custom function, `conv+bn` folding feature of the `ipex.optimize()` function doesn't work.
+  ```
+  import torch
+  import intel_pytorch_extension as ipex
+  class Module(torch.nn.Module):
+      def __init__(self):
+          super(Module, self).__init__()
+          self.conv = torch.nn.Conv2d(1, 10, 5, 1)
+          self.bn = torch.nn.BatchNorm2d(10)
+          self.relu = torch.nn.ReLU()
+      def forward(self, x):
+          x = self.conv(x)
+          x = self.bn(x)
+          x = self.relu(x)
+          return x
+      def inference(self, x):
+          return self.forward(x)
+  if __name__ == '__main__':
+      m = Module()
+      m.eval()
+      m = ipex.optimize(m, dtype=torch.float32, level="O0")
+      d = torch.rand(1, 1, 112, 112)
+      with torch.no_grad():
+        m.inference(d)
+  ```
+  This is a PyTorch FX limitation. You can avoid this error by calling `m = ipex.optimize(m, level="O0")`, which doesn't apply ipex optimization, or disable `conv+bn` folding by calling `m = ipex.optimize(m, level="O1", conv_bn_folding=False)`.
+
+## 1.11.200
+
+### Highlights
+
+- Enable more fused operators to accelerate particular models.
+- Fuse `Convolution` and `LeakyReLU` ([#648](https://github.com/intel/intel-extension-for-pytorch/commit/d7603133f37375b3aba7bf744f1095b923ba979e))
+- Support [`torch.einsum`](https://pytorch.org/docs/stable/generated/torch.einsum.html) and fuse it with `add` ([#684](https://github.com/intel/intel-extension-for-pytorch/commit/b66d6d8d0c743db21e534d13be3ee75951a3771d))
+- Fuse `Linear` and `Tanh` ([#685](https://github.com/intel/intel-extension-for-pytorch/commit/f0f2bae96162747ed2a0002b274fe7226a8eb200))
+- In addition to the original installation methods, this release provides Docker installation from [DockerHub](https://hub.docker.com/).
+- Provided the <a class="reference external" href="installation.html#installation_onednn_graph_compiler">evaluation wheel packages</a> that could boost performance for selective topologies on top of oneDNN graph compiler prototype feature.
+***NOTE***: This is still at an early development stage and not fully mature yet, but feel free to reach out through [GitHub issues](https://github.com/intel/intel-extension-for-pytorch/issues) if you have any suggestions.
+
+**[Full Changelog](https://github.com/intel/intel-extension-for-pytorch/compare/v1.11.0...v1.11.200)**
+
 ## 1.11.0
 
 We are excited to announce Intel® Extension for PyTorch\* 1.11.0-cpu release by tightly following PyTorch 1.11 release. Along with extension 1.11, we focused on continually improving OOB user experience and performance. Highlights include:
@@ -14,9 +237,9 @@ We are excited to announce Intel® Extension for PyTorch\* 1.11.0-cpu release by
 ### Highlights
 - Combine the AVX2 and AVX512 binary as a single binary and automatically dispatch to different implementations based on hardware ISA detection at runtime. The typical case is to serve the data center that mixtures AVX2-only and AVX512 platforms. It does not need to deploy the different ISA binary now compared to the previous version
 
-    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Please refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details. 
+    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details. 
 
-    > When one input is of type u8, and the other one is of type s8, oneDNN assumes that it is the user’s responsibility to choose the quantization parameters so that no overflow/saturation occurs. For instance, a user can use u7 [0, 127] instead of u8 for the unsigned input, or s7 [-64, 63] instead of the s8 one. It is worth mentioning that this is required only when the Intel AVX2 or Intel AVX512 Instruction Set is used.
+    > When one input is of type u8, and the other one is of type s8, oneDNN assumes the user will choose the quantization parameters so no overflow/saturation occurs. For instance, a user can use u7 [0, 127] instead of u8 for the unsigned input, or s7 [-64, 63] instead of the s8 one. It is worth mentioning that this is required only when the Intel AVX2 or Intel AVX512 Instruction Set is used.
 
 - The extension wheel packages have been uploaded to [pypi.org](https://pypi.org/project/intel-extension-for-pytorch/). The user could directly install the extension by `pip/pip3` without explicitly specifying the binary location URL.
 
@@ -94,7 +317,7 @@ This release is meant to fix the following issues:
 
 ## 1.10.0
 
-The Intel® Extension for PyTorch\* 1.10 is on top of PyTorch 1.10. In this release, we polished the front end APIs. The APIs are more simplible, stable and straightforward now. According to PyTorch community recommendation, we changed the underhood device from `XPU` to `CPU`. With this change, the model and tensor does not need to be converted to the extension device to get performance improvement. It simplifies the model changes.
+The Intel® Extension for PyTorch\* 1.10 is on top of PyTorch 1.10. In this release, we polished the front end APIs. The APIs are more simple, stable, and straightforward now. According to PyTorch community recommendation, we changed the underhood device from `XPU` to `CPU`. With this change, the model and tensor does not need to be converted to the extension device to get performance improvement. It simplifies the model changes.
 
 Besides that, we continuously optimize the Transformer\* and CNN models by fusing more operators and applying NHWC. We measured the 1.10 performance on Torchvison and HugginFace. As expected, 1.10 can speed up the two model zones.
 
@@ -125,7 +348,7 @@ import intel_extension_for_pytorch as ipex
 </tbody>
 </table>
 
-- The underhood device is changed from the extension-specific device(`XPU`) to the standard CPU device which aligns with PyTorch CPU device design regardless of the dispatch mechanism and operator register mechanism. The interface impactions are that the model does not need to be converted to the extension device explicitly.
+- The underhood device is changed from the extension-specific device(`XPU`) to the standard CPU device that aligns with the PyTorch CPU device design, regardless of the dispatch mechanism and operator register mechanism. The means the model does not need to be converted to the extension device explicitly.
 
 <table align="center">
 <tbody>
@@ -220,7 +443,7 @@ with torch.cpu.amp.autocast(), torch.no_grad():
 </tbody>
 </table>
 
-- The 1.10 release provides the INT8 calibration as an experimental feature while it only supports post-training static quantization now. Compared to 1.9.0, the fronted APIs for qutization is more straightforward and ease-of-use.
+- The 1.10 release provides the INT8 calibration as an experimental feature while it only supports post-training static quantization now. Compared to 1.9.0, the fronted APIs for quantization is more straightforward and ease-of-use.
 
 ```
 import torch
@@ -334,7 +557,7 @@ with torch.no_grad():
 
 - This release introduces the `optimize` API at python front end to optimize the model and optimizer for training. The new API both supports FP32 and BF16, inference and training.
 
-- Runtime Extension (Experimental) provides a runtime CPU pool API to bind threads to cores. It also features async tasks. Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available in the extension documentation.
+- Runtime Extension (Experimental) provides a runtime CPU pool API to bind threads to cores. It also features async tasks. **Note**: Intel® Extension for PyTorch\* Runtime extension is still in the **experimental** stage. The API is subject to change. More detailed descriptions are available in the extension documentation.
 
 ### Known Issues
 
@@ -355,7 +578,7 @@ with torch.no_grad():
 
 - Low performance with INT8 support for dynamic shapes
 
-  The support for dynamic shapes in Intel® Extension for PyTorch\* INT8 integration is still working in progress. For the use cases where the input shapes are dynamic, for example, inputs of variable image sizes in an object detection task or of variable sequence lengths in NLP tasks, the Intel® Extension for PyTorch\* INT8 path may slow down the model inference. In this case, please utilize stock PyTorch INT8 functionality.
+  The support for dynamic shapes in Intel® Extension for PyTorch\* INT8 integration is still work in progress. When the input shapes are dynamic, for example, inputs of variable image sizes in an object detection task or of variable sequence lengths in NLP tasks, the Intel® Extension for PyTorch\* INT8 path may slow down the model inference. In this case, use stock PyTorch INT8 functionality.
 
 - Low throughput with DLRM FP32 Train
 
@@ -380,7 +603,7 @@ with torch.no_grad():
 
 * Rebased the Intel Extension for Pytorch from Pytorch -1.7.0 to the official Pytorch-1.8.0 release. The new XPU device type has been added into Pytorch-1.8.0(49786), don’t need to patch PyTorch to enable Intel Extension for Pytorch anymore
 * Upgraded the oneDNN from v1.5-rc to v1.8.1
-* Updated the README file to add the sections to introduce supported customized operators, supported fusion patterns, tutorials and joint blogs with stakeholders
+* Updated the README file to add the sections to introduce supported customized operators, supported fusion patterns, tutorials, and joint blogs with stakeholders
 
 ## 1.2.0
 
@@ -391,7 +614,7 @@ with torch.no_grad():
 
   We changed the device name from DPCPP to XPU to align with the future Intel GPU product for heterogeneous computation.
 * Enabled the launcher for end users.
-* We enabled the launch script which helps users launch the program for training and inference, then automatically setup the strategy for multi-thread, multi-instance, and memory allocator. Please refer to the launch script comments for more details.
+* We enabled the launch script that helps users launch the program for training and inference, then automatically setup the strategy for multi-thread, multi-instance, and memory allocator. Refer to the launch script comments for more details.
 
 ### Performance Improvement
 
@@ -408,7 +631,7 @@ with torch.no_grad():
   This upgrade adds several custom operators: ROIAlign, RNN, FrozenBatchNorm, nms.
 * Optimized operators/fusion
 
-  This upgrade optimizes several operators: tanh, log_softmax, upsample, embeddingbad and enables int8 linear fusion.
+  This upgrade optimizes several operators: tanh, log_softmax, upsample, and embeddingbad and enables int8 linear fusion.
 * Performance
 
   The release has daily automated testing for the supported models: ResNet50, ResNext101, Huggingface Bert, DLRM, Resnext3d, MaskRNN, SSD-ResNet34. With the extension imported, it can bring up to 2x INT8 over FP32 inference performance improvements on the 3rd Gen Intel Xeon scalable processors (formerly codename Cooper Lake).
@@ -482,7 +705,7 @@ with torch.no_grad():
 
 ### Performance Result
 
-We collected the performance data of some models on the Intel Cooper Lake platform with 1 socket and 28 cores. Intel Cooper Lake introduced AVX512 BF16 instructions which could improve the bfloat16 computation significantly. The detail is as follows (The data is the speedup ratio and the baseline is upstream PyTorch).
+We collected the performance data of some models on the Intel Cooper Lake platform with 1 socket and 28 cores. Intel Cooper Lake introduced AVX512 BF16 instructions that could improve the bfloat16 computation significantly. The detail is as follows (The data is the speedup ratio and the baseline is upstream PyTorch).
 
 ||Imperative - Operator Injection|Imperative - Mixed Precision|JIT- Operator Injection|JIT - Mixed Precision|
 |:--:|:--:|:--:|:--:|:--:|

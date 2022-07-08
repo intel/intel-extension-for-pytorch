@@ -14,6 +14,25 @@ SET(AVX2_CODE "
   }
 ")
 
+SET(AVX2_VNNI_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+
+  int main()
+  {
+    char a1 = 1;
+    char a2 = 2;
+    char a3 = 0;
+    __m256i src1 = _mm256_set1_epi8(a1);
+    __m256i src2 = _mm256_set1_epi8(a2);
+    __m256i src3 = _mm256_set1_epi8(a3);
+    // detect avx2_vnni
+    _mm256_dpbusds_epi32(src3, src1, src2);
+
+    return 0;
+  }
+")
+
 SET(AVX512_CODE "
   #include <immintrin.h>
 
@@ -70,6 +89,12 @@ SET(AVX512_BF16_CODE "
     __m512 src;
     // detect avx512f and avx512_bf16
     _mm512_cvtneps_pbh(src);
+
+    // Enhance check logical for Ubuntu 18.04 + gcc 11.1. Which compiler is not fully support BF16.
+    __m128 a;
+    __m128bh b;
+    b = _mm_cvtneps_pbh(a);
+
     return 0;
   }
 ")
@@ -114,6 +139,11 @@ ENDMACRO()
 
 CHECK_SSE(C "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
 CHECK_SSE(CXX "AVX2" " ;-mavx2 -mfma;/arch:AVX2")
+
+# gcc start to support avx2_vnni from version 11.2
+# https://gcc.gnu.org/onlinedocs/gcc-11.2.0/gcc/x86-Options.html#x86-Options
+CHECK_SSE(C "AVX2_VNNI" " ;-mavx2 -mavxvnni -mfma;/arch:AVX2")
+CHECK_SSE(CXX "AVX2_VNNI" " ;-mavx2 -mavxvnni -mfma;/arch:AVX2")
 
 CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mfma;/arch:AVX512")
 CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mfma;/arch:AVX512")

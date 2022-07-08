@@ -43,6 +43,13 @@ class TestInputOutputModule2(torch.nn.Module):
     def forward(self, param1):
         return param1
 
+class TestCPUPool(TestCase):
+    @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    def test_cpupool_get_core_list(self):
+        core_list = [0, 1]
+        cpu_pool = ipex.cpu.runtime.CPUPool(core_list)
+        self.assertEqual(cpu_pool.cpu_pool.get_core_list(), core_list)
+
 class TestCoreBinding(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
     def test_decorator_imperative_model(self):

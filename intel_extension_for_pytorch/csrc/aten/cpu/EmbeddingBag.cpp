@@ -75,7 +75,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
     int64_t num_weights = weight.size(0);
     bool sparse = ctx->saved_data["sparse"].toBool();
 
-    at::Tensor grad = sparse ? grad_outputs[0] : grad_outputs[0].contiguous();
+    at::Tensor grad = grad_outputs[0].contiguous();
 
     /*
     pointer to embedding_bag_backward_kernel_stub(
@@ -169,22 +169,6 @@ A namespace wrapper to keep API compatiable to callers.
 And also compatiable to new dyndisp.
 */
 namespace torch_ipex {
-
-bool embedding_bag_fast_path_sum(
-    const at::Tensor weight,
-    const c10::optional<at::Tensor> per_sample_weights,
-    int64_t mode,
-    const c10::optional<int64_t> padding_idx) {
-  if ((mode != MODE_SUM) || (weight.stride(1) != 1))
-    return false;
-  if ((weight.scalar_type() != at::kFloat) &&
-      (weight.scalar_type() != at::kBFloat16))
-    return false;
-  if (padding_idx.has_value() ||
-      (per_sample_weights.has_value() && per_sample_weights.value().defined()))
-    return false;
-  return true;
-}
 
 at::Tensor embedding_bag(
     const at::Tensor& weight,

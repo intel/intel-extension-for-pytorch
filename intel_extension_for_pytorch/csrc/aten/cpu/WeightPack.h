@@ -203,21 +203,6 @@ std::tuple<ideep::tensor, ideep::tensor> get_lstm_packed_weight(
 
 bool is_packed(const at::Tensor& weight);
 
-// Get the convolution's expected ideep weight tensor desc.
-ideep::tensor::desc get_conv_expected_weights_desc(
-    const ideep::tensor::dims& weights_dims,
-    ideep::tensor::data_type w_dtype = ideep::data_type::f32,
-    const ideep::tensor::dims& strides = {1, 1, 1},
-    const ideep::tensor::dims& padding_l = {0, 0, 0},
-    const ideep::tensor::dims& padding_r = {0, 0, 0},
-    const ideep::tensor::dims& dilates = {1, 1, 1},
-    int groups = 1,
-    bool channels_last = false,
-    ideep::algorithm aalgorithm = ideep::algorithm::convolution_direct,
-    ideep::data_type x_dtype = ideep::data_type::f32,
-    const ideep::dims& src_dims = ideep::tensor::dims(),
-    const ideep::attr_t& attr = ideep::attr_t());
-
 // Get the conv_transpose's expected ideep weight tensor desc.
 ideep::tensor::desc get_conv_transpose_expected_weights_desc(
     const ideep::tensor::dims& weights_dims,
