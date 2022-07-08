@@ -79,6 +79,12 @@ at::Tensor conv_transpose_add_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
 
+at::Tensor conv_transpose_add_relu_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context);
+
 ContextConvTranspose create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,

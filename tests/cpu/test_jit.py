@@ -236,6 +236,22 @@ class ConvTransposeSumBroadcast(nn.Module):
         b = self.convtranspose1(x)
         return self.add_func(a, b, self.kwargs)
 
+class ConvTransposeAddRelu(nn.Module):
+    def __init__(self, dim, in_channels, mid_channels, out_channels, kernel_size, inplace, **kwargs):
+        super(ConvTransposeAddRelu, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, mid_channels, kernel_size, padding=1, bias=False, **kwargs)
+        self.convtranspose1 = convtranspose_module[dim](
+            mid_channels, out_channels, kernel_size, padding=1, bias=False, **kwargs)
+        self.convtranspose2 = convtranspose_module[dim](in_channels, out_channels, kernel_size, padding=1, bias=False, **kwargs)
+        self.inplace = inplace
+
+    def forward(self, x):
+        a = self.convtranspose(x)
+        a = F.relu(a, inplace=self.inplace)
+        a = self.convtranspose1(a)
+        b = self.convtranspose2(x)
+        return F.relu(a.add_(b), inplace=self.inplace)
+
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvBatchNorm_Fixed, self).__init__()
@@ -1785,6 +1801,34 @@ class Tester(TestCase):
             alpha=1,
             supported=False,
             test_inplace=False) # in-place add does not support shape broadcast
+
+    def test_conv_transpose_sum_relu(self):
+        batch_size = 1
+        out_channels = 3
+        mid_channels = 2
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8        
+        for inplace in [True, False]:
+            for dim in [2, 3]:
+                m = ConvTransposeAddRelu(dim, in_channels, mid_channels, out_channels, kernel_size, inplace)
+
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+                x = torch.randn(input_size)
+                
+                self._test_output(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_add_relu_run",
+                    kind_not_in_graph="ipex_prepack::conv_transpose_add_run")                
+                self._test_output_bf16(
+                    m,
+                    x,
+                    kind_in_graph="ipex_prepack::conv_transpose_add_relu_run",
+                    kind_not_in_graph="ipex_prepack::conv_transpose_add_run",
+                    prec=5e-2)        
 
     def test_conv_fusion(self):
         batch_size = 8
