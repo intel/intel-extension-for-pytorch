@@ -496,6 +496,22 @@ class LinearAdd(nn.Module):
         x1 = x.clone()
         return torch.add(self.linear(x),self.linear1(x1))
 
+class LinearAddRelu(nn.Module):
+    def __init__(self, in_channels, mid_channels, out_channels, inplace, **kwargs):
+        super(LinearAddRelu, self).__init__()
+        self.linear = nn.Linear(in_channels, mid_channels, bias=False, **kwargs)
+        self.linear1 = nn.Linear(
+            mid_channels, out_channels, bias=False, **kwargs)
+        self.linear2 = nn.Linear(in_channels, out_channels, bias=False, **kwargs)
+        self.inplace = inplace
+
+    def forward(self, x):
+        a = self.linear(x)
+        a = F.relu(a, inplace=self.inplace)
+        a = self.linear1(a)
+        b = self.linear2(x)
+        return F.relu(a.add_(b), inplace=self.inplace)
+
 class Linear_Reshape_Relu(nn.Module):
     def __init__(self, in_channels, out_channels,dest_shape, **kwargs):
         super(Linear_Reshape_Relu, self).__init__()
@@ -2636,6 +2652,26 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
+
+    def test_output_linear_add_relu(self):
+        for inplace in [True, False]:
+            m = LinearAddRelu(3, 5, 8, inplace)
+            x = torch.randn(2, 3)
+            self._test_output(
+                m,
+                x,
+                kind_in_graph="aten::linear")        
+            self._test_onednn_fp32(
+                m,
+                x,
+                kind_in_graph="ipex_prepack::linear_add_relu_run",
+                kind_not_in_graph="ipex_prepack::linear_add_run")                
+            self._test_output_bf16(
+                m,
+                x,
+                kind_in_graph="ipex_prepack::linear_add_relu_run",
+                kind_not_in_graph="ipex_prepack::linear_add_run",
+                prec=5e-2)
 
     def test_output_linear_reshape_relu(self):
         self._test_output(

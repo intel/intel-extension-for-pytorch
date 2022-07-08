@@ -227,7 +227,6 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
     int64_t groups,
     at::IntArrayRef dilation,
     bool bias_defined) {
-
   auto grad_y = itensor_from_tensor(grad_output);
   auto x = itensor_from_tensor(input);
 

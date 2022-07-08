@@ -257,8 +257,9 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2;
+  SubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
   std::array<std::string, 2> add_operators = {"add", "add_"};
+  std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
   // linear   Y
   //   \   /
@@ -285,6 +286,17 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::linear_add_run(%input, %accumu, %alpha, %packed_weight)
         return (%res))";
 
+  auto linear_add_relu_rstring = CodeTemplate(R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %x = ipex_prepack::linear_add_run(%input, %accumu, %alpha, %packed_weight)
+        %res = aten::${relu}(%x)
+        return (%res))");
+
+  std::string linear_add_relu_fused = R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %res = ipex_prepack::linear_add_relu_run(%input, %accumu, %alpha, %packed_weight)
+        return (%res))";
+
   // linear + add
   for (const auto& add : add_operators) {
     TemplateEnv env;
@@ -295,8 +307,17 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
         linear_add_rstring_v2.format(env), linear_add_fused);
   }
 
+  // linear + add + relu
+  for (const auto& relu : relu_operators) {
+    TemplateEnv env;
+    env.s("relu", relu);
+    rewriter_add_relu.RegisterRewritePattern(
+        linear_add_relu_rstring.format(env), linear_add_relu_fused);
+  }
+
   rewriter_add_v1.runOnGraph(graph, fuse_add_filter_v1);
   rewriter_add_v2.runOnGraph(graph, fuse_add_filter_v2);
+  rewriter_add_relu.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

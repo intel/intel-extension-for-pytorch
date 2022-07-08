@@ -70,6 +70,12 @@ at::Tensor linear_add_run(
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context);
 
+at::Tensor linear_add_relu_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<LinearOpContext>& op_context);
+
 ContextLinear create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
