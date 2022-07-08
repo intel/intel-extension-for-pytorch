@@ -472,19 +472,12 @@ class TestFusionPattern(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
                 self.conv2 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
-                self.conv3 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
-                self.conv4 = nn.Conv2d(32, 32, 3, padding=1, bias=True)
                 self.eltwise = eltwise_fn
                 self.adaptive_avg_pool_2d = nn.AdaptiveAvgPool2d((5, 7))
 
             def forward(self, x, y):
                 x = self.conv1(x)
-                x = self.eltwise(x)
-                x = self.conv2(x)
-                x = self.eltwise(x)
-                y = self.conv3(y)
-                y = self.eltwise(y)
-                y = self.conv4(y)
+                y = self.conv2(y)
                 y = self.eltwise(y)
                 x = torch.add(x, y)
                 x = self.adaptive_avg_pool_2d(x)
@@ -503,7 +496,7 @@ class TestFusionPattern(JitLlgaTestCase):
             # LlgaTensorImpl (assertEqual would fail in that case).
             graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1,
                                             qconfig=qconfig)
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
 
     def test_conv2d_bn(self):
