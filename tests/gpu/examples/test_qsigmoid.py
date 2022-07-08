@@ -8,7 +8,7 @@ from torch.testing._internal.common_utils import TestCase
 
 
 class TestTorchMethod(TestCase):
-
+    @pytest.mark.skip(reason="Need create a PR for torch to align output_scale")
     def test_qsigmoid(self, dtype=torch.float):
         dtype = torch.qint8
 

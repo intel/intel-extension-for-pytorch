@@ -1,4 +1,5 @@
 import torch
+import copy
 from torch.testing._internal.common_utils import TestCase
 
 import time
@@ -11,14 +12,13 @@ from torch.quantization.quantize_jit import (
 )
 from torch.quantization import default_qconfig
 
-
 class M(torch.nn.Module):
     def __init__(self):
         super(M, self).__init__()
         self.block = torch.nn.Sequential(
-            torch.nn.Conv2d(64, 128, kernel_size=7, stride=2, padding=3, bias=False),
+            torch.nn.Conv2d(3, 3, kernel_size=7, stride=2, padding=3, bias=False),
             torch.nn.Sigmoid(),
-            torch.nn.Conv2d(128, 128, kernel_size=7, stride=2, padding=3, bias=False),
+            torch.nn.Conv2d(3, 3, kernel_size=7, stride=2, padding=3, bias=False),
             torch.nn.Sigmoid()
         )
 
@@ -26,92 +26,93 @@ class M(torch.nn.Module):
         x = self.block(x)
         return x
 
+def impe_int8_model(model, device, test_input):
+    modelImpe = torch.quantization.QuantWrapper(model)
+    modelImpe = modelImpe.to(device)
+    modelImpe.eval()
+
+    qconfig_u8 = torch.quantization.QConfig(
+        activation=torch.quantization.observer.MinMaxObserver.with_args(
+            qscheme=torch.per_tensor_symmetric,
+            reduce_range=False,
+            dtype=torch.quint8
+        ),
+        weight=torch.quantization.default_weight_observer
+    )
+    modelImpe.qconfig = qconfig_u8
+
+    torch.quantization.prepare(modelImpe, inplace=True)
+
+    with torch.no_grad():
+        calib = test_input.to(device)
+        modelImpe(calib)
+
+    torch.quantization.convert(modelImpe, inplace=True)
+
+    return modelImpe(test_input.to(device))
+
+def trace_int8_model(model, device, test_input):
+    model = model.to("cpu")
+    modelJit = torch.jit.trace(model, test_input.to("cpu"))
+    modelJit.eval()
+    modelJit.to(device)
+    print(modelJit)
+    print("finish jit tracing...")
+
+    print("start ", device, " calibration ...")
+    qconfig_u8 = torch.quantization.QConfig(
+        activation=torch.quantization.observer.MinMaxObserver.with_args(
+            qscheme=torch.per_tensor_symmetric,
+            reduce_range=False,
+            dtype=torch.quint8
+        ),
+        weight=torch.quantization.default_weight_observer
+    )
+
+
+    modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+
+    # do calibration
+    test_input = test_input.to(device)
+    with torch.no_grad():
+        for i in range(1):
+            calib_input = test_input
+            modelJit(calib_input)
+    print("start ", device, " convert...")
+    modelJit = convert_jit(modelJit, True)
+    # inference
+    print("start ", device, " inference ...")
+    with torch.no_grad():
+        for i in range(1):
+            start = time.time()
+            output_cpu = modelJit(test_input)
+            end = time.time()
+            print("iter.{} ... {time:.3f}ms".format(i, time=(end - start) * 1000))
+        print("print ", device, " jit graph ....")
+        print(modelJit.graph_for(test_input))
+
+        print("get ", device, " test input result....")
+        output = modelJit(test_input)
+        print("finish ", device, " testing.......")
+    return output
+
 class TestTorchMethod(TestCase):
     def test_qConv2d_sigmoid(self, dtype=torch.float):
-        torch._C._jit_set_profiling_mode(True)
-        torch._C._jit_set_profiling_executor(True)
         model = M()
+        model1 = copy.deepcopy(model)
+        test_input = torch.rand([1, 3, 8, 8])
+        # impe vs. jit
+        # For model that JIT and impe path are both reachable.
+        xpu_res = trace_int8_model(model, "xpu", test_input)
+        impe_res = impe_int8_model(model1, "xpu", test_input)
+        self.assertEqual(xpu_res.cpu(), impe_res.cpu())
 
-        # cpu int8
-        modelJit = torch.jit.trace(model, torch.randn([1, 64, 128, 128]))
-        modelJit.eval()
-        print(modelJit)
-        print("finish jit...")
-
-        input = torch.rand([1, 64, 128, 128])
-        print("start calibration ...")
-        qconfig_u8 = torch.quantization.QConfig(
-            activation=torch.quantization.observer.MinMaxObserver.with_args(
-                qscheme=torch.per_tensor_symmetric,
-                reduce_range=False,
-                dtype=torch.quint8
-            ),
-            weight=torch.quantization.default_weight_observer
-        )
-
-        modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
-
-        # do calibration
-        for i in range(1):
-            calib_input = input
-            modelJit(calib_input)
-        print("start cpu convert")
-        modelJit = convert_jit(modelJit, True)
-        # inference
-        print("start inference ...")
-        for i in range(5):
-            start = time.time()
-            output_cpu = modelJit(input)
-            end = time.time()
-            print("iter.{} ... {time:.3f}ms".format(i, time=(end - start) * 1000))
-
-
-        torch._C._jit_set_profiling_mode(False)
-        torch._C._jit_set_profiling_executor(False)
-
-        # xpu
-        print("-------start xpu path-------")
-        print("start jit ...")
-        model = model.to("xpu")
-        model = torch.jit.trace(model, torch.randn([1, 64, 128, 128]).to("xpu"))
-        modelJit = wrap_cpp_module(torch._C._jit_pass_fold_convbn(model._c))
-        modelJit.eval()
-        print("finish jit ...")
-
-        input = torch.rand([1, 64, 128, 128], device="xpu")
-        input = input.to("xpu")
-        modelJit = modelJit.to("xpu")
-
-        print("start calibration ...")
-        # calibration
-        # default with per_tensor quantization
-        qconfig_u8 = torch.quantization.QConfig(
-            activation=torch.quantization.observer.MinMaxObserver.with_args(
-                qscheme=torch.per_tensor_symmetric,
-                reduce_range=False,
-                dtype=torch.quint8
-            ),
-            weight=torch.quantization.default_weight_observer
-        )
-
-        modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
-        modelJit = modelJit.to("xpu")
-
-        # do calibration
-        for i in range(1):
-            calib_input = input
-            print(calib_input.size())
-            modelJit(calib_input)
-        modelJit = convert_jit(modelJit, True)
-        print(modelJit.graph_for(input))
-
-        print("start inference ...")
-        for i in range(5):
-            start = time.time()
-
-            output = modelJit(input)
-            torch.xpu.synchronize()
-
-            end = time.time()
-            print("iter.{} ... {time:.3f}ms".format(i, time=(end - start) * 1000))
-        self.assertEqual(output.cpu(), output)
+        # cpu vs. xpu
+        # For model that impe path is unreachable, we can compare int8 result
+        # with CPU float module result + quantization counterpart.
+        model = model.to("cpu")
+        cpu_res = model(test_input)
+        xpu_res = trace_int8_model(model, "xpu", test_input)
+        cpu_res = torch.quantize_per_tensor(cpu_res, 1.0 / 255.0, 0, torch.quint8)
+        xpu_res = torch.quantize_per_tensor(xpu_res, 1.0 / 255.0, 0, torch.quint8)
+        self.assertEqual(cpu_res.int_repr().numpy(), xpu_res.to("cpu").int_repr().numpy())

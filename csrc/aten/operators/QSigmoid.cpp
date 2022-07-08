@@ -22,8 +22,8 @@ namespace AtenIpexTypeQuantizedXPU {
 
 void qsigmoid_kernel(const Tensor& qx, Tensor& qy) {
   IPEX_DISPATCH_QINT_TYPES(qx.scalar_type(), "qsigmoid_xpu", [&]() {
-    // output_scale = 1 / 2^8
-    double output_scale = 0.00390625;
+    // output_scale = 1 / (2^8 - 1)
+    double output_scale = 0.00392157;
     int64_t output_zero_point = 0;
 
     // The range of sigmoid's output is (0,1) ,therefore we quantize our data
@@ -34,8 +34,8 @@ void qsigmoid_kernel(const Tensor& qx, Tensor& qy) {
 
     auto data_type = at::kQUInt8;
     if (SCALAR_TYPE == at::kQInt32) {
-      // output_scale = 1 / 2^32
-      output_scale = 2.3283064365386963e-10;
+      // output_scale = 1 / (2^32 - 1)
+      output_scale = 2.3283064370807974e-10;
       data_type = at::kQInt32;
     }
     auto x = at::dequantize(qx);

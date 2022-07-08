@@ -336,6 +336,15 @@ static at::Tensor convolution(
         ? src.q_scale() / 2
         : src.q_scale();
     conv_scale.clear();
+    /* Note: [Convolution requantization]
+       Suppose y = w * x. The * refer to convolution operation, and y, w, x are
+       dtype of FP32.
+       Then we have
+         y_int / y_sc =  (w_int / w_sc) * (x_int / x_sc) =>
+         y_int = [y_sc / (w_sc x x_sc)] (w_int * x_int).
+       The y_sc / (w_sc x x_sc) is requantization scale, which is also the
+       conv_scale in following line.
+       Inversion is required due to scale_onednn = 1  / scale_torch */
     for (int i = 0; i < wgh_scales.size(); i++) {
       conv_scale.push_back(1.f / (dst_scale / (src_scale * wgh_scales[i])));
     }
@@ -367,11 +376,20 @@ static at::Tensor convolution(
   if (attr.with_sum())
     po.append_sum(attr.scale_);
 
+  /* Note: [Conv post eltwise ops requantization]
+     Suppose y = w * x. The * refer to convolution operation, and y, w, x are
+     dtype of FP32. It is qeual to
+       y_int / y_sc = Post((w_int / w_sc) * (x_int / x_sc)) =>
+       y_int = y_sc x Post(1 / (w_sc * x_sc) x (w_int * x_int))
+     y_sc need to be passed to attr.scale.
+     Also, conv_scale should be 1 / (w_sc* x_sc).
+     For conv_scale setting  see Note: [Convolution requantization]
+   */
   if (attr.with_relu()) {
     po.append_eltwise(1.0, algorithm::eltwise_relu, attr.alpha_, attr.beta_);
   } else if (attr.with_sigmoid()) {
     po.append_eltwise(
-        1.0, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
+        attr.scale_, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
   } else if (attr.with_mish()) {
     po.append_eltwise(1.0, algorithm::eltwise_mish, attr.alpha_, attr.beta_);
   }

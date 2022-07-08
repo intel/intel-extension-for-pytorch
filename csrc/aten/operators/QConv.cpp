@@ -258,11 +258,15 @@ at::Tensor q_conv2d_sigmoid(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
+  /* The output range for sigmoid is [0, 1), we can infer the requantization
+     scale for post_ops is 255 (the maximum in UInt8).
+     For detailed information of requantization scale,
+     See Note [Conv Post eltwise ops requantization] */
   ConvAttr attr = {
-      static_cast<float>(input.q_scale()),
+      static_cast<float>(255.0),
       0.f,
       0.f,
-      static_cast<float>(output_scale),
+      static_cast<float>(1.0),
       ConvAttr::kind_with_sigmoid};
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
@@ -278,9 +282,9 @@ at::Tensor q_conv2d_sigmoid(
           padding.vec(),
           stride.vec(),
           dilation.vec()),
-      input.options().dtype(toQIntType(input.scalar_type())),
-      output_scale,
-      output_zero_point,
+      device(kXPU).dtype(kQUInt8),
+      0.00392157, // 1.0 / 255
+      0,
       mfmt);
 
   output = convolution(
