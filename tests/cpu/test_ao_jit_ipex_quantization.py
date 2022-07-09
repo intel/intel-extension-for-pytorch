@@ -11,8 +11,9 @@ import copy
 from test_autocast import get_rand_seed
 
 import intel_extension_for_pytorch as ipex
-from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
+from test_ao_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP, llga_fp32_bf16_test_env
 from torch.testing._internal.common_utils import TEST_SCIPY, TemporaryFileName
+from torch.testing._internal.jit_utils import freeze_rng_state
 
 import intel_extension_for_pytorch as ipex
 from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, HistogramObserver, \
@@ -353,6 +354,57 @@ class TestRemoveMutate(JitLlgaTestCase):
         x = torch.randn(1, 3, 224, 224)
         graph, _, _ = self.prepareModel(m, [x])
         FileCheck().check_not("aten::mul_").check("aten::mul").run(graph)
+
+    @llga_fp32_bf16_test_env
+    def test_special_mapped_op(self):
+        class M1(nn.Module):
+            def __init__(self):
+                super(M1, self).__init__()
+
+            def forward(self, x, y):
+                z = x + 1
+                z.zero_()
+                y.fill_(3)
+                return z, y
+
+        m = M1()
+        x = torch.tensor([2, 2])
+        y = torch.tensor([2, 4])
+        graph, traced_model, _ = self.prepareModel(m, [x, y])
+        FileCheck().check_not("aten::zero_").check_not("aten::fill_").run(graph)
+        self.assertEqual(traced_model(x,y), m(x,y))
+
+        class M2(nn.Module):
+            def __init__(self):
+                super(M2, self).__init__()
+
+            def forward(self, x):
+                return x.normal_()
+
+        m = M2()
+        x = torch.rand(2, 1, 3, 4)
+        graph, traced_model, _ = self.prepareModel(m, [x])
+        FileCheck().check_not("normal_").run(graph)
+        with freeze_rng_state():
+            out1 = m(x)
+        with freeze_rng_state():
+            out2 = traced_model(x)
+        self.assertEqual(out1, out2)
+
+        class M3(nn.Module):
+            def __init__(self):
+                super(M3, self).__init__()
+
+            def forward(self, x):
+                x.fill_(3)
+                x.zero_()
+                return x
+
+        m = M3()
+        x = torch.tensor([2, 2])
+        graph, traced_model, _ = self.prepareModel(m, [x])
+        FileCheck().check_not("aten::zero_").check_not("aten::fill_").run(graph)
+        self.assertEqual(traced_model(x), m(x))
 
 class TestDynamicQuantization(JitLlgaTestCase):
     def test_linear_dynamic(self):

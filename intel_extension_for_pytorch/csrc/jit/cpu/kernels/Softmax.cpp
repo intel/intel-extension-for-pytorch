@@ -77,9 +77,9 @@ at::Tensor& dil_softmax_(
     AT_ASSERTM(
         intype != at::ScalarType::Half,
         "softmax with half to float conversion is not supported on Mkldnn");
-    at::Tensor converted = input.toType(outtype);
-    softmax_impl_(converted, dim);
-    return converted;
+    input = input.toType(outtype);
+    softmax_impl_(input, dim);
+    return input;
   }
   softmax_impl_(input, dim);
   return input;
