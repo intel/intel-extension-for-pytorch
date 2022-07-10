@@ -50,3 +50,17 @@
 
 #define IS_COMPLEX(scalar_t) \
   (IS_COMPLEX_FLOAT(scalar_t) || IS_COMPLEX_DOUBLE(scalar_t))
+
+struct NullType {
+  using value_type = NullType;
+  template <typename T>
+  inline NullType& operator=(const T&) {
+    return *this;
+  }
+  inline bool operator==(const NullType&) {
+    return true;
+  }
+  inline bool operator!=(const NullType&) {
+    return false;
+  }
+};
