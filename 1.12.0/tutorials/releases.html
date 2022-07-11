@@ -141,12 +141,12 @@
 <li><p>Automatic INT8 quantization became a stable feature baking into a well-tuned default quantization recipe, supporting both static and dynamic quantization and a wide range of calibration algorithms.</p></li>
 <li><p>Runtime Extension, featured MultiStreamModule, became a stable feature, could further enhance throughput in offline inference scenario.</p></li>
 <li><p>More optimizations in graph and operations to improve performance of broad set of models, examples include but not limited to wave2vec, T5, Albert etc.</p></li>
-<li><p>We provide a pre-built experimental binary with oneDNN Graph Compiler tuned on, which would deliver additional performance gain for Bert, Albert, Roberta in INT8 inference.</p></li>
+<li><p>Pre-built experimental binary with oneDNN Graph Compiler tuned on would deliver additional performance gain for Bert, Albert, Roberta in INT8 inference.</p></li>
 </ul>
 <section id="highlights">
 <h3>Highlights<a class="headerlink" href="#highlights" title="Permalink to this headline"></a></h3>
 <ul>
-<li><p>Finalize the quantization feature from experimental to golden. We facilitate the user experience to be fully compatible with that of PyTorch. In this release, the extension supports PyTorch calibration algorithm directly and uses <code class="docutils literal notranslate"><span class="pre">Histogram</span></code> for calibration by default. Comparing to the previous version, changes are listed as following. Refer to <a class="reference internal" href="features/int8.html"><span class="doc">tutorial page</span></a> for more details.</p>
+<li><p>Matured automatic INT8 quantization feature baking into a well-tuned default quantization recipe. We facilitated the user experience and provided a wide range of calibration algorithms like Histogram, MinMax, MovingAverageMinMax, etc. Meanwhile, We polished the static quantization with better flexibility and enabled dynamic quantization as well. Compared to the previous version, the brief changes are as follows. Refer to <a class="reference internal" href="features/int8.html"><span class="doc">tutorial page</span></a> for more details.</p>
 <table align="center">
 <tbody>
 <tr>
@@ -189,7 +189,7 @@
 </tr>
 </tbody>
 </table></li>
-<li><p>Improve runtime performance and user experience. In this release, we enhance the heuristic rule to make the Runtime Extension feature benefit OOB models in most situations. Meanwhile, we also provide <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.MultiStreamModuleHint</span></code> to customize how to distribute input into streams and then concatenate outputs from each steam.</p>
+<li><p>Runtime Extension, featured MultiStreamModule, became a stable feature. In this release, we enhanced the heuristic rule to further enhance throughput in offline inference scenario. Meanwhile, we also provide the <code class="docutils literal notranslate"><span class="pre">ipex.cpu.runtime.MultiStreamModuleHint</span></code> to custom how to split the input into streams and concat the output for each steam.</p>
 <table align="center">
 <tbody>
 <tr>
@@ -221,7 +221,7 @@
 </tr>
 </tbody>
 </table></li>
-<li><p>Polish <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> to take input shape information. With additional shape information, it is possible to choose the optimal memory layout to improve kernel efficiency.</p>
+<li><p>Polished the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> to accept the input shape information which would conclude the optimal memory layout for better kernel efficiency.</p>
 <table align="center">
 <tbody>
 <tr>
@@ -248,20 +248,24 @@
 </tr>
 </tbody>
 </table></li>
+<li><p>Provided more optimizations in graph and operations</p>
+<ul class="simple">
 <li><p>Fuse Adam to improve training performance <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/d3f714e54dc8946675259ea7a445b26a2460b523">#822</a></p></li>
-<li><p>Support Deconv3D to serve most models like xxx and implement most fusions like Conv</p></li>
+<li><p>Enable Normalization operators to support channels-last 3D <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/ae268ac1760d598a29584de5c99bfba46c6554ae">#642</a></p></li>
+<li><p>Support Deconv3D to serve most models and implement most fusions like Conv</p></li>
 <li><p>Enable LSTM to support static and dynamic quantization <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/2bf8dba0c380a26bbb385e253adbfaa2a033a785">#692</a></p></li>
 <li><p>Enable Linear to support dynamic quantization <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/ff231fb55e33c37126a0ef7f0e739cd750d1ef6c">#787</a></p></li>
-<li><p>Add more optimizations, including more custom operators and fusions.</p>
-<ul class="simple">
+<li><p>Fusions.</p>
+<ul>
 <li><p>Fuse <code class="docutils literal notranslate"><span class="pre">Add</span></code> + <code class="docutils literal notranslate"><span class="pre">Swish</span></code> to accelerate FSI Riskful model <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/cc855ff2bafd245413a6111f3d21244d0bcbb6f6">#551</a></p></li>
 <li><p>Fuse <code class="docutils literal notranslate"><span class="pre">Conv</span></code> + <code class="docutils literal notranslate"><span class="pre">LeakyReLU</span></code> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/dc6ed1a5967c644b03874fd1f8a503f0b80be6bd">#589</a></p></li>
 <li><p>Fuse <code class="docutils literal notranslate"><span class="pre">BMM</span></code> + <code class="docutils literal notranslate"><span class="pre">Add</span></code> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/d1379aa565cc84b4a61b537ba2c9a046b7652f1a">#407</a></p></li>
-<li><p>Enable Normalization operators to support channels-last 3D <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/ae268ac1760d598a29584de5c99bfba46c6554ae">#642</a></p></li>
 <li><p>Fuse <code class="docutils literal notranslate"><span class="pre">Concat</span></code> + <code class="docutils literal notranslate"><span class="pre">BN</span></code> + <code class="docutils literal notranslate"><span class="pre">ReLU</span></code> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/cad3f82f6b7efed0c08b2f0c11117a4720f58df4">#647</a></p></li>
 <li><p>Optimize <code class="docutils literal notranslate"><span class="pre">Convolution1D</span></code> to support channels last memory layout and fuse <code class="docutils literal notranslate"><span class="pre">GeLU</span></code> as its post operation. <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/a0c063bdf4fd1a7e66f8a23750ac0c2fe471a559">#657</a></p></li>
 <li><p>Fuse <code class="docutils literal notranslate"><span class="pre">Einsum</span></code> + <code class="docutils literal notranslate"><span class="pre">Add</span></code> to boost Alphafold2 <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/3094f346a67c81ad858ad2a80900fab4c3b4f4e9">#674</a></p></li>
 <li><p>Fuse <code class="docutils literal notranslate"><span class="pre">Linear</span></code> + <code class="docutils literal notranslate"><span class="pre">Tanh</span></code> <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/b24cc530b1fd29cb161a76317891e361453333c9">#711</a></p></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
