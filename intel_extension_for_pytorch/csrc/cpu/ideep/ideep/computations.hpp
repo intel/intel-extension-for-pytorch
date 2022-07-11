@@ -5,7 +5,6 @@
 #include "operators/batchnorm.hpp"
 #include "operators/binary.hpp"
 #include "operators/channel_shuffle.hpp"
-#include "operators/concat.hpp"
 #include "operators/conv.hpp"
 #include "operators/deconv.hpp"
 #include "operators/direct_copy.hpp"
@@ -18,9 +17,7 @@
 #include "operators/lrn.hpp"
 #include "operators/lstm.hpp"
 #include "operators/matmul.hpp"
-#include "operators/pool.hpp"
 #include "operators/softmax.hpp"
-#include "operators/spliter.hpp"
 #include "operators/sum.hpp"
 #include "operators/vanilla_rnn.hpp"
 

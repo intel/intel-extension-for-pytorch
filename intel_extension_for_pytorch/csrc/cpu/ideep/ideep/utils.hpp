@@ -89,13 +89,10 @@ inline bool any_le(const std::vector<T>& v, T i) {
 inline memory::dims get_compatible_dilates(
     const memory::dims& dilates,
     int input_size = 4) {
-  if (!dilates.empty() && !any_le(dilates, static_cast<dim>(0)))
-    return fmap(dilates, [](dim x) { return x - 1; });
-  if (4 == input_size) {
-    return {0, 0};
-  } else {
-    return {0, 0, 0};
-  }
+  IDEEP_ENFORCE(!dilates.empty(), "dilates must not be empty");
+  IDEEP_ENFORCE(
+      !any_le(dilates, static_cast<dim>(0)), "dilates must be positive");
+  return fmap(dilates, [](dim x) { return x - 1; });
 }
 
 inline memory::dims group_dims(const dims& adims, dim groups) {
@@ -125,20 +122,6 @@ inline dnnl::algorithm rnn_kind_to_activation(rnn_kind rnn) {
   } else {
     return dnnl::algorithm::undef;
   }
-}
-
-inline std::pair<std::vector<float>, std::vector<float>> compute_scales(
-    float src_scale,
-    float dst_scale,
-    std::vector<float> weight_scales) {
-  auto scale_size = weight_scales.size();
-  std::vector<float> bias_scales(scale_size), op_scales(scale_size);
-
-  for (int i = 0; i < scale_size; i++) {
-    bias_scales[i] = src_scale * weight_scales[i];
-    op_scales[i] = dst_scale / bias_scales[i];
-  }
-  return std::make_pair(std::move(bias_scales), std::move(op_scales));
 }
 
 using bytestring = std::string;
@@ -280,10 +263,6 @@ inline int op_scale_mask(dim scale_size) {
 
 inline int tensor_scale_mask(dim scale_size, bool grouped) {
   return scale_size > 1 ? grouped ? 3 : 1 : 0;
-}
-
-inline int tensor_zp_mask(dim zp_size) {
-  return zp_size > 1 ? 1 : 0;
 }
 
 inline uintptr_t mod_ptr(void* ptr, size_t bytes) {

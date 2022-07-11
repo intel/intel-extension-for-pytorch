@@ -3450,6 +3450,13 @@ class Tester(TestCase):
             result = model(input)
             self.assertEqual(tresult, result)
 
+    def test_lru_cache_resize(self):
+        import os
+        # Set LRU_CACHE_CAPACITY < 1024 to trigger resize
+        os.environ["LRU_CACHE_CAPACITY"] = "512"
+        self.test_conv_fusion()
+        os.environ["LRU_CACHE_CAPACITY"] = "1024"
+
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()
