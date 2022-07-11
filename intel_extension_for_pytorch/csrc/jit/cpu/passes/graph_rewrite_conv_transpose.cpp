@@ -275,9 +275,9 @@ void fuseConvTransposeWithEltwise(std::shared_ptr<Graph>& graph) {
 
 void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_add_accumu_on_the_right,
-      rewriter_add_accumu_on_the_left;
-  // TODO: add_
+      rewriter_add_accumu_on_the_left, rewriter_add_relu;
   std::array<std::string, 2> add_operators = {"add", "add_"};
+  std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
   // ConvTranspose  accumu
   //       \        /
@@ -304,6 +304,18 @@ void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::conv_transpose_add_run(%input, %accumu, %alpha, %packed_weight)
         return (%res))";
 
+  auto conv_transpose_add_relu_rstring = CodeTemplate(R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %x = ipex_prepack::conv_transpose_add_run(%input, %accumu, %alpha, %packed_weight)
+        %res = aten::${relu}(%x)
+        return (%res))");
+
+  std::string conv_transpose_add_relu_fused = R"(
+    graph(%input, %accumu, %alpha, %packed_weight):
+        %res = ipex_prepack::conv_transpose_add_relu_run(%input, %accumu, %alpha, %packed_weight)
+        return (%res))";
+
+  // conv_transpose + add
   for (const auto& add : add_operators) {
     TemplateEnv env;
     env.s("add", add);
@@ -315,10 +327,20 @@ void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph) {
         conv_transpose_add_fused);
   }
 
+  // conv_transpose + add + relu
+  for (const auto& relu : relu_operators) {
+    TemplateEnv env;
+    env.s("relu", relu);
+    rewriter_add_relu.RegisterRewritePattern(
+        conv_transpose_add_relu_rstring.format(env),
+        conv_transpose_add_relu_fused);
+  }
+
   rewriter_add_accumu_on_the_right.runOnGraph(
       graph, fuse_add_filter_accumu_on_the_right);
   rewriter_add_accumu_on_the_left.runOnGraph(
       graph, fuse_add_filter_accumu_on_the_left);
+  rewriter_add_relu.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

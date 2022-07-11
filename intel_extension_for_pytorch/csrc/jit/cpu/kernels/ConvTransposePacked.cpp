@@ -151,6 +151,18 @@ at::Tensor conv_transpose_add_run(
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
 }
 
+at::Tensor conv_transpose_add_relu_run(
+    const at::Tensor& input,
+    at::Tensor& accumu,
+    const c10::optional<at::Scalar>& alpha,
+    const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
+  IPEX_RECORD_FUNCTION(
+      "ipex_prepack::conv_transpose_add_relu_run",
+      c10::ArrayRef<c10::IValue>({}));
+  auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
+  return op_context->run(input, accumu, ideep::attr_t::residual(scale));
+}
+
 ContextConvTranspose create(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias,
