@@ -30,11 +30,10 @@ class BatchKernelConfig {
 
     // ensure assigning successive work items along contiguous (small stride)
     // dimension
-    if (!problem_along_x_) {
-      while (problem_ <= wg_range_y_ >> 1 && wg_range_x_ <= wg_size) {
-        wg_range_y_ = wg_range_y_ >> 1;
-        wg_range_x_ = wg_size / wg_range_y_;
-      }
+    auto range_bound_y = problem_along_x_ ? batch_ : problem_;
+    while (range_bound_y <= wg_range_y_ >> 1 && wg_range_x_ <= wg_size) {
+      wg_range_y_ = wg_range_y_ >> 1;
+      wg_range_x_ = wg_size / wg_range_y_;
     }
 
     if (problem_batch_ == 0)
