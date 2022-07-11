@@ -29,7 +29,7 @@ inline void host_kvsort(
     const func_t& fn) {
   for (auto kit = kbegin, vit = vbegin; kit != kend; kit++, vit++) {
     for (auto kit_ = kit, vit_ = vit; kit_ != kend; kit_++, vit_++) {
-      if (fn(*kit, *kit_)) {
+      if (!fn(*kit, *kit_)) {
         std::swap(*kit, *kit_);
         std::swap(*vit, *vit_);
       }
@@ -191,14 +191,9 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
       "segmented_merge_sort_kernel",
       [&]() {
         scalar_t* self_ptr = self_.data_ptr<scalar_t>();
+        int stride = 1;
+        int nsegments = numel / nsort;
         using offset_t = uint32_t;
-        auto info = getTensorInfo<scalar_t, offset_t>(self_);
-        info.reduceDim(dim);
-        int collapse_dim = info.collapseDims(dim);
-        int nsegments = 1;
-        for (int i = 0; i < info.dims; ++i)
-          nsegments *= info.sizes[i];
-        int stride = info.strides[collapse_dim];
 
         SegmentedGroupRadixSortDesc desc(
             nsegments, nsort, stride, descending, true);
@@ -214,9 +209,7 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
                 (scalar_t*)values_ptr_,
                 nullptr,
                 (int64_t*)indices_ptr,
-                [=](offset_t slice) -> offset_t {
-                  return IndexToOffset<scalar_t, offset_t>::get(slice, info);
-                });
+                [=](offset_t slice) -> offset_t { return slice * nsort; });
           } else {
             auto sorting_tmp_k = at::empty_strided(
                 self_.sizes(), self_.strides(), self_.options());
@@ -232,9 +225,7 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
                 (scalar_t*)values_ptr_,
                 nullptr,
                 (int64_t*)indices_ptr,
-                [=](offset_t slice) -> offset_t {
-                  return IndexToOffset<scalar_t, offset_t>::get(slice, info);
-                },
+                [=](offset_t slice) -> offset_t { return slice * nsort; },
                 (scalar_t*)sorting_tmp_k.data_ptr(),
                 (int64_t*)sorting_tmp_v.data_ptr());
           }
@@ -251,9 +242,7 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
               (scalar_t*)values_ptr_,
               nullptr,
               (int64_t*)indices_ptr,
-              [=](offset_t slice) -> offset_t {
-                return IndexToOffset<scalar_t, offset_t>::get(slice, info);
-              },
+              [=](offset_t slice) -> offset_t { return slice * nsort; },
               (scalar_t*)sorting_tmp_k.data_ptr(),
               (int64_t*)sorting_tmp_v.data_ptr());
         }
