@@ -329,6 +329,43 @@ inline scalar_t gelu_erf_backward(scalar_t grad, scalar_t self) {
        v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
 }
 
+Tensor& silu_out_kernel(const Tensor& self, Tensor& result) {
+  auto iter = TensorIterator::unary_float_op(result, self);
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "_silu_out",
+      [&]() {
+        result.resize_as_(self);
+        dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t x) -> scalar_t {
+          scalar_t one = (scalar_t)1.0;
+          return x / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(x)));
+        });
+      });
+  return result;
+}
+
+template <typename scalar_t>
+void silu_backward_kernel(
+    Tensor& gradInput,
+    const Tensor& gradOutput,
+    const Tensor& self) {
+  gradInput.resize_as_(self);
+  auto iter = TensorIteratorConfig()
+                  .set_check_mem_overlap(true)
+                  .add_output(gradInput)
+                  .add_input(gradOutput)
+                  .add_input(self)
+                  .build();
+  dpcpp_kernel_for_tensor_iter(iter, [=](scalar_t dy, scalar_t x) -> scalar_t {
+    scalar_t one = (scalar_t)1.0;
+    const scalar_t sigmoid =
+        one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(x)));
+    return dy * sigmoid * (one + x * (one - sigmoid));
+  });
+}
+
 } // namespace impl
 
 Tensor relu(const Tensor& self) {
@@ -707,6 +744,24 @@ Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
         });
     return dX;
   }
+}
+
+Tensor& silu_out(const Tensor& self, Tensor& output) {
+  return impl::silu_out_kernel(self, output);
+}
+
+Tensor& silu_backward_out(
+    const Tensor& grad_output,
+    const Tensor& output,
+    Tensor& grad_input) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      output.scalar_type(),
+      "silu_backward_out",
+      [&]() {
+        impl::silu_backward_kernel<scalar_t>(grad_input, grad_output, output);
+      });
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU

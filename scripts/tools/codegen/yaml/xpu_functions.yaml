@@ -180,6 +180,8 @@ supported:
   - elu_
   - elu_backward
   - elu_backward.grad_input
+  - silu.out
+  - silu_backward.grad_input
   - embedding_dense_backward
   - empty.memory_format
   - empty_strided
