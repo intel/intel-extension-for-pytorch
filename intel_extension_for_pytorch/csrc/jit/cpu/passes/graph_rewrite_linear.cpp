@@ -257,7 +257,8 @@ void fuseLinearWithEltwise(std::shared_ptr<Graph>& graph) {
 }
 
 void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
-  SubgraphRewriter rewriter_add_v1, rewriter_add_v2, rewriter_add_relu;
+  SubgraphRewriter rewriter_add_accumu_on_the_right,
+      rewriter_add_accumu_on_the_left, rewriter_add_relu;
   std::array<std::string, 2> add_operators = {"add", "add_"};
   std::array<std::string, 2> relu_operators = {"relu", "relu_"};
 
@@ -265,7 +266,7 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
   //   \   /
   //    add
   // output = linear_output + alpha*Y
-  auto linear_add_rstring_v1 = CodeTemplate(R"(
+  auto linear_add_accumu_on_the_right_rstring = CodeTemplate(R"(
     graph(%input, %accumu, %alpha, %packed_weight):
         %x = ipex_prepack::linear_run(%input, %packed_weight)
         %res = aten::${add}(%x, %accumu, %alpha)
@@ -275,7 +276,7 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
   //   \   /
   //    add
   // output = Y + alpha*linear_output, alpha need to one or none.
-  auto linear_add_rstring_v2 = CodeTemplate(R"(
+  auto linear_add_accumu_on_the_left_rstring = CodeTemplate(R"(
     graph(%input, %accumu, %alpha, %packed_weight):
         %x = ipex_prepack::linear_run(%input, %packed_weight)
         %res = aten::${add}(%accumu, %x, %alpha)
@@ -301,10 +302,10 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
   for (const auto& add : add_operators) {
     TemplateEnv env;
     env.s("add", add);
-    rewriter_add_v1.RegisterRewritePattern(
-        linear_add_rstring_v1.format(env), linear_add_fused);
-    rewriter_add_v2.RegisterRewritePattern(
-        linear_add_rstring_v2.format(env), linear_add_fused);
+    rewriter_add_accumu_on_the_right.RegisterRewritePattern(
+        linear_add_accumu_on_the_right_rstring.format(env), linear_add_fused);
+    rewriter_add_accumu_on_the_left.RegisterRewritePattern(
+        linear_add_accumu_on_the_left_rstring.format(env), linear_add_fused);
   }
 
   // linear + add + relu
@@ -315,8 +316,10 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
         linear_add_relu_rstring.format(env), linear_add_relu_fused);
   }
 
-  rewriter_add_v1.runOnGraph(graph, fuse_add_filter_v1);
-  rewriter_add_v2.runOnGraph(graph, fuse_add_filter_v2);
+  rewriter_add_accumu_on_the_right.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_right);
+  rewriter_add_accumu_on_the_left.runOnGraph(
+      graph, fuse_add_filter_accumu_on_the_left);
   rewriter_add_relu.runOnGraph(graph);
 }
 

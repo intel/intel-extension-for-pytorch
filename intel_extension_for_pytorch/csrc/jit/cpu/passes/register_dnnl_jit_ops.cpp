@@ -751,6 +751,27 @@ torch::jit::RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
+        "ipex_prepack::conv_transpose_add_run"
+        "(Tensor input, Tensor(a!) accumu, "
+        "*, Scalar? alpha, "
+        "__torch__.torch.classes.ipex_prepack.ConvTransposeOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto output = (std::move(peek(stack, 1, 4))).toTensor();
+            auto result = conv_transpose_add_run(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                output,
+                (std::move(peek(stack, 2, 4))).toOptional<at::Scalar>(),
+                (std::move(peek(stack, 3, 4)))
+                    .toCustomClass<ConvTransposeOpContext>());
+            drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
         "ipex::matmul_div(Tensor left, Tensor right, Tensor(a!) out_opt, Tensor "
         "div_input) -> Tensor(a!)",
         [](const Node* node) -> Operation {

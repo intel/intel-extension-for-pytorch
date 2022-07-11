@@ -180,7 +180,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
       "After insertPrePackedConvTransposeOp.Before fuseConvTransposeWithEltwise",
       graph);
   graph_rewrite::fuseConvTransposeWithEltwise(graph);
-  GRAPH_DUMP("After fuseConvTransposeWithEltwise.", graph);
+  GRAPH_DUMP(
+      "After fuseConvTransposeWithEltwise.Before fuseConvTransposeAdd", graph);
+  graph_rewrite::fuseConvTransposeAdd(graph);
+  GRAPH_DUMP("After fuseConvTransposeAdd.", graph);
 
   // fuse concat+bn+relu for the input float tensors with the same sizes
   // and channelslast format

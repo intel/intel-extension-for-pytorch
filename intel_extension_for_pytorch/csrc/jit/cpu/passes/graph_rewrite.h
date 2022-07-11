@@ -66,6 +66,7 @@ void FuseConcatBnRelu(std::shared_ptr<torch::jit::Graph>& graph);
 
 void insertPrePackedConvTransposeOp(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvTransposeWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
+void fuseConvTransposeAdd(std::shared_ptr<torch::jit::Graph>& graph);
 
 void FusedEinsumPost(std::shared_ptr<torch::jit::Graph>& graph);
 

@@ -26,7 +26,7 @@ inline auto accumu_use_check = [](const torch::jit::Node* add_node,
 //   \   /
 //    add
 // output = op_output + alpha*Y
-inline auto fuse_add_filter_v1 =
+inline auto fuse_add_filter_accumu_on_the_right =
     [](const torch::jit::Match& match,
        const std::unordered_map<std::string, torch::jit::Value*>& vmap) {
       auto accumu = match.values_map.at(vmap.at("accumu"));
@@ -67,7 +67,7 @@ inline auto fuse_add_filter_v1 =
 //   \   /
 //    add
 // output = Y + alpha*op_output
-inline auto fuse_add_filter_v2 =
+inline auto fuse_add_filter_accumu_on_the_left =
     [](const torch::jit::Match& match,
        const std::unordered_map<std::string, torch::jit::Value*>& vmap) {
       auto accumu = match.values_map.at(vmap.at("accumu"));
@@ -106,9 +106,18 @@ inline auto fuse_add_filter_v2 =
       // alpha is optional
       if (vmap.find("alpha") != vmap.end()) {
         auto alpha = toIValue(match.values_map.at(vmap.at("alpha")));
-        if (alpha.has_value() && alpha.value().isDouble()) {
-          auto alpha_ = alpha.value().toDouble();
-          if (alpha_ != 1.0) {
+        if (alpha.has_value()) {
+          if (alpha.value().isDouble()) {
+            auto alpha_ = alpha.value().toDouble();
+            if (alpha_ != 1.0) {
+              return false;
+            }
+          } else if (alpha.value().isInt()) {
+            auto alpha_ = alpha.value().toInt();
+            if (alpha_ != 1) {
+              return false;
+            }
+          } else {
             return false;
           }
         }

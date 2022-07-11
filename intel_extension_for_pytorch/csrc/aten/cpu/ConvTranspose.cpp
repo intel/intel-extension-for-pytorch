@@ -4,6 +4,7 @@
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/utils/ipex_op_profile.h"
+#include "utils/utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -126,6 +127,77 @@ at::Tensor conv_transpose_kernel_impl(
         input.options().device_opt()));
   } else {
     return output;
+  }
+}
+
+void conv_transpose_out_kernel_impl(
+    const at::Tensor& input,
+    const ideep::tensor& w,
+    const c10::optional<at::Tensor>& bias_opt,
+    at::Tensor& output,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    int64_t groups,
+    at::IntArrayRef dilation,
+    at::IntArrayRef origin_weight_dims,
+    const ideep::attr_t& attr) {
+  // ConvTranspose out kernel, assuming the output always has same format with
+  // input, so this function will not change input and output's format, making
+  // sure you has made pre-process for input and output to make them have same
+  // format before call this function.
+  TORCH_CHECK(
+      input.suggest_memory_format() == output.suggest_memory_format(),
+      "input and output need has same format for conv_transpose_out_kernel_impl");
+  TORCH_CHECK(
+      (IS_CONTIGUOUS_ANY(input)) && (IS_CONTIGUOUS_ANY(output)),
+      "input and output should be contiguous tensor for "
+      "conv_transpose_out_kernel_impl");
+  const ideep::tensor mkldnn_input = itensor_view_from_dense(input);
+
+  std::vector<int64_t> output_sizes = conv_input_size(
+      input.sizes(),
+      origin_weight_dims,
+      padding,
+      output_padding,
+      stride,
+      dilation,
+      groups);
+
+  ideep::tensor mkldnn_output = itensor_view_from_dense(output);
+
+  const ideep::tensor x = itensor_view_from_dense(input);
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<at::Tensor> bias_maybe_owned =
+      at::borrow_from_optional_tensor(bias_opt);
+  const at::Tensor& bias = *bias_maybe_owned;
+
+  if (bias.defined()) {
+    const ideep::tensor b = itensor_view_from_dense(bias);
+    ideep::convolution_transpose_forward::compute(
+        x,
+        w,
+        b,
+        output_sizes,
+        mkldnn_output,
+        stride.vec(),
+        padding.vec(),
+        padding_r(padding, output_padding),
+        dilation.vec(),
+        groups,
+        attr);
+  } else {
+    ideep::convolution_transpose_forward::compute(
+        x,
+        w,
+        output_sizes,
+        mkldnn_output,
+        stride.vec(),
+        padding.vec(),
+        padding_r(padding, output_padding),
+        dilation.vec(),
+        groups,
+        attr);
   }
 }
 

@@ -196,6 +196,45 @@ class ConvTransposeEltwise(nn.Module):
         b = self.eltwise(a, **self.kwargs)
         return b
 
+class ConvTransposeSumAccumuOnRight(nn.Module):
+    def __init__(self, dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeSumAccumuOnRight, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.convtranspose1 = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.add_func = add_func
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = self.convtranspose(x)
+        b = F.relu(self.convtranspose1(x))
+        return self.add_func(a, b, self.kwargs)
+
+class ConvTransposeSumAccumuOnLeft(nn.Module):
+    def __init__(self, dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeSumAccumuOnLeft, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.convtranspose1 = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.add_func = add_func
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = F.relu(self.convtranspose(x))
+        b = self.convtranspose1(x)
+        return self.add_func(a, b, self.kwargs)
+
+class ConvTransposeSumBroadcast(nn.Module):
+    def __init__(self, dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs):
+        super(ConvTransposeSumBroadcast, self).__init__()
+        self.convtranspose = convtranspose_module[dim](in_channels, 1, kernel_size, image_size)
+        self.convtranspose1 = convtranspose_module[dim](in_channels, out_channels, kernel_size, image_size)
+        self.add_func = add_func
+        self.kwargs = kwargs
+
+    def forward(self, x):
+        a = F.relu(self.convtranspose(x))
+        b = self.convtranspose1(x)
+        return self.add_func(a, b, self.kwargs)
+
 class ConvBatchNorm_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvBatchNorm_Fixed, self).__init__()
@@ -1589,6 +1628,86 @@ class Tester(TestCase):
                 m,
                 x,
                 kind_not_in_graph = 'ipex_prepack::convolution_%s_run' % ipex_eltwise_op)
+
+    def _test_conv_transpose_sum(self, module, alpha, supported, test_inplace=True):
+        batch_size = 1
+        out_channels = 3
+        in_channels = 3
+        kernel_size = 3
+        image_size = 8
+
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        prec = 0.02
+        kwargs = {"alpha": alpha}
+        add_funcs = [lambda a, b, kwargs: torch.add(a, b, **kwargs)]
+        if test_inplace:
+            add_funcs.append(lambda a, b, kwargs: a.add_(b, **kwargs))
+        
+        for dim in [2, 3]:
+            for add_func in add_funcs:
+                input_size = [batch_size, in_channels, image_size, image_size]
+                if dim == 3:
+                    input_size.append(image_size)
+                ipex_eltwise_op = "add"
+                x = torch.randn(input_size)
+                m = module(dim, add_func, in_channels, out_channels, kernel_size, image_size, **kwargs)
+                if supported:
+                    self._test_output(
+                        m,
+                        x,
+                        kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_prepack")
+                    # TODO: stock PyTorch does not support bf16 deconv.
+                    # self._test_output_bf16(
+                    #     m,
+                    #     x,
+                    #     kind_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    #     kind_not_in_graph="ipex_prepack::conv_transpose_prepack",
+                    #     prec=prec)
+                else:
+                    self._test_output(
+                        m,
+                        x,
+                        kind_not_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op)
+                    # TODO: stock PyTorch does not support bf16 deconv.
+                    # self._test_output_bf16(
+                    #     m,
+                    #     x,
+                    #     kind_not_in_graph="ipex_prepack::conv_transpose_%s_run" % ipex_eltwise_op,
+                    #     prec=prec)
+
+    def test_conv_transpose_sum_accumu_on_right(self):
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnRight, 
+            alpha=1,
+            supported=True)
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnRight,
+            alpha=2,
+            supported=True)
+
+    def test_conv_transpose_sum_accumu_on_left(self):
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnLeft,
+            alpha=1,
+            supported=True)
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnLeft,
+            alpha=2,
+            supported=False)
+        self._test_conv_transpose_sum(
+            ConvTransposeSumAccumuOnLeft,
+            alpha=2.,
+            supported=False)
+
+    def test_conv_transpose_sum_broadcast_unsupported(self):
+        self._test_conv_transpose_sum(
+            ConvTransposeSumBroadcast,
+            alpha=1,
+            supported=False,
+            test_inplace=False) # in-place add does not support shape broadcast
 
     def test_conv_fusion(self):
         batch_size = 8
