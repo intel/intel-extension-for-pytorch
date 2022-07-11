@@ -215,6 +215,10 @@ static inline void matmul(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
+  if (m1_dt == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
   post_ops po;
   if (attr.alpha_ != 1.f)
     pattr.set_output_scales(/* mask */ 0, {(float)attr.alpha_});

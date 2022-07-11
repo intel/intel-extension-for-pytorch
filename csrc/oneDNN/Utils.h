@@ -6,6 +6,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <tensor/Context.h>
 #include <utils/Macros.h>
+#include <utils/Settings.h>
 
 using namespace dnnl;
 
@@ -29,7 +30,7 @@ enum post_attr {
   with_linear = 0b100000000,
 };
 
-static inline dnnl::memory::format_tag get_dnnl_default_format(
+static inline memory::format_tag get_dnnl_default_format(
     int ndims,
     bool is_channels_last = false,
     bool allow_undef = false) {
@@ -105,6 +106,18 @@ static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
           memory::data_type::undef
       ? false
       : true;
+}
+
+static inline fpmath_mode get_onednn_fpmath_mode() {
+  auto math_mode = Settings::I().get_fp32_math_mode();
+  switch (math_mode) {
+    case FP32_MATH_MODE::TF32:
+      return fpmath_mode::tf32;
+    case FP32_MATH_MODE::BF32:
+      return fpmath_mode::bf16;
+    default: // use FP32_MATH_MODE::FP32 as default
+      return fpmath_mode::strict;
+  }
 }
 
 static inline memory::dims get_onednn_dims(const at::Tensor& tensor) {

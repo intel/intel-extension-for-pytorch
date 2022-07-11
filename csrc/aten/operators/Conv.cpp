@@ -118,15 +118,16 @@ Tensor dpcpp_convolution_backward_input(
       _padding_front_top_left,
       _padding_back_bottom_right);
 
+  primitive_attr pattr;
+  if (data_grad == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
 #ifdef USE_SCRATCHPAD_MODE
-  primitive_attr attr;
-  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
-      conv_backward_data_desc, attr, engine, conv_forward_pd);
-#else
-  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
-      conv_backward_data_desc, engine, conv_forward_pd);
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
+      conv_backward_data_desc, pattr, engine, conv_forward_pd);
 
   memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
   if (!Settings::I().is_onednn_layout_enabled()) {

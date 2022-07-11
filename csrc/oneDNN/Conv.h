@@ -402,6 +402,10 @@ static at::Tensor convolution(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
 
+  if (src_data_t == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
   auto conv_fwd_pd =
       convolution_forward::primitive_desc(conv_fwd_desc, pattr, engine);
 
@@ -725,15 +729,16 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                                          _padding_front_top_left,
                                          _padding_back_bottom_right);
 
+  primitive_attr pattr;
+  if (src_dt == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
 #ifdef USE_SCRATCHPAD_MODE
-  primitive_attr attr;
-  attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-  auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
-      conv_bwd_w_desc, attr, engine, conv_fwd_pd);
-#else
-  auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
-      conv_bwd_w_desc, engine, conv_fwd_pd);
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  auto conv_bwd_w_pd = convolution_backward_weights::primitive_desc(
+      conv_bwd_w_desc, pattr, engine, conv_fwd_pd);
 
   memory src_usr_m, diff_dst_usr_m, diff_wgh_usr_m;
   if (!Settings::I().is_onednn_layout_enabled()) {

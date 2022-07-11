@@ -100,30 +100,68 @@ class onemkl_verbose(object):
 
 # FP32 math mode
 class FP32MathMode(EnumBase):
-    FP32 = 0
-    TF32 = 1
-    BF32 = 2
+    FP32 = int(_C.FP32MathMode.FP32)
+    TF32 = int(_C.FP32MathMode.TF32)
+    BF32 = int(_C.FP32MathMode.BF32)
 
 def get_fp32_math_mode():
+    r"""
+    Get the current fpmath_mode setting.
+
+    Returns:
+        Fpmath mode
+        The value will be ``FP32MathMode.FP32`` or ``FP32MathMode.TF32`` or ``FP32MathMode.BF32``.
+        ``FP32MathMode.FP32: 0`` means implicit down-conversion is disabled;
+        ``FP32MathMode.TF32: 1`` means implicit down-conversions from f32 to tf32;
+        ``FP32MathMode.BF32: 2`` means implicit down-conversions from f32 to bf16.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch
+        >>> # to get the current fpmath mode
+        >>> torch.xpu.get_fp32_math_mode()
+    """
     return FP32MathMode.get_value(_C._get_fp32_math_mode)
 
-def set_fp32_math_mode(math_mode):
-    st = FP32MathMode.set_value(_C._set_fp32_math_mode, math_mode)
+def set_fp32_math_mode(mode):
+    r"""
+    Enable or disable implicit data type conversion.
+    If mode is FP32MathMode.FP32 which means to disable the oneDNN fpmath mode.
+    If mode is FP32MathMode.TF32 which means to enable the oneDNN fpmath mode by down converting to tf32 implicitly.
+    If mode is FP32MathMode.BF32 which means to enable the oneDNN fpmath mode by down converting to bfloat16 implicitly.
+
+    Args:
+        mode (FP32MathMode): Only works for ``FP32MathMode.FP32``, ``FP32MathMode.TF32`` and ``FP32MathMode.BF32``.
+            oneDNN fpmath mode will be disabled by default if dtype is set to ``FP32MathMode.FP32``.
+            The implicit FP32 to TF32 data type conversion will be enabled if dtype is set to ``FP32MathMode.TF32`.
+            The implicit FP32 to BF16 data type conversion will be enabled if dtype is set to ``FP32MathMode.BF32`.
+
+    Examples:
+
+        >>> import intel_extension_for_pytorch
+        >>> # to enable the implicit data type conversion to tf32
+        >>> torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.TF32)
+        >>> # to enable the implicit data type conversion to bfloat16
+        >>> torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.BF32)
+        >>> # to disable the implicit data type conversion
+        >>> torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.FP32)
+    """
+    st = FP32MathMode.set_value(_C._set_fp32_math_mode, mode)
     assert bool(st), "WARNING: Failed to set FP32 math mode!"
 
 class fp32_math_mode(object):
-    def __init__(self, math_mode):
-        self.math_mode = FP32MathMode.convert(math_mode)
+    def __init__(self, mode):
+        self.mode = FP32MathMode.convert(mode)
 
     def __enter__(self):
         current_math_mode = get_fp32_math_mode()
-        if self.math_mode != current_math_mode:
-            set_fp32_math_mode(self.math_mode)
-            self.math_mode = current_math_mode
+        if self.mode != current_math_mode:
+            set_fp32_math_mode(self.mode)
+            self.mode = current_math_mode
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        set_fp32_math_mode(self.math_mode)
+        set_fp32_math_mode(self.mode)
         return False
 
 
@@ -200,9 +238,9 @@ def using_tile_as_device():
 # XPU Backend
 # NOTE: XPU Backend is not available yet.
 class Backend(EnumBase):
-    GPU = 0
-    CPU = 1
-    AUTO = 2
+    GPU = int(_C.XPUBackend.GPU)
+    CPU = int(_C.XPUBackend.CPU)
+    AUTO = int(_C.XPUBackend.AUTO)
 
 def get_backend():
     return Backend.get_value(_C._get_backend)

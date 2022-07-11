@@ -22,7 +22,7 @@ namespace dpcpp {
  *
  * XPU private optionos:
  *   IPEX_XPU_BACKEND:
- *      Default = 0 (XB_GPU), Set XPU_BACKEND as global IPEX backend
+ *      Default = 0 (GPU), Set XPU_BACKEND as global IPEX backend
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0, Set 1 to enforce synchronization execution mode
  *   IPEX_TILE_AS_DEVICE:
@@ -44,30 +44,43 @@ Settings& Settings::I() {
 }
 
 Settings::Settings() {
-#define DPCPP_ENV_TYPE_DEF(type, name, val, show) \
-  auto type = [&]() -> std::optional<int> {       \
-    auto env = std::getenv("IPEX_" #name);        \
-    std::optional<int> _##type;                   \
-    try {                                         \
-      _##type = std::stoi(env, 0, 10);            \
-    } catch (...) {                               \
-      _##type = std::nullopt;                     \
-    }                                             \
-    if (show) {                                   \
-      std::cerr << " ** IPEX_" << #name << ": ";  \
-      if (_##type.has_value()) {                  \
-        std::cerr << _##type.value();             \
-      } else {                                    \
-        std::cerr << val;                         \
-      }                                           \
-      std::cerr << std::endl;                     \
-    }                                             \
-    return _##type;                               \
-  }()
+#define _(name) "IPEX_" #name
 
-  DPCPP_ENV_TYPE_DEF(show_option, SHOW_OPTION, 0, false);
-  bool show_opt =
-      show_option.has_value() ? (show_option != 0 ? true : false) : false;
+#define DPCPP_INIT_ENV_VAL(name, var, etype, show)    \
+  do {                                                \
+    auto env = std::getenv(_(name));                  \
+    if (env) {                                        \
+      try {                                           \
+        int _ival = std::stoi(env, 0, 10);            \
+        if (_ival <= etype##_MAX && _ival >= 0) {     \
+          var = static_cast<decltype(var)>(_ival);    \
+        }                                             \
+      } catch (...) {                                 \
+        try {                                         \
+          std::string _sval(env);                     \
+          for (int i = 0; i <= etype##_MAX; i++) {    \
+            if (_sval == etype##_STR[i]) {            \
+              var = static_cast<decltype(var)>(i);    \
+              break;                                  \
+            }                                         \
+          }                                           \
+        } catch (...) {                               \
+        }                                             \
+      }                                               \
+    }                                                 \
+    if (show) {                                       \
+      std::cerr << " ** " << _(name) << ": ";         \
+      if (var <= etype##_MAX && var >= 0) {           \
+        std::cerr << etype##_STR[var];                \
+      } else {                                        \
+        std::cerr << "UNKNOW";                        \
+      }                                               \
+      std::cerr << " (= " << var << ")" << std::endl; \
+    }                                                 \
+  } while (0)
+
+  ENV_VAL show_opt = ENV_VAL::OFF;
+  DPCPP_INIT_ENV_VAL(SHOW_OPTION, show_opt, ENV_VAL, false);
   if (show_opt) {
     std::cerr << std::endl
               << " *********************************************************"
@@ -78,72 +91,48 @@ Settings::Settings() {
               << std::endl;
   }
 
-  verbose_level = 0;
-  DPCPP_ENV_TYPE_DEF(env_verbose_level, VERBOSE, verbose_level, show_opt);
-  if (env_verbose_level.has_value()) {
-    verbose_level = env_verbose_level.value();
-  }
+  verbose_level = VERBOSE_LEVEL::DISABLE;
+  DPCPP_INIT_ENV_VAL(VERBOSE, verbose_level, VERBOSE_LEVEL, show_opt);
 
-  xpu_backend = XPU_BACKEND::XB_GPU;
-  DPCPP_ENV_TYPE_DEF(env_xpu_backend, XPU_BACKEND, xpu_backend, show_opt);
-  if (env_xpu_backend.has_value() &&
-      ((env_xpu_backend.value() >= XPU_BACKEND::XB_GPU) &&
-       (env_xpu_backend.value() < XPU_BACKEND::XB_MAX))) {
-    xpu_backend = static_cast<XPU_BACKEND>(env_xpu_backend.value());
-  }
+  xpu_backend = XPU_BACKEND::GPU;
+  DPCPP_INIT_ENV_VAL(XPU_BACKEND, xpu_backend, XPU_BACKEND, show_opt);
 
-  sync_mode_enabled = false;
-  DPCPP_ENV_TYPE_DEF(env_sync_mode, XPU_SYNC_MODE, sync_mode_enabled, show_opt);
-  if (env_sync_mode.has_value() && (env_sync_mode.value() != 0)) {
-    sync_mode_enabled = true;
-  }
+  sync_mode_enabled = ENV_VAL::OFF;
+  DPCPP_INIT_ENV_VAL(XPU_SYNC_MODE, sync_mode_enabled, ENV_VAL, show_opt);
 
-  tile_as_device_enabled = true;
-  DPCPP_ENV_TYPE_DEF(
-      env_tile_as_device, TILE_AS_DEVICE, tile_as_device_enabled, show_opt);
-  if (env_tile_as_device.has_value() && (env_tile_as_device.value() == 0)) {
-    tile_as_device_enabled = false;
-  }
+  tile_as_device_enabled = ENV_VAL::ON;
+  DPCPP_INIT_ENV_VAL(TILE_AS_DEVICE, tile_as_device_enabled, ENV_VAL, show_opt);
 
-  onednn_layout_enabled = false;
-  DPCPP_ENV_TYPE_DEF(
-      env_onednn_layout, XPU_ONEDNN_LAYOUT, onednn_layout_enabled, show_opt);
-  if (env_onednn_layout.has_value() && (env_onednn_layout.value() != 0)) {
-    onednn_layout_enabled = true;
-  }
+  onednn_layout_enabled = ENV_VAL::OFF;
+  DPCPP_INIT_ENV_VAL(
+      XPU_ONEDNN_LAYOUT, onednn_layout_enabled, ENV_VAL, show_opt);
 
-  fp32_math_mode = FP32_MATH_MODE::FMM_FP32;
-  DPCPP_ENV_TYPE_DEF(env_math_mode, FP32_MATH_MODE, fp32_math_mode, show_opt);
-  if (env_math_mode.has_value() &&
-      ((env_math_mode.value() >= FP32_MATH_MODE::FMM_FP32) &&
-       (env_math_mode.value() < FP32_MATH_MODE::FMM_MAX))) {
-    fp32_math_mode = static_cast<FP32_MATH_MODE>(env_math_mode.value());
-  }
+  fp32_math_mode = FP32_MATH_MODE::FP32;
+  DPCPP_INIT_ENV_VAL(FP32_MATH_MODE, fp32_math_mode, FP32_MATH_MODE, show_opt);
 
 #ifdef BUILD_SIMPLE_TRACE
-  simple_trace_enabled = false;
-  DPCPP_ENV_TYPE_DEF(
-      env_simple_trace, SIMPLE_TRACE, simple_trace_enabled, show_opt);
-  if (env_simple_trace.has_value() && (env_simple_trace.value() != 0)) {
-    simple_trace_enabled = true;
-  }
+  simple_trace_enabled = ENV_VAL::OFF;
+  DPCPP_INIT_ENV_VAL(SIMPLE_TRACE, simple_trace_enabled, ENV_VAL, show_opt);
 #endif
 
   if (show_opt) {
     std::cerr << " *********************************************************"
               << std::endl;
   }
-}
+} // namespace dpcpp
 
 int Settings::get_verbose_level() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return verbose_level;
+  return static_cast<int>(verbose_level);
 }
 
 bool Settings::set_verbose_level(int level) {
   std::lock_guard<std::mutex> lock(s_mutex);
-  verbose_level = level;
-  return true;
+  if (level >= 0 && level <= VERBOSE_LEVEL_MAX) {
+    verbose_level = static_cast<VERBOSE_LEVEL>(level);
+    return true;
+  }
+  return false;
 }
 
 XPU_BACKEND Settings::get_backend() const {
@@ -153,7 +142,7 @@ XPU_BACKEND Settings::get_backend() const {
 
 bool Settings::set_backend(XPU_BACKEND backend) {
   std::lock_guard<std::mutex> lock(s_mutex);
-  if ((backend >= XPU_BACKEND::XB_GPU) && (backend < XPU_BACKEND::XB_MAX)) {
+  if ((backend >= XPU_BACKEND::GPU) && (backend <= XPU_BACKEND_MAX)) {
     xpu_backend = backend;
     return true;
   }
@@ -162,37 +151,37 @@ bool Settings::set_backend(XPU_BACKEND backend) {
 
 bool Settings::is_sync_mode_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return sync_mode_enabled;
+  return sync_mode_enabled == ENV_VAL::ON;
 }
 
 void Settings::enable_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  sync_mode_enabled = true;
+  sync_mode_enabled = ENV_VAL::ON;
 }
 
 void Settings::disable_sync_mode() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  sync_mode_enabled = false;
+  sync_mode_enabled = ENV_VAL::OFF;
 }
 
 bool Settings::is_tile_as_device_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return tile_as_device_enabled;
+  return tile_as_device_enabled == ENV_VAL::ON;
 }
 
 bool Settings::is_onednn_layout_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return onednn_layout_enabled;
+  return onednn_layout_enabled == ENV_VAL::ON;
 }
 
 void Settings::enable_onednn_layout() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_layout_enabled = true;
+  onednn_layout_enabled = ENV_VAL::ON;
 }
 
 void Settings::disable_onednn_layout() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_layout_enabled = false;
+  onednn_layout_enabled = ENV_VAL::OFF;
 }
 
 FP32_MATH_MODE Settings::get_fp32_math_mode() const {
@@ -200,11 +189,10 @@ FP32_MATH_MODE Settings::get_fp32_math_mode() const {
   return fp32_math_mode;
 }
 
-bool Settings::set_fp32_math_mode(FP32_MATH_MODE math_mode) {
+bool Settings::set_fp32_math_mode(FP32_MATH_MODE mode) {
   std::lock_guard<std::mutex> lock(s_mutex);
-  if ((math_mode >= FP32_MATH_MODE::FMM_FP32) &&
-      (math_mode < FP32_MATH_MODE::FMM_MAX)) {
-    fp32_math_mode = math_mode;
+  if ((mode >= FP32_MATH_MODE::FP32) && (mode <= FP32_MATH_MODE_MAX)) {
+    fp32_math_mode = mode;
     return true;
   }
   return false;
@@ -245,17 +233,17 @@ bool Settings::is_double_disabled() const {
 #ifdef BUILD_SIMPLE_TRACE
 bool Settings::is_simple_trace_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
-  return simple_trace_enabled;
+  return simple_trace_enabled == ENV_VAL::ON;
 }
 
 void Settings::enable_simple_trace() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  simple_trace_enabled = true;
+  simple_trace_enabled = ENV_VAL::ON;
 }
 
 void Settings::disable_simple_trace() {
   std::lock_guard<std::mutex> lock(s_mutex);
-  simple_trace_enabled = false;
+  simple_trace_enabled = ENV_VAL::OFF;
 }
 #endif
 

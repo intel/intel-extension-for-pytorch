@@ -596,6 +596,12 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_verbose_level(level);
   });
 
+  py::enum_<xpu::dpcpp::XPU_BACKEND>(m, "XPUBackend")
+      .value("GPU", xpu::dpcpp::XPU_BACKEND::GPU)
+      .value("CPU", xpu::dpcpp::XPU_BACKEND::CPU)
+      .value("AUTO", xpu::dpcpp::XPU_BACKEND::AUTO)
+      .export_values();
+
   m.def("_get_backend", []() {
     return static_cast<int>(Settings::I().get_backend());
   });
@@ -632,12 +638,17 @@ void init_module(pybind11::module& m) {
     return Settings::I().set_onemkl_verbose(level);
   });
 
+  py::enum_<xpu::dpcpp::FP32_MATH_MODE>(m, "FP32MathMode")
+      .value("FP32", xpu::dpcpp::FP32_MATH_MODE::FP32)
+      .value("TF32", xpu::dpcpp::FP32_MATH_MODE::TF32)
+      .value("BF32", xpu::dpcpp::FP32_MATH_MODE::BF32)
+      .export_values();
+
   m.def("_get_fp32_math_mode", []() {
     return static_cast<int>(Settings::I().get_fp32_math_mode());
   });
-  m.def("_set_fp32_math_mode", [](const int math_mode) {
-    return Settings::I().set_fp32_math_mode(
-        static_cast<FP32_MATH_MODE>(math_mode));
+  m.def("_set_fp32_math_mode", [](const int mode) {
+    return Settings::I().set_fp32_math_mode(static_cast<FP32_MATH_MODE>(mode));
   });
 
   m.def("_enable_simple_trace", []() {
