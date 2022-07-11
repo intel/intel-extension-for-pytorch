@@ -187,16 +187,21 @@ DPCPP_DEVICE static inline OutputIt copy_if(
   // 1. get mask for `if` positions
   auto cgf_1 = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      gmask_ptr[item_id] =
-          static_cast<index_t>(static_cast<bool>(pred(first[item_id])));
+      if (first) {
+        gmask_ptr[item_id] =
+            static_cast<index_t>(static_cast<bool>(pred(first[item_id])));
+      } else {
+        gmask_ptr[item_id] =
+            static_cast<index_t>(static_cast<bool>(pred(item_id)));
+      }
     };
 
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
-  // 2. get target positions with exclusive_scan
-  scan<EXCLUSIVE_TYPE, index_t, index_t>(
+  // 2. get target positions(with shift -1) using inclusive_scan
+  scan<INCLUSIVE_TYPE, index_t, index_t>(
       target_pos,
       global_mask,
       /*dim*/ 0,
@@ -206,16 +211,20 @@ DPCPP_DEVICE static inline OutputIt copy_if(
   // 3. copy selected data into dst
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      if (gmask_ptr[item_id] != 0)
-        d_first[tpos_ptr[item_id]] = first[item_id];
+      if (gmask_ptr[item_id] != 0) {
+        if (first) {
+          d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = first[item_id];
+        } else {
+          d_first[tpos_ptr[item_id] - /*inclusive shift*/ 1] = item_id;
+        }
+      }
     };
 
     __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
   };
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_3);
 
-  index_t M = global_mask[N - 1].template item<index_t>() +
-      target_pos[N - 1].template item<index_t>();
+  index_t M = target_pos[N - 1].template item<index_t>();
   return d_first + M;
 }
 

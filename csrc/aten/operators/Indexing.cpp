@@ -115,9 +115,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
     scalar_t* self_begin = self.data_ptr<scalar_t>();
     int64_t* idx_flat_begin = idx_flat.data_ptr<int64_t>();
-    int64_t* range_begin = range.data_ptr<int64_t>();
-
-    at::AtenIpexTypeXPU::iota(range_begin, range_begin + N, (int64_t)0);
+    int64_t* range_begin = nullptr;
 
     auto idx_flat_end = at::AtenIpexTypeXPU::copy_if<int64_t>(
         range_begin, range_begin + N, idx_flat_begin, [=](int64_t x) {
