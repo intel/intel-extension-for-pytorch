@@ -253,6 +253,146 @@ This page shows performance boost with Intel® Extension for PyTorch\* on severa
 | Docker OS | Ubuntu 18.04.5 LTS |
 | [Spectre-Meltdown Mitigation](https://github.com/speed47/spectre-meltdown-checker) | Mitigated |
 
+## FP32 with v1.11.200 on an AWS EC2 C6i.2xlarge instance
+
+### Performance Numbers
+
+<table border="1" cellpadding="10" align="center" class="perf_table">
+<tbody>
+  <col>
+  <col>
+  <col>
+  <colgroup span="2"></colgroup>
+  <colgroup span="2"></colgroup>
+  <col>
+  <col>
+  <col>
+  <tr>
+    <th rowspan="2" scope="col">Hardware</th>
+    <th rowspan="2" scope="col">Workload<sup>1</sup></th>
+    <th rowspan="2" scope="col">Precision</th>
+    <th colspan="2" scope="colgroup">Throughput Inference<sup>2</sup></th>
+    <th colspan="2" scope="colgroup">Real-time Inference<sup>3</sup></th>
+    <th rowspan="2" scope="col">Model Type</th>
+    <th rowspan="2" scope="col">Dataset</th>
+    <th rowspan="2" scope="col">Input Data Shape</th>
+    <th rowspan="2" scope="col">Tunable Parameters</th>
+  </tr>
+  <tr>
+    <th scope="col">Batch Size</th>
+    <th scope="col">Boost Ratio</th>
+    <th scope="col">Batch Size</th>
+    <th scope="col">Boost Ratio</th>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" rowspan="10" scope="col">AWS EC2 C6i.2xlarge</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">ResNet50</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.24x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.31x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Computer Vision</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">ImageNet</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Input shape<br />[3, 224, 224]</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Default memory allocator;<br />Intel(R) OpenMP;<br /><a href="https://github.com/IntelAI/models/tree/pytorch-r1.10-models/quickstart/image_recognition/pytorch/resnet50/inference/cpu">inference scripts</a></td>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" scope="col">ResNext 32x16d</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.07x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.05x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Computer Vision</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">ImageNet</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Input shape<br />[3, 224, 224]</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Default memory allocator;<br />Intel(R) OpenMP;<br /><a href="https://github.com/IntelAI/models/tree/pytorch-r1.10-models/quickstart/image_recognition/pytorch/resnext-32x16d/inference/cpu">inference scripts</a></td>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" scope="col">VGG-11</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.15x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.21x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Computer Vision</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">ImageNet</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Input shape<br />[3, 224, 224]</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Default memory allocator;<br />Intel(R) OpenMP;<br /><a href="https://github.com/IntelAI/models/tree/pytorch-r1.10-models/quickstart/image_recognition/pytorch/vgg11/inference/cpu">inference scripts</a></td>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" scope="col">ShuffleNetv2_x1.0</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.12x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.30x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Computer Vision</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">ImageNet</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Input shape<br />[3, 224, 224]</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Default memory allocator;<br />Intel(R) OpenMP;</td>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" scope="col">MobileNet v2</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.08x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.12x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Computer Vision</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">ImageNet</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Input shape<br />[3, 224, 224]</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Default memory allocator;<br />Intel(R) OpenMP;</td>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" scope="col">BERT-Large</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.05x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.03x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">NLP</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Squad</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">max_seq_len=384<br />Task: Question Answering</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Default memory allocator;<br />Intel(R) OpenMP;<br /><a href="https://github.com/IntelAI/models/tree/pytorch-r1.10-models/quickstart/language_modeling/pytorch/bert_large/inference/cpu">inference scripts</a>;<br />Recommend to set auto_kernel_selection to ON when seq_len exceeds 64</td>
+  </tr>
+  <tr>
+    <td style="text-align: center; vertical-align: middle" scope="col">Bert-Base</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Float32</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">64</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.08x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">1.09x</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">NLP</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">MRPC</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">max_seq_len=128<br />Task: Text Classification</td>
+    <td style="text-align: center; vertical-align: middle" scope="col">Jemalloc;<br />Intel(R) OpenMP;<br /><a href="https://github.com/IntelAI/models/tree/pytorch-r1.10-models/quickstart/language_modeling/pytorch/bert_base/inference/cpu">inference scripts</a>;<br />Recommend to set auto_kernel_selection to ON when seq_len exceeds 128</td>
+  </tr>
+</tbody>
+</table>
+
+<br />
+<sup>1. <a href="https://github.com/IntelAI/models/tree/pytorch-r1.11-models">Model Zoo for Intel® Architecture</a></sup>
+<br />
+<sup>2. Throughput inference runs with single instance per socket.</sup>
+<br />
+<sup>3. Realtime inference runs with multiple instances, 4 cores per instance.</sup>
+<br />
+
+*Note:* Performance numbers with stock PyTorch are measured with its most performant configuration.
+
+*Note:* Environment variable *DNNL_PRIMITIVE_CACHE_CAPACITY* is set to *1024*.
+
+### Configuration
+
+#### Software Version
+
+| Software | Version |
+| :-: | :-: |
+| PyTorch | [v1.11.0](https://pytorch.org/get-started/locally/) |
+| Intel® Extension for PyTorch\* | [v1.11.200](https://github.com/intel/intel-extension-for-pytorch/releases) |
+
 ## FP32 and BFloat16 with v1.10
 
 ### Performance Numbers
