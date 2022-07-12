@@ -47,11 +47,11 @@ The latest release version for GPU solution of Intel® Extension for PyTorch\* i
 
 | **GPU HW** | **OS** | **GPU User Mode Driver** | Python |
 | ------ | ------ | ------ | ------ |
-| **ATS-P B0** | Ubuntu-20.04.3 |  agama-ci-prerelease-438 | 3.x |
-| **ATS-P B0** | OpenSUSE Leap 15sp3| agama-ci-prerelease-438 | 3.x |
-| **PVC-XT A0** | Ubuntu-20.04.3 |  agama-ci-prerelease-438 | 3.x |
-| **PVC-XT A0** | OpenSUSE Leap 15sp3| agama-ci-prerelease-438 | 3.x |
-| **ATS-M M1** | Ubuntu-20.04.3 | agama-ci-prerelease-459 | 3.x |
+| **ATS-P B0** | Ubuntu-20.04.3 |  agama-ci-prerelease-516 | 3.x |
+| **ATS-P B0** | OpenSUSE Leap 15sp3| agama-ci-prerelease-516 | 3.x |
+| **PVC-XT B4** | Ubuntu-20.04.3 |  agama-ci-prerelease-516 | 3.x |
+| **PVC-XT B4** | OpenSUSE Leap 15sp3| agama-ci-prerelease-516 | 3.x |
+| **ATS-M M1** | Ubuntu-20.04.3 | agama-ci-prerelease-516 | 3.x |
 
 ### **Dependencies**
 
@@ -330,13 +330,12 @@ IPEX_VERBOSE=1 IPEX_LAYOUT_OPT=1 python ResNet50.py
 AOT compilation is supported on ATS-P, ATS-M or PVC with below config:
 | Supported HW | Setting |
 | ------ | ------ |
-| ATS-P B0 |  USE_AOT_DEVLIST='12.1.0'  |
-| ATS-M M1 |  USE_AOT_DEVLIST='12.2.1'
-| PVC XT A0 | USE_AOT_DEVLIST='12.4.0'  |
-| PVC XT B3 | USE_AOT_DEVLIST='12.4.2' |
-| ATS-P B0 + PVC XT A0 | USE_AOT_DEVLIST='12.1.0,12.4.0' |
-| ATS-P B0 + PVC XT B3 | USE_AOT_DEVLIST='12.1.0,12.4.2' |
-| ATS-M M1 + PVC XT B3 | USE_AOT_DEVLIST='12.2.1,12.4.2' |
+| ATS-P B0 |  USE_AOT_DEVLIST='xehp-sdv'  |
+| ATS-M M1 |  USE_AOT_DEVLIST='dg2-g10-c0'
+| PVC XT B3 | USE_AOT_DEVLIST='pvc-xt-b1' |
+| PVC XT B4| USE_AOT_DEVLIST='pvc-xt-c0' |
+| ATS-M M1 + PVC XT B4 | USE_AOT_DEVLIST='dg2-g10-c0,pvc-xt-c0' |
+| ATS-M M1 + PVC XT B4 + ATS-P B0 | USE_AOT_DEVLIST='dg2-g10-c0,pvc-xt-c0,xehp-sdv' |
 
 Multi-target AOT compilation are supported with application side workaround. We still need product solution of CMPLRLLVM-25864 to support large object file (>2GB).
 
