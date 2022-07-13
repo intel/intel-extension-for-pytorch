@@ -33,11 +33,9 @@ class TestTorchMethod(TestCase):
         print("sycl")
         input_sycl.requires_grad = True
         output_sycl = m(input_sycl, weight_sycl, bias_sycl)
-        if not torch.xpu.has_double_dtype():
-            print("output: ", output_sycl.cpu())
+        print("output: ", output_sycl.cpu())
         output_sycl.backward(torch.ones_like(output_sycl).to("xpu"))
-        if not torch.xpu.has_double_dtype():
-            print("input.grad: ", input_sycl.grad)
+        print("input.grad: ", input_sycl.grad)
         # input_sycl.grad.zero_()
 
         self.assertEqual(output_cpu, output_sycl.cpu())

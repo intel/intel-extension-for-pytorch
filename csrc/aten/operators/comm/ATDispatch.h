@@ -25,13 +25,6 @@
 
 #endif // BUILD_INTERNAL_DEBUG
 
-#if defined(BUILD_INTERNAL_DEBUG) && !defined(BUILD_DOUBLE_KERNEL)
-#define IPEX_PRIVATE_CASE_DOUBLE(enum_type, type, ...)
-#else // Always BUILD_DOUBLE_KERNEL
-#define IPEX_PRIVATE_CASE_DOUBLE(enum_type, type, ...) \
-  IPEX_PRIVATE_CASE_TYPE(enum_type, type, __VA_ARGS__)
-#endif
-
 #define IPEX_DISPATCH_ATOMIC_ALL_TYPES(TYPE, NAME, ...)                      \
   [&] {                                                                      \
     const auto& the_type = TYPE;                                             \
@@ -47,7 +40,7 @@
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Bool, bool, __VA_ARGS__)        \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, long, __VA_ARGS__)        \
       default:                                                               \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
@@ -69,7 +62,7 @@
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Bool, bool, __VA_ARGS__)        \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, long, __VA_ARGS__)        \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::ComplexFloat, c10::complex<float>, __VA_ARGS__)    \
@@ -90,7 +83,7 @@
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
       default:                                                               \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
     }                                                                        \
@@ -106,7 +99,7 @@
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::ComplexFloat, c10::complex<float>, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(                                                \
@@ -161,7 +154,7 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       default:                                                              \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");      \
@@ -174,7 +167,7 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)   \
       default:                                                              \
@@ -188,7 +181,7 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           SCALARTYPE,                                                       \
@@ -206,7 +199,7 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           SCALARTYPE1,                                                      \
@@ -227,9 +220,9 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
@@ -245,9 +238,9 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
@@ -267,9 +260,9 @@
     /* don't use TYPE again in case it is an expensive or side-effect op */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                   \
     switch (_st) {                                                          \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
@@ -327,7 +320,7 @@
     switch (_st) {                                                           \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)      \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)      \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)      \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)     \
@@ -345,7 +338,7 @@
     switch (_st) {                                                          \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       default:                                                              \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");      \
@@ -375,37 +368,37 @@
     switch (_st) {                                                          \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       default:                                                              \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");      \
     }                                                                       \
   }()
 
-#define IPEX_DISPATCH_ALL_TYPES_AND(SCALARTYPE, TYPE, NAME, ...)            \
-  [&] {                                                                     \
-    switch (TYPE) {                                                         \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_TYPE(                                               \
-          SCALARTYPE,                                                       \
-          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE>::t),          \
-          __VA_ARGS__)                                                      \
-      default:                                                              \
-        AT_ERROR(#NAME, " not implemented for '", toString(TYPE), "'");     \
-    }                                                                       \
+#define IPEX_DISPATCH_ALL_TYPES_AND(SCALARTYPE, TYPE, NAME, ...)          \
+  [&] {                                                                   \
+    switch (TYPE) {                                                       \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(                                             \
+          SCALARTYPE,                                                     \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE>::t),        \
+          __VA_ARGS__)                                                    \
+      default:                                                            \
+        AT_ERROR(#NAME, " not implemented for '", toString(TYPE), "'");   \
+    }                                                                     \
   }()
 
 #define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND(SCALARTYPE, TYPE, NAME, ...) \
@@ -413,14 +406,14 @@
     switch (TYPE) {                                                          \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)      \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)      \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)      \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_DOUBLE(                                              \
+      IPEX_PRIVATE_CASE_TYPE(                                                \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__)  \
       IPEX_PRIVATE_CASE_TYPE(                                                \
           SCALARTYPE,                                                        \
@@ -436,7 +429,7 @@
     switch (TYPE) {                                                         \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           SCALARTYPE,                                                       \
@@ -447,28 +440,28 @@
     }                                                                       \
   }()
 
-#define IPEX_DISPATCH_ALL_TYPES_AND2(                                       \
-    SCALARTYPE1, SCALARTYPE2, TYPE, NAME, ...)                              \
-  [&] {                                                                     \
-    switch (TYPE) {                                                         \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_TYPE(                                               \
-          SCALARTYPE1,                                                      \
-          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE1>::t),         \
-          __VA_ARGS__)                                                      \
-      IPEX_PRIVATE_CASE_TYPE(                                               \
-          SCALARTYPE2,                                                      \
-          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE2>::t),         \
-          __VA_ARGS__)                                                      \
-      default:                                                              \
-        AT_ERROR(#NAME, " not implemented for '", toString(TYPE), "'");     \
-    }                                                                       \
+#define IPEX_DISPATCH_ALL_TYPES_AND2(                                     \
+    SCALARTYPE1, SCALARTYPE2, TYPE, NAME, ...)                            \
+  [&] {                                                                   \
+    switch (TYPE) {                                                       \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(                                             \
+          SCALARTYPE1,                                                    \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE1>::t),       \
+          __VA_ARGS__)                                                    \
+      IPEX_PRIVATE_CASE_TYPE(                                             \
+          SCALARTYPE2,                                                    \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE2>::t),       \
+          __VA_ARGS__)                                                    \
+      default:                                                            \
+        AT_ERROR(#NAME, " not implemented for '", toString(TYPE), "'");   \
+    }                                                                     \
   }()
 
 #define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(                           \
@@ -477,14 +470,14 @@
     switch (TYPE) {                                                         \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           SCALARTYPE1,                                                      \
@@ -499,32 +492,32 @@
     }                                                                       \
   }()
 
-#define IPEX_DISPATCH_ALL_TYPES_AND3(                                       \
-    SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, ...)                 \
-  [&] {                                                                     \
-    switch (TYPE) {                                                         \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)    \
-      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_TYPE(                                               \
-          SCALARTYPE1,                                                      \
-          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE1>::t),         \
-          __VA_ARGS__)                                                      \
-      IPEX_PRIVATE_CASE_TYPE(                                               \
-          SCALARTYPE2,                                                      \
-          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE2>::t),         \
-          __VA_ARGS__)                                                      \
-      IPEX_PRIVATE_CASE_TYPE(                                               \
-          SCALARTYPE3,                                                      \
-          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE3>::t),         \
-          __VA_ARGS__)                                                      \
-      default:                                                              \
-        AT_ERROR(#NAME, " not implemented for '", toString(TYPE), "'");     \
-    }                                                                       \
+#define IPEX_DISPATCH_ALL_TYPES_AND3(                                     \
+    SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, ...)               \
+  [&] {                                                                   \
+    switch (TYPE) {                                                       \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)  \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(                                             \
+          SCALARTYPE1,                                                    \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE1>::t),       \
+          __VA_ARGS__)                                                    \
+      IPEX_PRIVATE_CASE_TYPE(                                             \
+          SCALARTYPE2,                                                    \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE2>::t),       \
+          __VA_ARGS__)                                                    \
+      IPEX_PRIVATE_CASE_TYPE(                                             \
+          SCALARTYPE3,                                                    \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE3>::t),       \
+          __VA_ARGS__)                                                    \
+      default:                                                            \
+        AT_ERROR(#NAME, " not implemented for '", toString(TYPE), "'");   \
+    }                                                                     \
   }()
 
 #define IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(                           \
@@ -533,14 +526,14 @@
     switch (TYPE) {                                                         \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)     \
-      IPEX_PRIVATE_CASE_DOUBLE(at::ScalarType::Double, double, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Long, int64_t, __VA_ARGS__)    \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Short, int16_t, __VA_ARGS__)   \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexFloat, c10::complex<float>, __VA_ARGS__)   \
-      IPEX_PRIVATE_CASE_DOUBLE(                                             \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
           at::ScalarType::ComplexDouble, c10::complex<double>, __VA_ARGS__) \
       IPEX_PRIVATE_CASE_TYPE(                                               \
           SCALARTYPE1,                                                      \

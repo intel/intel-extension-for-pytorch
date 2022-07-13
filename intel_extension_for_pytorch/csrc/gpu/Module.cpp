@@ -585,10 +585,6 @@ void init_module(pybind11::module& m) {
     return Settings::I().is_channels_last_1d_enabled();
   });
 
-  m.def("_is_double_disabled", []() {
-    return Settings::I().is_double_disabled();
-  });
-
   m.def(
       "_get_verbose_level", []() { return Settings::I().get_verbose_level(); });
 

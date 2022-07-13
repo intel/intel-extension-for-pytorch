@@ -291,7 +291,6 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 | BUILD_OPT_LEVEL | OFF | Add build option -Ox, accept values: 0/1
 | BUILD_NO_CLANGFORMAT | OFF | Build without force clang-format if set to ON. |
 | BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path if set to ON. |
-| BUILD_DOUBLE_KERNEL | OFF | Build double data type kernels. This option is set to ON only if <br> BUILD_INTERNAL_DEBUG is set to ON. |
 
 ## Launch Option List
 The following lauch options are supported in Intel® Extension for PyTorch* GPU.

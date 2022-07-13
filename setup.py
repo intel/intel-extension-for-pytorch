@@ -20,7 +20,6 @@
 # BUILD_OPT_LEVEL       - to add build option -Ox, accept values: 0/1
 # BUILD_NO_CLANGFORMAT  - to build without force clang-format
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
-# BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)
 #
 ##############################################################
 

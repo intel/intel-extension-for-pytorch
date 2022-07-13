@@ -64,8 +64,6 @@ class IPEX_API Settings final {
 
   bool is_channels_last_1d_enabled() const;
 
-  bool is_double_disabled() const;
-
 #ifdef BUILD_SIMPLE_TRACE
   bool is_simple_trace_enabled() const;
   void enable_simple_trace();

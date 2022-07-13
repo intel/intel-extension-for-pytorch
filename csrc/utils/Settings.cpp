@@ -222,14 +222,6 @@ bool Settings::is_channels_last_1d_enabled() const {
 #endif
 }
 
-bool Settings::is_double_disabled() const {
-#if defined(BUILD_INTERNAL_DEBUG) && !defined(BUILD_DOUBLE_KERNEL)
-  return false;
-#else
-  return true;
-#endif
-}
-
 #ifdef BUILD_SIMPLE_TRACE
 bool Settings::is_simple_trace_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
