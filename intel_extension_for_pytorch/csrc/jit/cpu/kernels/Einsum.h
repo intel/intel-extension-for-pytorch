@@ -30,5 +30,9 @@ at::Tensor einsum_binary(
     const at::Tensor& input,
     const c10::Scalar& alpha);
 
+bool is_add_broadcast_supported_by_onednn(
+    const at::Tensor& left,
+    const at::Tensor& right,
+    const at::Tensor& post_add_tensor);
 } // namespace cpu
 } // namespace torch_ipex
