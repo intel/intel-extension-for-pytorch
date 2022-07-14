@@ -5,6 +5,7 @@ import intel_extension_for_pytorch
 import pytest
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skip(reason="Unstable outputs on ATS-P")
     def test_nonzero_memory_leak(self):
         '''
         Regression desc:
@@ -29,9 +30,9 @@ class TestTorchMethod(TestCase):
             centroid = xyz[batch_indices, farthest, :].view(B, 1, 3)
             dist = torch.sum((xyz - centroid) ** 2, -1)
             mask = dist < distance
-            
+
             distance_cpu = distance.clone().cpu()
-            
+
             distance[mask] = dist[mask]
             distance_cpu[mask] = dist.cpu()[mask.cpu()]
 
