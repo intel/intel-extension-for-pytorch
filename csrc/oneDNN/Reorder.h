@@ -78,7 +78,9 @@ static inline void reorder(
                                             const Tensor& dst) -> memory::desc {
     if (src.ndimension() == dst.ndimension()) {
       return memory::desc(
-          get_onednn_dims(src), get_onednn_dtype(src), get_onednn_strides(src));
+          get_onednn_dims(src),
+          get_onednn_dtype_include_double(src),
+          get_onednn_strides(src));
     } else if (
         ((src.ndimension() == dst.ndimension() - 1) &&
          (src.size(0) == dst.size(0) * dst.size(1))) ||
@@ -87,7 +89,7 @@ static inline void reorder(
       // group tensor
       return memory::desc(
           get_onednn_dims(dst),
-          get_onednn_dtype(src),
+          get_onednn_dtype_include_double(src),
           get_onednn_strides(dst.contiguous()));
     } else {
       TORCH_CHECK(0, "invalid src/dst dimension in oneDNN reorder ...");
@@ -101,11 +103,12 @@ static inline void reorder(
   auto src_mem = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
 
   auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-  memory::desc dst_md = dst_ctx.is_plain() ? memory::desc(
-                                                 get_onednn_dims(dst),
-                                                 get_onednn_dtype(dst),
-                                                 get_onednn_strides(dst))
-                                           : dst_ctx.meta();
+  memory::desc dst_md = dst_ctx.is_plain()
+      ? memory::desc(
+            get_onednn_dims(dst),
+            get_onednn_dtype_include_double(dst),
+            get_onednn_strides(dst))
+      : dst_ctx.meta();
   auto dst_mem = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
 
   primitive prim;

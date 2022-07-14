@@ -29,6 +29,7 @@ Tensor dpcpp_convolution_backward_input(
     IntArrayRef dilation,
     int64_t groups,
     bool bias_defined) {
+  bool conv_double = grad_output.scalar_type() == kDouble;
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -52,9 +53,10 @@ Tensor dpcpp_convolution_backward_input(
   auto oc = grad_output.size(1);
 
   // align data type with bf16
-  auto data_grad = get_onednn_dtype(grad_output);
-  auto weight_t = get_onednn_dtype(weight);
-  auto bias_t = dnnl::memory::data_type::f32;
+  auto data_grad = get_onednn_dtype_include_double(grad_output);
+  auto weight_t = get_onednn_dtype_include_double(weight);
+  auto bias_t =
+      conv_double ? dnnl::memory::data_type::f64 : dnnl::memory::data_type::f32;
   auto weight_usr_t = weight_t;
   auto format_any = memory::format_tag::any;
   auto format_input =
@@ -881,11 +883,11 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
       3 == input_ndim || 4 == input_ndim || 5 == input_ndim,
       "convolution bwd only supports 3D, 4D, 5D tensor");
 
-  // TODO: support half and double type in convolution
   TORCH_CHECK(
       grad_output.scalar_type() == ScalarType::Float ||
-          grad_output.scalar_type() == ScalarType::BFloat16,
-      "so far only support float and bfloat16 convolution backward in XPU backend, your data type is ",
+          grad_output.scalar_type() == ScalarType::BFloat16 ||
+          grad_output.scalar_type() == ScalarType::Double,
+      "so far only support float, bfloat16 and double convolution backward in XPU backend, your data type is ",
       grad_output.scalar_type());
 
   auto cl_tag = get_cl_tag_by_ndim(input_ndim);

@@ -101,6 +101,14 @@ static inline memory::data_type get_onednn_dtype(
   };
 }
 
+static inline memory::data_type get_onednn_dtype_include_double(
+    const at::Tensor& tensor,
+    bool allow_undef = false) {
+  if (tensor.scalar_type() == at::ScalarType::Double)
+    return memory::data_type::f64;
+  return get_onednn_dtype(tensor, allow_undef);
+}
+
 static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
   return get_onednn_dtype(tensor, /*allow_undef*/ true) ==
           memory::data_type::undef

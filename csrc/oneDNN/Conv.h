@@ -238,18 +238,20 @@ static at::Tensor convolution(
     dst = at::empty(dst_tz, dst_opt);
   }
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto src_data_t =
-      src_ctx.is_plain() ? get_onednn_dtype(src) : src_ctx.meta().data_type();
-  auto wei_usr_data_t = get_onednn_dtype(wgh);
-  auto wei_data_t =
-      src.is_quantized() ? memory::data_type::s8 : get_onednn_dtype(wgh);
-  auto dst_data_t = dst.defined() ? get_onednn_dtype(dst) : src_data_t;
+  auto src_data_t = src_ctx.is_plain() ? get_onednn_dtype_include_double(src)
+                                       : src_ctx.meta().data_type();
+  auto wei_usr_data_t = get_onednn_dtype_include_double(wgh);
+  auto wei_data_t = src.is_quantized() ? memory::data_type::s8
+                                       : get_onednn_dtype_include_double(wgh);
+  auto dst_data_t =
+      dst.defined() ? get_onednn_dtype_include_double(dst) : src_data_t;
 
   // if src is quant, set bia data type to f32
   // if src is not quant, get user demanded data type
   auto bia_data_t = bia.defined() && src.is_quantized()
       ? memory::data_type::f32
-      : bia.defined() ? get_onednn_dtype(bia) : memory::data_type::undef;
+      : bia.defined() ? get_onednn_dtype_include_double(bia)
+                      : memory::data_type::undef;
 
   if (memory::data_type::bf16 == src_data_t && bia.defined()) {
     // if src data type is bf16 and bia is defined, bia data type must be bf16
@@ -327,8 +329,9 @@ static at::Tensor convolution(
       }
     }
 
-    auto dst_scale = (get_onednn_dtype(dst) == memory::data_type::u8 &&
-                      dst.q_zero_point() == 128)
+    auto dst_scale =
+        (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
+         dst.q_zero_point() == 128)
         ? attr.oscale_ / 2
         : attr.oscale_;
     src_scale =
@@ -517,7 +520,7 @@ static at::Tensor convolution(
   if (dst_usr_md != expected_dst_md) {
     if (Settings::I().is_onednn_layout_enabled() && dst.is_quantized()) {
       auto quantizer = dpcpp_make_per_tensor_affine_quantizer(
-          (get_onednn_dtype(dst) == memory::data_type::u8 &&
+          (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
            dst.q_zero_point() == 128)
               ? dst.q_scale() / 2
               : dst.q_scale(),
@@ -641,8 +644,8 @@ static std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto ic = src.size(1);
   auto oc = diff_dst.size(1);
 
-  memory::data_type diff_dst_dt = get_onednn_dtype(diff_dst);
-  memory::data_type src_dt = get_onednn_dtype(src);
+  memory::data_type diff_dst_dt = get_onednn_dtype_include_double(diff_dst);
+  memory::data_type src_dt = get_onednn_dtype_include_double(src);
   TORCH_CHECK(
       diff_dst_dt == src_dt,
       "convolution bwd_wb need same dtype for src and diff_dst");
