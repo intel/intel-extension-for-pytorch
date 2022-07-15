@@ -19,6 +19,29 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
+    def test_conv2d_first(self, dtype=torch.float):
+        x_cpu = torch.randn([1, 3, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+        grad_cpu = torch.full([1, 64, 256, 256], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)
+        conv_cpu = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        y_cpu = conv_cpu(x_cpu)
+        y_cpu.backward(grad_cpu)
+        y_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+        conv_cpu.zero_grad()
+
+        x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
+        grad_dpcpp = grad_cpu.to(dpcpp_device)
+        conv_dpcpp = conv_cpu.to(dpcpp_device)
+        y_dpcpp = conv_dpcpp(x_dpcpp)
+        y_dpcpp.backward(grad_dpcpp)
+        y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
+
+        print("ref (cpu):\n", "output:\n", y_cpu, "\ngrad weight:\n", y_cpu_gw)
+        print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+        self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5 * 1e-5, rtol=0)
+
     def test_conv2d(self, dtype=torch.float):
         x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
         grad_cpu = torch.full([1, 64, 256, 256], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True)

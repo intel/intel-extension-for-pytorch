@@ -295,7 +295,13 @@ static at::Tensor convolution(
 
   // block combination
   if (Settings::I().is_onednn_layout_enabled()) {
-    src_md = memory::desc(src_tz, src_data_t, fmt_any);
+    // In blocked format scenario, oneDNN accept the src in plain format
+    // when src ic = 3
+    if (ic == 3) {
+      src_md = memory::desc(src_tz, src_data_t, fmt_src);
+    } else {
+      src_md = memory::desc(src_tz, src_data_t, fmt_any);
+    }
     dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
   }
