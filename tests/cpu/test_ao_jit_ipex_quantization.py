@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing import FileCheck
 import copy
+import json
 from test_autocast import get_rand_seed
 
 import intel_extension_for_pytorch as ipex
@@ -290,16 +291,19 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.linear = nn.Linear(128,1)
+                self.conv = nn.Conv2d(3, 64, 1, 1)
+                self.linear = nn.Linear(256, 1)
 
             def forward(self, x):
+                x = self.conv(x)
+                x = torch.flatten(x, 1)
                 x = self.linear(x)
                 y = torch.relu(x)
                 x = torch.add(x, y)
                 return x
 
         m = M()
-        x = torch.rand(1,128)
+        x = torch.rand(1, 3, 2, 2)
         prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
         prepared_model(x)
         with tempfile.TemporaryDirectory() as tmp:
@@ -317,6 +321,22 @@ class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
             traced_model = torch.jit.freeze(traced_model)
             y_after = traced_model(x)
             self.assertEqual(y_before, y_after)
+            # save and load qconf again to make sure we didn't lost something
+            path2 = os.path.join(tmp, "configure_new.json")
+            prepared_model.save_qconf_summary(path2)
+            prepared_model = ipex.quantization.prepare(m, static_qconfig[0], example_inputs=x, inplace=False)
+            prepared_model.load_qconf_summary(path2)
+            convert_model = ipex.quantization.convert(prepared_model)
+            traced_model = torch.jit.trace(convert_model, x).eval()
+            traced_model = torch.jit.freeze(traced_model)
+            y_after = traced_model(x)
+            self.assertEqual(y_before, y_after)
+            # make sure the new saved json is same as old one.
+            with open(path, 'r') as f:
+                old_json = json.load(f)
+            with open(path2, 'r') as f:
+                new_json = json.load(f)
+            self.assertTrue(old_json == new_json) 
 
 class TestRemoveMutate(JitLlgaTestCase):
     def test_mutated_value_alive_after_inplace_op(self):
