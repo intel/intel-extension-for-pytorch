@@ -4,6 +4,7 @@
 #include <ATen/core/MT19937RNGEngine.h>
 #include <ATen/core/PhiloxRNGEngine.h>
 #include <CL/sycl.hpp>
+#include <aten/operators/MemoryAccess.h>
 #include <utils/DPCPP.h>
 
 // TODO: move this into the GeneratorImpl in pytorch-1.7 or later
@@ -56,6 +57,16 @@ class RandomState final {
       uint32_t val = engine();
       return uniform_real<T>(val, 0.0, 1.0);
     }
+  }
+
+  template <typename T, int vec_size>
+  at::native::Memory::aligned_vector_loop<T, vec_size> uniform() {
+    at::native::Memory::aligned_vector_loop<T, vec_size> result;
+#pragma unroll
+    for (int i = 0; i < vec_size; ++i) {
+      result[i] = uniform<T>();
+    }
+    return result;
   }
 
   /**
