@@ -268,27 +268,6 @@ at::Tensor unpack(ContextLinear& context, const at::Tensor& tensor) {
   return result;
 }
 
-void repack_for(ContextLinear& context, int64_t batch_size) {
-  auto dtype = context.original_desc_.get_data_type();
-  ideep::tensor packed_weight;
-  auto packed_desc = ideep::inner_product_forward::expected_weights_desc(
-      context.weight_packed_.get_dims(),
-      {batch_size, context.weight_packed_.get_dim(1)},
-      /* weight dtype */ dtype,
-      /* src dtype */ dtype);
-  auto new_at_weight =
-      empty_aten_tensor_from_desc(packed_desc, context.at_weight_.options());
-  if (ideep::data_type::f32 == dtype) {
-    packed_weight.init(packed_desc, new_at_weight.template data_ptr<float>());
-  } else {
-    packed_weight.init(
-        packed_desc, new_at_weight.template data_ptr<c10::BFloat16>());
-  }
-  packed_weight.feed_from(context.weight_packed_);
-  context.at_weight_ = new_at_weight;
-  context.weight_packed_ = packed_weight;
-}
-
 } // namespace linear
 } // namespace detail
 } // namespace cpu

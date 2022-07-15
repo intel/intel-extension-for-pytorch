@@ -178,30 +178,13 @@ class LinearOpContext : public torch::jit::CustomClassHolder {
   // weight This n-D ATen weight will be used for autograd and optimizer update
   virtual at::Tensor get_at_packed_weight() = 0;
 
-  // update the bias stored in context
-  virtual void set_bias(at::Tensor& tensor) = 0;
-
-  // update the weight stored in context (update both n-D ATen weight and mkldnn
-  // weight)
-  virtual void set_weight(at::Tensor& tensor) = 0;
-
   // Pack given tensor to same format with mkldnn packed weight
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
   // Unpack given tensor to same format with original public format for weight
   virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
 
-  // query best weight format by given input size, and re-pack the mkldnn weight
-  // to newly queried format
-  virtual void may_repack(int64_t batch_size) = 0;
-
-  virtual int64_t get_out_features() = 0;
-
-  virtual int64_t get_in_features() = 0;
-
   virtual detail::ContextLinear& get_context() = 0;
-
-  c10::optional<int64_t> get_batchsize();
 };
 
 class IpexLinearOpContext final : public LinearOpContext {
@@ -233,19 +216,10 @@ class IpexLinearOpContext final : public LinearOpContext {
 
   virtual at::Tensor get_at_packed_weight() override;
 
-  virtual void set_bias(at::Tensor& tensor) override;
-
-  virtual void set_weight(at::Tensor& tensor) override;
-
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
 
-  virtual void may_repack(int64_t batch_size) override;
-
-  virtual int64_t get_out_features() override;
-
-  virtual int64_t get_in_features() override;
 
   virtual detail::ContextLinear& get_context() override;
 

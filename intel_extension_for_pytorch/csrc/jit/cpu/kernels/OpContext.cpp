@@ -98,10 +98,6 @@ at::Tensor IpexConvolutionOpContext::get_data_handle() {
   return ptr;
 }
 
-c10::optional<int64_t> LinearOpContext::get_batchsize() {
-  return batch_size_;
-}
-
 c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -145,24 +141,8 @@ at::Tensor IpexLinearOpContext::get_at_packed_weight() {
   return op_context_.at_weight_;
 }
 
-int64_t IpexLinearOpContext::get_out_features() {
-  return op_context_.original_desc_.get_dim(0);
-}
-
-int64_t IpexLinearOpContext::get_in_features() {
-  return op_context_.original_desc_.get_dim(1);
-}
-
 detail::ContextLinear& IpexLinearOpContext::get_context() {
   return op_context_;
-}
-
-void IpexLinearOpContext::set_bias(at::Tensor& bias) {
-  op_context_.bias_ = c10::make_optional<at::Tensor>(std::move(bias));
-}
-
-void IpexLinearOpContext::set_weight(at::Tensor& weight) {
-  op_context_.at_weight_.copy_(weight);
 }
 
 at::Tensor IpexLinearOpContext::pack(const at::Tensor& tensor) {
@@ -171,14 +151,6 @@ at::Tensor IpexLinearOpContext::pack(const at::Tensor& tensor) {
 
 at::Tensor IpexLinearOpContext::to_public(const at::Tensor& tensor) {
   return torch_ipex::cpu::detail::linear::unpack(op_context_, tensor);
-}
-
-void IpexLinearOpContext::may_repack(int64_t batch_size) {
-  if (!batch_size_.has_value() || batch_size_.has_value() != batch_size) {
-    batch_size_ = c10::make_optional(batch_size);
-    torch_ipex::cpu::detail::linear::repack_for(op_context_, batch_size);
-  }
-  return;
 }
 
 c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
