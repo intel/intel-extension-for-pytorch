@@ -2943,6 +2943,12 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
+        self._test_output_bf16(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::linear_add_run",
+            kind_not_in_graph="aten::linear",
+            prec=5e-2)
 
     def test_output_linear_add_relu(self):
         for inplace in [True, False]:
