@@ -42,8 +42,8 @@ void interaction_kernel(
   const int NX = DivUp(Row - 1, TILE_OUTPUT_COL);
   const int working_set = (NX + 1) * NX / 2;
 
-  int local_size = 32;
-  int total_local_size = TILE_BN * local_size;
+  constexpr int local_size = 32;
+  constexpr int total_local_size = TILE_BN * local_size;
   // Computation Mapping
   DPCPP::range<2> local{TILE_BN, local_size};
   // Virtual Padding for group mapping to HW
@@ -106,7 +106,12 @@ void interaction_kernel(
 
             // Load one-sub-cube data to SLM
             size_t global_offset = group_id * TILE_BN * Col_fp + col;
-#pragma unroll
+            /* #pragma unroll
+               TODO: the loop boundary is var.
+               const int64_t Row
+               int cub_numel = (Row - 1) * TILE_BN * TILE_INPUT_COL_FLOAT;
+               DivUp(cub_numel, total_local_size);
+               Need to change it to const expression if possible. */
             for (int kk = 0; kk < DivUp(cub_numel, total_local_size); ++kk) {
               int cub_offset = local_id + kk * total_local_size;
               int col_idx = cub_offset % TILE_INPUT_COL_FLOAT; // col
