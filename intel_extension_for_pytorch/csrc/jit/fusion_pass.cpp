@@ -146,6 +146,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // hence the concat dim should be the channel
   graph_rewrite::FuseConcatBnRelu(graph);
 
+  // replace aten max_pool2d with ipex max_pool2d
+  graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
+
   // Fuse operators as shuffle
   graph_rewrite::FuseShuffle(graph);
   graph_rewrite::FuseMatmulDiv(graph);
