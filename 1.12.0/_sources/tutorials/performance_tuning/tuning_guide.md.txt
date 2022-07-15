@@ -215,12 +215,9 @@ export LD_PRELOAD=<jemalloc.so/tcmalloc.so>:$LD_PRELOAD
 A recommended setting for ``MALLOC_CONF`` is ``oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000`` from performance perspective. However, in some cases the ``dirty_decay_ms:9000000000,mmuzzy_decay_ms:9000000000`` may cause Out-of-Memory crash. Try ``oversize_threshold:1,background_thread:true,metadata_thp:auto`` instead in this case.
 
 Getting Jemalloc is straight-forward.
+
 ```
-git clone https://github.com/jemalloc/jemalloc
-cd jemalloc
-./autogen.sh
-make
-make install
+conda install -c conda-forge jemalloc
 ```
 
 #### TCMalloc
@@ -230,12 +227,7 @@ make install
 Getting TCMalloc is also not complicated.
 
 ```
-wget https://github.com/gperftools/gperftools/releases/download/gperftools-<version>/gperftools-<version>.tar.gz
-tar xzvf gperftools-<version>.tar.gz
-cd gperftools-<version>
-./configure --disable-cpu-profiler --disable-heap-profiler --disable-heap-checker --disable-debugalloc --enable-minimal
-make
-make install
+conda install -c conda-forge gperftools
 ```
 
 ### Denormal Number
