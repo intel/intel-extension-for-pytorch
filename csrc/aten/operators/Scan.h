@@ -157,23 +157,47 @@ DPCPP_DEVICE T group_x_scan(
 #else
     dpcpp_local_ptr<T> carrier,
 #endif
+    T init,
     BinaryFunction func) {
 #ifndef SG_SCAN
   const auto lix = item.get_local_id(1);
   const auto liy = item.get_local_id(0);
   const auto rx = item.get_local_range(1);
   const auto ry = item.get_local_range(0);
-
   slm[liy * rx + lix] = value;
-  for (int offset = 1; offset < rx; offset <<= 1) {
-    item.barrier(dpcpp_local_fence);
-    if (lix >= offset)
-      value = func(slm[liy * rx + (lix - offset)], slm[liy * rx + lix]);
-    item.barrier(dpcpp_local_fence);
 
-    if (lix >= offset)
-      slm[liy * rx + lix] = value;
+  // Parallel reduction (Up-sweep)
+  int offset = 1;
+  for (int d = rx >> 1; d > 0; d >>= 1) {
+    item.barrier(dpcpp_local_fence);
+    if (lix < d) {
+      int ai = liy * rx + offset * (2 * lix + 1) - 1;
+      int bi = liy * rx + offset * (2 * lix + 2) - 1;
+      slm[bi] = func(slm[ai], slm[bi]);
+    }
+    offset <<= 1;
   }
+
+  if (lix == 0) {
+    slm[liy * rx + rx - 1] = init;
+  }
+
+  // Down-sweep
+  for (int d = 1; d < rx; d <<= 1) {
+    offset >>= 1;
+    item.barrier(dpcpp_local_fence);
+    if (lix < d) {
+      int ai = liy * rx + offset * (2 * lix + 1) - 1;
+      int bi = liy * rx + offset * (2 * lix + 2) - 1;
+      T temp = slm[ai];
+      slm[ai] = slm[bi];
+      slm[bi] = func(temp, slm[bi]);
+    }
+  }
+
+  item.barrier(dpcpp_local_fence);
+  // inclusive
+  value = func(slm[liy * rx + lix], value);
 #else
   const auto wg_size = item.get_local_range(1);
   const auto sg = item.get_sub_group();
@@ -514,7 +538,8 @@ class segment_scan_kernel {
     if (cfg.problem_along_x_) {
       // so far assign all work items along problem dimension
       // sg_shuffle benefits reduce on the dimension
-      value = group_x_scan<T, BinaryFunction>(item, value, slm, cfg.func_);
+      value = group_x_scan<T, BinaryFunction>(
+          item, value, slm, cfg.init_, cfg.func_);
     } else {
       // parallel prefix reduce
       value = group_y_scan<T, BinaryFunction>(item, value, slm, cfg.func_);
