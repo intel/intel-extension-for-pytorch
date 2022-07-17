@@ -584,6 +584,7 @@ supported:
   - complex.out
   - eig          # must register
   - vdot
+  - square.out
 autograd:
   - cdist
   - lstm.input
