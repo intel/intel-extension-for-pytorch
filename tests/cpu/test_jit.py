@@ -1318,6 +1318,19 @@ class Tester(TestCase):
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
                 self.assertEqual(jit_res, ori_res)
 
+                #input bf16, weight fp32
+                a_bf16 = a.to(torch.bfloat16)
+                b_bf16 = b.to(torch.bfloat16)
+                with torch.cpu.amp.autocast():
+                    ori_res = model(a_bf16, b_bf16)
+                    model_jit = jit_model = torch.jit.trace(model,(a, b))
+                    trace_graph = jit_model.graph_for(a, b)
+                    jit_res = jit_model(a_bf16, b_bf16)
+                    node = "ipex::add_layernorm"
+                    self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                    self.assertEqual(jit_res, ori_res, prec=5e-2)
+
+                #input weight both bf16
                 a_bf16 = a.to(torch.bfloat16)
                 b_bf16 = b.to(torch.bfloat16)
                 w_bf16 = w.to(torch.bfloat16)
