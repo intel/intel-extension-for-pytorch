@@ -9,11 +9,11 @@ from torch.testing._internal.common_utils import TestCase
 class TestNNMethod(TestCase):
     def test_sort(self, dtypes=[torch.bfloat16, torch.half]):
         for dtype in dtypes:
-            for i in range(20):
+            for i in range(100):
                 a = random.randint(1, 3)
                 b = random.randint(1, 5)
                 c = random.randint(1, 7)
-                d = random.randint(1, 6384)
+                d = random.randint(1, 26384)
                 abcd = [a, b, c, d]
                 random.shuffle(abcd)
                 x_cpu = torch.randn(abcd).to(dtype)
