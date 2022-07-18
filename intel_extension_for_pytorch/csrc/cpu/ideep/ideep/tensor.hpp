@@ -150,19 +150,6 @@ class tensor : public memory {
       return is_rnn_packed_desc();
     }
 
-    inline bool is_default() const {
-      if (!is_plain())
-        return false;
-
-      const auto& strides = blocking_strides();
-      for (int i = 0; i < data.ndims - 1; i++) {
-        if (strides[i] < strides[i + 1]) {
-          return false;
-        }
-      }
-      return true;
-    }
-
     inline bool is_ndhwc() const {
       if (!is_plain() || data.ndims != 5)
         return false;
@@ -887,20 +874,10 @@ class tensor : public memory {
 
     auto old_dims = get_dims();
     if (adims != old_dims) {
-      // Since we are going to set the desc to new dims with default format,
-      // we have to make sure it's already in default format. In particular,
-      // tensor format does not matter if actual rank <= 1
-      if (!get_desc().is_default() && actual_rank(old_dims) > 1) {
-        to_default_format();
-      }
       // set desc with default format
       set_desc({adims, get_data_type()});
     }
     return *this;
-  }
-
-  inline void to_default_format() {
-    to_format(get_desc().to_default_format());
   }
 
   inline void to_format(format_tag aformat_tag) {
@@ -957,22 +934,7 @@ class tensor : public memory {
     }
 
     auto dst = buffer ? tensor(dst_desc, buffer) : tensor(dst_desc);
-
-    if (utils::one_of(
-            get_data_type(), data_type::s8, data_type::u8, data_type::s32) &&
-        dst_desc.get_data_type() == data_type::f32 && has_scale()) {
-      auto& src_scale = get_scale();
-      auto dequantize_scale =
-          utils::fmap(src_scale, [](float s) { return 1.f / s; });
-      auto mask =
-          utils::tensor_scale_mask(src_scale.size(), get_desc().is_grouped());
-      this->reorder_to(dst, {mask, dequantize_scale});
-    } else {
-      this->reorder_to(dst);
-      if (has_scale()) {
-        dst.set_scale(get_scale());
-      }
-    }
+    this->reorder_to(dst);
 
     return dst;
   }
@@ -1097,11 +1059,6 @@ class tensor : public memory {
   /// Return the scale of this param.
   const scale_t& get_scale() const {
     return *scale_.get();
-  }
-
-  /// Set new scale into param
-  void set_scale(const scale_t& ascale) {
-    scale_.reset(new scale_t(ascale));
   }
 
   /// Return whether the param has a scale
