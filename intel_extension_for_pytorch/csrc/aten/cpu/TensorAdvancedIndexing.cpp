@@ -35,11 +35,6 @@ at::Tensor& index_select_out_cpu_(
     int64_t dim,
     const at::Tensor& index,
     at::Tensor& result) {
-  if (self.is_quantized()) {
-    TORCH_CHECK(
-        self.qscheme() == at::kPerTensorAffine,
-        "Only per_tensor quantized quantized tensors are supported by index_select.")
-  }
   dim = at::maybe_wrap_dim(dim, self.dim());
   auto numel = index.numel();
   TORCH_CHECK_INDEX(
@@ -262,6 +257,9 @@ IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::index_select"),
       TORCH_FN((&torch_ipex::cpu::index_select_cpu_)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::index_select.out"),
+      TORCH_FN((&torch_ipex::cpu::index_select_out_cpu_)));
 }
 
 } // namespace cpu
