@@ -53,7 +53,7 @@ from setuptools.command.egg_info import egg_info
 
 from subprocess import check_call, check_output
 from setuptools import setup, distutils
-from distutils.version import LooseVersion
+from packaging.version import Version
 from sysconfig import get_paths
 
 import distutils.ccompiler
@@ -220,7 +220,7 @@ def get_cmake_command():
     def _get_version(cmd):
         for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
             if 'version' in line:
-                return LooseVersion(line.strip().split(' ')[2])
+                return Version(line.strip().split(' ')[2])
         raise RuntimeError('no version found')
     "Returns cmake command."
     cmake_command = 'cmake'
@@ -228,10 +228,10 @@ def get_cmake_command():
         return cmake_command
     cmake3 = which('cmake3')
     cmake = which('cmake')
-    if cmake3 is not None and _get_version(cmake3) >= LooseVersion("3.13.0"):
+    if cmake3 is not None and _get_version(cmake3) >= Version("3.13.0"):
         cmake_command = 'cmake3'
         return cmake_command
-    elif cmake is not None and _get_version(cmake) >= LooseVersion("3.13.0"):
+    elif cmake is not None and _get_version(cmake) >= Version("3.13.0"):
         return cmake_command
     else:
         raise RuntimeError('no cmake or cmake3 with version >= 3.13.0 found')
@@ -424,8 +424,6 @@ class IPEXCPPLibBuild(build_clib, object):
         cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + get_build_type(),
             '-DCMAKE_INSTALL_PREFIX=' + os.path.abspath(output_lib_path),
-            '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
-            '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + os.path.abspath(output_lib_path),
             '-DIPEX_INSTALL_LIBDIR=' + os.path.abspath(output_lib_path),
             '-DGLIBCXX_USE_CXX11_ABI=' + str(int(USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,

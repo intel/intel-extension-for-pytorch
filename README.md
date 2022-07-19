@@ -20,13 +20,13 @@ python -m pip install intel_extension_for_pytorch -f https://software.intel.com/
 
 **Note:** Intel® Extension for PyTorch\* has PyTorch version requirement. Please check more detailed information via the URL below.
 
-More installation methods can be found at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/1.12.0/tutorials/installation.html)
+More installation methods can be found at [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/latest/tutorials/installation.html)
 
 ## Getting Started
 
 Minor code changes are required for users to get start with Intel® Extension for PyTorch\*. Both PyTorch imperative mode and TorchScript mode are supported. You just need to import Intel® Extension for PyTorch\* package and apply its optimize function against the model object. If it is a training workload, the optimize function also needs to be applied against the optimizer object.
 
-The following code snippet shows an inference code with FP32 data type. More examples, including training and C++ examples, are available at [Example page](https://intel.github.io/intel-extension-for-pytorch/1.12.0/tutorials/examples.html).
+The following code snippet shows an inference code with FP32 data type. More examples, including training and C++ examples, are available at [Example page](https://intel.github.io/intel-extension-for-pytorch/latest/tutorials/examples.html).
 
 ```python
 import torch
