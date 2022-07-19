@@ -96,10 +96,9 @@ inline bool is_eligible_cpu(const Tensor& arg) {
 inline at::ScalarType prioritize(
     at::ScalarType current,
     const Tensor& nextArg) {
-  if (current == at::kDouble) {
-    AT_ERROR("promote type is double in at::autocast::prioritize");
-    return current;
-  }
+  TORCH_CHECK(
+      current != at::kDouble,
+      "promote type is double in at::autocast::prioritize");
   if (is_eligible_cpu(nextArg)) {
     auto next = nextArg.scalar_type();
     if (next == at::kDouble) {

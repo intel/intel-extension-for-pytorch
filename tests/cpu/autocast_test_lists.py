@@ -84,7 +84,7 @@ class AutocastCPUTestLists(object):
                                     torch.randn((n, n, n), device=dev, dtype=torch.float32))),
             ("group_norm", (torch.randn((4, 8, 10, 10), device=dev, dtype=torch.float32),
                             4, torch.randn(8, device=dev, dtype=torch.float32),
-                            torch.randn(8, device=dev, dtype=torch.float32), 1e-5)),
+                            torch.randn(8, device=dev, dtype=torch.float32), 1e-5, True)),
         ]
         self.torch_bf16_multi_output = [
             ("_native_multi_head_attention", (torch.randn((1, 1, 768), device=dev, dtype=torch.float32),
