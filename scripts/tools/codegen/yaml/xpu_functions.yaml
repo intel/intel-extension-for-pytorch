@@ -12,6 +12,8 @@ supported:
   - _cat.out
   - _cdist_backward
   - _cdist_forward
+  - _compute_linear_combination
+  - _compute_linear_combination.out
   - _ctc_loss
   - _ctc_loss_backward
   - cumprod.out
