@@ -285,7 +285,14 @@ void mkl_baddbmm(
 
   const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 2 : 1];
   const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 2 : 1];
-  const int64_t ldc = c.strides()[transpose_c ? 1 : 2];
+  // for the corner case: result tensor with size [b, m, 1], stride [m, 1, 1]
+  // we cannot use stride to get its leading dimension, whose value should be m.
+  int64_t ldc;
+  if (c.strides()[1] == c.strides()[2] == 1) {
+    ldc = c.sizes()[transpose_c ? 2 : 1];
+  } else {
+    ldc = c.strides()[transpose_c ? 1 : 2];
+  }
 
   const int64_t stridea = a.strides()[0];
   const int64_t strideb = b.strides()[0];
