@@ -4,3 +4,6 @@
 [submodule "third_party/ittapi"]
 	path = third_party/ittapi
 	url = https://github.com/intel/ittapi.git
+[submodule "third_party/oneDPL"]
+	path = third_party/oneDPL
+	url = https://github.com/oneapi-src/oneDPL

@@ -274,6 +274,7 @@ The following build options are supported in Intel® Extension for PyTorch* GPU.
 
 | **Build Option** | **Default<br> Value** | **Description** |
 | ------ | ------ | ------ |
+| USE_ONEDPL | ON | Use oneDPL library if set to ON. |
 | USE_ONEMKL | ON | Use oneMKL BLAS library if set to ON. |
 | USE_CHANNELS_LAST_1D | ON | Support channels last 1D memory format if set to ON. |
 | USE_PERSIST_STREAM | ON | Use persistent oneDNN stream if set to ON.|
