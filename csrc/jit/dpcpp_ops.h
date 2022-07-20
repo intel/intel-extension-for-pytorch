@@ -140,6 +140,11 @@ at::Tensor reorder(
     dnnl::memory::format_tag to,
     int64_t groups);
 
+at::Tensor permute_contiguous(
+    const at::Tensor& input,
+    at::IntArrayRef dims,
+    at::MemoryFormat dim_contiguous);
+
 at::Tensor q_conv2d_sum_relu(
     at::Tensor& accumu,
     const at::Tensor& input,

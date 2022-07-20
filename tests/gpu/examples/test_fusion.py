@@ -1,9 +1,14 @@
+# from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch
+
+from torch.quantization.quantize_jit import (convert_jit, prepare_jit)
+from torch.quantization import default_qconfig
+from torch.jit._recursive import wrap_cpp_module
 
 import pytest
 
@@ -91,6 +96,7 @@ class Conv2dSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
 
+
 class PadConv2d(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(PadConv2d, self).__init__()
@@ -100,6 +106,20 @@ class PadConv2d(torch.nn.Module):
     def forward(self, x):
         x = self.pad(x)
         return self.conv(x)
+
+
+class PermuteContiguous(torch.nn.Module):
+    def __init__(self) -> None:
+        super(PermuteContiguous, self).__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(32, 126, (1, 1))
+        )
+
+    def forward(self, x):
+        x = self.block(x)
+        x = torch.permute(x, [0, 2, 3, 1])
+        return x.contiguous()
+
 
 class LinearReLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -377,6 +397,89 @@ class TestNNMethod(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
 
+    @pytest.mark.skip("quantize convolution have some misalignment with pytorch")
+    def test_permute_contiguous_fusion(self, dtype=torch.float):
+        model = PermuteContiguous()
+        input_cpu = torch.rand([1, 32, 128, 128])
+        input_xpu = input_cpu.clone().to("xpu")
+
+        torch._C._jit_set_profiling_mode(True)
+        torch._C._jit_set_profiling_executor(True)
+
+        # cpu int8
+        modelJit = torch.jit.trace(model, input_cpu)
+        modelJit.eval()
+        print(modelJit)
+        print("finish jit...")
+
+        print("start calibration ...")
+        qconfig_u8 = torch.quantization.QConfig(
+            activation=torch.quantization.observer.MinMaxObserver.with_args(
+                qscheme=torch.per_tensor_symmetric,
+                reduce_range=False,
+                dtype=torch.quint8
+            ),
+            weight=torch.quantization.default_weight_observer
+        )
+
+        modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+
+        # do calibration
+        for i in range(1):
+            calib_input = input_cpu
+            modelJit(calib_input)
+        print("start cpu convert")
+        modelJit = convert_jit(modelJit, True)
+        print(modelJit.graph_for(input_cpu))
+        print("--modelJit={}".format(modelJit))
+
+        # inference
+        print("start inference ...")
+        for i in range(5):
+            output_cpu = modelJit(input_cpu)
+
+        torch._C._jit_set_profiling_mode(False)
+        torch._C._jit_set_profiling_executor(False)
+
+        # xpu
+        print("-------start xpu path-------")
+        print("start jit ...")
+        model = model.to("xpu")
+        model = torch.jit.trace(model, input_cpu.to("xpu"))
+        modelJit = wrap_cpp_module(torch._C._jit_pass_fold_convbn(model._c))
+        modelJit.eval()
+        print("finish jit ...")
+
+        modelJit = modelJit.to("xpu")
+        print("start calibration ...")
+        # calibration
+        # default with per_tensor quantization
+        qconfig_u8 = torch.quantization.QConfig(
+            activation=torch.quantization.observer.MinMaxObserver.with_args(
+                qscheme=torch.per_tensor_symmetric,
+                reduce_range=False,
+                dtype=torch.quint8
+            ),
+            weight=torch.quantization.default_weight_observer
+        )
+
+        modelJit = prepare_jit(modelJit, {'': qconfig_u8}, True)
+        modelJit = modelJit.to("xpu")
+
+        # do calibration
+        for i in range(1):
+            calib_input = input_xpu
+            print(calib_input.size())
+            modelJit(calib_input)
+        modelJit = convert_jit(modelJit, True)
+        print(modelJit.graph_for(input_xpu))
+
+        print("start inference ...")
+        for i in range(5):
+
+            output = modelJit(input_xpu)
+            torch.xpu.synchronize()
+        self.assertEqual(output.cpu(), output_cpu)
 
     def test_linear_relu(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)

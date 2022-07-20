@@ -434,6 +434,10 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{Symbol::fromQualString("aten::softplus"),
       Symbol::fromQualString("aten::tanh")},
      xpu::softplus_tanh_sym},
+    // 'block_permution + copy'-> 'block permution'.
+    {{Symbol::fromQualString("aten::permute"),
+      Symbol::fromQualString("aten::contiguous")},
+     xpu::permute_contiguous_sym},
     // YOLOv4 INT8 For ATS-M: softplus_tanh + mul
     {{xpu::softplus_tanh_sym, aten::mul}, xpu::softplus_tanh_mul_sym},
     {{xpu::softplus_tanh_sym, Symbol::fromQualString("aten::mul")},

@@ -63,6 +63,8 @@ static auto dequant_pixelshuffle_sym =
     Symbol::fromQualString("xpu::dequant_pixelshuffle");
 static auto dequant_pixelshuffle_quant_sym =
     Symbol::fromQualString("xpu::dequant_pixelshuffle_quant");
+static auto permute_contiguous_sym =
+    Symbol::fromQualString("xpu::permute_contiguous");
 
 // Fold weights of batch_norm with conv2d's
 static auto fold_weight_sym = Symbol::fromQualString("xpu::fold_weight");
