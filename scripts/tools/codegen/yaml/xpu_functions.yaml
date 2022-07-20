@@ -586,6 +586,14 @@ supported:
   - complex.out
   - eig          # must register
   - vdot
+  - __lshift__.Scalar
+  - __lshift__.Tensor
+  - __ilshift__.Scalar
+  - __ilshift__.Tensor
+  - __rshift__.Scalar
+  - __rshift__.Tensor
+  - __irshift__.Scalar
+  - __irshift__.Tensor
   - square.out
 autograd:
   - cdist

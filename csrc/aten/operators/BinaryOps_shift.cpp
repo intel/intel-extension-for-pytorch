@@ -109,5 +109,41 @@ Tensor bitwise_right_shift(const Scalar& self, const Tensor& other) {
       wrapped_scalar_tensor(self).toType(other.scalar_type()), other);
 }
 
+Tensor __lshift__(const Tensor& self, const Tensor& other) {
+  return at::bitwise_left_shift(self, other);
+}
+
+Tensor __lshift__(const Tensor& self, const Scalar& other) {
+  auto wrapper = wrapped_scalar_tensor(other).toType(self.scalar_type());
+  return at::bitwise_left_shift(self, wrapper);
+}
+
+Tensor& __ilshift__(Tensor& self, const Tensor& other) {
+  return at::bitwise_left_shift_out(self, self, other);
+}
+
+Tensor& __ilshift__(Tensor& self, const Scalar& other) {
+  auto wrapper = wrapped_scalar_tensor(other).toType(self.scalar_type());
+  return at::bitwise_left_shift_out(self, self, wrapper);
+}
+
+Tensor __rshift__(const Tensor& self, const Tensor& other) {
+  return at::bitwise_right_shift(self, other);
+}
+
+Tensor __rshift__(const Tensor& self, const Scalar& other) {
+  auto wrapper = wrapped_scalar_tensor(other).toType(self.scalar_type());
+  return at::bitwise_right_shift(self, wrapper);
+}
+
+Tensor& __irshift__(Tensor& self, const Tensor& other) {
+  return at::bitwise_right_shift_out(self, self, other);
+}
+
+Tensor& __irshift__(Tensor& self, const Scalar& other) {
+  auto wrapper = wrapped_scalar_tensor(other).toType(self.scalar_type());
+  return at::bitwise_right_shift_out(self, self, wrapper);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
