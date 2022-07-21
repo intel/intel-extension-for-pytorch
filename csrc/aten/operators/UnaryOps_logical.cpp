@@ -39,7 +39,7 @@ void signbit_kernel(TensorIteratorBase& iter) {
 
 } // namespace impl
 
-Tensor& logical_not_out(Tensor& result, const Tensor& self) {
+Tensor& logical_not_out(const Tensor& self, Tensor& result) {
   TensorIterator iter = TensorIteratorConfig()
                             .check_all_same_dtype(false)
                             .set_check_mem_overlap(true)

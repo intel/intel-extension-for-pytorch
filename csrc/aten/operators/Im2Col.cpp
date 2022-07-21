@@ -8,6 +8,7 @@
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
+#include "comm/RegistrationDeclarations.h"
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"
@@ -18,15 +19,6 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
-Tensor& col2im_out(
-    Tensor& out,
-    const Tensor& self,
-    IntArrayRef output_size,
-    IntArrayRef kernel_size,
-    IntArrayRef dilation,
-    IntArrayRef padding,
-    IntArrayRef stride);
 
 namespace impl {
 
@@ -152,24 +144,24 @@ static void im2col_backward_out_template(
       "It is expected input_size equals to 2, but got size ",
       input_size.size());
   at::AtenIpexTypeXPU::col2im_out(
-      grad_input,
       grad_output,
       input_size,
       kernel_size,
       dilation,
       padding,
-      stride);
+      stride,
+      grad_input);
 }
 
 } // namespace impl
 
 Tensor& im2col_out(
-    Tensor& out,
     const Tensor& self,
     IntArrayRef kernel_size,
     IntArrayRef dilation,
     IntArrayRef padding,
-    IntArrayRef stride) {
+    IntArrayRef stride,
+    Tensor& out) {
   impl::im2col_out_template(out, self, kernel_size, dilation, padding, stride);
   return out;
 }
@@ -187,13 +179,13 @@ Tensor im2col(
 }
 
 Tensor& im2col_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef input_size,
     IntArrayRef kernel_size,
     IntArrayRef dilation,
     IntArrayRef padding,
-    IntArrayRef stride) {
+    IntArrayRef stride,
+    Tensor& grad_input) {
   impl::im2col_backward_out_template(
       grad_input,
       grad_output,

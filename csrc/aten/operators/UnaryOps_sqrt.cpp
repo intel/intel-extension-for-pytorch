@@ -29,7 +29,7 @@ void sqrt_kernel_xpu(TensorIterator& iter) {
       });
 }
 
-Tensor& sqrt_out(Tensor& result, const Tensor& self) {
+Tensor& sqrt_out(const Tensor& self, Tensor& result) {
   auto iter = TensorIterator::unary_float_op(result, self);
   sqrt_kernel_xpu(iter);
   return result;

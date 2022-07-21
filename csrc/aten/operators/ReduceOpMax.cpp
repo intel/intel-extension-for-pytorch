@@ -52,10 +52,10 @@ static void max_kernel(TensorIterator& iter) {
 }
 
 Tensor& amax_out(
-    Tensor& result,
     const Tensor& self,
     IntArrayRef dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& result) {
   TORCH_CHECK(
       self.scalar_type() == result.scalar_type(),
       "Illegal dtype for self, and out:",
@@ -74,13 +74,13 @@ Tensor& amax_out(
 
 Tensor amax(const Tensor& self, IntArrayRef dim, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::amax_out(result, self, dim, keepdim);
+  return at::AtenIpexTypeXPU::amax_out(self, dim, keepdim, result);
 }
 
 Tensor max(const Tensor& self) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::amax_out(
-      result, self, std::vector<int64_t>{}, false);
+      self, std::vector<int64_t>{}, false, result);
 }
 
 } // namespace AtenIpexTypeXPU

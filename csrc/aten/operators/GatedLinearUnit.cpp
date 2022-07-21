@@ -76,7 +76,7 @@ void GatedLinearUnit_updateGradInput(
 } // namespace impl
 
 // namespace AtenIpexTypeXPU
-Tensor& glu_out(Tensor& out, const Tensor& self, int64_t dim) {
+Tensor& glu_out(const Tensor& self, int64_t dim, Tensor& out) {
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "glu_out", [&] {
     impl::GatedLinearUnit_updateOutput<scalar_t>(out, self, dim);
   });
@@ -85,14 +85,14 @@ Tensor& glu_out(Tensor& out, const Tensor& self, int64_t dim) {
 
 Tensor glu(const Tensor& self, int64_t dim) {
   Tensor out = at::empty({}, self.options());
-  return at::AtenIpexTypeXPU::glu_out(out, self, dim);
+  return at::AtenIpexTypeXPU::glu_out(self, dim, out);
 }
 
 Tensor& glu_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
-    int64_t dim) {
+    int64_t dim,
+    Tensor& grad_input) {
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       self.scalar_type(), "glu_backward_out", [&] {
         impl::GatedLinearUnit_updateGradInput<scalar_t>(
@@ -107,7 +107,7 @@ Tensor glu_backward(
     int64_t dim) {
   Tensor grad_input = at::empty({}, self.options());
   return at::AtenIpexTypeXPU::glu_backward_out(
-      grad_input, grad_output, self, dim);
+      grad_output, self, dim, grad_input);
 }
 
 } // namespace AtenIpexTypeXPU

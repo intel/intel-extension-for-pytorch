@@ -73,7 +73,7 @@ void pow_tensor_scalar_kernel(TensorIterator& iter, const Scalar& exp_scalar) {
   }
 }
 
-Tensor& pow_out(Tensor& result, const Tensor& base, const Scalar& exp) {
+Tensor& pow_out(const Tensor& base, const Scalar& exp, Tensor& result) {
   TORCH_CHECK(
       !(isIntegralType(base.scalar_type(), true) && exp.isIntegral(true) &&
         exp.toLong() < 0),
@@ -106,7 +106,7 @@ Tensor pow(const Tensor& base, Scalar exp) {
   auto dtype = at::result_type(base, exp);
   Tensor result =
       at::empty_like(base, base.options().dtype(dtype), MemoryFormat::Preserve);
-  return at::AtenIpexTypeXPU::pow_out(result, base, exp);
+  return at::AtenIpexTypeXPU::pow_out(base, exp, result);
 }
 
 } // namespace AtenIpexTypeXPU

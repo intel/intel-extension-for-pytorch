@@ -146,7 +146,7 @@ std::tuple<Tensor&, Tensor&> sort_out_stable(
   }
 
   if (values.strides() == self_.strides() &&
-      (newself || get_overlap_status(self, values) == MemOverlapStatus::NO)) {
+      (newself || get_overlap_status(self, values) == MemOverlapStatus::No)) {
     values_ptr_ = values.data_ptr();
   } else {
     values_tmp =

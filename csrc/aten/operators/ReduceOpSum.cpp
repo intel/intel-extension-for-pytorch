@@ -11,7 +11,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
+//#include "comm/RegistrationDeclarations.h"
 
 #include "Reduce.h"
 #include "ReduceOpsUtils.h"
@@ -52,13 +52,13 @@ void sum_kernel(TensorIterator& iter) {
 }
 
 Tensor& sum_out(
-    Tensor& result,
     const Tensor& self,
-    IntArrayRef dim,
+    OptionalIntArrayRef dim,
     bool keepdim,
-    c10::optional<at::ScalarType> opt_dtype) {
+    c10::optional<at::ScalarType> opt_dtype,
+    Tensor& result) {
   ScalarType dtype = get_dtype(result, self, opt_dtype, true);
-  auto iter = meta::make_reduction("sum", result, self, dim, keepdim, dtype);
+  auto iter = make_reduction("sum", result, self, dim, keepdim, dtype);
   if (iter.numel() == 0) {
     result.zero_();
   } else {
@@ -69,15 +69,16 @@ Tensor& sum_out(
 
 Tensor sum(
     const Tensor& self,
-    IntArrayRef dim,
+    OptionalIntArrayRef dim,
     bool keepdim,
-    c10::optional<ScalarType> dtype) {
-  Tensor result;
-  return at::AtenIpexTypeXPU::sum_out(result, self, dim, keepdim, dtype);
+    c10::optional<ScalarType> opt_dtype) {
+  ScalarType dtype = get_dtype_from_self(self, opt_dtype, true);
+  Tensor result = create_reduction_result(self, dim.value_or(IntArrayRef{}), keepdim, dtype);
+  return at::AtenIpexTypeXPU::sum_out(self, dim, keepdim, dtype, result);
 }
 
 Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype) {
-  return at::AtenIpexTypeXPU::sum(self, std::vector<int64_t>{}, false, dtype);
+  return at::AtenIpexTypeXPU::sum(self, IntArrayRef{}, false, dtype);
 }
 
 template <
@@ -90,7 +91,7 @@ void nansum_kernel_impl(TensorIterator& iter) {
 
 Tensor& nansum_out(
     const Tensor& self,
-    IntArrayRef dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {
@@ -100,10 +101,11 @@ Tensor& nansum_out(
   // For integral types, use existing sum as
   // integral types don't have `Nan`.
   if (c10::isIntegralType(self.scalar_type(), true)) {
-    return at::sum_out(result, self, dim, keepdim, opt_dtype);
+    return at::sum_out(result, self, opt_dim, keepdim, opt_dtype);
   }
 
   ScalarType dtype = get_dtype_from_result(result, opt_dtype);
+  IntArrayRef dim = opt_dim.value_or(IntArrayRef{});
   auto iter = meta::make_reduction("nansum", result, self, dim, keepdim, dtype);
   if (iter.numel() == 0) {
     result = result.zero_();
@@ -123,17 +125,17 @@ Tensor& nansum_out(
 
 Tensor nansum(
     const Tensor& self,
-    IntArrayRef dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     c10::optional<ScalarType> opt_dtype) {
   ScalarType dtype = get_dtype_from_self(self, opt_dtype, true);
-  Tensor result = create_reduction_result(self, dim, keepdim, dtype);
-  return at::AtenIpexTypeXPU::nansum_out(self, dim, keepdim, dtype, result);
+  Tensor result = create_reduction_result(self, opt_dim, keepdim, dtype);
+  return at::AtenIpexTypeXPU::nansum_out(self, opt_dim, keepdim, dtype, result);
 }
 
 Tensor nansum(const Tensor& self, c10::optional<ScalarType> dtype) {
   return at::AtenIpexTypeXPU::nansum(
-      self, std::vector<int64_t>{}, false, dtype);
+      self, OptionalIntArrayRef{IntArrayRef{}}, false, dtype);
 }
 
 } // namespace AtenIpexTypeXPU

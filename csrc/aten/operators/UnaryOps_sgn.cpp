@@ -24,11 +24,11 @@ Tensor& sgn_out(const Tensor& self, Tensor& out) {
   if (self.is_complex()) {
     return at::AtenIpexTypeXPU::sgn_xpu(self, out);
   } else {
-    return at::AtenIpexTypeXPU::sign_out(out, self);
+    return at::AtenIpexTypeXPU::sign_out(self, out);
   }
 }
 
-Tensor& sign_out(Tensor& out, const Tensor& self) {
+Tensor& sign_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_op(out, self);
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_for_tensor_iter(iter, [](bool a) { return a; });

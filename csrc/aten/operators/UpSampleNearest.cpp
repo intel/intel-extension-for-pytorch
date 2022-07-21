@@ -370,11 +370,11 @@ Tensor upsample_nearest3d_backward(
 }
 
 Tensor& upsample_nearest2d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
     c10::optional<double> scales_h,
-    c10::optional<double> scales_w) {
+    c10::optional<double> scales_w,
+    Tensor& output) {
   upsample_nearest_out_dpcpp_kernel(
       output,
       input,

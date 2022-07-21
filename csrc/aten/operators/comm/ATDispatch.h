@@ -21,7 +21,7 @@
 #else // NOT BUILD_INTERNAL_DEBUG
 
 #define IPEX_PRIVATE_CASE_TYPE(enum_type, type, ...) \
-  AT_PRIVATE_CASE_TYPE("DUMMY_NAME", enum_type, type, __VA_ARGS__)
+  AT_DISPATCH_CASE(enum_type, __VA_ARGS__)
 
 #endif // BUILD_INTERNAL_DEBUG
 
@@ -30,6 +30,7 @@
     const auto& the_type = TYPE;                                             \
     /* don't use TYPE again in case it is an expensive or side-effect op  */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    constexpr const char* at_dispatch_name = NAME;                           \
     switch (_st) {                                                           \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)      \
@@ -52,6 +53,7 @@
     const auto& the_type = TYPE;                                             \
     /* don't use TYPE again in case it is an expensive or side-effect op  */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    constexpr const char* at_dispatch_name = NAME;                           \
     switch (_st) {                                                           \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)      \
@@ -78,6 +80,7 @@
     const auto& the_type = TYPE;                                             \
     /* don't use TYPE again in case it is an expensive or side-effect op  */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    constexpr const char* at_dispatch_name = NAME;                           \
     switch (_st) {                                                           \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)      \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)    \
@@ -94,6 +97,7 @@
     const auto& the_type = TYPE;                                             \
     /* don't use TYPE again in case it is an expensive or side-effect op  */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    constexpr const char* at_dispatch_name = NAME;                           \
     switch (_st) {                                                           \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)      \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)    \
@@ -114,6 +118,7 @@
     const auto& the_type = TYPE;                                             \
     /* don't use TYPE again in case it is an expensive or side-effect op  */ \
     at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    constexpr const char* at_dispatch_name = NAME;                           \
     switch (_st) {                                                           \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Byte, uint8_t, __VA_ARGS__)     \
       IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Char, int8_t, __VA_ARGS__)      \

@@ -30,7 +30,7 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
 }
 } // namespace impl
 
-Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& mul_out(const Tensor& self, const Tensor& other, Tensor& result) {
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::mul_kernel_dpcpp(iter);
   return result;
@@ -44,7 +44,7 @@ Tensor mul(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& mul_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::mul_out(self, self, other);
+  return at::AtenIpexTypeXPU::mul_out(self, other, self);
 }
 
 } // namespace AtenIpexTypeXPU

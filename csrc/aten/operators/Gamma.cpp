@@ -218,7 +218,7 @@ Tensor& digamma_(Tensor& self) {
   return self;
 }
 
-Tensor& digamma_out(Tensor& out, const Tensor& self) {
+Tensor& digamma_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   impl::digamma_kernel_xpu(iter);
   return out;
@@ -252,7 +252,7 @@ Tensor& polygamma_(Tensor& self, int64_t n) {
   return self;
 }
 
-Tensor& polygamma_out(Tensor& out, int64_t n, const Tensor& self) {
+Tensor& polygamma_out(int64_t n, const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   impl::polygamma_kernel_xpu(iter, n);
   return out;

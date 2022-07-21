@@ -172,9 +172,9 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
 } // namespace impl
 
 Tensor& adaptive_avg_pool3d_out(
-    Tensor& out,
     const Tensor& self,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -189,13 +189,13 @@ Tensor& adaptive_avg_pool3d_out(
 Tensor _adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
   auto output = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::adaptive_avg_pool3d_out(
-      output, self, output_size);
+      self, output_size, output);
 }
 
 Tensor& adaptive_avg_pool3d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output_,
-    const Tensor& self_) {
+    const Tensor& self_,
+    Tensor& grad_input) {
   Tensor self, grad_output;
   if (self_.ndimension() == 4) {
     // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)

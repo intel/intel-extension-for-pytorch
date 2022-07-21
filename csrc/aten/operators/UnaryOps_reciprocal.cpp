@@ -63,7 +63,7 @@ void reciprocal_kernel_xpu(TensorIterator& iter) {
       });
 }
 
-Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
+Tensor& reciprocal_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   reciprocal_kernel_xpu(iter);
   return out;

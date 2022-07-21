@@ -15,11 +15,11 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor&, Tensor&> sort_out(
-    Tensor& sorted,
-    Tensor& indices,
     const Tensor& input,
     long dim,
-    bool order) {
+    bool order,
+    Tensor& sorted,
+    Tensor& indices) {
   return sort_out_stable(input, false, dim, order, sorted, indices);
 }
 

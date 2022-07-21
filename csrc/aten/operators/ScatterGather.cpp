@@ -148,11 +148,11 @@ void scatter_scalar_reduce_dpcpp_kernel(
 
 // gather family
 Tensor& gather_out(
-    Tensor& out,
     const Tensor& self,
     int64_t dim,
     const Tensor& index,
-    bool sparse_grad) {
+    bool sparse_grad,
+    Tensor& out) {
   out.resize_(index.sizes());
 
   bool check_result = out.defined();

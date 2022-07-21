@@ -43,7 +43,7 @@ Tensor& erfc_out(const Tensor& self, Tensor& out) {
   return out;
 }
 
-Tensor& erfinv_out(Tensor& out, const Tensor& self) {
+Tensor& erfinv_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_float_op(out, self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,

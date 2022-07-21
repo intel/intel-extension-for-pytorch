@@ -42,12 +42,12 @@ void avg_pool3d_out_template(
       "avg_pool3d: stride must either be omitted, a single int, or a tuple of "
       "three ints");
   const int dD = stride.empty() ? kD : safe_downcast<int, int64_t>(stride[0]);
-  const int dH = stride.empty()
-      ? kH
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[1]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[2]);
+  const int dH = stride.empty() ? kH
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[2]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
@@ -186,12 +186,12 @@ Tensor& avg_pool3d_backward_out_template(
       "avg_pool3d: stride must either be omitted, a single int, or a tuple of "
       "three ints");
   const int dD = stride.empty() ? kD : safe_downcast<int, int64_t>(stride[0]);
-  const int dH = stride.empty()
-      ? kH
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[1]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[2]);
+  const int dH = stride.empty() ? kH
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[2]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
@@ -302,14 +302,14 @@ Tensor& avg_pool3d_backward_out_template(
 } // namespace impl
 
 Tensor& avg_pool3d_out(
-    Tensor& out,
     const Tensor& self,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
+    c10::optional<int64_t> divisor_override,
+    Tensor& out) {
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool3d operator does not support divisor");
@@ -328,18 +328,17 @@ Tensor avg_pool3d(
     c10::optional<int64_t> divisor_override) {
   Tensor output = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::avg_pool3d_out(
-      output,
       self,
       kernel_size,
       stride,
       padding,
       ceil_mode,
       count_include_pad,
-      divisor_override);
+      divisor_override,
+      output);
 }
 
 Tensor& avg_pool3d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output_,
     const Tensor& self_,
     IntArrayRef kernel_size,
@@ -347,7 +346,8 @@ Tensor& avg_pool3d_backward_out(
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
+    c10::optional<int64_t> divisor_override,
+    Tensor& grad_input) {
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool3d operator does not support divisor");

@@ -446,12 +446,12 @@ Tensor empty_strided(
   return at::impl::empty_strided_dpcpp(size, stride, options);
 }
 
-Tensor& eye_out(Tensor& out, int64_t n) {
+Tensor& eye_out(int64_t n, Tensor& out) {
   at::impl::eye_out_dpcpp(out, n);
   return out;
 }
 
-Tensor& eye_out(Tensor& out, int64_t n, int64_t m) {
+Tensor& eye_out(int64_t n, int64_t m, Tensor& out) {
   at::impl::eye_out_dpcpp(out, n, m);
   return out;
 }
@@ -501,7 +501,7 @@ Tensor triu_indices(
 
 Tensor var(
     const Tensor& self,
-    c10::optional<IntArrayRef> _dim,
+    c10::OptionalIntArrayRef _dim,
     c10::optional<int64_t> _correction,
     bool keepdim) {
   Tensor result = at::empty({0}, self.options());
@@ -519,14 +519,13 @@ Tensor _var(const Tensor& self, bool unbiased) {
 
 at::Tensor& var_out(
     const at::Tensor& self,
-    c10::optional<at::IntArrayRef> _dim,
+    c10::OptionalArrayRef<long> opt_dim,
     c10::optional<int64_t> _correction,
     bool keepdim,
     at::Tensor& out) {
   auto correction = _correction.value_or(1);
-  auto dim = _dim.value_or(IntArrayRef{});
   return at::AtenIpexTypeXPU::std_var_out(
-      out, self, dim, correction, keepdim, false);
+      out, self, opt_dim, correction, keepdim, false);
 }
 
 Tensor _std(const Tensor& self, bool unbiased) {
@@ -537,8 +536,8 @@ Tensor _std(const Tensor& self, bool unbiased) {
 
 Tensor std(
     const Tensor& self,
-    c10::optional<IntArrayRef>(_dim),
-    c10::optional<int64_t>(_correction),
+    c10::OptionalArrayRef<long> _dim,
+    c10::optional<int64_t> _correction,
     bool keepdim) {
   Tensor result = at::empty({0}, self.options());
   auto correction = _correction.value_or(1);
@@ -549,8 +548,8 @@ Tensor std(
 
 Tensor& std_out(
     const Tensor& self,
-    c10::optional<IntArrayRef>(_dim),
-    c10::optional<int64_t>(_correction),
+    c10::OptionalArrayRef<long> _dim,
+    c10::optional<int64_t> _correction,
     bool keepdim,
     Tensor& out) {
   auto correction = _correction.value_or(1);
@@ -561,7 +560,7 @@ Tensor& std_out(
 
 std::tuple<Tensor, Tensor> var_mean(
     const Tensor& self,
-    c10::optional<IntArrayRef> _dim,
+    c10::OptionalArrayRef<long> _dim,
     c10::optional<int64_t> _correction,
     bool keepdim) {
   Tensor result1 = at::empty({0}, self.options());
@@ -574,7 +573,7 @@ std::tuple<Tensor, Tensor> var_mean(
 
 std::tuple<Tensor, Tensor> std_mean(
     const Tensor& self,
-    c10::optional<IntArrayRef> _dim,
+    c10::OptionalArrayRef<long> _dim,
     c10::optional<int64_t> _correction,
     bool keepdim) {
   Tensor result1 = at::empty({0}, self.options());
