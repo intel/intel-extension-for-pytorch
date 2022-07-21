@@ -878,11 +878,11 @@ Tensor upsample_bilinear2d_backward(
 }
 
 Tensor& upsample_linear1d_out(
-    Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
     bool align_corners,
-    c10::optional<double> scales) {
+    c10::optional<double> scales,
+    Tensor& output) {
   if (align_corners)
     printf(
         "we don't support this path by currently as oneDNN don't support this "

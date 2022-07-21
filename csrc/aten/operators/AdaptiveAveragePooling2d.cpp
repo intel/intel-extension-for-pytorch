@@ -160,9 +160,9 @@ void adaptive_avg_pool2d_backward_out_template(
 } // namespace impl
 
 Tensor& adaptive_avg_pool2d_out(
-    Tensor& out,
     const Tensor& self,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -184,7 +184,7 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   }
 
   return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
-      output, self, output_size);
+      self, output_size, output);
 }
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
@@ -197,7 +197,7 @@ Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
   }
 
   return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
-      output, self, output_size);
+      self, output_size, output);
 }
 
 Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
@@ -274,9 +274,9 @@ Tensor _adaptive_avg_pool2d_backward(
 namespace AtenIpexTypeQuantizedXPU {
 
 Tensor& adaptive_avg_pool2d_out(
-    Tensor& out,
     const Tensor& self,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& out) {
   at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(
       out, self, output_size);
   return out;

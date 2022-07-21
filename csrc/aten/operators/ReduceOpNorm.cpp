@@ -315,13 +315,13 @@ Tensor& renorm_out(
   }
 
   return at::AtenIpexTypeXPU::mul_out(
-      out, self, norm.contiguous().view(sizes_));
+      self, norm.contiguous().view(sizes_), out);
 }
 
 static Tensor& linalg_vector_norm_impl(
     const Tensor& self,
     const Scalar& scalar_ord,
-    optional<IntArrayRef> opt_dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {
@@ -383,7 +383,7 @@ static Tensor& linalg_vector_norm_impl(
   }
   Tensor self_;
   self_ = self;
-  ScalarType out_dtype = opt_dtype.value_or(toValueType(self.scalar_type()));
+  ScalarType out_dtype = opt_dtype.value_or(toRealValueType(self.scalar_type()));
   TORCH_CHECK(
       !result.defined() || out_dtype == result.scalar_type(),
       "linalg.vector_norm expected out tensor dtype ",
@@ -405,12 +405,12 @@ static Tensor& linalg_vector_norm_impl(
 Tensor linalg_vector_norm(
     const Tensor& self,
     const Scalar& ord,
-    optional<IntArrayRef> opt_dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype) {
-  ScalarType out_dtype = opt_dtype.value_or(toValueType(self.scalar_type()));
+  ScalarType out_dtype = opt_dtype.value_or(toRealValueType(self.scalar_type()));
   Tensor result = create_reduction_result(
-      self, opt_dim.value_or(IntArrayRef{}), keepdim, out_dtype);
+      self, opt_dim, keepdim, out_dtype);
   return linalg_vector_norm_impl(
       self, ord, opt_dim, keepdim, opt_dtype, result);
 }
@@ -418,7 +418,7 @@ Tensor linalg_vector_norm(
 Tensor& linalg_vector_norm_out(
     const Tensor& self,
     const Scalar& ord,
-    optional<IntArrayRef> opt_dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {

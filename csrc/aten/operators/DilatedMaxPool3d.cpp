@@ -43,12 +43,12 @@ void max_pool3d_with_indices_out_template(
       "max_pool3d: stride must either be omitted, a single int, or a tuple of "
       "three ints")
   const int dD = stride.empty() ? kD : safe_downcast<int, int64_t>(stride[0]);
-  const int dH = stride.empty()
-      ? kH
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[1]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[2]);
+  const int dH = stride.empty() ? kH
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[2]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
@@ -181,12 +181,12 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       "max_pool3d: stride must either be omitted, a single int, or a tuple of "
       "three ints");
   const int dD = stride.empty() ? kD : safe_downcast<int, int64_t>(stride[0]);
-  const int dH = stride.empty()
-      ? kH
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[1]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dD : safe_downcast<int, int64_t>(stride[2]);
+  const int dH = stride.empty() ? kH
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dD
+                                : safe_downcast<int, int64_t>(stride[2]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 3,
@@ -283,14 +283,14 @@ Tensor& max_pool3d_with_indices_backward_out_template(
 } // namespace impl
 
 std::tuple<Tensor&, Tensor&> max_pool3d_with_indices_out(
-    Tensor& out,
-    Tensor& indices,
     const Tensor& self,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     IntArrayRef dilation,
-    bool ceil_mode) {
+    bool ceil_mode,
+    Tensor& out,
+    Tensor& indices) {
   impl::max_pool3d_with_indices_out_template(
       out, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
   return std::tuple<Tensor&, Tensor&>(out, indices);
@@ -306,11 +306,10 @@ std::tuple<Tensor, Tensor> max_pool3d_with_indices(
   Tensor output = at::empty({0}, self.options());
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
   return at::AtenIpexTypeXPU::max_pool3d_with_indices_out(
-      output, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
+      self, kernel_size, stride, padding, dilation, ceil_mode, output, indices);
 }
 
 Tensor& max_pool3d_with_indices_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output_,
     const Tensor& self_,
     IntArrayRef kernel_size,
@@ -318,7 +317,8 @@ Tensor& max_pool3d_with_indices_backward_out(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode,
-    const Tensor& indices_) {
+    const Tensor& indices_,
+    Tensor& grad_input) {
   Tensor self, grad_output, indices;
   if (self_.ndimension() == 4) {
     // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)

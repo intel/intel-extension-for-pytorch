@@ -33,17 +33,17 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
 void div_floor_kernel(TensorIterator& iter);
 void div_trunc_kernel(TensorIterator& iter);
 
-Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& div_out(const Tensor& self, const Tensor& other, Tensor& result) {
   auto iter = TensorIterator::binary_float_op(result, self, other);
   impl::div_kernel_dpcpp(iter);
   return result;
 }
 
 Tensor& div_out(
-    Tensor& result,
     const Tensor& self,
     const Tensor& other,
-    c10::optional<c10::string_view> rounding_mode) {
+    c10::optional<c10::string_view> rounding_mode,
+    Tensor& result) {
   if (!rounding_mode.has_value()) {
     auto iter = TensorIterator::binary_float_op(result, self, other);
     impl::div_kernel_dpcpp(iter);
@@ -65,7 +65,7 @@ Tensor div(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& div_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::div_out(self, self, other);
+  return at::AtenIpexTypeXPU::div_out(self, other, self);
 }
 
 } // namespace AtenIpexTypeXPU

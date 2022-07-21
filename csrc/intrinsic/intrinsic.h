@@ -141,7 +141,7 @@ at::Tensor& fill_slice_with_index(at::Tensor& t, int dim);
 at::Tensor& std_var_out(
     at::Tensor& result,
     const at::Tensor& self,
-    at::IntArrayRef dim,
+    c10::OptionalArrayRef<long> dim,
     int64_t correction_opt,
     bool keepdim,
     bool take_sqrt);

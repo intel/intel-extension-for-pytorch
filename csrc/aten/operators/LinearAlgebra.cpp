@@ -274,7 +274,7 @@ void addr_kernel_out(
 
 } // namespace impl
 
-Tensor& cholesky_inverse_out(Tensor& out, const Tensor& self, bool upper) {
+Tensor& cholesky_inverse_out(const Tensor& self, bool upper, Tensor& out) {
 #ifdef USE_ONEMKL
   TORCH_CHECK(
       self.dim() == 2, "input must be 2-d matrix. input shape=", self.sizes());
@@ -328,7 +328,7 @@ Tensor cholesky_inverse(const Tensor& self, bool upper) {
       "input should be square. input shape=",
       self.sizes());
   Tensor out;
-  return AtenIpexTypeXPU::cholesky_inverse_out(out, self, upper);
+  return AtenIpexTypeXPU::cholesky_inverse_out(self, upper, out);
 }
 
 // PyTorch deprecates this op, which calls mul_out now
@@ -699,10 +699,10 @@ std::tuple<Tensor, Tensor> slogdet(const Tensor& self) {
   return at::linalg_slogdet(self);
 }
 
-std::tuple<Tensor, Tensor, Tensor> _det_lu_based_helper(const Tensor& self) {
-  // fallback to at::native::_det_lu_based_helper
-  return at::native::_det_lu_based_helper(self);
-}
+// std::tuple<Tensor, Tensor, Tensor> _det_lu_based_helper(const Tensor& self) {
+//   // fallback to at::native::_det_lu_based_helper
+//   return at::native::_det_lu_based_helper(self);
+// }
 
 constexpr int n_elems_per_work_item = UNROLLED_ELEM_PER_WORK_ITEM;
 

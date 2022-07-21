@@ -12,9 +12,9 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
+    const Tensor& self,
     Tensor& output,
-    Tensor& buffer,
-    const Tensor& self) {
+    Tensor& buffer) {
   checkBackend("log_sigmoid_forward", output, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIteratorConfig()
@@ -45,15 +45,15 @@ std::tuple<Tensor, Tensor> log_sigmoid_forward(const Tensor& self) {
       !self.is_sparse(), "log_sigmoid_forward(dpcpp_sparse) is not supported.");
   Tensor buffer = at::empty({0}, self.options());
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeXPU::log_sigmoid_forward_out(result, buffer, self);
+  at::AtenIpexTypeXPU::log_sigmoid_forward_out(self, result, buffer);
   return std::tuple<Tensor, Tensor>{result, buffer};
 }
 
 Tensor& log_sigmoid_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
-    const Tensor& buffer) {
+    const Tensor& buffer,
+    Tensor& grad_input) {
   checkBackend(
       "log_sigmoid_backward",
       {grad_input, grad_output},
@@ -92,7 +92,7 @@ Tensor log_sigmoid_backward(
     const Tensor& buffer) {
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::AtenIpexTypeXPU::log_sigmoid_backward_out(
-      grad_input, grad_output, self, buffer);
+      grad_output, self, buffer, grad_input);
 }
 } // namespace AtenIpexTypeXPU
 } // namespace at

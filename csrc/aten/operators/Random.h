@@ -12,7 +12,7 @@
 namespace dpl = oneapi::dpl;
 
 // TODO: move this into the GeneratorImpl in pytorch-1.7 or later
-using Philox4_32_10 = at::Philox4_32_10;
+using Philox4_32_10 = at::Philox4_32;
 using mt19937 = at::mt19937;
 template <typename engine_t = Philox4_32_10>
 class RandomState final {

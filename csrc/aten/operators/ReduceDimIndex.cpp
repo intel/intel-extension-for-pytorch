@@ -127,11 +127,11 @@ std::tuple<Tensor, Tensor> min(const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 std::tuple<Tensor&, Tensor&> min_out(
-    Tensor& min,
-    Tensor& min_values,
     const Tensor& self,
     int64_t dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& min,
+    Tensor& min_values) {
   return AtenIpexTypeXPU::_min_out(min, min_values, self, dim, keepdim);
 }
 
@@ -181,11 +181,11 @@ std::tuple<Tensor, Tensor> max(const Tensor& self, int64_t dim, bool keepdim) {
 }
 
 std::tuple<Tensor&, Tensor&> max_out(
-    Tensor& max,
-    Tensor& max_values,
     const Tensor& self,
     int64_t dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& max,
+    Tensor& max_values) {
   return AtenIpexTypeXPU::_max_out(max, max_values, self, dim, keepdim);
 }
 

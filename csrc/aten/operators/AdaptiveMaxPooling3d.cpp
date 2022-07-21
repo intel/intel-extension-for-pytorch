@@ -176,10 +176,10 @@ Tensor& adaptive_max_pool3d_backward_out_template(
 } // namespace impl
 
 std::tuple<Tensor&, Tensor&> adaptive_max_pool3d_out(
-    Tensor& out,
-    Tensor& indices,
     const Tensor& self,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& out,
+    Tensor& indices) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -197,15 +197,15 @@ std::tuple<Tensor, Tensor> adaptive_max_pool3d(
   Tensor output = at::empty({0}, self.options());
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
   at::AtenIpexTypeXPU::adaptive_max_pool3d_out(
-      output, indices, self, output_size);
+      self, output_size, output, indices);
   return std::tuple<Tensor, Tensor>(output, indices);
 }
 
 Tensor& adaptive_max_pool3d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output_,
     const Tensor& self_,
-    const Tensor& indices_) {
+    const Tensor& indices_,
+    Tensor& grad_input) {
   Tensor self, grad_output, indices;
   if (self_.ndimension() == 4) {
     // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)

@@ -36,7 +36,7 @@ void minimum_kernel(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor& minimum_out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& minimum_out(const Tensor& self, const Tensor& other, Tensor& result) {
   TORCH_CHECK(
       !self.is_complex() && !other.is_complex(),
       "minimum does not support complex inputs.");

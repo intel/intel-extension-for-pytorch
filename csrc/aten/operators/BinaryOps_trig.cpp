@@ -55,7 +55,7 @@ void atan2_kernel(TensorIterator& iter) {
       });
 }
 
-Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& atan2_out(const Tensor& self, const Tensor& other, Tensor& result) {
   auto iter = TensorIterator::binary_float_op(result, self, other);
   atan2_kernel(iter);
   return result;
@@ -69,7 +69,7 @@ Tensor atan2(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& atan2_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::atan2_out(self, self, other);
+  return at::AtenIpexTypeXPU::atan2_out(self, other, self);
 }
 
 } // namespace AtenIpexTypeXPU

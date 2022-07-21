@@ -79,9 +79,9 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
 void div_trunc_kernel(TensorIterator& iter);
 
 Tensor& floor_divide_out(
-    Tensor& result,
     const Tensor& self,
-    const Tensor& other) {
+    const Tensor& other,
+    Tensor& result) {
   TORCH_WARN_ONCE(
       "floor_divide is deprecated, and will be removed in a future version of pytorch. "
       "It currently rounds toward 0 (like the 'trunc' function NOT 'floor'). "
@@ -112,7 +112,7 @@ Tensor floor_divide(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& floor_divide_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::floor_divide_out(self, self, other);
+  return at::AtenIpexTypeXPU::floor_divide_out(self, other, self);
 }
 
 void div_floor_kernel(TensorIterator& iter) {

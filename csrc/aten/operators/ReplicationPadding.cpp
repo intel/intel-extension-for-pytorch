@@ -752,9 +752,9 @@ Tensor& replication_pad1d_backward_out(
 }
 
 Tensor& replication_pad2d_out(
-    Tensor& output,
     const Tensor& input,
-    IntArrayRef paddingSize) {
+    IntArrayRef paddingSize,
+    Tensor& output) {
   impl::replication_pad2d_out_template(output, input, paddingSize);
   return output;
 }
@@ -766,10 +766,10 @@ Tensor replication_pad2d(const Tensor& input, IntArrayRef paddingSize) {
 }
 
 Tensor& replication_pad2d_backward_out(
-    Tensor& gradInput,
     const Tensor& gradOutput,
     const Tensor& input,
-    IntArrayRef paddingSize) {
+    IntArrayRef paddingSize,
+    Tensor& gradInput) {
   impl::replication_pad2d_backward_out_template(
       gradInput, gradOutput, input, paddingSize);
   return gradInput;

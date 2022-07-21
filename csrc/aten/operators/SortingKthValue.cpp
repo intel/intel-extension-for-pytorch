@@ -543,11 +543,11 @@ std::tuple<Tensor&, Tensor&> mode_out_template(
 } // namespace impl
 
 std::tuple<Tensor&, Tensor&> mode_out(
-    Tensor& values,
-    Tensor& indices,
     const Tensor& self,
     int64_t dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& values,
+    Tensor& indices) {
   TORCH_CHECK(
       self.layout() == Layout::Strided,
       "mode only supports strided layout, got: ",
@@ -607,14 +607,14 @@ std::tuple<Tensor, Tensor> mode(const Tensor& self, int64_t dim, bool keepdim) {
     values = at::empty(size, self.options());
     indices = at::empty(size, self.options().dtype(kLong));
     auto ans =
-        at::AtenIpexTypeXPU::mode_out(values, indices, self, dim, keepdim);
+        at::AtenIpexTypeXPU::mode_out(self, dim, keepdim, values, indices);
     values = std::get<0>(ans);
     indices = std::get<1>(ans);
   } else {
     values = at::empty({1}, self.options());
     indices = at::empty({1}, self.options().dtype(kLong));
     auto ans =
-        at::AtenIpexTypeXPU::mode_out(values, indices, self, dim, keepdim);
+        at::AtenIpexTypeXPU::mode_out(self, dim, keepdim, values, indices);
     values = std::get<0>(ans).squeeze();
     indices = std::get<1>(ans).squeeze();
   }

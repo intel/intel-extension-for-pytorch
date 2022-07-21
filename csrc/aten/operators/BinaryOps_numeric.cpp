@@ -15,7 +15,7 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& remainder_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& remainder_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   if (isIntegralType(iter.common_dtype(), /*includeBool*/ false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "remainder_xpu", [&]() {
@@ -49,7 +49,7 @@ Tensor remainder(const Scalar& self, const Tensor& other) {
   return at::remainder(at::native::wrapped_scalar_tensor(self), other);
 }
 
-Tensor& fmod_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& fmod_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   if (isIntegralType(iter.common_dtype(), /*includeBool*/ false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "fmod_xpu", [&]() {

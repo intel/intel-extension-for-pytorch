@@ -25,7 +25,7 @@ void frac_kernel(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor& frac_out(Tensor& result, const Tensor& self) {
+Tensor& frac_out(const Tensor& self, Tensor& result) {
   auto iter = TensorIterator::unary_op(result, self);
   impl::frac_kernel(iter);
   return result;

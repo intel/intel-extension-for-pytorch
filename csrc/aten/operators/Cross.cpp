@@ -100,10 +100,10 @@ void cross(Tensor& result, const Tensor& x, const Tensor& y, int dimension) {
 } // namespace impl
 
 Tensor& cross_out(
-    Tensor& out,
     const Tensor& input,
     const Tensor& other,
-    const c10::optional<int64_t> dimension) {
+    const c10::optional<int64_t> dimension,
+    Tensor& out) {
   TORCH_CHECK(
       input.dim() == other.dim(),
       "inconsistent tensors dimensions input: ",
@@ -152,7 +152,7 @@ Tensor cross(
     const Tensor& other,
     const c10::optional<int64_t> dimension) {
   Tensor out = at::empty_like(input);
-  at::AtenIpexTypeXPU::cross_out(out, input, other, dimension);
+  at::AtenIpexTypeXPU::cross_out(input, other, dimension, out);
   return out;
 }
 
