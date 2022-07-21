@@ -30,6 +30,8 @@ if(DEFINED MKL_DPCPP_ROOT)
     set(mkl_dpcpp_root_hint ${MKL_DPCPP_ROOT})
 elseif(DEFINED ENV{MKL_DPCPP_ROOT})
     set(mkl_dpcpp_root_hint $ENV{MKL_DPCPP_ROOT})
+elseif(DEFINED ENV{MKLROOT})
+    set(mkl_dpcpp_root_hint $ENV{MKLROOT})
 endif()
 
 # Try to find Intel MKL DPCPP header
