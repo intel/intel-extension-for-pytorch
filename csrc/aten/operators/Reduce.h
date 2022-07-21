@@ -129,8 +129,7 @@ struct ReduceConfig {
   sycl::range<2> global_sz() const {
     return {
         (size_t)(groups_per_output * group_height),
-        (size_t)(
-            group_width * div_up(num_outputs / output_vec_size, step_output))};
+        (size_t)(group_width * div_up(num_outputs / output_vec_size, step_output))};
   }
   sycl::range<2> n_groups() const {
     return {
