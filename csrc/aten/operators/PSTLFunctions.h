@@ -283,6 +283,36 @@ DPCPP_DEVICE static inline OutputIt transform(
   return d_first + N;
 }
 
+template <
+    typename output_t,
+    class InputIt1,
+    class InputIt2,
+    class OutputIt,
+    class BinaryOperation>
+DPCPP_DEVICE static inline OutputIt transform_first_true(
+    InputIt1 first1,
+    InputIt1 last1,
+    InputIt2 first2,
+    OutputIt d_first,
+    BinaryOperation binary_op) {
+  RECORD_FUNCTION("transform_first_true", {});
+  const auto N = std::distance(first1, last1);
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      first1[0] = 1;
+      d_first[item_id] =
+          static_cast<output_t>(binary_op(first1[item_id], first2[item_id]));
+    };
+
+    __cgh.parallel_for(DPCPP::range</*dim=*/1>(N), kfn);
+  };
+  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+
+  return d_first + N;
+}
+
 template <class T, class ForwardIt>
 DPCPP_DEVICE static inline void iota(ForwardIt first, ForwardIt last, T value) {
   RECORD_FUNCTION("iota_xpu", {});

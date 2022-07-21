@@ -4,7 +4,9 @@
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <runtime/Utils.h>
+#include "EmbeddingBackwardKernel.h"
 #include "Indexing.h"
+#include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
 
@@ -96,104 +98,6 @@ static inline void embedding_dense_backward_kernel(
   launch_index_kernel(cfg);
 }
 
-template <typename scalar_t, typename index_t>
-static inline void embedding_backward_dpcpp_kernel(
-    const Tensor& indices,
-    const scalar_t* __restrict__ grad_data,
-    scalar_t* __restrict__ grad_weight_data,
-    int num_indices,
-    int64_t stride,
-    int padding_idx,
-    int numel_weights,
-    bool scale_grad_by_freq) {
-  auto indices_contig = indices.contiguous();
-  auto indices_data = indices_contig.data_ptr<index_t>();
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  if (scale_grad_by_freq) {
-    auto row_num_weights = numel_weights / stride;
-    Tensor idx_counts = at::zeros(
-        {row_num_weights * sizeof(uint32_t)},
-        indices.options().dtype(at::kByte));
-    uint32_t* idx_cnt_ptr = static_cast<uint32_t*>(idx_counts.data_ptr());
-
-    auto cgf_scale = DPCPP_Q_CGF(cgh) {
-      auto idx_data = indices_data;
-      cgh.parallel_for(DPCPP::range<1>(1), [=](DPCPP::item<1> item) {
-        auto idx_ptr = idx_data;
-        for (int i = 0; i < num_indices; ++i) {
-          idx_cnt_ptr[idx_ptr[i]] += static_cast<uint32_t>(1);
-        }
-      });
-    };
-    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_scale);
-
-    auto cgf_scatter = DPCPP_Q_CGF(cgh) {
-      auto idx_data = indices_data;
-      auto g_data = grad_data;
-      auto gw_data = grad_weight_data;
-
-      cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-        int64_t gid = item.get_linear_id();
-        auto idx_ptr = idx_data;
-        auto g_ptr = g_data;
-        auto gw_ptr = gw_data;
-        for (int nidx = 0; nidx < num_indices; nidx++) {
-          auto idx = idx_ptr[nidx];
-          gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
-              g_ptr[gid + nidx * stride] * 1.0 / (scalar_t)idx_cnt_ptr[idx]);
-        }
-      });
-    };
-    DPCPP_Q_SUBMIT(dpcpp_queue, cgf_scatter);
-
-    if (padding_idx != -1) {
-      auto cgf_pad = DPCPP_Q_CGF(cgh) {
-        auto gw_data = grad_weight_data;
-
-        cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-          int64_t gid = item.get_linear_id();
-          auto gw_ptr = gw_data;
-          gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
-        });
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf_pad);
-    }
-
-  } else {
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      auto idx_data = indices_data;
-      auto g_data = grad_data;
-      auto gw_data = grad_weight_data;
-
-      cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-        int64_t gid = item.get_linear_id();
-        auto idx_ptr = idx_data;
-        auto g_ptr = g_data;
-        auto gw_ptr = gw_data;
-        for (int nidx = 0; nidx < num_indices; nidx++) {
-          auto idx = idx_ptr[nidx];
-          gw_ptr[gid + idx * stride] +=
-              static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
-        }
-      });
-    };
-    DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-
-    if (padding_idx != -1) {
-      auto cgf_pad = DPCPP_Q_CGF(cgh) {
-        auto gw_data = grad_weight_data;
-
-        cgh.parallel_for(DPCPP::range<1>(stride), [=](DPCPP::item<1> item) {
-          int64_t gid = item.get_linear_id();
-          auto gw_ptr = gw_data;
-          gw_ptr[gid + padding_idx * stride] = static_cast<scalar_t>(0);
-        });
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf_pad);
-    }
-  }
-}
-
 } // namespace
 
 Tensor embedding_dense_backward(
@@ -210,10 +114,7 @@ Tensor embedding_dense_backward(
   auto num_indices = indices.numel();
   auto grad_output_cont =
       grad_output.contiguous().view({num_indices, grad_output.size(-1)});
-  auto grad_weight =
-      at::zeros({num_weights, grad_output.size(-1)}, grad_output.options());
-
-  int64_t stride = grad_weight.stride(0);
+  Tensor grad_weight;
 
   // XXX: avoid software atomic_ref::fetch_add (compare_and_swap)
   // in violent contend case, `contend_per_dict > 2`.
@@ -221,6 +122,11 @@ Tensor embedding_dense_backward(
   // auto contend_per_dict = num_indices / num_weights;
   // if (contend_per_dict > 2) {
   if (num_weights < 128) {
+    auto sorted_indices =
+        at::empty_like(indices, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+    auto orig_indices =
+        at::empty_like(indices, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+    Tensor count;
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
@@ -229,22 +135,53 @@ Tensor embedding_dense_backward(
         [&]() {
           IPEX_DISPATCH_INDEX_TYPES(
               indices.scalar_type(), "embedding_backward", [&] {
-                embedding_backward_dpcpp_kernel<scalar_t, index_t>(
-                    indices,
-                    grad_output_cont.data_ptr<scalar_t>(),
-                    grad_weight.data_ptr<scalar_t>(),
-                    static_cast<int>(num_indices),
-                    static_cast<int64_t>(stride),
-                    static_cast<int>(padding_idx),
-                    grad_weight.numel(),
-                    scale_grad_by_freq);
+                auto sorted_begin = sorted_indices.data_ptr<index_t>();
+                auto orig_begin = orig_indices.data_ptr<index_t>();
+                {
+                  sorted_indices.copy_(indices);
+                  at::AtenIpexTypeXPU::iota(
+                      orig_begin, orig_begin + num_indices, (index_t)0);
+                  at::AtenIpexTypeXPU::merge_sort_kernel<index_t, index_t>(
+                      sorted_begin,
+                      orig_begin,
+                      num_indices, // prb_size
+                      [](index_t a, index_t b) {
+                        return Numerics<index_t>::lt(a, b);
+                      });
+                }
+
+                if (scale_grad_by_freq) {
+                  count = at::empty_like(sorted_indices);
+                  index_t* count_begin = count.data_ptr<index_t>();
+                  // Take the maximum of each count per unique key:
+                  // sorted: 2 5 5 5 7 7 8 9 9
+                  //  count: 1 3 3 3 2 2 1 2 2
+                  //
+                  at::AtenIpexTypeXPU::
+                      count_by_segment<index_t, index_t, index_t>(
+                          sorted_begin,
+                          sorted_begin + num_indices,
+                          count_begin,
+                          [](index_t a, index_t b) {
+                            return Numerics<index_t>::eq(a, b);
+                          });
+                }
+                grad_weight = impl::
+                    embedding_backward_deterministic_kernel<scalar_t, index_t>(
+                        grad_output_cont,
+                        orig_indices,
+                        sorted_indices,
+                        count,
+                        num_weights,
+                        padding_idx);
               });
         });
-
     return grad_weight;
   }
 
   at::Tensor indices_cnt;
+  grad_weight =
+      at::zeros({num_weights, grad_output.size(-1)}, grad_output.options());
   if (scale_grad_by_freq) {
     indices_cnt = at::zeros({num_weights}, indices.options());
     switch (indices.scalar_type()) {
