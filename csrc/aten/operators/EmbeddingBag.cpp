@@ -550,7 +550,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   // directly
   {
     sorted_indices.copy_(indices);
-    at::AtenIpexTypeXPU::iota(orig_begin, orig_begin + numel, (index_t)0);
+    xpu::pstl::iota(orig_begin, orig_begin + numel, (index_t)0);
     at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<index_t, index_t>(
         sorted_begin,
         orig_begin,
@@ -569,7 +569,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     // sorted: 2 5 5 5 7 7 8 9 9
     //  count: 1 3 3 3 2 2 1 2 2
     //
-    at::AtenIpexTypeXPU::count_by_segment<index_t, index_t, index_t>(
+    xpu::pstl::count_by_segment<index_t, index_t, index_t>(
         sorted_begin,
         sorted_begin + numel,
         count_begin,

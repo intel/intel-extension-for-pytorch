@@ -356,7 +356,7 @@ Tensor embedding_backward_deterministic_kernel(
     auto dummy_begin = dummy.data_ptr<index_t>();
     auto idx_tensor = at::empty_like(sorted_indices);
     auto idx_begin = idx_tensor.data_ptr<index_t>();
-    at::AtenIpexTypeXPU::adjacent_difference<index_t>(
+    xpu::pstl::adjacent_difference<index_t>(
         sorted_indices_begin,
         sorted_indices_begin + numel,
         dummy_begin,
@@ -372,15 +372,15 @@ Tensor embedding_backward_deterministic_kernel(
     Tensor count_tensor =
         at::empty({numel}, at::TensorOptions().device(kXPU).dtype(kLong));
     auto count_begin = count_tensor.data_ptr<int64_t>();
-    at::AtenIpexTypeXPU::iota(count_begin, count_begin + numel, (int64_t)0);
+    xpu::pstl::iota(count_begin, count_begin + numel, (int64_t)0);
     auto segment_offsets_begin = segment_offsets.data_ptr<index_t>();
-    at::AtenIpexTypeXPU::transform_first_true<index_t>(
+    xpu::pstl::transform_first_true<index_t>(
         dummy_begin,
         dummy_begin + numel,
         count_begin,
         idx_begin,
         [](auto d, auto idx) { return d ? idx : -1; });
-    auto ends = at::AtenIpexTypeXPU::copy_if<index_t>(
+    auto ends = xpu::pstl::copy_if<index_t>(
         idx_begin, idx_begin + numel, segment_offsets_begin, [](auto x) {
           return x != -1;
         });
@@ -402,7 +402,7 @@ Tensor embedding_backward_deterministic_kernel(
   // Unit: index in `partial_segment_offset`
   auto partials_per_segment_offset =
       at::empty({num_of_segments}, orig_indices.options());
-  at::AtenIpexTypeXPU::exclusive_scan(
+  xpu::pstl::exclusive_scan(
       partials_per_segment.template data_ptr<index_t>(),
       partials_per_segment.template data_ptr<index_t>() + num_of_segments,
       partials_per_segment_offset.template data_ptr<index_t>(),

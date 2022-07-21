@@ -116,109 +116,58 @@ Tensor embedding_dense_backward(
       grad_output.contiguous().view({num_indices, grad_output.size(-1)});
   Tensor grad_weight;
 
-  // XXX: avoid software atomic_ref::fetch_add (compare_and_swap)
-  // in violent contend case, `contend_per_dict > 2`.
-  // retrieve the condition, if deterministic impl is done.
-  // auto contend_per_dict = num_indices / num_weights;
-  // if (contend_per_dict > 2) {
-  if (num_weights < 128) {
-    auto sorted_indices =
-        at::empty_like(indices, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-    auto orig_indices =
-        at::empty_like(indices, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-    Tensor count;
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        grad_output_cont.scalar_type(),
-        "embedding_backward",
-        [&]() {
-          IPEX_DISPATCH_INDEX_TYPES(
-              indices.scalar_type(), "embedding_backward", [&] {
-                auto sorted_begin = sorted_indices.data_ptr<index_t>();
-                auto orig_begin = orig_indices.data_ptr<index_t>();
-                {
-                  sorted_indices.copy_(indices);
-                  at::AtenIpexTypeXPU::iota(
-                      orig_begin, orig_begin + num_indices, (index_t)0);
-                  at::AtenIpexTypeXPU::merge_sort_kernel<index_t, index_t>(
-                      sorted_begin,
-                      orig_begin,
-                      num_indices, // prb_size
-                      [](index_t a, index_t b) {
-                        return Numerics<index_t>::lt(a, b);
-                      });
-                }
-
-                if (scale_grad_by_freq) {
-                  count = at::empty_like(sorted_indices);
-                  index_t* count_begin = count.data_ptr<index_t>();
-                  // Take the maximum of each count per unique key:
-                  // sorted: 2 5 5 5 7 7 8 9 9
-                  //  count: 1 3 3 3 2 2 1 2 2
-                  //
-                  at::AtenIpexTypeXPU::
-                      count_by_segment<index_t, index_t, index_t>(
-                          sorted_begin,
-                          sorted_begin + num_indices,
-                          count_begin,
-                          [](index_t a, index_t b) {
-                            return Numerics<index_t>::eq(a, b);
-                          });
-                }
-                grad_weight = impl::
-                    embedding_backward_deterministic_kernel<scalar_t, index_t>(
-                        grad_output_cont,
-                        orig_indices,
-                        sorted_indices,
-                        count,
-                        num_weights,
-                        padding_idx);
-              });
-        });
-    return grad_weight;
-  }
-
-  at::Tensor indices_cnt;
-  grad_weight =
-      at::zeros({num_weights, grad_output.size(-1)}, grad_output.options());
-  if (scale_grad_by_freq) {
-    indices_cnt = at::zeros({num_weights}, indices.options());
-    switch (indices.scalar_type()) {
-      case at::ScalarType::Long:
-        indices_count(
-            indices_cnt.data_ptr<int64_t>(),
-            indices.data_ptr<int64_t>(),
-            indices.numel());
-        break;
-      case at::ScalarType::Int:
-        indices_count(
-            indices_cnt.data_ptr<int32_t>(),
-            indices.data_ptr<int32_t>(),
-            indices.numel());
-        break;
-      default:
-        break;
-    };
-  }
-
+  auto sorted_indices =
+      at::empty_like(indices, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  auto orig_indices = at::empty_like(indices, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor count;
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       grad_output_cont.scalar_type(),
-      "embedding_backward_non_deterministic",
+      "embedding_backward",
       [&]() {
         IPEX_DISPATCH_INDEX_TYPES(
-            indices.scalar_type(), "embedding_backward_non_deterministic", [&] {
-              embedding_dense_backward_kernel<scalar_t, index_t>(
-                  grad_output_cont,
-                  grad_weight,
-                  indices,
-                  indices_cnt,
-                  padding_idx);
+            indices.scalar_type(), "embedding_backward", [&] {
+              auto sorted_begin = sorted_indices.data_ptr<index_t>();
+              auto orig_begin = orig_indices.data_ptr<index_t>();
+              {
+                sorted_indices.copy_(indices);
+                xpu::pstl::iota(
+                    orig_begin, orig_begin + num_indices, (index_t)0);
+                xpu::pstl::merge_sort<index_t, index_t>(
+                    sorted_begin,
+                    orig_begin,
+                    num_indices, // prb_size
+                    [](index_t a, index_t b) {
+                      return Numerics<index_t>::lt(a, b);
+                    });
+              }
+
+              if (scale_grad_by_freq) {
+                count = at::empty_like(sorted_indices);
+                index_t* count_begin = count.data_ptr<index_t>();
+                // Take the maximum of each count per unique key:
+                // sorted: 2 5 5 5 7 7 8 9 9
+                //  count: 1 3 3 3 2 2 1 2 2
+                //
+                xpu::pstl::count_by_segment<index_t, index_t, index_t>(
+                    sorted_begin,
+                    sorted_begin + num_indices,
+                    count_begin,
+                    [](index_t a, index_t b) {
+                      return Numerics<index_t>::eq(a, b);
+                    });
+              }
+              grad_weight = impl::
+                  embedding_backward_deterministic_kernel<scalar_t, index_t>(
+                      grad_output_cont,
+                      orig_indices,
+                      sorted_indices,
+                      count,
+                      num_weights,
+                      padding_idx);
             });
       });
-
   return grad_weight;
 }
 

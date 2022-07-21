@@ -154,7 +154,7 @@ Tensor randperm_dpcpp(
     shuffled_data = shuffled.data_ptr<scalar_t>();
   }
 
-  at::AtenIpexTypeXPU::iota(shuffled_data, shuffled_data + n, scalar_t(0));
+  xpu::pstl::iota(shuffled_data, shuffled_data + n, scalar_t(0));
   at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, scalar_t>(
       keys_data,
       shuffled_data,

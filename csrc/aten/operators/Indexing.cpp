@@ -117,7 +117,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     int64_t* idx_flat_begin = idx_flat.data_ptr<int64_t>();
     int64_t* range_begin = nullptr;
 
-    auto idx_flat_end = at::AtenIpexTypeXPU::copy_if<int64_t>(
+    auto idx_flat_end = xpu::pstl::copy_if<int64_t>(
         range_begin, range_begin + N, idx_flat_begin, [=](int64_t x) {
           return Numerics<scalar_t>::ne(self_begin[x], scalar_t(0));
         });
@@ -467,7 +467,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   auto maskLong_ptr = acc_maskLong_data;
   auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
-  exclusive_scan(
+  xpu::pstl::exclusive_scan(
       maskLong_ptr,
       maskLong_ptr + size,
       maskPrefixSum_ptr,
@@ -538,7 +538,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   auto acc_maskLong_ptr = maskLong.data_ptr<int64_t>();
   auto acc_maskPrefixSum_ptr = maskPrefixSum.data_ptr<int64_t>();
-  at::AtenIpexTypeXPU::inclusive_scan<int64_t>(
+  xpu::pstl::inclusive_scan<int64_t>(
       acc_maskLong_ptr,
       acc_maskLong_ptr + size,
       acc_maskPrefixSum_ptr,

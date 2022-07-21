@@ -41,7 +41,7 @@ Tensor compute_inverse(
     inverse_indices = at::empty({num_inp}, index_options);
     index_t* inv_loc_ptr = inv_loc.data_ptr<index_t>();
     auto inv_loc_begin = inv_loc_ptr;
-    at::AtenIpexTypeXPU::adjacent_difference<index_t>(
+    xpu::pstl::adjacent_difference<index_t>(
         data_begin, data_begin + num_inp, inv_loc_begin, not_equal);
     inv_loc[0] = 0;
     at::AtenIpexTypeXPU::scan<INCLUSIVE_TYPE, index_t, index_t>(
@@ -78,25 +78,24 @@ std::tuple<Tensor, index_t> compute_unique(
   Tensor counts = at::empty({0}, index_options);
   int64_t num_out;
   if (!return_counts) {
-    num_out = at::AtenIpexTypeXPU::unique<input_t, index_t>(
+    num_out = xpu::pstl::unique<input_t, index_t>(
                   data_begin, data_begin + num_inp, equal) -
         data_begin;
   } else {
     Tensor range = at::empty({num_inp + 1}, index_options);
     index_t* range_begin = range.data_ptr<index_t>();
-    at::AtenIpexTypeXPU::iota(
-        range_begin, range_begin + num_inp + 1, (index_t)0);
+    xpu::pstl::iota(range_begin, range_begin + num_inp + 1, (index_t)0);
     auto data_end = data_begin;
     auto range_end = range_begin;
     std::tie(data_end, range_end) =
-        at::AtenIpexTypeXPU::unique_with_zip<input_t, index_t, index_t>(
+        xpu::pstl::unique_with_zip<input_t, index_t, index_t>(
             data_begin, data_begin + num_inp, range_begin, equal);
     num_out = std::distance(data_begin, data_end);
     range[num_out] = num_inp;
     counts.resize_(num_out);
     int64_t* counts_ptr = counts.data_ptr<index_t>();
     auto counts_begin = counts_ptr;
-    at::AtenIpexTypeXPU::adjacent_difference<index_t>(
+    xpu::pstl::adjacent_difference<index_t>(
         range_begin + 1, range_begin + num_out + 1, counts_begin);
   }
 
@@ -118,7 +117,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   Tensor inverse_indices = at::empty({num_inp}, index_options);
   Tensor counts = at::empty({num_inp}, index_options);
   auto sorted_indices_begin = sorted_indices.data_ptr<int64_t>();
-  at::AtenIpexTypeXPU::iota(
+  xpu::pstl::iota(
       sorted_indices_begin, sorted_indices_begin + num_inp, (int64_t)0);
 
   if (num_inp > 0) {

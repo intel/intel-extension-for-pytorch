@@ -187,7 +187,7 @@ static inline void sparse_packed_add_kernel(
   auto indices1D_end = indices1D;
   auto uniqueOffsets_end = uniqueOffsets;
   std::tie(indices1D_end, uniqueOffsets_end) =
-      at::AtenIpexTypeXPU::unique_with_zip<int64_t, int64_t, int64_t>(
+      xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
           indices1D, indices1D + nnz, uniqueOffsets, [](auto lhs, auto rhs) {
             return lhs == rhs;
           });

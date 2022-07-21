@@ -184,9 +184,8 @@ Tensor _coalesce(const Tensor& self) {
   auto origIndices_ptr = origIndices.data_ptr<int64_t>();
   auto uniqueOffsets_ptr = uniqueOffsets.data_ptr<int64_t>();
 
-  at::AtenIpexTypeXPU::iota<int64_t>(
-      origIndices_ptr, origIndices_ptr + nnz, (int64_t)0);
-  at::AtenIpexTypeXPU::iota<int64_t>(
+  xpu::pstl::iota<int64_t>(origIndices_ptr, origIndices_ptr + nnz, (int64_t)0);
+  xpu::pstl::iota<int64_t>(
       uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
   auto indices1D_ptr = indices1D.data_ptr<int64_t>();
@@ -202,7 +201,7 @@ Tensor _coalesce(const Tensor& self) {
   auto indices1D_end = indices1D_ptr;
   auto uniqueOffsets_end = uniqueOffsets_ptr;
   std::tie(indices1D_end, uniqueOffsets_end) =
-      at::AtenIpexTypeXPU::unique_with_zip<int64_t, int64_t, int64_t>(
+      xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
           indices1D_ptr,
           indices1D_ptr + nnz,
           uniqueOffsets_ptr,
