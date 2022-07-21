@@ -161,25 +161,26 @@ class dists {
 template <
     typename scalar_t,
     typename F,
-    typename nd_item_id,
+    typename nd_item,
     typename local_shared>
 static inline scalar_t reduce_agg(
     scalar_t agg,
-    nd_item_id item_id,
+    nd_item item,
     const local_shared& local_shared_mem) {
-  auto local_idx = item_id.get_local_id(0);
-  auto group_size = item_id.get_local_range().size();
+  auto local_idx = item.get_local_id(0);
+  auto group_size = item.get_local_range(0);
 
   local_shared_mem[local_idx] = agg;
-  decltype(group_size) __k = 1;
-  do {
-    item_id.barrier(DPCPP::access::fence_space::local_space);
-    if (local_idx % (2 * __k) == 0 && local_idx + __k < group_size) {
-      F::agg(local_shared_mem[local_idx], local_shared_mem[local_idx + __k]);
+
+  for (int offset = group_size / 2; offset > 0; offset >>= 1) {
+    item.barrier(dpcpp_local_fence);
+    if (local_idx < offset && local_idx + offset < group_size) {
+      scalar_t other = local_shared_mem[local_idx + offset];
+      F::agg(agg, other);
+      local_shared_mem[local_idx] = agg;
     }
-    __k *= 2;
-  } while (__k < group_size);
-  return local_shared_mem[local_idx];
+  }
+  return agg;
 }
 
 Tensor _euclidean_dist(const Tensor& x1, const Tensor& x2) {
@@ -207,9 +208,10 @@ static void pdist_kernel_impl(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
+  while (wgroup_size >> 1 >= m && wgroup_size >> 1 >= 32 /* sg_size */) {
+    wgroup_size >>= 1;
+  }
 
-  // TODO: this is not optimized if the m is smaller than 256. The work item is
-  // wasted (m-256).
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = self.data_ptr<scalar_t>();
