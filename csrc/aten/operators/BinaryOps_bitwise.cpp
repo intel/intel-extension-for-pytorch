@@ -89,13 +89,13 @@ Tensor& bitwise_and_out(const Tensor& self, const Tensor& other, Tensor& out) {
   return out;
 }
 
-Tensor& bitwise_or_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& bitwise_or_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   impl::or_kernel_dpcpp(iter);
   return out;
 }
 
-Tensor& bitwise_xor_out(Tensor& out, const Tensor& self, const Tensor& other) {
+Tensor& bitwise_xor_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_op(out, self, other);
   impl::xor_kernel_dpcpp(iter);
   return out;

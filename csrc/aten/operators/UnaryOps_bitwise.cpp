@@ -28,7 +28,7 @@ void bitwise_not_kernel_dpcpp(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
+Tensor& bitwise_not_out(const Tensor& self, Tensor& out) {
   auto iter = TensorIterator::unary_op(out, self);
   impl::bitwise_not_kernel_dpcpp(iter);
 #ifdef BUILD_NAMEDTENSOR
@@ -39,7 +39,7 @@ Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
 
 Tensor bitwise_not(const Tensor& self) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::bitwise_not_out(result, self);
+  return at::AtenIpexTypeXPU::bitwise_not_out(self, result);
 }
 
 Tensor& bitwise_not_(Tensor& self) {

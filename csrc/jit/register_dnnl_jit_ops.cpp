@@ -7,7 +7,7 @@
 #include <vector>
 #include "ATen/core/ivalue.h"
 #include "ATen/core/stack.h"
-#include "ATen/native/quantized/cpu/conv_packed_params.h"
+#include <ATen/native/quantized/PackedParams.h>
 #include "accelerated_ops.h"
 #include "c10/core/Scalar.h"
 #include "c10/core/ScalarType.h"

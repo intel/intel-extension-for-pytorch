@@ -36,7 +36,7 @@ void maximum_kernel(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor& maximum_out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& maximum_out(const Tensor& self, const Tensor& other, Tensor& result) {
   TORCH_CHECK(
       !self.is_complex() && !other.is_complex(),
       "maximum does not support complex inputs.");

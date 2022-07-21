@@ -36,19 +36,19 @@ void pow_tensor_tensor_kernel(TensorIterator& iter) {
       });
 }
 
-Tensor& pow_out(Tensor& result, const Tensor& base, const Tensor& exp) {
+Tensor& pow_out(const Tensor& base, const Tensor& exp, Tensor& result) {
   auto iter = TensorIterator::binary_op(result, base, exp);
   pow_tensor_tensor_kernel(iter);
   return result;
 }
 
-Tensor& pow_out(Tensor& result, const Scalar& base, const Tensor& exp) {
+Tensor& pow_out(const Scalar& base, const Tensor& exp, Tensor& result) {
   if (base.isComplex() && base.toComplexDouble() == 1.0) {
     result.resize_as_(exp).fill_(1);
   } else if (!base.isComplex() && base.toDouble() == 1.0) {
     result.resize_as_(exp).fill_(1);
   } else {
-    at::AtenIpexTypeXPU::pow_out(result, wrapped_scalar_tensor(base), exp);
+    at::AtenIpexTypeXPU::pow_out(wrapped_scalar_tensor(base), exp, result);
   }
   return result;
 }
@@ -56,7 +56,7 @@ Tensor& pow_out(Tensor& result, const Scalar& base, const Tensor& exp) {
 Tensor pow(const Tensor& base, const Tensor& exp) {
   auto dtype = at::result_type(base, exp);
   Tensor result = at::empty({0}, base.options().dtype(dtype));
-  return at::AtenIpexTypeXPU::pow_out(result, base, exp);
+  return at::AtenIpexTypeXPU::pow_out(base, exp, result);
 }
 
 } // namespace AtenIpexTypeXPU

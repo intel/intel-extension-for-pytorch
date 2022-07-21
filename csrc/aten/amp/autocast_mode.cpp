@@ -721,7 +721,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_fft2",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
           at::IntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
@@ -730,7 +730,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_ifft2",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
           at::IntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
@@ -739,8 +739,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_fftn",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
+          at::OptionalIntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
   KERNEL_XPU(
@@ -748,8 +748,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_ifftn",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
+          at::OptionalIntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
   KERNEL_XPU(
@@ -775,7 +775,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_rfft2",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
           at::IntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
@@ -784,7 +784,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_irfft2",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
           at::IntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
@@ -793,8 +793,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_rfftn",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
+          at::OptionalIntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
   KERNEL_XPU(
@@ -802,8 +802,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
       "fft_irfftn",
       Tensor(
           const Tensor&,
-          c10::optional<at::IntArrayRef>,
-          c10::optional<at::IntArrayRef>,
+          at::OptionalIntArrayRef,
+          at::OptionalIntArrayRef,
           c10::optional<c10::string_view>),
       fp32)
   KERNEL_XPU(

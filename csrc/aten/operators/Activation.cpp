@@ -25,8 +25,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& mul_out(Tensor& out, const Tensor& self, const Tensor& other);
-
 namespace impl {
 
 template <typename scalar_t, int unroll_factor, typename F, typename item_t>
@@ -390,18 +388,16 @@ inline scalar_t gelu_erf_forward(scalar_t self) {
   const accscalar_t one = accscalar_t(1);
   const accscalar_t pointfive = accscalar_t(0.5);
   const accscalar_t x = static_cast<accscalar_t>(self);
-  return (scalar_t)(
-      x * pointfive * (one + Numerics<accscalar_t>::erf(x * alpha)));
+  return (
+      scalar_t)(x * pointfive * (one + Numerics<accscalar_t>::erf(x * alpha)));
 }
 
 template <typename scalar_t>
 inline scalar_t gelu_erf_backward(scalar_t grad, scalar_t self) {
   using accscalar_t = acc_type<scalar_t>;
   auto v = static_cast<accscalar_t>(self) * M_SQRT1_2;
-  return (scalar_t)(
-      grad * 0.5 *
-      (1.0 + Numerics<accscalar_t>::erf(v) +
-       v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
+  return (
+      scalar_t)(grad * 0.5 * (1.0 + Numerics<accscalar_t>::erf(v) + v * M_2_SQRTPI * Numerics<accscalar_t>::exp(-v * v)));
 }
 
 Tensor& silu_out_kernel(const Tensor& self, Tensor& result) {
@@ -798,7 +794,9 @@ Tensor hardswish_backward(const Tensor& grad_output, const Tensor& self) {
   return result;
 }
 
-Tensor& gelu_out(const Tensor& self, Tensor& result) {
+Tensor& gelu_out(const Tensor& self,
+                 c10::string_view approximate,
+                 Tensor& result) {
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
     xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(
@@ -826,12 +824,13 @@ Tensor& gelu_out(const Tensor& self, Tensor& result) {
 
 Tensor gelu(const Tensor& self) {
   Tensor result;
-  return gelu_out(self, result);
+  return gelu_out(self, "none", result);
 }
 
 Tensor& gelu_backward_out(
     const Tensor& grad,
     const Tensor& self,
+    c10::string_view approximate,
     Tensor& grad_input) {
   if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad, self) &&
       IPEX_ALL(xpu::oneDNN::eltwise_backward_valid, grad, self)) {
@@ -862,7 +861,7 @@ Tensor& gelu_backward_out(
 
 Tensor gelu_backward(const Tensor& grad, const Tensor& self) {
   Tensor result;
-  return gelu_backward_out(grad, self, result);
+  return gelu_backward_out(grad, self, "none", result);
 }
 
 Tensor& silu_out(const Tensor& self, Tensor& output) {

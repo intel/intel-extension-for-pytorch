@@ -811,10 +811,10 @@ Tensor& max_unpooling3d_backward_template(
 } // namespace impl
 
 Tensor& max_unpool2d_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& indices,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& out) {
   impl::max_unpooling2d_forward_template(out, self, indices, output_size);
   return out;
 }
@@ -824,16 +824,16 @@ Tensor max_unpool2d(
     const Tensor& indices,
     IntArrayRef output_size) {
   auto out = at::empty({0}, self.options());
-  at::AtenIpexTypeXPU::max_unpool2d_out(out, self, indices, output_size);
+  at::AtenIpexTypeXPU::max_unpool2d_out(self, indices, output_size, out);
   return out;
 }
 
 Tensor& max_unpool2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& grad_input) {
   impl::max_unpooling2d_backward_template(
       grad_input, grad_output, self, indices, output_size);
   return grad_input;
@@ -846,17 +846,17 @@ Tensor max_unpool2d_backward(
     IntArrayRef output_size) {
   auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
   at::AtenIpexTypeXPU::max_unpool2d_backward_out(
-      grad_input, grad_output, self, indices, output_size);
+      grad_output, self, indices, output_size, grad_input);
   return grad_input;
 }
 
 Tensor& max_unpool3d_out(
-    Tensor& out,
     const Tensor& self,
     const Tensor& indices,
     IntArrayRef output_size,
     IntArrayRef stride,
-    IntArrayRef padding) {
+    IntArrayRef padding,
+    Tensor& out) {
   impl::max_unpooling3d_forward_template(
       out, self, indices, output_size, stride, padding);
   return out;
@@ -870,18 +870,18 @@ Tensor max_unpool3d(
     IntArrayRef padding) {
   auto out = at::empty({0}, self.options());
   at::AtenIpexTypeXPU::max_unpool3d_out(
-      out, self, indices, output_size, stride, padding);
+      self, indices, output_size, stride, padding, out);
   return out;
 }
 
 Tensor& max_unpool3d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices,
     IntArrayRef output_size,
     IntArrayRef stride,
-    IntArrayRef padding) {
+    IntArrayRef padding,
+    Tensor& grad_input) {
   impl::max_unpooling3d_backward_template(
       grad_input, grad_output, self, indices, output_size, stride, padding);
   return grad_input;
@@ -896,7 +896,7 @@ Tensor max_unpool3d_backward(
     IntArrayRef padding) {
   auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
   at::AtenIpexTypeXPU::max_unpool3d_backward_out(
-      grad_input, grad_output, self, indices, output_size, stride, padding);
+      grad_output, self, indices, output_size, stride, padding, grad_input);
   return grad_input;
 }
 

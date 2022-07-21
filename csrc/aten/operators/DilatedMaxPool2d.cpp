@@ -67,9 +67,9 @@ void max_pool2d_with_indices_out_template(
       "max_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints")
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dH
+                                : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
@@ -237,9 +237,9 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       "max_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints")
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+      : stride.size() == 1      ? dH
+                                : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
@@ -368,14 +368,14 @@ Tensor& max_pool2d_with_indices_backward_out_template(
 } // namespace impl
 
 std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
-    Tensor& output,
-    Tensor& indices,
     const Tensor& input,
     IntArrayRef kernel_size,
     IntArrayRef stride,
     IntArrayRef padding,
     IntArrayRef dilation,
-    bool ceil_mode) {
+    bool ceil_mode,
+    Tensor& output,
+    Tensor& indices) {
   impl::max_pool2d_with_indices_out_template(
       output,
       indices,
@@ -400,18 +400,17 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
   indices = at::empty({0}, input.options().dtype(kLong));
 
   return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
-      output,
-      indices,
       input,
       kernel_size,
       stride,
       padding,
       dilation,
-      ceil_mode);
+      ceil_mode,
+      output,
+      indices);
 }
 
 Tensor& max_pool2d_with_indices_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output_,
     const Tensor& self_,
     IntArrayRef kernel_size,
@@ -419,7 +418,8 @@ Tensor& max_pool2d_with_indices_backward_out(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode,
-    const Tensor& indices_) {
+    const Tensor& indices_,
+    Tensor& grad_input) {
   /* PyTorch support two cases of MaxPool2d:
      1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
      This case does not support channel last format. For a 3-dim tensor,
@@ -521,14 +521,14 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
   indices = at::empty({0}, input.options().dtype(kLong));
 
   return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
-      output,
-      indices,
       input,
       kernel_size,
       stride,
       padding,
       dilation,
-      ceil_mode);
+      ceil_mode,
+      output,
+      indices);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

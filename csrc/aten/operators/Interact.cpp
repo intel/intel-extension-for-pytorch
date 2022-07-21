@@ -147,7 +147,7 @@ void interaction_kernel(
               continue;
 
             for (int kk = 0; kk < TILE_INPUT_COL_FLOAT; ++kk) {
-              //#pragma unroll
+              // #pragma unroll
               for (int i = 0; i < TILE_OUTPUT_COL; ++i) {
                 int global_row = item_row + i;
                 float value_row = in_local_data[local_bn][global_row][kk];

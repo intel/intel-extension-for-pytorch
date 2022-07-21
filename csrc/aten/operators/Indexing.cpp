@@ -381,8 +381,8 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
     int64_t stride1 = src.stride(1);
     int64_t size0 = src.size(0);
     int64_t size1 = src.size(1);
-    int64_t size = (k > 0) ? sycl::min((int64_t)size0, (int64_t)size1 - k)
-                           : sycl::min((int64_t)size0 + k, (int64_t)size1);
+    int64_t size = (k > 0) ? std::min((int64_t)size0, (int64_t)size1 - k)
+                           : std::min((int64_t)size0 + k, (int64_t)size1);
     int64_t size_[1] = {size};
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
     if (size > 0) {
@@ -857,10 +857,10 @@ static std::tuple<bool, Tensor> canDispatchToMaskedFill(
 } // namespace impl
 
 Tensor& index_select_out(
-    Tensor& out,
     const Tensor& self,
     int64_t dim,
-    const Tensor& index) {
+    const Tensor& index,
+    Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -873,10 +873,10 @@ Tensor& index_select_out(
 
 Tensor index_select(const Tensor& self, int64_t dim, const Tensor& index) {
   auto out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::index_select_out(out, self, dim, index);
+  return at::AtenIpexTypeXPU::index_select_out(self, dim, index, out);
 }
 
-Tensor& nonzero_out(Tensor& out, const Tensor& self) {
+Tensor& nonzero_out(const Tensor& self, Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -889,7 +889,7 @@ Tensor& nonzero_out(Tensor& out, const Tensor& self) {
 
 Tensor nonzero(const at::Tensor& self) {
   auto out = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeXPU::nonzero_out(out, self);
+  return at::AtenIpexTypeXPU::nonzero_out(self, out);
 }
 
 Tensor count_nonzero(const Tensor& self, IntArrayRef dims) {
@@ -1095,7 +1095,7 @@ Tensor& index_fill_(
   return at::AtenIpexTypeXPU::index_fill_(self, dim, index, value.item());
 }
 
-Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
+Tensor& diag_out(const Tensor& self, int64_t diagonal, Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -1108,7 +1108,7 @@ Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
 
 Tensor diag(const Tensor& self, int64_t diagonal) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::diag_out(out, self, diagonal);
+  return at::AtenIpexTypeXPU::diag_out(self, diagonal, out);
 }
 
 Tensor trace(const Tensor& self) {
@@ -1219,7 +1219,7 @@ Tensor& masked_scatter_(
   return self;
 }
 
-Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
+Tensor& masked_select_out(const Tensor& self, const Tensor& mask, Tensor& out) {
   TORCH_CHECK(
       self.scalar_type() == out.scalar_type(),
       "masked_select(): self and result must have the same scalar type")
@@ -1253,7 +1253,7 @@ Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
 
 Tensor masked_select(const Tensor& self, const Tensor& mask) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::masked_select_out(out, self, mask);
+  return at::AtenIpexTypeXPU::masked_select_out(self, mask, out);
 }
 
 Tensor& put_(

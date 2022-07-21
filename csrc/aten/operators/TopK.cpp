@@ -720,13 +720,13 @@ void Topk(
 } // namespace
 
 std::tuple<at::Tensor&, at::Tensor&> topk_out(
-    at::Tensor& values,
-    at::Tensor& indices,
     const at::Tensor& self,
     int64_t k,
     int64_t dim,
     bool largest,
-    bool sorted) {
+    bool sorted,
+    at::Tensor& values,
+    at::Tensor& indices) {
   auto dim_ = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,

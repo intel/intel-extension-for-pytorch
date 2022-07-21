@@ -11,14 +11,13 @@ Function(GEN_BACKEND file_yaml)
                 LIST(APPEND generated_files "${BUILD_IPEX_GPU_ATEN_GENERATED}/${f}")
         ENDFOREACH()
         file(GLOB_RECURSE depended_files
-                ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/*.py
-                ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/templates/*)
+                ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml})
         add_custom_command(OUTPUT
                 ${generated_files}
                 COMMAND
                 mkdir -p ${BUILD_IPEX_GPU_ATEN_GENERATED}
                 COMMAND
-                "${PYTHON_EXECUTABLE}" -m tools.codegen.gen_backend_stubs
+                "${PYTHON_EXECUTABLE}" -m torchgen.gen_backend_stubs
                 --output_dir ${BUILD_IPEX_GPU_ATEN_GENERATED}
                 --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/codegen/yaml/${file_yaml}
                 ${SIMPLE_TRACE}

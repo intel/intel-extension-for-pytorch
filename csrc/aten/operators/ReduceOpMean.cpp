@@ -81,11 +81,11 @@ static void mean_kernel(TensorIterator& iter) {
 }
 
 Tensor& mean_out(
-    Tensor& result,
     const Tensor& self,
-    IntArrayRef dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
-    c10::optional<ScalarType> opt_dtype) {
+    c10::optional<ScalarType> opt_dtype,
+    Tensor& result) {
   ScalarType scalarType =
       opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
   TORCH_CHECK(
@@ -95,6 +95,7 @@ Tensor& mean_out(
       " instead.");
 
   ScalarType dtype = get_dtype(result, self, opt_dtype, true);
+  auto dim = opt_dim.value_or(IntArrayRef{});
   auto iter = meta::make_reduction("mean", result, self, dim, keepdim, dtype);
   if (iter.numel() == 0) {
     result.fill_(std::numeric_limits<double>::quiet_NaN());
@@ -106,15 +107,15 @@ Tensor& mean_out(
 
 Tensor mean(
     const Tensor& self,
-    IntArrayRef dim,
+    c10::OptionalArrayRef<long> opt_dim,
     bool keepdim,
     optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeXPU::mean_out(result, self, dim, keepdim, dtype);
+  return at::AtenIpexTypeXPU::mean_out(self, opt_dim, keepdim, dtype, result);
 }
 
 Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
-  return at::AtenIpexTypeXPU::mean(self, IntArrayRef{}, false, dtype);
+  return at::AtenIpexTypeXPU::mean(self, OptionalIntArrayRef{IntArrayRef{}}, false, dtype);
 }
 
 } // namespace AtenIpexTypeXPU

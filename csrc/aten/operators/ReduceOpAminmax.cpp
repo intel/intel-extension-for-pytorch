@@ -129,7 +129,7 @@ Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   return at::AtenIpexTypeXPU::argmin_out(self, dim, keepdims, result);
 }
 
-void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
+void aminmax_out(const Tensor& self, Tensor& min_result, Tensor& max_result) {
   auto iter = meta::make_reduction(
       "aminmax",
       min_result,
@@ -143,11 +143,11 @@ void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
 }
 
 void aminmax_dim_out(
-    Tensor& min_result,
-    Tensor& max_result,
     const Tensor& self,
     int64_t dim,
-    bool keepdim) {
+    bool keepdim,
+    Tensor& min_result,
+    Tensor& max_result) {
   auto iter = meta::make_reduction(
       "aminmax_dim",
       min_result,
@@ -166,7 +166,7 @@ std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
   TORCH_CHECK(self.numel() > 0, "operation does not have an identity.");
   Tensor min_result;
   Tensor max_result;
-  at::AtenIpexTypeXPU::aminmax_out(min_result, max_result, self);
+  at::AtenIpexTypeXPU::aminmax_out(self, min_result, max_result);
   return std::tuple<Tensor, Tensor>(min_result, max_result);
 }
 
@@ -180,7 +180,7 @@ std::tuple<Tensor, Tensor> _aminmax(
   Tensor min_result = at::empty_like(self);
   Tensor max_result = at::empty_like(self);
   at::AtenIpexTypeXPU::aminmax_dim_out(
-      min_result, max_result, self, dim, keepdim);
+      self, dim, keepdim, min_result, max_result);
   return std::tuple<Tensor, Tensor>(min_result, max_result);
 }
 

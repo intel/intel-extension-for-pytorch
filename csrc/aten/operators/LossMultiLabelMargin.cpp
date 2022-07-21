@@ -324,11 +324,11 @@ Tensor multilabel_margin_loss(
 }
 
 std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out(
-    Tensor& output,
-    Tensor& is_target,
     const Tensor& self,
     const Tensor& target,
-    int64_t reduction) {
+    int64_t reduction,
+    Tensor& output,
+    Tensor& is_target) {
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -348,16 +348,16 @@ std::tuple<Tensor, Tensor> multilabel_margin_loss_forward(
   Tensor output = at::empty({0}, self.options());
   Tensor is_target = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::multilabel_margin_loss_forward_out(
-      output, is_target, self, target, reduction);
+      self, target, reduction, output, is_target);
 }
 
 Tensor& multilabel_margin_loss_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
     int64_t reduction,
-    const Tensor& is_target) {
+    const Tensor& is_target,
+    Tensor& grad_input) {
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -377,7 +377,7 @@ Tensor multilabel_margin_loss_backward(
     const Tensor& is_target) {
   Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::multilabel_margin_loss_backward_out(
-      grad_input, grad_output, self, target, reduction, is_target);
+      grad_output, self, target, reduction, is_target, grad_input);
 }
 
 } // namespace AtenIpexTypeXPU

@@ -16,7 +16,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 Tensor& square_out(const Tensor& self, Tensor& out) {
-  return at::AtenIpexTypeXPU::pow_out(out, self, 2);
+  return at::AtenIpexTypeXPU::pow_out(self, 2, out);
 }
 
 } // namespace AtenIpexTypeXPU

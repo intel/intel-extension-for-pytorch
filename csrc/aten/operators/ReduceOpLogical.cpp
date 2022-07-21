@@ -101,7 +101,7 @@ Tensor all(const Tensor& self, int64_t dim, bool keepdim) {
   Tensor result;
   auto result_type = get_result_or_bytebool_dtype(self, result);
   result = at::empty({0}, self.options().dtype(result_type));
-  return at::AtenIpexTypeXPU::all_out(result, self, dim, keepdim);
+  return at::AtenIpexTypeXPU::all_out(self, dim, keepdim, result);
 }
 
 inline Tensor& _any(Tensor& result, TensorIterator& iter) {
@@ -132,7 +132,7 @@ Tensor& any_out(at::Tensor& out, const at::Tensor& self) {
   return out;
 }
 
-Tensor& any_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
+Tensor& any_out(const Tensor& self, int64_t dim, bool keepdim, Tensor& result) {
   check_result_is_bytebool("any", self, result);
   dim = maybe_wrap_dim(dim, self.dim());
   if (_dimreduce_return_trivial(result, self, 0, dim, keepdim)) {
@@ -154,7 +154,7 @@ Tensor any(const Tensor& self, int64_t dim, bool keepdim) {
   Tensor result;
   auto result_type = get_result_or_bytebool_dtype(self, result);
   result = at::empty({0}, self.options().dtype(result_type));
-  return at::AtenIpexTypeXPU::any_out(result, self, dim, keepdim);
+  return at::AtenIpexTypeXPU::any_out(self, dim, keepdim, result);
 }
 
 } // namespace AtenIpexTypeXPU

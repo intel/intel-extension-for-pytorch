@@ -69,7 +69,7 @@ Tensor& addmm_out(
   return result;
 }
 
-Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
+Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   checkBackend("mm_out", {result, self, mat2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "self must be a matrix");
   TORCH_CHECK(mat2.dim() == 2, "mat2 must be a matrix");
@@ -108,7 +108,7 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
 
 Tensor mm(const Tensor& self, const Tensor& mat2) {
   auto result = at::empty({0}, self.options());
-  at::AtenIpexTypeXPU::mm_out(result, self, mat2);
+  at::AtenIpexTypeXPU::mm_out(self, mat2, result);
   return result;
 }
 
@@ -251,7 +251,7 @@ Tensor addbmm(
   return out;
 }
 
-Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
+Tensor& bmm_out(const Tensor& self, const Tensor& batch2, Tensor& result) {
   checkBackend("bmm_out", {result, self, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
@@ -278,7 +278,7 @@ Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
 
 Tensor bmm(const Tensor& self, const Tensor& batch2) {
   auto result = at::empty({0}, self.options());
-  at::AtenIpexTypeXPU::bmm_out(result, self, batch2);
+  at::AtenIpexTypeXPU::bmm_out(self, batch2, result);
   return result;
 }
 

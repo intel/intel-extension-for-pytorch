@@ -21,14 +21,6 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor& im2col_out(
-    Tensor& out,
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef dilation,
-    IntArrayRef padding,
-    IntArrayRef stride);
-
 namespace impl {
 
 static void col2im_out_template(
@@ -154,19 +146,19 @@ void col2im_backward_out_template(
     IntArrayRef padding,
     IntArrayRef stride) {
   at::AtenIpexTypeXPU::im2col_out(
-      grad_input, grad_output, kernel_size, dilation, padding, stride);
+      grad_output, kernel_size, dilation, padding, stride, grad_input);
 }
 
 } // namespace impl
 
 Tensor& col2im_out(
-    Tensor& out,
     const Tensor& self,
     IntArrayRef output_size,
     IntArrayRef kernel_size,
     IntArrayRef dilation,
     IntArrayRef padding,
-    IntArrayRef stride) {
+    IntArrayRef stride,
+    Tensor& out) {
   impl::col2im_out_template(
       out, self, output_size, kernel_size, dilation, padding, stride);
   return out;
@@ -187,12 +179,12 @@ Tensor col2im(
 }
 
 Tensor& col2im_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef kernel_size,
     IntArrayRef dilation,
     IntArrayRef padding,
-    IntArrayRef stride) {
+    IntArrayRef stride,
+    Tensor& grad_input) {
   impl::col2im_backward_out_template(
       grad_input, grad_output, kernel_size, dilation, padding, stride);
   return grad_input;

@@ -66,11 +66,11 @@ Tensor& prod_out_impl(
 }
 
 Tensor& prod_out(
-    Tensor& result,
     const Tensor& self,
     int64_t dim,
     bool keepdim,
-    c10::optional<ScalarType> dtype) {
+    c10::optional<ScalarType> dtype,
+    Tensor& result) {
   return at::AtenIpexTypeXPU::prod_out_impl(
       result, self, {dim}, keepdim, dtype);
 }

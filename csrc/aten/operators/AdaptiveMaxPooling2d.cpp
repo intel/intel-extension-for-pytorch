@@ -164,10 +164,10 @@ Tensor& adaptive_max_pool2d_backward_out_template(
 } // namespace impl
 
 std::tuple<Tensor&, Tensor&> adaptive_max_pool2d_out(
-    Tensor& out,
-    Tensor& indices,
     const Tensor& self,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    Tensor& out,
+    Tensor& indices) {
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -186,14 +186,14 @@ std::tuple<Tensor, Tensor> adaptive_max_pool2d(
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
   TORCH_INTERNAL_ASSERT(output_size.size() == 2);
   return at::AtenIpexTypeXPU::adaptive_max_pool2d_out(
-      output, indices, self, output_size);
+      self, output_size, output, indices);
 }
 
 Tensor& adaptive_max_pool2d_backward_out(
-    Tensor& grad_input,
     const Tensor& grad_output_,
     const Tensor& self_,
-    const Tensor& indices_) {
+    const Tensor& indices_,
+    Tensor& grad_input) {
   /* PyTorch support two cases of AdaptiveMaxPool2d:
      1. 3D: Input (C, H, W),  Output (C, H0, W0)
      This case does not support channel last format. For a 3-dim tensor,
