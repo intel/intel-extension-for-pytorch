@@ -253,7 +253,7 @@ class Launcher():
     def is_numactl_available(self):
         numactl_available = False
         cmd = ["numactl", "-C", "0", "-m", "0", "ls"]
-        r = subprocess.run(cmd, env=os.environ)
+        r = subprocess.run(cmd, env=os.environ, stdout=subprocess.DEVNULL)
         if r.returncode == 0:
             numactl_available = True
         return numactl_available
