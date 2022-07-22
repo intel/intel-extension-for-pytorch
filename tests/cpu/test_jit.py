@@ -3505,28 +3505,6 @@ class Tester(TestCase):
             result = model(input)
             self.assertEqual(tresult, result)
 
-    def test_lru_cache_resize(self):
-        import os
-        # Set LRU_CACHE_CAPACITY < 1024 to trigger resize
-        os.environ["LRU_CACHE_CAPACITY"] = "512"
-        # Run conv
-        batch_size, out_channels, in_channels = 8, 16, 3
-        dim, image_size, kernel_size = 2, 16, 3
-        input_size = [batch_size, in_channels, image_size, image_size]
-        x = torch.randn(input_size)
-        self._test_output(
-            ConvSwishInplace(dim, in_channels, out_channels, kernel_size, image_size),
-            x,
-            kind_in_graph="ipex_prepack::convolution_swish_run",
-            kind_not_in_graph="ipex_prepack::convolution_swish_prepack")
-        # Run linear
-        self._test_onednn_fp32(
-            LinearSigmoidMul(3, 32, bias=True),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-        # unset this environment variable
-        del os.environ['LRU_CACHE_CAPACITY']
-
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()
