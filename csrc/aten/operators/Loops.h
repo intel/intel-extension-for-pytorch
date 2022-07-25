@@ -144,14 +144,14 @@ template <
     typename inp_calc_t,
     typename outp_calc_t>
 void vectorized_elementwise_kernel(
-    DPCPP::item<1> item_id,
+    DPCPP::item<1>& item,
     int numel,
     const func_t& fn,
     array_t data,
     inp_calc_t& input_calc,
     outp_calc_t& output_calc) {
   using traits = function_traits<func_t>;
-  int thread_idx = item_id.get_linear_id();
+  int thread_idx = item.get_linear_id();
   int remaining = numel - vec_size * thread_idx;
 
   if (remaining < vec_size) { // if this thread handles the remaining, just do a
@@ -174,6 +174,50 @@ void vectorized_elementwise_kernel(
     auto policy = at::native::Memory::policies::
         vectorized<vec_size, array_t, inp_calc_t, outp_calc_t>(
             data, input_calc, output_calc, thread_idx);
+    elementwise_kernel_helper<vec_size>(fn, policy);
+  }
+}
+
+template <
+    int vec_size,
+    typename func_t,
+    typename array_t,
+    typename inp_calc_t,
+    typename outp_calc_t>
+void unroll_load_vec_store_elementwise_kernel(
+    DPCPP::item<1>& item,
+    int numel,
+    const func_t& fn,
+    array_t data,
+    inp_calc_t& input_calc,
+    outp_calc_t& output_calc) {
+  using traits = function_traits<func_t>;
+  int thread_idx = item.get_linear_id();
+  int remaining = numel - vec_size * thread_idx;
+
+  if (remaining < vec_size) { // if this thread handles the remaining, just do a
+                              // naive unrolled loop
+    auto output_calc = TrivialOffsetCalculator<1>();
+    auto loader = at::native::Memory::LoadWithoutCast();
+    auto storer = at::native::Memory::StoreWithoutCast();
+    auto policy = at::native::Memory::policies::unroll<
+        vec_size,
+        array_t,
+        decltype(input_calc),
+        decltype(output_calc),
+        at::native::Memory::LoadWithoutCast,
+        at::native::Memory::StoreWithoutCast>(
+        data, remaining, input_calc, output_calc, loader, storer, thread_idx);
+    elementwise_kernel_helper<LOOPS_UNROLL_WORK_SIZE>(fn, policy);
+  } else { // if this block has a full `block_work_size` data to handle, use
+    // vectorized memory access
+    auto loader = at::native::Memory::LoadWithoutCast();
+    auto policy = at::native::Memory::policies::unroll_load_vec_store<
+        vec_size,
+        array_t,
+        inp_calc_t,
+        outp_calc_t,
+        decltype(loader)>(data, input_calc, output_calc, loader, thread_idx);
     elementwise_kernel_helper<vec_size>(fn, policy);
   }
 }
@@ -228,6 +272,7 @@ static inline bool has_double_arg(TensorIteratorBase& iter) {
 // Assumption:
 // this function assume trivial 1d and no dynamic casting
 template <
+    bool unroll_load_vec_store,
     typename func_t,
     typename array_t,
     typename inp_calc_t,
@@ -252,8 +297,13 @@ static inline void launch_vectorized_kernel(
       auto cgf = DPCPP_Q_CGF(cgh) {                                   \
         cgh.parallel_for(                                             \
             DPCPP::range<1>(thread_num), [=](DPCPP::item<1> itemId) { \
-              vectorized_elementwise_kernel<vec_size>(                \
-                  itemId, N, fn, data, input_calc, output_calc);      \
+              if constexpr (unroll_load_vec_store) {                  \
+                unroll_load_vec_store_elementwise_kernel<vec_size>(   \
+                    itemId, N, fn, data, input_calc, output_calc);    \
+              } else {                                                \
+                vectorized_elementwise_kernel<vec_size>(              \
+                    itemId, N, fn, data, input_calc, output_calc);    \
+              }                                                       \
             });                                                       \
       };                                                              \
       DPCPP_Q_SUBMIT(dpcpp_queue, cgf);                               \
@@ -307,7 +357,22 @@ static inline bool can_use_broadcast_vectorize(
   return vec_size > 1;
 }
 
-template <typename func_t, bool singed_strides = false>
+template <typename func_t, typename array_t>
+static inline bool can_use_unroll_load_vec_store(
+    TensorIteratorBase& iter,
+    const func_t& fn,
+    array_t data,
+    int& vec_size) {
+  using traits = function_traits<func_t>;
+  using return_t = typename traits::result_type;
+  if (iter.is_contiguous() || !iter.tensor(0).is_contiguous())
+    return false;
+  vec_size = at::native::Memory::can_vectorize_up_to_loop<return_t>(
+      getDeviceIdOfCurrentQueue(), data[0]);
+  return vec_size > 1;
+}
+
+template <typename func_t, bool singed_strides = false, bool fast_mode = false>
 void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   using traits = function_traits<func_t>;
   constexpr int ntensors = traits::arity + 1;
@@ -332,7 +397,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
     if (contiguous) {
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
       auto output_offset_calculator = TrivialOffsetCalculator<1>();
-      launch_vectorized_kernel(
+      launch_vectorized_kernel<false>(
           numel,
           f,
           data,
@@ -342,41 +407,55 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
     } else {
       auto input_offset_calculator =
           make_input_offset_calculator<traits::arity, singed_strides>(iter);
-      if (can_use_broadcast_vectorize(iter, vec_size) && !singed_strides) {
-        if (iter.tensor(0).is_contiguous()) {
+      if constexpr (fast_mode) {
+        if (can_use_broadcast_vectorize(iter, vec_size) && !singed_strides) {
+          if (iter.tensor(0).is_contiguous()) {
+            auto output_offset_calculator = TrivialOffsetCalculator<1>();
+            launch_vectorized_kernel<false>(
+                numel,
+                f,
+                data,
+                input_offset_calculator,
+                output_offset_calculator,
+                vec_size);
+          } else {
+            auto output_offset_calculator =
+                make_output_offset_calculator<1, singed_strides>(iter);
+            launch_vectorized_kernel<false>(
+                numel,
+                f,
+                data,
+                input_offset_calculator,
+                output_offset_calculator,
+                vec_size);
+          }
+          return;
+        } else if (
+            can_use_unroll_load_vec_store(iter, f, data, vec_size) &&
+            !singed_strides) {
           auto output_offset_calculator = TrivialOffsetCalculator<1>();
-          launch_vectorized_kernel(
+          launch_vectorized_kernel<true>(
               numel,
               f,
               data,
               input_offset_calculator,
               output_offset_calculator,
               vec_size);
-        } else {
-          auto output_offset_calculator =
-              make_output_offset_calculator<1, singed_strides>(iter);
-          launch_vectorized_kernel(
-              numel,
-              f,
-              data,
-              input_offset_calculator,
-              output_offset_calculator,
-              vec_size);
+          return;
         }
-      } else {
-        auto output_offset_calculator =
-            make_output_offset_calculator<1, singed_strides>(iter);
-        auto loader = at::native::Memory::LoadWithoutCast();
-        auto storer = at::native::Memory::StoreWithoutCast();
-        launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
-            numel,
-            f,
-            data,
-            input_offset_calculator,
-            output_offset_calculator,
-            loader,
-            storer);
       }
+      auto output_offset_calculator =
+          make_output_offset_calculator<1, singed_strides>(iter);
+      auto loader = at::native::Memory::LoadWithoutCast();
+      auto storer = at::native::Memory::StoreWithoutCast();
+      launch_unrolled_kernel<UNROLLED_ELEM_PER_WORK_ITEM>(
+          numel,
+          f,
+          data,
+          input_offset_calculator,
+          output_offset_calculator,
+          loader,
+          storer);
     }
   } else {
     at::detail::Array<ScalarType, traits::arity> dtypes;
@@ -418,17 +497,20 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
     }                                                                          \
   }
 
-    if (!has_double_arg<func_t>(iter)) {
-      HANDLE_DYNAMIC_CAST(true)
-    } else {
-      HANDLE_DYNAMIC_CAST(false)
+    if constexpr (fast_mode) {
+      if (!has_double_arg<func_t>(iter)) {
+        HANDLE_DYNAMIC_CAST(true)
+        return;
+      }
     }
+
+    HANDLE_DYNAMIC_CAST(false)
 
 #undef HANDLE_DYNAMIC_CAST
   }
 }
 
-template <typename func_t, bool sined_strides = false>
+template <typename func_t, bool singed_strides = false>
 void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(
@@ -445,12 +527,40 @@ void dpcpp_kernel_for_tensor_iter(TensorIteratorBase& iter, const func_t& f) {
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_kernel_for_tensor_iter(sub_iter, f);
+      dpcpp_kernel_for_tensor_iter<func_t, singed_strides>(sub_iter, f);
     }
     return;
   }
 
-  dpcpp_loops_kernel<func_t, sined_strides>(iter, f);
+  dpcpp_loops_kernel<func_t, singed_strides, false>(iter, f);
+}
+
+template <typename func_t, bool singed_strides = false>
+void dpcpp_fast_mode_kernel_for_tensor_iter(
+    TensorIteratorBase& iter,
+    const func_t& f) {
+  for (int arg = 0; arg < iter.ntensors(); arg++) {
+    TORCH_INTERNAL_ASSERT(
+        iter.device(arg).type() == at::kXPU,
+        "argument ",
+        arg,
+        ": expected a XPU device but found ",
+        iter.device(arg));
+  }
+
+  if (iter.numel() == 0) {
+    return;
+  }
+
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      dpcpp_fast_mode_kernel_for_tensor_iter<func_t, singed_strides>(
+          sub_iter, f);
+    }
+    return;
+  }
+
+  dpcpp_loops_kernel<func_t, singed_strides, true>(iter, f);
 }
 
 template <typename arg1_t, typename arg2_t, typename return_t, typename func_t>
@@ -505,7 +615,8 @@ template <
     typename arg1_t,
     typename arg2_t = arg1_t,
     typename return_t = arg1_t,
-    typename func_t>
+    typename func_t,
+    bool fast_mode>
 void opmath_gpu_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   TORCH_INTERNAL_ASSERT(iter.ntensors() == 3);
 
@@ -526,15 +637,25 @@ void opmath_gpu_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
     // kernels device guards, but structured kernels do it right and
     // we can assume the device is already set correctly
     const OptionalDeviceGuard device_guard(device_of(iter.tensor(1)));
-    dpcpp_kernel_for_tensor_iter(iter, af);
+    if constexpr (fast_mode)
+      dpcpp_fast_mode_kernel_for_tensor_iter(iter, af);
+    else
+      dpcpp_kernel_for_tensor_iter(iter, af);
   } else if (iter.is_cpu_scalar(2)) {
     BUnaryFunctor<arg1_t, arg2_t, return_t, func_t> bf(
         f, iter.scalar_value<opmath_arg2_t>(2));
     iter.remove_operand(2);
-    dpcpp_kernel_for_tensor_iter(iter, bf);
+    if constexpr (fast_mode)
+      dpcpp_fast_mode_kernel_for_tensor_iter(iter, bf);
+    else
+      dpcpp_kernel_for_tensor_iter(iter, bf);
   } else {
-    dpcpp_kernel_for_tensor_iter(
-        iter, BinaryFunctor<arg1_t, arg2_t, return_t, func_t>(f));
+    if constexpr (fast_mode)
+      dpcpp_fast_mode_kernel_for_tensor_iter(
+          iter, BinaryFunctor<arg1_t, arg2_t, return_t, func_t>(f));
+    else
+      dpcpp_kernel_for_tensor_iter(
+          iter, BinaryFunctor<arg1_t, arg2_t, return_t, func_t>(f));
   }
 }
 
@@ -547,7 +668,23 @@ void dpcpp_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   using arg1_t = typename traits::template arg<0>::type;
   using arg2_t = typename traits::template arg<1>::type;
   using return_t = typename traits::result_type;
-  opmath_gpu_kernel_with_scalars<arg1_t, arg2_t, return_t, func_t>(iter, f);
+  opmath_gpu_kernel_with_scalars<arg1_t, arg2_t, return_t, func_t, false>(
+      iter, f);
+}
+
+template <typename func_t>
+void dpcpp_fast_mode_kernel_with_scalars(
+    TensorIteratorBase& iter,
+    const func_t& f) {
+  using traits = function_traits<func_t>;
+  static_assert(
+      traits::arity == 2,
+      "dpcpp_kernel_with_scalars only supports two input arguments");
+  using arg1_t = typename traits::template arg<0>::type;
+  using arg2_t = typename traits::template arg<1>::type;
+  using return_t = typename traits::result_type;
+  opmath_gpu_kernel_with_scalars<arg1_t, arg2_t, return_t, func_t, true>(
+      iter, f);
 }
 
 template <typename func_t>

@@ -24,7 +24,7 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        dpcpp_kernel_with_scalars(
+        dpcpp_fast_mode_kernel_with_scalars(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
       });
 }

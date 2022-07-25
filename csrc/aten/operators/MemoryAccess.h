@@ -424,6 +424,64 @@ struct vectorized {
   }
 };
 
+template <
+    int vec_size,
+    typename data_t,
+    typename input_offset_calc,
+    typename output_offset_calc,
+    typename loader_t,
+    int num_outputs = 1>
+struct unroll_load_vec_store {
+  data_t data;
+  input_offset_calc& input_offset_calculator;
+  output_offset_calc& output_offset_calculator;
+  loader_t& loader;
+  int thread_idx;
+  int vec_idx;
+
+  unroll_load_vec_store(
+      data_t data,
+      input_offset_calc& ic,
+      output_offset_calc& oc,
+      loader_t& l,
+      int thread_idx)
+      : data(data),
+        input_offset_calculator(ic),
+        output_offset_calculator(oc),
+        loader(l),
+        thread_idx(thread_idx),
+        vec_idx(thread_idx * vec_size) {}
+
+  inline constexpr bool check_inbounds(int thread_work_elem) const {
+    return true;
+  }
+
+  template <typename args_t>
+  inline void load(args_t* args) {
+    constexpr int arity = std::tuple_size<args_t>::value;
+#pragma unroll
+    for (int i = 0; i < vec_size; i++) {
+      auto offset = input_offset_calculator.get(vec_idx + i);
+      detail::static_unroll<detail::unroll_load_helper, arity>::with_args(
+          *this, args, offset, loader, i, num_outputs);
+    }
+  }
+
+  template <typename scalar_t>
+  inline void store(scalar_t* from) {
+    using vec_t = aligned_vector_loop<scalar_t, vec_size>;
+    auto offset = output_offset_calculator.get(vec_idx);
+    auto ptr = reinterpret_cast<scalar_t*>(data[0]) + offset[0];
+    vec_t* to = reinterpret_cast<vec_t*>(ptr);
+    vec_t v;
+#pragma unroll
+    for (int j = 0; j < vec_size; j++) {
+      v.val[j] = from[j];
+    }
+    *to = v;
+  }
+};
+
 } // namespace policies
 
 static inline int preferred_vector_width(DeviceId dev_id, int elem_sz) {
