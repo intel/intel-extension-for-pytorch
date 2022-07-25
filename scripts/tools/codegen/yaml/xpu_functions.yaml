@@ -8,6 +8,7 @@ supported:
   - _adaptive_avg_pool2d_backward
   - _aminmax
   - _aminmax.dim
+  - _amp_update_scale_
   - _cat
   - _cat.out
   - _cdist_backward
