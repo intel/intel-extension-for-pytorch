@@ -23,28 +23,10 @@ py::object FutureTensor::get() {
 
 TaskModule::TaskModule(
     const torch::jit::Module& script_module,
-    const std::vector<int32_t>& cpu_core_list,
-    bool traced_module)
-    : script_module_(script_module) {
-  this->task_executor = std::make_shared<TaskExecutor>(cpu_core_list);
-  this->script_module_initialized_ = true;
-}
-
-TaskModule::TaskModule(
-    const py::object& module,
-    const std::vector<int32_t>& cpu_core_list)
-    : module_(module) {
-  this->task_executor = std::make_shared<TaskExecutor>(cpu_core_list);
-  this->module_initialized_ = true;
-}
-
-TaskModule::TaskModule(
-    const torch::jit::Module& script_module,
     const torch_ipex::runtime::CPUPool& cpu_pool,
     bool traced_module)
     : script_module_(script_module) {
-  this->task_executor =
-      std::make_shared<TaskExecutor>(cpu_pool.get_cpu_core_list());
+  this->task_executor = std::make_shared<TaskExecutor>(cpu_pool);
   this->script_module_initialized_ = true;
 }
 
@@ -52,8 +34,7 @@ TaskModule::TaskModule(
     const py::object& module,
     const torch_ipex::runtime::CPUPool& cpu_pool)
     : module_(module) {
-  this->task_executor =
-      std::make_shared<TaskExecutor>(cpu_pool.get_cpu_core_list());
+  this->task_executor = std::make_shared<TaskExecutor>(cpu_pool);
   this->module_initialized_ = true;
 }
 

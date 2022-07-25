@@ -1,5 +1,6 @@
 import torch
 import intel_extension_for_pytorch as ipex
+from functools import wraps
 
 class AutoMixPrecision(object):
     def __init__(self, enable_or_not = False, train = False):
@@ -36,3 +37,13 @@ class AutoDNNL(object):
             ipex.core.enable_auto_dnnl()
         else:
             ipex.core.disable_auto_dnnl()
+
+def runtime_thread_affinity_test_env(func):
+    @wraps(func)
+    def wrapTheFunction(*args):
+        # In some cases, the affinity of main thread may be changed: MultiStreamModule of stream 1
+        # Ensure, we restore the affinity of main thread
+        previous_cpu_pool = ipex._C.get_current_cpu_pool()
+        func(*args)
+        ipex._C.set_cpu_pool(previous_cpu_pool)
+    return wrapTheFunction

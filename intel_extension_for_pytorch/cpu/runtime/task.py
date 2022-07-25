@@ -25,9 +25,9 @@ class Task(object):
         self.cpu_pool = cpu_pool
         assert type(self.cpu_pool) is CPUPool
         if isinstance(module, torch.jit.ScriptModule):
-            self._task = ipex._C.TaskModule(module._c, self.cpu_pool.core_ids, True)
+            self._task = ipex._C.TaskModule(module._c, self.cpu_pool.cpu_pool, True)
         else:
-            self._task = ipex._C.TaskModule(module, self.cpu_pool.core_ids)
+            self._task = ipex._C.TaskModule(module, self.cpu_pool.cpu_pool)
 
     def __call__(self, *args, **kwargs):
         # async execution

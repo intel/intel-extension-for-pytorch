@@ -1,6 +1,8 @@
 #pragma once
 #include <dlfcn.h>
 #include <omp.h>
+#include <unistd.h>
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -14,6 +16,7 @@ typedef int (*kmp_set_affinity_mask_proc_p)(int, kmp_affinity_mask_t*);
 typedef int (*kmp_set_affinity_p)(kmp_affinity_mask_t*);
 typedef void (*kmp_destroy_affinity_mask_p)(kmp_affinity_mask_t*);
 typedef int (*kmp_get_affinity_p)(kmp_affinity_mask_t*);
+typedef int (*kmp_get_affinity_max_proc_p)();
 
 class CPUPool {
  public:
@@ -45,10 +48,14 @@ class CPUPool {
   CPUPool& operator=(CPUPool&& source_cpu_pool) = delete;
 };
 
+std::vector<int32_t> init_process_available_cores();
+std::vector<int32_t> get_process_available_cores();
+std::vector<int32_t> filter_cores_by_thread_affinity(
+    const std::vector<int32_t>& cpu_core_list);
 bool do_load_iomp_symbol();
 bool is_runtime_ext_enabled();
 void init_runtime_ext();
-void _pin_cpu_cores(const std::vector<int32_t>& cpu_core_list);
+void _pin_cpu_cores(const torch_ipex::runtime::CPUPool& cpu_pool);
 bool is_same_core_affinity_setting(const std::vector<int32_t>& cpu_core_list);
 CPUPool get_cpu_pool_from_mask_affinity();
 void set_mask_affinity_from_cpu_pool(const CPUPool& cpu_pool);
@@ -59,7 +66,7 @@ class WithCPUPool {
       : previous_cpu_pool(
             torch_ipex::runtime::get_cpu_pool_from_mask_affinity()),
         current_cpu_pool(std::move(cpu_pool)) {
-    torch_ipex::runtime::_pin_cpu_cores(current_cpu_pool.get_cpu_core_list());
+    torch_ipex::runtime::_pin_cpu_cores(current_cpu_pool);
   }
 
   ~WithCPUPool() {
