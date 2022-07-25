@@ -596,6 +596,8 @@ supported:
   - __irshift__.Scalar
   - __irshift__.Tensor
   - square.out
+  - hardsigmoid.out
+  - hardsigmoid_backward.grad_input
 autograd:
   - cdist
   - lstm.input
