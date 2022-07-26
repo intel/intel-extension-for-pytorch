@@ -1387,8 +1387,12 @@ Tensor grid_sampler_2d(
   auto output = at::empty({N, C, H, W}, input.options());
   int64_t count = N * H * W;
   if (count > 0) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-        input.scalar_type(), "grid_sampler_2d_xpu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        input.scalar_type(),
+        "grid_sampler_2d_xpu",
+        [&] {
           if (canUse32BitIndexMath(input) && canUse32BitIndexMath(grid) &&
               canUse32BitIndexMath(output)) {
             impl::grid_sampler_2d_kernel<scalar_t>(
@@ -1429,8 +1433,12 @@ std::tuple<Tensor, Tensor> grid_sampler_2d_backward(
   auto grad_grid = at::empty_like(grid, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   int64_t count = N * H * W;
   if (count > 0) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-        input.scalar_type(), "grid_sampler_2d_backward_xpu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        input.scalar_type(),
+        "grid_sampler_2d_backward_xpu",
+        [&] {
           if (canUse32BitIndexMath(input) && canUse32BitIndexMath(grid) &&
               canUse32BitIndexMath(grad_output)) {
             impl::grid_sampler_2d_backward_kernel<scalar_t>(
@@ -1473,8 +1481,12 @@ Tensor grid_sampler_3d(
   auto output = at::empty({N, input.size(1), D, H, W}, input.options());
   int64_t count = N * D * H * W;
   if (count > 0) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-        input.scalar_type(), "grid_sampler_3d_xpu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        input.scalar_type(),
+        "grid_sampler_3d_xpu",
+        [&] {
           if (canUse32BitIndexMath(input) && canUse32BitIndexMath(grid) &&
               canUse32BitIndexMath(output)) {
             impl::grid_sampler_3d_kernel<scalar_t>(
@@ -1518,8 +1530,12 @@ std::tuple<Tensor, Tensor> grid_sampler_3d_backward(
   auto grad_grid = at::empty_like(grid, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   int64_t count = N * D * H * W;
   if (count > 0) {
-    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-        input.scalar_type(), "grid_sampler_3d_backward_xpu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        input.scalar_type(),
+        "grid_sampler_3d_backward_xpu",
+        [&] {
           if (canUse32BitIndexMath(input) && canUse32BitIndexMath(grid) &&
               canUse32BitIndexMath(grad_output)) {
             impl::grid_sampler_3d_backward_kernel<scalar_t>(

@@ -63,3 +63,17 @@ class TestTorchMethod(TestCase):
         print("out_cpu", out_cpu)
         print("out_xpu", out_xpu.cpu())
         self.assertEqual(out_cpu.to(cpu_device), out_xpu.to(cpu_device))
+
+    def test_gridSampler_bf16(self, dtype=torch.bfloat16):
+        N = random.randint(2, 8)
+        C = random.randint(2, 6)
+        H = random.randint(2, 8)
+        W = random.randint(2, 8)
+        input_cpu = torch.randn(N, C, H, W, requires_grad=True)
+        grid_cpu = torch.randn(N, H, W, 2, requires_grad=True)
+        out_cpu = F.grid_sample(input_cpu, grid_cpu, mode='bilinear', align_corners=True)
+
+        grid_xpu = torch.tensor(grid_cpu, device=dpcpp_device, dtype=dtype)
+        inp_xpu = torch.tensor(input_cpu, device=dpcpp_device, dtype=dtype)
+        out_xpu = F.grid_sample(inp_xpu, grid=grid_xpu, mode='bilinear', align_corners=True)
+        self.assertEqualIgnoreType(out_cpu.to(cpu_device), out_xpu.to(cpu_device), rtol=1e-3, atol=1e-2)
