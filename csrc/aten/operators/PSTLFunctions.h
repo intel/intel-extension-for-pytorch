@@ -823,7 +823,7 @@ void copy_to_dst(
 
 #define VEC_COPY_KERNEL_IMPL(vec_size)                  \
   {                                                     \
-    vec_copy_kernel_impl<vec_size, KeyType, KeyType>(   \
+    vec_copy_kernel_impl<vec_size, KeyType, ValueType>( \
         key, tmp_key_data, val, tmp_val_data, sort_sz); \
   }
 

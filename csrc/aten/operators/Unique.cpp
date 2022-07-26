@@ -51,13 +51,10 @@ Tensor compute_inverse(
         ScalarConvert<float, index_t>::to(0.0),
         AddOp<index_t>());
 
-    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<index_t, index_t>(
+    xpu::pstl::merge_sort<index_t, index_t>(
         sorted_indices_ptr,
         inv_loc_ptr,
-        sorted_indices.size(0), // prb_size
-        1, // batch_size
-        sorted_indices.stride(0), // stride
-        Numerics<index_t>::upper_bound(), // padding
+        sorted_indices.size(0),
         [](index_t a, index_t b) { return Numerics<index_t>::lt(a, b); });
     inverse_indices = inv_loc;
   }
@@ -122,13 +119,10 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
 
   if (num_inp > 0) {
     if (!consecutive) {
-      at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, int64_t>(
+      xpu::pstl::merge_sort<scalar_t, int64_t>(
           output.data_ptr<scalar_t>(),
           sorted_indices.data_ptr<int64_t>(),
-          output.size(0), // prb_size
-          1, // batch_size
-          output.stride(0), // stride
-          Numerics<scalar_t>::upper_bound(),
+          num_inp,
           [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
     }
 
@@ -246,14 +240,8 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   };
 
   if (!consecutive) {
-    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<int64_t, int64_t>(
-        indices_begin,
-        indices_idx.data_ptr<int64_t>(),
-        num_inp, // prb_size
-        1, // batch_size
-        indices.stride(0), // stride
-        Numerics<int64_t>::upper_bound(), // padding
-        less_comp);
+    xpu::pstl::merge_sort<int64_t, int64_t>(
+        indices_begin, indices_idx.data_ptr<int64_t>(), num_inp, less_comp);
   }
   Tensor origin_indices = indices.clone();
   int64_t* origin_indices_data = origin_indices.data_ptr<int64_t>();

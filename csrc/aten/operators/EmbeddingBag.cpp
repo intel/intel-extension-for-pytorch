@@ -551,14 +551,10 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   {
     sorted_indices.copy_(indices);
     xpu::pstl::iota(orig_begin, orig_begin + numel, (index_t)0);
-    at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<index_t, index_t>(
-        sorted_begin,
-        orig_begin,
-        sorted_indices.size(0), // prb_size
-        1, // batch_size
-        sorted_indices.stride(0), // stride
-        Numerics<index_t>::upper_bound(), // padding
-        [](index_t a, index_t b) { return Numerics<index_t>::lt(a, b); });
+    xpu::pstl::merge_sort<index_t, index_t>(
+        sorted_begin, orig_begin, numel, [](index_t a, index_t b) {
+          return Numerics<index_t>::lt(a, b);
+        });
   }
 
   Tensor count;

@@ -189,13 +189,10 @@ Tensor _coalesce(const Tensor& self) {
       uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
   auto indices1D_ptr = indices1D.data_ptr<int64_t>();
-  at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<int64_t, int64_t>(
+  xpu::pstl::merge_sort<int64_t, int64_t>(
       indices1D_ptr,
       origIndices_ptr,
-      indices1D.size(0), // prb_size
-      1, // batch_size
-      indices1D.stride(0), // stride
-      Numerics<int64_t>::upper_bound(), // padding
+      indices1D.size(0),
       [](int64_t a, int64_t b) { return Numerics<int64_t>::lt(a, b); });
 
   auto indices1D_end = indices1D_ptr;

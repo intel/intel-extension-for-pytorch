@@ -155,14 +155,10 @@ Tensor randperm_dpcpp(
   }
 
   xpu::pstl::iota(shuffled_data, shuffled_data + n, scalar_t(0));
-  at::AtenIpexTypeXPU::bitonic_merge_sort_kernel<scalar_t, scalar_t>(
-      keys_data,
-      shuffled_data,
-      keys.size(0), // prb_size
-      1, // batch_size
-      keys.stride(0), // stride
-      Numerics<scalar_t>::upper_bound(), // padding
-      [](scalar_t a, scalar_t b) { return Numerics<scalar_t>::lt(a, b); });
+  xpu::pstl::merge_sort<scalar_t, scalar_t>(
+      keys_data, shuffled_data, keys.size(0), [](scalar_t a, scalar_t b) {
+        return Numerics<scalar_t>::lt(a, b);
+      });
 
   if (!result.is_contiguous()) {
     result.copy_(shuffled);
