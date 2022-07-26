@@ -144,14 +144,14 @@ template <
     typename inp_calc_t,
     typename outp_calc_t>
 void vectorized_elementwise_kernel(
-    DPCPP::item<1>& item,
+    DPCPP::nd_item<1>& item,
     int numel,
     const func_t& fn,
     array_t data,
     inp_calc_t& input_calc,
     outp_calc_t& output_calc) {
   using traits = function_traits<func_t>;
-  int thread_idx = item.get_linear_id();
+  int thread_idx = item.get_global_linear_id();
   int remaining = numel - vec_size * thread_idx;
 
   if (remaining < vec_size) { // if this thread handles the remaining, just do a
@@ -185,14 +185,14 @@ template <
     typename inp_calc_t,
     typename outp_calc_t>
 void unroll_load_vec_store_elementwise_kernel(
-    DPCPP::item<1>& item,
+    DPCPP::nd_item<1>& item,
     int numel,
     const func_t& fn,
     array_t data,
     inp_calc_t& input_calc,
     outp_calc_t& output_calc) {
   using traits = function_traits<func_t>;
-  int thread_idx = item.get_linear_id();
+  int thread_idx = item.get_global_linear_id();
   int remaining = numel - vec_size * thread_idx;
 
   if (remaining < vec_size) { // if this thread handles the remaining, just do a
@@ -288,15 +288,20 @@ static inline void launch_vectorized_kernel(
   constexpr auto max_scalar_bytes = max_scalar_size<func_t>();
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto thread_num = (N + vec_size - 1) / vec_size;
+  auto group_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
 
 #define VEC_LOOPS_KERNEL(vec_size)                                    \
   {                                                                   \
     TORCH_CHECK(max_scalar_bytes* vec_size <= 16);                    \
     if constexpr (max_scalar_bytes * vec_size <= 16) {                \
       auto cgf = DPCPP_Q_CGF(cgh) {                                   \
+        int group_work_size = group_size * vec_size;                  \
+        int num_groups = (N + group_work_size - 1) / group_work_size; \
         cgh.parallel_for(                                             \
-            DPCPP::range<1>(thread_num), [=](DPCPP::item<1> itemId) { \
+            DPCPP::nd_range<1>(                                       \
+                DPCPP::range<1>(num_groups * group_size),             \
+                DPCPP::range<1>(group_size)),                         \
+            [=](DPCPP::nd_item<1> itemId) {                           \
               if constexpr (unroll_load_vec_store) {                  \
                 unroll_load_vec_store_elementwise_kernel<vec_size>(   \
                     itemId, N, fn, data, input_calc, output_calc);    \
