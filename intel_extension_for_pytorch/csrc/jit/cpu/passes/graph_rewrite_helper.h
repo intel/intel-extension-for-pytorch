@@ -12,7 +12,6 @@ namespace graph_rewrite_helper {
 // those code just copy from PyTorch offical and extend
 // replaceConvolutionWithAtenConv to handle conv_transpose3d.
 
-std::string getFuncName(Value* func_value);
 Value* getValue(
     const std::string& name,
     const std::unordered_map<const Value*, Value*>& match_vmap,
