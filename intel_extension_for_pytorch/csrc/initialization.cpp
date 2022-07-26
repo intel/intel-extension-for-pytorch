@@ -30,7 +30,6 @@ void disable_autocast_for_jit_script() {
 InitIPEX::InitIPEX() = default;
 InitIPEX::~InitIPEX() = default;
 InitIPEX::InitIPEX(InitIPEX&&) noexcept = default;
-InitIPEX& InitIPEX::operator=(InitIPEX&&) noexcept = default;
 
 static auto init = InitIPEX()
                        .init(&init_jit_fusion_pass)
