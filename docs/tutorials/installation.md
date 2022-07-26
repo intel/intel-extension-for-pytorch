@@ -5,7 +5,7 @@ Installation Guide
 
 |Category|Content|
 |--|--|
-|Compiler|Recommend using GCC newer than 11.2|
+|Compiler|Recommend using GCC 10|
 |Operating System|CentOS 7, RHEL 8, Rocky Linux 8.5, Ubuntu newer than 18.04|
 |Python|See prebuilt wheel files availability matrix below|
 
@@ -26,7 +26,7 @@ Make sure PyTorch is installed so that the extension will work properly. For eac
 |[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|
 |[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|
 
-Here is an example showing how to install PyTorch. For more details, refer to [pytorch.org](https://pytorch.org/get-started/locally/).
+Please install CPU version of PyTorch through its official channel. For more details, refer to [pytorch.org](https://pytorch.org/get-started/locally/).
 
 ---
 

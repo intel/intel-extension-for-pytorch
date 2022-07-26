@@ -8,24 +8,25 @@ import copy
 import warnings
 
 class MultiStreamModuleHint(object):
+    r"""
+    MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
+    or concat the output. Each argument should be None, with type of int or a container
+    which containes int or None such as: (0, None, ...) or [0, None, ...]. If the argument
+    is None, it means this argument will not be split or concat. If the argument is with
+    type int, its value means along which dim this argument will be split or concat.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Returns:
+        intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint: Generated
+        intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint object.
+
+    :meta public:
+    """
+
     def __init__(self, *args, **kwargs):
-        r"""
-        MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
-        or concat the output. Each argument should be None, with type of int or a container
-        which containes int or None such as: (0, None, ...) or [0, None, ...]. If the argument
-        is None, it means this argument will not be split or concat. If the argument is with
-        type int, its value means along which dim this argument will be split or concat.
-
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint: Generated
-            intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint object.
-
-        :meta public:
-        """
         self.args = list(args)
         self.kwargs = kwargs
         self.args_len = args.__len__()

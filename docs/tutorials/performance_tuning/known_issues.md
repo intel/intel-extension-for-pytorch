@@ -1,6 +1,8 @@
 Known Issues
 ============
 
+- Compiling with gcc 11 might result in `illegal instruction` error.
+
 - `RuntimeError: Overflow when unpacking long` when a tensor's min max value exceeds int range while performing int8 calibration. Please customize QConfig to use min-max calibration method.
 
 - For models with dynamic control flow, please try dynamic quantization. Users are likely to get performance gain for GEMM models.
