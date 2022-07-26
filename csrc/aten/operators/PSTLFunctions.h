@@ -203,12 +203,7 @@ DPCPP_DEVICE static inline OutputIt copy_if(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   // 2. get target positions(with shift -1) using inclusive_scan
-  scan<INCLUSIVE_TYPE, index_t, index_t>(
-      target_pos,
-      global_mask,
-      /*dim*/ 0,
-      ScalarConvert<float, index_t>::to(0.0),
-      AddOp<index_t>());
+  inclusive_scan(gmask_ptr, gmask_ptr + N, tpos_ptr, static_cast<index_t>(0));
 
   // 3. copy selected data into dst
   auto cgf_3 = DPCPP_Q_CGF(__cgh) {
@@ -360,12 +355,7 @@ ForwardIt unique(ForwardIt first, ForwardIt last, BinaryPredicate p) {
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   // 2. get target positions with exclusive_scan
-  scan<EXCLUSIVE_TYPE, index_t, index_t>(
-      target_pos,
-      global_mask,
-      /*dim*/ 0,
-      ScalarConvert<float, index_t>::to(0.0),
-      AddOp<index_t>());
+  exclusive_scan(gmask_ptr, gmask_ptr + N, tpos_ptr, static_cast<index_t>(0));
 
   // 3. copy selected data into dst
   Tensor scratchpad = at::empty({N}, options);
@@ -436,12 +426,7 @@ std::tuple<ForwardIt, ZipForwardIt> unique_with_zip(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   // 2. get target positions with exclusive_scan
-  scan<EXCLUSIVE_TYPE, index_t, index_t>(
-      target_pos,
-      global_mask,
-      /*dim*/ 0,
-      ScalarConvert<float, index_t>::to(0.0),
-      AddOp<index_t>());
+  exclusive_scan(gmask_ptr, gmask_ptr + N, tpos_ptr, static_cast<index_t>(0));
 
   // 3. copy selected data into dst
   Tensor scratchpad = at::empty({N}, options);
@@ -571,12 +556,7 @@ OutputIt count_by_segment(
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf_1);
 
   // 2. get target positions with inclusive_scan
-  scan<INCLUSIVE_TYPE, index_t, index_t>(
-      target_pos,
-      global_mask,
-      /*dim*/ 0,
-      ScalarConvert<float, index_t>::to(0.0),
-      AddOp<index_t>());
+  inclusive_scan(gmask_ptr, gmask_ptr + N, tpos_ptr, static_cast<index_t>(0));
 
   // 3. calculate counts for each unique point
   Tensor range = at::empty({N + 1}, options);
