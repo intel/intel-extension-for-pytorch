@@ -2,7 +2,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
@@ -23,12 +23,13 @@ namespace onednn {
 // (1) and (2) are in the purpose of aligning with the OP spec of LLGA.
 // (3) is an optimization pass to remove the redundant calculation
 //
-void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph);
+void PrepareBinaryForLLGA(const std::shared_ptr<torch::jit::Graph>& graph);
 
 // For unfused add/div, convert tensor input back to scalar input
-void RevertPrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph);
+void RevertPrepareBinaryForLLGA(
+    const std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

@@ -6,12 +6,14 @@
 #include <torch/csrc/jit/passes/utils/subgraph_utils.h>
 #include "graph_helper.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 
 namespace {
+
+using namespace torch::jit;
 
 struct WorkBlock : public std::pair<Node*, Node*> {
   using pair::pair;
@@ -203,4 +205,4 @@ void CreateLlgaSubgraphs(std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

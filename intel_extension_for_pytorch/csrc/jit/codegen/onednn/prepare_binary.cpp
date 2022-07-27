@@ -2,10 +2,12 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/shape_analysis.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 bool compareConstValue(Value* v, double d) {
   auto ival = toIValue(v);
@@ -140,4 +142,4 @@ void RevertPrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

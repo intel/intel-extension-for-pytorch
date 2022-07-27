@@ -17,13 +17,14 @@
 #include "folding_common_utils.h"
 #include "frozen_conv_folding.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 
 namespace graph_rewrite {
 
 using Tensor = at::Tensor;
 using namespace torch_ipex::cpu;
+using namespace torch::jit;
 
 bool supportedConvNode(Node* n) {
   if (n->kind() == aten::conv2d || n->kind() == aten::conv3d) {
@@ -351,4 +352,4 @@ void FrozenConvFolding(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

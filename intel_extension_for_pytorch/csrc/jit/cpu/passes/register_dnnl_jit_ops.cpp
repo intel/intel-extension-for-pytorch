@@ -20,8 +20,14 @@
 #include "csrc/jit/cpu/kernels/Shuffle.h"
 #include "csrc/jit/cpu/kernels/Softmax.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
+
+using namespace torch::jit;
+using namespace torch_ipex::cpu;
+using namespace torch_ipex::cpu::detail::convolution;
+using namespace torch_ipex::cpu::detail::linear;
+using namespace torch_ipex::cpu::detail::conv_transpose;
 
 c10::AliasAnalysisKind aliasAnalysisFromSchema() {
   return c10::AliasAnalysisKind::FROM_SCHEMA;
@@ -30,11 +36,6 @@ c10::AliasAnalysisKind aliasAnalysisFromSchema() {
 at::Tensor toOptionalTensor(const IValue& v) {
   return v.isNone() ? at::Tensor() : v.toTensor();
 }
-
-using namespace torch_ipex::cpu;
-using namespace torch_ipex::cpu::detail::convolution;
-using namespace torch_ipex::cpu::detail::linear;
-using namespace torch_ipex::cpu::detail::conv_transpose;
 
 #define CONV_PREPACK_ARGS                         \
   "Tensor W, Tensor? B, "                         \
@@ -60,7 +61,7 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
               std::move((std::move(peek(stack, 7, 8))).toIntVector()),     \
               ideep::attr_t::fuse_##FUSED_OP());                           \
           drop(stack, 8);                                                  \
-          pack(stack, std::move(result));                                  \
+          torch::jit::pack(stack, std::move(result));                      \
           return 0;                                                        \
         };                                                                 \
       },                                                                   \
@@ -79,7 +80,7 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
               (std::move(peek(stack, 1, 2)))                       \
                   .toCustomClass<ConvolutionOpContext>());         \
           drop(stack, 2);                                          \
-          pack(stack, std::move(result));                          \
+          torch::jit::pack(stack, std::move(result));              \
           return 0;                                                \
         };                                                         \
       },                                                           \
@@ -106,7 +107,7 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
               std::move((std::move(peek(stack, 7, 9))).toIntVector()),        \
               ideep::attr_t::ATTR(scale));                                    \
           drop(stack, 9);                                                     \
-          pack(stack, std::move(result));                                     \
+          torch::jit::pack(stack, std::move(result));                         \
           return 0;                                                           \
         };                                                                    \
       },                                                                      \
@@ -129,7 +130,7 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
               (std::move(peek(stack, 3, 4)))                           \
                   .toCustomClass<ConvolutionOpContext>());             \
           drop(stack, 4);                                              \
-          pack(stack, std::move(result));                              \
+          torch::jit::pack(stack, std::move(result));                  \
           return 0;                                                    \
         };                                                             \
       },                                                               \
@@ -148,7 +149,7 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
               (std::move(peek(stack, 1, 2)))                  \
                   .toCustomClass<LinearOpContext>());         \
           drop(stack, 2);                                     \
-          pack(stack, std::move(result));                     \
+          torch::jit::pack(stack, std::move(result));         \
           return 0;                                           \
         };                                                    \
       },                                                      \
@@ -167,13 +168,13 @@ using namespace torch_ipex::cpu::detail::conv_transpose;
               (std::move(peek(stack, 1, 2)))                         \
                   .toCustomClass<ConvTransposeOpContext>());         \
           drop(stack, 2);                                            \
-          pack(stack, std::move(result));                            \
+          torch::jit::pack(stack, std::move(result));                \
           return 0;                                                  \
         };                                                           \
       },                                                             \
       aliasAnalysisFromSchema())
 
-RegisterOperators op({
+torch::jit::RegisterOperators op({
     CreateConvUnaryPostOpPrepack(relu),
     CreateConvUnaryPostOpPrepack(sigmoid),
     CreateConvUnaryPostOpPrepack(swish),
@@ -230,7 +231,7 @@ RegisterOperators op({
                 ideep::attr_t::fuse_clamp(
                     lower_bound_value, upper_bound_value));
             drop(stack, 10);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -259,7 +260,7 @@ RegisterOperators op({
                 ideep::attr_t::fuse_elu(
                     scale_value, alpha_value, input_scale_value));
             drop(stack, 11);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -283,7 +284,7 @@ RegisterOperators op({
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
                 ideep::attr_t::fuse_relu(1.0, alpha_value));
             drop(stack, 9);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -307,7 +308,7 @@ RegisterOperators op({
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
                 ideep::attr_t::fuse_pow(1.0, exponent_value));
             drop(stack, 9);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -336,7 +337,7 @@ RegisterOperators op({
                 std::move((std::move(peek(stack, 7, 9))).toIntVector()),
                 ideep::attr_t::fuse_gelu(1.f, 0.f, 0.f, gelu_type));
             drop(stack, 9);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -355,7 +356,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -375,7 +376,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 4, 5)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 5);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -392,7 +393,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -409,7 +410,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -433,7 +434,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -458,7 +459,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 4, 5)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 5);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -475,7 +476,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvolutionOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -508,7 +509,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -527,7 +528,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -547,7 +548,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 4, 5)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 5);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -564,7 +565,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -581,7 +582,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -601,7 +602,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -621,7 +622,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -655,7 +656,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -672,7 +673,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -691,7 +692,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -711,7 +712,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 4, 5)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 5);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -728,7 +729,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 3)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -749,7 +750,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -769,7 +770,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<ConvTransposeOpContext>());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -785,7 +786,7 @@ RegisterOperators op({
                 toOptionalTensor(std::move(peek(stack, 2, 4))),
                 (std::move(peek(stack, 3, 4))).toTensor());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -802,7 +803,7 @@ RegisterOperators op({
                 toOptionalTensor(std::move(peek(stack, 2, 4))),
                 (std::move(peek(stack, 3, 4))).toScalar());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -819,7 +820,7 @@ RegisterOperators op({
                 at::Tensor(),
                 (std::move(peek(stack, 2, 3))).toTensor());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -836,7 +837,7 @@ RegisterOperators op({
                 at::Tensor(),
                 (std::move(peek(stack, 2, 3))).toScalar());
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -853,7 +854,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toTensor(),
                 (std::move(peek(stack, 3, 4))).toScalar());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -873,7 +874,7 @@ RegisterOperators op({
               peek(stack, 5, 7).toInt(),
               peek(stack, 6, 7));
           drop(stack, 7);
-          pack(stack, std::move(result));
+          torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
 
@@ -894,7 +895,7 @@ RegisterOperators op({
               peek(stack, 7, 8).toScalar());
           drop(stack, 8);
 
-          pack(stack, std::move(result));
+          torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
 
@@ -911,7 +912,7 @@ RegisterOperators op({
               peek(stack, 3, 4).toScalar());
           drop(stack, 4);
 
-          pack(stack, std::move(result));
+          torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
 
@@ -923,7 +924,7 @@ RegisterOperators op({
               peek(stack, 1, 3).toTensor(),
               toOptionalTensor(std::move(peek(stack, 2, 3))));
           drop(stack, 3);
-          pack(stack, std::move(result));
+          torch::jit::pack(stack, std::move(result));
         },
         aliasAnalysisFromSchema()),
 
@@ -936,7 +937,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 1, 3))).toInt(),
                 (std::move(peek(stack, 2, 3))));
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -951,7 +952,7 @@ RegisterOperators op({
             auto result = dil_softmax_(
                 output, peek(stack, 1, 3).toInt(), peek(stack, 2, 3));
             drop(stack, 3);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -972,7 +973,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 7, 9))).toDouble(),
                 (std::move(peek(stack, 8, 9))).toBool());
             drop(stack, 9);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -994,7 +995,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 6, 8))).toInt(),
                 (std::move(peek(stack, 7, 8))).toScalarType());
             drop(stack, 8);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1011,7 +1012,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toInt(),
                 (std::move(peek(stack, 3, 4))).toScalarType());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1036,9 +1037,9 @@ RegisterOperators op({
                 (std::move(peek(stack, 11, 12))).toInt());
             drop(stack, 12);
 
-            pack(stack, std::move(std::get<0>(result)));
-            pack(stack, std::move(std::get<1>(result)));
-            pack(stack, std::move(std::get<2>(result)));
+            torch::jit::pack(stack, std::move(std::get<0>(result)));
+            torch::jit::pack(stack, std::move(std::get<1>(result)));
+            torch::jit::pack(stack, std::move(std::get<2>(result)));
             return 0;
           };
         },
@@ -1058,7 +1059,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 2, 4))).toInt(),
                 (std::move(peek(stack, 3, 4))).toInt());
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1080,7 +1081,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 6, 8))).toDouble(),
                 (std::move(peek(stack, 7, 8))).toBool());
             drop(stack, 8);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1105,7 +1106,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 10, 12))).toBool(),
                 (std::move(peek(stack, 11, 12))).toInt());
             drop(stack, 12);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1123,7 +1124,7 @@ RegisterOperators op({
                   other_arg_st,
                   (std::move(peek(stack, 3, 4))).toScalar());
               drop(stack, 4);
-              pack(stack, std::move(result));
+              torch::jit::pack(stack, std::move(result));
             } else {
               auto result = einsum_binary(
                   (std::move(peek(stack, 0, 4))).toStringView(),
@@ -1131,7 +1132,7 @@ RegisterOperators op({
                   other_arg.toTensor(),
                   (std::move(peek(stack, 3, 4))).toScalar());
               drop(stack, 4);
-              pack(stack, std::move(result));
+              torch::jit::pack(stack, std::move(result));
             }
             return 0;
           };
@@ -1150,7 +1151,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4))).toScalar());
 
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1168,7 +1169,7 @@ RegisterOperators op({
                 (std::move(peek(stack, 3, 4))).toScalar());
 
             drop(stack, 4);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
@@ -1186,11 +1187,12 @@ RegisterOperators op({
                 (std::move(peek(stack, 4, 6))).toIntVector(),
                 (std::move(peek(stack, 5, 6))).toBool());
             drop(stack, 6);
-            pack(stack, std::move(result));
+            torch::jit::pack(stack, std::move(result));
             return 0;
           };
         },
         aliasAnalysisFromSchema()),
 });
+
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

@@ -8,11 +8,12 @@
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/utils/subgraph_utils.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 
+using namespace torch::jit;
 using opkind = dnnl::graph::op::kind;
 
 void fixConvOptionalBias(Node* node) {
@@ -437,7 +438,7 @@ bool LlgaGraphHelper::isSupported(Node* node) const {
   return createOperator(node).kind() != opkind::Wildcard;
 }
 
-DeviceType inferDeviceFromValue(Value* v) {
+at::DeviceType inferDeviceFromValue(Value* v) {
   auto tt = v->type()->cast<TensorType>();
   if (!tt)
     return at::kCPU;
@@ -447,7 +448,7 @@ DeviceType inferDeviceFromValue(Value* v) {
   return device->type();
 }
 
-DeviceType inferDevice(const std::shared_ptr<Graph>& graph) {
+at::DeviceType inferDevice(const std::shared_ptr<Graph>& graph) {
   auto dt = inferDeviceFromValue(graph->inputs()[0]);
   TORCH_CHECK(
       std::all_of(
@@ -458,9 +459,9 @@ DeviceType inferDevice(const std::shared_ptr<Graph>& graph) {
   return dt;
 }
 
-dnnl::graph::engine::kind getLlgaEngineKind(DeviceType type) {
+dnnl::graph::engine::kind getLlgaEngineKind(at::DeviceType type) {
   switch (type) {
-    case DeviceType::CPU:
+    case at::DeviceType::CPU:
       return dnnl::graph::engine::kind::cpu;
     default:
       TORCH_CHECK(false, "Not support device type ", type);
@@ -732,4 +733,4 @@ void LlgaNodeWrapper::initOutputLayouts() {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

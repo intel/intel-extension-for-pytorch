@@ -2,10 +2,12 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include "utils.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 bool usedBySingleOp(Value* v) {
   return v->uses().size() == 1;
@@ -116,4 +118,4 @@ void LiftUpQuant(std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

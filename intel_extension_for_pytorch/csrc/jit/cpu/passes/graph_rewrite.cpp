@@ -1,28 +1,15 @@
 #include "graph_rewrite.h"
-#include <ATen/code_template.h>
-#include <torch/csrc/jit/passes/remove_mutation.h>
+#include "graph_rewrite_helper.h"
 #include "utils.h"
 
-namespace torch {
+#include <ATen/code_template.h>
+#include <torch/csrc/jit/passes/remove_mutation.h>
+
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
-// those code just copy from PyTorch offical:
-// https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/graph_rewrite_helper.cpp
-
-Value* getValue(
-    const std::string& name,
-    const std::unordered_map<const Value*, Value*>& match_vmap,
-    const std::unordered_map<std::string, Value*>& vmap) {
-  return match_vmap.at(vmap.at(name));
-}
-
-c10::optional<IValue> getIValue(
-    const std::string& name,
-    const std::unordered_map<const Value*, Value*>& match_vmap,
-    const std::unordered_map<std::string, Value*>& vmap) {
-  return toIValue(getValue(name, match_vmap, vmap));
-}
+using namespace torch::jit;
 
 // FuseShuffle is matching the channelshuffle pattern, where:
 // (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
@@ -170,10 +157,14 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
          const std::unordered_map<std::string, Value*>& vmap) {
         const auto& match_vmap = match.values_map;
 
-        auto n_idx = getIValue("idx_0", match_vmap, vmap);
-        auto c_idx = getIValue("idx_1", match_vmap, vmap);
-        auto h_idx = getIValue("idx_2", match_vmap, vmap);
-        auto w_idx = getIValue("idx_3", match_vmap, vmap);
+        auto n_idx = torch_ipex::jit::graph_rewrite_helper::getIValue(
+            "idx_0", match_vmap, vmap);
+        auto c_idx = torch_ipex::jit::graph_rewrite_helper::getIValue(
+            "idx_1", match_vmap, vmap);
+        auto h_idx = torch_ipex::jit::graph_rewrite_helper::getIValue(
+            "idx_2", match_vmap, vmap);
+        auto w_idx = torch_ipex::jit::graph_rewrite_helper::getIValue(
+            "idx_3", match_vmap, vmap);
         if (!n_idx.has_value() || !c_idx.has_value() || !h_idx.has_value() ||
             !w_idx.has_value()) {
           return false;
@@ -347,7 +338,9 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         const auto& match_vmap = match.values_map;
 
         // Only support last dimension for softmax
-        auto dim_ = getIValue("softmax_dim", match_vmap, vmap).value();
+        auto dim_ = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                        "softmax_dim", match_vmap, vmap)
+                        .value();
         if (!(dim_.isInt())) {
           return false;
         }
@@ -396,7 +389,9 @@ void FuseMHAScoreCalc(std::shared_ptr<Graph>& graph) {
         }
 
         // Checking the dtype as None
-        auto dtype_value = getIValue("dtype", match_vmap, vmap).value();
+        auto dtype_value = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                               "dtype", match_vmap, vmap)
+                               .value();
         if (!dtype_value.isNone()) {
           return false;
         }
@@ -723,10 +718,14 @@ void fuseBmmAdd(std::shared_ptr<Graph>& graph) {
                           const std::unordered_map<std::string, Value*>& vmap) {
     const auto& match_vmap = match.values_map;
 
-    auto batch1 =
-        getValue("batch1", match_vmap, vmap)->type()->cast<TensorType>();
-    auto batch2 =
-        getValue("batch2", match_vmap, vmap)->type()->cast<TensorType>();
+    auto batch1 = torch_ipex::jit::graph_rewrite_helper::getValue(
+                      "batch1", match_vmap, vmap)
+                      ->type()
+                      ->cast<TensorType>();
+    auto batch2 = torch_ipex::jit::graph_rewrite_helper::getValue(
+                      "batch2", match_vmap, vmap)
+                      ->type()
+                      ->cast<TensorType>();
     if (batch1->dim() != batch2->dim()) {
       return false;
     }
@@ -766,7 +765,9 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     Node* node = match.anchor;
     const auto& match_vmap = match.values_map;
     // Check if the Concat Dimension is the channel
-    auto dim_ = getIValue("dim", match_vmap, vmap).value();
+    auto dim_ = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                    "dim", match_vmap, vmap)
+                    .value();
     if (!(dim_.isInt())) {
       return false;
     }
@@ -870,4 +871,4 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

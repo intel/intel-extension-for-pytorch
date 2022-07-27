@@ -1,6 +1,6 @@
 #include "runtime.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
@@ -20,4 +20,4 @@ stream& Stream::getStream() {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

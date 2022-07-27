@@ -1,18 +1,21 @@
-#include "csrc/jit/cpu/passes/utils.h"
+#include "utils.h"
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
-#include <torch/csrc/jit/passes/graph_rewrite_helper.h>
+#include "graph_rewrite_helper.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 namespace utils {
+
+using namespace torch::jit;
 
 bool aten_gelu_approximate_is_supported(
     const Match& match,
     const std::unordered_map<std::string, Value*>& vmap) {
   const auto& match_vmap = match.values_map;
-  auto approximate_value =
-      graph_rewrite_helper::getIValue("approximate", match_vmap, vmap).value();
+  auto approximate_value = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                               "approximate", match_vmap, vmap)
+                               .value();
   return approximate_value == "none" || approximate_value == "tanh";
 }
 
@@ -20,8 +23,9 @@ bool aten_elu_no_input_scale(
     const Match& match,
     const std::unordered_map<std::string, Value*>& vmap) {
   const auto& match_vmap = match.values_map;
-  auto input_scale_value =
-      graph_rewrite_helper::getIValue("input_scale", match_vmap, vmap).value();
+  auto input_scale_value = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                               "input_scale", match_vmap, vmap)
+                               .value();
   bool no_input_scale = input_scale_value.isDouble()
       ? (input_scale_value.toDouble() == 1.0)
       : (input_scale_value.toInt() == 1);
@@ -33,9 +37,11 @@ bool aten_clamp_min_max_not_none(
     const std::unordered_map<std::string, Value*>& vmap) {
   const auto& match_vmap = match.values_map;
   auto min_value =
-      graph_rewrite_helper::getIValue("min", match_vmap, vmap).value();
+      torch_ipex::jit::graph_rewrite_helper::getIValue("min", match_vmap, vmap)
+          .value();
   auto max_value =
-      graph_rewrite_helper::getIValue("max", match_vmap, vmap).value();
+      torch_ipex::jit::graph_rewrite_helper::getIValue("max", match_vmap, vmap)
+          .value();
   return !min_value.isNone() && !max_value.isNone();
 }
 
@@ -43,8 +49,9 @@ bool aten_pow_exponent_is_scalar(
     const Match& match,
     const std::unordered_map<std::string, Value*>& vmap) {
   const auto& match_vmap = match.values_map;
-  auto exponent_value =
-      graph_rewrite_helper::getIValue("exponent", match_vmap, vmap).value();
+  auto exponent_value = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                            "exponent", match_vmap, vmap)
+                            .value();
   return exponent_value.isScalar();
 }
 
@@ -167,4 +174,4 @@ bool is_contiguous(c10::TensorTypePtr tensor) {
 } // namespace utils
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

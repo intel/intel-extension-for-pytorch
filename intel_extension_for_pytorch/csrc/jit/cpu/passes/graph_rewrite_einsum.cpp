@@ -1,20 +1,24 @@
 #include "graph_rewrite.h"
+#include "graph_rewrite_helper.h"
 #include "graph_rewrite_utils.h"
 
 #include <ATen/code_template.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
 using namespace at::jit;
+using namespace torch::jit;
 
 auto ipex_einsum_filter =
     [](const Match& match,
        const std::unordered_map<std::string, Value*>& vmap) {
       const auto& match_vmap = match.values_map;
-      auto equation =
-          getIValue("equation", match_vmap, vmap).value().toStringView();
+      auto equation = torch_ipex::jit::graph_rewrite_helper::getIValue(
+                          "equation", match_vmap, vmap)
+                          .value()
+                          .toStringView();
       int num_ops = std::count(equation.begin(), equation.end(), ',') + 1;
       if (num_ops != 2) {
         return false; // only process the 2 operands
@@ -46,4 +50,4 @@ void FusedEinsumPost(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

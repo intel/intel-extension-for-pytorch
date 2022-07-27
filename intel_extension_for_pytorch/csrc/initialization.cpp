@@ -15,7 +15,7 @@ void init_jit_fusion_pass() {
   // jit fusion pass
   torch::jit::registerPrePass([](std::shared_ptr<torch::jit::Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
-      torch::jit::FusionPass(g);
+      torch_ipex::jit::FusionPass(g);
     }
   });
 }

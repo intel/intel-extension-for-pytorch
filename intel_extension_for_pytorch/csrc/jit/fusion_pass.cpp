@@ -1,14 +1,13 @@
 #include "fusion_pass.h"
 #include <string>
 #include "codegen/onednn/interface.h"
-#include "cpu/passes/graph_rewrite.h"
-#include "cpu/passes/prepack_folding.h"
-
 #include "cpu/kernels/Matmul.h"
 #include "cpu/passes/concat_linear.h"
 #include "cpu/passes/frozen_conv_folding.h"
 #include "cpu/passes/frozen_linear_folding.h"
+#include "cpu/passes/graph_rewrite.h"
 #include "cpu/passes/graph_rewrite_helper.h"
+#include "cpu/passes/prepack_folding.h"
 #include "cpu/passes/remove_redundant_aliases.h"
 
 #include <c10/util/hash.h>
@@ -24,13 +23,12 @@
 #include <torch/csrc/jit/passes/tensorexpr_fuser.h>
 #include <torch/csrc/jit/runtime/operator.h>
 
-using namespace torch::jit;
-
 // XXX: move to somewhere convenient
 namespace std {
 template <>
-struct hash<std::pair<Symbol, Symbol>> {
-  size_t operator()(std::pair<Symbol, Symbol> pair) const {
+struct hash<std::pair<torch::jit::Symbol, torch::jit::Symbol>> {
+  size_t operator()(
+      std::pair<torch::jit::Symbol, torch::jit::Symbol> pair) const {
     return std::hash<uint64_t>()(
         static_cast<uint64_t>(pair.first) << 32 |
         static_cast<uint64_t>(pair.second));
@@ -38,8 +36,11 @@ struct hash<std::pair<Symbol, Symbol>> {
 };
 } // namespace std
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
+
+using namespace torch::jit;
+
 // Including in-place optimizations that try to (conditionally)
 // replace the origin op with in-place opted one for better performance.
 // This in-place optimized ops may come from either oneDNN or aten
@@ -79,7 +80,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   graph_rewrite::fuseBmmAdd(graph);
 
   // Replace _convolution with conv2d or conv3d
-  graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
+  torch_ipex::jit::graph_rewrite_helper::replaceConvolutionWithAtenConv(graph);
 
   // Replace torch_ipex::convolution_forward with conv2d or conv3d when conv
   // weights are constant. Conv weights will be unpacked in this step.
@@ -110,7 +111,8 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // linear folding
   graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(graph);
   // concat multi-linear with same input
-  torch::jit::FrozenConcatLinear(graph, aten_linear_recorder.get_records());
+  torch_ipex::jit::FrozenConcatLinear(
+      graph, aten_linear_recorder.get_records());
   graph_rewrite::FrozenLinearFolding(graph);
 
   // linear fusion
@@ -233,13 +235,11 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   IPEXFusionPass(graph);
   GRAPH_DUMP(
       "After IPEXFusionPass. Before RemoveTensorTypeSpecializations", graph);
-
   // TODO: workaround here to go throughput the TE fuser pass before
   // RemoveTensorTypeSpecializations since TE fuser needs the type
   // specializations
   LowerSimpleTuples(graph);
   BatchMM(graph);
-
   if (tensorExprFuserEnabled()) {
     auto min_size = getFusionGroupInlining() ? 2 : 1;
     // Here we always get the first valid behavior per the global fusion
@@ -256,10 +256,10 @@ void FusionPass(std::shared_ptr<Graph>& graph) {
   // Note: Since TE is with priority and it has not supported inplace op yet,
   //       we make inplace optimization after TE.
   ApplyInplaceOptimization(graph);
-
   RemoveTensorTypeSpecializations(graph);
   GRAPH_DUMP(
       "After RemoveTensorTypeSpecializations. End of optimization pass", graph);
 }
+
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

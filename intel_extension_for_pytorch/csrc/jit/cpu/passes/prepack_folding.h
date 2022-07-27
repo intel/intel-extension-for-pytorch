@@ -2,10 +2,10 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 
-void PrePackingOpsFolder(std::shared_ptr<Graph>& graph);
+void PrePackingOpsFolder(std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

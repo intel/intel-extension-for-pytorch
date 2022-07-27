@@ -2,10 +2,12 @@
 
 #include "utils.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 class SizeCheckMover {
  private:
@@ -91,4 +93,4 @@ void DeferSizeCheck(std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

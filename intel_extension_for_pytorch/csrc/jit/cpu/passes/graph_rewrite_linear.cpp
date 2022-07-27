@@ -5,12 +5,13 @@
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
 using namespace at::jit;
 using namespace torch_ipex::cpu;
+using namespace torch::jit;
 
 void replaceFrozenIPEXLinearWithAtenLinear(
     Block* b,
@@ -324,4 +325,4 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

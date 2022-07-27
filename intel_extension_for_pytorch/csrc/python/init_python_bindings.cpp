@@ -95,16 +95,16 @@ void InitIpexModuleBindings(py::module m) {
   // llga path
   m.def(
       "is_llga_fp32_bf16_enabled",
-      &torch::jit::fuser::onednn::is_llga_fp32_bf16_enabled);
+      &torch_ipex::jit::fuser::onednn::is_llga_fp32_bf16_enabled);
   m.def(
       "set_llga_fp32_bf16_enabled",
-      &torch::jit::fuser::onednn::set_llga_fp32_bf16_enabled);
+      &torch_ipex::jit::fuser::onednn::set_llga_fp32_bf16_enabled);
   m.def(
       "_jit_set_llga_weight_cache_enabled",
-      &torch::jit::fuser::onednn::setLlgaWeightCacheEnabled);
+      &torch_ipex::jit::fuser::onednn::setLlgaWeightCacheEnabled);
   m.def(
       "_jit_llga_weight_cache_enabled",
-      &torch::jit::fuser::onednn::getLlgaWeightCacheEnabled);
+      &torch_ipex::jit::fuser::onednn::getLlgaWeightCacheEnabled);
 
   m.def("enable_jit_opt", []() {
     AutoOptConfig::singleton().set_jit_fuse(true);

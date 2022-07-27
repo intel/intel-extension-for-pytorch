@@ -5,10 +5,12 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 bool shouldDecomposeSilu(Node* node) {
   if (node->kind() != aten::silu) {
@@ -62,4 +64,4 @@ void PrepareSiluForLLGA(std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

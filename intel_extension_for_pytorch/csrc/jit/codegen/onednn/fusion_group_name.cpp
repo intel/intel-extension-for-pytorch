@@ -1,6 +1,6 @@
 #include "fusion_group_name.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
@@ -18,4 +18,4 @@ const std::string& LlgaGuardName() {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex
