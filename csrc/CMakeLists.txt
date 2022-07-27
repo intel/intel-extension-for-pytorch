@@ -120,24 +120,28 @@ if (USE_CHANNELS_LAST_1D)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_CHANNELS_LAST_1D")
 endif()
 
-if(USE_ONEDPL)
-    find_package(oneDPL)
-    target_link_libraries(intel-ext-pt-gpu PUBLIC oneDPL)
-    if(BUILD_SEPARATE_OPS)
-        foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
-            target_link_libraries(${op_lib} PUBLIC oneDPL)
-        endforeach()
-    endif()
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_ONEDPL")
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};ONEDPL_USE_TBB_BACKEND=0")
-    # FIXME:
-    # Refer to oneAPI TBB release note:
-    # https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-threading-building-blocks-release-notes.html
-    # We must set below two flags to bypass TBB checking by GCC with libstdc++ 9 and libstdc++ 10
-    # Related Jira: https://jira.devtools.intel.com/browse/ONEDPL-245
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};PSTL_USE_PARALLEL_POLICIES=0")
-    set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};_GLIBCXX_USE_TBB_PAR_BACKEND=0")
+# use onedpl
+find_package(oneDPL)
+if (ONEDPL_FOUND)
+  target_link_libraries(intel-ext-pt-gpu PUBLIC oneDPL)
+  if(BUILD_SEPARATE_OPS)
+      foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
+          target_link_libraries(${op_lib} PUBLIC oneDPL)
+      endforeach()
+  endif()
+  set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};ONEDPL_USE_TBB_BACKEND=0")
+  # FIXME:
+  # Refer to oneAPI TBB release note:
+  # https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-threading-building-blocks-release-notes.html
+  # We must set below two flags to bypass TBB checking by GCC with libstdc++ 9 and libstdc++ 10
+  # Related Jira: https://jira.devtools.intel.com/browse/ONEDPL-245
+  set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};PSTL_USE_PARALLEL_POLICIES=0")
+  set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};_GLIBCXX_USE_TBB_PAR_BACKEND=0")
+else()
+  message(FATAL_ERROR "Cannot find oneDPL")
 endif()
+
+
 
 if (USE_MULTI_CONTEXT)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_MULTI_CONTEXT")
