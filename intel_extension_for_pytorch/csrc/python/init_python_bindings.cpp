@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "intel_extension_for_pytorch/csrc/jit/auto_opt_config.h"
-#include "intel_extension_for_pytorch/csrc/utils/env_settings.h"
 #include "intel_extension_for_pytorch/csrc/utils/fpmath_mode.h"
 #include "intel_extension_for_pytorch/csrc/utils/onednn_utils.h"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
@@ -66,11 +65,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("_get_highest_binary_support_isa_level", []() {
     using namespace torch_ipex::cpu;
     return get_highest_binary_support_isa_level();
-  });
-
-  m.def("set_profile_op_enabled", [](bool b_enable) {
-    using namespace torch_ipex;
-    EnvSettings::get_instance().set_settings_profile_op(b_enable);
   });
 
   m.def("mkldnn_set_verbose", &torch_ipex::utils::onednn_set_verbose);
@@ -208,11 +202,12 @@ void InitIpexModuleBindings(py::module m) {
         return;
       });
 }
+
 } // namespace
+
 using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
-  EnvSettings::get_instance().initialize_all_settings();
   InitIpexModuleBindings(m);
 }
 

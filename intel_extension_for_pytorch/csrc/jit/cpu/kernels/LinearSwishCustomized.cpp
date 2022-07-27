@@ -10,7 +10,6 @@
 #include <limits>
 
 #include "csrc/cpu/ideep/ideep.hpp"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {

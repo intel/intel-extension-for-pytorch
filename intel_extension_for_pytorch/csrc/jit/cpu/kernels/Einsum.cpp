@@ -12,7 +12,6 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/jit/cpu/kernels/Matmul.h"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -732,7 +731,7 @@ at::Tensor einsum_binary(
     const c10::List<at::Tensor>& operands,
     const at::Tensor& add_arg,
     const c10::Scalar& alpha) {
-  IPEX_RECORD_FUNCTION("dil_einsum_binary", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_einsum_binary", c10::ArrayRef<c10::IValue>({}));
   auto prepare_res = einsum_prepare(equation, operands);
   bool has_zero_size_dim = std::get<0>(prepare_res);
   auto out_size = std::get<1>(prepare_res);

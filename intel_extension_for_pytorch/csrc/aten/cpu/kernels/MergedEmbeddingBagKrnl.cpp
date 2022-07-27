@@ -4,7 +4,6 @@
 #include <torch/extension.h>
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/vec/vec.h"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -57,7 +56,7 @@ void merged_embeddingbag_forward_cpu_kernel(
     const std::vector<Tensor>& weights,
     const std::vector<int64_t> pooling_modes,
     std::vector<Tensor>& outputs) {
-  IPEX_RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
 
   int64_t n_tables = weights.size();
   TORCH_CHECK(n_tables > 0);

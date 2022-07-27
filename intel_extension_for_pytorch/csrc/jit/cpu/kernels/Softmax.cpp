@@ -11,7 +11,6 @@
 #include <limits>
 
 #include "csrc/cpu/ideep/ideep.hpp"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -47,7 +46,7 @@ at::Tensor dil_softmax(
     const at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-  IPEX_RECORD_FUNCTION("dil_softmax", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_softmax", c10::ArrayRef<c10::IValue>({}));
 
   auto half_to_float = false;
 
@@ -68,7 +67,7 @@ at::Tensor& dil_softmax_(
     at::Tensor& input,
     const int64_t dim,
     const at::IValue& dtype) {
-  IPEX_RECORD_FUNCTION("dil_softmax_", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_softmax_", c10::ArrayRef<c10::IValue>({}));
 
   auto half_to_float = false;
   if (!dtype.isNone()) {

@@ -3,7 +3,6 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -14,7 +13,7 @@ namespace linear {
   at::Tensor linear_##FUSED_OP##_run(                                \
       const at::Tensor& input,                                       \
       const c10::intrusive_ptr<LinearOpContext>& op_context) {       \
-    IPEX_RECORD_FUNCTION(                                            \
+    RECORD_FUNCTION(                                                 \
         "ipex_prepack::linear_" #FUSED_OP "_run",                    \
         c10::ArrayRef<c10::IValue>({}));                             \
     return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP()); \
@@ -24,7 +23,7 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
     c10::optional<int64_t> batch_size) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::createLinearPrePackOpContext",
       c10::ArrayRef<c10::IValue>({}));
 
@@ -37,8 +36,7 @@ c10::intrusive_ptr<LinearOpContext> createLinearPrePackOpContext(
 at::Tensor linear_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "ipex_prepack::linear_run", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("ipex_prepack::linear_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t());
 }
@@ -61,7 +59,7 @@ at::Tensor linear_leaky_relu_run(
     const at::Tensor& input,
     at::Scalar alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_leaky_relu_run", c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
   return op_context->run(input, ideep::attr_t::fuse_relu(1.0, alpha_value));
@@ -72,7 +70,7 @@ at::Tensor linear_hardtanh_run(
     at::Scalar lower_bound,
     at::Scalar upper_bound,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_hardtanh_run", c10::ArrayRef<c10::IValue>({}));
   auto lower_bound_value = lower_bound.to<float>();
   auto upper_bound_value = upper_bound.to<float>();
@@ -86,7 +84,7 @@ at::Tensor linear_elu_run(
     at::Scalar scale,
     at::Scalar input_scale,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_elu_run", c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
   auto scale_value = scale.to<float>();
@@ -100,7 +98,7 @@ at::Tensor linear_pow_run(
     const at::Tensor& input,
     at::Scalar exponent,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_pow_run", c10::ArrayRef<c10::IValue>({}));
   auto exponent_value = exponent.to<float>();
   return op_context->run(
@@ -111,7 +109,7 @@ at::Tensor linear_gelu_run(
     const at::Tensor& input,
     const c10::string_view approximate,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_gelu_run", c10::ArrayRef<c10::IValue>({}));
   // https://github.com/pytorch/pytorch/pull/61439
   // at::gelu can support tanh approximate now and OneDNN also support it
@@ -135,7 +133,7 @@ at::Tensor linear_add_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_add_run", c10::ArrayRef<c10::IValue>({}));
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
@@ -147,7 +145,7 @@ at::Tensor linear_add_relu_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<LinearOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::linear_add_relu_run", c10::ArrayRef<c10::IValue>({}));
 
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;

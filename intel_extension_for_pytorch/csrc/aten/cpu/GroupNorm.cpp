@@ -7,7 +7,6 @@
 #include <ATen/Parallel.h>
 #include <ATen/record_function.h>
 #include <c10/util/accumulate.h>
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 #include <array>
@@ -35,7 +34,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::native_group_norm\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::native_group_norm", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
@@ -82,7 +81,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_group_norm_backward(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::native_group_norm_backward\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::native_group_norm_backward", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
@@ -147,8 +146,7 @@ at::Tensor group_norm(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::group_norm\n");
 #endif
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::group_norm", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::group_norm", c10::ArrayRef<c10::IValue>({}));
 
   // See [Note: hacky wrapper removal for optional tensor]
   c10::MaybeOwned<at::Tensor> weight_maybe_owned =

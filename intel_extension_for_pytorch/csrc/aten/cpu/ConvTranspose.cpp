@@ -3,7 +3,6 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "utils/utils.h"
 
 namespace torch_ipex {
@@ -217,7 +216,7 @@ at::Tensor IPEXConvTransposeOp::_forward(
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
   at::AutoNonVariableTypeMode g;
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "IPEXConvTransposeOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   static auto op = torch::Dispatcher::singleton()
@@ -232,7 +231,7 @@ at::Tensor IPEXConvTransposeOp::forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "IPEXConvTransposeOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["op_context"] = op_context;
@@ -376,7 +375,7 @@ conv_transpose_backward_kernel_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::conv_transpose_backward\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::conv_transpose_backward", c10::ArrayRef<c10::IValue>({}));
 
   auto memory_format = input.suggest_memory_format();
@@ -413,7 +412,7 @@ conv_transpose_backward_kernel_impl(
 torch::autograd::variable_list IPEXConvTransposeOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "IPEXConvTransposeOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto op_context = ctx->saved_data["op_context"].toTensor();

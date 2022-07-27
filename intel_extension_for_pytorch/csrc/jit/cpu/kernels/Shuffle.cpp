@@ -10,7 +10,6 @@
 
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -20,7 +19,7 @@ at::Tensor dil_shuffle(
     at::IntArrayRef view_shape,
     int64_t dim0,
     int64_t dim1) {
-  IPEX_RECORD_FUNCTION("dil_shuffle", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_shuffle", c10::ArrayRef<c10::IValue>({}));
   ideep::tensor _self = itensor_view_from_dense(self);
   auto group_dim = dim0 < dim1 ? dim0 : dim1;
   auto groups = view_shape[group_dim];

@@ -2,7 +2,6 @@
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -23,7 +22,7 @@ void adam_fused_step(
     double learning_rate,
     double weight_decay,
     double eps) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::adam_fused_step", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(

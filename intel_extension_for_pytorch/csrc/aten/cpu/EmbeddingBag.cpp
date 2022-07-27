@@ -13,7 +13,6 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 #include <algorithm>
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -30,7 +29,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       const at::Tensor& offsets,
       bool sparse,
       bool include_last_offset) {
-    IPEX_RECORD_FUNCTION(
+    RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
     /*
@@ -50,7 +49,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
       const at::Tensor& offsets,
       bool sparse,
       bool include_last_offset) {
-    IPEX_RECORD_FUNCTION(
+    RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::forward", c10::ArrayRef<c10::IValue>({}));
 
     at::AutoNonVariableTypeMode g;
@@ -63,7 +62,7 @@ class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
   static torch::autograd::tensor_list backward(
       torch::autograd::AutogradContext* ctx,
       torch::autograd::tensor_list grad_outputs) {
-    IPEX_RECORD_FUNCTION(
+    RECORD_FUNCTION(
         "IPEXEmbeddingBagOp::backward", c10::ArrayRef<c10::IValue>({}));
 
     at::AutoNonVariableTypeMode g;

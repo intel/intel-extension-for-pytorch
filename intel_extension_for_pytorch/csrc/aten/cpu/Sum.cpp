@@ -8,7 +8,6 @@
 #include <c10/util/irange.h>
 
 #include "Sum.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -24,8 +23,7 @@ at::Tensor sum_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::sum_out_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::sum_out_cpu", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::sum_out_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // if dtype does not have value, we assign the input type to dtype
   // if dtype is an integer, we promote it to kLong.

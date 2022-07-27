@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <vector>
 
-#include <csrc/utils/ipex_op_profile.h>
 #include <csrc/utils/library.h>
 
 #include "TensorAdvancedIndexing.h"
@@ -76,8 +75,7 @@ at::Tensor& cat_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::cat_out_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::cat_out_cpu", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::cat_out_cpu", c10::ArrayRef<c10::IValue>({}));
   // previously, size [0] tensors were the only possible empty tensors; thus, it
   // wasn't possible to cat empty tensors unless all the other tensors were
   // 1-dimensional, so we allowed these tensors to be "skipped".  We maintain
@@ -251,7 +249,7 @@ at::Tensor cat_cpu(at::TensorList tensors, int64_t dim) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::cat_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION("torch_ipex::cat_cpu", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::cat_cpu", c10::ArrayRef<c10::IValue>({}));
   at::Tensor result;
   return cat_out_cpu(tensors, dim, result);
 }

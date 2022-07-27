@@ -3,7 +3,6 @@
 #include "BatchNorm.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -182,8 +181,7 @@ at::Tensor IPEXBatchNormOp::forward(
     bool train,
     double momentum,
     double eps) {
-  IPEX_RECORD_FUNCTION(
-      "IPEXBatchNormOp::forward", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXBatchNormOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["train"] = train;
   ctx->saved_data["eps"] = eps;
@@ -210,8 +208,7 @@ at::Tensor IPEXBatchNormOp::forward(
 torch::autograd::variable_list IPEXBatchNormOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-  IPEX_RECORD_FUNCTION(
-      "IPEXBatchNormOp::backward", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXBatchNormOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto train = ctx->saved_data["train"].toBool();
   auto eps = ctx->saved_data["eps"].toDouble();
@@ -260,7 +257,7 @@ at::Tensor batch_norm(
     double momentum,
     double eps,
     bool cudnn_enabled) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::batch_norm", c10::ArrayRef<c10::IValue>({}));
 
   // Only 2d bfloat16 training calling onednn path, and this path will be
@@ -301,7 +298,7 @@ at::Tensor frozen_batch_norm(
     const at::Tensor& running_mean,
     const at::Tensor& running_var,
     double eps) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::frozen_batch_norm", c10::ArrayRef<c10::IValue>({}));
 
   return IPEXBatchNormOp::apply(

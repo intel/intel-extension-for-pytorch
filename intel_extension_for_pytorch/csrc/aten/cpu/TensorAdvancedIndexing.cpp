@@ -19,7 +19,6 @@
 #include <numeric>
 #include <vector>
 
-#include <csrc/utils/ipex_op_profile.h>
 #include <csrc/utils/library.h>
 
 #include "TensorAdvancedIndexing.h"
@@ -246,7 +245,7 @@ at::Tensor index_select_cpu_(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::index_select_cpu_\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::index_select_cpu_", c10::ArrayRef<c10::IValue>({}));
 
   at::Tensor result = at::empty({0}, self.options());

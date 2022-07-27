@@ -8,7 +8,6 @@
 #include <ATen/core/functional.h>
 #include <ATen/quantized/Quantizer.h>
 #include <torch/csrc/jit/jit_log.h>
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch {
 namespace jit {
@@ -158,7 +157,7 @@ ArgSpecs LlgaKernel::initializeOutputSpecs() const {
 std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
     const TensorArgs& inputs,
     TensorArgs& outputs) const {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "LLGA_bridge::prepareRunArgs", c10::ArrayRef<c10::IValue>({}));
 
   RunArgs runInputs, runOutputs;
