@@ -7,6 +7,7 @@
 
 #include <torch/custom_class.h>
 #include <utils/Macros.h>
+#include <oneapi/dpl/cmath>
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
@@ -135,6 +136,23 @@ struct PackedLinearWeightQDPCPP : public LinearPackedParamsBase {
       at::Tensor weight,
       c10::optional<at::Tensor> bias);
 };
+
+template <typename T>
+inline T Round(const T x) {
+  return oneapi::dpl::nearbyint(x);
+}
+
+template <typename T>
+T quantize_val(double scale, int64_t zero_point, float value) {
+  int64_t qvalue;
+  constexpr int64_t qmin = std::numeric_limits<typename T::underlying>::min();
+  constexpr int64_t qmax = std::numeric_limits<typename T::underlying>::max();
+
+  qvalue = static_cast<int64_t>(zero_point + Round(value / scale));
+  qvalue = std::max<int64_t>(qvalue, qmin);
+  qvalue = std::min<int64_t>(qvalue, qmax);
+  return static_cast<T>(qvalue);
+}
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
