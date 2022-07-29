@@ -470,6 +470,7 @@ supported:
   - sgn.out
   - sigmoid.out
   - sigmoid_backward.grad_input
+  - signbit.out
   - sign.out
   - sin.out
   - sinh.out

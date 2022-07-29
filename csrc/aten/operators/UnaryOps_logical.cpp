@@ -28,6 +28,15 @@ void logical_not_kernel(TensorIterator& iter) {
       });
 }
 
+void signbit_kernel(TensorIteratorBase& iter) {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      kBFloat16, ScalarType::Half, iter.input_dtype(), "signbit_dpcpp", [&]() {
+        dpcpp_kernel_for_tensor_iter(iter, [](scalar_t a) -> bool {
+          return !dpl::is_unsigned<scalar_t>::value && a < 0;
+        });
+      });
+}
+
 } // namespace impl
 
 Tensor& logical_not_out(Tensor& result, const Tensor& self) {
@@ -38,6 +47,16 @@ Tensor& logical_not_out(Tensor& result, const Tensor& self) {
                             .add_input(self)
                             .build();
   impl::logical_not_kernel(iter);
+  return result;
+}
+
+Tensor& signbit_out(const Tensor& self, Tensor& result) {
+  if (self.dtype() == at::kBool) {
+    result.fill_(false);
+  } else {
+    auto iter = TensorIterator::unary_force_boolean_op(result, self);
+    impl::signbit_kernel(iter);
+  }
   return result;
 }
 

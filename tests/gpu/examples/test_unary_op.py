@@ -143,3 +143,13 @@ print("XPU {}: ", y_xpu.cpu())
 self.assertEqual(y_cpu, y_xpu.cpu())
                 """.format(op_str, op_str, op_str, op_str)
                  )
+
+    @repeat_test_for_types([torch.float, torch.half, torch.bfloat16])
+    def test_unary_op_signbit(self, dtype=torch.float):
+        x_cpu = torch.randn(5, 5, requires_grad=True)
+        sign_cpu = torch.signbit(x_cpu)
+        x_xpu = x_cpu.clone().to(xpu_device)
+        sign_xpu = torch.signbit(x_xpu)
+        self.assertEqual(sign_cpu, sign_xpu.to(cpu_device))
+        sign_xpu = torch.signbit(sign_xpu)
+        self.assertFalse(sign_xpu.any())

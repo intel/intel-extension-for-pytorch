@@ -8,6 +8,7 @@
 
 #include <oneapi/dpl/cmath>
 #include <oneapi/dpl/complex>
+#include <oneapi/dpl/type_traits>
 #include "General.h"
 
 namespace dpl = oneapi::dpl;
