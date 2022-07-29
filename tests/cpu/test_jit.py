@@ -1,5 +1,7 @@
 from __future__ import division
 from __future__ import print_function
+from logging import exception
+import logging
 
 '''
 From PyTorch:
@@ -1306,6 +1308,22 @@ class Tester(TestCase):
                 self.assertEqual(jit_res, ori_res)
                 node = "ipex::add_layernorm"
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+
+                # test norm dim is not last dim, expect RuntimeError
+                # here in the case, norm dim is mid dim with seq_len size, not the last dim
+                # which is expected as unsupported RuntimeError
+                try:
+                    model_except_error = AddLayerNorm(seq_len)
+                    torch.jit.trace(model_except_error,(a, b))
+                    #it is not excepted if no RuntimeError exception is found
+                    #so end with assert
+                    self.assertTrue(False)
+                except RuntimeError as e:
+                    expected_error = f"Given normalized_shape=[{seq_len}], expected input with shape [*, {seq_len}]"
+                    self.assertTrue(expected_error in str(e))
+                    logging.info("expected RuntimeError is found")
+                finally:
+                    pass
 
                 # not contiguous
                 a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
@@ -3183,13 +3201,13 @@ class Tester(TestCase):
             model = model.eval()
             model = ipex.optimize(model, dtype=torch.float32)
             with torch.no_grad():
-                res_ref = model(input1, input2, bias)
                 tr_model = torch.jit.trace(model, (input1, input2, bias))
                 tr_model = torch.jit.freeze(tr_model)
                 tr_model(input1, input2, bias)
                 tr_model(input1, input2, bias)
                 trace_graph = tr_model.graph_for(input1, input2, bias)
                 res_jit = tr_model(input1, input2, bias,)
+                res_ref = model(input1, input2, bias)
                 self.assertEqual(res_ref, res_jit, prec)
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
@@ -3260,6 +3278,103 @@ class Tester(TestCase):
         model_v2 = EinsumAdd("mc,cn->mn")
         _test_fp32(model_v2, input1, input2, bias1)
         
+        bias1 = torch.randn(1)
+        input1 = torch.randn(1024, 1)
+        input2 = torch.randn(1024,1024)
+        model_v2 = EinsumAdd("mc,cc->mc")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(1)
+        input1 = torch.randn(1024, 1)
+        input2 = torch.randn(1024)
+        model_v2 = EinsumAdd("mc,c->mc")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(1,1)
+        input1 = torch.randn(1,1)
+        input2 = torch.randn(1)
+        model_v2 = EinsumAdd("mc,c->m")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(2)
+        input1 = torch.randn(2)
+        input2 = torch.tensor(2)
+        model_v2 = EinsumAdd("m,...->m")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        # this case is testing the repeated dim c meeting unmatched size during runtime
+        # which is excepted as a RuntimeError
+        try:
+            bias1 = torch.randn(1)
+            input1 = torch.randn(1024, 1)
+            input2 = torch.randn(1024, 512)
+            input2_fake = torch.randn(1024, 1024)
+            model_v2 = EinsumAdd("mc,cc->mc").eval()
+            model_v2 = ipex.optimize(model_v2, dtype=torch.float32)
+            with torch.no_grad():
+                tr_model = torch.jit.trace(model_v2, (input1, input2_fake, bias1))
+                tr_model = torch.jit.freeze(tr_model)
+                tr_model(input1, input2_fake, bias1)
+                tr_model(input1, input2, bias1)
+            #it is not excepted if no RuntimeError exception is found
+            #so end with assert
+            self.assertTrue(False)
+        except RuntimeError as e:
+            expected_error = f"subscript c is repeated for operand 1 but the sizes don't match"
+            self.assertTrue(expected_error in str(e))
+            logging.info("expected RuntimeError is found")
+        finally:
+            pass
+
+        # this case is testing the broadcast dim b meeting remapped shape during runtime
+        # which is excepted as a RuntimeError
+        try:
+            bias1 = torch.randn(2)
+            input1 = torch.randn(2)
+            input2 = torch.randn(4, 4)
+            input2_fake = torch.randn(2, 4)
+            model_v2 = EinsumAdd("b,bj->b").eval()
+            with torch.no_grad():
+                tr_model = torch.jit.trace(model_v2, (input1, input2_fake, bias1))
+                tr_model = torch.jit.freeze(tr_model)
+                tr_model(input1, input2_fake, bias1)
+                tr_model(input1, input2, bias1)
+            #it is not excepted if no RuntimeError exception is found
+            #so end with assert
+            self.assertTrue(False)
+        except RuntimeError as e:
+            expected_error = f"operands do not broadcast with remapped shapes [original->remapped]"
+            self.assertTrue(expected_error in str(e))
+            logging.info("expected RuntimeError is found")
+        finally:
+            pass
+
+        bias1 = torch.randn(2)
+        input1 = torch.randn(2)
+        input2 = torch.randn(2)
+        model_v2 = EinsumAdd("i,j->").eval()
+        model_ipex = ipex.optimize(model_v2, dtype=torch.float32)
+        with torch.no_grad():
+            res_ref = model_v2(input1, input2, bias1)
+            tr_model = torch.jit.trace(model_ipex, (input1, input2, bias1))
+            tr_model = torch.jit.freeze(tr_model)
+            tr_model(input1, input2, bias1)
+            res_jit = tr_model(input1, input2, bias1)
+            self.assertEqual(res_ref, res_jit, prec=1e-3)
+
+        #sum dims > 2
+        bias = torch.randn(1, 7)
+        input1 = torch.randn( 3, 4, 6, 7)
+        input2 = torch.randn( 4, 6, 7)
+        model_v2 = EinsumAdd('sho,ksho->ko')
+        _test_fp32(model_v2, input2, input1, bias)
+
+        bias = torch.randn(1,7)
+        input1 = torch.randn( 3, 6, 7)
+        input2 = torch.randn( 6, 7)
+        model_v2 = EinsumAdd('so,kso->ko')
+        _test_fp32(model_v2, input2, input1, bias)
+
         bias1 = torch.randn(1024)
         input1 = torch.randn(1024, 1024)
         input2 = torch.randn(1024, 1024)

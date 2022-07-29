@@ -47,6 +47,13 @@ bool is_add_broadcast_supported_by_onednn(
     const at::Tensor& left,
     const at::Tensor& right,
     const at::Tensor& post_add_tensor) {
+  // we only support add.dim == left.dim == right.dim == output.dim
+  // for that we can not enumerate all the cases when output.dim is reduced and
+  // testing the ability of oneDNN kernel for this workaround
+  if (post_add_tensor.dim() != left.dim() ||
+      post_add_tensor.dim() != right.dim()) {
+    return false;
+  }
   auto non_broadcast_mask = 0;
   for (int i = 0; i < left.dim(); i++) {
     if (post_add_tensor.size(i) != 1) {
@@ -328,6 +335,7 @@ static Tensor sumproduct_pair(
 
   // now we do the computation
   Tensor result;
+  bool is_fallback_post_add = false;
   if (is_add_broadcast_supported_by_onednn(left, right, arg)) {
     auto _input = arg.is_contiguous() ? arg : arg.contiguous();
     ideep::tensor onednn_input = itensor_view_from_dense(_input);
@@ -336,9 +344,9 @@ static Tensor sumproduct_pair(
     result = bmm_impl(left, right, at::Tensor(), op_attr, {onednn_input}, 1.0f);
   } else {
     result = at::matmul(left, right);
-    auto f_alpha = alpha.to<float>();
-    result = result + f_alpha * arg;
+    is_fallback_post_add = true;
   }
+
   result = result.view(out_size).permute(opermutation);
 
   // finally squeeze summed dimensions if desired
@@ -351,6 +359,13 @@ static Tensor sumproduct_pair(
       }
     }
     result = result.view(sizes);
+  }
+
+  // if fallback, add op should be done after einsum has finalize the result,
+  // like the result may have another view if "keepdim" is false
+  if (is_fallback_post_add) {
+    auto f_alpha = alpha.to<float>();
+    result = result + f_alpha * add_arg;
   }
   return result;
 }
@@ -672,34 +687,30 @@ einsum_prepare(
   }
 
   // Compute result
-  Tensor result = permuted_operands[0];
-
-  // Fast path for when an operand has zero sized dim
+  // Sum out or squeeze dimensions that are size 1 for all later operands
   int64_t dim = out_size;
   for (int64_t i = dim; i < perm_index; ++i, ++dim) {
     if (dim_last_op[i] == 0) {
-      if (result.size(dim) == 1) {
-        result = permuted_operands[0].squeeze(dim--);
+      if (permuted_operands[0].size(dim) == 1) {
+        permuted_operands[0] = permuted_operands[0].squeeze(dim--);
       } else {
-        result = permuted_operands[0].sum(dim--);
+        permuted_operands[0] = permuted_operands[0].sum(dim--);
       }
     }
   }
-  auto i = 1;
 
-  Tensor operand = permuted_operands[i];
+  // we only process two operands, so the operands index is from [0, 1]
   std::vector<int64_t> sum_dims;
-
   // Sum out or squeeze dimensions that are size 1 for all later operands
   dim = out_size;
   for (int64_t j = dim; j < perm_index; ++j, ++dim) {
-    if (dim_last_op[j] < i) {
-      operand = operand.squeeze(dim);
+    if (dim_last_op[j] < 1) {
+      permuted_operands[1] = permuted_operands[1].squeeze(dim);
       --dim;
-    } else if (dim_last_op[j] == i) {
-      if (result.size(dim) == 1) {
-        operand = operand.sum(dim);
-        result = result.squeeze(dim);
+    } else if (dim_last_op[j] == 1) {
+      if (permuted_operands[0].size(dim) == 1) {
+        permuted_operands[1] = permuted_operands[1].sum(dim);
+        permuted_operands[0] = permuted_operands[0].squeeze(dim);
         --dim;
       } else {
         sum_dims.push_back(dim);
@@ -772,6 +783,7 @@ at::Tensor einsum_binary(
         add_arg,
         alpha);
   }
+
   return result;
 }
 
