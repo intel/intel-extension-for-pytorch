@@ -247,6 +247,10 @@ supported:
   - hardshrink
   - hardshrink.out
   - hardshrink_backward
+  - hardswish
+  - hardswish.out
+  - hardswish_
+  - hardswish_backward
   - hardtanh
   - hardtanh.out
   - hardtanh_

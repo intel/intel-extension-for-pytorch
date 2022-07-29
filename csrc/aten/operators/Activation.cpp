@@ -694,6 +694,72 @@ Tensor hardshrink_backward(
   return result;
 }
 
+Tensor& hardswish_out(const Tensor& self, Tensor& result) {
+  auto iter = TensorIterator::unary_op(result, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "hardswish",
+      [&]() {
+        using accscalar_t = acc_type<scalar_t>;
+        const accscalar_t zero(0.0f);
+        const accscalar_t one_sixth(1.0f / 6.0f);
+        const accscalar_t three(3.0f);
+        const accscalar_t six(6.0f);
+        dpcpp_kernel_for_tensor_iter(
+            iter, [zero, one_sixth, three, six](scalar_t self_val) -> scalar_t {
+              accscalar_t x = static_cast<accscalar_t>(self_val);
+              return x *
+                  Numerics<accscalar_t>::min(
+                         Numerics<accscalar_t>::max(x + three, zero), six) *
+                  one_sixth;
+            });
+      });
+  return result;
+}
+
+Tensor hardswish(const Tensor& self) {
+  Tensor result = at::empty_like(self);
+  return at::AtenIpexTypeXPU::hardswish_out(self, result);
+}
+
+Tensor& hardswish_(Tensor& self) {
+  return at::AtenIpexTypeXPU::hardswish_out(self, self);
+}
+
+Tensor hardswish_backward(const Tensor& grad_output, const Tensor& self) {
+  auto result = at::empty_like(grad_output);
+  auto iter = TensorIterator::binary_op(result, grad_output, self);
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "hardswish_backward",
+      [&]() {
+        using accscalar_t = acc_type<scalar_t>;
+        const accscalar_t zero(0.0f);
+        const accscalar_t three(3.0f);
+        const accscalar_t neg_three(-3.0f);
+        const accscalar_t one_half(0.5f);
+        dpcpp_kernel_for_tensor_iter(
+            iter,
+            [zero, three, neg_three, one_half](
+                scalar_t grad_val_, scalar_t self_val_) -> scalar_t {
+              accscalar_t grad_val = static_cast<accscalar_t>(grad_val_);
+              accscalar_t self_val = static_cast<accscalar_t>(self_val_);
+              if (self_val < neg_three) {
+                return zero;
+              } else if (self_val <= three) {
+                return grad_val * ((self_val / three) + one_half);
+              } else {
+                return grad_val;
+              }
+            });
+      });
+  return result;
+}
+
 Tensor gelu(const Tensor& self) {
   if (xpu::oneDNN::is_onednn_layout(self) &&
       xpu::oneDNN::eltwise_forward_valid(self)) {
