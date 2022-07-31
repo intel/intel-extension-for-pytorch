@@ -278,6 +278,9 @@ class LoopScanConfig {
         wg_range_y_(0) {
     int64_t wg_size = dpcppMaxWorkGroupSize(dpcppGetDeviceIdOfCurrentQueue());
     wg_range_x_ = 32;
+    while (problem_ <= wg_range_x_ >> 1) {
+      wg_range_x_ = wg_range_x_ >> 1;
+    }
     wg_range_y_ = wg_size / wg_range_x_;
 
     glb_range_x_ = wg_range_x_;
