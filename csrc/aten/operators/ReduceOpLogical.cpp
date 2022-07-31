@@ -66,16 +66,6 @@ inline Tensor& _all(Tensor& result, TensorIterator& iter) {
   return result;
 }
 
-Tensor all(const at::Tensor& self) {
-  Tensor result;
-  auto result_type = get_result_or_bytebool_dtype(self, result);
-  result = at::empty({0}, self.options().dtype(result_type));
-  auto iter = meta::make_reduction(
-      "all", result, self, {}, false, self.scalar_type(), result.scalar_type());
-
-  return at::AtenIpexTypeXPU::_all(result, iter);
-}
-
 Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
   check_result_is_bytebool("all", self, result);
   dim = maybe_wrap_dim(dim, self.dim());
@@ -92,6 +82,19 @@ Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
         result.scalar_type());
     return at::AtenIpexTypeXPU::_all(result, iter);
   }
+}
+
+// Implementation of all.all_out
+Tensor& all_out(at::Tensor& out, const at::Tensor& self) {
+  check_result_is_bytebool("all_out", self, out);
+  if (self.numel() == 0) {
+    out.fill_(1);
+  } else {
+    auto iter = meta::make_reduction(
+        "all", out, self, {}, false, self.scalar_type(), out.scalar_type());
+    at::AtenIpexTypeXPU::_all(out, iter);
+  }
+  return out;
 }
 
 Tensor all(const Tensor& self, int64_t dim, bool keepdim) {

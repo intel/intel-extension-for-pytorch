@@ -81,7 +81,7 @@ supported:
   - addmv.out  # newly added
   - addr
   - addr.out
-  - all
+  - all.all_out
   - all.dim
   - all.out
   - amax

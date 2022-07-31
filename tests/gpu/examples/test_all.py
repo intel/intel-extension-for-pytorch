@@ -17,6 +17,22 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
 
+        x_cpu = torch.randn([1], device=cpu_device).byte() % 2
+        x_dpcpp = x_cpu.to(dpcpp_device)
+
+        y_cpu = x_cpu.all()
+        y_dpcpp = x_dpcpp.all()
+
+        self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
+
+        x_cpu = torch.Tensor()
+        x_dpcpp = x_cpu.to(dpcpp_device)
+
+        y_cpu = x_cpu.all()
+        y_dpcpp = x_dpcpp.all()
+
+        self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
+
         x_cpu = torch.randn([461, 42, 2, 5], device=cpu_device).byte() % 2
         x_dpcpp = x_cpu.to(dpcpp_device)
 
