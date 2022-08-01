@@ -427,7 +427,10 @@ class TestModuleMultiStreamModuleHint(TestCase):
 def is_numactl_available():
     numactl_available = False
     cmd = ["numactl", "-C", "0", "-m", "0", "ls"]
-    r = subprocess.run(cmd, env=os.environ)
+    try:
+        r = subprocess.run(cmd, env=os.environ)
+    except:
+        return numactl_available
     if r.returncode == 0:
         numactl_available = True
     return numactl_available
