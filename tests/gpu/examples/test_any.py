@@ -9,6 +9,22 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_any(self, dtype=torch.float):
+        x_cpu = torch.Tensor()
+        x_dpcpp = x_cpu.to(dpcpp_device)
+
+        y_cpu = x_cpu.any()
+        y_dpcpp = x_dpcpp.any()
+
+        self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
+
+        x_cpu = torch.randn([1], device=cpu_device).byte() % 2
+        x_dpcpp = x_cpu.to(dpcpp_device)
+
+        y_cpu = x_cpu.any()
+        y_dpcpp = x_dpcpp.any()
+
+        self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
+
         x_cpu = torch.randn([1, 3, 8, 2], device=cpu_device).byte() % 2
         x_dpcpp = x_cpu.to(dpcpp_device)
 

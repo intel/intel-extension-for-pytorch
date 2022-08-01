@@ -87,7 +87,7 @@ supported:
   - amax
   - amax.out
   - amin.out
-  - any
+  - any.all_out
   - any.dim
   - any.out
   - arange.start_out
