@@ -32,13 +32,13 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
 
   // below is channelshuffle for dynamic view shape pattern
   std::string dynamic_shape_input = R"(
-      graph(%input, %idx_0:int, %idx_1:int, %idx_2:int, %idx_3:int, %div_g, %g:int, %type, %flattern_c):
+      graph(%input, %idx_0:int, %idx_1:int, %idx_2:int, %idx_3:int, %div_g, %g:int, %flattern_c):
         %n_ = aten::size(%input, %idx_0)
         %c_ = aten::size(%input, %idx_1)
         %tensor_c_ = prim::NumToTensor(%c_)
         %h_ = aten::size(%input, %idx_2)
         %w_ = aten::size(%input, %idx_3)
-        %c_div_g_ = aten::div(%tensor_c_, %div_g, %type)
+        %c_div_g_ = aten::floor_divide(%tensor_c_, %div_g)
         %int_c_div_g_ = aten::Int(%c_div_g_)
         %view_shape:int[] = prim::ListConstruct(%n_, %g, %int_c_div_g_, %h_, %w_) )";
 

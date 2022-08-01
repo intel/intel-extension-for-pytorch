@@ -133,7 +133,7 @@ class SoftmaxTester(JitTestCase):
                 model5 = torch.jit.trace(model5, test5)
                 res5 = model5(test5)
                 model7 = torch.jit.script(model7)
-                res7 = model7(test7, True)
+                res7 = model7(test7, torch.BoolTensor([True]))
                 model8 = torch.jit.trace(model8, test8)
                 res8 = model8(test8)
                 model9 = torch.jit.trace(model9, test9)
@@ -177,7 +177,7 @@ class SoftmaxTester(JitTestCase):
             graph6 = converted_model.graph_for(test3)
             self.assertGraphContainsExactly(graph6, IPEX_SOFTMAX_, 1)
             # should be inplace
-            graph7 = model7.graph_for(test7, True)
+            graph7 = model7.graph_for(test7, torch.BoolTensor([True]))
             self.assertGraphContainsExactly(graph7, IPEX_SOFTMAX_, 1)
             # should be outplace
             graph8 = model8.graph_for(test8)

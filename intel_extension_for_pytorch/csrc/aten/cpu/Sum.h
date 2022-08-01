@@ -17,7 +17,7 @@ DECLARE_DISPATCH(sum_kernel_fn, sum_kernel_stub);
 
 at::Tensor sum_out_cpu(
     const at::Tensor& input,
-    c10::IntArrayRef dim,
+    c10::OptionalIntArrayRef dim,
     bool keepdim,
     c10::optional<c10::ScalarType> dtype);
 
