@@ -522,6 +522,7 @@ supported:
   - triu_
   - triu_indices
   - trunc.out
+  - unfold_backward
   - unfold
   - uniform_
   - unique_consecutive
