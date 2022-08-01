@@ -7,30 +7,37 @@ from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithSGD as 
 
 class TestMergedEmbeddingBagWithSGD(TestCase):
 
-    # table 0, 1, 3 used for inference only
-    # table 0, 1, 2 used for other test except inference only
+    # table 0, 1, 4 used for inference only
+    # table 0, 1, 2, 3 used for other test except inference only
     table0 = nn.EmbeddingBag(100, 16, mode='mean').double()
     table1 = nn.EmbeddingBag(50, 32, mode='sum')
-    table2 = nn.EmbeddingBag(18000000, 8, mode='mean', include_last_offset=True, _weight=torch.empty(18000000, 8, dtype=torch.bfloat16))
-    table3 = nn.EmbeddingBag(10, 8, mode='sum', include_last_offset=True, _weight=torch.empty(10, 8, dtype=torch.bfloat16))
-    merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table2])
+    table2 = nn.EmbeddingBag(50, 65, mode='mean', include_last_offset=True, _weight=torch.empty(50, 65, dtype=torch.bfloat16))
+    table3 = nn.EmbeddingBag(18000000, 8, mode='mean', include_last_offset=True, _weight=torch.empty(18000000, 8, dtype=torch.bfloat16))
+    table4 = nn.EmbeddingBag(10, 8, mode='sum', include_last_offset=True, _weight=torch.empty(10, 8, dtype=torch.bfloat16))
+    merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table2, table3])
     merged2 = MergedEmbeddingBagWithSGD([
         (100, 16, 'mean', table0.weight.dtype, table0.weight.detach()),
         (50, 32, 'sum', table1.weight.dtype, table1.weight.detach()),
-        (18000000, 8, 'mean', table2.weight.dtype, table2.weight.detach()),
+        (50, 8, 'mean', table2.weight.dtype, table2.weight.detach()),
+        (18000000, 8, 'mean', table3.weight.dtype, table3.weight.detach()),
     ])
-    inference_only_merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table3])
+    inference_only_merged = MergedEmbeddingBagWithSGD.from_embeddingbag_list([table0, table1, table4])
 
     input = [
-        [torch.LongTensor([10, 10, 15, 10, 20, 25]), torch.LongTensor([[0, 30], [21, 15], [30, 11]]), torch.LongTensor([10, 15, 20, 17999999])],
-        [torch.LongTensor([0, 1, 3]), None, torch.LongTensor([0, 2, 3, 4])],
-        [table0.include_last_offset, table1.include_last_offset, table2.include_last_offset]
+        [
+            torch.LongTensor([10, 10, 15, 10, 20, 25]),
+            torch.LongTensor([[0, 30], [21, 15], [30, 11]]),
+            torch.LongTensor([[0], [10], [20]]),
+            torch.LongTensor([10, 15, 20, 17999999])
+        ],
+        [torch.LongTensor([0, 1, 3]), None, None, torch.LongTensor([0, 2, 3, 4])],
+        [t.include_last_offset for t in [table0, table1, table2, table3]]
     ]
 
     expected_input = (
-        torch.LongTensor([10, 10, 15, 10, 20, 25, 0, 30, 21, 15, 30, 11, 10, 15, 20, 17999999]),
-        torch.LongTensor([0, 1, 3, 6, 8, 10, 12, 14, 15, 16]),
-        torch.LongTensor([10, 10, 15, 10, 20, 25, 100, 130, 121, 115, 130, 111, 160, 165, 170, 18000149])
+        torch.LongTensor([10, 10, 15, 10, 20, 25, 0, 30, 21, 15, 30, 11, 0, 10, 20, 10, 15, 20, 17999999]),
+        torch.LongTensor([0, 1, 3, 6, 8, 10, 12, 13, 14, 15, 17, 18, 19]),
+        torch.LongTensor([10, 10, 15, 10, 20, 25, 100, 130, 121, 115, 130, 111, 150, 160, 170, 210, 215, 220, 18000199])
     )
 
     inference_only_input = [
@@ -49,7 +56,8 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
         10: 1 + 1 / 2 + 1 / 3,
         15: 1 / 2, 20: 1 / 3, 25: 1 / 3,
         100: 1, 111: 1, 115: 1, 121: 1, 130: 2,
-        160: 1/2, 165: 1/2, 170: 1, 18000149: 1
+        150: 1, 160: 1, 160: 1,
+        210: 1/2, 215: 1/2, 220: 1, 18000199: 1
     }
 
     def test_create_from_embedingbaglist_vs_create_from_init_function(self):
@@ -67,7 +75,7 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
             outputs = model(self.inference_only_expected_input, torch.BoolTensor([False]))
             ref_out0 = self.table0(self.inference_only_input[0][0], self.inference_only_input[1][0])
             ref_out1 = self.table1(self.inference_only_input[0][1], self.inference_only_input[1][1])
-            ref_out2 = self.table3(self.inference_only_input[0][2], self.inference_only_input[1][2])
+            ref_out2 = self.table4(self.inference_only_input[0][2], self.inference_only_input[1][2])
             self.assertEqual(outputs[0], ref_out0)
             self.assertEqual(outputs[1], ref_out1)
             self.assertEqual(outputs[2], ref_out2)
@@ -91,7 +99,7 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
     def test_training(self):
         model = copy.deepcopy(self.merged)
         outputs = model(self.expected_input, torch.BoolTensor([False]))
-        loss = outputs[0].sum() + outputs[1].sum() + outputs[2].sum()
+        loss = outputs[0].sum() + outputs[1].sum() + outputs[2].sum() + outputs[3].sum()
         default_lr = 0.01
         weights = copy.deepcopy(model.weights)
         loss.backward()
@@ -107,13 +115,13 @@ class TestMergedEmbeddingBagWithSGD(TestCase):
         import bench.custom_op_bench.optimizer
         sgd = bench.custom_op_bench.optimizer.non_fused_sgd
         model = MergedEmbeddingBagWithSGD.from_embeddingbag_list(
-            [self.table0, self.table1, self.table2],
+            [self.table0, self.table1, self.table2, self.table3],
             lr=1.0,
             weight_decay=0.1
         )
         outputs = model(self.expected_input, torch.BoolTensor([False]))
         sgd_args = copy.deepcopy(model.sgd_args)
-        loss = outputs[0].sum() + outputs[1].sum() + outputs[2].sum()
+        loss = outputs[0].sum() + outputs[1].sum() + outputs[2].sum() + outputs[3].sum()
         weights = copy.deepcopy(model.weights)
         loss.backward()
         updated_weights = model.weights
