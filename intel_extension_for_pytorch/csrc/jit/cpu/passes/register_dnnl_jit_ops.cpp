@@ -1157,24 +1157,6 @@ torch::jit::RegisterOperators op({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "ipex::einsum_binary(str equation, Tensor[] tensors, double add_arg, Scalar alpha) -> Tensor",
-        [](const Node* node) -> Operation {
-          return [](Stack* stack) {
-            auto other_ard =
-                at::ones(1).fill_((std::move(peek(stack, 2, 4))).toDouble());
-            auto result = einsum_binary(
-                (std::move(peek(stack, 0, 4))).toStringView(),
-                (std::move(peek(stack, 1, 4))).toTensorList(),
-                other_ard,
-                (std::move(peek(stack, 3, 4))).toScalar());
-
-            drop(stack, 4);
-            torch::jit::pack(stack, std::move(result));
-            return 0;
-          };
-        },
-        aliasAnalysisFromSchema()),
-    Operator(
         "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, "
         "int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
         [](const Node* node) -> Operation {
