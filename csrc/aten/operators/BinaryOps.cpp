@@ -31,6 +31,7 @@ Tensor& heaviside_out(const Tensor& self, const Tensor& values, Tensor& out) {
           return a == 0 ? b : static_cast<scalar_t>(a > 0);
         });
       });
+  return out;
 }
 
 } // namespace AtenIpexTypeXPU
