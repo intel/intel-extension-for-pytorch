@@ -1,13 +1,17 @@
+r"""
+This package is lazily initialized, so you can always import it.
+"""
+
 import contextlib
 import sys
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import torch
 import intel_extension_for_pytorch
 from torch import device as _device
+import traceback
+import threading
 
 from .streams import Stream, Event
-from .random import *
-from .memory import *
 from .intrinsic import *
 from .settings import *
 from .itt import emit_itt
@@ -19,16 +23,117 @@ import intel_extension_for_pytorch.optim as optim
 import intel_extension_for_pytorch.autograd as autograd
 from intel_extension_for_pytorch.autograd import inference_mode
 
-default_generators: Tuple[torch._C.Generator] = intel_extension_for_pytorch._C.default_generators
+_initialized = False
+_tls = threading.local()
+_initialization_lock = threading.Lock()
+_queued_calls = []  # invoke these after initialization occurs
+_is_in_bad_fork = getattr(intel_extension_for_pytorch._C, "_xpu_isInBadFork", lambda: False)
+
+
+class _LazySeedTracker:
+    # We only track the latest seed given by 'manual_seed_all' or 'manual_seed'.
+    def __init__(self):
+        self.manual_seed_all_cb = None
+        self.manual_seed_cb = None
+        self.call_order = [] 
+
+    def queue_seed_all(self, cb, traceback):
+        self.manual_seed_all_cb = (cb, traceback)
+        # update seed_all to be latest
+        self.call_order = [self.manual_seed_cb, self.manual_seed_all_cb]
+
+    def queue_seed(self, cb, traceback):
+        self.manual_seed_cb = (cb, traceback)
+        # update seed to be latest
+        self.call_order = [self.manual_seed_all_cb, self.manual_seed_cb]
+
+    def get_calls(self) -> List:
+        return self.call_order
+
+
+_lazy_seed_tracker = _LazySeedTracker()
+
+default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
 
-def _lazy_init():
+def is_initialized():
+    r"""Returns whether XPU state has been initialized."""
+    return _initialized and not _is_in_bad_fork()
+
+
+class DeferredXPUCallError(Exception):
     pass
 
 
+def init():
+    r"""Initialize the XPU's state. This is a Python API about lazy initialization
+    that avoids initializing XPU until the first time it is accessed. You may need 
+    to call this function explicitly in very rare cases, since IPEX could call
+    this initialization automatically when XPU functionality is on-demand.
+
+    Does nothing if call this function repeatedly.
+    """
+    _lazy_init()
+
+
+def _lazy_init():
+    global _initialized, _queued_calls
+    if is_initialized() or hasattr(_tls, 'is_initializing'):
+        return
+    with _initialization_lock:
+        # This test was was protected via GIL. Double-check whether XPU has
+        # already been initialized. If a thread acquired the lock first,
+        # it will do an initialization. When the other threads get the lock,
+        # they will find XPU has been initialized.
+        if is_initialized():
+            return
+        # It is important to prevent other threads from entering _lazy_init
+        # immediately, while we are still guaranteed to have the GIL, because some
+        # of the C calls we make below will release the GIL.
+        if _is_in_bad_fork():
+            raise RuntimeError(
+                "Cannot re-initialize XPU in forked subprocess. To use XPU with "
+                "multiprocessing, you must use the 'spawn' start method")
+        if not hasattr(intel_extension_for_pytorch._C, '_getDeviceCount'):
+            raise AssertionError("IPEX not compiled with XPU enabled")
+        # This function detects bad fork processing and throws if there's a device
+        # initialization error, no XPUs are found or any other error occurs
+        intel_extension_for_pytorch._C._initExtension() 
+        # Some of the queued calls in _queued_calls[] may reentrantly call 
+        # _lazy_init(). We must prevent multiple initializations. In that case
+        # just return early without initializeing to avoid a deadlock.
+        _tls.is_initializing = True
+
+        for calls in _lazy_seed_tracker.get_calls():
+            if calls:
+                _queued_calls.append(calls)
+
+        try:
+            for queued_call, orig_traceback in _queued_calls:
+                try:
+                    queued_call()
+                except Exception as e:
+                    msg = (f"XPU call failed lazily at initialization with error: {str(e)}\n\n"
+                           f"XPU call was originally invoked at:\n\n{orig_traceback}")
+                    raise DeferredXPUCallError(msg) from e
+        finally:
+            delattr(_tls, 'is_initializing')
+        _initialized = True
+
+
 def _lazy_call(callable, **kwargs):
-    callable()
+    if is_initialized():
+        callable()
+    else:
+        global _lazy_seed_tracker
+        if kwargs.get("seed_all", False):
+            _lazy_seed_tracker.queue_seed_all(callable, traceback.format_stack())
+        elif kwargs.get("seed", False):
+            _lazy_seed_tracker.queue_seed(callable, traceback.format_stack())
+        else:
+            # Don't store the actual traceback to avoid memory cycle
+            _queued_calls.append((callable, traceback.format_stack()))
 
 
 def is_available() -> bool:
@@ -66,7 +171,8 @@ class device(object):
         self.prev_idx = intel_extension_for_pytorch._C._getDevice()
         if self.prev_idx != self.idx:
             intel_extension_for_pytorch._C._setDevice(self.idx)
-        _lazy_init()
+        if not torch.jit.is_scripting():
+            _lazy_init()
 
     def __exit__(self, *args):
         if self.prev_idx != self.idx:
@@ -134,7 +240,7 @@ def get_device_capability(device: Optional[_device_t] = None) -> Tuple[int, int]
 
 
 def get_device_properties(device: _device_t):
-    # _lazy_init()  # will define _get_device_properties
+    _lazy_init()  # will define _get_device_properties
     device = _get_device_index(device, optional=True)
     if device < 0 or device >= device_count():
         raise AssertionError("Invalid device id")
@@ -143,7 +249,7 @@ def get_device_properties(device: _device_t):
 
 def current_device() -> int:
     r"""Returns the index of a currently selected device."""
-    _lazy_init()
+    # lazy initialization occurs in _getDevice
     return intel_extension_for_pytorch._C._getDevice()
 
 
@@ -169,6 +275,7 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
             by :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
             (default).
     """
+    _lazy_init()
     return Stream(_cdata=intel_extension_for_pytorch._C._getCurrentStream(
         _get_device_index(device, optional=True)))
 
@@ -205,50 +312,74 @@ def stream(stream):
         intel_extension_for_pytorch._C._setCurrentStream(src_prev_stream._cdata)
 
 
+from .random import *
+
+from .memory import *
+
 from torch.storage import _StorageBase
 
+@staticmethod  # type: ignore[misc]
+def _lazy_new(cls, *args, **kwargs):
+    _lazy_init()
+    # We may need to call lazy init again if we are a forked child
+    # del _XPUBase.__new__
+    return super(_XPUBase, cls).__new__(cls, *args, **kwargs)
 
-class ShortStorage(intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
+
+class _XPUBase(object):
+    is_xpu = True
+    is_sparse = False
+
+    def type(self, *args, **kwargs):
+        # We could use a Protocol here to tell mypy that self has `get_device` method
+        # but it is only available in the typing module on Python >= 3.8
+        # or on typing_extensions module on Python >= 3.6
+        with device(self.get_device()):  # type: ignore[attr-defined]
+            return super(_XPUBase, self).type(*args, **kwargs)  # type: ignore[misc]
+    __new__ = _lazy_new
+
+
+class ShortStorage(_XPUBase, intel_extension_for_pytorch._C.ShortStorageBase, _StorageBase):
     pass
 
 
-class CharStorage(intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
+class CharStorage(_XPUBase, intel_extension_for_pytorch._C.CharStorageBase, _StorageBase):
     pass
 
 
-class IntStorage(intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
+class IntStorage(_XPUBase, intel_extension_for_pytorch._C.IntStorageBase, _StorageBase):
     pass
 
 
-class LongStorage(intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
+class LongStorage(_XPUBase, intel_extension_for_pytorch._C.LongStorageBase, _StorageBase):
     pass
 
 
-class BoolStorage(intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
+class BoolStorage(_XPUBase, intel_extension_for_pytorch._C.BoolStorageBase, _StorageBase):
     pass
 
 
-class HalfStorage(intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
+class HalfStorage(_XPUBase, intel_extension_for_pytorch._C.HalfStorageBase, _StorageBase):
     pass
 
 
-class DoubleStorage(intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
+class DoubleStorage(_XPUBase, intel_extension_for_pytorch._C.DoubleStorageBase, _StorageBase):
     pass
 
 
-class FloatStorage(intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
+class FloatStorage(_XPUBase, intel_extension_for_pytorch._C.FloatStorageBase, _StorageBase):
     pass
 
 
-class BFloat16Storage(intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
+class BFloat16Storage(_XPUBase, intel_extension_for_pytorch._C.BFloat16StorageBase, _StorageBase):
     pass
 
 
-class QUInt8Storage(intel_extension_for_pytorch._C.QUInt8StorageBase, _StorageBase):
+class QUInt8Storage(_XPUBase, intel_extension_for_pytorch._C.QUInt8StorageBase, _StorageBase):
     pass
 
 
-class QInt8Storage(intel_extension_for_pytorch._C.QInt8StorageBase, _StorageBase):
+class QInt8Storage(_XPUBase, intel_extension_for_pytorch._C.QInt8StorageBase, _StorageBase):
     pass
 
 
@@ -263,7 +394,6 @@ torch._storage_classes.add(FloatStorage)
 torch._storage_classes.add(BFloat16Storage)
 torch._storage_classes.add(QUInt8Storage)
 torch._storage_classes.add(QInt8Storage)
-intel_extension_for_pytorch._C._initExtension()
 
 
 def _xpu_tag(obj):
