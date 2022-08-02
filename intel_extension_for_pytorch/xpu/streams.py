@@ -70,18 +70,18 @@ class Event(intel_extension_for_pytorch._C._XPUEventBase):
     def record(self, stream=None):
         r"""Records the event in a given stream.
 
-        Uses ``intel_extension_for_pytorch.current_stream()`` if no stream is specified."""
+        Uses ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified."""
         if stream is None:
-            stream = intel_extension_for_pytorch.current_stream()
+            stream = intel_extension_for_pytorch.xpu.current_stream()
         super(Event, self).record(stream)
 
     def wait(self, stream=None):
         r"""Makes all future work submitted to the given stream wait for this
         event.
 
-        Use ``intel_extension_for_pytorch.current_stream()`` if no stream is specified."""
+        Use ``intel_extension_for_pytorch.xpu.current_stream()`` if no stream is specified."""
         if stream is None:
-            stream = intel_extension_for_pytorch.current_stream()
+            stream = intel_extension_for_pytorch.xpu.current_stream()
         super(Event, self).wait(stream)
 
     def query(self):
