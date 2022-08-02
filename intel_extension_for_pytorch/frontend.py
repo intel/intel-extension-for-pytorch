@@ -164,8 +164,8 @@ def optimize(
             different performances with different dtypes/shapes. Default value
             is False. Intel® Extension for PyTorch* will try to optimize the
             kernel selection for better performance if this knob is set to
-            ``True``. There might be regressions at current stage. The default
-            value is ``None``. Explicitly setting this knob overwrites the
+            ``True``. You might get better performance at the cost of extra memory usage.
+            The default value is ``None``. Explicitly setting this knob overwrites the
             configuration set by ``level`` knob.
 
     Returns:

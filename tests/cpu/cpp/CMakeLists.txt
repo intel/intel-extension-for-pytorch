@@ -21,8 +21,10 @@ if(DEFINED GLIBCXX_USE_CXX11_ABI)
   endif()
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=${_CXX11_ABI_FLAG}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # Set the include dir
+include_directories(${MKL_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include)
 include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 include_directories(${THIRD_PARTY_ROOT}/googletest/googletest/include)
@@ -43,6 +45,11 @@ add_executable(${TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
 # Link GTest
 target_link_libraries(${TEST_NAME} PUBLIC gtest_main)
 target_link_libraries(${TEST_NAME} PUBLIC gtest)
+
+# Link MKL
+target_link_libraries(${TEST_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_intel_lp64.a)
+target_link_libraries(${TEST_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_gnu_thread.a)
+target_link_libraries(${TEST_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_core.a)
 
 # Link Pytorch
 target_link_libraries(${TEST_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)

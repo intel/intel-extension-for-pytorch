@@ -111,13 +111,13 @@ class TestOp(JitLlgaTestCase):
                     logits = self.conv(feature)
                     all_logits.append(logits)
                 return torch.cat(all_logits, dim=1)
-        
+
         for memory_format in [torch.contiguous_format, torch.channels_last]:
             patterns = [
                 ["aten::dequantize", "aten::_convolution"],
                 ["aten::dequantize", "aten::_convolution"],
                 ["aten::dequantize", "aten::_convolution"],
-            ]            
+            ]
             a = torch.randn(1, 32, 28, 28).to(memory_format=memory_format)
             b = torch.randn(1, 32, 28, 28).to(memory_format=memory_format)
             c = torch.randn(1, 32, 28, 28).to(memory_format=memory_format)
@@ -337,6 +337,47 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
         self.checkPatterns(graph, patterns)
 
+    def test_mixed_precision_softmax(self):
+        class M(torch.nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y, z, a):
+                o = torch.matmul(x, y) / 8.
+                o = o + a.to(o.dtype)
+                o = torch.softmax(o, -1)
+                o = o.matmul(z)
+                return o
+
+        x = torch.randn(1, 16, 16, 64)
+        y = torch.randn(1, 16, 64, 16)
+        z = torch.randn(1, 16, 16, 64)
+        a = torch.randn(1, 1, 1, 16)
+        m = M()
+
+        # fp32 in int8 out softmax
+        int8_fp32_patterns = [
+            ["aten::dequantize", "aten::matmul", "aten::div", "aten::add"],
+            ["aten::softmax", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::matmul"],
+        ]
+        graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, int8_bf16=False)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.checkPatterns(graph, int8_fp32_patterns)
+
+        # bf16 in int8 out softmax
+        int8_bf16_patterns = [
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul", "aten::div", "aten::add"],
+            ["aten::softmax", "aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul"],
+        ]
+        graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 6)
+        self.checkPatterns(graph, int8_bf16_patterns)
+
 class TestFusionPattern(JitLlgaTestCase):
     def test_conv2d_eltwise(self):
         class M(nn.Module):
@@ -415,7 +456,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 x = self.conv1(x)
                 x = self.eltwise(x)
                 x = self.conv2(x)
-                return x        
+                return x
         for inplace in [False, True]:
             for memory_format in [torch.contiguous_format, torch.channels_last]:
                 m = M(inplace)
@@ -425,15 +466,15 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
                 silu_op = 'aten::silu_' if inplace else 'aten::silu'
-                
+
                 # oneDNN graph does not have silu OP. The bridge will convert silu to sigmoid - mul
                 patterns = [
                     ["aten::dequantize", "aten::_convolution", 'aten::sigmoid', 'aten::mul', "aten::quantize_per_tensor"], # inplace op will become outplace op on the JIT graph
                     ["aten::dequantize", "aten::_convolution"]
-                ]                
+                ]
 
                 self.assertFused(graph, ['aten::_convolution', silu_op, 'aten::dequantize'])
-                self.checkPatterns(graph, patterns)                
+                self.checkPatterns(graph, patterns)
 
     def test_deconv_silu(self):
         class M(nn.Module):
@@ -445,8 +486,8 @@ class TestFusionPattern(JitLlgaTestCase):
             def forward(self, x):
                 x = self.deconv(x)
                 x = self.eltwise(x)
-                return x        
-        
+                return x
+
         for inplace in [False, True]:
             m = M(inplace)
             x = torch.rand(1, 3, 28, 28)
@@ -454,7 +495,7 @@ class TestFusionPattern(JitLlgaTestCase):
             graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
             # TODO: deconv is unsupported in the bridge, thus conv-silu will be fused by IPEX
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
-            self.assertGraphContainsExactly(graph, silu_op, 1)         
+            self.assertGraphContainsExactly(graph, silu_op, 1)
 
     def test_ensure_tensor_is_rewrapped(self):
         class M(nn.Module):
@@ -608,7 +649,7 @@ class TestFusionPattern(JitLlgaTestCase):
         #          /  |
         #       quant |
         #        /    |
-        #     dequant | 
+        #     dequant |
         #       |     |
         #     conv    |
         #       |     |
@@ -633,17 +674,17 @@ class TestFusionPattern(JitLlgaTestCase):
 
             def forward(self, x):
                 x = self.conv1(x)
-                
+
                 # The output y of relu is used by mul
                 y = x.relu()
-                
+
                 z = self.conv2(y)
                 z = z.relu()
                 z = self.conv3(z)
                 z = z.sigmoid()
                 z = z.mul(y)
                 return z
-        
+
         x = torch.rand(1, 32,16, 16, requires_grad=False)
         m = M()
         graph = self.checkQuantizeTrace(m, [x], atol=1e-1)
@@ -651,10 +692,10 @@ class TestFusionPattern(JitLlgaTestCase):
             ["aten::dequantize", "aten::_convolution", "aten::relu"],
             ["aten::dequantize", "aten::_convolution", "aten::relu", "aten::quantize_per_tensor"],
             ["aten::dequantize", "aten::_convolution", "aten::sigmoid", "aten::mul"],
-        ] 
+        ]
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
         self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::sigmoid','aten::mul'])
-        self.checkPatterns(graph, patterns)     
+        self.checkPatterns(graph, patterns)
 
     def test_conv_eltwise_tensor_method(self):
         class ConvSigmoid(nn.Module):
@@ -694,7 +735,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ['aten::_convolution', 'aten::relu'])
         self.checkPatterns(graph, patterns)
- 
+
     def test_conv2d_sum(self):
         class M(nn.Module):
             def __init__(self, bias=False):
@@ -732,7 +773,7 @@ class TestFusionPattern(JitLlgaTestCase):
                     self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
                     self.assertFused(graph, ['aten::_convolution', 'aten::relu', 'aten::add', 'aten::quantize_per_channel', 'aten::dequantize'])
                     self.checkPatterns(graph, patterns)
- 
+
     def test_add_quantization(self):
         class M(nn.Module):
             def __init__(self, bias=False):
@@ -854,7 +895,7 @@ class TestFusionPattern(JitLlgaTestCase):
         patterns = [
             ["aten::dequantize", "aten::linear", "aten::dequantize"],
         ]
-        # HistogramObserver failed, need to do some checks? 
+        # HistogramObserver failed, need to do some checks?
         for qconfig in static_qconfig[:2]:
             graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
@@ -1027,7 +1068,7 @@ class TestFusionPattern(JitLlgaTestCase):
         #   quant       add
         #     |
 
-        # Lifting up in this case will raise: 
+        # Lifting up in this case will raise:
         # promoteTypes with quantized numbers is not handled in aten::add;
         #          |
         #        quant
@@ -1048,7 +1089,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 z = z1 + y
                 output = z2 + z
                 return output
-        
+
         x = torch.randn(1, 3, 8, 8)
         y = torch.randn(1, 8, 8, 8)
         m = M()
@@ -1061,7 +1102,7 @@ class TestFusionPattern(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
         self.assertFused(graph, ['aten::_convolution', 'aten::dequantize'])
-        self.checkPatterns(graph, patterns)        
+        self.checkPatterns(graph, patterns)
 
     def test_wildcard(self):
         class M(nn.Module):
@@ -1294,7 +1335,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::div', 'aten::add'])
         self.checkPatterns(graph, patterns)
 
-   
+
     @unittest.skip("Graph Compiler unit-test")
     def test_mha_pattern_int8_fp32(self):
         class M(torch.nn.Module):

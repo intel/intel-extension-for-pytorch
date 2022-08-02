@@ -1,8 +1,12 @@
 import torch
 import torch.nn as nn
 import warnings
+import copy
+import logging
 
-from intel_extension_for_pytorch import optim
+from intel_extension_for_pytorch import optim, frontend
+
+logger = logging.getLogger(__name__)
 
 class _IPEXConvNd(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
@@ -90,9 +94,10 @@ class _IPEXConv3d(_IPEXConvNd):
         super(_IPEXConv3d, self).__init__(dense_module)
 
 class _IPEXLinear(torch.nn.Module):
-    def __init__(self, dense_module):
+    def __init__(self, dense_module, use_dnnl):
         super(_IPEXLinear, self).__init__()
 
+        self.use_dnnl = use_dnnl
         # prepare batch size
         self.batch_size_collapsed = None
         if hasattr(dense_module, "input_shape"):
@@ -114,9 +119,12 @@ class _IPEXLinear(torch.nn.Module):
             self.register_parameter('bias', None)
 
         # create linear op context
-        self.ctx = torch.ops.ipex_prepack.linear_prepack(
-            dense_module.weight, self.bias, self.batch_size_collapsed
-        )
+        if self.use_dnnl:
+            self.ctx = torch.ops.ipex_prepack.linear_prepack(dense_module.weight,
+                self.bias, self.batch_size_collapsed)
+        else:
+            self.ctx = torch.ops.ipex_prepack.mkl_sgemm_prepack(dense_module.weight,
+                self.bias, self.batch_size_collapsed)
 
         self.weight = nn.Parameter(self.ctx.get_weight(), requires_grad = dense_module.weight.requires_grad)
 
@@ -131,9 +139,12 @@ class _IPEXLinear(torch.nn.Module):
             )
 
     def forward(self, x):
-        return torch.ops.torch_ipex.ipex_linear(
-            x, self.weight, self.bias, self.ctx.get_data_handle()
-        )
+        if self.use_dnnl:
+            return torch.ops.torch_ipex.ipex_linear(
+                x, self.weight, self.bias, self.ctx.get_data_handle())
+        else:
+            return torch.ops.torch_ipex.ipex_MKLSGEMM(
+                x, self.weight, self.bias, self.ctx.get_data_handle())
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         assert not keep_vars, "can not using keep_vars true when to save _IPEXLinear's parameters"
@@ -266,9 +277,9 @@ def _should_prepack(module, auto_kernel_selection):
         for _, hook in module._backward_hooks.items():
             if hook.name == 'weight' or hook.name == 'bias':
                 return False
+    # When the auto_kernel_selection is on, dtype is float, IPEX will use the prepack MKL backend
+    # for FP32 Linear in the inference mode.
     if isinstance(module, torch.nn.Linear) and not auto_kernel_selection and module.weight.dtype is torch.float:
-        # For now we simply distinguish "mkl" and "mkldnn" backend by "weight prepack"
-        # Does not prepack Linear for FP32 to choose "mkl" backend
         return False
     if isinstance(module, torch.nn.ConvTranspose2d):
         if module.padding[0] - module.output_padding[0] + module.stride[0] <= 0:
@@ -290,7 +301,13 @@ def weight_prepack_with_ipex(module, optimizer, params_attr, auto_kernel_selecti
             weight = m.master_weight if hasattr(m, "master_weight") else m.weight
             if weight not in params_attr:
                 params_attr[weight] = {}
-            new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m)
+            if type(m) is torch.nn.Linear:
+                if m.weight.dtype == torch.float32 and optimizer is None and frontend.get_fp32_math_mode(device="cpu") == frontend.FP32MathMode.FP32:
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = False)
+                else:
+                    new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m, use_dnnl = True)
+            else:
+                new_m = IPEX_WEIGHT_PREPACK_MODULE[type(m)](m)
             params_attr[weight].update({
                 'op': type(m),
                 'ctx': new_m.ctx})

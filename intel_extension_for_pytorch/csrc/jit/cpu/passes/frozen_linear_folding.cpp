@@ -25,7 +25,8 @@ using Tensor = at::Tensor;
 
 bool supportedLinearNode(Node* n) {
   if (n->kind() == aten::linear ||
-      n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear")) {
+      n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||
+      n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
     return true;
   } else {
     return false;

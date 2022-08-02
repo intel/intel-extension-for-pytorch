@@ -1060,7 +1060,7 @@ class Tester(TestCase):
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
-    def _test_onednn_fp32(self, model, input, kind_in_graph=None, kind_not_in_graph=None, prec=5e-3):
+    def _test_mkl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
         model = model.eval()
         model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
         with torch.no_grad():
@@ -1074,10 +1074,6 @@ class Tester(TestCase):
 
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-
-            if kind_not_in_graph is not None:
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
-
 
     def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
         modelName = base_model.__class__.__name__
@@ -1184,29 +1180,31 @@ class Tester(TestCase):
 #call mkl path(fp32)
         model = ipex.optimize(origin_model, dtype=torch.float32)
         ori_res = model(test_val1)
-        model_jit = torch.jit.trace(model,(test_val1))
-        graph_ori = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_ori, ["aten::linear"])
-        self.assertEqual(linear_count_ori, 4)
-        model_jit = torch.jit.freeze(model_jit)
-        jit_res = model_jit(test_val1)
-        self.assertEqual(ori_res, jit_res)
-        graph_opt = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
-        self.assertEqual(linear_count_ori, 2)
-#call onednn path(fp32)
+        with torch.no_grad():
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["aten::linear"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res, jit_res)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
+            self.assertEqual(linear_count_ori, 2)
+#call prepack mkl path(fp32)
         model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
         ori_res = model(test_val1)
-        model_jit = torch.jit.trace(model,(test_val1))
-        graph_ori = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
-        self.assertEqual(linear_count_ori, 4)
-        model_jit = torch.jit.freeze(model_jit)
-        jit_res = model_jit(test_val1)
-        self.assertEqual(ori_res, jit_res)
-        graph_opt = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
-        self.assertEqual(linear_count_ori, 2)
+        with torch.no_grad():
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_MKLSGEMM"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res, jit_res)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::mkl_sgemm_run"])
+            self.assertEqual(linear_count_ori, 2)
 
         model = ipex.optimize(origin_model, dtype=torch.bfloat16)
         test_val1 = test_val1.bfloat16()
@@ -1660,7 +1658,7 @@ class Tester(TestCase):
         add_funcs = [lambda a, b, kwargs: torch.add(a, b, **kwargs)]
         if test_inplace:
             add_funcs.append(lambda a, b, kwargs: a.add_(b, **kwargs))
-        
+
         for dim in [2, 3]:
             for add_func in add_funcs:
                 input_size = [batch_size, in_channels, image_size, image_size]
@@ -1696,7 +1694,7 @@ class Tester(TestCase):
 
     def test_conv_transpose_sum_accumu_on_right(self):
         self._test_conv_transpose_sum(
-            ConvTransposeSumAccumuOnRight, 
+            ConvTransposeSumAccumuOnRight,
             alpha=1,
             supported=True)
         self._test_conv_transpose_sum(
@@ -1731,7 +1729,7 @@ class Tester(TestCase):
         mid_channels = 2
         in_channels = 3
         kernel_size = 3
-        image_size = 8        
+        image_size = 8
         for inplace in [True, False]:
             for dim in [2, 3]:
                 m = ConvTransposeAddRelu(dim, in_channels, mid_channels, out_channels, kernel_size, inplace)
@@ -1740,19 +1738,19 @@ class Tester(TestCase):
                 if dim == 3:
                     input_size.append(image_size)
                 x = torch.randn(input_size)
-                
+
                 self._test_output(
                     m,
                     x,
                     kind_in_graph="ipex_prepack::conv_transpose_add_relu_run",
-                    kind_not_in_graph="ipex_prepack::conv_transpose_add_run")                
+                    kind_not_in_graph="ipex_prepack::conv_transpose_add_run")
                 # TODO: stock PyTorch does not support bf16 deconv.
                 # self._test_output_bf16(
                 #     m,
                 #     x,
                 #     kind_in_graph="ipex_prepack::conv_transpose_add_relu_run",
                 #     kind_not_in_graph="ipex_prepack::conv_transpose_add_run",
-                #     prec=5e-2)        
+                #     prec=5e-2)
 
     def test_conv_fusion(self):
         batch_size = 8
@@ -2608,8 +2606,8 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 if auto_select_kernel and level == 'O1':
-# for auto_select_kernel is True and level is O1, we will use ipex linear
-                    self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+# for auto_select_kernel is True and level is O1, we will use ipex prepacked MKL linear
+                    self.assertTrue(any(n.kind() == 'ipex_prepack::mkl_sgemm_run' for n in trace_graph.nodes()))
                 else:
 # auto_select_kernel is false, we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
@@ -2767,11 +2765,10 @@ class Tester(TestCase):
                     m,
                     x,
                     kind_in_graph="aten::linear")
-                self._test_onednn_fp32(
+                self._test_mkl_fp32(
                     m,
                     x,
-                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
-                    kind_not_in_graph="ipex_prepack::linear_prepack")
+                    kind_in_graph="ipex_prepack::mkl_sgemm_run")
                 if bf16_supported:
                     self._test_output_bf16(
                         m,
@@ -2816,6 +2813,16 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
+        self._test_mkl_fp32(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_output_bf16(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_not_in_graph="aten::linear",
+            kind_in_graph="ipex_prepack::linear_add_run",
+            prec=5e-2)
 
     def test_output_linear_add_relu(self):
         for inplace in [True, False]:
@@ -2824,12 +2831,11 @@ class Tester(TestCase):
             self._test_output(
                 m,
                 x,
-                kind_in_graph="aten::linear")        
-            self._test_onednn_fp32(
+                kind_in_graph="aten::linear")
+            self._test_mkl_fp32(
                 m,
                 x,
-                kind_in_graph="ipex_prepack::linear_add_relu_run",
-                kind_not_in_graph="ipex_prepack::linear_add_run")                
+                kind_in_graph="ipex_prepack::mkl_sgemm_run")
             self._test_output_bf16(
                 m,
                 x,
@@ -2856,20 +2862,19 @@ class Tester(TestCase):
             kind_in_graph="aten::linear")
 
     def test_output_linear_swish(self):
-        self._test_onednn_fp32(
+        self._test_mkl_fp32(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_mkl_fp32(
+            LinearSigmoidMul(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
             prec=5e-3)
-        self._test_onednn_fp32(
-            LinearSigmoidMul(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
@@ -3006,7 +3011,7 @@ class Tester(TestCase):
                 kind_in_graph="ipex::matmul_div",
                 kind_not_in_graph=None)
             # When the div is outplace and out parameter be modified with an inplace op not in this pattern,
-            # and we observe it's value by some other op("==" -> aten::equl). In this case, jit.trace will treat 
+            # and we observe it's value by some other op("==" -> aten::equl). In this case, jit.trace will treat
             # out parameter that will modified by other ops as output of matmul, thus will not be matched by
             # our pattern, and we can't observe our fused op's side effect after we modified out param by an inplace op.
             self._test_output(

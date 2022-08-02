@@ -37,7 +37,8 @@ void replaceLstmWithQLstm(std::shared_ptr<torch::jit::Graph>& graph);
 void replaceFrozenIPEXConvWithAtenConv(
     std::shared_ptr<torch::jit::Graph>& graph);
 void replaceFrozenIPEXLinearWithAtenLinear(
-    std::shared_ptr<torch::jit::Graph>& graph);
+    std::shared_ptr<torch::jit::Graph>& graph,
+    const bool& use_mkl_sgemm);
 void insertPrePackedConvOp(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseConvAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
@@ -53,10 +54,12 @@ void ReplaceHardsigmoidWithIPEX(std::shared_ptr<torch::jit::Graph>& graph);
 
 void RecordAtenLinearNodes(
     std::shared_ptr<torch::jit::Graph>& graph,
-    std::unordered_set<torch::jit::Node*>& aten_linear);
+    std::unordered_set<torch::jit::Node*>& aten_linear,
+    bool& use_mkl_sgemm);
 void insertPrePackedLinearOp(
     std::shared_ptr<torch::jit::Graph>& graph,
-    std::unordered_set<torch::jit::Node*>& aten_linear);
+    std::unordered_set<torch::jit::Node*>& aten_linear,
+    const bool& use_mkl_sgemm);
 void fuseLinearWithEltwise(std::shared_ptr<torch::jit::Graph>& graph);
 void fuseLinearAddRelu(std::shared_ptr<torch::jit::Graph>& graph);
 

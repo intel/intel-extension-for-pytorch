@@ -92,15 +92,21 @@ void RemoveBailoutTemplateNodes(Block* b) {
 class ATenLinearRecorder {
  public:
   ATenLinearRecorder(std::shared_ptr<Graph> graph) {
-    graph_rewrite::RecordAtenLinearNodes(graph, aten_linear_nodes_);
+    graph_rewrite::RecordAtenLinearNodes(
+        graph, aten_linear_nodes_, use_mkl_sgemm);
   }
 
   std::unordered_set<Node*>& get_records() {
     return aten_linear_nodes_;
   }
 
+  bool& use_mkl() {
+    return use_mkl_sgemm;
+  }
+
  private:
   std::unordered_set<Node*> aten_linear_nodes_;
+  bool use_mkl_sgemm = false;
 };
 
 void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
@@ -147,7 +153,8 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // up fusion pass, will further abstract this as a class method.
   auto aten_linear_recorder = ATenLinearRecorder(graph);
   // linear folding
-  graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(graph);
+  graph_rewrite::replaceFrozenIPEXLinearWithAtenLinear(
+      graph, aten_linear_recorder.use_mkl());
   // concat multi-linear with same input
   torch_ipex::jit::FrozenConcatLinear(
       graph, aten_linear_recorder.get_records());
@@ -156,7 +163,9 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   // linear fusion
   GRAPH_DUMP("After FrozenLinearFolding.Before insertPrePackedLinearOp", graph);
   graph_rewrite::insertPrePackedLinearOp(
-      graph, aten_linear_recorder.get_records());
+      graph,
+      aten_linear_recorder.get_records(),
+      aten_linear_recorder.use_mkl());
   GRAPH_DUMP(
       "After insertPrePackedLinearOp.Before fuseLinearWithEltwise", graph);
   graph_rewrite::fuseLinearWithEltwise(graph);
@@ -169,6 +178,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
   GRAPH_DEBUG("After replacing hardsigmoid", graph);
 
   graph_rewrite::FuseLinearSwishCustomized(graph);
+
   // fuse add+layernorm
   graph_rewrite::FuseAddLayerNorm(graph);
 

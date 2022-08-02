@@ -4,3 +4,4 @@ ninja
 wheel>=0.36
 setuptools>=50.0
 psutil
+mkl-include

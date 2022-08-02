@@ -7,6 +7,7 @@
 #include "ContextConvTranspose.h"
 #include "ContextConvolution.h"
 #include "ContextLinear.h"
+#include "ContextLinearMKL.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 
 namespace torch_ipex {
@@ -140,10 +141,8 @@ class IpexConvolutionOpContext final : public ConvolutionOpContext {
 };
 
 // linear op
-using SerializationTypeLinearPrePack = std::tuple<
-    at::Tensor,
-    c10::optional<at::Tensor>,
-    c10::optional<int64_t>>;
+using SerializationTypeLinearPrePack =
+    std::tuple<at::Tensor, c10::optional<at::Tensor>, c10::optional<int64_t>>;
 
 class LinearOpContext : public torch::jit::CustomClassHolder {
  protected:
@@ -250,6 +249,78 @@ class IpexLinearOpContext final : public LinearOpContext {
   virtual detail::ContextLinear& get_context() override;
 
   static c10::intrusive_ptr<LinearOpContext> create_context(
+      at::Tensor&& weight,
+      c10::optional<at::Tensor>&& bias,
+      c10::optional<int64_t> batch_size);
+};
+
+using SerializationTypeMKLPrePack =
+    std::tuple<at::Tensor, c10::optional<at::Tensor>, c10::optional<int64_t>>;
+
+class MKLOpContext : public torch::jit::CustomClassHolder {
+ protected:
+  c10::optional<int64_t> batch_size_;
+
+ public:
+  SerializationTypeMKLPrePack unpack() {
+    auto orig_weight = this->to_public(this->get_at_packed_weight());
+    auto orig_bias = this->get_mkl_context().bias_;
+    return std::make_tuple(orig_weight, orig_bias, batch_size_);
+  }
+
+  virtual at::Tensor get_at_packed_weight() = 0;
+
+  virtual at::Tensor get_data_handle() = 0;
+
+  virtual at::Tensor pack(const at::Tensor& tensor) = 0;
+
+  virtual at::Tensor run(const at::Tensor& input) = 0;
+
+  virtual at::Tensor& run(const at::Tensor& input, at::Tensor& accumu) = 0;
+
+  // Unpack given tensor to same format with original public format for weight
+  virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
+
+  virtual int64_t get_out_features() = 0;
+
+  virtual int64_t get_in_features() = 0;
+
+  virtual detail::ContextLinearMKL& get_mkl_context() = 0;
+
+  c10::optional<int64_t> get_batchsize();
+};
+
+class IpexLinearMKLOpContext final : public MKLOpContext {
+ private:
+  detail::ContextLinearMKL op_context_;
+
+ public:
+  IpexLinearMKLOpContext(
+      c10::optional<int64_t> batch_size,
+      detail::ContextLinearMKL&& op_context)
+      : op_context_(std::move(op_context)) {
+    batch_size_ = batch_size;
+  }
+
+  virtual at::Tensor get_at_packed_weight() override;
+
+  virtual at::Tensor get_data_handle() override;
+
+  virtual at::Tensor pack(const at::Tensor& tensor) override;
+
+  virtual at::Tensor run(const at::Tensor& input) override;
+
+  virtual at::Tensor& run(const at::Tensor& input, at::Tensor& accumu) override;
+
+  virtual at::Tensor to_public(const at::Tensor& tensor) override;
+
+  virtual detail::ContextLinearMKL& get_mkl_context() override;
+
+  virtual int64_t get_out_features() override;
+
+  virtual int64_t get_in_features() override;
+
+  static c10::intrusive_ptr<MKLOpContext> create_context(
       at::Tensor&& weight,
       c10::optional<at::Tensor>&& bias,
       c10::optional<int64_t> batch_size);

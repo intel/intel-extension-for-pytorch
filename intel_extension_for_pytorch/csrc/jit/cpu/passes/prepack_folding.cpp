@@ -33,6 +33,7 @@ static const std::set<std::string> prepack_foldable_ops = {
     "ipex_prepack::convolution_add_relu_prepack",
     "ipex_prepack::linear_prepack",
     "ipex_prepack::conv_transpose_prepack",
+    "ipex_prepack::mkl_sgemm_prepack",
 };
 
 void PrePackingOpsFolder(Block* b) {
