@@ -33,15 +33,16 @@ inline void rnnt_embedding_kernel_body(
   at::parallel_for(0, batch_size, 16, [&](int64_t start, int64_t end) {
     for (int i = start; i < end; i++) {
       int64_t embed_idx = idx_ptr[i];
-      if (embed_idx == _SOS) {
-        continue;
-      }
-      int64_t in_pos = embed_idx * embedding_dim;
       int64_t out_pos = i * embedding_dim;
-      move_ker(
-          &embedding_out_ptr[out_pos],
-          &embedding_table_ptr[in_pos],
-          embedding_dim);
+      if (embed_idx == _SOS) {
+        zero_ker(&embedding_out_ptr[out_pos], embedding_dim);
+      } else {
+        int64_t in_pos = embed_idx * embedding_dim;
+        move_ker(
+            &embedding_out_ptr[out_pos],
+            &embedding_table_ptr[in_pos],
+            embedding_dim);
+      }
     }
   });
 }

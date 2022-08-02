@@ -146,8 +146,7 @@ class TestRNNTEmbedding(TestCase):
     def _test_rnnt_embedding_kernel(self, y_in, embedding):
         batch_size = y_in.shape[0]
         embedding_dim = embedding.weight.shape[1]
-        y = torch.zeros([batch_size, y_in.shape[1], embedding_dim], dtype=embedding.weight.dtype)
-
+        y = torch.empty([batch_size, y_in.shape[1], embedding_dim], dtype=embedding.weight.dtype)
         torch.ops.torch_ipex.rnnt_embedding(
             embedding.weight,
             y_in,
