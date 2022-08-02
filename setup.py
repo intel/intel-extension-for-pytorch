@@ -81,6 +81,7 @@ package_name = "intel_extension_for_pytorch"
 
 # build mode
 pytorch_install_dir = ''
+mkl_install_dir = ''
 USE_CXX11_ABI = 0
 mode = ''
 if len(sys.argv) > 1:
@@ -158,12 +159,13 @@ def _install_requirements():
                 if k == 'wheel':
                     restart = True
         else:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', k])
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', requires_raw[k]])
             if k == 'wheel':
                 restart = True
         if restart:
             os.execv(sys.executable, ['python'] + sys.argv)
             exit(1)
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', 'mkl-static'])
 
 
 def _build_installation_dependency():
@@ -428,7 +430,8 @@ class IPEXCPPLibBuild(build_clib, object):
             '-DGLIBCXX_USE_CXX11_ABI=' + str(int(USE_CXX11_ABI)),
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
-            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir]
+            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
+            '-DMKL_INSTALL_DIR=' + mkl_install_dir]
 
         if _check_env_flag("IPEX_DISP_OP"):
             cmake_args += ['-DIPEX_DISP_OP=1']
@@ -529,6 +532,11 @@ elif mode == 'python':
     # Install requirements for building
     _install_requirements()
 
+    # Find the oneMKL library path
+    mkl_install_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), ".."))
+    mkl_lib_path = mkl_install_dir + "/lib/"
+    mkl_include_path = mkl_install_dir + "/include/"
+
     def get_src_py_and_dst():
         ret = []
         generated_python_files = glob.glob(
@@ -587,18 +595,20 @@ elif mode == 'python':
             return '-Wl,-rpath,$ORIGIN/' + path
 
     def pyi_module():
-        main_libraries = ['intel-ext-pt-cpu']
+        main_libraries = ['mkl_intel_lp64','mkl_gnu_thread','mkl_core','intel-ext-pt-cpu']
         main_sources = [os.path.join(package_name, "csrc", "python", "init_python_bindings.cpp"),
                         os.path.join(package_name, "csrc", "python", "TaskModule.cpp")]
 
         include_dirs = [
             os.path.realpath("."),
             os.path.realpath(os.path.join(package_name, "csrc")),
+            os.path.join(mkl_include_path),
             os.path.join(pytorch_install_dir, "include"),
             os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include")]
 
         library_dirs = [
             "lib",
+            os.path.join(mkl_lib_path),
             os.path.join(pytorch_install_dir, "lib")]
 
         extra_compile_args = [
@@ -630,7 +640,6 @@ elif mode == 'python':
             library_dirs=library_dirs,
             extra_link_args=[make_relative_rpath('lib')])
         return C_ext
-
 
     cmdclass['build_ext'] = IPEXExtBuild
     cmdclass['build_py'] = IPEXPythonPackageBuild

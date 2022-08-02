@@ -350,7 +350,6 @@ class TestOp(JitLlgaTestCase):
         class M(torch.nn.Module):
             def __init__(self):
                 super(M, self).__init__()
-                self.linear = nn.Linear(1024, 1024, False)
 
             def forward(self, x, y, z, a):
                 o = torch.matmul(x, y) / 8.

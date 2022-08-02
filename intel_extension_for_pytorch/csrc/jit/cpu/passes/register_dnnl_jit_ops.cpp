@@ -10,6 +10,7 @@
 #include "csrc/jit/cpu/kernels/Einsum.h"
 #include "csrc/jit/cpu/kernels/Embeddingbag.h"
 #include "csrc/jit/cpu/kernels/Interaction.h"
+#include "csrc/jit/cpu/kernels/LinearMKLPacked.h"
 #include "csrc/jit/cpu/kernels/LinearPacked.h"
 #include "csrc/jit/cpu/kernels/LinearSwishCustomized.h"
 #include "csrc/jit/cpu/kernels/Matmul.h"
@@ -28,6 +29,7 @@ using namespace torch_ipex::cpu;
 using namespace torch_ipex::cpu::detail::convolution;
 using namespace torch_ipex::cpu::detail::linear;
 using namespace torch_ipex::cpu::detail::conv_transpose;
+using namespace torch_ipex::cpu::detail::mkl_sgemm;
 
 c10::AliasAnalysisKind aliasAnalysisFromSchema() {
   return c10::AliasAnalysisKind::FROM_SCHEMA;
@@ -622,6 +624,21 @@ torch::jit::RegisterOperators op({
                 (std::move(peek(stack, 3, 4)))
                     .toCustomClass<LinearOpContext>());
             drop(stack, 4);
+            torch::jit::pack(stack, std::move(result));
+            return 0;
+          };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex_prepack::mkl_sgemm_run(Tensor input, "
+        "__torch__.torch.classes.ipex_prepack.MKLOpContext "
+        "W_prepack) -> Tensor",
+        [](const Node* node) -> Operation {
+          return [](Stack* stack) {
+            auto result = mkl_sgemm_run(
+                (std::move(peek(stack, 0, 2))).toTensor(),
+                (std::move(peek(stack, 1, 2))).toCustomClass<MKLOpContext>());
+            drop(stack, 2);
             torch::jit::pack(stack, std::move(result));
             return 0;
           };
