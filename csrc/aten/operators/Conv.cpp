@@ -545,7 +545,7 @@ Tensor _convolution_out(
     bool transposed_,
     IntArrayRef output_padding_,
     int64_t groups_,
-    ConvAttr attr,
+    Attr attr,
     IntArrayRef pad_nd = IntArrayRef({})) {
   auto output = output_r;
   auto ndim = input_r.ndimension();
@@ -644,7 +644,7 @@ Tensor _convolution(
     bool transposed_,
     IntArrayRef output_padding_,
     int64_t groups_,
-    ConvAttr attr) {
+    Attr attr) {
   Tensor output_r;
   return _convolution_out(
       output_r,
@@ -687,7 +687,7 @@ Tensor pad_convolution(
         transposed_,
         output_padding_,
         groups_,
-        ConvAttr());
+        Attr());
   }
 
   Tensor output_r;
@@ -702,7 +702,7 @@ Tensor pad_convolution(
       transposed_,
       output_padding_,
       groups_,
-      ConvAttr(),
+      Attr(),
       pad_nd);
 }
 
@@ -720,12 +720,13 @@ Tensor convolution_sum(
     Scalar scale,
     Scalar alpha,
     Scalar beta) {
-  ConvAttr attr(
-      scale.to<float>(),
-      alpha.to<float>(),
-      beta.to<float>(),
-      1.f,
-      ConvAttr::kind_with_sum);
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sum fusion with sum scale equals to 1");
+  // output = conv_scale * (Conv(input, weight) + bias) + sum_scale * accumu;
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
   return _convolution_out(
       accumu,
       input_r,
@@ -754,12 +755,19 @@ Tensor convolution_sum_relu(
     Scalar scale,
     Scalar alpha,
     Scalar beta) {
-  ConvAttr attr(
-      scale.to<float>(),
-      alpha.to<float>(),
-      beta.to<float>(),
-      1.f,
-      ConvAttr::kind_with_relu | ConvAttr::kind_with_sum);
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sum fusion with sum scale equals to 1");
+  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias) +
+  // sum_scale * accumu);
+  Attr attr;
+  attr.append_post_sum(/* sum_scale */ scale.to<float>()); // append post op sum
+  attr.append_post_eltwise( // append post relu
+      /* relu_scale */ 1.f,
+      /* alpha */ 1.f,
+      /* beta */ 1.f,
+      attr.kind_with_relu);
   return _convolution_out(
       accumu,
       input_r,
@@ -787,12 +795,17 @@ Tensor convolution_relu(
     Scalar scale,
     Scalar alpha,
     Scalar beta) {
-  ConvAttr attr(
-      scale.to<float>(),
-      alpha.to<float>(),
-      beta.to<float>(),
-      1.f,
-      ConvAttr::kind_with_relu);
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution relu fusion with relu scale equals to 1");
+  // output = relu_scale * Relu(conv_scale * (Conv(input, weight) + bias));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* relu_scale */ 1.0,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_relu);
   return _convolution(
       input_r,
       weight_r,
@@ -819,12 +832,18 @@ Tensor convolution_sigmoid(
     Scalar scale,
     Scalar alpha,
     Scalar beta) {
-  ConvAttr attr(
-      scale.to<float>(),
-      alpha.to<float>(),
-      beta.to<float>(),
-      1.f,
-      ConvAttr::kind_with_sigmoid);
+  // only support scale = 1.0f in oneDNN for non-quantized case.
+  TORCH_CHECK(
+      scale.to<float>() == 1.f,
+      "only support convolution sigmoid fusion with sigmoid scale equals to 1");
+  // output = sigmoid_scale * Sigmoid(conv_scale * (Conv(input, weight) +
+  // bias));
+  Attr attr;
+  attr.append_post_eltwise(
+      /* sigmoid_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_sigmoid);
   return _convolution(
       input_r,
       weight_r,
@@ -861,7 +880,7 @@ Tensor convolution_overrideable(
       transposed_,
       output_padding_,
       groups_,
-      ConvAttr());
+      Attr());
 }
 
 std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(

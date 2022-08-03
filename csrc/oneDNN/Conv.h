@@ -11,6 +11,7 @@
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include <utils/LRUCache.h>
+#include "Attr.h"
 #include "Reorder.h"
 #include "Utils.h"
 
@@ -23,63 +24,6 @@ using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace xpu {
 namespace oneDNN {
-
-struct ConvAttr {
-  static const int64_t kind_with_relu = xpu::oneDNN::with_relu; // 0b01;
-  static const int64_t kind_with_sum = xpu::oneDNN::with_sum; // 0b10;
-  static const int64_t kind_with_sigmoid = xpu::oneDNN::with_sigmoid; // 0b100;
-  static const int64_t kind_with_mish = xpu::oneDNN::with_mish; // 0b10000000;
-  static const int64_t kind_with_linear =
-      xpu::oneDNN::with_linear; // 0b100000000;
-
-  ConvAttr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
-  ConvAttr(float scale, float alpha, float beta, float oscale, int64_t attr)
-      : scale_(scale),
-        alpha_(alpha),
-        beta_(beta),
-        oscale_(oscale),
-        attr_(attr) {}
-
-  bool with_relu() {
-    return attr_ & kind_with_relu;
-  }
-
-  bool with_sum() {
-    return attr_ & kind_with_sum;
-  }
-
-  bool with_sigmoid() {
-    return attr_ & kind_with_sigmoid;
-  }
-
-  bool with_mish() {
-    return attr_ & kind_with_mish;
-  }
-
-  bool with_linear() {
-    return attr_ & kind_with_linear;
-  }
-
-  int64_t attr() {
-    return attr_;
-  }
-
-#ifdef USE_PRIMITIVE_CACHE
-  void to_bytes(bytestring& bytes) {
-    xpu::dpcpp::to_bytes(bytes, scale_);
-    xpu::dpcpp::to_bytes(bytes, alpha_);
-    xpu::dpcpp::to_bytes(bytes, beta_);
-    xpu::dpcpp::to_bytes(bytes, oscale_);
-    xpu::dpcpp::to_bytes(bytes, attr_);
-  }
-#endif
-
-  float scale_;
-  float alpha_;
-  float beta_;
-  float oscale_;
-  int64_t attr_;
-};
 
 constexpr int src_batch_size_dim = 0;
 constexpr int wgh_dst_channels_dim = 0;
@@ -209,7 +153,7 @@ static at::Tensor convolution(
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
-    ConvAttr attr) {
+    Attr& attr) {
   auto engine =
       GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -225,8 +169,7 @@ static at::Tensor convolution(
   if (!Settings::I().is_onednn_layout_enabled() && !dst.defined()) {
     auto dst_opt = src.options();
     if (src.is_quantized()) {
-      dst_opt = attr.with_relu() ? device(kXPU).dtype(kQUInt8)
-                                 : device(kXPU).dtype(kQInt8);
+      dst_opt = attr.get_dst_dtype();
     }
     if (onednn_conv_use_channels_last(src, wgh)) {
       TORCH_CHECK(
@@ -335,11 +278,6 @@ static at::Tensor convolution(
       }
     }
 
-    auto dst_scale =
-        (get_onednn_dtype_include_double(dst) == memory::data_type::u8 &&
-         dst.q_zero_point() == 128)
-        ? attr.oscale_ / 2
-        : attr.oscale_;
     src_scale =
         (src_data_t == memory::data_type::u8 && src.q_zero_point() == 128)
         ? src.q_scale() / 2
@@ -354,8 +292,10 @@ static at::Tensor convolution(
        The y_sc / (w_sc x x_sc) is requantization scale, which is also the
        conv_scale in following line.
        Inversion is required due to scale_onednn = 1  / scale_torch */
+    /*The requantization will be performed in Attr.h with appending post op
+     * linear to adjust the scale/zeropoint*/
     for (int i = 0; i < wgh_scales.size(); i++) {
-      conv_scale.push_back(1.f / (dst_scale / (src_scale * wgh_scales[i])));
+      conv_scale.push_back(1.f / (1.f / (src_scale * wgh_scales[i])));
     }
     conv_zero_point = static_cast<int>(0);
     int mask_ac = 0;
@@ -382,29 +322,7 @@ static at::Tensor convolution(
 #endif
 
   post_ops po;
-  if (attr.with_sum())
-    po.append_sum(attr.scale_);
-
-  /* Note: [Conv post eltwise ops requantization]
-     Suppose y = w * x. The * refer to convolution operation, and y, w, x are
-     dtype of FP32. It is qeual to
-       y_int / y_sc = Post((w_int / w_sc) * (x_int / x_sc)) =>
-       y_int = y_sc x Post(1 / (w_sc * x_sc) x (w_int * x_int))
-     y_sc need to be passed to attr.scale.
-     Also, conv_scale should be 1 / (w_sc* x_sc).
-     For conv_scale setting  see Note: [Convolution requantization]
-   */
-  if (attr.with_relu()) {
-    po.append_eltwise(1.0, algorithm::eltwise_relu, attr.alpha_, attr.beta_);
-  } else if (attr.with_sigmoid()) {
-    po.append_eltwise(
-        attr.scale_, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
-  } else if (attr.with_mish()) {
-    po.append_eltwise(1.0, algorithm::eltwise_mish, attr.alpha_, attr.beta_);
-  }
-  if (attr.with_linear()) {
-    po.append_eltwise(1.0, algorithm::eltwise_linear, attr.alpha_, attr.beta_);
-  }
+  attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
 
 #ifdef USE_SCRATCHPAD_MODE

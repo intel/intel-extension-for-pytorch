@@ -33,7 +33,8 @@ at::Tensor q_conv2d(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
+  // output = Conv(input, weight)
+  Attr attr(/* q_scale */ static_cast<float>(output_scale));
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast
@@ -93,7 +94,8 @@ at::Tensor q_conv3d(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
+  // output = Conv(input, weight)
+  Attr attr(/* q_scale */ static_cast<float>(output_scale));
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast3d
@@ -144,12 +146,13 @@ at::Tensor q_conv3d_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {
-      1.f,
-      0.f,
-      0.f,
-      static_cast<float>(output_scale),
-      ConvAttr::kind_with_relu};
+  // output = eltwise_scale * Relu(conv_scale * Conv(input, weight))
+  Attr attr(/* q_scale */ static_cast<float>(output_scale));
+  attr.append_post_eltwise(
+      /* eltwise_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_relu);
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast3d
@@ -198,10 +201,10 @@ at::Tensor q_conv2d_sum_relu(
     Tensor& accumu,
     const Tensor& input,
     const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
-    double conv_scale,
-    int64_t conv_zero_point,
-    double sum_scale,
-    int64_t sum_zero_point) {
+    double q_conv_scale,
+    int64_t q_conv_zero_point,
+    double q_sum_scale,
+    int64_t q_sum_zero_point) {
   auto pack_ptr =
       dynamic_cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP<2>*>(
           packed_weight.get());
@@ -215,12 +218,18 @@ at::Tensor q_conv2d_sum_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {
-      static_cast<float>(accumu.q_scale() / sum_scale),
-      0.f,
-      0.f,
-      static_cast<float>(sum_scale),
-      ConvAttr::kind_with_relu | ConvAttr::kind_with_sum};
+  // output = eltwise_scale * Relu(conv_scale * Conv(input, weight) + sum_scale
+  // * accumu)
+
+  // since the input/output for RELU are share the same scale,
+  // then the fused op q_scale = q_sum_scale
+  Attr attr(/* q_scale */ static_cast<float>(q_sum_scale));
+  attr.append_post_sum(/*sum_scale*/ 1.f, /* sum_q_scale */ accumu.q_scale());
+  attr.append_post_eltwise(
+      /* eltwise_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_relu);
 
   convolution(
       accumu,
@@ -237,7 +246,7 @@ at::Tensor q_conv2d_sum_relu(
   set_quantizer_(
       accumu,
       dpcpp_make_per_tensor_affine_quantizer(
-          sum_scale, sum_zero_point, accumu.scalar_type()));
+          q_sum_scale, q_sum_zero_point, accumu.scalar_type()));
 
   return accumu;
 }
@@ -258,16 +267,17 @@ at::Tensor q_conv2d_sigmoid(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
+  // output = eltwise_scale * Sigmoid(conv_scale * Conv(input, weight))
   /* The output range for sigmoid is [0, 1), we can infer the requantization
      scale for post_ops is 255 (the maximum in UInt8).
      For detailed information of requantization scale,
      See Note [Conv Post eltwise ops requantization] */
-  ConvAttr attr = {
-      static_cast<float>(255.0),
-      0.f,
-      0.f,
-      static_cast<float>(1.0),
-      ConvAttr::kind_with_sigmoid};
+  Attr attr(/* q_scale */ static_cast<float>(1.0 / 255.0));
+  attr.append_post_eltwise(
+      /* eltwise_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_sigmoid);
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast
@@ -319,18 +329,20 @@ at::Tensor q_conv2d_leaky_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
+  // output = eltwise_scale * LeakyRelu(conv_scale * Conv(input, weight))
   float alpha = negative_slope.to<float>();
-  ConvAttr attr = {
-      1.f,
-      alpha,
-      0.f,
-      static_cast<float>(output_scale),
-      ConvAttr::kind_with_relu};
+  Attr attr(/* q_scale */ static_cast<float>(output_scale));
+  attr.append_post_eltwise(
+      /* eltwise_scale */ 1.f,
+      /* alpha */ alpha,
+      /* beta */ 0.f,
+      attr.kind_with_relu);
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast
       : at::MemoryFormat::Contiguous;
 
+  auto output_dtype = alpha <= 0.0 ? ScalarType::QUInt8 : ScalarType::QInt8;
   Tensor output = at::_empty_affine_quantized(
       conv_dst_tz(
           input.ndimension(),
@@ -340,7 +352,7 @@ at::Tensor q_conv2d_leaky_relu(
           padding.vec(),
           stride.vec(),
           dilation.vec()),
-      device(kXPU).dtype(kQUInt8),
+      device(kXPU).dtype(output_dtype),
       output_scale,
       output_zero_point,
       mfmt);
@@ -392,12 +404,14 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {
-      1.f,
-      0.f,
-      0.f,
-      static_cast<float>(output_scale),
-      ConvAttr::kind_with_mish};
+  // softplus + tanh + mul equals to Mish post op in oneDNN
+  // output = mish_scale * Mish(conv_scale * Conv(input, weight))
+  Attr attr(/* q_scale */ static_cast<float>(q_scale));
+  attr.append_post_eltwise(
+      /* mish_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_mish);
 
   auto mfmt = onednn_conv_use_channels_last(input, weight)
       ? at::MemoryFormat::ChannelsLast
@@ -412,9 +426,9 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize(
           padding.vec(),
           stride.vec(),
           dilation.vec()),
-      device(kXPU).dtype(kQUInt8),
-      output_scale,
-      output_zero_point,
+      device(kXPU).dtype(kQInt8),
+      q_scale,
+      q_zpoint,
       mfmt);
 
   output = convolution(
@@ -442,7 +456,7 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
     double q_scale,
     int64_t q_zpoint,
     at::ScalarType dtype,
-    Tensor qb,
+    Tensor accumu,
     double add_scale,
     int64_t add_zero_point) {
   auto pack_ptr = dynamic_cast<PackedConvWeightQDPCPP<2>*>(packed_weight.get());
@@ -456,33 +470,22 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  ConvAttr attr = {
-      1.f,
-      0.f,
-      0.f,
-      static_cast<float>(output_scale),
-      ConvAttr::kind_with_mish | ConvAttr::kind_with_linear};
+  // softplus + tanh + mul equals to Mish post op in oneDNN
+  // output = (mish_scale * Mish(conv_scale * Conv(input, weight))) + sum_scale
+  // * accumu
 
-  auto mfmt = onednn_conv_use_channels_last(input, weight)
-      ? at::MemoryFormat::ChannelsLast
-      : at::MemoryFormat::Contiguous;
+  Attr attr(/* q_scale */ static_cast<float>(add_scale));
+  attr.append_post_eltwise(
+      /* mish_scale */ 1.f,
+      /* alpha */ 0.f,
+      /* beta */ 0.f,
+      attr.kind_with_mish);
+  attr.append_post_sum(
+      /* sum_scale */ 1.f,
+      /* sum_q_scale */ accumu.q_scale());
 
-  Tensor output = at::_empty_affine_quantized(
-      conv_dst_tz(
-          input.ndimension(),
-          input.sizes(),
-          weight.sizes(),
-          padding.vec(),
-          padding.vec(),
-          stride.vec(),
-          dilation.vec()),
-      device(kXPU).dtype(kQUInt8),
-      output_scale,
-      output_zero_point,
-      mfmt);
-
-  output = convolution(
-      output,
+  convolution(
+      accumu,
       input,
       weight,
       bias,
@@ -493,7 +496,11 @@ at::Tensor q_conv2d_dequantize_softplus_tanh_mul_quantize_add(
       groups,
       attr);
 
-  return output;
+  set_quantizer_(
+      accumu,
+      dpcpp_make_per_tensor_affine_quantizer(
+          add_scale, add_zero_point, accumu.scalar_type()));
+  return accumu;
 }
 
 Tensor softplus_tanh(

@@ -420,6 +420,9 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
     {{aten::constant_pad_nd, aten::conv2d}, xpu::pad_conv2d_sym},
     // SSD-MobileNet INT8: conv + leaky_relu_
     {{Symbol::fromQualString("quantized::conv2d"),
+      Symbol::fromQualString("aten::leaky_relu")},
+     xpu::q_conv2d_leaky_relu_sym},
+    {{Symbol::fromQualString("quantized::conv2d"),
       Symbol::fromQualString("aten::leaky_relu_")},
      xpu::q_conv2d_leaky_relu_sym},
     // SE-ResNeXt INT8: conv + sigmoid
