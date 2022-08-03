@@ -11,6 +11,8 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
+#include "Resize.h"
+
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -1846,7 +1848,7 @@ static Tensor& linalg_solve_out_info(
   if (copy_needed) {
     Tensor result_tmp = at::empty({0}, input.options());
     result_tmp = linalg_solve_out_info(result_tmp, infos, input, other);
-    at::native::resize_output(result, result_tmp.sizes());
+    resize_output(result, result_tmp.sizes());
     result.copy_(result_tmp);
     return result;
   }
@@ -2650,8 +2652,8 @@ std::tuple<Tensor&, Tensor&> linalg_eig_out(
   Tensor vectors_tmp = at::empty({0}, options.dtype(vectors_type));
   std::tie(values_tmp, vectors_tmp) =
       at::native::linalg_eig_out(input_tmp, values_tmp, vectors_tmp);
-  at::native::resize_output(values, values_tmp.sizes());
-  at::native::resize_output(vectors, vectors_tmp.sizes());
+  resize_output(values, values_tmp.sizes());
+  resize_output(vectors, vectors_tmp.sizes());
   values.copy_(values_tmp);
   vectors.copy_(vectors_tmp);
   return std::tuple<Tensor&, Tensor&>(values, vectors);

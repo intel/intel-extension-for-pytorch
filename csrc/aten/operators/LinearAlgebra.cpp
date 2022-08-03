@@ -5,6 +5,7 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
+#include "Resize.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/ApplyUtils.h"
@@ -683,9 +684,9 @@ std::tuple<Tensor&, Tensor&> linalg_slogdet_out(
   Tensor sign_tmp, logabsdet_tmp;
   std::tie(sign_tmp, logabsdet_tmp) = at::linalg_slogdet(input);
 
-  at::native::resize_output(sign, sign_tmp.sizes());
+  resize_output(sign, sign_tmp.sizes());
   sign.copy_(sign_tmp);
-  at::native::resize_output(logabsdet, logabsdet_tmp.sizes());
+  resize_output(logabsdet, logabsdet_tmp.sizes());
   logabsdet.copy_(logabsdet_tmp);
 
   return std::tuple<Tensor&, Tensor&>(sign, logabsdet);

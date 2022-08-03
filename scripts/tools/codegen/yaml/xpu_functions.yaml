@@ -378,6 +378,7 @@ supported:
   - mv
   - mvlgamma
   - mvlgamma_
+  - nan_to_num.out
   - narrow_copy
   - native_batch_norm
   - native_batch_norm_backward

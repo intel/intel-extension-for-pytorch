@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/core/DimVector.h>
-#include <ATen/native/Resize.h>
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/detail/ListUtils.h>
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #include <utils/LRUCache.h>
+#include "Resize.h"
 #include "Utils.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
@@ -667,11 +667,11 @@ Tensor& _fft_r2c_out(
   auto result = at::AtenIpexTypeXPU::_fft_r2c(
       self, dim, normalization, /*onesided=*/true);
   if (onesided) {
-    native::resize_output(out, result.sizes());
+    resize_output(out, result.sizes());
     return out.copy_(result);
   }
 
-  native::resize_output(out, self.sizes());
+  resize_output(out, self.sizes());
 
   auto last_dim = dim.back();
   auto last_dim_halfsize = result.sizes()[last_dim];
@@ -689,7 +689,7 @@ Tensor& _fft_c2r_out(
     Tensor& out) {
   auto result =
       at::AtenIpexTypeXPU::_fft_c2r(self, dim, normalization, last_dim_size);
-  native::resize_output(out, result.sizes());
+  resize_output(out, result.sizes());
   return out.copy_(result);
 }
 
@@ -701,7 +701,7 @@ Tensor& _fft_c2c_out(
     Tensor& out) {
   auto result =
       at::AtenIpexTypeXPU::_fft_c2c(self, dim, normalization, forward);
-  native::resize_output(out, result.sizes());
+  resize_output(out, result.sizes());
   return out.copy_(result);
 }
 

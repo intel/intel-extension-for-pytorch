@@ -49,6 +49,38 @@ const Tensor& resize_as_(
   return at::AtenIpexTypeXPU::resize_(
       self, the_template.sizes(), memory_format);
 }
+
+bool resize_output_check(const Tensor& output, IntArrayRef shape) {
+  // Tests for resizing of tensors with one or more elements
+  if (output.sizes().equals(shape)) {
+    return false;
+  }
+  if (output.numel() != 0) {
+    TORCH_WARN(
+        "An output with one or more elements was resized since it had ",
+        "shape ",
+        output.sizes(),
+        ", which does not match the required ",
+        "output shape ",
+        shape,
+        ".",
+        "This behavior is deprecated, and in a future PyTorch release outputs ",
+        "will not be resized unless they have zero elements. You can explicitly ",
+        "reuse an out tensor t by resizing it, inplace, to zero elements with ",
+        "t.resize_(0).");
+  }
+  return true;
+}
+
+bool resize_output(const Tensor& output, IntArrayRef shape) {
+  if (resize_output_check(output, shape)) {
+    output.resize_(shape);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
@@ -59,5 +91,6 @@ const Tensor& resize_(
   at::AtenIpexTypeXPU::impl::resize_(self, size, memory_format);
   return self;
 }
+
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
