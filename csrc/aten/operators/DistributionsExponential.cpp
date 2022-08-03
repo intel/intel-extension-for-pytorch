@@ -71,7 +71,7 @@ Tensor& exponential_(
           // define lambd for exponential transformation
           auto exponential_func = [lambd](accscalar_t rand) {
             accscalar_t sample;
-            sample = DPCPP::log(rand);
+            sample = Numerics<accscalar_t>::log(rand);
             return static_cast<scalar_t>(
                 static_cast<accscalar_t>(-1.0) / lambd * sample);
           };

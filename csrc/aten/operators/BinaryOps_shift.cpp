@@ -3,11 +3,15 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
+#include "comm/Numerics.h"
 #include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/ScalarOps.h"
 
 #include "Loops.h"
+
+#include "oneapi/dpl/type_traits"
+namespace dpl = oneapi::dpl;
 
 using namespace xpu::dpcpp;
 
@@ -26,13 +30,13 @@ Tensor& bitwise_left_shift_out(
         ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "lshift", [&]() {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return a * std::pow(static_cast<scalar_t>(2), b);
+                return a * Numerics<scalar_t>::pow(static_cast<scalar_t>(2), b);
               });
         });
   } else {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "lshift", [&]() {
       dpcpp_kernel_with_scalars(iter, [](scalar_t a, scalar_t b) -> scalar_t {
-        return static_cast<std::make_unsigned_t<scalar_t>>(a) << b;
+        return static_cast<dpl::make_unsigned_t<scalar_t>>(a) << b;
       });
     });
   }
@@ -74,7 +78,7 @@ Tensor& bitwise_right_shift_out(
         ScalarType::Half, ScalarType::BFloat16, iter.dtype(), "rshift", [&]() {
           dpcpp_kernel_with_scalars(
               iter, [](scalar_t a, scalar_t b) -> scalar_t {
-                return a / std::pow(static_cast<scalar_t>(2), b);
+                return a / Numerics<scalar_t>::pow(static_cast<scalar_t>(2), b);
               });
         });
   } else {

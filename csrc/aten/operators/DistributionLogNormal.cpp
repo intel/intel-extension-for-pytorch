@@ -34,7 +34,8 @@ void log_normal_dpcpp(
         auto std = static_cast<accscalar_t>(std_);
         // define lambda to multiply std and add mean
         auto log_normal_func = [mean, std](accscalar_t rand) {
-          return static_cast<scalar_t>(DPCPP::exp(rand * std + mean));
+          return static_cast<scalar_t>(
+              Numerics<accscalar_t>::exp(rand * std + mean));
         };
         AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(
             iter,

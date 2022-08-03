@@ -11,6 +11,9 @@
 #include "comm/Numerics.h"
 #include "comm/zmath.h"
 
+#include "oneapi/dpl/cmath"
+namespace dpl = oneapi::dpl;
+
 using namespace xpu::dpcpp;
 
 namespace at {
@@ -49,7 +52,7 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
                   return a / b;
                 }
 
-                auto mod = std::fmod(a, b);
+                auto mod = Numerics<scalar_t>::fmod(a, b);
                 auto div = (a - mod) / b;
                 if ((mod != 0) && (b < 0) != (mod < 0)) {
                   div -= scalar_t(1);
@@ -57,12 +60,13 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
 
                 scalar_t floordiv;
                 if (div != 0) {
-                  floordiv = std::floor(div);
+                  floordiv = Numerics<scalar_t>::floor(div);
                   if (div - floordiv > scalar_t(0.5)) {
                     floordiv += scalar_t(1.0);
                   }
                 } else {
-                  floordiv = DPCPP::copysign(0.0, scalar_cast<double>(a / b));
+                  floordiv = Numerics<double>::copysign(
+                      0.0, scalar_cast<double>(a / b));
                 }
                 return floordiv;
               });

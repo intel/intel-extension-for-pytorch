@@ -5,6 +5,9 @@
 #include <c10/util/MathConstants.h>
 #include <c10/util/complex.h>
 #include <c10/util/math_compat.h>
+#include <oneapi/dpl/cmath>
+#include <oneapi/dpl/type_traits>
+namespace dpl = oneapi::dpl;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -185,19 +188,19 @@ inline c10::complex<double> floor_impl(c10::complex<double> z) {
 
 template <typename TYPE>
 inline TYPE round_impl(TYPE z) {
-  return std::nearbyint(z);
+  return dpl::nearbyint(z);
 }
 
 template <>
 inline c10::complex<float> round_impl(c10::complex<float> z) {
   return c10::complex<float>(
-      std::nearbyint(z.real()), std::nearbyint(z.imag()));
+      dpl::nearbyint(z.real()), dpl::nearbyint(z.imag()));
 }
 
 template <>
 inline c10::complex<double> round_impl(c10::complex<double> z) {
   return c10::complex<double>(
-      std::nearbyint(z.real()), std::nearbyint(z.imag()));
+      dpl::nearbyint(z.real()), dpl::nearbyint(z.imag()));
 }
 
 template <typename TYPE>
@@ -217,7 +220,7 @@ inline c10::complex<double> trunc_impl(c10::complex<double> z) {
 
 template <
     typename TYPE,
-    std::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
+    dpl::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE max_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a) || _isnan<TYPE>(b)) {
     return std::numeric_limits<TYPE>::quiet_NaN();
@@ -228,7 +231,7 @@ inline TYPE max_impl(TYPE a, TYPE b) {
 
 template <
     typename TYPE,
-    std::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
+    dpl::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE max_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a)) {
     return a;
@@ -241,7 +244,7 @@ inline TYPE max_impl(TYPE a, TYPE b) {
 
 template <
     typename TYPE,
-    std::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
+    dpl::enable_if_t<!c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE min_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a) || _isnan<TYPE>(b)) {
     return std::numeric_limits<TYPE>::quiet_NaN();
@@ -252,7 +255,7 @@ inline TYPE min_impl(TYPE a, TYPE b) {
 
 template <
     typename TYPE,
-    std::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
+    dpl::enable_if_t<c10::is_complex<TYPE>::value, int> = 0>
 inline TYPE min_impl(TYPE a, TYPE b) {
   if (_isnan<TYPE>(a)) {
     return a;
