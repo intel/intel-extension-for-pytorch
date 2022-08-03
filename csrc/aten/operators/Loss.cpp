@@ -10,6 +10,7 @@
 #include <utils/DPCPP.h>
 
 #include "comm/ATDispatch.h"
+#include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
@@ -207,6 +208,46 @@ void l1_backward_kernel(TensorIterator& iter, Scalar norm) {
                 -> scalar_t {
               return input < target ? -norm_val * grad_output
                                     : norm_val * grad_output;
+            });
+      });
+}
+
+void huber_kernel(TensorIterator& iter, double delta) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      kBFloat16, kHalf, iter.dtype(), "huber", [&iter, delta] {
+        scalar_t delta_val(delta);
+        dpcpp_kernel_for_tensor_iter(
+            iter, [delta_val](scalar_t a, scalar_t b) -> scalar_t {
+              auto z = Numerics<scalar_t>::abs(a - b);
+              return z < delta_val
+                  ? scalar_t(0.5) * z * z
+                  : delta_val * (z - scalar_t(0.5) * delta_val);
+            });
+      });
+}
+
+void huber_backward_kernel(
+    TensorIterator& iter,
+    const Scalar& norm,
+    double delta) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      kBFloat16, kHalf, iter.dtype(), "huber_backward", [&iter, &norm, delta] {
+        auto norm_val = norm.to<scalar_t>();
+        scalar_t delta_val(delta);
+        dpcpp_kernel_for_tensor_iter(
+            iter,
+            [norm_val, delta_val](
+                scalar_t input,
+                scalar_t target,
+                scalar_t grad_output) -> scalar_t {
+              const auto x = input - target;
+              if (x < -delta_val) {
+                return -norm_val * grad_output * delta_val;
+              } else if (x > delta_val) {
+                return norm_val * grad_output * delta_val;
+              } else {
+                return norm_val * x * grad_output;
+              }
             });
       });
 }
@@ -560,6 +601,66 @@ Tensor mse_loss_backward(
       self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
   return at::AtenIpexTypeXPU::mse_loss_backward_out(
       grad_input, grad_output, self, target, reduction);
+}
+
+Tensor huber_loss(
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction,
+    double delta) {
+  TORCH_CHECK(
+      delta > 0, "huber_loss does not support non-positive values for delta.")
+  Tensor loss = at::empty_like(self);
+  auto iter = TensorIterator::binary_op(loss, self, target);
+  impl::huber_kernel(iter, delta);
+  return apply_loss_reduction(loss, reduction);
+}
+
+Tensor& huber_loss_out(
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction,
+    double delta,
+    Tensor& out) {
+  TORCH_CHECK(
+      delta > 0, "huber_loss does not support non-positive values for delta.")
+  auto iter = TensorIterator::borrowing_binary_op(out, self, target);
+  impl::huber_kernel(iter, delta);
+  if (reduction != Reduction::None) {
+    auto reduced = apply_loss_reduction(out, reduction);
+    out.resize_({});
+    out.copy_(reduced);
+  }
+  return out;
+}
+
+Tensor huber_loss_backward(
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction,
+    double delta) {
+  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  return at::huber_loss_backward_out(
+      grad_input, grad_output, self, target, reduction, delta);
+}
+
+Tensor& huber_loss_backward_out(
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction,
+    double delta,
+    Tensor& grad_input) {
+  auto norm = (reduction == Reduction::Mean) ? (1. / self.numel()) : 1.;
+  auto iter = at::TensorIteratorConfig()
+                  .add_output(grad_input)
+                  .add_input(self)
+                  .add_input(target)
+                  .add_input(grad_output)
+                  .build();
+  impl::huber_backward_kernel(iter, norm, delta);
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeXPU

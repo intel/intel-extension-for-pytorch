@@ -259,6 +259,9 @@ supported:
   - heaviside.out
   - histc
   - histc.out
+  - huber_loss
+  - huber_loss.out
+  - huber_loss_backward.out
   - im2col
   - im2col.out
   - im2col_backward
