@@ -133,7 +133,7 @@ float DPCPPEvent::elapsed_time(const DPCPPEvent& other) const {
     time_ms = (self_end - other_end) / (1000.0 * 1000.0);
   } else {
     // nanoseconds to milliseconds
-    time_ms = -((other_end - self_end) / (1000.0 * 1000.0));
+    time_ms = (other_end - self_end) / (1000.0 * 1000.0);
   }
   return time_ms;
 }

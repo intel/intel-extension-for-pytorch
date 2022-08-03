@@ -10,3 +10,20 @@ class TestTorchXPUMethod(TestCase):
         # AttributeError: module 'intel_extension_for_pytorch' has no attribute 'current_stream'
         ev.record()
         ev.wait()
+
+    def test_event_elapsed_time(self):
+        import torch
+        import intel_extension_for_pytorch
+        t1 = torch.rand(1024, 1024).to("xpu")
+        t2 = torch.rand(1024, 1024).to("xpu")
+        torch.xpu.synchronize()
+        start_event = torch.xpu.Event(enable_timing=True)
+        start_event.record()
+        t2 = t1 * t2
+        t1 = t1 + t2
+        end_event = torch.xpu.Event(enable_timing=True)
+        end_event.record()
+        end_event.synchronize()
+        t = start_event.elapsed_time(end_event)
+        print(t)
+        self.assertTrue(t > 0)
