@@ -19,7 +19,6 @@
 #include <numeric>
 #include <vector>
 
-#include <csrc/utils/ipex_op_profile.h>
 #include <csrc/utils/library.h>
 
 #include "TensorAdvancedIndexing.h"
@@ -35,11 +34,6 @@ at::Tensor& index_select_out_cpu_(
     int64_t dim,
     const at::Tensor& index,
     at::Tensor& result) {
-  if (self.is_quantized()) {
-    TORCH_CHECK(
-        self.qscheme() == at::kPerTensorAffine,
-        "Only per_tensor quantized quantized tensors are supported by index_select.")
-  }
   dim = at::maybe_wrap_dim(dim, self.dim());
   auto numel = index.numel();
   TORCH_CHECK_INDEX(
@@ -251,7 +245,7 @@ at::Tensor index_select_cpu_(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::index_select_cpu_\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::index_select_cpu_", c10::ArrayRef<c10::IValue>({}));
 
   at::Tensor result = at::empty({0}, self.options());
@@ -262,6 +256,9 @@ IPEX_TORCH_LIBRARY_IMPL(aten, CPU, m) {
   m.impl(
       TORCH_SELECTIVE_NAME("aten::index_select"),
       TORCH_FN((&torch_ipex::cpu::index_select_cpu_)));
+  m.impl(
+      TORCH_SELECTIVE_NAME("aten::index_select.out"),
+      TORCH_FN((&torch_ipex::cpu::index_select_out_cpu_)));
 }
 
 } // namespace cpu

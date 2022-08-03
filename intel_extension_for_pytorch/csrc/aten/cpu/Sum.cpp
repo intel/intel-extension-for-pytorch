@@ -8,7 +8,6 @@
 #include <c10/util/irange.h>
 
 #include "Sum.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -18,14 +17,13 @@ DEFINE_DISPATCH(sum_kernel_stub);
 
 at::Tensor sum_out_cpu(
     const at::Tensor& input,
-    c10::IntArrayRef dim,
+    c10::OptionalIntArrayRef opt_dims,
     bool keepdim,
     c10::optional<c10::ScalarType> dtype) {
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::sum_out_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::sum_out_cpu", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::sum_out_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // if dtype does not have value, we assign the input type to dtype
   // if dtype is an integer, we promote it to kLong.
@@ -35,13 +33,14 @@ at::Tensor sum_out_cpu(
       dtype = kLong;
     }
   }
-  at::DimVector dims_(dim);
+
+  at::DimVector dims_ = at::native::make_dim_vector(opt_dims, input.dim());
   at::maybe_wrap_dims(dims_, input.dim());
   auto shape = at::meta::get_reduction_shape(input, dims_, keepdim);
   at::Tensor output = at::empty(shape, input.options().dtype(dtype));
 
   auto iter = at::meta::make_reduction_from_out_ty(
-      input, output, dim, keepdim, output.scalar_type());
+      input, output, dims_, keepdim, output.scalar_type());
 
   // This is a workaround for poor performance on some non-contiguous shapes.
   // These non-contiguous shapes cannot go through vectorized path directly,
@@ -66,7 +65,7 @@ at::Tensor sum_out_cpu(
     for (int i = 2; i < in_shapes.size(); i++) {
       if (in_strides[i] == typesize && in_shapes[i] >= vecsize) {
         auto input_ = input.contiguous();
-        return at::sum(input_, dim, keepdim, dtype);
+        return at::sum(input_, dims_, keepdim, dtype);
       }
     }
   }

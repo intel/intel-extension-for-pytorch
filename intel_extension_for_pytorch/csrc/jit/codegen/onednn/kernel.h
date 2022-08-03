@@ -10,23 +10,24 @@
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 
-using ArgSpec = at::LlgaTensorDesc;
+using ArgSpec = LlgaTensorDesc;
 using ArgSpecs = std::vector<ArgSpec>;
 using RunArg = dnnl::graph::tensor;
 using RunArgs = std::vector<RunArg>;
 using TensorArgs = std::vector<at::Tensor>;
 
 constexpr int MAX_COMPILATION_CACHE_SIZE = 1024;
+
 class LlgaKernel {
  public:
-  explicit LlgaKernel(const Node* fusionNode);
+  explicit LlgaKernel(const torch::jit::Node* fusionNode);
 
-  void run(Stack& stack);
+  void run(torch::jit::Stack& stack);
 
   const std::string& debugName() const {
     return debugName_;
@@ -89,11 +90,11 @@ class LlgaKernel {
   }
 
   at::Device device_ = at::kCPU;
-  const Node* fusionNode_;
-  std::shared_ptr<Graph> graph_;
+  const torch::jit::Node* fusionNode_;
+  std::shared_ptr<torch::jit::Graph> graph_;
   int64_t nGraphInputs_ = 0; // number of inputs to graph_ on the IR
   int64_t nOutputs_ = 0;
-  std::map<size_t, Value*> tensorIdToValue_;
+  std::map<size_t, torch::jit::Value*> tensorIdToValue_;
   std::vector<int64_t> runArgsIdx_;
   dnnl::graph::partition partition_;
   // nPartitionInputs_ is the actual number of inputs to partition_ of graph_
@@ -105,7 +106,7 @@ class LlgaKernel {
   std::vector<dnnl::graph::compiled_partition> compilations_ =
       std::vector<dnnl::graph::compiled_partition>(MAX_COMPILATION_CACHE_SIZE);
   std::set<size_t> initializedInputIds_;
-  std::vector<Value*> constantValues_;
+  std::vector<torch::jit::Value*> constantValues_;
   TensorArgs constantInputs_;
   ArgSpecs inputSpecs_;
   ArgSpecs outputSpecs_;
@@ -120,4 +121,4 @@ class LlgaKernel {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

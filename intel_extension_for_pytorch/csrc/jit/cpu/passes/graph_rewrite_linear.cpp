@@ -5,21 +5,28 @@
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
 using namespace at::jit;
 using namespace torch_ipex::cpu;
+using namespace torch::jit;
 
 void replaceFrozenIPEXLinearWithAtenLinear(
     Block* b,
-    std::vector<Node*>& get_data_handle_nodes) {
+    std::vector<Node*>& get_data_handle_nodes,
+    const bool& use_mkl_sgemm) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      replaceFrozenIPEXLinearWithAtenLinear(block, get_data_handle_nodes);
+      replaceFrozenIPEXLinearWithAtenLinear(
+          block, get_data_handle_nodes, use_mkl_sgemm);
     }
-    if (n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear")) {
+    if (n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||
+        n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
+      TORCH_CHECK(
+          !(c10::GradMode::is_enabled()),
+          "Detect the Grad Mode! Please make sure torch.no_grad() is set priori to JIT trace");
       if (!(constant_as<at::Tensor>(n->namedInput("weight")).has_value())) {
         continue;
       }
@@ -38,10 +45,20 @@ void replaceFrozenIPEXLinearWithAtenLinear(
       // For graph before "freeze", cannot get custom class to repack
       if (!toIValue(prepack_node).has_value())
         continue;
-      auto linear_op_ctx =
-          toIValue(prepack_node).value().toCustomClass<LinearOpContext>();
-      at::Tensor weight_tensor = linear_op_ctx->to_public(
-          constant_as<at::Tensor>(n->namedInput("weight")).value());
+      at::Tensor weight_tensor;
+      auto weight_dtype =
+          n->inputs().at(1)->type()->cast<TensorType>()->scalarType().value();
+      if (use_mkl_sgemm && weight_dtype != at::ScalarType::BFloat16) {
+        auto linear_op_ctx =
+            toIValue(prepack_node).value().toCustomClass<MKLOpContext>();
+        weight_tensor = linear_op_ctx->to_public(
+            constant_as<at::Tensor>(n->namedInput("weight")).value());
+      } else {
+        auto linear_op_ctx =
+            toIValue(prepack_node).value().toCustomClass<LinearOpContext>();
+        weight_tensor = linear_op_ctx->to_public(
+            constant_as<at::Tensor>(n->namedInput("weight")).value());
+      }
       WithInsertPoint guard(n);
       auto graph = n->owningGraph();
 
@@ -59,19 +76,25 @@ void replaceFrozenIPEXLinearWithAtenLinear(
   EliminateDeadCode(b);
 }
 
-void replaceFrozenIPEXLinearWithAtenLinear(std::shared_ptr<Graph>& graph) {
+void replaceFrozenIPEXLinearWithAtenLinear(
+    std::shared_ptr<Graph>& graph,
+    const bool& use_mkl_sgemm) {
   std::vector<Node*> get_data_handle_nodes;
-  replaceFrozenIPEXLinearWithAtenLinear(graph->block(), get_data_handle_nodes);
+  replaceFrozenIPEXLinearWithAtenLinear(
+      graph->block(), get_data_handle_nodes, use_mkl_sgemm);
   for (auto& n : get_data_handle_nodes) {
     n->destroy();
   }
   EliminateDeadCode(graph);
 }
 
-void insertPrePackedLinearOp(Block* b, std::unordered_set<Node*>& aten_linear) {
+void insertPrePackedLinearOp(
+    Block* b,
+    std::unordered_set<Node*>& aten_linear,
+    const bool& use_mkl_sgemm) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      insertPrePackedLinearOp(block, aten_linear);
+      insertPrePackedLinearOp(block, aten_linear, use_mkl_sgemm);
     }
     if (n->kind() != aten::linear)
       continue;
@@ -114,18 +137,29 @@ void insertPrePackedLinearOp(Block* b, std::unordered_set<Node*>& aten_linear) {
     // the check since its graph element is not initialized. Details please
     // refer to
     // https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/ir/alias_analysis.cpp#L1956
+    auto use_mkl_sgemm_ = use_mkl_sgemm &&
+        weight_dtype_option.value() != at::ScalarType::BFloat16;
     auto prepack_node = graph->create(
-        Symbol::fromQualString("ipex_prepack::linear_prepack"), 1);
+        use_mkl_sgemm_
+            ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_prepack")
+            : Symbol::fromQualString("ipex_prepack::linear_prepack"),
+        1);
     for (auto i = 1; i < n->inputs().size(); ++i) {
       Value* v = n->inputs().at(i);
       prepack_node->addInput(v);
     }
     prepack_node->addInput(batch_size);
     prepack_node->output()->setType(
-        getCustomClass("__torch__.torch.classes.ipex_prepack.LinearOpContext"));
+        use_mkl_sgemm_
+            ? getCustomClass(
+                  "__torch__.torch.classes.ipex_prepack.MKLOpContext")
+            : getCustomClass(
+                  "__torch__.torch.classes.ipex_prepack.LinearOpContext"));
     graph->insertNode(prepack_node);
-    auto prepack_linear = graph->insertNode(
-        graph->create(Symbol::fromQualString("ipex_prepack::linear_run"), 1));
+    auto prepack_linear = graph->insertNode(graph->create(
+        use_mkl_sgemm_ ? Symbol::fromQualString("ipex_prepack::mkl_sgemm_run")
+                       : Symbol::fromQualString("ipex_prepack::linear_run"),
+        1));
     prepack_linear->addInput(n->inputs().at(0));
     prepack_linear->addInput(prepack_node->output());
     prepack_linear->output()->setType(n->output()->type()->cast<TensorType>());
@@ -137,17 +171,24 @@ void insertPrePackedLinearOp(Block* b, std::unordered_set<Node*>& aten_linear) {
 
 void insertPrePackedLinearOp(
     std::shared_ptr<Graph>& graph,
-    std::unordered_set<Node*>& aten_linear) {
-  insertPrePackedLinearOp(graph->block(), aten_linear);
+    std::unordered_set<Node*>& aten_linear,
+    const bool& use_mkl_sgemm) {
+  insertPrePackedLinearOp(graph->block(), aten_linear, use_mkl_sgemm);
 }
 
-void RecordAtenLinearNodes(Block* b, std::unordered_set<Node*>& aten_linear) {
+void RecordAtenLinearNodes(
+    Block* b,
+    std::unordered_set<Node*>& aten_linear,
+    bool& use_mkl_sgemm) {
   for (Node* n : b->nodes()) {
     for (Block* block : n->blocks()) {
-      RecordAtenLinearNodes(block, aten_linear);
+      RecordAtenLinearNodes(block, aten_linear, use_mkl_sgemm);
     }
     if (n->kind() == aten::linear) {
       aten_linear.insert(n);
+    }
+    if (n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
+      use_mkl_sgemm = true;
     }
   }
   EliminateDeadCode(b);
@@ -155,8 +196,9 @@ void RecordAtenLinearNodes(Block* b, std::unordered_set<Node*>& aten_linear) {
 
 void RecordAtenLinearNodes(
     std::shared_ptr<Graph>& graph,
-    std::unordered_set<Node*>& aten_linear) {
-  RecordAtenLinearNodes(graph->block(), aten_linear);
+    std::unordered_set<Node*>& aten_linear,
+    bool& use_mkl_sgemm) {
+  RecordAtenLinearNodes(graph->block(), aten_linear, use_mkl_sgemm);
   EliminateDeadCode(graph);
 }
 
@@ -324,4 +366,4 @@ void fuseLinearAddRelu(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

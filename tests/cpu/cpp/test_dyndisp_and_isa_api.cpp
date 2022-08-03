@@ -10,7 +10,7 @@
 
 using namespace torch_ipex::cpu;
 
-TEST(TestDynDispAndIsaAPI, TestIsaInfo) {
+TEST(TestDynDispAndIsaAPI, TestIsaRegs) {
   uint32_t eax = 0;
   uint32_t ebx = 0;
   uint32_t ecx = 0;
@@ -36,6 +36,15 @@ TEST(TestDynDispAndIsaAPI, TestIsaInfo) {
       "os --> amx: %s\n",
       CPUFeature::get_instance().os_amx() ? "true" : "false");
   CPUFeature::get_instance().show_features();
+}
+
+TEST(TestDynDispAndIsaAPI, TestIsaLevels) {
+  CPUFeature::get_instance().isa_level_amx();
+  CPUFeature::get_instance().isa_level_avx2();
+  CPUFeature::get_instance().isa_level_avx2_vnni();
+  CPUFeature::get_instance().isa_level_avx512_core();
+  CPUFeature::get_instance().isa_level_avx512_vnni();
+  CPUFeature::get_instance().isa_level_avx512_bf16();
 }
 
 TEST(TestDynDispAndIsaAPI, TestDynDispFunc) {

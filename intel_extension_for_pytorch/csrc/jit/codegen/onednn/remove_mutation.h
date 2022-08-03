@@ -3,34 +3,38 @@
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/ir/ir.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 
 struct IPEXRemoveMutation {
-  IPEXRemoveMutation(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
+  IPEXRemoveMutation(std::shared_ptr<torch::jit::Graph> graph)
+      : graph_(std::move(graph)) {}
 
   bool removeTensorMutation();
-  bool maybeAliveAfterNode(Node* node, Value* v, Value* x = nullptr);
+  bool maybeAliveAfterNode(
+      torch::jit::Node* node,
+      torch::jit::Value* v,
+      torch::jit::Value* x = nullptr);
 
  private:
-  std::shared_ptr<Graph> graph_;
-  std::unique_ptr<AliasDb> aliasDb_ = nullptr;
+  std::shared_ptr<torch::jit::Graph> graph_;
+  std::unique_ptr<torch::jit::AliasDb> aliasDb_ = nullptr;
 
-  AliasDb* getAliasDb() {
+  torch::jit::AliasDb* getAliasDb() {
     if (!aliasDb_) {
-      aliasDb_ = std::make_unique<AliasDb>(graph_);
+      aliasDb_ = std::make_unique<torch::jit::AliasDb>(graph_);
     }
     return aliasDb_.get();
   }
-  Node* createSpecialMappedOp(Node* n);
-  bool removeTensorMutation(Block* block);
+  torch::jit::Node* createSpecialMappedOp(torch::jit::Node* n);
+  bool removeTensorMutation(torch::jit::Block* block);
 };
 
-bool IPEXRemoveTensorMutation(const std::shared_ptr<Graph>& graph);
+bool IPEXRemoveTensorMutation(const std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

@@ -27,10 +27,20 @@ class CPUPool(object):
                 core_ids = list(core_ids)
             assert type(core_ids) is list, "Input of core_ids must be the type of list[Int]"
             self.core_ids = core_ids
-        else:
-            assert node_id is not None, "Neither core_ids or node_id has been implemented"
+        elif node_id is not None:
             self.core_ids = get_core_list_of_node_id(node_id)
+        else:
+            # Default case, we will use all the cores available for current process.
+            # Please note:
+            #   * The cores will cross numa for multi sockets.
+            #   * Logic cores will be used by default.
+            # The cores available for current process will change with external numactl cmd.
+            self.core_ids = ipex._C.get_process_available_cores()
+
         self.cpu_pool = ipex._C.CPUPool(self.core_ids)
+        # The actual core ids inside CPUPool may be updated in creation of ipex._C.CPUPool.
+        # Since ipex._C.CPUPool will filter out core ids which not available for current process.
+        self.core_ids = self.cpu_pool.get_core_list()
 
 class pin(object):
     r"""
@@ -55,7 +65,7 @@ class pin(object):
     def __enter__(self):
         assert type(self.cpu_pool) is CPUPool
         self.previous_cpu_pool = ipex._C.get_current_cpu_pool()
-        ipex._C.pin_cpu_cores(self.cpu_pool.core_ids)
+        ipex._C.pin_cpu_cores(self.cpu_pool.cpu_pool)
 
     def __exit__(self, *args):
         ipex._C.set_cpu_pool(self.previous_cpu_pool)

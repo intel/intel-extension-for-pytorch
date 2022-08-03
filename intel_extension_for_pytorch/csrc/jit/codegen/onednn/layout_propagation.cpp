@@ -1,10 +1,12 @@
 #include "layout_propagation.h"
 #include "graph_helper.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 bool couldSupportOpaqueLayout(Node* node) {
   switch (node->kind()) {
@@ -51,4 +53,4 @@ void PropagateLayout(const std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

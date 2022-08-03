@@ -4,17 +4,17 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include "csrc/jit/codegen/LlgaTensorImpl.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 
 class Operator {
  public:
-  Operator(const Node* node, dnnl::graph::op::kind kind)
+  Operator(const torch::jit::Node* node, dnnl::graph::op::kind kind)
       : n(node), o(getId(node), kind, node->kind().toQualString()), k(kind) {}
 
-  Operator& setInputValue(Value* v) {
+  Operator& setInputValue(torch::jit::Value* v) {
     if (v->mustNotBeNone())
       o.add_input(createLogicalTensor(v));
     return *this;
@@ -30,7 +30,7 @@ class Operator {
     return setInput(other...);
   }
 
-  Operator& setOutputValue(Value* v) {
+  Operator& setOutputValue(torch::jit::Value* v) {
     if (v->mustNotBeNone())
       o.add_output(createLogicalTensor(v));
     return *this;
@@ -57,27 +57,32 @@ class Operator {
     return setAttr(name, fn(n, offset));
   }
 
-  static std::vector<int64_t> Ints(const Node* node, size_t offset) {
-    return toIValue(node->input(offset))->toIntVector();
+  static std::vector<int64_t> Ints(
+      const torch::jit::Node* node,
+      size_t offset) {
+    return torch::jit::toIValue(node->input(offset))->toIntVector();
   }
 
-  static int64_t Int(const Node* node, size_t offset) {
-    return toIValue(node->input(offset))->toInt();
+  static int64_t Int(const torch::jit::Node* node, size_t offset) {
+    return torch::jit::toIValue(node->input(offset))->toInt();
   }
 
-  static float Float(const Node* node, size_t offset) {
-    return static_cast<float>(toIValue(node->input(offset))->toDouble());
+  static float Float(const torch::jit::Node* node, size_t offset) {
+    return static_cast<float>(
+        torch::jit::toIValue(node->input(offset))->toDouble());
   }
 
-  static float ScalarToFloat(const Node* node, size_t offset) {
-    return toIValue(node->input(offset))->toScalar().to<float>();
+  static float ScalarToFloat(const torch::jit::Node* node, size_t offset) {
+    return torch::jit::toIValue(node->input(offset))->toScalar().to<float>();
   }
 
   static std::vector<float> FloatValueToVector(float value) {
     return {value};
   }
 
-  static std::vector<float> FloatToVector(const Node* node, size_t offset) {
+  static std::vector<float> FloatToVector(
+      const torch::jit::Node* node,
+      size_t offset) {
     return FloatValueToVector(Float(node, offset));
   }
 
@@ -85,7 +90,9 @@ class Operator {
     return {value};
   }
 
-  static std::vector<int64_t> IntToVector(const Node* node, size_t offset) {
+  static std::vector<int64_t> IntToVector(
+      const torch::jit::Node* node,
+      size_t offset) {
     return IntValueToVector(Int(node, offset));
   }
 
@@ -103,24 +110,24 @@ class Operator {
     }
   }
 
-  static std::string String(const Node* node, size_t offset) {
+  static std::string String(const torch::jit::Node* node, size_t offset) {
     return QuantString(static_cast<at::ScalarType>(Int(node, offset)));
   }
 
-  static at::Tensor Tensor(const Node* node, size_t offset) {
-    return toIValue(node->input(offset))->toTensor();
+  static at::Tensor Tensor(const torch::jit::Node* node, size_t offset) {
+    return torch::jit::toIValue(node->input(offset))->toTensor();
   }
 
-  static bool Bool(const Node* node, size_t offset) {
-    return toIValue(node->input(offset))->toBool();
+  static bool Bool(const torch::jit::Node* node, size_t offset) {
+    return torch::jit::toIValue(node->input(offset))->toBool();
   }
 
-  static uint64_t getId(const Node* node) {
+  static uint64_t getId(const torch::jit::Node* node) {
     return reinterpret_cast<uint64_t>(node); // cast node address as op id
   }
 
-  static Node* getNode(uint64_t opId) {
-    return reinterpret_cast<Node*>(opId);
+  static torch::jit::Node* getNode(uint64_t opId) {
+    return reinterpret_cast<torch::jit::Node*>(opId);
   }
 
   dnnl::graph::op::kind kind() const {
@@ -132,11 +139,12 @@ class Operator {
   }
 
  private:
-  dnnl::graph::logical_tensor createLogicalTensor(Value* value) const {
-    return at::LlgaTensorDesc(value).logical_tensor();
+  dnnl::graph::logical_tensor createLogicalTensor(
+      torch::jit::Value* value) const {
+    return LlgaTensorDesc(value).logical_tensor();
   }
 
-  const Node* n;
+  const torch::jit::Node* n;
   dnnl::graph::op o;
   dnnl::graph::op::kind k;
 };
@@ -144,4 +152,4 @@ class Operator {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

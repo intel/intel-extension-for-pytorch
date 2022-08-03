@@ -4,24 +4,14 @@
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite_helper {
 
+using namespace torch::jit;
+
 // those code just copy from PyTorch offical and extend
 // replaceConvolutionWithAtenConv to handle conv_transpose3d.
-
-std::string getFuncName(Value* func_value) {
-  auto func = func_value->type()->expectRef<FunctionType>().function();
-  const auto& qname = func->qualname();
-  const auto& name = qname.qualifiedName();
-  auto rdot_idx = name.rfind('.');
-  if (rdot_idx != std::string::npos) {
-    return name.substr(rdot_idx + 1, name.length());
-  } else {
-    return name;
-  }
-}
 
 Value* getValue(
     const std::string& name,
@@ -274,8 +264,7 @@ bool isClampFusable(
   TORCH_CHECK(
       vmap.find("dummy_min_max") != vmap.end(),
       "Expected to find dummy_min_max Value in the subgraph to be replaced.");
-  auto dummy_min_max =
-      graph_rewrite_helper::getIValue("dummy_min_max", match_vmap, vmap);
+  auto dummy_min_max = getIValue("dummy_min_max", match_vmap, vmap);
 
   auto is_fusable = !dummy_min_max || dummy_min_max.value().isNone();
 
@@ -291,10 +280,8 @@ bool isClampFusable(
         "Expected to find output_max as well given "
         "output_min exist in pattern graph.");
     // If output_min/max are not constant, we get c10::nullopt.
-    auto output_min =
-        graph_rewrite_helper::getIValue("output_min", match_vmap, vmap);
-    auto output_max =
-        graph_rewrite_helper::getIValue("output_max", match_vmap, vmap);
+    auto output_min = getIValue("output_min", match_vmap, vmap);
+    auto output_max = getIValue("output_max", match_vmap, vmap);
     is_fusable =
         is_fusable && (output_min.has_value() && output_max.has_value());
   }
@@ -304,4 +291,4 @@ bool isClampFusable(
 
 } // namespace graph_rewrite_helper
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

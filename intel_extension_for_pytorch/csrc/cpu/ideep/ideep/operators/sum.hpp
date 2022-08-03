@@ -1,6 +1,7 @@
 #ifndef IDEEP_OPERATORS_SUM_HPP
 #define IDEEP_OPERATORS_SUM_HPP
 
+/*
 namespace ideep {
 
 struct sum : public dnnl::sum {
@@ -34,5 +35,5 @@ struct sum : public dnnl::sum {
 };
 
 } // namespace ideep
-
+ */
 #endif

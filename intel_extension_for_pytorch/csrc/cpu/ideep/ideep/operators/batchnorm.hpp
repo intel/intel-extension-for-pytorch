@@ -8,19 +8,20 @@ struct batch_normalization_forward_inference
     : public dnnl::batch_normalization_forward {
   using super = dnnl::batch_normalization_forward;
 
-  static void compute(
-      const tensor& src,
-      const tensor& scale,
-      const tensor& shift,
-      tensor& dst,
-      float epsilon,
-      const batch_normalization_flag flags =
-          batch_normalization_flag::use_scale_shift,
-      const engine& aengine = engine::cpu_engine()) {
-    static tensor dummy;
-    compute_impl</*use_stats=*/false>(
-        src, dummy, dummy, scale, shift, dst, epsilon, flags, aengine);
-  }
+  // Not used for now
+  //  static void compute(
+  //      const tensor& src,
+  //      const tensor& scale,
+  //      const tensor& shift,
+  //      tensor& dst,
+  //      float epsilon,
+  //      const batch_normalization_flag flags =
+  //          batch_normalization_flag::use_scale_shift,
+  //      const engine& aengine = engine::cpu_engine()) {
+  //    static tensor dummy;
+  //    compute_impl</*use_stats=*/false>(
+  //        src, dummy, dummy, scale, shift, dst, epsilon, flags, aengine);
+  //  }
 
   static void compute(
       const tensor& src,
@@ -99,6 +100,7 @@ struct batch_normalization_forward_inference
   }
 };
 
+/*
 struct batch_normalization_forward_training
     : public dnnl::batch_normalization_forward {
   using super = dnnl::batch_normalization_forward;
@@ -178,6 +180,7 @@ struct batch_normalization_forward_training
         {momentum, 1 - momentum}, {running_var, variance}, running_var);
   }
 };
+*/
 
 struct batch_normalization_backward
     : public dnnl::batch_normalization_backward {

@@ -1,6 +1,5 @@
 #include <csrc/aten/cpu/ConcatBnRelu.h>
 
-#include "csrc/utils/ipex_op_profile.h"
 
 #include <torch/csrc/autograd/function.h>
 #include "csrc/cpu/vec/vec.h"

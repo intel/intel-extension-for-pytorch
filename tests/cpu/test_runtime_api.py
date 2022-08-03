@@ -6,6 +6,9 @@ from common_utils import TestCase
 from torch.testing._internal.jit_utils import JitTestCase
 import time, sys
 import torch.fx.experimental.optimization as optimization
+from common_ipex_conf import runtime_thread_affinity_test_env
+import subprocess
+import os
 
 class SimpleNet(torch.nn.Module):
     def __init__(self):
@@ -52,6 +55,7 @@ class TestCPUPool(TestCase):
 
 class TestCoreBinding(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_decorator_imperative_model(self):
         model = SimpleNet()
         model.eval()
@@ -65,6 +69,7 @@ class TestCoreBinding(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_with_context_imperative_model(self):
         model = SimpleNet()
         model.eval()
@@ -76,6 +81,7 @@ class TestCoreBinding(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_nested_with_context_imperative_model(self):
         model = torch.nn.Softmax(dim=-1)
         model.eval()
@@ -92,6 +98,7 @@ class TestCoreBinding(TestCase):
 
 class TestRuntimeAPI(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_task_async_api_imperative_model(self):
         model = SimpleNet()
         model.eval()
@@ -109,6 +116,7 @@ class TestRuntimeAPI(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_task_sync_api_imperative_model(self):
         model = SimpleNet()
         model.eval()
@@ -125,6 +133,7 @@ class TestRuntimeAPI(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_task_async_api_native_function(self):
         model = SimpleNet()
         model.eval()
@@ -145,6 +154,7 @@ class TestRuntimeAPI(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_task_copy(self):
         model = SimpleNet()
         model.eval()
@@ -169,6 +179,7 @@ class TestRuntimeAPI(TestCase):
 
 class TestMultiStreamModule(TestCase):
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_multi_stream_module(self):
         model = SimpleNet()
         model.eval()
@@ -186,6 +197,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, y_runtime)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_single_stream_module(self):
         model = SimpleNet()
         model.eval()
@@ -206,6 +218,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, y_runtime2[0])
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_core_number_not_divisible_by_stream_number(self):
         model = SimpleNet()
         model.eval()
@@ -227,6 +240,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_batchsize_less_than_stream_number(self):
         model = SimpleNet()
         model.eval()
@@ -248,6 +262,7 @@ class TestMultiStreamModule(TestCase):
         self.assertEqual(y, torch.cat(y_runtime2))
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_batchsize_not_divisible_by_stream_number(self):
         model = SimpleNet()
         model.eval()
@@ -275,9 +290,9 @@ class TestModuleMultiStreamModuleHint(TestCase):
     # For the inputs format which can't be jit.trace
     def init_set_up(self):
         # Create Multi Stream Module without concat output
-        batch_size = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
-        num_streams = ipex.cpu.runtime.get_core_list_of_node_id(0).__len__()
-        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=0)
+        cpu_pool = ipex.cpu.runtime.CPUPool()
+        batch_size = cpu_pool.core_ids.__len__()
+        num_streams = cpu_pool.core_ids.__len__()
         return batch_size, num_streams, cpu_pool
 
     def create_multi_stream_module(self,
@@ -301,6 +316,7 @@ class TestModuleMultiStreamModuleHint(TestCase):
                                                     output_concat_hint = multi_stream_output_hint)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_mix_tensor_bool_input_output_hint(self):
         # This module:
         #   * Accept 2 tensors + 1 scalar as input
@@ -328,6 +344,7 @@ class TestModuleMultiStreamModuleHint(TestCase):
         self.assertEqual(y_ref, y_runtime_res)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_tuple_input_output_hint(self):
         # This module:
         #   * Accept 1 tuple(3 tensors) as input
@@ -354,6 +371,7 @@ class TestModuleMultiStreamModuleHint(TestCase):
         self.assertEqual(y_ref, y_runtime_res)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_dict_input_output_hint(self):
         # This module:
         #   * Accept 1 dict(3 tensors) as input
@@ -380,6 +398,7 @@ class TestModuleMultiStreamModuleHint(TestCase):
         self.assertEqual(y_ref, y_runtime_res)
 
     @unittest.skipIf(not ipex.cpu.runtime.is_runtime_ext_enabled(), "Skip when IPEX Runtime extension is not enabled")
+    @runtime_thread_affinity_test_env
     def test_nested_tuple_input_output_hint(self):
         # This module:
         #   * Accept nested tuple ((tensor1, tensor2), tensor3) as input
@@ -404,6 +423,36 @@ class TestModuleMultiStreamModuleHint(TestCase):
                                                             concat_output=True)
         y_runtime_res = multi_stream_model(input)
         self.assertEqual(y_ref, y_runtime_res)
+
+def is_numactl_available():
+    numactl_available = False
+    cmd = ["numactl", "-C", "0", "-m", "0", "ls"]
+    try:
+        r = subprocess.run(cmd, env=os.environ)
+    except:
+        return numactl_available
+    if r.returncode == 0:
+        numactl_available = True
+    return numactl_available
+
+class TestRuntimeExtensionWithNumactl(TestCase):
+    @unittest.skipIf(not (is_numactl_available() and ipex.cpu.runtime.is_runtime_ext_enabled()), "Skip when numactl is not available")
+    @runtime_thread_affinity_test_env
+    def test_cpupool_creation_with_numactl(self):
+        loc = os.path.dirname(os.path.abspath(__file__))
+        cmd1 = "numactl -C 0-1 -m 0 python -u {}/runtime.py --case-name={}".format(loc, "create_cpu_pool")
+        cmd2 = "OMP_NUM_THREADS=1 KMP_AFFINITY=granularity=fine,compact,1,0 numactl -C 0-1 -m 0 python -u {}/runtime.py --case-name={}".format(loc, "create_cpu_pool")
+        cmds = [cmd1, cmd2]
+        for cmd in cmds:
+            match = False
+            with subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
+                for line in p.stdout.readlines():
+                    line = str(line, 'utf-8').strip()
+                    if "The created CPUPool has core is:" in line:
+                        x = line.split(":")
+                        assert "[1]" in x[1], 'The core ids in test_cpupool_creation with numactl is not as expected.'
+                        match = True
+            assert match, 'Test Case Failed to create CPUPool'
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -139,13 +139,21 @@ class RoIAlignTester(TestCase):
 
         #test autocast
         with torch.cpu.amp.autocast():
-            x3 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
+            x3 = x.clone().bfloat16().requires_grad_()
             y3 = fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
             y3.mean().backward()
             self.assertTrue(y3.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_y.to(y3.dtype), y3, rtol=1e-2, atol=1e-2))
             self.assertTrue(x3.grad.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5))
+
+            x4 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
+            y4 = fn(x4, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y4.mean().backward()
+            self.assertTrue(y4.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_y.to(y4.dtype), y4, rtol=1e-2, atol=1e-2))
+            self.assertTrue(x4.grad.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5))
 
     @skipIfNoTorchVision
     def test_torchvision_roialign(self):
@@ -195,13 +203,21 @@ class RoIAlignTester(TestCase):
 
         #test autocast
         with torch.cpu.amp.autocast():
-            x3 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
+            x3 = x.clone().bfloat16().requires_grad_()
             y3 = torchvision_fn(x3, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
             y3.mean().backward()
             self.assertTrue(y3.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_y.to(y3.dtype), y3, rtol=1e-2, atol=1e-2))
             self.assertTrue(x3.grad.dtype == torch.bfloat16)
             self.assertTrue(torch.allclose(gt_x.grad.to(x3.dtype), x3.grad, rtol=1e-5, atol=1e-5))
+
+            x4 = x.clone().bfloat16().to(memory_format=torch.channels_last).requires_grad_()
+            y4 = torchvision_fn(x4, rois.bfloat16(), pool_h, pool_w, spatial_scale=1, sampling_ratio=-1)
+            y4.mean().backward()
+            self.assertTrue(y4.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_y.to(y4.dtype), y4, rtol=1e-2, atol=1e-2))
+            self.assertTrue(x4.grad.dtype == torch.bfloat16)
+            self.assertTrue(torch.allclose(gt_x.grad.to(x4.dtype), x4.grad, rtol=1e-5, atol=1e-5))
 
 
 if __name__ == '__main__':

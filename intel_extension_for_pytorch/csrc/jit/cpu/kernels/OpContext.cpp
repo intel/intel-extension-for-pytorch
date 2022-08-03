@@ -2,6 +2,7 @@
 #include <torch/extension.h>
 #include "ConvPacked.h"
 #include "ConvTransposePacked.h"
+#include "LinearMKLPacked.h"
 #include "LinearPacked.h"
 
 namespace torch_ipex {
@@ -98,10 +99,6 @@ at::Tensor IpexConvolutionOpContext::get_data_handle() {
   return ptr;
 }
 
-c10::optional<int64_t> LinearOpContext::get_batchsize() {
-  return batch_size_;
-}
-
 c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
     at::Tensor&& weight,
     c10::optional<at::Tensor>&& bias,
@@ -109,8 +106,7 @@ c10::intrusive_ptr<LinearOpContext> IpexLinearOpContext::create_context(
   auto op_context =
       torch_ipex::cpu::detail::linear::create(weight, bias, batch_size);
   return c10::make_intrusive<IpexLinearOpContext>(
-      batch_size,
-      std::move(op_context));
+      batch_size, std::move(op_context));
 }
 
 at::Tensor IpexLinearOpContext::get_data_handle() {
@@ -145,24 +141,8 @@ at::Tensor IpexLinearOpContext::get_at_packed_weight() {
   return op_context_.at_weight_;
 }
 
-int64_t IpexLinearOpContext::get_out_features() {
-  return op_context_.original_desc_.get_dim(0);
-}
-
-int64_t IpexLinearOpContext::get_in_features() {
-  return op_context_.original_desc_.get_dim(1);
-}
-
 detail::ContextLinear& IpexLinearOpContext::get_context() {
   return op_context_;
-}
-
-void IpexLinearOpContext::set_bias(at::Tensor& bias) {
-  op_context_.bias_ = c10::make_optional<at::Tensor>(std::move(bias));
-}
-
-void IpexLinearOpContext::set_weight(at::Tensor& weight) {
-  op_context_.at_weight_.copy_(weight);
 }
 
 at::Tensor IpexLinearOpContext::pack(const at::Tensor& tensor) {
@@ -171,14 +151,6 @@ at::Tensor IpexLinearOpContext::pack(const at::Tensor& tensor) {
 
 at::Tensor IpexLinearOpContext::to_public(const at::Tensor& tensor) {
   return torch_ipex::cpu::detail::linear::unpack(op_context_, tensor);
-}
-
-void IpexLinearOpContext::may_repack(int64_t batch_size) {
-  if (!batch_size_.has_value() || batch_size_.has_value() != batch_size) {
-    batch_size_ = c10::make_optional(batch_size);
-    torch_ipex::cpu::detail::linear::repack_for(op_context_, batch_size);
-  }
-  return;
 }
 
 c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
@@ -209,6 +181,56 @@ c10::intrusive_ptr<ConvTransposeOpContext> IpexConvTransposeOpContext::
       std::move(dilation),
       std::move(input_size),
       std::move(op_context));
+}
+
+c10::intrusive_ptr<MKLOpContext> IpexLinearMKLOpContext::create_context(
+    at::Tensor&& weight,
+    c10::optional<at::Tensor>&& bias,
+    c10::optional<int64_t> batch_size) {
+  auto op_context =
+      torch_ipex::cpu::detail::mkl_sgemm::create(weight, bias, batch_size);
+  return c10::make_intrusive<IpexLinearMKLOpContext>(
+      batch_size, std::move(op_context));
+}
+
+at::Tensor IpexLinearMKLOpContext::get_at_packed_weight() {
+  return op_context_.mkl_weight_;
+}
+
+at::Tensor IpexLinearMKLOpContext::get_data_handle() {
+  at::Tensor ptr = at::empty(1, at::kLong);
+  ptr.data_ptr<int64_t>()[0] = reinterpret_cast<int64_t>(this);
+  return ptr;
+}
+
+at::Tensor IpexLinearMKLOpContext::pack(const at::Tensor& tensor) {
+  return torch_ipex::cpu::detail::mkl_sgemm::pack(op_context_, tensor);
+}
+
+at::Tensor IpexLinearMKLOpContext::run(const at::Tensor& input) {
+  return torch_ipex::cpu::detail::mkl_sgemm::run(op_context_, input);
+}
+
+at::Tensor& IpexLinearMKLOpContext::run(
+    const at::Tensor& input,
+    at::Tensor& accumu) {
+  return torch_ipex::cpu::detail::mkl_sgemm::run(op_context_, input, accumu);
+}
+
+at::Tensor IpexLinearMKLOpContext::to_public(const at::Tensor& tensor) {
+  return op_context_.ori_weight_.clone();
+}
+
+detail::ContextLinearMKL& IpexLinearMKLOpContext::get_mkl_context() {
+  return op_context_;
+}
+
+int64_t IpexLinearMKLOpContext::get_out_features() {
+  return op_context_.sgemm_sizes_[2];
+}
+
+int64_t IpexLinearMKLOpContext::get_in_features() {
+  return op_context_.sgemm_sizes_[1];
 }
 
 at::Tensor IpexConvTransposeOpContext::run(

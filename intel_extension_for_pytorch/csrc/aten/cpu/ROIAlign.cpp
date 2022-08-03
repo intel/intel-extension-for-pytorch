@@ -5,7 +5,6 @@
 #include <ATen/cpu/vec/vec.h>
 #include <torch/library.h>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -22,8 +21,7 @@ at::Tensor IPEXROIAlignOp::_forward(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-  IPEX_RECORD_FUNCTION(
-      "IPEXROIAlignOp::_forward", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXROIAlignOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   return roi_align_forward_kernel_stub(
       kCPU,
@@ -45,8 +43,7 @@ at::Tensor IPEXROIAlignOp::forward(
     int64_t pooled_width,
     int64_t sampling_ratio,
     bool aligned) {
-  IPEX_RECORD_FUNCTION(
-      "IPEXROIAlignOp::forward", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXROIAlignOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["input_shape"] = input.sizes();
   ctx->saved_data["spatial_scale"] = spatial_scale;
@@ -72,8 +69,7 @@ at::Tensor IPEXROIAlignOp::forward(
 torch::autograd::variable_list IPEXROIAlignOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-  IPEX_RECORD_FUNCTION(
-      "IPEXROIAlignOp::backward", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXROIAlignOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto input_shape = ctx->saved_data["input_shape"].toIntVector();
   auto spatial_scale = ctx->saved_data["spatial_scale"].toDouble();

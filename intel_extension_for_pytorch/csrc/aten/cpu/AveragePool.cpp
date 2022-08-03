@@ -6,7 +6,6 @@
 #include <ATen/native/cpu/utils.h>
 #include <ATen/record_function.h>
 #include <c10/util/irange.h>
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 #include "AveragePool.h"
@@ -31,7 +30,7 @@ at::Tensor avg_pool2d_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::avg_pool2d_out_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::avg_pool2d_out_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // #20866, #22032: Guarantee this for the official C++ API?
@@ -140,7 +139,7 @@ at::Tensor avg_pool2d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::avg_pool2d_backward_out_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::avg_pool2d_backward_out_cpu",
       c10::ArrayRef<c10::IValue>({}));
 
@@ -260,7 +259,7 @@ at::Tensor avg_pool3d_out_cpu(
   printf("torch_ipex::avg_pool3d_out_cpu\n");
 #endif
 
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::avg_pool3d_out_cpu", c10::ArrayRef<c10::IValue>({}));
 
   // #20866, #22032: Guarantee this for the official C++ API?
@@ -410,7 +409,7 @@ at::Tensor avg_pool3d_backward_out_cpu(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::avg_pool3d_backward_out_cpu\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::avg_pool3d_backward_out_cpu",
       c10::ArrayRef<c10::IValue>({}));
 

@@ -24,7 +24,8 @@ TEST(TestRuntimeAPI, TestMainThreadCoreBind) {
       torch_ipex::runtime::get_cpu_pool_from_mask_affinity();
   // Ping CPU Cores.
   std::vector<int32_t> cpu_core_list({0});
-  torch_ipex::runtime::_pin_cpu_cores(cpu_core_list);
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
+  torch_ipex::runtime::_pin_cpu_cores(cpu_pool);
   auto res = at::softmax(input_tensor, -1);
   ASSERT_VARIABLE_EQ(res, res_ref);
   // restore the cpu pool information.
@@ -52,8 +53,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPINativeTorchOperation) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPINativeTorchOperation. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
   auto res_ref = at::softmax(input_tensor, -1);
@@ -92,8 +94,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPILambdaFunction) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPILambdaFunction. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
   auto res_ref = at::softmax(input_tensor, -1);
@@ -123,8 +126,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionNativeInput) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionNativeInput. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
   auto res_ref = taskfunction_native_input(input_tensor);
@@ -143,8 +147,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionNativeInputLValue) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionNativeInput. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
   auto res_ref = taskfunction_native_input(input_tensor);
@@ -169,8 +174,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionLValueReference) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionLValueReference. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
   auto res_ref = taskfunction_lvalue_reference(input_tensor);
@@ -195,8 +201,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionConstLValueReference) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionConstLValueReference. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
   auto res_ref = taskfunction_const_lvalue_reference(input_tensor);
@@ -222,8 +229,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionRvalueReference) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionRvalueReference. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   at::Tensor input_tensor2 = input_tensor;
   // Get the reference result
@@ -256,8 +264,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionMixLvalueRvalueReference) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionMixLvalueRvalueReference. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   at::Tensor input_tensor2 = input_tensor;
   at::Tensor input_tensor3 = input_tensor;
@@ -302,8 +311,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionInputVectorTensor) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionInputVectorTensor. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   std::vector<at::Tensor> input_tenosrs;
   input_tenosrs.emplace_back(input_tensor);
@@ -332,8 +342,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPICPPFunctionOutputTensorLValueReference) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPICPPFunctionOutputTensorLValueReference. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
   at::Tensor input_tensor = at::rand({100, 8276});
   at::Tensor output_tensor;
   at::Tensor output_tensor2;
@@ -361,12 +372,14 @@ TEST(TestRuntimeTaskAPI, TestTaskAPIMultiTasksSameTensorInput) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPIMultiTasksSameTensorInput. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
 
   std::vector<int32_t> cpu_core_list2({1});
+  torch_ipex::runtime::CPUPool cpu_pool2(cpu_core_list2);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor2 =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list2);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool2);
 
   at::Tensor input_tensor = at::rand({100, 8276});
   // Get the reference result
@@ -395,8 +408,9 @@ TEST(TestRuntimeTaskAPI, TestTaskAPISameTasksMultiTensorInputs) {
         << "Skip TestRuntimeTaskAPI::TestTaskAPISameTasksMultiTensorInputs. Didn't preload IOMP.";
   }
   std::vector<int32_t> cpu_core_list({0});
+  torch_ipex::runtime::CPUPool cpu_pool(cpu_core_list);
   std::shared_ptr<torch_ipex::runtime::TaskExecutor> task_executor =
-      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_core_list);
+      std::make_shared<torch_ipex::runtime::TaskExecutor>(cpu_pool);
 
   at::Tensor input_tensor = at::rand({100, 8276});
   at::Tensor input_tensor2 = at::rand({100, 8276});

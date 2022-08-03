@@ -14,17 +14,19 @@
 #include "folding_common_utils.h"
 #include "frozen_linear_folding.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 
 namespace graph_rewrite {
 
+using namespace torch::jit;
 using namespace torch_ipex::cpu;
 using Tensor = at::Tensor;
 
 bool supportedLinearNode(Node* n) {
   if (n->kind() == aten::linear ||
-      n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear")) {
+      n->kind() == Symbol::fromQualString("torch_ipex::ipex_linear") ||
+      n->kind() == Symbol::fromQualString("torch_ipex::ipex_MKLSGEMM")) {
     return true;
   } else {
     return false;
@@ -234,4 +236,4 @@ void FrozenLinearFolding(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

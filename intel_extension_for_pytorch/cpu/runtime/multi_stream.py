@@ -8,24 +8,25 @@ import copy
 import warnings
 
 class MultiStreamModuleHint(object):
+    r"""
+    MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
+    or concat the output. Each argument should be None, with type of int or a container
+    which containes int or None such as: (0, None, ...) or [0, None, ...]. If the argument
+    is None, it means this argument will not be split or concat. If the argument is with
+    type int, its value means along which dim this argument will be split or concat.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Returns:
+        intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint: Generated
+        intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint object.
+
+    :meta public:
+    """
+
     def __init__(self, *args, **kwargs):
-        r"""
-        MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
-        or concat the output. Each argument should be None, with type of int or a container
-        which containes int or None such as: (0, None, ...) or [0, None, ...]. If the argument
-        is None, it means this argument will not be split or concat. If the argument is with
-        type int, its value means along which dim this argument will be split or concat.
-
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint: Generated
-            intel_extension_for_pytorch.cpu.runtime.MultiStreamModuleHint object.
-
-        :meta public:
-        """
         self.args = list(args)
         self.kwargs = kwargs
         self.args_len = args.__len__()
@@ -86,7 +87,7 @@ class MultiStreamModule(nn.Module):
     def __init__(self,
                 model,
                 num_streams: Union[int, str] = "AUTO",
-                cpu_pool: CPUPool = CPUPool(node_id=0),
+                cpu_pool: CPUPool = CPUPool(),
                 concat_output: bool = True,
                 input_split_hint: MultiStreamModuleHint = default_multi_stream_module_split_hint,
                 output_concat_hint: MultiStreamModuleHint = default_multi_stream_module_concat_hint):
@@ -95,6 +96,7 @@ class MultiStreamModule(nn.Module):
         if not isinstance(model, torch.jit.ScriptModule):
             warnings.warn("Creating MultiStreamModule on an nn.Module. This can be slow due "
             "to Python Global Interpreter Lock (GIL). Suggest to use JIT ScriptModule for better performance.")
+        self.cpu_pool = cpu_pool
         self.core_list = cpu_pool.core_ids
         if isinstance(num_streams, str):
             # For str input of num_streams, it must be "auto"
@@ -105,6 +107,11 @@ class MultiStreamModule(nn.Module):
         else:
             assert isinstance(num_streams, int), "Input of num_streams must be Number of instances or string \"auto\""
             self.num_streams = num_streams
+
+        if self.num_streams > self.core_list.__len__():
+            self.num_streams = self.core_list.__len__()
+            warnings.warn("The number of streams is larger than number of cores. The number of streams changes to {}.".format(self.num_streams))
+
         if self.num_streams == 1:
             # Sync execution path if num_stream is 1.
             self.model = model
@@ -342,7 +349,7 @@ class MultiStreamModule(nn.Module):
             # Sync execution path if num_stream is 1
             if not core.is_same_core_affinity_setting(self.core_list):
                 # If the main thread's core affinity has been changed, we should set it again.
-                core.pin_cpu_cores(self.core_list)
+                core.pin_cpu_cores(self.cpu_pool.cpu_pool)
             results_raw = self.model(*args, **kwargs)
             return results_raw if self.concat_output else [results_raw]
 
@@ -372,9 +379,10 @@ class _MultiStreamBenchmarkModule(nn.Module):
     # The diffence with MultiStreamModule:
     #    * The input will not be split. So each stream will run with the same input.
     #    * The output will not be concat. But synchronization point for each stream still exsits at the end of the forward method.
-    def __init__(self, model, num_streams: Union[int, str] = "AUTO", cpu_pool: CPUPool = CPUPool(node_id=0)):
+    def __init__(self, model, num_streams: Union[int, str] = "AUTO", cpu_pool: CPUPool = CPUPool()):
         super(_MultiStreamBenchmarkModule, self).__init__()
         assert type(cpu_pool) is CPUPool, "Input of cpu_pool must be provided with type of ipex.cpu.runtime.CPUPool"
+        self.cpu_pool = cpu_pool
         self.core_list = cpu_pool.core_ids
         if isinstance(num_streams, str):
             # For str input of num_streams, it must be "auto"
@@ -385,6 +393,11 @@ class _MultiStreamBenchmarkModule(nn.Module):
         else:
             assert isinstance(num_streams, int), "Input of num_streams must be Number of instances or string \"auto\""
             self.num_streams = num_streams
+
+        if self.num_streams > self.core_list.__len__():
+            self.num_streams = self.core_list.__len__()
+            warnings.warn("The number of streams is larger than number of cores. The number of streams changes to {}.".format(self.num_streams))
+
         if self.num_streams == 1:
             # Sync execution path if num_stream is 1.
             self.model = model
@@ -409,7 +422,7 @@ class _MultiStreamBenchmarkModule(nn.Module):
             # Sync execution path if num_stream is 1
             if not core.is_same_core_affinity_setting(self.core_list):
                 # If the main thread's core affinity has been changed, we should set it again.
-                core.pin_cpu_cores(self.core_list)
+                core.pin_cpu_cores(self.cpu_pool.cpu_pool)
             return self.model(*args, **kwargs)
 
         results_raw_future = []

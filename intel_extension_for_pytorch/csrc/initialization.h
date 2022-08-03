@@ -10,7 +10,6 @@ class InitIPEX final {
   InitIPEX(const InitIPEX&) = delete;
   InitIPEX& operator=(const InitIPEX&) = delete;
   InitIPEX(InitIPEX&&) noexcept;
-  InitIPEX& operator=(InitIPEX&&) noexcept;
 
   InitIPEX&& init(void (*func)()) && {
     check_pytorch_version();

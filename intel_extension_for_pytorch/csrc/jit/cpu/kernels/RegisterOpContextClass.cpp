@@ -3,6 +3,7 @@
 
 #include "ConvPacked.h"
 #include "ConvTransposePacked.h"
+#include "LinearMKLPacked.h"
 #include "LinearPacked.h"
 #include "OpContext.h"
 
@@ -11,6 +12,7 @@ namespace cpu {
 using detail::conv_transpose::createConvTransposePrePackOpContext;
 using detail::convolution::createConvolutionPrePackOpContext;
 using detail::linear::createLinearPrePackOpContext;
+using detail::mkl_sgemm::createLinearMKLPrePackOpContext;
 
 TORCH_LIBRARY(ipex_prepack, m) {
   m.class_<ConvolutionOpContext>("ConvolutionOpContext")
@@ -59,6 +61,23 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "get_data_handle",
           &torch_ipex::cpu::LinearOpContext::get_data_handle);
+  m.class_<MKLOpContext>("MKLOpContext")
+      .def_pickle(
+          [](const c10::intrusive_ptr<MKLOpContext>& op_context)
+              -> SerializationTypeMKLPrePack { // __getstate__
+            return op_context->unpack();
+          },
+          [](SerializationTypeMKLPrePack state)
+              -> c10::intrusive_ptr<MKLOpContext> { // __setstate__
+            return createLinearMKLPrePackOpContext(
+                std::move(std::get<0>(state)),
+                std::move(std::get<1>(state)),
+                std::move(std::get<2>(state)));
+          })
+      .def("get_weight", &torch_ipex::cpu::MKLOpContext::get_at_packed_weight)
+      .def("pack", &torch_ipex::cpu::MKLOpContext::pack)
+      .def("to_public", &torch_ipex::cpu::MKLOpContext::to_public)
+      .def("get_data_handle", &torch_ipex::cpu::MKLOpContext::get_data_handle);
   m.class_<ConvTransposeOpContext>("ConvTransposeOpContext")
       .def_pickle(
           [](const c10::intrusive_ptr<ConvTransposeOpContext>& op_context)
@@ -95,6 +114,9 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "linear_prepack(Tensor W, Tensor? B, int? batch_size) "
       "-> __torch__.torch.classes.ipex_prepack.LinearOpContext");
   m.def(
+      "mkl_sgemm_prepack(Tensor W, Tensor? B, int? batch_size) "
+      "-> __torch__.torch.classes.ipex_prepack.MKLOpContext");
+  m.def(
       "conv_transpose_prepack(Tensor W, Tensor? B, int[] stride, "
       "int[] padding, int[] output_padding, int groups, int[] dilation, "
       "bool input_is_channels_last, int[] input_sizes) "
@@ -104,6 +126,7 @@ TORCH_LIBRARY(ipex_prepack, m) {
 TORCH_LIBRARY_IMPL(ipex_prepack, AutogradCPU, m) {
   m.impl("convolution_prepack", TORCH_FN(createConvolutionPrePackOpContext));
   m.impl("linear_prepack", TORCH_FN(createLinearPrePackOpContext));
+  m.impl("mkl_sgemm_prepack", TORCH_FN(createLinearMKLPrePackOpContext));
   m.impl(
       "conv_transpose_prepack", TORCH_FN(createConvTransposePrePackOpContext));
 }

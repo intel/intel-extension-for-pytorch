@@ -4,7 +4,6 @@
 #include "csrc/aten/cpu/WeightPack.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -15,7 +14,7 @@ namespace conv_transpose {
   at::Tensor conv_transpose_##FUSED_OP##_run(                         \
       const at::Tensor& input,                                        \
       const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) { \
-    IPEX_RECORD_FUNCTION(                                             \
+    RECORD_FUNCTION(                                                  \
         "ipex_prepack::conv_transpose_" #FUSED_OP "_run",             \
         c10::ArrayRef<c10::IValue>({}));                              \
     return op_context->run(input, ideep::attr_t::fuse_##FUSED_OP());  \
@@ -31,7 +30,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
     std::vector<int64_t>&& dilation,
     bool weight_is_channels_last,
     std::vector<int64_t>&& input_size) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::createConvTransposePrePackOpContext",
       c10::ArrayRef<c10::IValue>({}));
   return IpexConvTransposeOpContext::create_context(
@@ -49,7 +48,7 @@ c10::intrusive_ptr<ConvTransposeOpContext> createConvTransposePrePackOpContext(
 at::Tensor conv_transpose_run(
     const at::Tensor& input,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_run", c10::ArrayRef<c10::IValue>({}));
 
   return op_context->run(input, ideep::attr_t());
@@ -73,7 +72,7 @@ at::Tensor conv_transpose_gelu_run(
     const at::Tensor& input,
     c10::string_view approximate,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_gelu_run", c10::ArrayRef<c10::IValue>({}));
   dnnl::algorithm gelu_type;
   if (approximate == "none") {
@@ -93,7 +92,7 @@ at::Tensor conv_transpose_leaky_relu_run(
     const at::Tensor& input,
     at::Scalar alpha,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_leaky_relu_run",
       c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
@@ -105,7 +104,7 @@ at::Tensor conv_transpose_hardtanh_run(
     at::Scalar lower_bound,
     at::Scalar upper_bound,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_hardtanh_run",
       c10::ArrayRef<c10::IValue>({}));
   auto lower_bound_value = lower_bound.to<float>();
@@ -120,7 +119,7 @@ at::Tensor conv_transpose_elu_run(
     at::Scalar scale,
     at::Scalar input_scale,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_elu_run", c10::ArrayRef<c10::IValue>({}));
   auto alpha_value = alpha.to<float>();
   auto scale_value = scale.to<float>();
@@ -134,7 +133,7 @@ at::Tensor conv_transpose_pow_run(
     const at::Tensor& input,
     at::Scalar exponent,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_pow_run", c10::ArrayRef<c10::IValue>({}));
   auto exponent_value = exponent.to<float>();
   return op_context->run(
@@ -146,7 +145,7 @@ at::Tensor conv_transpose_add_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_add_run", c10::ArrayRef<c10::IValue>({}));
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;
   return op_context->run(input, accumu, ideep::attr_t::fuse_sum(scale));
@@ -157,7 +156,7 @@ at::Tensor conv_transpose_add_relu_run(
     at::Tensor& accumu,
     const c10::optional<at::Scalar>& alpha,
     const c10::intrusive_ptr<ConvTransposeOpContext>& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "ipex_prepack::conv_transpose_add_relu_run",
       c10::ArrayRef<c10::IValue>({}));
   auto scale = alpha.has_value() ? alpha.value().to<float>() : 1.0;

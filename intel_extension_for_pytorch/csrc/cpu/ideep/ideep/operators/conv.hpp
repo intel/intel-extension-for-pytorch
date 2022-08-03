@@ -585,98 +585,24 @@ struct convolution_forward
     auto weights_ = weights.make_grouped_weights(groups);
     auto dilates_ = utils::get_compatible_dilates(dilates);
 
-    auto& weights_scales_in =
-        weights_.has_scale() ? weights_.get_scale() : weights_scales;
-    if (!weights_scales_in.empty()) {
+    op_attr = attr;
+
+    IDEEP_ENFORCE(
+        utils::one_of(
+            weights_.get_data_type(), data_type::f32, data_type::bf16),
+        "Incorrect data type in weights");
+
+    // align weights data type with src
+    dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
+                                                           : data_type::f32;
+    src_desc = src.get_desc().to_type(dst_data_type);
+    weights_desc = weights_.get_desc().to_type(dst_data_type);
+
+    if (with_bias) {
       IDEEP_ENFORCE(
-          alowp_kind == u8s8 || alowp_kind == s8s8, "Unsupported lowp kind");
-      int scale_size = (weights_scales_in.size() > 1) ? dst_dims[1] : 1;
-      auto src_scales_in = src.has_scale()
-          ? src.get_scale()
-          : (src_scales.empty() ? IDEEP_DEF_SCALE : src_scales);
-
-      // determine dst data type
-      if (attr.has_op_kind(kind::sum)) {
-        dst_data_type = dst.get_data_type();
-      } else if (dst_scales.empty() || dst_scales == IDEEP_DEF_SCALE) {
-        dst_data_type = data_type::f32;
-      } else if (attr.non_negitive_output()) {
-        dst_data_type = data_type::u8;
-      } else {
-        dst_data_type = data_type::s8;
-      }
-
-      // fill primitive attr
-      dst_scales_in = dst_scales.empty() || dst_data_type == data_type::f32
-          ? IDEEP_DEF_SCALE
-          : dst_scales;
-
-      scale_t bias_scales, op_scales;
-      std::tie(bias_scales, op_scales) = utils::compute_scales(
-          src_scales_in[0], dst_scales_in[0], weights_scales_in);
-
-      if (attr.has_op_kind(kind::sum)) {
-        float sum_scale =
-            dst_scales_in[0] / (dst.has_scale() ? dst.get_scale()[0] : 1.0f);
-        if (attr.has_op_kind(kind::eltwise)) {
-          op_attr = attr_t::residual(sum_scale);
-        } else {
-          op_attr = attr_t::fuse_sum(sum_scale);
-        }
-      } else if (attr.has_op_kind(kind::eltwise)) {
-        op_attr = attr_t::fuse_relu();
-      }
-      op_attr.set_output_scales(utils::op_scale_mask(scale_size), op_scales);
-
-      src_desc = {
-          src.get_dims(),
-          alowp_kind == u8s8 ? data_type::u8 : data_type::s8,
-          tag::any};
-      if (src.get_data_type() == data_type::f32) {
-        src_attr = {0, src_scales_in};
-      }
-
-      weights_desc = weights_.get_desc().to_type(data_type::s8);
-      if (weights_.get_data_type() == data_type::f32) {
-        weights_attr = {
-            utils::tensor_scale_mask(scale_size, groups > 1),
-            weights_scales_in};
-      }
-
-      if (with_bias) {
-        bias_desc = {bias.get_dims(), data_type::s32, tag::any};
-        if (bias.get_data_type() == data_type::f32) {
-          bias_attr = {
-              utils::tensor_scale_mask(scale_size, false), bias_scales};
-        }
-      }
-    } else {
-      op_attr = attr;
-
-      if (src.has_scale()) {
-        auto src_scale = src.get_scale();
-        src_scale[0] = 1.0f / src_scale[0];
-        src_attr = {0, src_scale};
-      }
-
-      IDEEP_ENFORCE(
-          utils::one_of(
-              weights_.get_data_type(), data_type::f32, data_type::bf16),
-          "Incorrect data type in weights");
-
-      // align weights data type with src
-      dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
-                                                             : data_type::f32;
-      src_desc = src.get_desc().to_type(dst_data_type);
-      weights_desc = weights_.get_desc().to_type(dst_data_type);
-
-      if (with_bias) {
-        IDEEP_ENFORCE(
-            utils::one_of(
-                bias.get_data_type(), data_type::f32, data_type::bf16),
-            "Incorrect data type in bias");
-        bias_desc = bias.get_desc();
-      }
+          utils::one_of(bias.get_data_type(), data_type::f32, data_type::bf16),
+          "Incorrect data type in bias");
+      bias_desc = bias.get_desc();
     }
 
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
@@ -728,17 +654,9 @@ struct convolution_forward
     // dst not init in FW or has same desc with expected desc.
     if (dst.is_empty() || dst.get_desc() == expected_dst_desc) {
       dst.reinit_if_possible(expected_dst_desc);
-      // For int8 case, dst is empty or dst.get_desc() == expected_dst_desc,
-      // because dst always acdb.
-      if (!param.dst_scales.empty() && dst.get_data_type() != data_type::f32) {
-        dst.set_scale(param.dst_scales);
-      }
       expected_dst = dst;
     } else {
       expected_dst.init(expected_dst_desc);
-      if (param.op_attr.has_op_kind(kind::sum)) {
-        expected_dst.feed_from(dst);
-      }
     }
 
     if (with_bias) {
@@ -793,11 +711,6 @@ struct convolution_forward
     // dst not init in FW or has same desc with expected desc.
     if (dst.is_empty() || dst.get_desc() == expected_dst_desc) {
       dst.reinit_if_possible(expected_dst_desc);
-      // For int8 case, dst is empty or dst.get_desc() == expected_dst_desc,
-      // because dst always acdb.
-      if (!param.dst_scales.empty() && dst.get_data_type() != data_type::f32) {
-        dst.set_scale(param.dst_scales);
-      }
       expected_dst = dst;
     } else {
       expected_dst.init(expected_dst_desc);
@@ -912,12 +825,6 @@ struct convolution_backward_data : public dnnl::convolution_backward_data {
          {DNNL_ARG_WEIGHTS, expected_weights},
          {DNNL_ARG_DIFF_SRC, expected_diff_src},
          {DNNL_ARG_SCRATCHPAD, scratchpad}});
-
-    // diff_src has been init in FW side, but has diff desc with
-    // expected_diff_src.
-    if (diff_src.get_desc() != expected_diff_src_desc) {
-      diff_src.feed_from(expected_diff_src);
-    }
   }
 };
 
@@ -1025,9 +932,6 @@ struct convolution_backward_weights
     // for forward hint, weights_desc should have same data_type
     // with other input desc, expect for bias_desc
     auto weights_desc = diff_weights_desc;
-    if (diff_weight_type_in != diff_dst_type) {
-      weights_desc = weights_desc.to_type(diff_dst_type);
-    }
     auto forward_hints =
         convolution_forward::get_primitive_desc<with_diff_bias>(
             src_desc,

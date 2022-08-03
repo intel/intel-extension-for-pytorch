@@ -5,12 +5,13 @@
 
 #include <ATen/code_template.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
 using namespace at::jit;
 using namespace torch_ipex::cpu;
+using namespace torch::jit;
 
 void insertPrePackedConvTransposeOpForATen(Block* b) {
   for (Node* n : b->nodes()) {
@@ -344,4 +345,4 @@ void fuseConvTransposeAdd(std::shared_ptr<Graph>& graph) {
 
 } // namespace graph_rewrite
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

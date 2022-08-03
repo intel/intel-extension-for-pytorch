@@ -12,7 +12,6 @@
 #include <limits>
 
 #include "csrc/cpu/ideep/ideep.hpp"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -32,7 +31,7 @@ at::Tensor dil_mha_scores_calc(
     const at::Scalar& dim_per_head,
     const int64_t& softmax_dim,
     const at::IValue& dtype) {
-  IPEX_RECORD_FUNCTION("dil_mha_scores_calc", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_mha_scores_calc", c10::ArrayRef<c10::IValue>({}));
 
   auto _dim_per_head = dim_per_head.to<float>();
   auto _alpha = alpha.to<float>();
@@ -80,8 +79,7 @@ at::Tensor dil_distil_mha_scores_calc(
     const int64_t& transpose_dim_b,
     const at::Scalar& fill,
     const at::Scalar& dim_per_head) {
-  IPEX_RECORD_FUNCTION(
-      "dil_distil_mha_scores_calc", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_distil_mha_scores_calc", c10::ArrayRef<c10::IValue>({}));
   auto _dim_per_head = dim_per_head.to<float>();
   auto _fill = fill.to<float>();
   auto qk = at::Tensor();
@@ -104,8 +102,7 @@ at::Tensor dil_maskedfill_softmax(
     const at::Tensor& mask_qk,
     const at::IntArrayRef& mask_qk_reshp,
     const at::Scalar& fill) {
-  IPEX_RECORD_FUNCTION(
-      "dil_maskedfill_softmax", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_maskedfill_softmax", c10::ArrayRef<c10::IValue>({}));
   float _dim_per_head = 1;
   auto _fill = fill.to<float>();
   // convert the mask to float for creating vec mask for kernel computation

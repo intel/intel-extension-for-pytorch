@@ -93,7 +93,7 @@ Optimizers are one of key parts of the training workloads. Intel® Extension for
 2.	SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
 
 
-For more detailed information, check `Optimizer Fusion <features/optimizer_fusion.md>`_ and `Split SGD <features/split_sgd.md>`_ 
+For more detailed information, check `Optimizer Fusion <features/optimizer_fusion.md>`_ and `Split SGD <features/split_sgd.html>`_ 
 
 .. toctree::
    :hidden:

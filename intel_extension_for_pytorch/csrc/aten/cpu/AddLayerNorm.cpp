@@ -4,7 +4,6 @@
 //  https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/layer_norm.cpp
 
 #include "AddLayerNorm.h"
-#include "csrc/utils/ipex_op_profile.h"
 
 #include <torch/csrc/autograd/function.h>
 
@@ -38,7 +37,7 @@ at::Tensor dil_add_layernorm(
     const c10::optional<at::Tensor>& bias_opt,
     float eps,
     bool cuda_enable) {
-  IPEX_RECORD_FUNCTION("dil_add_layernorm", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("dil_add_layernorm", c10::ArrayRef<c10::IValue>({}));
 
   // no broadcast
   bool no_broadcast = true;

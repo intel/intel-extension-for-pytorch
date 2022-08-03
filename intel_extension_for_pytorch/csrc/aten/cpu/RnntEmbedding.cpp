@@ -7,7 +7,6 @@
 #include <torch/csrc/autograd/function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -44,7 +43,7 @@ static void rnnt_embedding(
 #if defined(IPEX_DISP_OP)
   printf("IPEX::rnnt_embedding\n");
 #endif
-  IPEX_RECORD_FUNCTION("IPEX::rnnt_embedding", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEX::rnnt_embedding", c10::ArrayRef<c10::IValue>({}));
 
   /*
   pointer to torch_ipex::cpu::rnnt_embedding_kernel_impl(

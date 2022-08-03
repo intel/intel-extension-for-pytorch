@@ -1,7 +1,6 @@
 #include "LayerNorm.h"
 #include <torch/extension.h>
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 namespace torch_ipex {
@@ -166,8 +165,7 @@ at::Tensor layer_norm(
     const c10::optional<at::Tensor>& bias_opt,
     double eps,
     bool cudnn_enable) {
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::layer_norm", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::layer_norm", c10::ArrayRef<c10::IValue>({}));
 
   // onednn path for inference.
   // TODO: enable training path ??

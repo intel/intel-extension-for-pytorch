@@ -24,7 +24,7 @@ namespace runtime {
 
 class TaskExecutor {
  public:
-  explicit TaskExecutor(const std::vector<int32_t>& cpu_core_list);
+  explicit TaskExecutor(const torch_ipex::runtime::CPUPool& cpu_pool);
   std::mutex& get_mutex();
   std::condition_variable& get_condition();
   bool is_stop();
@@ -40,9 +40,6 @@ class TaskExecutor {
   bool stop;
   std::mutex worker_mutex;
   std::condition_variable worker_condition;
-
-  // Executor' thread_pool
-  std::vector<int32_t> cpu_core_list;
 
   // Put the deleted function in the private.
   TaskExecutor(const TaskExecutor& task_executor) =

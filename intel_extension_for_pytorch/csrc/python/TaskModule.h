@@ -32,13 +32,6 @@ class TORCH_API TaskModule {
  public:
   explicit TaskModule(
       const torch::jit::Module& module,
-      const std::vector<int32_t>& cpu_core_list,
-      bool traced_module);
-  explicit TaskModule(
-      const py::object& module,
-      const std::vector<int32_t>& cpu_core_list);
-  explicit TaskModule(
-      const torch::jit::Module& module,
       const torch_ipex::runtime::CPUPool& cpu_pool,
       bool traced_module);
   explicit TaskModule(

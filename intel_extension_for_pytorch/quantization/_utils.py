@@ -594,6 +594,7 @@ def load_qconf_summary_to_model(model, qconf_summary):
                         v.tensor_id_to_scale_zp[tensor_info["id"]] = (scale, zp)
                 else:
                     input_tensor_infos.append(None)
+                    input_force_dtype_infos.append(None)
             weight_tensor_infos = []
             weight_idx = 0
             for tensor_info in q_op_info["weight_tensor_infos"]:

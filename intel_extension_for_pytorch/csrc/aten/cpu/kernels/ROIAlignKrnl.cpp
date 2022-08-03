@@ -5,7 +5,6 @@
 #include <csrc/aten/cpu/ROIAlign.h>
 #include <torch/library.h>
 #include "csrc/autocast/autocast_mode.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "csrc/utils/library.h"
 
 // use float as accumulation type for BFloat16
@@ -677,7 +676,7 @@ at::Tensor roi_align_forward_kernel_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::ROIAlign_forward\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::ROIAlign_forward", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(input.device().is_cpu(), "input must be a CPU tensor");
@@ -745,7 +744,7 @@ at::Tensor roi_align_backward_kernel_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::ROIAlign_backward\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::ROIAlign_backward", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(grad.device().is_cpu(), "grad must be a CPU tensor");

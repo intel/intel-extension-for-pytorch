@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
@@ -18,4 +18,4 @@ extern const std::string& LlgaGuardName();
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

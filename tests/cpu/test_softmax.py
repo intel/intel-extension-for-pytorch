@@ -59,6 +59,19 @@ class softmax_MHA(torch.nn.Module):
         attention_scores = nn.Softmax(dim=-1)(attention_scores)
         return attention_scores
 
+class inplace_softmax_with_TE_group(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, x):
+        x1 = x + 1
+        x2 = x + 2
+        x3 = x + 3
+        x4 = x + 4
+        x5 = x + 5
+        y1 = (x1 / x2).softmax(dim = -1)
+        y2 = ((x4 - x3) / x5).softmax(dim = -1)
+        return y1, y2
+
 class softmax_dtype(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -84,6 +97,7 @@ class SoftmaxTester(JitTestCase):
             test7 = torch.tensor([[1.0,1.0],[1.0,1.0]])
             test8 = torch.rand(2,3)
             test9 = test8 - 1
+            test10 = torch.tensor([[1.0,1.0],[1.0,1.0]])
 
             if dtype == "bf16":
                 test1 = test1.bfloat16()
@@ -94,6 +108,7 @@ class SoftmaxTester(JitTestCase):
                 test7 = test7.bfloat16()
                 test8 = test8.bfloat16()
                 test9 = test9.bfloat16()
+                test10 = test10.bfloat16()
 
             model1 = softmax_with_multiuse_input().eval()
             model2 = softmax_with_alias_input().eval()
@@ -104,6 +119,7 @@ class SoftmaxTester(JitTestCase):
             model7 = inplace_softmax_with_blocks().eval()
             model8 = softmax_dtype().eval()
             model9 = inplace_softmax_dtype().eval()
+            model10 = inplace_softmax_with_TE_group().eval()
 
             with torch.no_grad():
                 model1 = torch.jit.trace(model1, test1)
@@ -117,11 +133,14 @@ class SoftmaxTester(JitTestCase):
                 model5 = torch.jit.trace(model5, test5)
                 res5 = model5(test5)
                 model7 = torch.jit.script(model7)
-                res7 = model7(test7, True)
+                res7 = model7(test7, torch.BoolTensor([True]))
                 model8 = torch.jit.trace(model8, test8)
                 res8 = model8(test8)
                 model9 = torch.jit.trace(model9, test9)
                 res9 = model9(test9)
+                model10_traced = torch.jit.trace(model10, test10)
+                res10_traced = model10_traced(test10)
+                res10 = model10(test10)
 
             # int8 case, testing inplac with llga fusion group
             qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8), weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
@@ -158,7 +177,7 @@ class SoftmaxTester(JitTestCase):
             graph6 = converted_model.graph_for(test3)
             self.assertGraphContainsExactly(graph6, IPEX_SOFTMAX_, 1)
             # should be inplace
-            graph7 = model7.graph_for(test7, True)
+            graph7 = model7.graph_for(test7, torch.BoolTensor([True]))
             self.assertGraphContainsExactly(graph7, IPEX_SOFTMAX_, 1)
             # should be outplace
             graph8 = model8.graph_for(test8)
@@ -166,6 +185,9 @@ class SoftmaxTester(JitTestCase):
             # should be inplace
             graph9 = model9.graph_for(test9)
             self.assertGraphContainsExactly(graph9, IPEX_SOFTMAX_, 1)
+            # should be inplace
+            graph10 = model10_traced.graph_for(test10)
+            self.assertGraphContainsExactly(graph10, IPEX_SOFTMAX_, 2)
 
             # the output results of above inplace/outplace softmax should be the same
             self.assertEqual(res1[0], res2[1], 0)
@@ -174,6 +196,8 @@ class SoftmaxTester(JitTestCase):
             self.assertEqual(res1[0], res5[0], 0)
             self.assertEqual(res1[0], res7, 0)
             self.assertEqual(res8, res9, 0)
+            self.assertEqual(res10[0], res10_traced[0], 0)
+            self.assertEqual(res10[1], res10_traced[1], 0)
 
 
 if __name__ == '__main__':

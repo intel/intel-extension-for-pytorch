@@ -12,7 +12,6 @@
 #include "csrc/cpu/ideep/IDeepConversions.h"
 #include "csrc/cpu/ideep/ideep.hpp"
 #include "csrc/jit/cpu/kernels/Matmul.h"
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -20,6 +19,74 @@ namespace cpu {
 using at::IntArrayRef;
 using at::Tensor;
 
+//! function: is_add_broadcast_supported_by_onednn
+/*!
+ * This is a workaround checking since oneDNN is not well supported
+ * matmul+binary_add fusion with all kinds of add input broadcast dims;
+ * Depending the add input broadcast dims, oneDNN matmul+binary_add will go into
+ * ref path in some cases; Here we add this function checking to map those
+ * verified supported cases, and fallback those unsupported cases;
+ *
+ * The verified supported cases use following oneDNN non_broadcast_mask:
+ * 2D: oneDNN non_broadcast_mask = {0, 2, 3}
+ * 3D: oneDNN non_broadcast_mask = {0, 2, 4, 5, 7}
+ * 4D: oneDNN non_broadcast_mask = {0, 2, 8, 9, 13, 15}
+ *
+ * For example:
+ * For 4D tensors, left has shape [8, 2, 4, 6] and right has shape [8, 2, 6, 4],
+ * so matmul shape is [8, 2, 4, 4], and post_add_tensor has shape [8, 1, 1, 4].
+ * Therefore, the according non_broadcast_mask is 9, which is supported.
+ *
+ * \param left: the left operand of matmul
+ * \param right: the right operand of matmul
+ * \param post_add_tensor: the post add input tensor
+ * \return: whether the post add input is supported for broadcast by oneDNN for
+ * matmul+binary_add fusion
+ */
+bool is_add_broadcast_supported_by_onednn(
+    const at::Tensor& left,
+    const at::Tensor& right,
+    const at::Tensor& post_add_tensor) {
+  // we only support add.dim == left.dim == right.dim == output.dim
+  // for that we can not enumerate all the cases when output.dim is reduced and
+  // testing the ability of oneDNN kernel for this workaround
+  if (post_add_tensor.dim() != left.dim() ||
+      post_add_tensor.dim() != right.dim()) {
+    return false;
+  }
+  auto non_broadcast_mask = 0;
+  for (int i = 0; i < left.dim(); i++) {
+    if (post_add_tensor.size(i) != 1) {
+      if (i == left.dim() - 1) {
+        non_broadcast_mask +=
+            post_add_tensor.size(i) == right.size(i) ? 1 << i : 0;
+      } else {
+        non_broadcast_mask +=
+            post_add_tensor.size(i) == left.size(i) ? 1 << i : 0;
+      }
+    }
+  }
+  if (left.dim() == 4) {
+    if (non_broadcast_mask == 0 || non_broadcast_mask == 2 ||
+        non_broadcast_mask == 8 || non_broadcast_mask == 9 ||
+        non_broadcast_mask == 13 || non_broadcast_mask == 15) {
+      return true;
+    }
+  } else if (left.dim() == 3) {
+    if (non_broadcast_mask == 0 || non_broadcast_mask == 2 ||
+        non_broadcast_mask == 4 || non_broadcast_mask == 5 ||
+        non_broadcast_mask == 7) {
+      return true;
+    }
+  } else if (left.dim() == 2) {
+    if (non_broadcast_mask == 0 || non_broadcast_mask == 2 ||
+        non_broadcast_mask == 3) {
+      return true;
+    }
+  }
+
+  return false;
+}
 //! function: sumproduct_pair
 /*!
  *
@@ -266,13 +333,19 @@ static Tensor sumproduct_pair(
   left = left.permute(lpermutation).reshape(left_shape);
   right = right.permute(rpermutation).reshape(right_shape);
 
-  // Tensor result = at::bmm(left, right);
-  auto _input = arg.is_contiguous() ? arg : arg.contiguous();
-  ideep::tensor onednn_input = itensor_view_from_dense(_input);
-  auto op_attr = ideep::attr_t::fuse_binary(
-      dnnl::algorithm::binary_add, onednn_input.get_desc());
-  Tensor result =
-      bmm_impl(left, right, at::Tensor(), op_attr, {onednn_input}, 1.0f);
+  // now we do the computation
+  Tensor result;
+  bool is_fallback_post_add = false;
+  if (is_add_broadcast_supported_by_onednn(left, right, arg)) {
+    auto _input = arg.is_contiguous() ? arg : arg.contiguous();
+    ideep::tensor onednn_input = itensor_view_from_dense(_input);
+    auto op_attr = ideep::attr_t::fuse_binary(
+        dnnl::algorithm::binary_add, onednn_input.get_desc());
+    result = bmm_impl(left, right, at::Tensor(), op_attr, {onednn_input}, 1.0f);
+  } else {
+    result = at::matmul(left, right);
+    is_fallback_post_add = true;
+  }
 
   result = result.view(out_size).permute(opermutation);
 
@@ -286,6 +359,13 @@ static Tensor sumproduct_pair(
       }
     }
     result = result.view(sizes);
+  }
+
+  // if fallback, add op should be done after einsum has finalize the result,
+  // like the result may have another view if "keepdim" is false
+  if (is_fallback_post_add) {
+    auto f_alpha = alpha.to<float>();
+    result = result + f_alpha * add_arg;
   }
   return result;
 }
@@ -607,34 +687,30 @@ einsum_prepare(
   }
 
   // Compute result
-  Tensor result = permuted_operands[0];
-
-  // Fast path for when an operand has zero sized dim
+  // Sum out or squeeze dimensions that are size 1 for all later operands
   int64_t dim = out_size;
   for (int64_t i = dim; i < perm_index; ++i, ++dim) {
     if (dim_last_op[i] == 0) {
-      if (result.size(dim) == 1) {
-        result = permuted_operands[0].squeeze(dim--);
+      if (permuted_operands[0].size(dim) == 1) {
+        permuted_operands[0] = permuted_operands[0].squeeze(dim--);
       } else {
-        result = permuted_operands[0].sum(dim--);
+        permuted_operands[0] = permuted_operands[0].sum(dim--);
       }
     }
   }
-  auto i = 1;
 
-  Tensor operand = permuted_operands[i];
+  // we only process two operands, so the operands index is from [0, 1]
   std::vector<int64_t> sum_dims;
-
   // Sum out or squeeze dimensions that are size 1 for all later operands
   dim = out_size;
   for (int64_t j = dim; j < perm_index; ++j, ++dim) {
-    if (dim_last_op[j] < i) {
-      operand = operand.squeeze(dim);
+    if (dim_last_op[j] < 1) {
+      permuted_operands[1] = permuted_operands[1].squeeze(dim);
       --dim;
-    } else if (dim_last_op[j] == i) {
-      if (result.size(dim) == 1) {
-        operand = operand.sum(dim);
-        result = result.squeeze(dim);
+    } else if (dim_last_op[j] == 1) {
+      if (permuted_operands[0].size(dim) == 1) {
+        permuted_operands[1] = permuted_operands[1].sum(dim);
+        permuted_operands[0] = permuted_operands[0].squeeze(dim);
         --dim;
       } else {
         sum_dims.push_back(dim);
@@ -666,6 +742,7 @@ at::Tensor einsum_binary(
     const c10::List<at::Tensor>& operands,
     const at::Tensor& add_arg,
     const c10::Scalar& alpha) {
+  RECORD_FUNCTION("dil_einsum_binary", c10::ArrayRef<c10::IValue>({}));
   auto prepare_res = einsum_prepare(equation, operands);
   bool has_zero_size_dim = std::get<0>(prepare_res);
   auto out_size = std::get<1>(prepare_res);
@@ -706,6 +783,7 @@ at::Tensor einsum_binary(
         add_arg,
         alpha);
   }
+
   return result;
 }
 

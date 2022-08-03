@@ -1,10 +1,12 @@
 #include "prepare_dequant.h"
 #include "operator.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 class OpSplitter {
  private:
@@ -171,4 +173,4 @@ void SaveDequantInformation(std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

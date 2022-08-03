@@ -117,6 +117,7 @@ set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -O0
 set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -O0")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # ---[ Main build
 
@@ -124,7 +125,6 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
-
 
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/intel_extension_for_pytorch)
@@ -137,6 +137,9 @@ include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
 # TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
 # include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
 # include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
+# Set installed MKL install dir
+include_directories(${MKL_INSTALL_DIR}/include)
 
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
@@ -197,6 +200,10 @@ if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
   get_target_property(DNNL_GRAPHCOMPILER_LLVM_LIB dnnl_graphcompiler_llvm_lib INTERFACE_LINK_LIBRARIES)
   target_link_libraries(${PLUGIN_NAME} PUBLIC graphcompiler ${DNNL_GRAPHCOMPILER_LLVM_LIB})
 endif()
+
+target_link_libraries(${PLUGIN_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_intel_lp64.a)
+target_link_libraries(${PLUGIN_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_gnu_thread.a)
+target_link_libraries(${PLUGIN_NAME} PUBLIC ${MKL_INSTALL_DIR}/lib/libmkl_core.a)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
@@ -213,4 +220,3 @@ else()
 endif()
 
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
-install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

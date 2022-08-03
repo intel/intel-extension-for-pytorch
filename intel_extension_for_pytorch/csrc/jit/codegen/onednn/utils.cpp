@@ -1,10 +1,12 @@
 #include "utils.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 namespace utils {
+
+using namespace torch::jit;
 
 bool isViewOp(Node* n) {
   switch (n->kind()) {
@@ -33,4 +35,4 @@ bool isEltwiseOp(Node* n) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

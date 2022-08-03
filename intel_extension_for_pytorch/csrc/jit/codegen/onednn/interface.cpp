@@ -1,6 +1,5 @@
 #include "interface.h"
 #include <oneapi/dnnl/dnnl_graph.hpp>
-#include "csrc/utils/ipex_op_profile.h"
 #include "defer_size_check.h"
 #include "fusion_group_name.h"
 #include "graph_fuser.h"
@@ -24,12 +23,12 @@
 #include <torch/csrc/jit/runtime/graph_executor.h>
 #include <torch/csrc/jit/runtime/operator_options.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
-
 namespace fuser {
 namespace onednn {
 
+using namespace torch::jit;
 namespace {
 thread_local bool llga_fp32_bf16_enabled = false;
 }
@@ -116,17 +115,19 @@ bool getLlgaWeightCacheEnabled() {
 } // namespace onednn
 } // namespace fuser
 
+using namespace torch::jit;
+
 Operation createLlgaKernel(const Node* node) {
   auto kernel = std::make_shared<fuser::onednn::LlgaKernel>(node);
   return [kernel](Stack* stack) {
-    IPEX_RECORD_FUNCTION(kernel->profileName(), c10::ArrayRef<c10::IValue>());
+    RECORD_FUNCTION(kernel->profileName(), c10::ArrayRef<c10::IValue>());
 
     kernel->run(*stack);
     return 0;
   };
 }
 
-RegisterOperators LLGAFusionGroupOp({
+torch::jit::RegisterOperators LLGAFusionGroupOp({
     torch::jit::Operator(
         Symbol::fromQualString(fuser::onednn::LlgaFusionGroupName()),
         createLlgaKernel,
@@ -135,7 +136,7 @@ RegisterOperators LLGAFusionGroupOp({
 
 Operation createLlgaGuardKernel(const Node* node) {
   return [node](Stack* stack) {
-    IPEX_RECORD_FUNCTION(
+    RECORD_FUNCTION(
         fuser::onednn::LlgaGuardName(), c10::ArrayRef<c10::IValue>());
 
     GRAPH_DEBUG("Guarding node: ", node->kind().toQualString());
@@ -181,7 +182,7 @@ Operation createLlgaGuardKernel(const Node* node) {
   };
 }
 
-RegisterOperators LLGAGuardOp({
+torch::jit::RegisterOperators LLGAGuardOp({
     torch::jit::Operator(
         Symbol::fromQualString(fuser::onednn::LlgaGuardName()),
         createLlgaGuardKernel,
@@ -189,4 +190,4 @@ RegisterOperators LLGAGuardOp({
 });
 
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

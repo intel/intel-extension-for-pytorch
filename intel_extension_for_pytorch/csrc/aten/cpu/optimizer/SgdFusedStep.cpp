@@ -2,7 +2,6 @@
 
 #include <torch/csrc/autograd/function.h>
 #include <torch/extension.h>
-#include "csrc/utils/ipex_op_profile.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -34,8 +33,7 @@ c10::optional<at::Tensor> sgd_fused_step(
     double weight_decay,
     double dampening,
     bool nesterov) {
-  IPEX_RECORD_FUNCTION(
-      "torch_ipex::sgd_fused_step", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("torch_ipex::sgd_fused_step", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
       weight_decay >= 0, "Expect weight_decay >= 0.0, got ", weight_decay);

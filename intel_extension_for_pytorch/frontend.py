@@ -164,8 +164,8 @@ def optimize(
             different performances with different dtypes/shapes. Default value
             is False. Intel® Extension for PyTorch* will try to optimize the
             kernel selection for better performance if this knob is set to
-            ``True``. There might be regressions at current stage. The default
-            value is ``None``. Explicitly setting this knob overwrites the
+            ``True``. You might get better performance at the cost of extra memory usage.
+            The default value is ``None``. Explicitly setting this knob overwrites the
             configuration set by ``level`` knob.
 
     Returns:
@@ -242,10 +242,6 @@ def optimize(
         opt_properties.fuse_update_step = fuse_update_step
     if auto_kernel_selection is not None:
         opt_properties.auto_kernel_selection = auto_kernel_selection        
-    if sample_input is not None:
-        if isinstance(sample_input, torch.Tensor):
-            sample_input = (sample_input,)
-        utils._weight_prepack.record_input_shape_for_prepack(model, sample_input)
 
     if inplace:
         optimized_model = model
@@ -253,6 +249,11 @@ def optimize(
     else:
         optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
 
+    if sample_input is not None:
+        if isinstance(sample_input, torch.Tensor):
+            sample_input = (sample_input,)
+        utils._weight_prepack.record_input_shape_for_prepack(optimized_model, sample_input)
+    
     if not model.training:
         if opt_properties.conv_bn_folding:
             try:

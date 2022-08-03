@@ -107,10 +107,6 @@ at::Tensor pack(ContextLinear& context, const at::Tensor& tensor);
 // Unpack given tensor to same format with original weight format
 at::Tensor unpack(ContextLinear& context, const at::Tensor& tensor);
 
-// query best weight format by given input size, and re-pack the mkldnn weight
-// to newly queried format
-void repack_for(ContextLinear& context, int64_t batch_size);
-
 } // namespace linear
 } // namespace detail
 } // namespace cpu

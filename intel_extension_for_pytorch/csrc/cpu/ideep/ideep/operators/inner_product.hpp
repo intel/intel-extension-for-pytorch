@@ -129,16 +129,8 @@ struct inner_product_forward
       const prop_kind aprop_kind,
       const lowp_kind alowp_kind,
       const engine& aengine) {
-    // workaround: src and weights from caffe2 may have different dims.
-    // It would be better for caffe2 to do this reshape anyway.
-    auto src_ = src;
-    if (src.ndims() != weights.ndims()) {
-      auto new_dims = weights.get_dims();
-      new_dims[0] = src.get_dim(0);
-      src_.reshape(new_dims);
-    }
     compute_impl_<with_bias>(
-        src_,
+        src,
         weights,
         bias,
         dst,
@@ -173,87 +165,19 @@ struct inner_product_forward
     auto weights_scales_in =
         weights.has_scale() ? weights.get_scale() : weights_scales;
 
-    // TODO(xpz): Remove int8 inner product implementation. We are switching to
-    // matmul for quantized *mm ops
-    if (!weights_scales_in.empty()) {
+    op_attr = attr;
+
+    IDEEP_ENFORCE(
+        utils::one_of(weights.get_data_type(), data_type::f32, data_type::bf16),
+        "Incorrect data type in weights");
+    dst_data_type = dst.get_data_type();
+    src_desc = src.get_desc().to_type(src.get_data_type());
+    weights_desc = weights.get_desc().to_type(src.get_data_type());
+    if (with_bias) {
       IDEEP_ENFORCE(
-          alowp_kind == u8s8 || alowp_kind == s8s8, "Unsupported lowp kind");
-
-      auto src_scales_in = src.has_scale() ? src.get_scale()
-          : src_scales.empty()             ? IDEEP_DEF_SCALE
-                                           : src_scales;
-
-      src_desc = {
-          src.get_dims(),
-          alowp_kind == u8s8 ? data_type::u8 : data_type::s8,
-          tag::any};
-      if (src.get_data_type() == data_type::f32) {
-        src_attr = {0, src_scales_in};
-      }
-
-      int scale_size = weights_scales_in.size() > 1 ? weights.get_dim(0) : 1;
-
-      weights_desc = {weights.get_dims(), data_type::s8, tag::any};
-      if (weights.get_data_type() == data_type::f32) {
-        weights_attr = {
-            utils::tensor_scale_mask(scale_size, false), weights_scales_in};
-      }
-
-      // determine dst data type
-      if (dst_scales.empty() || dst_scales == IDEEP_DEF_SCALE) {
-        dst_data_type = data_type::f32;
-      } else if (attr.non_negitive_output()) {
-        dst_data_type = data_type::u8;
-      } else {
-        dst_data_type = data_type::s8;
-      }
-
-      // fill primitive attr
-      scale_t op_scales(scale_size), bias_scales(scale_size);
-      dst_scales_in = dst_scales.empty() || dst_data_type == data_type::f32
-          ? IDEEP_DEF_SCALE
-          : dst_scales;
-      for (int i = 0; i < scale_size; i++) {
-        bias_scales[i] = src_scales_in[0] * weights_scales_in[i];
-        op_scales[i] = dst_scales_in[0] / bias_scales[i];
-      }
-      op_attr.set_output_scales(utils::op_scale_mask(scale_size), op_scales);
-
-      if (with_bias) {
-        bias_desc = {bias.get_dims(), data_type::s32, format_tag::any};
-        if (bias.get_data_type() == data_type::f32) {
-          bias_attr = {
-              utils::tensor_scale_mask(scale_size, false), bias_scales};
-        }
-      }
-    } else {
-      op_attr = attr;
-      if (src.has_scale()) {
-        auto src_scale = src.get_scale();
-        src_scale[0] = 1.f / src_scale[0];
-        src_attr = {0, src_scale};
-      }
-
-      IDEEP_ENFORCE(
-          utils::one_of(
-              weights.get_data_type(), data_type::f32, data_type::bf16),
-          "Incorrect data type in weights");
-      if (dst.is_empty()) {
-        // align weights data type with src
-        dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
-                                                               : data_type::f32;
-      } else {
-        dst_data_type = dst.get_data_type();
-      }
-      src_desc = src.get_desc().to_type(src.get_data_type());
-      weights_desc = weights.get_desc().to_type(src.get_data_type());
-      if (with_bias) {
-        IDEEP_ENFORCE(
-            utils::one_of(
-                bias.get_data_type(), data_type::f32, data_type::bf16),
-            "Incorrect data type in bias");
-        bias_desc = bias.get_desc();
-      }
+          utils::one_of(bias.get_data_type(), data_type::f32, data_type::bf16),
+          "Incorrect data type in bias");
+      bias_desc = bias.get_desc();
     }
 
     op_attr.set_fpmath_mode();
@@ -270,19 +194,6 @@ struct inner_product_forward
         with_bias,
         op_attr,
         aprop_kind);
-
-    // [ Note output buffer ]
-    // In this case, dst is an empty ideep tensor, can be re-init
-    // If dst is not empty, ideep must write result to dst's memory and it is
-    // caller's duty to make sure dst is big enough to hold the result
-    if (dst.is_empty()) {
-      dst.init(pd.dst_desc());
-    }
-
-    if (!dst_scales.empty() &&
-        utils::one_of(dst.get_data_type(), data_type::u8, data_type::s8)) {
-      dst.set_scale(dst_scales_in);
-    }
 
     tensor scratchpad(pd.scratchpad_desc());
 
@@ -302,10 +213,6 @@ struct inner_product_forward
            {DNNL_ARG_DST, dst},
            {DNNL_ARG_SCRATCHPAD, scratchpad}});
     }
-
-    if (attr.non_negitive_output() && dst.get_data_type() == data_type::s8) {
-      dst.to_type(data_type::u8);
-    }
   }
 };
 
@@ -318,17 +225,8 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
       const dims& diff_src_dims,
       tensor& diff_src,
       const engine& aengine = engine::cpu_engine()) {
-    auto weights_ = weights;
-    // workaround: diff_src and weights from caffe2 may have different dims.
-    // It would be better for caffe2 to do this reshape anyway.
-    if (diff_src_dims.size() != weights.ndims()) {
-      auto new_dims = diff_src_dims;
-      new_dims[0] = weights.get_dim(0);
-      weights_.reshape(new_dims);
-    }
-
     auto diff_dst_desc = diff_dst.get_desc();
-    auto weights_desc = weights_.get_desc();
+    auto weights_desc = weights.get_desc();
     auto diff_src_desc = diff_src.get_desc().to_type(diff_dst.get_data_type());
 
     auto forward_hints = inner_product_forward::get_primitive_desc(
@@ -359,7 +257,7 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     super(pd).execute(
         stream::default_stream(),
         {{DNNL_ARG_DIFF_DST, diff_dst},
-         {DNNL_ARG_WEIGHTS, weights_},
+         {DNNL_ARG_WEIGHTS, weights},
          {DNNL_ARG_DIFF_SRC, diff_src},
          {DNNL_ARG_SCRATCHPAD, scratchpad}});
   }
@@ -415,9 +313,9 @@ struct inner_product_backward_weights
     // for forward hint, weights_desc should have same data_type
     // with other input desc, expect for bias_desc
     auto weights_desc = diff_weights_desc;
-    if (diff_weight_type_in != diff_dst_type) {
+    /* if (diff_weight_type_in != diff_dst_type) {
       weights_desc = weights_desc.to_type(diff_dst_type);
-    }
+    } */
     auto forward_hints = inner_product_forward::get_primitive_desc(
         src_desc, weights_desc, diff_dst_desc, diff_bias_desc, with_diff_bias);
 
@@ -438,10 +336,6 @@ struct inner_product_backward_weights
               aengine,
               forward_hints);
 
-    if (diff_weights.is_empty()) {
-      diff_weights.init(pd.diff_weights_desc());
-    }
-
     tensor scratchpad(pd.scratchpad_desc());
 
     exec_args args{
@@ -451,11 +345,7 @@ struct inner_product_backward_weights
         {DNNL_ARG_SCRATCHPAD, scratchpad}};
 
     if (with_diff_bias) {
-      if (diff_bias.is_empty()) {
-        diff_bias.init(pd.diff_bias_desc());
-      } else {
-        diff_bias.init(pd.diff_bias_desc(), diff_bias.get_data_handle());
-      }
+      diff_bias.init(pd.diff_bias_desc(), diff_bias.get_data_handle());
       args.insert({DNNL_ARG_DIFF_BIAS, diff_bias});
     }
 

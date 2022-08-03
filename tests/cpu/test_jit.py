@@ -1,5 +1,7 @@
 from __future__ import division
 from __future__ import print_function
+from logging import exception
+import logging
 
 '''
 From PyTorch:
@@ -1124,7 +1126,7 @@ class Tester(TestCase):
                 if kind_not_in_graph is not None:
                     self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
-    def _test_onednn_fp32(self, model, input, kind_in_graph=None, kind_not_in_graph=None, prec=5e-3):
+    def _test_mkl_fp32(self, model, input, kind_in_graph=None, prec=5e-3):
         model = model.eval()
         model = ipex.optimize(model, dtype=torch.float32, auto_kernel_selection=True)
         with torch.no_grad():
@@ -1138,10 +1140,6 @@ class Tester(TestCase):
             
             if kind_in_graph is not None:
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-            
-            if kind_not_in_graph is not None:
-                self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
-
 
     def _test_output_bf16(self, base_model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None, levels=['O0', 'O1'], use_channels_last=[True, False], use_te=[True, False]):
         modelName = base_model.__class__.__name__
@@ -1248,29 +1246,31 @@ class Tester(TestCase):
 #call mkl path(fp32)
         model = ipex.optimize(origin_model, dtype=torch.float32)
         ori_res = model(test_val1)
-        model_jit = torch.jit.trace(model,(test_val1))
-        graph_ori = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_ori, ["aten::linear"])
-        self.assertEqual(linear_count_ori, 4)
-        model_jit = torch.jit.freeze(model_jit)
-        jit_res = model_jit(test_val1)
-        self.assertEqual(ori_res, jit_res)
-        graph_opt = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
-        self.assertEqual(linear_count_ori, 2)
-#call onednn path(fp32)
+        with torch.no_grad():
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["aten::linear"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res, jit_res)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
+            self.assertEqual(linear_count_ori, 2)
+#call prepack mkl path(fp32)
         model = ipex.optimize(origin_model, dtype=torch.float32, auto_kernel_selection=True)
         ori_res = model(test_val1)
-        model_jit = torch.jit.trace(model,(test_val1))
-        graph_ori = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_linear"])
-        self.assertEqual(linear_count_ori, 4)
-        model_jit = torch.jit.freeze(model_jit)
-        jit_res = model_jit(test_val1)
-        self.assertEqual(ori_res, jit_res)
-        graph_opt = str(model_jit.graph_for(test_val1))
-        linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
-        self.assertEqual(linear_count_ori, 2)
+        with torch.no_grad():
+            model_jit = torch.jit.trace(model,(test_val1))
+            graph_ori = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_ori, ["torch_ipex::ipex_MKLSGEMM"])
+            self.assertEqual(linear_count_ori, 4)
+            model_jit = torch.jit.freeze(model_jit)
+            jit_res = model_jit(test_val1)
+            self.assertEqual(ori_res, jit_res)
+            graph_opt = str(model_jit.graph_for(test_val1))
+            linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::mkl_sgemm_run"])
+            self.assertEqual(linear_count_ori, 2)
 
         model = ipex.optimize(origin_model, dtype=torch.bfloat16)
         test_val1 = test_val1.bfloat16()
@@ -1307,6 +1307,22 @@ class Tester(TestCase):
                 node = "ipex::add_layernorm"
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
 
+                # test norm dim is not last dim, expect RuntimeError
+                # here in the case, norm dim is mid dim with seq_len size, not the last dim
+                # which is expected as unsupported RuntimeError
+                try:
+                    model_except_error = AddLayerNorm(seq_len)
+                    torch.jit.trace(model_except_error,(a, b))
+                    #it is not excepted if no RuntimeError exception is found
+                    #so end with assert
+                    self.assertTrue(False)
+                except RuntimeError as e:
+                    expected_error = f"Given normalized_shape=[{seq_len}], expected input with shape [*, {seq_len}]"
+                    self.assertTrue(expected_error in str(e))
+                    logging.info("expected RuntimeError is found")
+                finally:
+                    pass
+
                 # not contiguous
                 a_not_cont = a.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
                 b_not_cont = b.clone().detach().unsqueeze(0).to(memory_format=torch.channels_last).squeeze(0)
@@ -1318,6 +1334,19 @@ class Tester(TestCase):
                 self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
                 self.assertEqual(jit_res, ori_res)
 
+                #input bf16, weight fp32
+                a_bf16 = a.to(torch.bfloat16)
+                b_bf16 = b.to(torch.bfloat16)
+                with torch.cpu.amp.autocast():
+                    ori_res = model(a_bf16, b_bf16)
+                    model_jit = jit_model = torch.jit.trace(model,(a, b))
+                    trace_graph = jit_model.graph_for(a, b)
+                    jit_res = jit_model(a_bf16, b_bf16)
+                    node = "ipex::add_layernorm"
+                    self.assertTrue(any(n.kind() == node for n in trace_graph.nodes()))
+                    self.assertEqual(jit_res, ori_res, prec=5e-2)
+
+                #input weight both bf16
                 a_bf16 = a.to(torch.bfloat16)
                 b_bf16 = b.to(torch.bfloat16)
                 w_bf16 = w.to(torch.bfloat16)
@@ -2719,8 +2748,8 @@ class Tester(TestCase):
                 trace_graph = traced_model.graph_for(x)
 
                 if auto_select_kernel and level == 'O1':
-# for auto_select_kernel is True and level is O1, we will use ipex linear
-                    self.assertTrue(any(n.kind() == 'ipex_prepack::linear_relu_run' for n in trace_graph.nodes()))
+# for auto_select_kernel is True and level is O1, we will use ipex prepacked MKL linear
+                    self.assertTrue(any(n.kind() == 'ipex_prepack::mkl_sgemm_run' for n in trace_graph.nodes()))
                 else:
 # auto_select_kernel is false, we will use mkl linear
                     self.assertTrue(any(n.kind() == 'aten::linear' for n in trace_graph.nodes()))
@@ -2894,11 +2923,10 @@ class Tester(TestCase):
                     m,
                     x,
                     kind_in_graph="aten::linear")
-                self._test_onednn_fp32(
+                self._test_mkl_fp32(
                     m,
                     x,
-                    kind_in_graph="ipex_prepack::linear_%s_run" % ipex_eltwise_op,
-                    kind_not_in_graph="ipex_prepack::linear_prepack")                
+                    kind_in_graph="ipex_prepack::mkl_sgemm_run")
                 if bf16_supported:
                     self._test_output_bf16(
                         m,
@@ -2943,6 +2971,16 @@ class Tester(TestCase):
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="aten::linear")
+        self._test_mkl_fp32(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_output_bf16(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_not_in_graph="aten::linear",
+            kind_in_graph="ipex_prepack::linear_add_run",
+            prec=5e-2)
 
     def test_output_linear_add_relu(self):
         for inplace in [True, False]:
@@ -2951,12 +2989,11 @@ class Tester(TestCase):
             self._test_output(
                 m,
                 x,
-                kind_in_graph="aten::linear")        
-            self._test_onednn_fp32(
+                kind_in_graph="aten::linear")
+            self._test_mkl_fp32(
                 m,
                 x,
-                kind_in_graph="ipex_prepack::linear_add_relu_run",
-                kind_not_in_graph="ipex_prepack::linear_add_run")                
+                kind_in_graph="ipex_prepack::mkl_sgemm_run")
             self._test_output_bf16(
                 m,
                 x,
@@ -2983,20 +3020,19 @@ class Tester(TestCase):
             kind_in_graph="aten::linear")
 
     def test_output_linear_swish(self):
-        self._test_onednn_fp32(
+        self._test_mkl_fp32(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
-
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_mkl_fp32(
+            LinearSigmoidMul(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex_prepack::mkl_sgemm_run")
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex_prepack::linear_swish_run",
             prec=5e-3)
-        self._test_onednn_fp32(
-            LinearSigmoidMul(3, 32, bias=False),
-            torch.rand(32, 3),
-            kind_in_graph="ipex_prepack::linear_swish_run")
         self._test_output_bf16(
             LinearSigmoidMul(3, 32, bias=False),
             torch.rand(32, 3),
@@ -3159,13 +3195,13 @@ class Tester(TestCase):
             model = model.eval()
             model = ipex.optimize(model, dtype=torch.float32)
             with torch.no_grad():
-                res_ref = model(input1, input2, bias)
                 tr_model = torch.jit.trace(model, (input1, input2, bias))
                 tr_model = torch.jit.freeze(tr_model)
                 tr_model(input1, input2, bias)
                 tr_model(input1, input2, bias)
                 trace_graph = tr_model.graph_for(input1, input2, bias)
                 res_jit = tr_model(input1, input2, bias,)
+                res_ref = model(input1, input2, bias)
                 self.assertEqual(res_ref, res_jit, prec)
                 self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
@@ -3236,6 +3272,103 @@ class Tester(TestCase):
         model_v2 = EinsumAdd("mc,cn->mn")
         _test_fp32(model_v2, input1, input2, bias1)
         
+        bias1 = torch.randn(1)
+        input1 = torch.randn(1024, 1)
+        input2 = torch.randn(1024,1024)
+        model_v2 = EinsumAdd("mc,cc->mc")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(1)
+        input1 = torch.randn(1024, 1)
+        input2 = torch.randn(1024)
+        model_v2 = EinsumAdd("mc,c->mc")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(1,1)
+        input1 = torch.randn(1,1)
+        input2 = torch.randn(1)
+        model_v2 = EinsumAdd("mc,c->m")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        bias1 = torch.randn(2)
+        input1 = torch.randn(2)
+        input2 = torch.tensor(2)
+        model_v2 = EinsumAdd("m,...->m")
+        _test_fp32(model_v2, input1, input2, bias1)
+
+        # this case is testing the repeated dim c meeting unmatched size during runtime
+        # which is excepted as a RuntimeError
+        try:
+            bias1 = torch.randn(1)
+            input1 = torch.randn(1024, 1)
+            input2 = torch.randn(1024, 512)
+            input2_fake = torch.randn(1024, 1024)
+            model_v2 = EinsumAdd("mc,cc->mc").eval()
+            model_v2 = ipex.optimize(model_v2, dtype=torch.float32)
+            with torch.no_grad():
+                tr_model = torch.jit.trace(model_v2, (input1, input2_fake, bias1))
+                tr_model = torch.jit.freeze(tr_model)
+                tr_model(input1, input2_fake, bias1)
+                tr_model(input1, input2, bias1)
+            #it is not excepted if no RuntimeError exception is found
+            #so end with assert
+            self.assertTrue(False)
+        except RuntimeError as e:
+            expected_error = f"subscript c is repeated for operand 1 but the sizes don't match"
+            self.assertTrue(expected_error in str(e))
+            logging.info("expected RuntimeError is found")
+        finally:
+            pass
+
+        # this case is testing the broadcast dim b meeting remapped shape during runtime
+        # which is excepted as a RuntimeError
+        try:
+            bias1 = torch.randn(2)
+            input1 = torch.randn(2)
+            input2 = torch.randn(4, 4)
+            input2_fake = torch.randn(2, 4)
+            model_v2 = EinsumAdd("b,bj->b").eval()
+            with torch.no_grad():
+                tr_model = torch.jit.trace(model_v2, (input1, input2_fake, bias1))
+                tr_model = torch.jit.freeze(tr_model)
+                tr_model(input1, input2_fake, bias1)
+                tr_model(input1, input2, bias1)
+            #it is not excepted if no RuntimeError exception is found
+            #so end with assert
+            self.assertTrue(False)
+        except RuntimeError as e:
+            expected_error = f"operands do not broadcast with remapped shapes [original->remapped]"
+            self.assertTrue(expected_error in str(e))
+            logging.info("expected RuntimeError is found")
+        finally:
+            pass
+
+        bias1 = torch.randn(2)
+        input1 = torch.randn(2)
+        input2 = torch.randn(2)
+        model_v2 = EinsumAdd("i,j->").eval()
+        model_ipex = ipex.optimize(model_v2, dtype=torch.float32)
+        with torch.no_grad():
+            res_ref = model_v2(input1, input2, bias1)
+            tr_model = torch.jit.trace(model_ipex, (input1, input2, bias1))
+            tr_model = torch.jit.freeze(tr_model)
+            tr_model(input1, input2, bias1)
+            res_jit = tr_model(input1, input2, bias1)
+            self.assertEqual(res_ref, res_jit, prec=1e-3)
+
+        #sum dims > 2
+        bias = torch.randn(1, 7)
+        input1 = torch.randn( 3, 4, 6, 7)
+        input2 = torch.randn( 4, 6, 7)
+        model_v2 = EinsumAdd('sho,ksho->ko')
+        _test_fp32(model_v2, input2, input1, bias)
+
+        bias = torch.randn(1,7)
+        input1 = torch.randn( 3, 6, 7)
+        input2 = torch.randn( 6, 7)
+        model_v2 = EinsumAdd('so,kso->ko')
+        _test_fp32(model_v2, input2, input1, bias)
+
         bias1 = torch.randn(1024)
         input1 = torch.randn(1024, 1024)
         input2 = torch.randn(1024, 1024)
@@ -3266,6 +3399,37 @@ class Tester(TestCase):
         input2 = torch.randn(3)
         model = EinsumAdd(("ij,j"))
         _test_fp32(model, input1, input2, bias)
+
+        bias = torch.randn(1, 4, 49, 49)
+        input1 = torch.randn(8, 4, 49, 32)
+        input2 = torch.randn(8, 4, 49, 32)
+        model_from_vit = EinsumAdd('bhid,bhjd->bhij')
+        _test_fp32(model_from_vit, input1, input2, bias)
+
+        bias = torch.randn(1, 1, 49, 49)
+        input1 = torch.randn(8, 6, 49, 32)
+        input2 = torch.randn(8, 6, 49, 32)
+        model_from_vit_v2 = EinsumAdd('bhid,bhjd->bhij')
+        _test_fp32(model_from_vit_v2, input1, input2, bias)
+
+        bias = torch.randn(8, 1, 1, 49)
+        input1 = torch.randn(8, 6, 49, 32)
+        input2 = torch.randn(8, 6, 49, 32)
+        model_from_vit_alphafold2_v1 = EinsumAdd('bhid,bhjd->bhij')
+        _test_fp32(model_from_vit_alphafold2_v1, input1, input2, bias)
+
+        bias = torch.randn(1, 1, 32)
+        input1 = torch.randn( 6, 50, 32)
+        input2 = torch.randn( 32, 32)
+        model_from_vit_alphafold2_v2 = EinsumAdd('bsh,ho->bso')
+        _test_fp32(model_from_vit_alphafold2_v2, input1, input2, bias)
+
+        bias = torch.randn(6, 1, 50)
+        input1 = torch.randn( 6, 50, 32)
+        input2 = torch.randn( 6, 32, 50)
+        model_from_vit_alphafold2_v3 = EinsumAdd('bsh,bho->bso')
+        _test_fp32(model_from_vit_alphafold2_v3, input1, input2, bias)
+
 
     def test_ipex_softmax(self):
         self._test_output(

@@ -857,70 +857,133 @@ class CPUOPsTester(TestCase):
         ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.FP32, device="cpu")
 
     def test_index_select(self):
-        for dim in [0, 1]:
-            for index_datatype in [torch.int32, torch.int64]:
-                indices = torch.tensor([1], dtype=index_datatype)
+        for index_datatype in [torch.int32, torch.int64]:
+            indices = torch.tensor([1], dtype=index_datatype)
 
-                # test floating types
-                for datatype in [torch.float32, torch.bfloat16, torch.double, torch.float16, torch.complex64, torch.complex128]:
-                    x1 = torch.randn((10, 2), dtype=datatype)
-                    y1 = x1.index_select(dim, indices)
-                    self.assertTrue(y1.dtype == datatype)
+            # test floating types
+            for datatype in [torch.float32, torch.bfloat16, torch.double, torch.float16, torch.complex64, torch.complex128]:
+                for dim in [0, 1]:
+                    x1_1 = torch.randn((10, 2), dtype=datatype)
+                    y1_1 = x1_1.index_select(dim, indices)
+                    self.assertTrue(y1_1.dtype == datatype)
 
-                # test integer types
-                for datatype in [torch.int32, torch.int64, torch.int16, torch.int8, torch.uint8]:
-                    x2 = torch.randint(10, (10, 10), dtype=datatype)
-                    y2 = x2.index_select(dim, indices)
-                    self.assertTrue(y2.dtype == datatype)
+                    x1_2 = torch.randn((10, 10), dtype=datatype)
+                    y1_2 = x1_2.index_select(dim, indices)
+                    self.assertTrue(y1_2.dtype == datatype)
 
-                # test bool
-                x3 = torch.randint(1, (10, 10), dtype=torch.bool)
-                y3 = x3.index_select(dim, indices)
-                self.assertTrue(y3.dtype == torch.bool)
+                    x1_3 = torch.randn((10, 40000), dtype=datatype)
+                    y1_3 = x1_3.index_select(dim, indices)
+                    self.assertTrue(y1_3.dtype == datatype)
+
+                    x1_4 = torch.randn((40000, 5), dtype=datatype)
+                    y1_4 = x1_4.index_select(dim, indices)
+                    self.assertTrue(y1_4.dtype == datatype)
+
+                for dim in [0, 1, 2]:
+                    x1_5 = torch.randn((10, 2, 3), dtype=datatype)
+                    y1_5 = x1_5.index_select(dim, indices)
+                    self.assertTrue(y1_5.dtype == datatype)
+
+                x1_6 = torch.randn((10), dtype=datatype)
+                y1_6 = x1_6.index_select(0, indices)
+                self.assertTrue(y1_6.dtype == datatype)
+
+            # test integer types
+            for datatype in [torch.int32, torch.int64, torch.int16, torch.int8, torch.uint8]:
+                for dim in [0, 1]:
+                    x2_1 = torch.randint(10, (10, 10), dtype=datatype)
+                    y2_1 = x2_1.index_select(dim, indices)
+                    self.assertTrue(y2_1.dtype == datatype)
+
+                    x2_2 = torch.randint(10, (40000, 5), dtype=datatype)
+                    y2_2 = x2_2.index_select(dim, indices)
+                    self.assertTrue(y2_2.dtype == datatype)
+
+                x2_3 = torch.randint(10, (10,), dtype=datatype)
+                y2_3 = x2_3.index_select(0, indices)
+                self.assertTrue(y2_3.dtype == datatype)
+
+            # test bool
+            for dim in [0, 1]:
+                x3_1 = torch.randint(1, (10, 10), dtype=torch.bool)
+                y3_1 = x3_1.index_select(dim, indices)
+                self.assertTrue(y3_1.dtype == torch.bool)
+
+                x3_2 = torch.randint(1, (40000, 5), dtype=torch.bool)
+                y3_2 = x3_2.index_select(dim, indices)
+                self.assertTrue(y3_2.dtype == torch.bool)
+
+            x3_3 = torch.randint(1, (10,), dtype=torch.bool)
+            y3_3 = x3_3.index_select(0, indices)
+            self.assertTrue(y3_3.dtype == torch.bool)
+
+            # out is defined
+            for dim in [0, 1]:
+                x1_5 = torch.randn(10, 2)
+                y1_5 = torch.index_select(x1_5, dim, indices, out=torch.empty(0))
+                self.assertTrue(y1_5.dtype == torch.float32)
 
     def test_cat(self):
-        for dim, size in itertools.product([0, 1], [[2, 1], [2, 2], [5, 10]]):
-            x = torch.randn(size)
-            y = torch.cat([x, x], dim)
+        for datatype in [torch.float32, torch.double, torch.bfloat16]:
+            for dim, size in itertools.product([0, 1], [[2, 1], [2, 2], [5, 10]]):
+                x = torch.randn(size, dtype=datatype)
+                y = torch.cat([x, x], dim)
+                self.assertTrue(y.dtype == datatype)
 
-            # test bfloat16
-            x1 = x.clone().detach().bfloat16()
-            y1 = torch.cat([x1, x1], dim)
-            self.assertTrue(y1.dtype == torch.bfloat16)
-            self.assertEqual(y1, y, prec=0.1)
+            # long input tensor list
+            x1 = torch.randn((2, 2), dtype=datatype)
+            input1 = []
+            for i in range(100):
+                input1.append(x1)
+            y1 = torch.cat(input1, 0)
+            self.assertTrue(y1.size() == torch.Size([200, 2]))
+            self.assertTrue(y1.dtype == datatype)
 
-            # test double
-            x2 = x.clone().detach().double()
-            y2 = torch.cat([x2, x2], dim)
-            self.assertTrue(y2.dtype == torch.double)
-            self.assertEqual(y2, y)
+            # input tensors have different shapes and strides
+            x2 = torch.randn((400, 2), dtype=datatype)
+            input2 = []
+            for i in range(10):
+                input2.append(x1)
+            for i in range(100):
+                input2.append(x2)
+            y2 = torch.cat(input2, 0)
+            self.assertTrue(y2.size() == torch.Size([40020, 2]))
+            self.assertTrue(y2.dtype == datatype)
 
-        # long input tensor list
-        x3 = torch.randn(2, 2)
-        input3 = []
-        for i in range(100):
-            input3.append(x3)
-        y3 = torch.cat(input3, 0)
-        self.assertTrue(y3.size() == torch.Size([200, 2]))
+            x3 = torch.randn((4000, 2), dtype=datatype)
+            input3 = []
+            for i in range(10):
+                input3.append(x1)
+            for i in range(10):
+                input3.append(x3)
+            y3 = torch.cat(input3, 0)
+            self.assertTrue(y3.size() == torch.Size([40020, 2]))
+            self.assertTrue(y3.dtype == datatype)
 
-        # input tensors have different shapes and strides
-        x4 = torch.randn(4, 2)
-        input4 = []
-        for i in range(10):
-            input4.append(x3)
-        for i in range(10):
-            input4.append(x4)
-        y4 = torch.cat(input4, 0)  
-        self.assertTrue(y4.size() == torch.Size([60, 2]))
+            x4 = torch.randn((4, 2), dtype=datatype)
+            input4 = []
+            for i in range(10):
+                input4.append(x1)
+            for i in range(10):
+                input4.append(x4)
+            y4 = torch.cat(input4, 0)  
+            self.assertTrue(y4.size() == torch.Size([60, 2]))
+            self.assertTrue(y4.dtype == datatype)
 
-        # out is defined
-        y5 = torch.cat([x4, x4], 0, out=torch.empty(0))
-        self.assertEqual(y5, torch.cat([x4, x4], 0))
+            # out is defined
+            y5 = torch.cat([x4, x4], 0, out=torch.empty(0, dtype=datatype))
+            self.assertEqual(y5, torch.cat([x4, x4], 0))
+            self.assertTrue(y5.dtype == datatype)
 
-        # one of input tensors is empty
-        x6 = torch.empty(0)
-        y6 = torch.cat([x4, x4, x6], 0)
-        self.assertTrue(y6.size() == torch.Size([8, 2]))
+            y6 = torch.cat([x4, x4], 0, out=torch.empty(0, dtype=torch.float32))
+            self.assertEqual(y6, torch.cat([x4, x4], 0))
+            self.assertTrue(y6.dtype == torch.float32)
+
+            # one of input tensors is empty
+            x7 = torch.empty(0, dtype=datatype)
+            y7 = torch.cat([x4, x4, x7], 0)
+            self.assertTrue(y7.size() == torch.Size([8, 2]))
+            self.assertTrue(y7.dtype == datatype)
 
 
 if __name__ == '__main__':

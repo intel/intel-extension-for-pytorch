@@ -346,6 +346,47 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ['aten::matmul', 'aten::dequantize', 'aten::quantize_per_tensor'])
         self.checkPatterns(graph, patterns)
 
+    def test_mixed_precision_softmax(self):
+        class M(torch.nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x, y, z, a):
+                o = torch.matmul(x, y) / 8.
+                o = o + a.to(o.dtype)
+                o = torch.softmax(o, -1)
+                o = o.matmul(z)
+                return o
+        
+        x = torch.randn(1, 16, 16, 64)
+        y = torch.randn(1, 16, 64, 16)
+        z = torch.randn(1, 16, 16, 64)
+        a = torch.randn(1, 1, 1, 16)
+        m = M()
+        
+        # fp32 in int8 out softmax
+        int8_fp32_patterns = [
+            ["aten::dequantize", "aten::matmul", "aten::div", "aten::add"],
+            ["aten::softmax", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::matmul"],
+        ]          
+        graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, int8_bf16=False)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.checkPatterns(graph, int8_fp32_patterns)        
+
+        # bf16 in int8 out softmax
+        int8_bf16_patterns = [
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul", "aten::div", "aten::add"],
+            ["aten::softmax", "aten::to", "aten::quantize_per_tensor"],
+            ["aten::to", "aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::to", "aten::matmul"],
+        ]        
+        graph = self.checkQuantizeTrace(m, [x, y, z, a], atol=2e-1, int8_bf16=True)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 6)
+        self.checkPatterns(graph, int8_bf16_patterns)
+
 class TestFusionPattern(JitLlgaTestCase):
     def test_conv2d_eltwise(self):
         class M(nn.Module):

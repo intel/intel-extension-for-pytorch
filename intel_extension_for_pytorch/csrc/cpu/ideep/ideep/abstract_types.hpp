@@ -9,7 +9,6 @@
 #include <map>
 #include <string>
 #include <vector>
-#include "allocators.hpp"
 
 namespace ideep {
 
@@ -82,9 +81,7 @@ struct engine : public dnnl::engine {
   static IDEEP_EXPORT engine& gpu_engine();
 
   engine(kind akind = kind::cpu, size_t index = 0)
-      : dnnl::engine(akind, index),
-        malloc(utils::allocator::malloc),
-        free(utils::allocator::free) {}
+      : dnnl::engine(akind, index), malloc(malloc), free(free) {}
 
   void set_allocator(
       const std::function<void*(size_t)>& malloc,

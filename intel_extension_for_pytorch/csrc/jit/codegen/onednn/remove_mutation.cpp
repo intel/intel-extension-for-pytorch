@@ -1,10 +1,12 @@
 #include "remove_mutation.h"
 #include <torch/csrc/jit/passes/remove_mutation.h>
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
+
+using namespace torch::jit;
 
 bool IPEXRemoveMutation::removeTensorMutation() {
   return removeTensorMutation(graph_->block());
@@ -168,4 +170,4 @@ bool IPEXRemoveTensorMutation(const std::shared_ptr<Graph>& graph) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

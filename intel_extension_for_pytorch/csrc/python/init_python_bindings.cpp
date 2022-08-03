@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "intel_extension_for_pytorch/csrc/jit/auto_opt_config.h"
-#include "intel_extension_for_pytorch/csrc/utils/env_settings.h"
 #include "intel_extension_for_pytorch/csrc/utils/fpmath_mode.h"
 #include "intel_extension_for_pytorch/csrc/utils/onednn_utils.h"
 #include "intel_extension_for_pytorch/csrc/utils/rw_lock.h"
@@ -68,11 +67,6 @@ void InitIpexModuleBindings(py::module m) {
     return get_highest_binary_support_isa_level();
   });
 
-  m.def("set_profile_op_enabled", [](bool b_enable) {
-    using namespace torch_ipex;
-    EnvSettings::get_instance().set_settings_profile_op(b_enable);
-  });
-
   m.def("mkldnn_set_verbose", &torch_ipex::utils::onednn_set_verbose);
   m.def("onednn_has_bf16_support", []() {
     return torch_ipex::utils::onednn_has_bf16_type_support();
@@ -101,16 +95,16 @@ void InitIpexModuleBindings(py::module m) {
   // llga path
   m.def(
       "is_llga_fp32_bf16_enabled",
-      &torch::jit::fuser::onednn::is_llga_fp32_bf16_enabled);
+      &torch_ipex::jit::fuser::onednn::is_llga_fp32_bf16_enabled);
   m.def(
       "set_llga_fp32_bf16_enabled",
-      &torch::jit::fuser::onednn::set_llga_fp32_bf16_enabled);
+      &torch_ipex::jit::fuser::onednn::set_llga_fp32_bf16_enabled);
   m.def(
       "_jit_set_llga_weight_cache_enabled",
-      &torch::jit::fuser::onednn::setLlgaWeightCacheEnabled);
+      &torch_ipex::jit::fuser::onednn::setLlgaWeightCacheEnabled);
   m.def(
       "_jit_llga_weight_cache_enabled",
-      &torch::jit::fuser::onednn::getLlgaWeightCacheEnabled);
+      &torch_ipex::jit::fuser::onednn::getLlgaWeightCacheEnabled);
 
   m.def("enable_jit_opt", []() {
     AutoOptConfig::singleton().set_jit_fuse(true);
@@ -121,6 +115,13 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_opt", []() {
     return AutoOptConfig::singleton().get_jit_fuse();
   });
+
+  // BF32
+  py::enum_<FP32MathMode>(m, "FP32MathMode")
+      .value("FP32", FP32MathMode::FP32)
+      .value("TF32", FP32MathMode::TF32)
+      .value("BF32", FP32MathMode::BF32)
+      .export_values();
 
   // runtime
   py::class_<torch_ipex::runtime::FutureTensor>(m, "FutureTensor")
@@ -143,15 +144,16 @@ void InitIpexModuleBindings(py::module m) {
   py::class_<
       torch_ipex::runtime::TaskModule,
       std::shared_ptr<torch_ipex::runtime::TaskModule>>(m, "TaskModule")
-      .def(py::init([](const py::object& module, const py::list& core_list) {
+      .def(py::init([](const py::object& module,
+                       std::shared_ptr<torch_ipex::runtime::CPUPool> cpu_pool) {
         return std::make_shared<torch_ipex::runtime::TaskModule>(
-            module, py::cast<std::vector<int32_t>>(core_list));
+            module, (*cpu_pool));
       }))
       .def(py::init([](const torch::jit::Module& module,
-                       const py::list& core_list,
+                       std::shared_ptr<torch_ipex::runtime::CPUPool> cpu_pool,
                        bool traced_module) {
         return std::make_shared<torch_ipex::runtime::TaskModule>(
-            module, py::cast<std::vector<int32_t>>(core_list), traced_module);
+            module, (*cpu_pool), traced_module);
       }))
       .def(
           "run_sync",
@@ -172,19 +174,17 @@ void InitIpexModuleBindings(py::module m) {
             return self.run_async(std::move(args), std::move(kwargs));
           });
 
-  py::enum_<FP32MathMode>(m, "FP32MathMode")
-      .value("FP32", FP32MathMode::FP32)
-      .value("TF32", FP32MathMode::TF32)
-      .value("BF32", FP32MathMode::BF32)
-      .export_values();
-
+  m.def(
+      "get_process_available_cores",
+      &torch_ipex::runtime::get_process_available_cores);
   m.def("is_runtime_ext_enabled", &torch_ipex::runtime::is_runtime_ext_enabled);
   m.def("init_runtime_ext", &torch_ipex::runtime::init_runtime_ext);
-  m.def("pin_cpu_cores", [](const py::list& core_list) {
-    torch_ipex::runtime::_pin_cpu_cores(
-        py::cast<std::vector<int32_t>>(core_list));
-    return;
-  });
+  m.def(
+      "pin_cpu_cores",
+      [](std::shared_ptr<torch_ipex::runtime::CPUPool> cpu_pool) {
+        torch_ipex::runtime::_pin_cpu_cores((*cpu_pool));
+        return;
+      });
   m.def("is_same_core_affinity_setting", [](const py::list& core_list) {
     return torch_ipex::runtime::is_same_core_affinity_setting(
         // Here converting py::list to std::vector<int32_t> will have the data
@@ -202,11 +202,12 @@ void InitIpexModuleBindings(py::module m) {
         return;
       });
 }
+
 } // namespace
+
 using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
-  EnvSettings::get_instance().initialize_all_settings();
   InitIpexModuleBindings(m);
 }
 

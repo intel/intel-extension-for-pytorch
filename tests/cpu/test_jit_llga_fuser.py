@@ -1,3 +1,5 @@
+import os
+import subprocess
 import unittest
 import itertools
 import torch
@@ -798,7 +800,21 @@ class TestAPI(JitLlgaTestCase):
         
         # set the value back to the default one
         ipex._C._jit_set_llga_weight_cache_enabled(weight_cache_enabled_default_value)
-        
+
+class TestDebugLog(JitLlgaTestCase):
+    def test_fusion_group_name(self):
+        num = 0
+        num_debug_str = 0
+        loc = os.path.dirname(os.path.abspath(__file__))
+        with subprocess.Popen('PYTORCH_JIT_LOG_LEVEL=":>>kernel:>>" python  -u {}/profile_ipex_op.py --llga'.format(loc), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
+            for line in p.stdout.readlines():
+                line = str(line, 'utf-8').strip()
+                if line.__contains__("LLGA_bridge::prepareRunArgs"):
+                    num += 1
+                if line.__contains__("Executing partition"):
+                    num_debug_str += 1
+        self.assertTrue(num == 2 , 'IPEX LLGA op profiling info not found.')
+        self.assertTrue(num_debug_str > 0, 'IPEX LLGA debug info not found')
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision

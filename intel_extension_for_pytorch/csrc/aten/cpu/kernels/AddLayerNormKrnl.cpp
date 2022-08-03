@@ -4,7 +4,6 @@
 //  https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/layer_norm.cpp
 
 #include <csrc/aten/cpu/AddLayerNorm.h>
-#include "csrc/utils/ipex_op_profile.h"
 
 #include <torch/csrc/autograd/function.h>
 #include "csrc/cpu/vec/vec.h"

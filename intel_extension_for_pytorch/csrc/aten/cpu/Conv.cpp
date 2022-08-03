@@ -3,7 +3,6 @@
 #include "WeightPack.h"
 #include "csrc/autocast/autocast_mode.h"
 #include "csrc/cpu/ideep/IDeepConversions.h"
-#include "csrc/utils/ipex_op_profile.h"
 #include "utils/utils.h"
 
 namespace torch_ipex {
@@ -152,7 +151,7 @@ at::Tensor convolution_forward_impl(
 #if defined(IPEX_DISP_OP)
   printf("torch_ipex::convolution_forward_impl\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::convolution_forward_impl", c10::ArrayRef<c10::IValue>({}));
 
   return reinterpret_cast<IpexConvolutionOpContext*>(
@@ -289,9 +288,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> convolution_backward_kernel(
     const bool weight_channels_last,
     std::array<bool, 3> output_mask) {
 #if defined(IPEX_DISP_OP)
-  printf("torch_ipeIPEX_RECORD_FUNCTIONx::convolution_backward\n");
+  printf("torch_ipex::convolution_backward\n");
 #endif
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "torch_ipex::convolution_backward", c10::ArrayRef<c10::IValue>({}));
 
   TORCH_CHECK(
@@ -347,7 +346,7 @@ at::Tensor IPEXConvolutionOp::_forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "IPEXConvolutionOp::_forward", c10::ArrayRef<c10::IValue>({}));
 
   return convolution_forward_impl(input, op_context);
@@ -359,8 +358,7 @@ at::Tensor IPEXConvolutionOp::forward(
     const at::Tensor& weight,
     const c10::optional<at::Tensor>& bias_opt,
     const at::Tensor& op_context) {
-  IPEX_RECORD_FUNCTION(
-      "IPEXConvolutionOp::forward", c10::ArrayRef<c10::IValue>({}));
+  RECORD_FUNCTION("IPEXConvolutionOp::forward", c10::ArrayRef<c10::IValue>({}));
 
   ctx->saved_data["op_context"] = op_context;
   ctx->saved_data["input_requires_grad"] = input.requires_grad();
@@ -375,7 +373,7 @@ at::Tensor IPEXConvolutionOp::forward(
 torch::autograd::variable_list IPEXConvolutionOp::backward(
     torch::autograd::AutogradContext* ctx,
     torch::autograd::variable_list grad_outputs) {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "IPEXConvolutionOp::backward", c10::ArrayRef<c10::IValue>({}));
 
   auto op_context = ctx->saved_data["op_context"].toTensor();

@@ -8,13 +8,13 @@
 #include <ATen/core/functional.h>
 #include <ATen/quantized/Quantizer.h>
 #include <torch/csrc/jit/jit_log.h>
-#include "csrc/utils/ipex_op_profile.h"
 
-namespace torch {
+namespace torch_ipex {
 namespace jit {
 namespace fuser {
 namespace onednn {
 
+using namespace torch::jit;
 using namespace dnnl::graph;
 
 using data_type = dnnl::graph::logical_tensor::data_type;
@@ -158,7 +158,7 @@ ArgSpecs LlgaKernel::initializeOutputSpecs() const {
 std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
     const TensorArgs& inputs,
     TensorArgs& outputs) const {
-  IPEX_RECORD_FUNCTION(
+  RECORD_FUNCTION(
       "LLGA_bridge::prepareRunArgs", c10::ArrayRef<c10::IValue>({}));
 
   RunArgs runInputs, runOutputs;
@@ -202,15 +202,15 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
         GRAPH_DEBUG("Rewrap tensor");
 #endif
         auto llgaImpl =
-            static_cast<at::LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
+            static_cast<LlgaTensorImpl*>(inputTensor.unsafeGetTensorImpl());
         switch (dataType) {
           case data_type::f32:
           case data_type::bf16:
-            inputTensor = at::LlgaTensorImpl::llga_to_aten_tensor(llgaImpl);
+            inputTensor = LlgaTensorImpl::llga_to_aten_tensor(llgaImpl);
             break;
           case data_type::s8:
           case data_type::u8:
-            inputTensor = at::LlgaTensorImpl::llga_to_aten_tensor(
+            inputTensor = LlgaTensorImpl::llga_to_aten_tensor(
                 llgaImpl, spec.get_quantizer());
             break;
           case data_type::s32:
@@ -229,9 +229,9 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
 #ifdef GRAPH_DEBUG_ENABLED
       GRAPH_DEBUG("Between partitions");
 #endif
-      auto tensor = at::empty_llga(spec, opt);
+      auto tensor = empty_llga(spec, opt);
       outputs.push_back(tensor);
-      runOutputs.push_back(at::llga_from_aten_tensor(tensor));
+      runOutputs.push_back(llga_from_aten_tensor(tensor));
     } else {
 #ifdef GRAPH_DEBUG_ENABLED
       GRAPH_DEBUG("Neither opaque nor inplace");
@@ -369,4 +369,4 @@ void LlgaKernel::run(Stack& stack) {
 } // namespace onednn
 } // namespace fuser
 } // namespace jit
-} // namespace torch
+} // namespace torch_ipex

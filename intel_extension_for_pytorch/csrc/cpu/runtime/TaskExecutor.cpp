@@ -3,7 +3,7 @@
 namespace torch_ipex {
 namespace runtime {
 
-TaskExecutor::TaskExecutor(const std::vector<int32_t>& cpu_core_list) {
+TaskExecutor::TaskExecutor(const torch_ipex::runtime::CPUPool& cpu_pool) {
   // Notice: We shouldn't load iomp symbol in sub_thread, otherwise race
   // condition happens.
   if (!is_runtime_ext_enabled()) {
@@ -11,11 +11,10 @@ TaskExecutor::TaskExecutor(const std::vector<int32_t>& cpu_core_list) {
         "Fail to init TaskExecutor. Didn't preload IOMP "
         "before using the runtime API.");
   }
-  this->cpu_core_list = cpu_core_list;
   this->stop = false;
 
   this->worker = std::make_shared<std::thread>([&, this] {
-    _pin_cpu_cores(this->cpu_core_list);
+    _pin_cpu_cores(cpu_pool);
     while (true) {
       std::function<void()> task;
       {

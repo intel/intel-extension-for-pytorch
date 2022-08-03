@@ -30,9 +30,6 @@ struct eltwise_forward : public dnnl::eltwise_forward {
         {aprop_kind, aalgorithm, src_desc, alpha, beta}, op_attr, aengine);
 
     dst.reinit_if_possible(pd.dst_desc());
-    if (src_in.has_scale()) {
-      dst.set_scale(src_in.get_scale());
-    }
     tensor scratchpad(pd.scratchpad_desc());
 
     super(pd).execute(

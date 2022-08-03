@@ -161,6 +161,24 @@ class TestCustomerOps(TestCase):
                 R = ipex.nn.functional.interaction(*A)
             return R
 
+        # test unexpected data types with autocast
+        try:
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                ipex.nn.functional.interaction(*[
+                    torch.randn([128, 128], dtype=torch.float),
+                    torch.randn([128, 128], dtype=torch.double)])
+        except:
+            # expected type error
+            pass
+        try:
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                ipex.nn.functional.interaction(*[
+                    torch.randn([128, 128]).to(torch.half),
+                    torch.randn([128, 128]).to(torch.half)])
+        except:
+            # expected type error
+            pass
+
         dtypes = [torch.float32]
         for dtype in dtypes:
             x1 = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()

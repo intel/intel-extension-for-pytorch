@@ -6,7 +6,10 @@
 #include <oneapi/dnnl/dnnl_graph.hpp>
 #include <torch/csrc/jit/ir/ir.h>
 
-namespace at {
+namespace torch_ipex {
+namespace jit {
+namespace fuser {
+namespace onednn {
 
 struct LlgaTensorDesc {
   using desc = dnnl::graph::logical_tensor;
@@ -46,8 +49,8 @@ struct LlgaTensorDesc {
             {},
             desc::data_type::f32,
             get_property_type(v)) {
-    if (v->type()->isSubtypeOf(TensorType::get())) {
-      auto tt = v->type()->cast<TensorType>();
+    if (v->type()->isSubtypeOf(torch::jit::TensorType::get())) {
+      auto tt = v->type()->cast<torch::jit::TensorType>();
 
       if (tt->scalarType())
         dtype_ = getLlgaDataType(tt->scalarType().value());
@@ -108,7 +111,7 @@ struct LlgaTensorDesc {
     return ret;
   }
 
-  LlgaTensorDesc set_quantizer(QuantizerPtr new_quantizer) {
+  LlgaTensorDesc set_quantizer(at::QuantizerPtr new_quantizer) {
     auto ret = *this;
     ret.quantizer_ = new_quantizer;
     return ret;
@@ -118,13 +121,13 @@ struct LlgaTensorDesc {
     return LlgaTensorDesc(t).set_quantizer(quantizer_);
   }
 
-  QuantizerPtr get_quantizer() {
+  at::QuantizerPtr get_quantizer() {
     return quantizer_;
   }
 
   desc::property_type get_property_type(const torch::jit::Value* v) {
     switch (v->node()->kind()) {
-      case prim::Constant:
+      case torch::jit::prim::Constant:
         return desc::property_type::constant;
       default:
         return desc::property_type::variable;
@@ -200,7 +203,7 @@ struct LlgaTensorDesc {
   desc::property_type property_type_;
   desc::layout_type layout_type_;
   size_t layout_id_;
-  QuantizerPtr quantizer_;
+  at::QuantizerPtr quantizer_;
 };
 
 // Initially, oneDNN Graph also used to have blocked layout for tensors between
@@ -212,7 +215,7 @@ struct LlgaTensorDesc {
 // otherwise expecting.
 struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
   LlgaTensorImpl(
-      Storage&& storage,
+      c10::Storage&& storage,
       const caffe2::TypeMeta& data_type,
       const LlgaTensorDesc& desc);
 
@@ -223,17 +226,22 @@ struct TORCH_API LlgaTensorImpl : public c10::TensorImpl {
   // Override a bunch of methods inherited from TensorImpl to return error
   // messages.
   bool has_storage() const override;
-  static Tensor llga_to_aten_tensor(LlgaTensorImpl* llgaImpl);
-  static Tensor llga_to_aten_tensor(
+  static at::Tensor llga_to_aten_tensor(LlgaTensorImpl* llgaImpl);
+  static at::Tensor llga_to_aten_tensor(
       LlgaTensorImpl* llgaImpl,
-      QuantizerPtr quantizer);
+      at::QuantizerPtr quantizer);
 
  private:
   LlgaTensorDesc desc_;
 };
 
-Tensor empty_llga(const LlgaTensorDesc& desc, const TensorOptions& options);
+at::Tensor empty_llga(
+    const LlgaTensorDesc& desc,
+    const at::TensorOptions& options);
 
-dnnl::graph::tensor llga_from_aten_tensor(const Tensor& tensor);
+dnnl::graph::tensor llga_from_aten_tensor(const at::Tensor& tensor);
 
-} // namespace at
+} // namespace onednn
+} // namespace fuser
+} // namespace jit
+} // namespace torch_ipex

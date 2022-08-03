@@ -1,25 +1,9 @@
-import math
-import random
 import unittest
-from functools import reduce
-
 import torch
-
-import intel_extension_for_pytorch as ipex
-
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
-from torch.nn import Parameter
-import torch.nn.functional as F
-from torch.autograd import gradcheck
-from torch.autograd.gradcheck import gradgradcheck
-from torch._six import inf, nan
-
-from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
-    TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
-    IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
-    IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
+import intel_extension_for_pytorch as ipex
+from common_utils import TestCase
+import itertools
 
 class TestInteractionCases(TestCase):
     def test_interaction(self):
@@ -41,14 +25,15 @@ class TestInteractionCases(TestCase):
             R = torch.cat([x] + [Zflat], dim=1)
             return R
 
-        dtypes=[torch.float32, torch.bfloat16]
-        for dtype in dtypes:
-            x1 = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
+        dtypes = [torch.float32, torch.bfloat16]
+        feature_sizes = [127, 128]
+        for dtype, feature_size in itertools.product(dtypes, feature_sizes):
+            x1 = torch.randn([2048, feature_size]).to(dtype).clone().detach().requires_grad_()
             x2 = x1.clone().detach().requires_grad_()
             ly1 = []
             ly2 = []
             for i in range(0, 26):
-                V = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
+                V = torch.randn([2048, feature_size]).to(dtype).clone().detach().requires_grad_()
                 ly1.append(V)
                 ly2.append(V.clone().detach().requires_grad_())
 
