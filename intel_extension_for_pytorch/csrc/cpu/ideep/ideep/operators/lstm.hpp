@@ -50,6 +50,7 @@ struct lstm_forward_inference : public dnnl::lstm_forward {
 
     // Use user mode scratchpad
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    op_attr.set_fpmath_mode();
 
     auto pd = primitive_desc(
         {aprop,
@@ -177,8 +178,9 @@ struct lstm_forward_training : public dnnl::lstm_forward {
     auto weights_iter_desc = weights_iter.get_desc().to_format_any();
 
     // Use user mode scratchpad
-    auto op_attr = dnnl::primitive_attr();
+    auto op_attr = ideep::attr_t();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    op_attr.set_fpmath_mode();
 
     auto pd = primitive_desc(
         {prop_kind::forward_training,
@@ -337,8 +339,9 @@ struct lstm_backward : public dnnl::lstm_backward {
     auto diff_dst_iter_c_desc = dst_iter_c_desc.to_type(data_type::f32);
 
     // Use user mode scratchpad
-    auto op_attr = dnnl::primitive_attr();
+    auto op_attr = ideep::attr_t();
     op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+    op_attr.set_fpmath_mode();
 
     auto pd = primitive_desc(
         {aprop,
